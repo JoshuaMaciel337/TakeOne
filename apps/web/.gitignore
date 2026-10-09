@@ -1,0 +1,19 @@
+# dependências
+/node_modules
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# diversos
+.DS_Store
+*.pem
+npm-debug.log*
+.env*
+
+# Gerados pelo "next dev" 16 (instruções para agentes); voltam sempre que ele roda
+/AGENTS.md
+/CLAUDE.md

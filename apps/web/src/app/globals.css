@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Cores do TakeOne. Um tema só, escuro, como uma ilha de edição. */
+:root {
+  --to-fundo: #0c0c0f;
+  --to-painel: #15151a;
+  --to-painel-2: #1d1d24;
+  --to-painel-3: #26262f;
+  --to-borda: #2b2b35;
+  --to-texto: #f3f3f6;
+  --to-suave: #9b9ba9;
+  --to-destaque: #ff6a3d;
+  --to-destaque-2: #ff3d77;
+  --to-sucesso: #34d399;
+  --to-aviso: #fbbf24;
+  --to-erro: #f43f5e;
+  --to-gradiente: linear-gradient(135deg, var(--to-destaque) 0%, var(--to-destaque-2) 100%);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-fundo: var(--to-fundo);
+  --color-painel: var(--to-painel);
+  --color-painel-2: var(--to-painel-2);
+  --color-painel-3: var(--to-painel-3);
+  --color-borda: var(--to-borda);
+  --color-texto: var(--to-texto);
+  --color-suave: var(--to-suave);
+  --color-destaque: var(--to-destaque);
+  --color-destaque-2: var(--to-destaque-2);
+  --color-sucesso: var(--to-sucesso);
+  --color-aviso: var(--to-aviso);
+  --color-erro: var(--to-erro);
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sora), var(--font-inter), system-ui, sans-serif;
+}
+
+html {
+  overflow-x: clip;
+}
+
+body {
+  background: var(--to-fundo);
+  color: var(--to-texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--to-destaque) 40%, transparent);
+}
+
+@layer components {
+  .botao-principal {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition
+      hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destaque
+      disabled:cursor-not-allowed disabled:opacity-50;
+    background-image: var(--to-gradiente);
+  }
+
+  .botao-secundario {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-borda bg-painel-2 px-5 py-2.5 text-sm font-semibold
+      text-texto transition hover:bg-painel-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destaque
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .botao-icone {
+    @apply inline-flex size-8 items-center justify-center rounded-md text-suave transition hover:bg-painel-3 hover:text-texto
+      focus-visible:outline-2 focus-visible:outline-destaque disabled:cursor-not-allowed disabled:opacity-40
+      disabled:hover:bg-transparent disabled:hover:text-suave;
+  }
+
+  .cartao {
+    @apply min-w-0 rounded-xl border border-borda bg-painel;
+  }
+
+  .texto-gradiente {
+    background-image: var(--to-gradiente);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
