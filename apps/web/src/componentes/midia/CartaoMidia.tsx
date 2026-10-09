@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertCircle, Loader2, Music, Trash2 } from "lucide-react";
+import { AlertCircle, Loader2, Music, Plus, Trash2 } from "lucide-react";
 
 import { arquivoDaMidia } from "@/lib/api";
+import { TIPO_ARRASTO_MIDIA } from "@/lib/arrasto";
 import { formatarTempo } from "@/lib/formatar";
 import type { Midia } from "@/lib/tipos";
 
@@ -11,6 +12,8 @@ type Props = {
   selecionada?: boolean;
   aoSelecionar?: (midia: Midia) => void;
   aoExcluir?: (midia: Midia) => void;
+  /** No editor: o botão "+" e o arrastar levam a mídia para a linha do tempo. */
+  aoAdicionar?: (midia: Midia) => void;
 };
 
 function situacao(midia: Midia): string {
@@ -24,15 +27,21 @@ function situacao(midia: Midia): string {
 }
 
 /** Miniatura com nome e duração. A capa aparece quando a ingestão termina. */
-export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir }: Props) {
+export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir, aoAdicionar }: Props) {
   const temCapa = midia.arquivos.includes("capa.jpg");
   const pronta = midia.status === "pronta";
+  const adicionavel = Boolean(aoAdicionar) && pronta;
 
   return (
     <div
       className={`group relative min-w-0 overflow-hidden rounded-lg border bg-painel-2 transition ${
         selecionada ? "border-destaque ring-1 ring-destaque" : "border-borda hover:border-suave/50"
       }`}
+      draggable={adicionavel}
+      onDragStart={(evento) => {
+        evento.dataTransfer.setData(`${TIPO_ARRASTO_MIDIA}${midia.id}`, midia.id);
+        evento.dataTransfer.effectAllowed = "copy";
+      }}
     >
       <button
         type="button"
@@ -44,7 +53,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
         <span className="relative flex aspect-video items-center justify-center bg-painel-3">
           {temCapa ? (
             // eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie
-            <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" loading="lazy" />
+            <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" loading="lazy" draggable={false} />
           ) : midia.status === "erro" ? (
             <AlertCircle className="size-6 text-erro" aria-hidden />
           ) : pronta ? (
@@ -78,6 +87,17 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
           title="Excluir"
         >
           <Trash2 className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
+      {adicionavel ? (
+        <button
+          type="button"
+          onClick={() => aoAdicionar!(midia)}
+          className="absolute left-1 top-1 hidden size-7 items-center justify-center rounded-md bg-destaque text-white shadow transition hover:brightness-110 group-hover:flex group-focus-within:flex"
+          aria-label={`Adicionar ${midia.nome} à linha do tempo`}
+          title="Adicionar à linha do tempo"
+        >
+          <Plus className="size-4" aria-hidden />
         </button>
       ) : null}
     </div>

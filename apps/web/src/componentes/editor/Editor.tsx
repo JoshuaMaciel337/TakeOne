@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { LoaderCircle, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
+import { ErroApi } from "@/lib/api";
+import type { Comando } from "@/lib/projeto/comandos";
+import type { Contexto } from "@/lib/projeto/edicao";
+import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
+import { duracaoDoQuadro, quadroMaisProximo, segundosParaTicks, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
 
@@ -13,26 +20,93 @@ import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
 import { PainelPropriedades } from "./PainelPropriedades";
 import { Previa } from "./Previa";
-import { type Proporcao } from "./proporcoes";
+import { useProjeto } from "./useProjeto";
 
 const CONTEUDO = { padrao: 320, minimo: 240, maximo: 520 };
 const PROPRIEDADES = { padrao: 300, minimo: 240, maximo: 440 };
-const LINHA_DO_TEMPO = { padrao: 240, minimo: 150, maximo: 520 };
+const LINHA_DO_TEMPO = { padrao: 260, minimo: 150, maximo: 560 };
+
+/** Relógio da reprodução. O tempo anda pelo relógio do navegador; os vídeos da prévia seguem ele. */
+function useReproducao(duracao: Tick, taxa: Taxa) {
+  const [tempo, setTempo] = useState<Tick>(0);
+  const [tocando, setTocando] = useState(false);
+  const partida = useRef({ tempo: 0, relogio: 0 });
+
+  useEffect(() => {
+    if (!tocando) return;
+    let pedido = 0;
+    const avancar = () => {
+      const t = partida.current.tempo + ((performance.now() - partida.current.relogio) / 1000) * TICKS_POR_SEGUNDO;
+      if (t >= duracao) {
+        setTempo(duracao);
+        setTocando(false);
+        return;
+      }
+      setTempo(Math.round(t));
+      pedido = requestAnimationFrame(avancar);
+    };
+    pedido = requestAnimationFrame(avancar);
+    return () => cancelAnimationFrame(pedido);
+  }, [tocando, duracao]);
+
+  // O limite é aplicado na leitura: logo depois de um comando, `duracao` ainda é a de antes
+  const buscar = useCallback((t: Tick) => {
+    const alvo = Math.round(Math.max(0, Math.min(t, TICK_MAXIMO)));
+    partida.current = { tempo: alvo, relogio: performance.now() };
+    setTempo(alvo);
+  }, []);
+
+  const atual = Math.min(tempo, duracao);
+  const alternar = useCallback(() => {
+    if (tocando) {
+      setTocando(false);
+      setTempo((t) => Math.min(quadroMaisProximo(taxa, t), duracao));
+      return;
+    }
+    if (duracao <= 0) return;
+    const inicio = atual >= duracao ? 0 : atual;
+    partida.current = { tempo: inicio, relogio: performance.now() };
+    setTempo(inicio);
+    setTocando(true);
+  }, [tocando, atual, duracao, taxa]);
+
+  return { tempo: atual, tocando, buscar, alternar };
+}
+
+function novoId(): string {
+  return crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+}
 
 /**
  * As quatro áreas: ferramentas e painel de conteúdo à esquerda, prévia no centro,
  * propriedades à direita e linha do tempo embaixo. No celular, a prévia ocupa o
  * topo, as ferramentas viram uma faixa embaixo e o painel abre por cima.
  */
-export function Editor() {
+export function Editor({ projetoId }: { projetoId: string }) {
   const biblioteca = useMidias();
-  const [nome, setNome] = useState("Projeto sem título");
-  const [proporcao, setProporcao] = useState<Proporcao>("9:16");
   const [ferramenta, setFerramenta] = useState<IdFerramenta>("midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
   const [midiaId, setMidiaId] = useState<string | null>(null);
-  const [tempo, setTempo] = useState(0);
-  const reprodutorRef = useRef<HTMLMediaElement | null>(null);
+  const [selecao, setSelecao] = useState<string[]>([]);
+  const [ima, setIma] = useState(true);
+
+  const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
+  const ctx = useMemo<Contexto>(
+    () => ({
+      novoId,
+      midia: (id) => {
+        const midia = midias.get(id);
+        if (!midia || midia.status !== "pronta" || !midia.duracao) return null;
+        return { duracao: segundosParaTicks(midia.duracao), video: Boolean(midia.video), audio: Boolean(midia.audio) };
+      },
+    }),
+    [midias],
+  );
+
+  const edicao = useProjeto(projetoId, ctx);
+  const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
+  const reproducao = useReproducao(projeto?.duracao ?? 0, projeto?.taxa ?? { num: 30, den: 1 });
+  const { tempo, buscar, alternar } = reproducao;
 
   const [larguraConteudo, setLarguraConteudo] = useTamanhoSalvo("largura-conteudo", CONTEUDO.padrao, CONTEUDO.minimo, CONTEUDO.maximo);
   const [larguraPropriedades, setLarguraPropriedades] = useTamanhoSalvo(
@@ -43,19 +117,90 @@ export function Editor() {
   );
   const [alturaLinha, setAlturaLinha] = useTamanhoSalvo("altura-linha", LINHA_DO_TEMPO.padrao, LINHA_DO_TEMPO.minimo, LINHA_DO_TEMPO.maximo);
 
-  const midia = biblioteca.midias?.find((item) => item.id === midiaId) ?? null;
-  const duracao = midia?.status === "pronta" ? (midia.duracao ?? 0) : 0;
+  // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
+  const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
+  const selecionado = projeto && selecaoValida.length === 1 ? acharClipe(projeto, selecaoValida[0]) : null;
+  const midiaDasPropriedades = selecionado ? (midias.get(selecionado.clipe.midia_id) ?? null) : midiaId ? (midias.get(midiaId) ?? null) : null;
   const ferramentaAtual = FERRAMENTAS.find((item) => item.id === ferramenta)!;
 
-  const selecionarMidia = useCallback((id: string | null) => {
-    setMidiaId(id);
-    setTempo(0);
+  const executar = useCallback(
+    (comando: Comando) => {
+      const resultado = executarNoProjeto(comando);
+      if (resultado?.selecao) setSelecao(resultado.selecao);
+      return resultado;
+    },
+    [executarNoProjeto],
+  );
+
+  /** Pelo botão "+": entra no cursor, e o cursor vai para o fim do clipe novo, como no CapCut. */
+  function adicionarNoCursor(midiaId: string) {
+    const resultado = executar({ comando: "clipe.adicionar", parametros: { midiaId, inicio: tempo } });
+    const novo = resultado?.selecao?.[0] && acharClipe(resultado.projeto, resultado.selecao[0]);
+    if (novo && novo.faixa.tipo === "principal") buscar(fimDoClipe(novo.clipe));
+  }
+
+  const bibliotecaDoEditor = useMemo(
+    () => ({
+      ...biblioteca,
+      excluir: (id: string) =>
+        biblioteca.excluir(id).catch((e) => mostrarAviso(e instanceof ErroApi ? e.message : "Não foi possível excluir a mídia.")),
+    }),
+    [biblioteca, mostrarAviso],
+  );
+
+  const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
+    const alvo = evento.target as HTMLElement | null;
+    if (!projeto || alvo?.closest("input, textarea, select, [contenteditable]")) return;
+    const ctrl = evento.ctrlKey || evento.metaKey;
+    const tecla = evento.key.toLowerCase();
+    const quadro = duracaoDoQuadro(projeto.taxa);
+
+    if (evento.code === "Space") {
+      if (alvo instanceof HTMLButtonElement) alvo.blur();
+      alternar();
+    } else if (ctrl && tecla === "z" && !evento.shiftKey) desfazer();
+    else if (ctrl && (tecla === "y" || (tecla === "z" && evento.shiftKey))) refazer();
+    else if (ctrl && tecla === "s") mostrarAviso("O TakeOne salva sozinho a cada alteração.");
+    else if ((tecla === "s" && !ctrl) || (ctrl && tecla === "b")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
+    else if ((tecla === "delete" || tecla === "backspace") && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
+    else if (ctrl && tecla === "d" && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
+    else if (ctrl && tecla === "a") setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id)));
+    else if (tecla === "arrowleft") buscar(quadroMaisProximo(projeto.taxa, tempo) - (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
+    else if (tecla === "arrowright") buscar(quadroMaisProximo(projeto.taxa, tempo) + (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
+    else if (tecla === "home") buscar(0);
+    else if (tecla === "end") buscar(projeto.duracao);
+    else if (tecla === "escape") setSelecao([]);
+    else if (tecla === "n" && !ctrl) setIma((atual) => !atual);
+    else return;
+    evento.preventDefault();
+  });
+
+  useEffect(() => {
+    const ouvir = (evento: KeyboardEvent) => aoTeclar(evento);
+    window.addEventListener("keydown", ouvir);
+    return () => window.removeEventListener("keydown", ouvir);
   }, []);
 
-  const buscar = useCallback((segundos: number) => {
-    setTempo(segundos);
-    if (reprodutorRef.current) reprodutorRef.current.currentTime = segundos;
-  }, []);
+  if (edicao.erroCarga) {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-3 bg-fundo p-6 text-center text-texto">
+        <TriangleAlert className="size-8 text-erro" aria-hidden />
+        <p className="text-sm">{edicao.erroCarga}</p>
+        <Link href="/app" className="botao-secundario px-3 py-1.5">
+          Voltar aos projetos
+        </Link>
+      </div>
+    );
+  }
+
+  if (!projeto) {
+    return (
+      <div className="flex h-dvh items-center justify-center gap-2 bg-fundo text-sm text-suave">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+        Abrindo o projeto…
+      </div>
+    );
+  }
 
   const tamanhos = {
     "--largura-conteudo": `${larguraConteudo}px`,
@@ -65,7 +210,17 @@ export function Editor() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto" style={tamanhos}>
-      <BarraSuperior nome={nome} aoMudarNome={setNome} proporcao={proporcao} aoMudarProporcao={setProporcao} />
+      <BarraSuperior
+        nome={edicao.nome}
+        aoMudarNome={edicao.renomear}
+        proporcao={projeto.proporcao}
+        aoMudarProporcao={(proporcao) => executar({ comando: "projeto.proporcao", parametros: { proporcao } })}
+        salvamento={edicao.salvamento}
+        nomeDesfazer={edicao.nomeDesfazer}
+        nomeRefazer={edicao.nomeRefazer}
+        aoDesfazer={desfazer}
+        aoRefazer={refazer}
+      />
 
       <div className="flex min-h-0 flex-1 max-md:flex-col">
         <BarraFerramentas
@@ -79,9 +234,13 @@ export function Editor() {
 
         <PainelConteudo
           ferramenta={ferramentaAtual}
-          biblioteca={biblioteca}
+          biblioteca={bibliotecaDoEditor}
           midiaSelecionadaId={midiaId}
-          aoSelecionarMidia={selecionarMidia}
+          aoSelecionarMidia={(id) => {
+            setMidiaId(id);
+            setSelecao([]);
+          }}
+          aoAdicionarMidia={adicionarNoCursor}
           aoFechar={() => setPainelNoCelular(false)}
           className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-30 max-md:h-[55dvh] ${
             painelNoCelular ? "" : "max-md:hidden"
@@ -99,14 +258,7 @@ export function Editor() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col max-md:order-1">
           <div className="flex min-h-0 flex-1">
-            <Previa
-              proporcao={proporcao}
-              midia={midia}
-              reprodutorRef={reprodutorRef}
-              tempo={tempo}
-              aoMudarTempo={setTempo}
-              className="flex-1"
-            />
+            <Previa projeto={projeto} midias={midias} tempo={tempo} tocando={reproducao.tocando} aoAlternar={alternar} className="flex-1" />
             <Divisor
               direcao="coluna"
               valor={larguraPropriedades}
@@ -117,7 +269,12 @@ export function Editor() {
               rotulo="Largura do painel de propriedades"
               className="max-lg:hidden"
             />
-            <PainelPropriedades midia={midia} className="w-[var(--largura-propriedades)] max-lg:hidden" />
+            <PainelPropriedades
+              midia={midiaDasPropriedades}
+              selecionado={selecionado}
+              taxa={projeto.taxa}
+              className="w-[var(--largura-propriedades)] max-lg:hidden"
+            />
           </div>
           <Divisor
             direcao="linha"
@@ -129,9 +286,31 @@ export function Editor() {
             rotulo="Altura da linha do tempo"
             className="max-md:hidden"
           />
-          <LinhaDoTempo duracao={duracao} tempo={tempo} aoBuscar={buscar} className="h-40 md:h-[var(--altura-linha)]" />
+          <LinhaDoTempo
+            projeto={projeto}
+            midias={midias}
+            ctx={ctx}
+            tempo={tempo}
+            tocando={reproducao.tocando}
+            selecao={selecaoValida}
+            ima={ima}
+            aoAlternarIma={() => setIma((atual) => !atual)}
+            aoBuscar={buscar}
+            aoSelecionar={(ids) => {
+              setSelecao(ids);
+              if (ids.length) setMidiaId(null);
+            }}
+            aoExecutar={executar}
+            className="h-48 md:h-[var(--altura-linha)]"
+          />
         </div>
       </div>
+
+      {edicao.aviso ? (
+        <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <p className="rounded-lg border border-borda bg-painel-3 px-4 py-2 text-sm shadow-xl shadow-black/40">{edicao.aviso}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

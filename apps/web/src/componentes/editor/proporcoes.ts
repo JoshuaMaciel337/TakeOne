@@ -1,6 +1,6 @@
-export const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] as const;
+import { PROPORCOES, type Proporcao } from "@/lib/projeto/modelo";
 
-export type Proporcao = (typeof PROPORCOES)[number];
+export { PROPORCOES, type Proporcao };
 
 export const NOMES_PROPORCAO: Record<Proporcao, string> = {
   "9:16": "9:16 · Stories, Reels, TikTok",

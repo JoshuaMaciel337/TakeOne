@@ -21,6 +21,7 @@ type Props = {
   biblioteca: Biblioteca;
   midiaSelecionadaId: string | null;
   aoSelecionarMidia: (midiaId: string | null) => void;
+  aoAdicionarMidia: (midiaId: string) => void;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   className?: string;
@@ -31,7 +32,8 @@ function PainelMidia({
   biblioteca: { midias, erro, excluir },
   midiaSelecionadaId,
   aoSelecionarMidia,
-}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia">) {
+  aoAdicionarMidia,
+}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia">) {
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
@@ -39,7 +41,7 @@ function PainelMidia({
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {midias && midias.length > 0 ? (
         <>
-          <p className="text-xs font-medium text-suave">Biblioteca do espaço</p>
+          <p className="text-xs font-medium text-suave">Biblioteca do espaço · arraste para a linha do tempo</p>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
             {midias.map((midia) => (
               <CartaoMidia
@@ -47,6 +49,7 @@ function PainelMidia({
                 midia={midia}
                 selecionada={midia.id === midiaSelecionadaId}
                 aoSelecionar={(alvo) => aoSelecionarMidia(alvo.id === midiaSelecionadaId ? null : alvo.id)}
+                aoAdicionar={(alvo) => aoAdicionarMidia(alvo.id)}
                 aoExcluir={(alvo) => {
                   if (!window.confirm(`Excluir "${alvo.nome}"? O arquivo sai da biblioteca.`)) return;
                   if (alvo.id === midiaSelecionadaId) aoSelecionarMidia(null);
@@ -84,6 +87,7 @@ export function PainelConteudo({
   biblioteca,
   midiaSelecionadaId,
   aoSelecionarMidia,
+  aoAdicionarMidia,
   aoFechar,
   className = "",
   style,
@@ -102,7 +106,12 @@ export function PainelConteudo({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {ferramenta.id === "midia" ? (
-          <PainelMidia biblioteca={biblioteca} midiaSelecionadaId={midiaSelecionadaId} aoSelecionarMidia={aoSelecionarMidia} />
+          <PainelMidia
+            biblioteca={biblioteca}
+            midiaSelecionadaId={midiaSelecionadaId}
+            aoSelecionarMidia={aoSelecionarMidia}
+            aoAdicionarMidia={aoAdicionarMidia}
+          />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}

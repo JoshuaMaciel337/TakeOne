@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { Editor } from "@/componentes/editor/Editor";
-
-export const metadata: Metadata = { title: "Editor" };
-
+/** Sem projeto escolhido, volta para a lista. Os projetos novos são criados pelo painel. */
 export default function PaginaEditor() {
-  return <Editor />;
+  redirect("/app");
 }

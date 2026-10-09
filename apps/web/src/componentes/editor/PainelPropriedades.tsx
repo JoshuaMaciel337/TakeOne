@@ -4,9 +4,11 @@ import { MousePointerClick } from "lucide-react";
 import { useState } from "react";
 
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
+import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import { formatarTimecode, type Taxa } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
-// As abas da seção 5 do plano. Só "Informações" já tem conteúdo; as outras chegam com os clipes.
+// As abas da seção 5 do plano. Só "Informações" já tem conteúdo; as outras chegam nas próximas fases.
 const ABAS = [
   { id: "info", nome: "Informações", fase: "" },
   { id: "basico", nome: "Básico", fase: "Fase 2" },
@@ -27,7 +29,18 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-export function PainelPropriedades({ midia, className = "", style }: { midia: Midia | null; className?: string; style?: React.CSSProperties }) {
+const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio" };
+
+type Props = {
+  midia: Midia | null;
+  /** O clipe escolhido na linha do tempo; `midia` é a dele. */
+  selecionado: { clipe: Clipe; faixa: Faixa } | null;
+  taxa: Taxa;
+  className?: string;
+  style?: React.CSSProperties;
+};
+
+export function PainelPropriedades({ midia, selecionado, taxa, className = "", style }: Props) {
   const [aba, setAba] = useState<(typeof ABAS)[number]["id"]>("info");
   const atual = ABAS.find((item) => item.id === aba)!;
 
@@ -61,8 +74,21 @@ export function PainelPropriedades({ midia, className = "", style }: { midia: Mi
       <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-3">
         {aba === "info" ? (
           <>
+            {selecionado ? (
+              <>
+                <h3 className="text-sm font-semibold">Clipe</h3>
+                <dl className="mb-4 mt-2">
+                  <Linha rotulo="Faixa" valor={NOMES_FAIXA[selecionado.faixa.tipo]} />
+                  <Linha rotulo="Começa em" valor={formatarTimecode(selecionado.clipe.inicio, taxa)} />
+                  <Linha rotulo="Duração" valor={formatarTimecode(selecionado.clipe.duracao, taxa)} />
+                  <Linha rotulo="Trecho da mídia a partir de" valor={formatarTimecode(selecionado.clipe.entrada, taxa)} />
+                  <Linha rotulo="Velocidade" valor={`${selecionado.clipe.velocidade.toLocaleString("pt-BR")}×`} />
+                  <Linha rotulo="Volume" valor={`${Math.round(selecionado.clipe.volume * 100)}%`} />
+                </dl>
+              </>
+            ) : null}
             <h3 className="truncate text-sm font-semibold" title={midia.nome}>
-              {midia.nome}
+              {selecionado ? `Mídia · ${midia.nome}` : midia.nome}
             </h3>
             <dl className="mt-2">
               <Linha rotulo="Arquivo" valor={midia.nome_original} />
@@ -87,7 +113,7 @@ export function PainelPropriedades({ midia, className = "", style }: { midia: Mi
           </>
         ) : (
           <p className="py-8 text-center text-xs text-suave">
-            Os ajustes de {atual.nome.toLowerCase()} aparecem quando um clipe estiver na linha do tempo ({atual.fase.toLowerCase()}).
+            Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
           </p>
         )}
       </div>
