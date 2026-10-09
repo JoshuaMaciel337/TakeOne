@@ -30,6 +30,11 @@ INDICES = {
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
     ],
+    "projetos": [
+        ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
+        # Para recusar a exclusão de uma mídia que ainda está em algum projeto
+        ([("organizacao_id", 1), ("midias_usadas", 1)], {}),
+    ],
     # Registro de workers online. O MongoDB apaga sozinho quem sumiu há mais de 1 hora.
     "workers": [
         ([("visto_em", 1)], {"expireAfterSeconds": 3600}),

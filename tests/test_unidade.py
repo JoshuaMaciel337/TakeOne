@@ -9,6 +9,14 @@ from core.modelos.job import calcular_espera_retry, montar_job, tipos_por_recurs
 from core.modelos.midia import extensao_aceita, montar_midia, nome_para_exibir
 from core.utils.ffmpeg import ler_progresso, resumir_sondagem
 from core.utils.storage import caminho_local
+from core.utils.tempo import (
+    TICK_MAXIMO,
+    TICKS_POR_SEGUNDO,
+    duracao_do_quadro,
+    quadro_em,
+    taxa_de_fps,
+    tick_do_quadro,
+)
 from worker.tarefas.ingestao import planejar_miniaturas
 
 
@@ -96,3 +104,18 @@ def test_plano_de_miniaturas():
     assert planejar_miniaturas(600)["total"] == 60
     plano = planejar_miniaturas(5000)
     assert (plano["total"], plano["linhas"]) == (100, 10)  # máximo de 100
+
+
+def test_ticks_exatos_nas_taxas_comuns():
+    # Os mesmos casos de apps/web/src/lib/tempo.test.ts: o navegador e o servidor fazem a mesma conta
+    for num, den in [(24000, 1001), (24, 1), (25, 1), (30000, 1001), (30, 1), (60000, 1001), (60, 1)]:
+        assert duracao_do_quadro(num, den) * num == TICKS_POR_SEGUNDO * den
+        ultimo = quadro_em(num, den, TICK_MAXIMO)
+        for quadro in (-1, 0, 1, 1799, 107892, ultimo):
+            assert quadro_em(num, den, tick_do_quadro(num, den, quadro)) == quadro
+            assert quadro_em(num, den, tick_do_quadro(num, den, quadro) + duracao_do_quadro(num, den) - 1) == quadro
+    for amostras in (8000, 11025, 16000, 22050, 44100, 48000, 96000, 192000):
+        assert TICKS_POR_SEGUNDO % amostras == 0
+    assert quadro_em(0, 0, TICKS_POR_SEGUNDO) == 30   # taxa danificada vira a padrão
+    assert taxa_de_fps(29.97) == (30000, 1001)
+    assert taxa_de_fps(12.5) == (25, 2)
