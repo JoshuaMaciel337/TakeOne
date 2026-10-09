@@ -109,6 +109,80 @@ class MidiaAtualizarEntrada(BaseModel):
         return _limpar_espacos(valor)
 
 
+class TaxaEntrada(BaseModel):
+    num: int = Field(ge=1, le=240_000)
+    den: int = Field(ge=1, le=1001)
+
+
+class FundoEntrada(BaseModel):
+    cor: str = Field(default="#000000", pattern=r"^#[0-9a-fA-F]{6}$")
+
+
+class ClipeEntrada(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    midia_id: str = Field(min_length=24, max_length=24)
+    inicio: int = Field(ge=0, description="Posição na linha do tempo, em ticks")
+    duracao: int = Field(gt=0, description="Em ticks")
+    entrada: int = Field(ge=0, description="De onde começa na mídia, em ticks")
+    velocidade: float = Field(default=1.0, ge=0.1, le=100)
+    volume: float = Field(default=1.0, ge=0, le=4)
+
+
+class FaixaEntrada(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    tipo: Literal["principal", "video", "audio"]
+    oculta: bool = False
+    muda: bool = False
+    travada: bool = False
+    clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
+
+
+class ProjetoCriarEntrada(BaseModel):
+    nome: str | None = Field(default=None, min_length=1, max_length=120)
+    proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] | None = None
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class ProjetoSalvarEntrada(BaseModel):
+    versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
+    nome: str = Field(min_length=1, max_length=120)
+    proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"]
+    taxa: TaxaEntrada
+    fundo: FundoEntrada
+    faixas: list[FaixaEntrada] = Field(min_length=1, max_length=30)
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class ProjetoSaida(BaseModel):
+    id: str
+    nome: str
+    proporcao: str
+    taxa: TaxaEntrada
+    fundo: FundoEntrada
+    faixas: list[FaixaEntrada]
+    versao: int
+    duracao: int
+    criado_em: datetime
+    atualizado_em: datetime
+
+
+class ProjetoResumoSaida(BaseModel):
+    id: str
+    nome: str
+    proporcao: str
+    duracao: int
+    capa_midia_id: str | None = None
+    atualizado_em: datetime
+
+
 class WorkerSaida(BaseModel):
     id: str
     recursos: list[str]
@@ -144,6 +218,14 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
         "arquivos": [nome for nome in doc.get("arquivos", []) if nome in ARQUIVOS_PUBLICOS],
         "processamento": processamento,
     })
+
+
+def projeto_para_saida(doc: dict) -> ProjetoSaida:
+    return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"])})
+
+
+def projeto_para_resumo(doc: dict) -> ProjetoResumoSaida:
+    return ProjetoResumoSaida.model_validate({**doc, "id": str(doc["_id"])})
 
 
 def worker_para_saida(doc: dict) -> WorkerSaida:

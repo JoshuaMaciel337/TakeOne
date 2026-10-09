@@ -86,6 +86,12 @@ async def atualizar_midia(midia_id: str, dados: MidiaAtualizarEntrada,
 @router.delete("/{midia_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     midia = await buscar_midia(db, midia_id, usuario)
+    em_projetos = await db.projetos.count_documents(
+        {"organizacao_id": usuario["organizacao_id"], "midias_usadas": str(midia["_id"])})
+    if em_projetos:
+        quantos = "1 projeto" if em_projetos == 1 else f"{em_projetos} projetos"
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"Esta mídia está em {quantos}. Tire os clipes dela da linha do tempo antes de excluir.")
     momento = agora()
     # Jobs que ainda iam mexer nesta mídia param aqui
     await db.jobs.update_many(
