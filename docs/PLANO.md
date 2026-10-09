@@ -346,7 +346,7 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Arquivos de licença e `THIRD_PARTY.md`.
 - [x] CI igual ao do HolyCut (ruff, pytest, lint, tipos, build).
 - [x] Subir no Docker do Nitro 5.
-- [ ] Rodar o CI no GitHub pela primeira vez (falta criar o repositório lá).
+- [x] Rodar o CI no GitHub pela primeira vez.
 
 ### Fase 1: linha do tempo de várias faixas (2 a 3 semanas)
 - [x] Modelo de dados da seção 4, base de tempo em ticks (portada do FilmCraft) e sistema de comandos com desfazer/refazer.

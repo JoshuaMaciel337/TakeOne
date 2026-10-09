@@ -29,7 +29,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 
 ## Estado atual (atualizado em 08/10/2026)
 
-- **Fase 0 (fundação):** pronta e rodando no Docker. Falta o primeiro CI verde no GitHub (o repositório ainda não foi criado lá).
+- **Fase 0 (fundação):** pronta, rodando no Docker e com o CI verde no GitHub ([JoshuaMaciel337/TakeOne](https://github.com/JoshuaMaciel337/TakeOne)).
   - Do HolyCut, sem as partes de igreja: config, Mongo, fila com lease, storage, FFmpeg, sessão com organizações ("espaços"), jobs, eventos SSE, upload tus, mídias, ingestão (proxy 720p, forma de onda, níveis, miniaturas e capa), backup e Compose.
   - Site: landing, entrar, cadastro e painel com projetos e biblioteca de mídias.
 - **Fase 1 (linha do tempo):** pronta, testada no navegador.
