@@ -345,12 +345,13 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Next.js com o layout das quatro áreas e painéis redimensionáveis.
 - [x] Arquivos de licença e `THIRD_PARTY.md`.
 - [x] CI igual ao do HolyCut (ruff, pytest, lint, tipos, build).
-- [ ] Subir no Docker do Nitro 5 e rodar o CI no GitHub pela primeira vez.
+- [x] Subir no Docker do Nitro 5.
+- [ ] Rodar o CI no GitHub pela primeira vez (falta criar o repositório lá).
 
 ### Fase 1: linha do tempo de várias faixas (2 a 3 semanas)
-- Modelo de dados da seção 4, base de tempo em ticks (portada do FilmCraft) e sistema de comandos com desfazer/refazer.
-- Mídia: envio, ingestão (proxy, miniaturas, forma de onda, já no HolyCut), biblioteca do projeto.
-- Linha do tempo:
+- [x] Modelo de dados da seção 4, base de tempo em ticks (portada do FilmCraft) e sistema de comandos com desfazer/refazer.
+- [x] Mídia: envio, ingestão (proxy, miniaturas, forma de onda, já no HolyCut), biblioteca do projeto.
+- [x] Linha do tempo:
   - arrastar da biblioteca
   - mover entre faixas
   - aparar
@@ -359,7 +360,8 @@ Cada fase termina com algo que dá para usar e testar.
   - duplicar
   - ímã e zoom
   - atalhos de teclado
-- Salvar automaticamente e recuperar depois de fechar a aba.
+- [x] Salvar automaticamente e recuperar depois de fechar a aba.
+- [x] Prévia tocando a linha do tempo, com as faixas de sobreposição por cima da principal. Por enquanto com elementos `<video>`; o compositor de verdade é a fase 2.
 
 ### Fase 2: prévia e exportação (2 a 3 semanas)
 - Compositor no navegador (WebCodecs + WebGL2): várias camadas, transformação, opacidade, recorte e fundo.
@@ -470,5 +472,5 @@ Cada fase termina com algo que dá para usar e testar.
 1. **Nome:** TakeOne. Visual próprio: tema escuro, destaque em degradê de coral (`#ff6a3d`) para magenta (`#ff3d77`), fontes Inter e Sora, ícones do `lucide-react`.
 2. **Repositório novo.** O HolyCut continua como está, sem ligação por código, banco ou login.
 3. **Contas e organizações desde o começo,** como no HolyCut: sessão por cookie e cada pessoa com o seu espaço.
-4. **Roda no Nitro 5,** junto com o HolyCut, sem custo. As portas padrão (Mongo 27018, API 8010, site 3010) não batem com as do HolyCut.
+4. **Roda no Nitro 5,** junto com o HolyCut, sem custo. As portas padrão (Mongo 27019, API 8010, site 3010) não batem com as do HolyCut.
 5. **Nada pago por enquanto** (seção 2).

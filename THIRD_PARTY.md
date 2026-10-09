@@ -22,7 +22,15 @@ Os dois projetos continuam independentes: nada de código compartilhado, banco o
 
 Os textos das licenças e o `NOTICE` de cada um estão em [`licencas/filmcraft/`](licencas/filmcraft) e [`licencas/lightcraft/`](licencas/lightcraft).
 
-**Ainda não há código deles no TakeOne.** As licenças já estão aqui porque as próximas fases portam partes dos dois (base de tempo, operações de linha do tempo, cor e áudio; veja a seção 2 do [plano](docs/PLANO.md)). Ao portar:
+Portado do FilmCraft (commit `5231852`), com a origem no topo de cada arquivo:
+
+| No TakeOne | Origem no FilmCraft | O que mudou |
+| --- | --- | --- |
+| `apps/web/src/lib/tempo.ts` e `core/utils/tempo.py` | `crates/time/src/lib.rs` | Traduzido para TypeScript e Python, só a parte que o editor usa |
+| `apps/web/src/lib/projeto/edicao.ts` | `crates/edit/src/lib.rs` | Escrito em TypeScript, com as regras do CapCut (faixa principal magnética) |
+| `apps/web/src/lib/tempo.test.ts` | testes de `crates/time/src/lib.rs` | Casos traduzidos para o `node:test` |
+
+O sistema de comandos (`lib/projeto/comandos.ts`) segue a ideia do `crates/engine`, mas o código é do TakeOne. Do LightCraft ainda não há nada. Ao portar:
 
 - O arquivo portado diz no topo de onde veio (repositório, caminho e commit) e a licença ("MIT OR Apache-2.0").
 - O `crates/segment` do LightCraft é **só Apache-2.0**, porque deriva do SAM 3 dos Transformers. Código portado dele segue só a Apache-2.0, com o aviso de modificação.

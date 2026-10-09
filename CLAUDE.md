@@ -29,12 +29,16 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 
 ## Estado atual (atualizado em 08/10/2026)
 
-- **Fase 0 (fundação):** código pronto. Falta subir no Docker do Nitro 5 e ver o primeiro CI verde no GitHub (o repositório ainda não foi criado lá).
+- **Fase 0 (fundação):** pronta e rodando no Docker. Falta o primeiro CI verde no GitHub (o repositório ainda não foi criado lá).
   - Do HolyCut, sem as partes de igreja: config, Mongo, fila com lease, storage, FFmpeg, sessão com organizações ("espaços"), jobs, eventos SSE, upload tus, mídias, ingestão (proxy 720p, forma de onda, níveis, miniaturas e capa), backup e Compose.
-  - Site: landing, entrar, cadastro, painel com a biblioteca de mídias e o editor em `/app/editor`.
-  - Editor: as quatro áreas com painéis redimensionáveis (tamanho lembrado no navegador), prévia na proporção escolhida que toca a mídia selecionada, propriedades da mídia, linha do tempo com régua, zoom e cursor. No celular, a prévia fica no topo, as ferramentas numa faixa embaixo e o painel abre por cima.
-  - As ferramentas além de Mídia mostram em que fase chegam. Desfazer, dividir, apagar, duplicar, ímã e Exportar aparecem desligados.
-- **Próximo passo:** fase 1 (modelo de dados do projeto, ticks, comandos com desfazer, linha do tempo de várias faixas e salvamento automático).
+  - Site: landing, entrar, cadastro e painel com projetos e biblioteca de mídias.
+- **Fase 1 (linha do tempo):** pronta, testada no navegador.
+  - Projeto em ticks (`lib/tempo.ts` e `core/utils/tempo.py`, portados do FilmCraft) e API `/api/projetos` (listar, criar, abrir, salvar com versão, excluir). A API confere a linha do tempo antes de salvar e não deixa excluir mídia usada em projeto.
+  - Editor em `/app/editor/<id>`: faixa principal magnética, faixas de sobreposição por cima e de áudio por baixo; arrastar da biblioteca ou botão "+", mover entre faixas, aparar, dividir, apagar, duplicar, ímã, zoom (também Ctrl + roda), esconder, silenciar e travar faixa.
+  - Desfazer e refazer de tudo, salvamento automático 1,2 s depois de cada mudança, cópia no navegador enquanto não salva e aviso de conflito quando outra aba salvou antes.
+  - A prévia toca a linha do tempo com elementos `<video>` e `<audio>` que seguem o relógio do editor. O compositor em WebCodecs/WebGL2 é da fase 2.
+  - As ferramentas além de Mídia mostram em que fase chegam. Exportar aparece desligado.
+- **Próximo passo:** fase 2 (compositor da prévia, transformações na prévia e render no worker).
 
 ## Arquitetura em um minuto
 
@@ -47,10 +51,17 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 
 ## Decisões técnicas que não aparecem de cara no código
 
-- **Portas:** Mongo 27018, API 8010 e site 3010, no Compose e no `npm run dev`. As do HolyCut (27017, 8000, 3000) ficam livres, porque os dois rodam no mesmo Nitro 5. O backup sai às 03:30, meia hora depois do HolyCut.
+- **Portas:** Mongo 27019, API 8010 e site 3010, no Compose e no `npm run dev`. As do HolyCut (27018, 8000, 3000) ficam livres, porque os dois rodam no mesmo Nitro 5. O backup sai às 03:30, meia hora depois do HolyCut.
 - **Licenças em `licencas/`, não na raiz:** os `LICENSE-*` do FilmCraft e do LightCraft têm o copyright do ArtCraft Team. Na raiz, pareceriam a licença do TakeOne inteiro.
 - **Organização se chama "espaço" na interface.** No cadastro, o nome é opcional; sem ele, vira "Espaço de <primeiro nome>".
-- **Editor:** a lista de mídias fica no `Editor` (um `useMidias` só), e a seleção guarda o id. Assim a prévia e as propriedades acompanham a ingestão sem recarregar. O elemento de vídeo ou áudio da prévia é passado por ref para a linha do tempo mover o cursor.
+- **Editor:** a lista de mídias fica no `Editor` (um `useMidias` só), e a seleção guarda o id. Assim a prévia e as propriedades acompanham a ingestão sem recarregar.
+- **Edição é pura:** as operações de `lib/projeto/edicao.ts` nunca alteram o projeto recebido e lançam `ErroEdicao` com a mensagem para a pessoa. Toda mudança passa por um `Comando` (`comandos.ts`); o histórico guarda os projetos de antes. Durante um arrasto, a linha do tempo aplica o comando a cada movimento e mostra o resultado, sem registrar no histórico.
+- **Nome e versão fora do histórico:** desfazer não desfaz o nome do projeto nem volta a `versao` do servidor. O PUT manda a versão que o editor conhece; se o banco tiver outra, a API responde 409 e o editor para de salvar e pede para recarregar.
+- **Rascunho no navegador** (`takeone-rascunho-<id>`): só é aplicado ao abrir se foi feito sobre a mesma versão que o banco tem. Se outra aba salvou depois, o rascunho é descartado.
+- **Prévia:** um elemento por faixa + mídia, para as duas metades de um clipe dividido usarem o mesmo vídeo sem engasgar. O próximo clipe da faixa já fica montado (escondido) 2 s antes de entrar. O vídeo só é reposicionado quando se afasta mais de 0,3 s do relógio.
+- **Arrastar da biblioteca:** o id da mídia vai no nome do tipo do `DataTransfer` (`application/x-takeone-midia-<id>`), porque durante o arrasto o navegador só deixa ler os tipos.
+- **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
+- **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.
 - **Next.js 16:** o middleware é `proxy.ts`. O Next guarda na memória o corpo de toda requisição a `/api` e corta em 10 MB; os vídeos passam porque o tus manda pedaços de 8 MB.
 
@@ -59,5 +70,6 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - Tudo: `docker compose up --build`, com o site em http://localhost:3010. Portas e pasta de armazenamento ficam no `.env` (veja o `.env.example`).
 - Python: `ruff check .` e `pytest`. Os testes de integração criam um banco `takeone_teste_*` e o apagam no fim, e o `conftest` recusa qualquer outro banco.
 - Os testes com FFmpeg são pulados quando ele não está instalado. Em Windows sem FFmpeg, rode-os dentro da imagem do worker.
-- Site: `npm run lint`, `npm run typecheck` e `npm run build`, dentro de `apps/web`.
-- O CI (GitHub Actions) roda lint e testes do Python, com FFmpeg, e lint, tipos e build do site. Todo push precisa terminar verde.
+- Site: `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`, dentro de `apps/web`.
+- Para mexer no site com a pilha no Docker: `next dev -p 3011` com `API_URL_INTERNA=http://localhost:8010`. O cookie de sessão vale para as duas portas.
+- O CI (GitHub Actions) roda lint e testes do Python, com FFmpeg, e lint, tipos, testes e build do site. Todo push precisa terminar verde.
