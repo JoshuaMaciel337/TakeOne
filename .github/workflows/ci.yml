@@ -28,7 +28,7 @@ jobs:
           MONGO_URI: mongodb://localhost:27017/?directConnection=true
 
   web:
-    name: Web (lint, tipos e build)
+    name: Web (lint, tipos, testes e build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,4 +43,5 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build

@@ -28,7 +28,7 @@ docker compose up --build
 
 Abra http://localhost:3010, crie uma conta, envie um vídeo e clique em **Novo projeto** para abrir o editor.
 
-As portas padrão (Mongo 27018, API 8010, site 3010) foram escolhidas para o TakeOne rodar ao lado do HolyCut no mesmo computador. Para trocar, mude `MONGO_PORTA`, `API_PORTA` ou `WEB_PORTA` no `.env`. Os vídeos enviados ficam em `./armazenamento`; aponte `PASTA_ARMAZENAMENTO_HOST` para o disco com mais espaço.
+As portas padrão (Mongo 27019, API 8010, site 3010) foram escolhidas para o TakeOne rodar ao lado do HolyCut no mesmo computador. Para trocar, mude `MONGO_PORTA`, `API_PORTA` ou `WEB_PORTA` no `.env`. Os vídeos enviados ficam em `./armazenamento`; aponte `PASTA_ARMAZENAMENTO_HOST` para o disco com mais espaço.
 
 | Onde | Comando |
 |---|---|
@@ -45,7 +45,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements-dev.txt
 set PYTHONPATH=.;apps;infra
-set MONGO_URI=mongodb://localhost:27017/?directConnection=true
+set MONGO_URI=mongodb://localhost:27019/?directConnection=true
 
 uvicorn api.main:app --reload --port 8010
 python -m worker.worker_principal --automatico --recursos cpu

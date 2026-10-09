@@ -6,7 +6,7 @@
 # Túnel fixo (produção):      docker compose --profile tunel up -d
 #
 # Antes da primeira vez: copie .env.example para .env e defina JWT_SEGREDO.
-# As portas padrão (27018, 8010, 3010) não batem com as do HolyCut, que roda no mesmo Nitro 5.
+# As portas padrão (27019, 8010, 3010) não batem com as do HolyCut, que roda no mesmo Nitro 5.
 # -----------------------------------------------
 name: takeone
 
@@ -21,7 +21,7 @@ services:
     image: mongo:8.0
     command: ["--replSet", "rs0", "--bind_ip_all"]
     # Só acessível a partir deste computador (MongoDB Compass). Nunca exposto no túnel.
-    ports: ["127.0.0.1:${MONGO_PORTA:-27018}:27017"]
+    ports: ["127.0.0.1:${MONGO_PORTA:-27019}:27017"]
     volumes: [mongo_dados:/data/db]
     healthcheck:
       # Inicia o replica set na primeira subida. Ele é necessário para os eventos ao vivo.
