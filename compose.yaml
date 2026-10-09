@@ -1,0 +1,109 @@
+# -----------------------------------------------
+# TakeOne — todos os serviços
+#
+# Subir tudo:                 docker compose up --build -d
+# Túnel rápido para testes:   docker compose --profile tunel-rapido up -d
+# Túnel fixo (produção):      docker compose --profile tunel up -d
+#
+# Antes da primeira vez: copie .env.example para .env e defina JWT_SEGREDO.
+# As portas padrão (27018, 8010, 3010) não batem com as do HolyCut, que roda no mesmo Nitro 5.
+# -----------------------------------------------
+name: takeone
+
+x-ambiente-python: &ambiente-python
+  MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+  DATABASE_NAME: ${DATABASE_NAME:-takeone}
+  PASTA_ARMAZENAMENTO: /dados/armazenamento
+  TZ: America/Sao_Paulo
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    # Só acessível a partir deste computador (MongoDB Compass). Nunca exposto no túnel.
+    ports: ["127.0.0.1:${MONGO_PORTA:-27018}:27017"]
+    volumes: [mongo_dados:/data/db]
+    healthcheck:
+      # Inicia o replica set na primeira subida. Ele é necessário para os eventos ao vivo.
+      test: ["CMD", "mongosh", "--quiet", "--eval",
+             "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}).ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build: {context: ., dockerfile: infra/docker/api.Dockerfile}
+    image: takeone/api:local
+    environment:
+      <<: *ambiente-python
+      JWT_SEGREDO: ${JWT_SEGREDO:?Defina JWT_SEGREDO no arquivo .env}
+      SESSAO_DIAS: ${SESSAO_DIAS:-7}
+      COOKIE_SEGURO: ${COOKIE_SEGURO:-false}
+      MODO_IA: ${MODO_IA:-simulado}
+      UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-20}
+      ESPACO_MINIMO_LIVRE_GB: ${ESPACO_MINIMO_LIVRE_GB:-2}
+    volumes: ["${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"]
+    ports: ["127.0.0.1:${API_PORTA:-8010}:8000"]
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  worker-cpu:
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: takeone/worker:local
+    command: ["python", "-m", "worker.worker_principal", "--automatico", "--recursos", "cpu"]
+    environment:
+      <<: *ambiente-python
+      MODO_IA: ${MODO_IA:-simulado}
+    volumes: ["${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"]
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args: {API_URL_INTERNA: "http://api:8000"}
+    image: takeone/web:local
+    ports: ["127.0.0.1:${WEB_PORTA:-3010}:3000"]
+    depends_on: [api]
+    restart: unless-stopped
+
+  backup:
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: takeone/worker:local
+    command: ["python", "-m", "backup.agendador_backup", "--automatico"]
+    environment:
+      <<: *ambiente-python
+      PASTA_BACKUP: /dados/backups
+      BACKUP_HORA: ${BACKUP_HORA:-03:30}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
+    volumes: ["${PASTA_BACKUP_HOST:-./backups}:/dados/backups"]
+    depends_on:
+      mongo: {condition: service_healthy}
+      worker-cpu: {condition: service_started}
+    restart: unless-stopped
+
+  # ---------- Acesso pela internet ----------
+  tunel-rapido:
+    profiles: [tunel-rapido]
+    image: cloudflare/cloudflared:latest
+    # Endereço aleatório *.trycloudflare.com, mostrado no log: docker compose logs tunel-rapido
+    command: ["tunnel", "--no-autoupdate", "--url", "http://web:3000"]
+    depends_on: [web]
+    restart: unless-stopped
+
+  tunel:
+    profiles: [tunel]
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web, api]
+    restart: unless-stopped
+
+volumes:
+  mongo_dados:
