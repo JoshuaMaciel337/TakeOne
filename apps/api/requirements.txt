@@ -1,0 +1,8 @@
+argon2-cffi==25.1.0
+email-validator==2.3.0
+fastapi==0.142.0
+pydantic==2.13.5
+pyjwt==2.15.1
+pymongo==4.18.2
+tzdata==2026.4
+uvicorn[standard]==0.54.0
