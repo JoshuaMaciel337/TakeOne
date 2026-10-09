@@ -1,0 +1,18 @@
+# Texto vai para o repositório sempre com LF, venha de Windows ou de Linux.
+* text=auto
+
+# Arquivos que rodam dentro de containers Linux precisam de LF. Clonado no
+# Windows com CRLF, um script vira "#!/bin/bash\r" e o Docker responde
+# "no such file or directory", sem citar fim de linha.
+*.sh text eol=lf
+*.Dockerfile text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binários
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary
+*.woff2 binary
