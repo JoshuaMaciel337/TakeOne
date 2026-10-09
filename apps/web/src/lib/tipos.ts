@@ -69,6 +69,16 @@ export type Midia = {
   enviado_em: string | null;
 };
 
+export type ProjetoResumo = {
+  id: string;
+  nome: string;
+  proporcao: string;
+  /** Em ticks (lib/tempo.ts). */
+  duracao: number;
+  capa_midia_id: string | null;
+  atualizado_em: string;
+};
+
 export type Worker = {
   id: string;
   recursos: string[];

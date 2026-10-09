@@ -23,6 +23,16 @@ export function formatarBytes(bytes: number): string {
   return `${valor.toLocaleString("pt-BR", { maximumFractionDigits: casas, minimumFractionDigits: casas })} ${unidades[indice]}`;
 }
 
+/** Data de alteração: "agora há pouco", "há 5 min", "há 3 h" ou "12 de mar." */
+export function formatarQuando(iso: string, agora = Date.now()): string {
+  const momento = new Date(iso).getTime();
+  const minutos = Math.floor((agora - momento) / 60_000);
+  if (minutos < 1) return "agora há pouco";
+  if (minutos < 60) return `há ${minutos} min`;
+  if (minutos < 24 * 60) return `há ${Math.floor(minutos / 60)} h`;
+  return new Date(momento).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+}
+
 export function porcentagem(parte: number, total: number): number {
   return total > 0 ? Math.min(100, Math.round((parte / total) * 100)) : 0;
 }
