@@ -129,7 +129,7 @@ Analisados com uma conta grátis, usando o vídeo de exemplo do HolyCut no OpusC
 
 Fica fora, como no HolyCut: avatar de IA e personas (Cut.Pro), dublagem, clonagem de voz e correção do olhar. O Captions saiu da análise porque a conta grátis só libera a criação de avatar.
 
-**Nada pago por enquanto:** nenhuma API, modelo ou serviço cobrado por uso. Tudo roda com modelos abertos na máquina (Whisper, Ollama, DeepFilterNet, MediaPipe).
+**Nada pago por enquanto:** nenhuma API, modelo ou serviço cobrado por uso. Tudo roda com modelos abertos na máquina (Whisper, Ollama, DeepFilterNet, MediaPipe e, para gerar vídeo, o Wan 2.2).
 
 ### Do FilmCraft (Rust, ~430 mil linhas)
 
@@ -245,7 +245,8 @@ Navegador (Next.js 16 + Tailwind 4)
 Servidor (do HolyCut)
 ├── API FastAPI: sessão, projetos, mídias, upload tus, eventos SSE
 ├── Worker CPU: ingestão, render FFmpeg, rosto, imagem
-├── Worker GPU: transcrição, limpeza de áudio, segmentação, LLM (Ollama)
+├── Worker GPU: transcrição, limpeza de áudio, segmentação, LLM (Ollama),
+│   geração de vídeo (Wan 2.2 pelo ComfyUI, num serviço à parte)
 ├── MongoDB: dados e fila
 └── Armazenamento: pasta local (depois S3/R2)
 ```
@@ -434,6 +435,7 @@ Cada fase termina com algo que dá para usar e testar.
   - "Criar automaticamente"
 - Novos:
   - recortar o fundo do vídeo (`segment` do EffectCraft, com MediaPipe ou MobileSAM)
+  - **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto ou de uma imagem, com o Wan 2.2 TI2V-5B. Detalhes na seção 9.
   - batida automática: cortar e animar no ritmo da música (detecção de batidas do SoundCraft)
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
   - texto em fala (TTS com modelo aberto)
@@ -466,7 +468,7 @@ Cada fase termina com algo que dá para usar e testar.
 - **Prévia diferente do render.** Cada efeito precisa da mesma fórmula no shader e no FFmpeg. Efeito novo só entra junto com o teste que compara os dois.
 - **Rust para WebAssembly.** Exige a toolchain Rust e `wasm-bindgen`. Se o ganho for pequeno, portar para TypeScript a parte que usamos.
 - **Navegadores.** WebCodecs e WebGPU funcionam bem no Chrome e no Edge e são limitados no Safari e no Firefox. Ter um caminho WebGL2 e começar pelo Chrome.
-- **GPU do servidor** (8 GB no Nitro 5): um modelo por vez, como o HolyCut já faz.
+- **GPU do servidor** (8 GB no Nitro 5): um modelo por vez, como o HolyCut já faz. A geração de vídeo é a tarefa mais pesada: ela só roda com a GPU livre, e os outros modelos esperam na fila.
 - **Conteúdo de terceiros:** nada de músicas, efeitos ou modelos tirados do CapCut. Só material próprio ou com licença.
 ## 8. Decisões tomadas
 
@@ -475,3 +477,17 @@ Cada fase termina com algo que dá para usar e testar.
 3. **Contas e organizações desde o começo,** como no HolyCut: sessão por cookie e cada pessoa com o seu espaço.
 4. **Roda no Nitro 5,** junto com o HolyCut, sem custo. As portas padrão (Mongo 27019, API 8010, site 3010) não batem com as do HolyCut.
 5. **Nada pago por enquanto** (seção 2).
+6. **Geração de vídeo com o Wan 2.2** (seção 9), na fase 5.
+
+## 9. Geração de vídeo com IA (Wan 2.2)
+
+Escolhido entre Wan 2.2, LTX-Video, HunyuanVideo, LTX Desktop e ComfyUI, pelo que cabe nos 8 GB da RTX 3070 Ti do Nitro 5 e pela licença.
+
+- **Modelo:** Wan 2.2 TI2V-5B (texto ou imagem para vídeo), licença Apache 2.0. É o único dos avaliados que roda em 8 GB.
+- **Como roda:** pelo ComfyUI, que descarrega parte do modelo para a memória comum (offload) enquanto gera. Sem isso, o modelo pede 24 GB.
+- **ComfyUI como serviço à parte:** o ComfyUI é GPL-3.0. Ele roda no próprio container (perfil `gpu` do Compose) e o worker de GPU conversa com ele pela API HTTP. Nenhum código do ComfyUI entra no TakeOne, então a licença dele não passa para o projeto.
+- **No editor:** o resultado entra na biblioteca de mídias como uma mídia comum e passa pela mesma ingestão (proxy, miniaturas, forma de onda).
+- **Expectativa:** clipes de poucos segundos, em 480p ou 720p, levando alguns minutos cada um. Serve para B-roll, fundos e transições, não para cenas longas.
+- **Memória:** 16 GB de RAM no Nitro 5 é o limite com o offload ligado. A tarefa roda sozinha na GPU e libera a memória ao terminar.
+- **Ficaram de fora:** LTX-Video (a licença só é grátis para empresas com menos de US$ 10 milhões de faturamento, e na prática pede mais de 8 GB), HunyuanVideo (licença própria com exclusão de países e uns 14 GB no mínimo) e LTX Desktop (é um editor separado e pede 32 GB).
+- **Antes de começar:** conferir a licença na página do modelo no Hugging Face e medir no Nitro 5 o tempo e a memória de um clipe de 5 s.
