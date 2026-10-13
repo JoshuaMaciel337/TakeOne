@@ -92,3 +92,22 @@ export type Sistema = {
   modo_ia: string;
   workers: Worker[];
 };
+
+export type Exportacao = {
+  id: string;
+  projeto_id: string;
+  nome: string;
+  resolucao: "720p" | "1080p" | "4k";
+  largura: number;
+  altura: number;
+  status: "processando" | "pronta" | "erro";
+  arquivos: string[];
+  tamanho: number | null;
+  duracao: number | null;
+  erro: string | null;
+  processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+  criado_em: string;
+  concluido_em: string | null;
+};
+
+export type LinkCelular = { caminho: string; expira_em: string };

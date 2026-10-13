@@ -4,5 +4,6 @@ fastapi==0.142.0
 pydantic==2.13.5
 pyjwt==2.15.1
 pymongo==4.18.2
+segno==1.6.6
 tzdata==2026.4
 uvicorn[standard]==0.54.0

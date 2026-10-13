@@ -18,6 +18,7 @@ type Props = {
   nomeRefazer: string | null;
   aoDesfazer: () => void;
   aoRefazer: () => void;
+  aoExportar: () => void;
 };
 
 const SALVAMENTO: Record<EstadoSalvamento, { texto: string; icone: typeof Check; cor: string; dica?: string }> = {
@@ -39,7 +40,18 @@ const SALVAMENTO: Record<EstadoSalvamento, { texto: string; icone: typeof Check;
   erro: { texto: "Não foi possível salvar", icone: TriangleAlert, cor: "text-erro", dica: "Desfaça a última alteração ou recarregue a página." },
 };
 
-export function BarraSuperior({ nome, aoMudarNome, proporcao, aoMudarProporcao, salvamento, nomeDesfazer, nomeRefazer, aoDesfazer, aoRefazer }: Props) {
+export function BarraSuperior({
+  nome,
+  aoMudarNome,
+  proporcao,
+  aoMudarProporcao,
+  salvamento,
+  nomeDesfazer,
+  nomeRefazer,
+  aoDesfazer,
+  aoRefazer,
+  aoExportar,
+}: Props) {
   const status = SALVAMENTO[salvamento];
   const Icone = status.icone;
   return (
@@ -110,7 +122,7 @@ export function BarraSuperior({ nome, aoMudarNome, proporcao, aoMudarProporcao, 
         ))}
       </select>
 
-      <button type="button" className="botao-principal shrink-0 px-3 py-1.5" disabled title="A exportação chega na fase 2">
+      <button type="button" className="botao-principal shrink-0 px-3 py-1.5" onClick={aoExportar} title="Exportar o vídeo">
         <Download className="size-4" aria-hidden />
         <span className="hidden sm:inline">Exportar</span>
       </button>

@@ -40,8 +40,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - As ferramentas além de Mídia mostram em que fase chegam. Exportar aparece desligado.
 - **Fase 2 (prévia e exportação):** em andamento.
   - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`) com os quadros decodificados pelo WebCodecs (`lib/previa/decodificador.ts`) e o som pelo Web Audio. Dá para selecionar, arrastar, redimensionar e girar direto na prévia; há a aba Básico nas propriedades e a cor de fundo do projeto.
-  - Falta: render no worker e o teste que compara prévia e render.
-- **Próximo passo:** render no worker (precisa do FFmpeg, então no Nitro ou pelo CI).
+  - Exportação: botão Exportar com 720p, 1080p e 4K, render na fila do worker (`core/utils/render.py` e `apps/worker/tarefas/renderizacao.py`), progresso, download e QR para o celular. **O render foi escrito numa máquina sem FFmpeg e ainda não rodou de verdade:** confira o CI ou rode `pytest tests/integracao/test_exportacoes.py` no Nitro.
+  - Falta: ver o render rodar e a parte da prévia no teste que compara prévia e render.
+- **Próximo passo:** rodar o render no Nitro (ou ver o CI) e corrigir o que aparecer; depois a fase 3.
 
 ## Arquitetura em um minuto
 
@@ -68,6 +69,8 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Quadros pelo WebCodecs:** o decodificador lê do proxy só o cabeçalho (mp4box) e depois cada grupo de quadros por Range, e decodifica a partir do quadro-chave anterior. O tempo de cada quadro desconta a lista de edição (`elst`), como o FFmpeg faz. Guarda poucos `VideoFrame` abertos, porque o decodificador trava com muitos. Se o WebCodecs falhar (navegador sem ele, arquivo que o leitor não entende), aquele clipe volta para um `<video>` escondido, que pode errar o quadro por um.
 - **Som separado da imagem:** o som de todo clipe sai de um `<audio>` próprio, ligado a um ganho do Web Audio (`lib/previa/audio.ts`), que segue o relógio do editor. O contexto de áudio só nasce quando a pessoa aperta reproduzir, porque o navegador exige um gesto.
 - **Mudança provisória:** arrastar na prévia ou num controle deslizante do painel muda um `Comando` provisório no `Editor`, que só aparece na tela. Ao soltar, vira comando de verdade e um passo do desfazer.
+- **Render:** cada clipe é uma entrada do FFmpeg aberta só no trecho dele (`-ss`/`-t` antes do `-i`), sobreposta num quadro de cor com `overlay format=rgb`, como a mistura do navegador. O clipe aparece com `gte(t, início - meio quadro) * lt(t, fim - meio quadro)`, para nenhum quadro cair bem na fronteira. São no máximo 400 clipes por exportação, porque cada um é um arquivo aberto ao mesmo tempo.
+- **Exportação guarda uma cópia do projeto:** editar enquanto o vídeo é gerado não muda o que sai. O link do celular é o do HolyCut: token de 24 h, com só o hash no banco.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.

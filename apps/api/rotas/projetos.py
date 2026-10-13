@@ -19,6 +19,7 @@ from api.esquemas import (
     projeto_para_resumo,
     projeto_para_saida,
 )
+from api.rotas.exportacoes import apagar_exportacoes
 from core.modelos.midia import STATUS_PRONTA
 from core.modelos.projeto import (
     capa_do_projeto,
@@ -115,5 +116,6 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
 @router.delete("/{projeto_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def excluir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     projeto = await buscar_projeto(db, projeto_id, usuario, {"nome": 1})
+    await apagar_exportacoes(db, {"projeto_id": projeto["_id"], "organizacao_id": usuario["organizacao_id"]})
     await db.projetos.delete_one({"_id": projeto["_id"]})
     logging.info(f"[{usuario['organizacao_id']}] Projeto excluído: {projeto['nome']}")

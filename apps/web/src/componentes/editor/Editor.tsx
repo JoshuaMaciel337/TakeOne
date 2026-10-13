@@ -17,6 +17,7 @@ import { BarraFerramentas } from "./BarraFerramentas";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
+import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
 import { PainelPropriedades } from "./PainelPropriedades";
@@ -92,6 +93,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
   const [midiaId, setMidiaId] = useState<string | null>(null);
   const [selecao, setSelecao] = useState<string[]>([]);
   const [ima, setIma] = useState(true);
+  const [exportando, setExportando] = useState(false);
 
   const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
   const ctx = useMemo<Contexto>(
@@ -165,7 +167,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
   const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
     const alvo = evento.target as HTMLElement | null;
-    if (!projeto || alvo?.closest("input, textarea, select, [contenteditable]")) return;
+    if (!projeto || alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]") || exportando) return;
     const ctrl = evento.ctrlKey || evento.metaKey;
     const tecla = evento.key.toLowerCase();
     const quadro = duracaoDoQuadro(projeto.taxa);
@@ -235,6 +237,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
         nomeRefazer={edicao.nomeRefazer}
         aoDesfazer={desfazer}
         aoRefazer={refazer}
+        aoExportar={() => setExportando(true)}
       />
 
       <div className="flex min-h-0 flex-1 max-md:flex-col">
@@ -342,6 +345,10 @@ export function Editor({ projetoId }: { projetoId: string }) {
           />
         </div>
       </div>
+
+      {exportando ? (
+        <JanelaExportar projetoId={projetoId} proporcao={projeto.proporcao} salvamento={edicao.salvamento} aoFechar={() => setExportando(false)} />
+      ) : null}
 
       {edicao.aviso ? (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

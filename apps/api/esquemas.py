@@ -6,6 +6,9 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
+from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
+from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
+from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
 
@@ -209,6 +212,33 @@ class ProjetoResumoSaida(BaseModel):
     atualizado_em: datetime
 
 
+class ExportacaoCriarEntrada(BaseModel):
+    projeto_id: str = Field(min_length=24, max_length=24)
+    resolucao: Literal["720p", "1080p", "4k"] = "1080p"
+
+
+class ExportacaoSaida(BaseModel):
+    id: str
+    projeto_id: str
+    nome: str
+    resolucao: str
+    largura: int
+    altura: int
+    status: str
+    arquivos: list[str] = []
+    tamanho: int | None = None
+    duracao: float | None = None
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+    criado_em: datetime
+    concluido_em: datetime | None = None
+
+
+class LinkCelularSaida(BaseModel):
+    caminho: str = Field(description="Endereço relativo ao site, que baixa o vídeo sem entrar na conta")
+    expira_em: datetime
+
+
 class WorkerSaida(BaseModel):
     id: str
     recursos: list[str]
@@ -256,3 +286,23 @@ def projeto_para_resumo(doc: dict) -> ProjetoResumoSaida:
 
 def worker_para_saida(doc: dict) -> WorkerSaida:
     return WorkerSaida.model_validate({**doc, "id": str(doc["_id"])})
+
+
+def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida:
+    """job: o job de render, para mostrar o progresso enquanto o vídeo é gerado."""
+    processamento = None
+    status, erro = doc["status"], doc.get("erro")
+    if job is not None and status == STATUS_EXPORTACAO_PROCESSANDO:
+        processamento = ProcessamentoSaida(status=job["status"], progresso=job.get("progresso", 0),
+                                           mensagem=job.get("mensagem", ""))
+        if job["status"] == STATUS_JOB_ERRO:  # o worker caiu de vez sem avisar a exportação
+            status, erro = STATUS_EXPORTACAO_ERRO, erro or job.get("erro")
+    return ExportacaoSaida.model_validate({
+        **doc,
+        "id": str(doc["_id"]),
+        "projeto_id": str(doc["projeto_id"]),
+        "status": status,
+        "erro": erro,
+        "arquivos": [nome for nome in doc.get("arquivos", []) if nome in ARQUIVOS_EXPORTACAO],
+        "processamento": processamento,
+    })
