@@ -19,6 +19,7 @@ RECURSO_GPU = "gpu"
 TAREFAS = {
     "teste": RECURSO_CPU,
     "ingestao": RECURSO_CPU,
+    "renderizacao": RECURSO_CPU,
 }
 
 
