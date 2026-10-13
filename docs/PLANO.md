@@ -384,7 +384,8 @@ Cada fase termina com algo que dá para usar e testar.
   - estilos de contorno, sombra e brilho (estilos de camada do PhotoCraft)
 - Áudio:
   - faixas de música e efeitos sonoros
-  - volume e fades em vários formatos (SoundCraft)
+  - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render
+  - fades em outros formatos (SoundCraft)
   - ducking sob a voz (do HolyCut)
   - loudness medido (`audio-dsp` do FilmCraft)
   - efeitos de voz: EQ, reverb, eco, mudança de tom (SoundCraft)

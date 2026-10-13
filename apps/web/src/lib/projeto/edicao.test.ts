@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { duracaoDoQuadro, segundosParaTicks } from "../tempo.ts";
 import {
   adicionarClipe,
+  ajustarAudio,
   alternarFaixa,
   apagarClipes,
   apararClipe,
@@ -17,8 +18,9 @@ import {
   recortarClipes,
   restaurarClipes,
   transformarClipes,
+  VOLUME_MAXIMO,
 } from "./edicao.ts";
-import { completarProjeto, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
 const TAXA = { num: 30, den: 1 };
@@ -235,4 +237,31 @@ test("projeto antigo, sem transformação nem recorte, é completado", () => {
   delete clipe.transformacao;
   delete clipe.recorte;
   assert.deepEqual(completarProjeto(antigo), projeto);
+});
+
+test("volume e fades: limites, e os fades acompanham o dividir e o aparar", () => {
+  const ctx = contexto();
+  const adicionado = adicionarClipe(vazio(), ctx, "video10");
+  const id = adicionado.clipeId;
+  let projeto = ajustarAudio(adicionado.projeto, [id], { volume: 9, fade_entrada: 2 * S, fade_saida: 20 * S });
+  let clipe = principal(projeto)[0];
+  assert.equal(clipe.volume, VOLUME_MAXIMO);
+  assert.equal(clipe.fade_entrada, 2 * S);
+  assert.equal(clipe.fade_saida, 8 * S, "o fade de saída para onde o de entrada acaba");
+
+  assert.equal(fatorDosFades(clipe, 0), 0);
+  assert.equal(fatorDosFades(clipe, S), 0.5);
+  assert.equal(fatorDosFades(clipe, 2 * S), 1);
+  assert.equal(fatorDosFades(clipe, 4 * S), 0.75, "no fade de saída, que começa em 2 s");
+  assert.equal(fatorDosFades(clipe, 10 * S), 0);
+
+  projeto = ajustarAudio(projeto, [id], { fade_saida: 3 * S });
+  const dividido = dividirClipes(projeto, ctx, 5 * S, [id]).projeto;
+  const [esquerda, direita] = principal(dividido);
+  assert.deepEqual([esquerda.fade_entrada, esquerda.fade_saida], [2 * S, 0]);
+  assert.deepEqual([direita.fade_entrada, direita.fade_saida], [0, 3 * S]);
+
+  const aparado = apararClipe(projeto, ctx, id, "fim", 4 * S);
+  clipe = principal(aparado)[0];
+  assert.equal(clipe.fade_entrada + clipe.fade_saida <= clipe.duracao, true, "os fades encolhem com o clipe");
 });

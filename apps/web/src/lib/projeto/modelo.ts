@@ -39,7 +39,11 @@ export type Clipe = {
   /** De onde o clipe começa dentro da mídia. */
   entrada: Tick;
   velocidade: number;
+  /** De 0 a 4 (400%). */
   volume: number;
+  /** Quanto o som leva para subir do zero no começo e descer a zero no fim. */
+  fade_entrada: Tick;
+  fade_saida: Tick;
   transformacao: Transformacao;
   recorte: Recorte;
 };
@@ -79,6 +83,14 @@ export function duracaoDoProjeto(projeto: Pick<Projeto, "faixas">): Tick {
   return fim;
 }
 
+/** Quanto do volume do clipe vale no instante `t`, pelos fades (de 0 a 1). */
+export function fatorDosFades(clipe: Clipe, t: Tick): number {
+  let fator = 1;
+  if (clipe.fade_entrada > 0) fator = Math.min(fator, (t - clipe.inicio) / clipe.fade_entrada);
+  if (clipe.fade_saida > 0) fator = Math.min(fator, (fimDoClipe(clipe) - t) / clipe.fade_saida);
+  return Math.min(1, Math.max(0, fator));
+}
+
 /** Instante da mídia que aparece no instante `t` da linha do tempo. */
 export function tempoNaMidia(clipe: Clipe, t: Tick): Tick {
   return clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade);
@@ -111,6 +123,8 @@ export function completarProjeto(projeto: Projeto): Projeto {
       ...faixa,
       clipes: faixa.clipes.map((clipe) => ({
         ...clipe,
+        fade_entrada: clipe.fade_entrada ?? 0,
+        fade_saida: clipe.fade_saida ?? 0,
         transformacao: { ...TRANSFORMACAO_PADRAO, ...clipe.transformacao },
         recorte: { ...RECORTE_PADRAO, ...clipe.recorte },
       })),

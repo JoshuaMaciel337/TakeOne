@@ -152,6 +152,8 @@ class ClipeEntrada(BaseModel):
     entrada: int = Field(ge=0, description="De onde começa na mídia, em ticks")
     velocidade: float = Field(default=1.0, ge=0.1, le=100)
     volume: float = Field(default=1.0, ge=0, le=4)
+    fade_entrada: int = Field(default=0, ge=0, description="Em ticks")
+    fade_saida: int = Field(default=0, ge=0, description="Em ticks")
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)

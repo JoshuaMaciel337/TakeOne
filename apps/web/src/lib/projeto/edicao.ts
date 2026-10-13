@@ -87,8 +87,17 @@ function infoDoClipe(ctx: Contexto, clipe: Clipe, faixa: Faixa): InfoMidia {
 }
 
 /** Tira as faixas livres que ficaram vazias e confere o tamanho máximo. */
+/** Os fades nunca passam do clipe: depois de aparar ou dividir, encolhem junto. */
+function limitarFades(clipe: Clipe): Clipe {
+  const entrada = Math.min(clipe.fade_entrada, clipe.duracao);
+  const saida = Math.min(clipe.fade_saida, clipe.duracao - entrada);
+  return entrada === clipe.fade_entrada && saida === clipe.fade_saida ? clipe : { ...clipe, fade_entrada: entrada, fade_saida: saida };
+}
+
 function finalizar(projeto: Projeto): Projeto {
-  const faixas = projeto.faixas.filter((faixa) => faixa.tipo === "principal" || faixa.clipes.length > 0);
+  const faixas = projeto.faixas
+    .filter((faixa) => faixa.tipo === "principal" || faixa.clipes.length > 0)
+    .map((faixa) => (faixa.clipes.every((clipe) => limitarFades(clipe) === clipe) ? faixa : { ...faixa, clipes: faixa.clipes.map(limitarFades) }));
   let duracao = 0;
   for (const faixa of faixas) for (const clipe of faixa.clipes) duracao = Math.max(duracao, fimDoClipe(clipe));
   if (duracao > TICK_MAXIMO) throw new ErroEdicao("O projeto pode ter no máximo 6 horas.");
@@ -170,6 +179,8 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     entrada: 0,
     velocidade: 1,
     volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
     transformacao: TRANSFORMACAO_PADRAO,
     recorte: RECORTE_PADRAO,
   };
@@ -275,8 +286,10 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         inicio: t,
         duracao: fim - t,
         entrada: clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade),
+        // O fade de entrada fica com a metade da esquerda, e o de saída com a da direita
+        fade_entrada: 0,
       };
-      clipes.push({ ...clipe, duracao: t - clipe.inicio }, direita);
+      clipes.push({ ...clipe, duracao: t - clipe.inicio, fade_saida: 0 }, direita);
       novos.push(direita.id);
     }
     return { ...faixa, clipes };
@@ -407,6 +420,32 @@ export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
 
 export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Recorte): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, recorte: limitarRecorte(recorte) }));
+}
+
+export const VOLUME_MAXIMO = 4;
+
+export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick };
+
+/** Volume e fades. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
+export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: MudancaDeAudio): Projeto {
+  const alvos = new Set(clipeIds);
+  if (!alvos.size) throw new ErroEdicao("Escolha um clipe.");
+  let achou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.clipes.some((clipe) => alvos.has(clipe.id))) return faixa;
+    achou = true;
+    exigirDestravada(faixa);
+    const clipes = faixa.clipes.map((clipe) => {
+      if (!alvos.has(clipe.id)) return clipe;
+      const volume = mudanca.volume === undefined ? clipe.volume : limitar(mudanca.volume, 0, VOLUME_MAXIMO);
+      const fadeEntrada = Math.round(limitar(mudanca.fade_entrada ?? clipe.fade_entrada, 0, clipe.duracao));
+      const fadeSaida = Math.round(limitar(mudanca.fade_saida ?? clipe.fade_saida, 0, clipe.duracao - fadeEntrada));
+      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida };
+    });
+    return { ...faixa, clipes };
+  });
+  if (!achou) throw new ErroEdicao("Este clipe não existe mais.");
+  return { ...projeto, faixas };
 }
 
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { arquivoDaMidia } from "@/lib/api";
 import { aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
-import { type Clipe, type Faixa, tempoNaMidia } from "@/lib/projeto/modelo";
+import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -129,15 +129,16 @@ function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFon
   );
 }
 
-/** O som de um clipe, com o volume pelo Web Audio (até 400%). */
+/** O som de um clipe, com o volume e os fades pelo Web Audio (até 400%). */
 export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo: Tick; tocando: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   useSeguirRelogio(audioRef, item, tempo, tocando);
 
-  const { volume } = item.clipe;
+  // Os fades mudam o ganho a cada quadro da tela enquanto toca, como o afade do render
+  const ganho = item.ativo ? item.clipe.volume * fatorDosFades(item.clipe, tempo) : 0;
   useEffect(() => {
-    if (audioRef.current) aplicarVolume(audioRef.current, volume);
-  }, [volume, tocando]);
+    if (audioRef.current) aplicarVolume(audioRef.current, ganho);
+  }, [ganho, tocando]);
 
   const { midia } = item;
   return <audio ref={audioRef} src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a")} preload="auto" />;

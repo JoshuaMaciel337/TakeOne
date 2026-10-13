@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
-import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO } from "@/lib/projeto/edicao";
+import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
-import { formatarTimecode, type Taxa } from "@/lib/tempo";
+import { formatarTimecode, type Taxa, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { ControleNumerico } from "./ControleNumerico";
@@ -16,7 +16,7 @@ import { ControleNumerico } from "./ControleNumerico";
 const ABAS = [
   { id: "info", nome: "Informações", fase: "" },
   { id: "basico", nome: "Básico", fase: "" },
-  { id: "audio", nome: "Áudio", fase: "Fase 3" },
+  { id: "audio", nome: "Áudio", fase: "" },
   { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
   { id: "animacao", nome: "Animação", fase: "Fase 3" },
   { id: "cor", nome: "Cor", fase: "Fase 4" },
@@ -133,6 +133,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
           </>
         ) : aba === "basico" && selecionado ? (
           <AbaBasico clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        ) : aba === "audio" && selecionado ? (
+          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} temSom={Boolean(midia.audio)} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
             Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
@@ -276,6 +278,65 @@ function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
         <ControleNumerico rotulo="Direita" {...controleDeBorda("direita")} />
         <ControleNumerico rotulo="Cima" {...controleDeBorda("topo")} />
         <ControleNumerico rotulo="Baixo" {...controleDeBorda("base")} />
+      </Secao>
+    </div>
+  );
+}
+
+/** Fade mais longo que o controle deslizante oferece; no campo de número vai até a duração do clipe. */
+const FADE_MAXIMO_S = 10;
+
+/** Volume e fades de entrada e saída do som do clipe. */
+function AbaAudio({ clipe, faixa, temSom, aoPrever, aoExecutar }: PropsAba & { temSom: boolean }) {
+  if (!temSom) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
+  const travada = faixa.travada;
+  const ids = [clipe.id];
+  const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
+  const comando = (mudanca: { volume?: number; fade_entrada?: number; fade_saida?: number }): Comando => ({
+    comando: "clipe.audio",
+    parametros: { clipeIds: ids, ...mudanca },
+  });
+  const controle = (atual: number, paraMudanca: (valor: number) => Parameters<typeof comando>[0]) => ({
+    valor: atual,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando(paraMudanca(valor))),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor - atual) < PERTO) aoPrever(null);
+      else aoExecutar(comando(paraMudanca(valor)));
+    },
+  });
+  const emTicks = (segundos: number) => Math.round(segundos * TICKS_POR_SEGUNDO);
+
+  return (
+    <div>
+      {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      {faixa.muda ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está silenciada: o som deste clipe não sai.</p> : null}
+      <Secao titulo="Som">
+        <ControleNumerico
+          rotulo="Volume"
+          minimo={0}
+          maximo={VOLUME_MAXIMO * 100}
+          sufixo="%"
+          {...controle(clipe.volume * 100, (valor) => ({ volume: valor / 100 }))}
+        />
+        <ControleNumerico
+          rotulo="Aparecer aos poucos"
+          minimo={0}
+          maximo={Math.min(FADE_MAXIMO_S, duracaoS)}
+          maximoDigitado={duracaoS}
+          passo={0.1}
+          sufixo="s"
+          {...controle(clipe.fade_entrada / TICKS_POR_SEGUNDO, (valor) => ({ fade_entrada: emTicks(valor) }))}
+        />
+        <ControleNumerico
+          rotulo="Sumir aos poucos"
+          minimo={0}
+          maximo={Math.min(FADE_MAXIMO_S, duracaoS)}
+          maximoDigitado={duracaoS}
+          passo={0.1}
+          sufixo="s"
+          {...controle(clipe.fade_saida / TICKS_POR_SEGUNDO, (valor) => ({ fade_saida: emTicks(valor) }))}
+        />
       </Secao>
     </div>
   );

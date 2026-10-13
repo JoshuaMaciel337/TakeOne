@@ -103,6 +103,8 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
             fonte_fim = clipe["entrada"] + round(clipe["duracao"] * clipe["velocidade"])
             if fonte_fim > segundos_para_ticks(midia.get("duracao") or 0) + FOLGA_FIM_DA_MIDIA:
                 return f'Um clipe de "{midia["nome"]}" passa do fim da mídia.'
+            if clipe.get("fade_entrada", 0) + clipe.get("fade_saida", 0) > clipe["duracao"]:
+                return "Os fades de um clipe passam da duração dele."
             if clipe["inicio"] < anterior_fim:
                 return "Dois clipes da mesma faixa estão um por cima do outro."
             if faixa["tipo"] == FAIXA_PRINCIPAL and clipe["inicio"] != anterior_fim:

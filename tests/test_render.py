@@ -144,3 +144,9 @@ def test_link_do_celular_vale_24_horas_e_guarda_so_o_hash():
     assert not link_vencido(link, agora + timedelta(hours=23))
     assert link_vencido(link, agora + timedelta(hours=24))
     assert link_vencido(None)
+
+
+def test_fades_no_tempo_do_clipe_antes_do_atraso():
+    com_fade = clipe("c1", "deitado", 1, 3, fade_entrada=S // 2, fade_saida=S)
+    plano = planejar_render(projeto([faixa("principal", [com_fade])]), MIDIAS, 1080, 1920)
+    assert "volume=1,afade=t=in:st=0:d=0.5,afade=t=out:st=2:d=1,adelay=48000S:all=1" in plano.filtro

@@ -7,12 +7,14 @@
 import type { Tick } from "../tempo.ts";
 import {
   adicionarClipe,
+  ajustarAudio,
   alternarFaixa,
   apagarClipes,
   apararClipe,
   type Contexto,
   type DestinoClipe,
   dividirClipes,
+  type MudancaDeAudio,
   duplicarClipes,
   moverClipe,
   mudarFundo,
@@ -34,7 +36,8 @@ export type Comando =
   | { comando: "projeto.fundo"; parametros: { cor: string } }
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao> } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
-  | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } };
+  | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
+  | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -49,6 +52,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.transformar": "mudar posição e tamanho",
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
+  "clipe.audio": "mudar o som",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -87,6 +91,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: recortarClipes(projeto, parametros.clipeIds, parametros.recorte) };
     case "clipe.restaurar":
       return { projeto: restaurarClipes(projeto, parametros.clipeIds) };
+    case "clipe.audio": {
+      const { clipeIds, ...mudanca } = parametros;
+      return { projeto: ajustarAudio(projeto, clipeIds, mudanca) };
+    }
   }
 }
 

@@ -129,14 +129,21 @@ def _video_do_clipe(entrada: int, clipe: dict, midia: MidiaDoRender, quadro: tup
 
 def _som_do_clipe(entrada: int, clipe: dict) -> str:
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
+    duracao = segundos(clipe["duracao"])
     filtros = [
         "asetpts=PTS-STARTPTS",
         f"aresample={TAXA_AUDIO}",
         "aformat=sample_fmts=fltp:channel_layouts=stereo",
         *cadeia_atempo(clipe["velocidade"]),
         f"volume={_numero(clipe['volume'])}",
-        f"adelay={atraso}S:all=1",
     ]
+    # Fades no tempo do próprio clipe (depois da velocidade), antes de ir para o instante dele
+    fade_entrada, fade_saida = segundos(clipe.get("fade_entrada", 0)), segundos(clipe.get("fade_saida", 0))
+    if fade_entrada > 0:
+        filtros.append(f"afade=t=in:st=0:d={_numero(fade_entrada)}")
+    if fade_saida > 0:
+        filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}")
+    filtros.append(f"adelay={atraso}S:all=1")
     return f"[{entrada}:a]{','.join(filtros)}"
 
 
