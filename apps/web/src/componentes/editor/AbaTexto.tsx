@@ -1,0 +1,148 @@
+"use client";
+
+import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper } from "lucide-react";
+
+import type { Comando } from "@/lib/projeto/comandos";
+import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import { type Alinhamento, FONTES_TEXTO, type FonteTexto, LIMITES_TEXTO, type Texto } from "@/lib/projeto/texto";
+
+import { CampoCor } from "./CampoCor";
+import { ControleNumerico } from "./ControleNumerico";
+
+type Props = {
+  clipe: Clipe;
+  faixa: Faixa;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+};
+
+const ALINHAMENTOS: { id: Alinhamento; nome: string; icone: typeof AlignLeft }[] = [
+  { id: "esquerda", nome: "Alinhar à esquerda", icone: AlignLeft },
+  { id: "centro", nome: "Centralizar", icone: AlignCenter },
+  { id: "direita", nome: "Alinhar à direita", icone: AlignRight },
+];
+
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="border-b border-borda/60 pb-2 pt-3 first:pt-0 last:border-0">
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-suave">{titulo}</h3>
+      {children}
+    </section>
+  );
+}
+
+function BotaoAlternar({ ativo, rotulo, desativado, aoClicar, children }: { ativo: boolean; rotulo: string; desativado: boolean; aoClicar: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={ativo}
+      aria-label={rotulo}
+      title={rotulo}
+      disabled={desativado}
+      onClick={aoClicar}
+      className={`botao-icone ${ativo ? "bg-painel-3 text-texto" : ""}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const PERTO = 1e-6;
+
+/** Conteúdo, fonte, cor, contorno, sombra e fundo de um clipe de texto. */
+export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
+  const texto = clipe.texto!;
+  const travada = faixa.travada;
+  const mudar = (mudanca: Partial<Texto>): Comando => ({ comando: "texto.mudar", parametros: { clipeIds: [clipe.id], texto: mudanca } });
+  /** Controle deslizante: `fator` converte o valor guardado no que aparece (0,07 → 7%). */
+  const controle = (chave: "tamanho" | "contorno_espessura" | "sombra" | "fundo_opacidade", fator: number) => ({
+    valor: texto[chave] * fator,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(mudar({ [chave]: valor / fator })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / fator - texto[chave]) < PERTO) aoPrever(null);
+      else aoExecutar(mudar({ [chave]: valor / fator }));
+    },
+  });
+  const cor = (chave: "cor" | "contorno_cor" | "fundo_cor") => ({
+    cor: texto[chave],
+    desativado: travada,
+    aoPrever: (valor: string) => aoPrever(mudar({ [chave]: valor })),
+    aoConfirmar: (valor: string) => aoExecutar(mudar({ [chave]: valor })),
+  });
+
+  return (
+    <div>
+      {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      <Secao titulo="Texto">
+        <textarea
+          value={texto.conteudo}
+          disabled={travada}
+          maxLength={LIMITES_TEXTO.conteudo}
+          rows={3}
+          aria-label="Texto"
+          // Cada letra aparece na prévia; vira um passo do desfazer quando sai do campo
+          onFocus={(evento) => {
+            evento.currentTarget.dataset.inicial = evento.currentTarget.value;
+          }}
+          onChange={(evento) => aoPrever(mudar({ conteudo: evento.currentTarget.value }))}
+          onBlur={(evento) => {
+            const { value, dataset } = evento.currentTarget;
+            if (value === dataset.inicial) aoPrever(null);
+            else aoExecutar(mudar({ conteudo: value }));
+          }}
+          className="mb-2 w-full resize-y rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-sm outline-none focus:border-destaque disabled:opacity-50"
+        />
+        <div className="flex items-center gap-2">
+          <select
+            value={texto.fonte}
+            disabled={travada}
+            aria-label="Fonte"
+            onChange={(evento) => aoExecutar(mudar({ fonte: evento.currentTarget.value as FonteTexto }))}
+            className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+          >
+            {FONTES_TEXTO.map((fonte) => (
+              <option key={fonte.id} value={fonte.id}>
+                {fonte.nome}
+              </option>
+            ))}
+          </select>
+          <BotaoAlternar ativo={texto.negrito} rotulo="Negrito" desativado={travada} aoClicar={() => aoExecutar(mudar({ negrito: !texto.negrito }))}>
+            <Bold className="size-4" aria-hidden />
+          </BotaoAlternar>
+          <BotaoAlternar ativo={texto.caixa_alta} rotulo="Tudo em maiúsculas" desativado={travada} aoClicar={() => aoExecutar(mudar({ caixa_alta: !texto.caixa_alta }))}>
+            <CaseUpper className="size-4" aria-hidden />
+          </BotaoAlternar>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-suave">Alinhamento</span>
+          <span className="flex gap-1">
+            {ALINHAMENTOS.map(({ id, nome, icone: Icone }) => (
+              <BotaoAlternar key={id} ativo={texto.alinhamento === id} rotulo={nome} desativado={travada} aoClicar={() => aoExecutar(mudar({ alinhamento: id }))}>
+                <Icone className="size-4" aria-hidden />
+              </BotaoAlternar>
+            ))}
+          </span>
+        </div>
+        <ControleNumerico
+          rotulo="Tamanho"
+          minimo={LIMITES_TEXTO.tamanho.minimo * 100}
+          maximo={LIMITES_TEXTO.tamanho.maximo * 100}
+          passo={0.5}
+          sufixo="%"
+          {...controle("tamanho", 100)}
+        />
+        <CampoCor rotulo="Cor" {...cor("cor")} />
+      </Secao>
+      <Secao titulo="Contorno">
+        <ControleNumerico rotulo="Espessura" minimo={0} maximo={LIMITES_TEXTO.contorno.maximo * 100} passo={0.5} sufixo="%" {...controle("contorno_espessura", 100)} />
+        <CampoCor rotulo="Cor do contorno" {...cor("contorno_cor")} />
+      </Secao>
+      <Secao titulo="Sombra e fundo">
+        <ControleNumerico rotulo="Sombra" minimo={0} maximo={100} sufixo="%" {...controle("sombra", 100)} />
+        <ControleNumerico rotulo="Fundo" minimo={0} maximo={100} sufixo="%" {...controle("fundo_opacidade", 100)} />
+        <CampoCor rotulo="Cor do fundo" {...cor("fundo_cor")} />
+      </Secao>
+    </div>
+  );
+}

@@ -42,7 +42,23 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`) com os quadros decodificados pelo WebCodecs (`lib/previa/decodificador.ts`) e o som pelo Web Audio. Dá para selecionar, arrastar, redimensionar e girar direto na prévia; há a aba Básico nas propriedades e a cor de fundo do projeto.
   - Exportação: botão Exportar com 720p, 1080p e 4K, render na fila do worker (`core/utils/render.py` e `apps/worker/tarefas/renderizacao.py`), progresso, download e QR para o celular. **O render foi escrito numa máquina sem FFmpeg e ainda não rodou de verdade:** confira o CI ou rode `pytest tests/integracao/test_exportacoes.py` no Nitro.
   - Falta: ver o render rodar e a parte da prévia no teste que compara prévia e render.
-- **Próximo passo:** rodar o render no Nitro (ou ver o CI) e corrigir o que aparecer; depois a fase 3.
+- **Fase 3 (texto, áudio e legendas):** em andamento.
+  - Pronto: volume até 400% e fades na aba Áudio; clipes de texto (ferramenta Texto com estilos prontos, aba Texto com fonte, cor, contorno, sombra e fundo), na prévia e no render.
+  - Falta: animações de texto, ducking, loudness medido, efeitos de voz, legendas automáticas (Whisper, no Nitro) e SRT/VTT.
+- **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, seguir a fase 3 pelas legendas manuais e SRT/VTT.
+
+## Pendente no Nitro
+
+Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto só dá para conferir no Nitro (ou, no caso dos testes, no CI). Tire da lista o que for conferido.
+
+- [ ] `git pull` e `docker compose up --build`. Há dependências novas: `pillow` e `segno` no Python, `mp4box` no site.
+- [ ] Ver o CI do GitHub verde. Os testes com FFmpeg (`tests/integracao/test_exportacoes.py`, render e texto no render) nunca rodaram: foram escritos sem FFmpeg.
+- [ ] Exportar um projeto de verdade em 1080p: vídeo do celular na principal, uma sobreposição girada e meio transparente, um texto com fundo e uma música com fade. Conferir posição, giro, opacidade, texto, volume, fades, duração e o loudness em -14 LUFS.
+- [ ] Comparar a prévia e o vídeo exportado no mesmo instante: camadas e texto no mesmo lugar e do mesmo tamanho. Se der diferença, ela entra no teste que compara prévia e render.
+- [ ] WebCodecs com um proxy de verdade, que tem quadros B e lista de edição: parar em vários pontos e ver se a prévia mostra o mesmo quadro do vídeo, e tocar dois vídeos sobrepostos.
+- [ ] Exportar em 4K e ver o tempo e a memória do worker.
+- [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
+- [ ] Wan 2.2 (fase 5): conferir a licença no Hugging Face e medir tempo e memória de um clipe de 5 s com o ComfyUI.
 
 ## Arquitetura em um minuto
 
@@ -71,6 +87,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Mudança provisória:** arrastar na prévia ou num controle deslizante do painel muda um `Comando` provisório no `Editor`, que só aparece na tela. Ao soltar, vira comando de verdade e um passo do desfazer.
 - **Render:** cada clipe é uma entrada do FFmpeg aberta só no trecho dele (`-ss`/`-t` antes do `-i`), sobreposta num quadro de cor com `overlay format=rgb`, como a mistura do navegador. O clipe aparece com `gte(t, início - meio quadro) * lt(t, fim - meio quadro)`, para nenhum quadro cair bem na fronteira. São no máximo 400 clipes por exportação, porque cada um é um arquivo aberto ao mesmo tempo.
 - **Exportação guarda uma cópia do projeto:** editar enquanto o vídeo é gerado não muda o que sai. O link do celular é o do HolyCut: token de 24 h, com só o hash no banco.
+- **Texto é imagem do servidor:** o PNG do texto vem de `core/utils/texto.py` (Pillow, motor de layout BASIC, fontes em `core/fontes`), pedido pela prévia em `/api/textos/imagem` e gerado de novo pelo worker no render. A prévia pede sempre com lado menor 1080 (`LADO_REFERENCIA_TEXTO`); o render desenha no tamanho do vídeo, para ficar nítido em 4K, mas estica a imagem até a caixa medida em 1080. Assim o texto fica no mesmo lugar nos dois, mesmo com a medida das letras mudando 1 a 2% entre tamanhos.
+- **Clipe de texto não tem mídia:** `midia_id` é `null` e o clipe tem `texto`. Ele só fica em faixas `texto`, que ficam sempre acima das de vídeo. Não há quebra automática de linha: as linhas são as que a pessoa digitou.
+- **Fades:** `fade_entrada` e `fade_saida` em ticks, sempre somando no máximo a duração do clipe (a edição encolhe os fades ao aparar). Ao dividir, o fade de entrada fica com a primeira metade e o de saída com a segunda.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.

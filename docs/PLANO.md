@@ -373,13 +373,13 @@ Cada fase termina com algo que dá para usar e testar.
 - [ ] Teste automático que compara quadros da prévia e do render. Feito pela metade: o render é conferido ponto a ponto contra a geometria (`test_render_segue_a_geometria_da_previa`, roda com FFmpeg), e a prévia contra a mesma geometria só por script no navegador, fora do CI.
 
 ### Fase 3: texto, áudio e legendas (2 semanas)
-- Texto:
-  - fontes
-  - cor
-  - contorno
-  - sombra
-  - fundo
-  - estilos prontos
+- Texto (faixa de texto por cima de tudo; o PNG do texto é desenhado pela API e é o mesmo no render):
+  - [x] fontes (Montserrat, Inter e Caveat, OFL), negrito, maiúsculas e alinhamento
+  - [x] cor
+  - [x] contorno
+  - [x] sombra
+  - [x] fundo
+  - [x] estilos prontos
   - animações de entrada, saída e loop (animadores de texto do EffectCraft)
   - estilos de contorno, sombra e brilho (estilos de camada do PhotoCraft)
 - Áudio:

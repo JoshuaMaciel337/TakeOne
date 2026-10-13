@@ -7,6 +7,7 @@
 import type { Tick } from "../tempo.ts";
 import {
   adicionarClipe,
+  adicionarTexto,
   ajustarAudio,
   alternarFaixa,
   apagarClipes,
@@ -18,11 +19,13 @@ import {
   duplicarClipes,
   moverClipe,
   mudarFundo,
+  mudarTexto,
   recortarClipes,
   restaurarClipes,
   transformarClipes,
 } from "./edicao.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
+import type { Texto } from "./texto.ts";
 
 export type Comando =
   | { comando: "clipe.adicionar"; parametros: { midiaId: string } & DestinoClipe }
@@ -37,7 +40,9 @@ export type Comando =
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao> } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
-  | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio };
+  | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
+  | { comando: "texto.adicionar"; parametros: { inicio: Tick; texto: Texto } }
+  | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -53,6 +58,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
   "clipe.audio": "mudar o som",
+  "texto.adicionar": "adicionar texto",
+  "texto.mudar": "mudar o texto",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -91,6 +98,12 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: recortarClipes(projeto, parametros.clipeIds, parametros.recorte) };
     case "clipe.restaurar":
       return { projeto: restaurarClipes(projeto, parametros.clipeIds) };
+    case "texto.adicionar": {
+      const resultado = adicionarTexto(projeto, ctx, parametros.inicio, parametros.texto);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "texto.mudar":
+      return { projeto: mudarTexto(projeto, parametros.clipeIds, parametros.texto) };
     case "clipe.audio": {
       const { clipeIds, ...mudanca } = parametros;
       return { projeto: ajustarAudio(projeto, clipeIds, mudanca) };

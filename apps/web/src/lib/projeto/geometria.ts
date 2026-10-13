@@ -21,6 +21,22 @@ export type Caixa = {
   opacidade: number;
 };
 
+/** O PNG de um texto é medido num quadro com este lado menor; em outro tamanho, a caixa escala junto. */
+export const LADO_REFERENCIA_TEXTO = 1080;
+
+/** Caixa de um clipe de texto: `imagem` é o tamanho do PNG desenhado para LADO_REFERENCIA_TEXTO. */
+export function caixaDoTexto(transformacao: Transformacao, imagem: Tamanho, quadro: Tamanho): Caixa {
+  const escala = (transformacao.escala * Math.min(quadro.largura, quadro.altura)) / LADO_REFERENCIA_TEXTO;
+  return {
+    cx: quadro.largura / 2 + transformacao.x * quadro.largura,
+    cy: quadro.altura / 2 + transformacao.y * quadro.altura,
+    largura: imagem.largura * escala,
+    altura: imagem.altura * escala,
+    rotacao: transformacao.rotacao,
+    opacidade: transformacao.opacidade,
+  };
+}
+
 export function caixaDoClipe(transformacao: Transformacao, recorte: Recorte, midia: Tamanho, quadro: Tamanho): Caixa {
   const largura = midia.largura * recorte.largura;
   const altura = midia.altura * recorte.altura;

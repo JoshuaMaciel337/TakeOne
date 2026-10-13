@@ -25,14 +25,17 @@ from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
+from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.mongo import agora
 from core.utils.render import (
     ErroRender,
+    ImagemDoTexto,
     MidiaDoRender,
     argumentos_de_saida,
     opcao_filtro_em_arquivo,
     planejar_render,
 )
+from core.utils.texto import desenhar_texto
 
 ARQUIVO_FILTRO = "filtro.txt"
 ARQUIVO_PARCIAL = "video.parcial.mp4"
@@ -67,6 +70,25 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
     return preparadas
 
 
+def preparar_textos(faixas: list[dict], largura: int, altura: int, pasta: Path) -> dict[str, ImagemDoTexto]:
+    """
+    O PNG de cada texto, no tamanho do vídeo (nítido em 4K). A caixa no quadro sai do tamanho no lado
+    de referência, o mesmo que a prévia mede, para o texto ficar no mesmo lugar nos dois.
+    """
+    textos = {}
+    for faixa in faixas:
+        if faixa.get("oculta"):
+            continue
+        for clipe in faixa["clipes"]:
+            if not clipe.get("texto"):
+                continue
+            referencia = desenhar_texto(clipe["texto"], LADO_REFERENCIA_TEXTO).size
+            caminho = pasta / f"texto_{clipe['id']}.png"
+            desenhar_texto(clipe["texto"], min(largura, altura)).save(caminho, format="PNG")
+            textos[clipe["id"]] = ImagemDoTexto(str(caminho), *referencia)
+    return textos
+
+
 def marcar_exportacao_com_erro(db, job: dict, mensagem: str):
     """Chamado quando o render falha de vez: a exportação mostra o erro."""
     exportacao_id = (job.get("entrada") or {}).get("exportacao_id")
@@ -91,11 +113,14 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         "status": STATUS_PROCESSANDO, "erro": None, "atualizado_em": agora(),
     }})
 
-    reportar(2, "Preparando as mídias")
+    reportar(2, "Preparando as mídias e os textos")
     midias = preparar_midias(db, organizacao_id, projeto["faixas"])
     largura, altura = exportacao["largura"], exportacao["altura"]
+    pasta = caminho(ARQUIVO_FILTRO).parent
+    pasta.mkdir(parents=True, exist_ok=True)
+    textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
     try:
-        plano = planejar_render(projeto, midias, largura, altura)
+        plano = planejar_render(projeto, midias, largura, altura, textos)
     except ErroRender as e:
         raise ErroDefinitivo(str(e)) from e
     logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
@@ -112,6 +137,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(5 + int(f * 90), "Gerando o vídeo"))
     finally:
         filtro.unlink(missing_ok=True)
+        for imagem in textos.values():
+            Path(imagem.caminho).unlink(missing_ok=True)
 
     reportar(97, "Conferindo o vídeo")
     try:

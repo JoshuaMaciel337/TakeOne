@@ -61,7 +61,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "texto",
     nome: "Texto",
     icone: Type,
-    emBreve: { fase: "Fase 3", descricao: "Títulos e textos com fonte, contorno, sombra, brilho e animações de entrada e saída." },
   },
   {
     id: "legendas",

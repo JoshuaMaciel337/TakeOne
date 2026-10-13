@@ -39,4 +39,4 @@ O sistema de comandos (`lib/projeto/comandos.ts`) segue a ideia do `crates/engin
 
 ## Bibliotecas
 
-As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e as fontes Inter e Sora (OFL) vêm do Google Fonts pelo `next/font`.
+As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e as fontes Inter e Sora (OFL) vêm do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.

@@ -12,7 +12,7 @@ from core.modelos.exportacao import (
     nome_de_arquivo,
     tamanho_de_saida,
 )
-from core.utils.render import ErroRender, MidiaDoRender, cadeia_atempo, planejar_render
+from core.utils.render import ErroRender, ImagemDoTexto, MidiaDoRender, cadeia_atempo, planejar_render
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
 S = TICKS_POR_SEGUNDO
@@ -150,3 +150,18 @@ def test_fades_no_tempo_do_clipe_antes_do_atraso():
     com_fade = clipe("c1", "deitado", 1, 3, fade_entrada=S // 2, fade_saida=S)
     plano = planejar_render(projeto([faixa("principal", [com_fade])]), MIDIAS, 1080, 1920)
     assert "volume=1,afade=t=in:st=0:d=0.5,afade=t=out:st=2:d=1,adelay=48000S:all=1" in plano.filtro
+
+
+def test_texto_entra_como_imagem_parada_com_a_caixa_do_lado_de_referencia():
+    titulo = {"id": "t1", "midia_id": None, "texto": {"conteudo": "Oi"}, "inicio": S, "duracao": 2 * S,
+              "entrada": 0, "velocidade": 1, "volume": 1, **PADRAO}
+    projeto_com_texto = projeto([faixa("texto", [titulo]), faixa("principal", [clipe("c1", "deitado", 0, 4)])])
+    textos = {"t1": ImagemDoTexto("/tmp/texto_t1.png", 540, 120)}
+    plano = planejar_render(projeto_com_texto, MIDIAS, 720, 1280, textos)
+    assert plano.entradas[1].argumentos() == ["-loop", "1", "-framerate", "30/1", "-t", "2.000000",
+                                              "-i", "/tmp/texto_t1.png"]
+    # Em 720 de lado menor, o PNG medido em 1080 fica com dois terços: 360 × 80
+    assert "scale=360:80" in plano.filtro and "setpts=PTS+1/TB" in plano.filtro
+    assert "[1:a]" not in plano.filtro, "texto não tem som"
+    with pytest.raises(ErroRender, match="texto"):
+        planejar_render(projeto_com_texto, MIDIAS, 720, 1280, {})

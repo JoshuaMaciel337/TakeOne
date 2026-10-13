@@ -3,9 +3,10 @@
 import { Maximize, Pause, Play, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { type Caixa, caixaDoClipe, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
+import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { type Clipe, type Faixa, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
+import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -72,7 +73,7 @@ function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo
       [atual, true],
       [proximo, false],
     ] as const) {
-      const midia = clipe ? midias.get(clipe.midia_id) : undefined;
+      const midia = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
       if (!clipe || midia?.status !== "pronta") continue;
       const chave = `${faixa.id}:${clipe.midia_id}`;
       if (chaves.has(chave)) continue;
@@ -90,7 +91,16 @@ function tamanhoDaMidia(midia: Midia): Tamanho | null {
 
 /** Uma camada do quadro atual, de baixo para cima. */
 /** `segundos` é o instante da mídia que aparece agora. */
-type CamadaNaTela = { chave: string; clipe: Clipe; faixa: Faixa; recorte: Recorte; caixa: Caixa; segundos: number };
+type CamadaNaTela = {
+  chave: string;
+  clipe: Clipe;
+  faixa: Faixa;
+  recorte: Recorte;
+  caixa: Caixa;
+  segundos: number;
+  /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
+  imagem?: ImageBitmap;
+};
 
 type EstadoDoDesenho = {
   camadas: CamadaNaTela[];
@@ -143,6 +153,25 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
+  // Os textos ficam por cima de todas as faixas de vídeo (a faixa de texto é sempre a de cima)
+  const faixasDeTexto = projeto.faixas.filter((faixa) => faixa.tipo === "texto" && !faixa.oculta);
+  const imagensDeTexto = useImagensDeTexto(
+    faixasDeTexto.flatMap((faixa) => faixa.clipes.flatMap((clipe) => (clipe.texto ? [{ id: clipe.id, texto: clipe.texto }] : []))),
+  );
+  for (const faixa of [...faixasDeTexto].reverse()) {
+    const clipe = faixa.clipes.find((item) => item.inicio <= tempo && tempo < fimDoClipe(item));
+    const imagem = clipe ? imagensDeTexto.get(clipe.id) : undefined;
+    if (!clipe || !imagem || tamanho.largura <= 0) continue;
+    camadas.push({
+      chave: `texto:${clipe.id}`,
+      clipe,
+      faixa,
+      recorte: clipe.recorte,
+      caixa: caixaDoTexto(clipe.transformacao, imagem, tamanho),
+      segundos: 0,
+      imagem: imagem.bitmap,
+    });
+  }
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
 
@@ -165,7 +194,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       const prontas = [];
       let faltando = false;
       for (const camada of estado.camadas) {
-        const quadro = fontes.current.get(camada.chave)?.quadro(camada.segundos);
+        const quadro = camada.imagem ?? fontes.current.get(camada.chave)?.quadro(camada.segundos);
         if (!quadro) {
           faltando = true;
           continue;

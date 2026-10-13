@@ -208,3 +208,37 @@ def test_render_segue_a_geometria_da_previa(cliente, db_limpo):
                 erros.append(((x, y), esperada, obtida))
     assert conferidos > 400
     assert not erros, f"{len(erros)} pontos diferentes da prévia, por exemplo {erros[:5]}"
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_poe_o_texto_no_lugar_da_previa(cliente, db_limpo):
+    from core.utils.geometria import LADO_REFERENCIA_TEXTO, caixa_do_texto
+    from core.utils.texto import desenhar_texto
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    projeto = projeto_com(cliente, midia_id)
+    texto = {"conteudo": "Oi", "tamanho": 0.15, "fundo_cor": "#00ffff", "fundo_opacidade": 1}
+    transformacao = {"x": 0.1, "y": -0.3, "escala": 1.2, "rotacao": 0, "opacidade": 1}
+    clipe_texto = {"id": "t1", "midia_id": None, "texto": texto, "inicio": 0, "duracao": 2 * SEGUNDO, "entrada": 0,
+                   "transformacao": transformacao}
+    faixa_texto = {"id": "ft", "tipo": "texto", "oculta": False, "muda": False, "travada": False,
+                   "clipes": [clipe_texto]}
+    corpo = {campo: projeto[campo] for campo in ("versao", "nome", "proporcao", "taxa", "fundo")}
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json={**corpo, "faixas": [faixa_texto, *projeto["faixas"]]})
+    assert salvo.status_code == 200, salvo.text
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    quadro = quadro_do_video(video, 1.0, 720, 1280)
+    referencia = desenhar_texto(texto, LADO_REFERENCIA_TEXTO).size
+    caixa = caixa_do_texto(transformacao, referencia, (720, 1280))
+    # Logo acima da borda de baixo da caixa, no meio: só o fundo do texto, sem letra
+    x, y = round(caixa.cx), round(caixa.cy + caixa.altura / 2 - caixa.altura * 0.12)
+    assert max(abs(int(a) - b) for a, b in zip(quadro[y, x], (0, 255, 255), strict=True)) <= 40, quadro[y, x]
+    # Fora da caixa, à esquerda dela, aparece o fundo do projeto (a imagem fica mais embaixo)
+    fora = quadro[round(caixa.cy), max(round(caixa.cx - caixa.largura / 2 - 30), 0)]
+    assert max(abs(int(a) - b) for a, b in zip(fora, FUNDO, strict=True)) <= 40, fora

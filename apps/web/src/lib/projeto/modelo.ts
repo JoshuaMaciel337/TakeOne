@@ -1,12 +1,16 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Taxa, Tick } from "../tempo.ts";
+import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
 export const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] as const;
 export type Proporcao = (typeof PROPORCOES)[number];
 
-/** "principal" é a faixa magnética, sem espaço vazio; "video" fica por cima dela; "audio", embaixo. */
-export type TipoFaixa = "principal" | "video" | "audio";
+/**
+ * "principal" é a faixa magnética, sem espaço vazio; "video" fica por cima dela; "audio", embaixo;
+ * "texto" guarda os clipes de texto, por cima de tudo.
+ */
+export type TipoFaixa = "principal" | "video" | "audio" | "texto";
 
 /**
  * Onde a imagem do clipe fica no quadro (lib/projeto/geometria.ts). Sem mudança, a mídia aparece
@@ -32,7 +36,9 @@ export const RECORTE_PADRAO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
 
 export type Clipe = {
   id: string;
-  midia_id: string;
+  /** null nos clipes de texto, que não têm mídia. */
+  midia_id: string | null;
+  texto?: Texto | null;
   /** Posição na linha do tempo. */
   inicio: Tick;
   duracao: Tick;
@@ -123,6 +129,7 @@ export function completarProjeto(projeto: Projeto): Projeto {
       ...faixa,
       clipes: faixa.clipes.map((clipe) => ({
         ...clipe,
+        ...(clipe.texto ? { texto: { ...TEXTO_PADRAO, ...clipe.texto } } : {}),
         fade_entrada: clipe.fade_entrada ?? 0,
         fade_saida: clipe.fade_saida ?? 0,
         transformacao: { ...TRANSFORMACAO_PADRAO, ...clipe.transformacao },

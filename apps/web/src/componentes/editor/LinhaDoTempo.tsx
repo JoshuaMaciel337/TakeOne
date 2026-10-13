@@ -11,6 +11,7 @@ import {
   Magnet,
   Music,
   Scissors,
+  Type,
   Trash2,
   Volume2,
   VolumeX,
@@ -25,6 +26,7 @@ import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
 import { acharClipe, type Clipe, type Faixa, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
+import { resumoDoTexto } from "@/lib/projeto/texto";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -53,7 +55,7 @@ const LARGURA_ROTULOS_COMPACTA = 88;
 const LARGURA_TELA_ESTREITA = 640;
 const ALTURA_REGUA = 24;
 const ALTURA_ZONA_NOVA = 18;
-const ALTURAS: Record<TipoFaixa, number> = { principal: 64, video: 48, audio: 40 };
+const ALTURAS: Record<TipoFaixa, number> = { principal: 64, video: 48, audio: 40, texto: 36 };
 const TOLERANCIA_IMA_PX = 8;
 const LIMIAR_ARRASTO_PX = 4;
 const INTERVALOS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
@@ -77,9 +79,16 @@ function destinoNaAltura(linhas: Linha[], y: number): { faixa?: Faixa; novaFaixa
   return linha ? { faixa: linha.faixa } : { novaFaixa: true };
 }
 
-function aceita(tipo: TipoFaixa, midia: Midia | undefined): boolean {
+/** Se a faixa recebe o clipe: texto só na de texto; mídia com imagem nas de vídeo; som na de áudio. */
+function aceita(tipo: TipoFaixa, midia: Midia | undefined, texto = false): boolean {
+  if (texto) return tipo === "texto";
+  if (tipo === "texto") return false;
   if (!midia) return true;
   return tipo === "audio" ? !midia.video : Boolean(midia.video);
+}
+
+function midiaDoClipe(midias: ReadonlyMap<string, Midia>, clipe: Clipe): Midia | undefined {
+  return clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
 }
 
 type Arrasto =
@@ -99,8 +108,10 @@ type Arrasto =
 function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
   if (faixa.tipo === "principal") return "Principal";
   const iguais = projeto.faixas.filter((item) => item.tipo === faixa.tipo);
-  const numero = faixa.tipo === "video" ? iguais.length - iguais.indexOf(faixa) : iguais.indexOf(faixa) + 1;
-  return `${faixa.tipo === "video" ? "Sobreposição" : "Áudio"} ${numero}`;
+  // As faixas de imagem contam de baixo para cima; as de áudio, de cima para baixo
+  const numero = faixa.tipo === "audio" ? iguais.indexOf(faixa) + 1 : iguais.length - iguais.indexOf(faixa);
+  const nomes = { video: "Sobreposição", audio: "Áudio", texto: "Texto" } as const;
+  return `${nomes[faixa.tipo]} ${numero}`;
 }
 
 export function LinhaDoTempo({
@@ -207,11 +218,18 @@ export function LinhaDoTempo({
   }
 
   /** Para onde vai um clipe da mídia `midia`, começando em `inicio`, com o ponteiro na altura `y`. */
-  function destinoDoClipe(midia: Midia | undefined, inicio: Tick, ponteiro: Tick, y: number, faixaAtual?: string): DestinoClipe & { inicio: Tick } {
+  function destinoDoClipe(
+    midia: Midia | undefined,
+    inicio: Tick,
+    ponteiro: Tick,
+    y: number,
+    faixaAtual?: string,
+    texto = false,
+  ): DestinoClipe & { inicio: Tick } {
     const alvo = destinoNaAltura(layoutOriginal.linhas, y);
     if (alvo.novaFaixa) return { inicio, novaFaixa: true };
     const faixa = alvo.faixa!;
-    if (!aceita(faixa.tipo, midia)) return { inicio, faixaId: faixaAtual };
+    if (!aceita(faixa.tipo, midia, texto)) return { inicio, faixaId: faixaAtual };
     // Na principal o lugar é decidido pelo ponteiro, entre os clipes que já estão lá
     if (faixa.tipo === "principal") return { inicio: ponteiro, faixaId: faixa.id };
     return { inicio, faixaId: faixa.id };
@@ -256,7 +274,7 @@ export function LinhaDoTempo({
     if (atual.tipo === "mover") {
       const { clipe } = atual;
       const { inicio, guia } = encaixar(clipe.inicio + ticks(dx), clipe.duracao, [clipe.id]);
-      const destino = destinoDoClipe(midias.get(clipe.midia_id), inicio, tempoNoPonteiro(evento), pontoNaArea(evento).y, atual.faixaId);
+      const destino = destinoDoClipe(midiaDoClipe(midias, clipe), inicio, tempoNoPonteiro(evento), pontoNaArea(evento).y, atual.faixaId, Boolean(clipe.texto));
       trocarArrasto({ ...atual, ativo: true, guia, comando: { comando: "clipe.mover", parametros: { clipeId: clipe.id, ...destino } } });
     } else {
       const { clipe, borda } = atual;
@@ -495,7 +513,7 @@ export function LinhaDoTempo({
                       key={clipe.id}
                       clipe={clipe}
                       faixa={faixa}
-                      midia={midias.get(clipe.midia_id)}
+                      midia={midiaDoClipe(midias, clipe)}
                       zoom={zoom}
                       esquerda={px(clipe.inicio)}
                       largura={Math.max(2, px(clipe.duracao))}
@@ -532,7 +550,7 @@ function CabecalhoDaFaixa({
   altura: number;
   aoAlternar: (propriedade: "oculta" | "muda" | "travada") => void;
 }) {
-  const Icone = faixa.tipo === "principal" ? Film : faixa.tipo === "video" ? Layers : Music;
+  const Icone = { principal: Film, video: Layers, audio: Music, texto: Type }[faixa.tipo];
   const botao = "grid size-5 place-items-center rounded text-suave hover:bg-white/10 hover:text-texto";
   return (
     <div
@@ -583,17 +601,24 @@ function BlocoDoClipe({
   aoApertar: (evento: React.PointerEvent, borda?: "inicio" | "fim") => void;
 }) {
   const audio = faixa.tipo === "audio";
+  const texto = clipe.texto ?? null;
   const alturaInterna = altura - 6;
+  const nome = texto ? resumoDoTexto(texto) : (midia?.nome ?? "Mídia não encontrada");
+  const cores = texto
+    ? "border-amber-400/50 bg-amber-900/60 text-amber-100"
+    : audio
+      ? "border-emerald-500/40 bg-emerald-900/50 text-emerald-300/70"
+      : "border-sky-500/30 bg-sky-950";
   return (
     <div
       className={`absolute top-[3px] touch-none select-none overflow-hidden rounded-md border ${
-        audio ? "border-emerald-500/40 bg-emerald-900/50 text-emerald-300/70" : "border-sky-500/30 bg-sky-950"
+        cores
       } ${selecionado ? "z-10 outline outline-2 -outline-offset-1 outline-white" : ""} ${faixa.travada ? "cursor-not-allowed opacity-70" : "cursor-grab active:cursor-grabbing"} ${
         faixa.oculta || faixa.muda ? "opacity-50" : ""
       }`}
       style={{ left: esquerda, width: largura, height: alturaInterna }}
       onPointerDown={(evento) => aoApertar(evento)}
-      title={midia?.nome ?? "Mídia não encontrada"}
+      title={nome}
     >
       {midia ? (
         audio ? (
@@ -606,7 +631,7 @@ function BlocoDoClipe({
         )
       ) : null}
       <span className="pointer-events-none absolute left-1.5 top-0.5 max-w-[calc(100%-12px)] truncate rounded bg-black/50 px-1 text-[10px] leading-4 text-white/90">
-        {midia?.nome ?? "Mídia não encontrada"}
+        {nome}
       </span>
       {selecionado && !faixa.travada && largura > 14 ? (
         <>

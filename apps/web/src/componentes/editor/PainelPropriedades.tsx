@@ -10,6 +10,8 @@ import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformaca
 import { formatarTimecode, type Taxa, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { AbaTexto } from "./AbaTexto";
+import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
@@ -22,7 +24,14 @@ const ABAS = [
   { id: "cor", nome: "Cor", fase: "Fase 4" },
 ] as const;
 
-type IdAba = (typeof ABAS)[number]["id"];
+// Clipe de texto: o texto em si, posição e tamanho, e a animação (que vem depois)
+const ABAS_TEXTO = [
+  { id: "texto", nome: "Texto", fase: "" },
+  { id: "basico", nome: "Básico", fase: "" },
+  { id: "animacao", nome: "Animação", fase: "Fase 4" },
+] as const;
+
+type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -35,7 +44,7 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio" };
+const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio", texto: "Texto" };
 
 type Props = {
   midia: Midia | null;
@@ -52,17 +61,30 @@ type Props = {
 };
 
 export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
-  const [abaEscolhida, setAba] = useState<IdAba>("basico");
-  // Mídia da biblioteca, sem clipe, só tem informações
-  const aba = selecionado ? abaEscolhida : "info";
-  const atual = ABAS.find((item) => item.id === aba)!;
+  // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
+  const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
+  const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
+  const ehTexto = Boolean(selecionado?.clipe.texto);
+  const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
+  const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
+  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ABAS;
+  // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
+  const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : abas[0].id;
+  const atual = abas.find((item) => item.id === aba)!;
 
-  if (!midia) {
+  if (!midia && !selecionado) {
     return (
       <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
         <div className="border-b border-borda p-3">
           <h3 className="text-sm font-semibold">Projeto</h3>
-          <CorDeFundo cor={fundo} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <div className="mt-1">
+            <CampoCor
+              rotulo="Cor de fundo"
+              cor={fundo}
+              aoPrever={(cor) => aoPrever({ comando: "projeto.fundo", parametros: { cor } })}
+              aoConfirmar={(cor) => aoExecutar({ comando: "projeto.fundo", parametros: { cor } })}
+            />
+          </div>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <MousePointerClick className="size-6 text-suave" aria-hidden />
@@ -75,7 +97,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
   return (
     <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
       <div role="tablist" aria-label="Propriedades" className="flex shrink-0 gap-1 overflow-x-auto border-b border-borda px-2 py-1.5">
-        {ABAS.map((item) => (
+        {abas.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -92,7 +114,9 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
         ))}
       </div>
       <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-3">
-        {aba === "info" ? (
+        {aba === "texto" && selecionado?.clipe.texto ? (
+          <AbaTexto clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        ) : aba === "info" && midia ? (
           <>
             {selecionado ? (
               <>
@@ -134,7 +158,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
         ) : aba === "basico" && selecionado ? (
           <AbaBasico clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (
-          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} temSom={Boolean(midia.audio)} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} temSom={Boolean(midia?.audio)} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
             Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
@@ -273,12 +297,14 @@ function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
         <ControleNumerico rotulo="Giro" minimo={-180} maximo={180} passo={0.5} sufixo="°" {...controleDeTransformacao("rotacao", 1)} />
         <ControleNumerico rotulo="Opacidade" minimo={opacidade.minimo * 100} maximo={opacidade.maximo * 100} sufixo="%" {...controleDeTransformacao("opacidade", 100)} />
       </Secao>
-      <Secao titulo="Recorte">
-        <ControleNumerico rotulo="Esquerda" {...controleDeBorda("esquerda")} />
-        <ControleNumerico rotulo="Direita" {...controleDeBorda("direita")} />
-        <ControleNumerico rotulo="Cima" {...controleDeBorda("topo")} />
-        <ControleNumerico rotulo="Baixo" {...controleDeBorda("base")} />
-      </Secao>
+      {clipe.texto ? null : (
+        <Secao titulo="Recorte">
+          <ControleNumerico rotulo="Esquerda" {...controleDeBorda("esquerda")} />
+          <ControleNumerico rotulo="Direita" {...controleDeBorda("direita")} />
+          <ControleNumerico rotulo="Cima" {...controleDeBorda("topo")} />
+          <ControleNumerico rotulo="Baixo" {...controleDeBorda("base")} />
+        </Secao>
+      )}
     </div>
   );
 }
@@ -339,32 +365,5 @@ function AbaAudio({ clipe, faixa, temSom, aoPrever, aoExecutar }: PropsAba & { t
         />
       </Secao>
     </div>
-  );
-}
-
-type PropsCor = { cor: string; aoPrever: (comando: Comando | null) => void; aoExecutar: (comando: Comando) => void };
-
-/** Cor atrás das camadas, onde nenhum clipe cobre o quadro. */
-function CorDeFundo({ cor, aoPrever, aoExecutar }: PropsCor) {
-  return (
-    <label className="mt-2 flex items-center justify-between gap-3 text-xs">
-      <span className="text-suave">Cor de fundo</span>
-      <span className="flex items-center gap-2">
-        <span className="font-mono uppercase tabular-nums text-suave">{cor}</span>
-        <input
-          type="color"
-          value={cor}
-          onChange={(evento) => aoPrever({ comando: "projeto.fundo", parametros: { cor: evento.currentTarget.value } })}
-          // O "change" nativo só vem quando a pessoa fecha o seletor: aí vira um passo do desfazer
-          ref={(elemento) => {
-            if (!elemento) return;
-            const confirmar = () => aoExecutar({ comando: "projeto.fundo", parametros: { cor: elemento.value } });
-            elemento.addEventListener("change", confirmar);
-            return () => elemento.removeEventListener("change", confirmar);
-          }}
-          className="h-7 w-10 cursor-pointer rounded border border-borda bg-painel-2"
-        />
-      </span>
-    </label>
   );
 }

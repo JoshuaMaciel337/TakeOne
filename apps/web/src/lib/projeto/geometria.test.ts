@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { ajustarAsGuias, type Caixa, caixaDoClipe, contemPonto, deslocamentoDoCentro, limitesDaCaixa } from "./geometria.ts";
+import { ajustarAsGuias, type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, deslocamentoDoCentro, limitesDaCaixa } from "./geometria.ts";
 import type { Recorte, Transformacao } from "./modelo.ts";
 
 type Caso = {
@@ -15,7 +15,20 @@ type Caso = {
 };
 
 // Os mesmos casos que tests/test_geometria.py confere no render
-const { casos } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/geometria.json", import.meta.url), "utf-8")) as { casos: Caso[] };
+type CasoTexto = Omit<Caso, "midia" | "recorte"> & { imagem: { largura: number; altura: number } };
+const { casos, casos_texto: casosTexto } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/geometria.json", import.meta.url), "utf-8")) as {
+  casos: Caso[];
+  casos_texto: CasoTexto[];
+};
+
+for (const caso of casosTexto) {
+  test(`caixa do texto: ${caso.nome}`, () => {
+    const caixa = caixaDoTexto(caso.transformacao, caso.imagem, caso.quadro);
+    for (const chave of Object.keys(caso.caixa) as (keyof Caixa)[]) {
+      assert.ok(Math.abs(caixa[chave] - caso.caixa[chave]) < 1e-9, `${chave}: ${caixa[chave]} ≠ ${caso.caixa[chave]}`);
+    }
+  });
+}
 
 for (const caso of casos) {
   test(`caixa do clipe: ${caso.nome}`, () => {

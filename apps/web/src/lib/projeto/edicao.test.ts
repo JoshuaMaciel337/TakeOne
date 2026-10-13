@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { duracaoDoQuadro, segundosParaTicks } from "../tempo.ts";
 import {
   adicionarClipe,
+  adicionarTexto,
   ajustarAudio,
   alternarFaixa,
   apagarClipes,
@@ -14,12 +15,14 @@ import {
   ErroEdicao,
   moverClipe,
   mudarFundo,
+  mudarTexto,
   normalizarRotacao,
   recortarClipes,
   restaurarClipes,
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
+import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "./texto.ts";
 import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
@@ -264,4 +267,40 @@ test("volume e fades: limites, e os fades acompanham o dividir e o aparar", () =
   const aparado = apararClipe(projeto, ctx, id, "fim", 4 * S);
   clipe = principal(aparado)[0];
   assert.equal(clipe.fade_entrada + clipe.fade_saida <= clipe.duracao, true, "os fades encolhem com o clipe");
+});
+
+test("texto: entra numa faixa de texto por cima de tudo, só anda entre faixas de texto e não tem limite de mídia", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const comSobreposicao = adicionarClipe(projeto, ctx, "video4", { novaFaixa: true });
+  projeto = comSobreposicao.projeto;
+  const titulo = adicionarTexto(projeto, ctx, 2 * S, ESTILOS_DE_TEXTO[0].texto);
+  projeto = titulo.projeto;
+  assert.deepEqual(projeto.faixas.map((f) => f.tipo), ["texto", "video", "principal"]);
+  const clipe = projeto.faixas[0].clipes[0];
+  assert.equal(clipe.midia_id, null);
+  assert.equal(clipe.inicio, 2 * S);
+  assert.equal(clipe.duracao, 3 * S);
+  conferir(projeto);
+
+  // Outro texto no mesmo instante não cabe na mesma faixa: ganha outra, também por cima
+  projeto = adicionarTexto(projeto, ctx, 2 * S, TEXTO_PADRAO).projeto;
+  assert.deepEqual(projeto.faixas.map((f) => f.tipo), ["texto", "texto", "video", "principal"]);
+
+  const video = projeto.faixas.find((f) => f.tipo === "video")!;
+  assert.throws(() => moverClipe(projeto, ctx, titulo.clipeId, { inicio: 0, faixaId: video.id }), /faixa de texto/);
+  assert.throws(() => moverClipe(projeto, ctx, video.clipes[0].id, { inicio: 0, faixaId: projeto.faixas[0].id }), /só recebe textos/);
+
+  // Puxar o começo para trás e o fim para a frente, sem mídia limitando
+  const esticado = apararClipe(apararClipe(projeto, ctx, titulo.clipeId, "inicio", 0), ctx, titulo.clipeId, "fim", 40 * S);
+  const depois = esticado.faixas.flatMap((f) => f.clipes).find((c) => c.id === titulo.clipeId)!;
+  assert.equal(depois.inicio, 0);
+  assert.equal(depois.duracao, 40 * S);
+
+  const mudado = mudarTexto(projeto, [titulo.clipeId], { conteudo: "Novo", tamanho: 9, cor: "vermelho" });
+  const texto = mudado.faixas.flatMap((f) => f.clipes).find((c) => c.id === titulo.clipeId)!.texto!;
+  assert.equal(texto.conteudo, "Novo");
+  assert.equal(texto.tamanho, 0.3, "o tamanho para no limite");
+  assert.equal(texto.cor, "#ffffff", "cor inválida fica a de antes");
+  assert.throws(() => mudarTexto(projeto, [video.clipes[0].id], { conteudo: "x" }), /não é um texto/);
 });

@@ -20,7 +20,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
-from core.utils.geometria import caixa_do_clipe
+from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
 TAXA_AUDIO = 48000
@@ -47,13 +47,25 @@ class MidiaDoRender:
 
 
 @dataclass(frozen=True)
+class ImagemDoTexto:
+    """O PNG de um clipe de texto, desenhado no tamanho do vídeo, e o tamanho dele no lado de referência."""
+    caminho: str
+    largura_referencia: int
+    altura_referencia: int
+
+
+@dataclass(frozen=True)
 class Entrada:
-    """Um clipe aberto no FFmpeg: só o trecho da mídia que ele usa."""
+    """Um clipe aberto no FFmpeg: só o trecho da mídia que ele usa, ou uma imagem parada (texto)."""
     caminho: str
     inicio: float     # segundos dentro da mídia
     duracao: float    # segundos da mídia lidos (a duração no vídeo vezes a velocidade)
+    imagem: bool = False
+    taxa: str = ""
 
     def argumentos(self) -> list[str]:
+        if self.imagem:
+            return ["-loop", "1", "-framerate", self.taxa, "-t", f"{self.duracao:.6f}", "-i", self.caminho]
         return ["-ss", f"{self.inicio:.6f}", "-t", f"{self.duracao:.6f}", "-i", self.caminho]
 
 
@@ -93,10 +105,8 @@ def cadeia_atempo(velocidade: float) -> list[str]:
     return filtros
 
 
-def _video_do_clipe(entrada: int, clipe: dict, midia: MidiaDoRender, quadro: tuple[int, int],
-                    taxa: str) -> tuple[str, str]:
+def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str) -> tuple[str, str]:
     """(cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro)."""
-    caixa = caixa_do_clipe(clipe["transformacao"], clipe["recorte"], (midia.largura, midia.altura), quadro)
     recorte = clipe["recorte"]
     inicio = segundos(clipe["inicio"])
     largura = max(1, round(caixa.largura))
@@ -147,11 +157,14 @@ def _som_do_clipe(entrada: int, clipe: dict) -> str:
     return f"[{entrada}:a]{','.join(filtros)}"
 
 
-def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int) -> PlanoDeRender:
+def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
+                    textos: dict[str, ImagemDoTexto] | None = None) -> PlanoDeRender:
     """
     projeto: a cópia guardada na exportação (proporcao, taxa, fundo, faixas, duracao).
     midias: id → arquivo e tamanho da imagem de cada mídia usada.
+    textos: id do clipe → PNG de cada clipe de texto.
     """
+    textos = textos or {}
     duracao = segundos(projeto["duracao"])
     if duracao <= 0:
         raise ErroRender("O projeto está vazio. Coloque alguma mídia na linha do tempo antes de exportar.")
@@ -171,10 +184,16 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     entradas: list[Entrada] = []
     indice_da_entrada: dict[str, int] = {}
     for clipe in clipes:
+        indice_da_entrada[clipe["id"]] = len(entradas)
+        if clipe.get("texto"):
+            imagem = textos.get(clipe["id"])
+            if imagem is None:
+                raise ErroRender("Faltou a imagem de um texto do projeto.")
+            entradas.append(Entrada(imagem.caminho, 0, segundos(clipe["duracao"]), imagem=True, taxa=taxa))
+            continue
         midia = midias.get(clipe["midia_id"])
         if midia is None:
             raise ErroRender("Uma mídia usada no projeto foi excluída ou não está pronta.")
-        indice_da_entrada[clipe["id"]] = len(entradas)
         entradas.append(Entrada(midia.caminho, segundos(clipe["entrada"]),
                                 segundos(clipe["duracao"]) * clipe["velocidade"]))
 
@@ -182,10 +201,16 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     linhas = [f"color=c=0x{cor}:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp[base0]"]
     anterior = "base0"
     for numero, clipe in enumerate((c for f in visuais for c in f["clipes"]), start=1):
-        midia = midias[clipe["midia_id"]]
-        if not midia.video:
-            continue
-        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, midia, quadro, taxa)
+        if clipe.get("texto"):
+            imagem = textos[clipe["id"]]
+            referencia = (imagem.largura_referencia, imagem.altura_referencia)
+            caixa = caixa_do_texto(clipe["transformacao"], referencia, quadro)
+        else:
+            midia = midias[clipe["midia_id"]]
+            if not midia.video:
+                continue
+            caixa = caixa_do_clipe(clipe["transformacao"], clipe["recorte"], (midia.largura, midia.altura), quadro)
+        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"
@@ -194,7 +219,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     sons = []
     for faixa in com_som:
         for clipe in faixa["clipes"]:
-            if midias[clipe["midia_id"]].audio:
+            if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
                 sons.append(f"a{len(sons)}")
                 linhas.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))

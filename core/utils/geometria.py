@@ -21,6 +21,23 @@ class Caixa:
     opacidade: float
 
 
+# O PNG de um texto é medido num quadro com este lado menor; em outro tamanho, a caixa escala junto
+LADO_REFERENCIA_TEXTO = 1080
+
+
+def caixa_do_texto(transformacao: dict, imagem: tuple[float, float], quadro: tuple[float, float]) -> Caixa:
+    """imagem: (largura, altura) do PNG do texto desenhado para LADO_REFERENCIA_TEXTO."""
+    escala = transformacao["escala"] * min(quadro) / LADO_REFERENCIA_TEXTO
+    return Caixa(
+        cx=quadro[0] / 2 + transformacao["x"] * quadro[0],
+        cy=quadro[1] / 2 + transformacao["y"] * quadro[1],
+        largura=imagem[0] * escala,
+        altura=imagem[1] * escala,
+        rotacao=transformacao["rotacao"],
+        opacidade=transformacao["opacidade"],
+    )
+
+
 def caixa_do_clipe(transformacao: dict, recorte: dict, midia: tuple[float, float],
                    quadro: tuple[float, float]) -> Caixa:
     """midia e quadro: (largura, altura) em pixels."""

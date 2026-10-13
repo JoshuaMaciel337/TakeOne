@@ -9,7 +9,7 @@
 // em TypeScript e com as regras do CapCut no lugar das do Premiere. A faixa principal é magnética (os
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
-import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick } from "../tempo.ts";
+import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import {
   type Clipe,
   type Faixa,
@@ -22,6 +22,7 @@ import {
   type Transformacao,
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
+import { ajustarTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
 
@@ -75,6 +76,7 @@ function acharOuErro(projeto: Projeto, clipeId: string): { faixa: Faixa; clipe: 
 
 /** Faixa de áudio só recebe mídia sem imagem; as de vídeo, só mídia com imagem. */
 function combina(tipo: TipoFaixa, info: InfoMidia): boolean {
+  if (tipo === "texto") return false;
   return tipo === "audio" ? !info.video && info.audio : info.video;
 }
 
@@ -83,7 +85,20 @@ function mensagemDeTipo(info: InfoMidia): string {
 }
 
 function infoDoClipe(ctx: Contexto, clipe: Clipe, faixa: Faixa): InfoMidia {
+  // Texto não tem mídia: dura o quanto a pessoa quiser
+  if (clipe.texto || !clipe.midia_id) return { duracao: Number.POSITIVE_INFINITY, video: false, audio: false };
   return ctx.midia(clipe.midia_id) ?? { duracao: Number.POSITIVE_INFINITY, video: faixa.tipo !== "audio", audio: faixa.tipo === "audio" };
+}
+
+/** A faixa livre onde o clipe pode ficar: texto na de texto, imagem na de vídeo, som na de áudio. */
+function tipoLivreDoClipe(clipe: Clipe, info: InfoMidia): TipoLivre {
+  if (clipe.texto) return "texto";
+  return info.video ? "video" : "audio";
+}
+
+function aceitaNaFaixa(tipo: TipoFaixa, clipe: Clipe, info: InfoMidia): boolean {
+  if (clipe.texto) return tipo === "texto";
+  return tipo !== "texto" && combina(tipo, info);
 }
 
 /** Tira as faixas livres que ficaram vazias e confere o tamanho máximo. */
@@ -124,7 +139,10 @@ function criarFaixa(projeto: Projeto, ctx: Contexto, tipo: TipoLivre, perto?: st
   const faixa: Faixa = { id: ctx.novoId(), tipo, oculta: false, muda: false, travada: false, clipes: [] };
   const faixas = [...projeto.faixas];
   const referencia = faixas.findIndex((item) => item.id === perto && item.tipo === tipo);
-  if (tipo === "video") {
+  if (tipo === "texto") {
+    // Textos ficam por cima de tudo
+    faixas.splice(referencia >= 0 ? referencia : 0, 0, faixa);
+  } else if (tipo === "video") {
     // Logo acima da faixa de referência, ou logo acima da principal
     const principal = faixas.findIndex((item) => item.tipo === "principal");
     faixas.splice(referencia >= 0 ? referencia : Math.max(principal, 0), 0, faixa);
@@ -185,7 +203,7 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     recorte: RECORTE_PADRAO,
   };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
-  if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(mensagemDeTipo(info));
+  if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixa.tipo === "texto" ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
 
   let resultado: Projeto;
   if (faixa?.tipo === "principal" || (!faixa && !destino.novaFaixa && info.video)) {
@@ -207,7 +225,9 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
   let resultado = trocarFaixa(projeto, origem.tipo === "principal" ? compactar(semOClipe) : semOClipe);
 
   const faixa = destino.faixaId ? resultado.faixas.find((item) => item.id === destino.faixaId) : undefined;
-  if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(mensagemDeTipo(info));
+  if (faixa && !aceitaNaFaixa(faixa.tipo, clipe, info)) {
+    throw new ErroEdicao(clipe.texto ? "Textos ficam na faixa de texto." : faixa.tipo === "texto" ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
+  }
   if (faixa) exigirDestravada(faixa);
 
   if (faixa?.tipo === "principal") {
@@ -216,7 +236,7 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
     const movido = { ...clipe, inicio: Math.max(0, quadroMaisProximo(projeto.taxa, destino.inicio)) };
     // Solto por cima de outro clipe, ganha uma faixa nova ao lado, como no CapCut
     const ocupado = faixa ? !cabe(faixa, movido.inicio, movido.duracao) : false;
-    resultado = colocarLivre(resultado, ctx, info.video ? "video" : "audio", movido, faixa?.id, destino.novaFaixa || ocupado);
+    resultado = colocarLivre(resultado, ctx, tipoLivreDoClipe(clipe, info), movido, faixa?.id, destino.novaFaixa || ocupado);
   }
   return finalizar(resultado);
 }
@@ -232,14 +252,17 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
   let novo: Clipe;
 
   if (borda === "fim") {
-    let maximo = ajustarAoQuadro(projeto.taxa, (info.duracao - clipe.entrada) / clipe.velocidade);
+    // Sem mídia limitando (texto, ou mídia que sumiu da biblioteca), o limite é o tamanho máximo do projeto
+    let maximo = Number.isFinite(info.duracao)
+      ? ajustarAoQuadro(projeto.taxa, (info.duracao - clipe.entrada) / clipe.velocidade)
+      : TICK_MAXIMO - clipe.inicio;
     const proximo = livre ? faixa.clipes.find((item) => item.inicio >= fimDoClipe(clipe) && item.id !== clipe.id) : undefined;
     if (proximo) maximo = Math.min(maximo, proximo.inicio - clipe.inicio);
     const duracao = Math.min(Math.max(alvo - clipe.inicio, quadro), maximo);
     novo = { ...clipe, duracao };
   } else {
-    // delta > 0 encurta pelo começo; delta < 0 mostra o que vinha antes na mídia
-    let minimo = -ajustarAoQuadro(projeto.taxa, clipe.entrada / clipe.velocidade);
+    // delta > 0 encurta pelo começo; delta < 0 mostra o que vinha antes na mídia (o texto não tem limite)
+    let minimo = clipe.texto ? Number.NEGATIVE_INFINITY : -ajustarAoQuadro(projeto.taxa, clipe.entrada / clipe.velocidade);
     if (livre) {
       const anterior = [...faixa.clipes].reverse().find((item) => fimDoClipe(item) <= clipe.inicio && item.id !== clipe.id);
       minimo = Math.max(minimo, (anterior ? fimDoClipe(anterior) : 0) - clipe.inicio);
@@ -446,6 +469,35 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
   });
   if (!achou) throw new ErroEdicao("Este clipe não existe mais.");
   return { ...projeto, faixas };
+}
+
+/** Duração de um texto novo, como no CapCut. */
+export const DURACAO_TEXTO_S = 3;
+
+/** Texto novo no instante `inicio`, numa faixa de texto onde caiba (ou numa nova, por cima de tudo). */
+export function adicionarTexto(projeto: Projeto, ctx: Contexto, inicio: Tick, texto: Texto): { projeto: Projeto; clipeId: string } {
+  const clipe: Clipe = {
+    id: ctx.novoId(),
+    midia_id: null,
+    texto: ajustarTexto(texto, {}),
+    inicio: Math.max(0, quadroMaisProximo(projeto.taxa, inicio)),
+    duracao: ajustarAoQuadro(projeto.taxa, DURACAO_TEXTO_S * TICKS_POR_SEGUNDO),
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: TRANSFORMACAO_PADRAO,
+    recorte: RECORTE_PADRAO,
+  };
+  return { projeto: finalizar(colocarLivre(projeto, ctx, "texto", clipe)), clipeId: clipe.id };
+}
+
+export function mudarTexto(projeto: Projeto, clipeIds: string[], mudanca: Partial<Texto>): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (!clipe.texto) throw new ErroEdicao("Este clipe não é um texto.");
+    return { ...clipe, texto: ajustarTexto(clipe.texto, mudanca) };
+  });
 }
 
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {

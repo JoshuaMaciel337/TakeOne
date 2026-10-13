@@ -137,7 +137,8 @@ export function Editor({ projetoId }: { projetoId: string }) {
   // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
   const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
-  const midiaDasPropriedades = selecionado ? (midias.get(selecionado.clipe.midia_id) ?? null) : midiaId ? (midias.get(midiaId) ?? null) : null;
+  const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
+  const midiaDasPropriedades = selecionado ? midiaDoClipe : midiaId ? (midias.get(midiaId) ?? null) : null;
   const ferramentaAtual = FERRAMENTAS.find((item) => item.id === ferramenta)!;
 
   const executar = useCallback(
@@ -259,6 +260,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
             setSelecao([]);
           }}
           aoAdicionarMidia={adicionarNoCursor}
+          aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
           aoFechar={() => setPainelNoCelular(false)}
           className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-30 max-md:h-[55dvh] ${
             painelNoCelular ? "" : "max-md:hidden"

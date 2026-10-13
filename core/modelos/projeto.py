@@ -17,7 +17,8 @@ NOME_PADRAO = "Projeto sem título"
 FAIXA_PRINCIPAL = "principal"
 FAIXA_VIDEO = "video"      # sobreposição, por cima da principal
 FAIXA_AUDIO = "audio"
-TIPOS_FAIXA = (FAIXA_PRINCIPAL, FAIXA_VIDEO, FAIXA_AUDIO)
+FAIXA_TEXTO = "texto"      # clipes de texto, sem mídia, por cima de tudo
+TIPOS_FAIXA = (FAIXA_PRINCIPAL, FAIXA_VIDEO, FAIXA_AUDIO, FAIXA_TEXTO)
 
 LIMITE_FAIXAS = 30
 LIMITE_CLIPES = 1500
@@ -63,13 +64,23 @@ def duracao_do_projeto(faixas: list[dict]) -> int:
 
 
 def midias_usadas(faixas: list[dict]) -> list[str]:
-    return sorted({c["midia_id"] for f in faixas for c in f["clipes"]})
+    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")})
 
 
 def capa_do_projeto(faixas: list[dict]) -> str | None:
     """A mídia do primeiro clipe da faixa principal: a capa dela vira a capa do projeto."""
     principal = next((f for f in faixas if f["tipo"] == FAIXA_PRINCIPAL), None)
     return principal["clipes"][0]["midia_id"] if principal and principal["clipes"] else None
+
+
+def _conferir_posicao(faixa: dict, clipe: dict, anterior_fim: int) -> str | None:
+    if fim_do_clipe(clipe) > TICK_MAXIMO:
+        return "O projeto pode ter no máximo 6 horas."
+    if clipe["inicio"] < anterior_fim:
+        return "Dois clipes da mesma faixa estão um por cima do outro."
+    if faixa["tipo"] == FAIXA_PRINCIPAL and clipe["inicio"] != anterior_fim:
+        return "A faixa principal não pode ter espaço vazio entre os clipes."
+    return None
 
 
 def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str | None:
@@ -91,6 +102,14 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
         clipes = sorted(faixa["clipes"], key=lambda c: c["inicio"])
         anterior_fim = 0
         for clipe in clipes:
+            if faixa["tipo"] == FAIXA_TEXTO or clipe.get("texto") or not clipe.get("midia_id"):
+                if faixa["tipo"] != FAIXA_TEXTO or not clipe.get("texto") or clipe.get("midia_id"):
+                    return "Textos ficam só na faixa de texto, e a faixa de texto só tem textos."
+                problema = _conferir_posicao(faixa, clipe, anterior_fim)
+                if problema:
+                    return problema
+                anterior_fim = fim_do_clipe(clipe)
+                continue
             midia = midias.get(clipe["midia_id"])
             if midia is None:
                 return "Um clipe usa uma mídia que não existe mais ou ainda não está pronta."
@@ -105,9 +124,8 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
                 return f'Um clipe de "{midia["nome"]}" passa do fim da mídia.'
             if clipe.get("fade_entrada", 0) + clipe.get("fade_saida", 0) > clipe["duracao"]:
                 return "Os fades de um clipe passam da duração dele."
-            if clipe["inicio"] < anterior_fim:
-                return "Dois clipes da mesma faixa estão um por cima do outro."
-            if faixa["tipo"] == FAIXA_PRINCIPAL and clipe["inicio"] != anterior_fim:
-                return "A faixa principal não pode ter espaço vazio entre os clipes."
+            problema = _conferir_posicao(faixa, clipe, anterior_fim)
+            if problema:
+                return problema
             anterior_fim = fim_do_clipe(clipe)
     return None

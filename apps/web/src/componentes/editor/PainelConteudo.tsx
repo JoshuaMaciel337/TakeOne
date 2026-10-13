@@ -6,9 +6,11 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
+import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelTexto } from "./PainelTexto";
 
 type Biblioteca = {
   midias: Midia[] | null;
@@ -22,6 +24,7 @@ type Props = {
   midiaSelecionadaId: string | null;
   aoSelecionarMidia: (midiaId: string | null) => void;
   aoAdicionarMidia: (midiaId: string) => void;
+  aoAdicionarTexto: (texto: Texto) => void;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   className?: string;
@@ -88,6 +91,7 @@ export function PainelConteudo({
   midiaSelecionadaId,
   aoSelecionarMidia,
   aoAdicionarMidia,
+  aoAdicionarTexto,
   aoFechar,
   className = "",
   style,
@@ -112,6 +116,8 @@ export function PainelConteudo({
             aoSelecionarMidia={aoSelecionarMidia}
             aoAdicionarMidia={aoAdicionarMidia}
           />
+        ) : ferramenta.id === "texto" ? (
+          <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}

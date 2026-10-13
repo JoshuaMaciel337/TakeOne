@@ -144,9 +144,30 @@ class RecorteEntrada(BaseModel):
         return self
 
 
+COR = r"^#[0-9a-fA-F]{6}$"
+
+
+# Os limites são os mesmos de apps/web/src/lib/projeto/texto.ts
+class TextoEntrada(BaseModel):
+    conteudo: str = Field(max_length=500)
+    fonte: Literal["display", "texto", "manuscrita"] = "display"
+    negrito: bool = True
+    caixa_alta: bool = False
+    tamanho: float = Field(default=0.07, ge=0.02, le=0.3, description="Fração do lado menor do quadro")
+    cor: str = Field(default="#ffffff", pattern=COR)
+    alinhamento: Literal["esquerda", "centro", "direita"] = "centro"
+    contorno_cor: str = Field(default="#000000", pattern=COR)
+    contorno_espessura: float = Field(default=0, ge=0, le=0.25, description="Fração do tamanho da letra")
+    sombra: float = Field(default=0, ge=0, le=1)
+    fundo_cor: str = Field(default="#000000", pattern=COR)
+    fundo_opacidade: float = Field(default=0, ge=0, le=1)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
-    midia_id: str = Field(min_length=24, max_length=24)
+    # Clipe de texto não tem mídia: tem o texto
+    midia_id: str | None = Field(default=None, min_length=24, max_length=24)
+    texto: TextoEntrada | None = None
     inicio: int = Field(ge=0, description="Posição na linha do tempo, em ticks")
     duracao: int = Field(gt=0, description="Em ticks")
     entrada: int = Field(ge=0, description="De onde começa na mídia, em ticks")
@@ -161,11 +182,16 @@ class ClipeEntrada(BaseModel):
 
 class FaixaEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
-    tipo: Literal["principal", "video", "audio"]
+    tipo: Literal["principal", "video", "audio", "texto"]
     oculta: bool = False
     muda: bool = False
     travada: bool = False
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
+
+
+class ImagemTextoEntrada(BaseModel):
+    texto: TextoEntrada
+    lado_menor: int = Field(default=1080, ge=100, le=2160, description="Lado menor do quadro, em pixels")
 
 
 class ProjetoCriarEntrada(BaseModel):

@@ -127,6 +127,39 @@ def test_transformacao_e_recorte_sao_salvos_e_conferidos(cliente, db_limpo):
         assert resposta.status_code == 422, invalido
 
 
+def test_textos_ficam_na_faixa_de_texto(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente)
+    projeto = cliente.post("/api/projetos", json={}).json()
+    texto = {"id": "t1", "midia_id": None, "texto": {"conteudo": "Olá", "cor": "#ff6a3d"}, "inicio": 0,
+             "duracao": 3 * SEGUNDO, "entrada": 0}
+    faixa_texto = {"id": "ft", "tipo": "texto", "oculta": False, "muda": False, "travada": False, "clipes": [texto]}
+    salvo = salvar(cliente, projeto, [faixa_texto, *principal_com(projeto, [clipe(midia_id, 0, 2)])])
+    assert salvo.status_code == 200, salvo.text
+    guardado = salvo.json()["faixas"][0]["clipes"][0]
+    assert guardado["texto"]["conteudo"] == "Olá" and guardado["texto"]["fonte"] == "display"
+    assert guardado["midia_id"] is None
+
+    projeto = salvo.json()
+    casos = {
+        "texto na principal": principal_com(projeto, [{**texto, "inicio": 0}]),
+        "mídia na faixa de texto": [{**faixa_texto, "clipes": [clipe(midia_id, 0, 2)]},
+                                    *principal_com(projeto, [clipe(midia_id, 0, 2)])],
+        "cor inválida": [{**faixa_texto, "clipes": [{**texto, "texto": {"conteudo": "x", "cor": "laranja"}}]},
+                         *principal_com(projeto, [])],
+    }
+    for nome, faixas in casos.items():
+        assert salvar(cliente, projeto, faixas).status_code == 422, nome
+
+
+def test_imagem_do_texto(cliente):
+    cadastrar(cliente)
+    resposta = cliente.post("/api/textos/imagem", json={"texto": {"conteudo": "Olá"}, "lado_menor": 720})
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "image/png" and resposta.content[1:4] == b"PNG"
+    assert cliente.post("/api/textos/imagem", json={"texto": {"conteudo": "x", "tamanho": 5}}).status_code == 422
+
+
 def test_midia_em_projeto_nao_pode_ser_excluida(cliente, db_limpo):
     cadastrar(cliente)
     midia_id = criar_midia(db_limpo, cliente)

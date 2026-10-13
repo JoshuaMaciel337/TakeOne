@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from core.utils.geometria import caixa_do_clipe
+from core.utils.geometria import caixa_do_clipe, caixa_do_texto
 
-CASOS = json.loads((Path(__file__).parent / "casos" / "geometria.json").read_text(encoding="utf-8"))["casos"]
+DADOS = json.loads((Path(__file__).parent / "casos" / "geometria.json").read_text(encoding="utf-8"))
+CASOS = DADOS["casos"]
+CASOS_TEXTO = DADOS["casos_texto"]
 
 
 @pytest.mark.parametrize("caso", CASOS, ids=[c["nome"] for c in CASOS])
@@ -16,3 +18,10 @@ def test_caixa_igual_a_da_previa(caso):
     quadro = (caso["quadro"]["largura"], caso["quadro"]["altura"])
     caixa = asdict(caixa_do_clipe(caso["transformacao"], caso["recorte"], midia, quadro))
     assert caixa == pytest.approx(caso["caixa"], abs=1e-9)
+
+
+@pytest.mark.parametrize("caso", CASOS_TEXTO, ids=[c["nome"] for c in CASOS_TEXTO])
+def test_caixa_do_texto_igual_a_da_previa(caso):
+    imagem = (caso["imagem"]["largura"], caso["imagem"]["altura"])
+    quadro = (caso["quadro"]["largura"], caso["quadro"]["altura"])
+    assert asdict(caixa_do_texto(caso["transformacao"], imagem, quadro)) == pytest.approx(caso["caixa"], abs=1e-9)

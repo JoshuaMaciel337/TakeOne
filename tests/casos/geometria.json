@@ -3,43 +3,218 @@
   "casos": [
     {
       "nome": "vídeo deitado num quadro em pé, sem mudança",
-      "midia": {"largura": 1280, "altura": 720},
-      "quadro": {"largura": 1080, "altura": 1920},
-      "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
-      "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1},
-      "caixa": {"cx": 540, "cy": 960, "largura": 1080, "altura": 607.5, "rotacao": 0, "opacidade": 1}
+      "midia": {
+        "largura": 1280,
+        "altura": 720
+      },
+      "quadro": {
+        "largura": 1080,
+        "altura": 1920
+      },
+      "transformacao": {
+        "x": 0,
+        "y": 0,
+        "escala": 1,
+        "rotacao": 0,
+        "opacidade": 1
+      },
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      },
+      "caixa": {
+        "cx": 540,
+        "cy": 960,
+        "largura": 1080,
+        "altura": 607.5,
+        "rotacao": 0,
+        "opacidade": 1
+      }
     },
     {
       "nome": "aumentado, deslocado, girado e meio transparente",
-      "midia": {"largura": 1280, "altura": 720},
-      "quadro": {"largura": 1080, "altura": 1920},
-      "transformacao": {"x": 0.1, "y": -0.25, "escala": 2, "rotacao": 30, "opacidade": 0.5},
-      "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1},
-      "caixa": {"cx": 648, "cy": 480, "largura": 2160, "altura": 1215, "rotacao": 30, "opacidade": 0.5}
+      "midia": {
+        "largura": 1280,
+        "altura": 720
+      },
+      "quadro": {
+        "largura": 1080,
+        "altura": 1920
+      },
+      "transformacao": {
+        "x": 0.1,
+        "y": -0.25,
+        "escala": 2,
+        "rotacao": 30,
+        "opacidade": 0.5
+      },
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      },
+      "caixa": {
+        "cx": 648,
+        "cy": 480,
+        "largura": 2160,
+        "altura": 1215,
+        "rotacao": 30,
+        "opacidade": 0.5
+      }
     },
     {
       "nome": "recortado no meio: a parte que sobra ocupa o quadro",
-      "midia": {"largura": 1280, "altura": 720},
-      "quadro": {"largura": 1080, "altura": 1920},
-      "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
-      "recorte": {"x": 0.25, "y": 0, "largura": 0.5, "altura": 1},
-      "caixa": {"cx": 540, "cy": 960, "largura": 1080, "altura": 1215, "rotacao": 0, "opacidade": 1}
+      "midia": {
+        "largura": 1280,
+        "altura": 720
+      },
+      "quadro": {
+        "largura": 1080,
+        "altura": 1920
+      },
+      "transformacao": {
+        "x": 0,
+        "y": 0,
+        "escala": 1,
+        "rotacao": 0,
+        "opacidade": 1
+      },
+      "recorte": {
+        "x": 0.25,
+        "y": 0,
+        "largura": 0.5,
+        "altura": 1
+      },
+      "caixa": {
+        "cx": 540,
+        "cy": 960,
+        "largura": 1080,
+        "altura": 1215,
+        "rotacao": 0,
+        "opacidade": 1
+      }
     },
     {
       "nome": "vídeo em pé num quadro deitado, menor e no canto",
-      "midia": {"largura": 720, "altura": 1280},
-      "quadro": {"largura": 1920, "altura": 1080},
-      "transformacao": {"x": -0.375, "y": 0.25, "escala": 0.5, "rotacao": -90, "opacidade": 1},
-      "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1},
-      "caixa": {"cx": 240, "cy": 810, "largura": 303.75, "altura": 540, "rotacao": -90, "opacidade": 1}
+      "midia": {
+        "largura": 720,
+        "altura": 1280
+      },
+      "quadro": {
+        "largura": 1920,
+        "altura": 1080
+      },
+      "transformacao": {
+        "x": -0.375,
+        "y": 0.25,
+        "escala": 0.5,
+        "rotacao": -90,
+        "opacidade": 1
+      },
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      },
+      "caixa": {
+        "cx": 240,
+        "cy": 810,
+        "largura": 303.75,
+        "altura": 540,
+        "rotacao": -90,
+        "opacidade": 1
+      }
     },
     {
       "nome": "mesma proporção do quadro, em outra resolução",
-      "midia": {"largura": 3840, "altura": 2160},
-      "quadro": {"largura": 1280, "altura": 720},
-      "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
-      "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1},
-      "caixa": {"cx": 640, "cy": 360, "largura": 1280, "altura": 720, "rotacao": 0, "opacidade": 1}
+      "midia": {
+        "largura": 3840,
+        "altura": 2160
+      },
+      "quadro": {
+        "largura": 1280,
+        "altura": 720
+      },
+      "transformacao": {
+        "x": 0,
+        "y": 0,
+        "escala": 1,
+        "rotacao": 0,
+        "opacidade": 1
+      },
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      },
+      "caixa": {
+        "cx": 640,
+        "cy": 360,
+        "largura": 1280,
+        "altura": 720,
+        "rotacao": 0,
+        "opacidade": 1
+      }
+    }
+  ],
+  "descricao_texto": "Casos da caixa dos clipes de texto: o PNG medido num quadro com lado menor 1080 escala com o lado menor do quadro e com a escala do clipe.",
+  "casos_texto": [
+    {
+      "nome": "texto no quadro de referência, sem mudança",
+      "imagem": {
+        "largura": 540,
+        "altura": 120
+      },
+      "quadro": {
+        "largura": 1080,
+        "altura": 1920
+      },
+      "transformacao": {
+        "x": 0,
+        "y": 0,
+        "escala": 1,
+        "rotacao": 0,
+        "opacidade": 1
+      },
+      "caixa": {
+        "cx": 540,
+        "cy": 960,
+        "largura": 540,
+        "altura": 120,
+        "rotacao": 0,
+        "opacidade": 1
+      }
+    },
+    {
+      "nome": "texto em 720p, maior, deslocado e girado",
+      "imagem": {
+        "largura": 540,
+        "altura": 120
+      },
+      "quadro": {
+        "largura": 1280,
+        "altura": 720
+      },
+      "transformacao": {
+        "x": 0.1,
+        "y": 0.3,
+        "escala": 1.5,
+        "rotacao": -10,
+        "opacidade": 0.8
+      },
+      "caixa": {
+        "cx": 768,
+        "cy": 576,
+        "largura": 540,
+        "altura": 120,
+        "rotacao": -10,
+        "opacidade": 0.8
+      }
     }
   ]
 }
