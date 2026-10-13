@@ -3,13 +3,13 @@
 import { Maximize, Pause, Play, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { arquivoDaMidia } from "@/lib/api";
 import { type Caixa, caixaDoClipe, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { type Clipe, type Faixa, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe } from "./FontesDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { razao } from "./proporcoes";
 
@@ -28,8 +28,6 @@ type Props = {
   className?: string;
 };
 
-/** Diferença, em segundos, entre o vídeo e o relógio do editor a partir da qual o vídeo é reposicionado. */
-const DESVIO_MAXIMO = 0.3;
 /** O próximo clipe da faixa começa a carregar quando falta isto para ele entrar. */
 const ANTECEDENCIA = 2 * TICKS_POR_SEGUNDO;
 /** Quanto a prévia espera um vídeo carregar o quadro antes de desenhar sem ele. */
@@ -57,7 +55,7 @@ function useQuadro(proporcao: Projeto["proporcao"]) {
   return { areaRef, tamanho };
 }
 
-type Item = { chave: string; clipe: Clipe; faixa: Faixa; midia: Midia; ativo: boolean };
+type Item = ItemDaPrevia;
 
 /**
  * Clipes que precisam de um elemento agora: o que está sob o cursor e o próximo da mesma faixa, para
@@ -91,7 +89,8 @@ function tamanhoDaMidia(midia: Midia): Tamanho | null {
 }
 
 /** Uma camada do quadro atual, de baixo para cima. */
-type CamadaNaTela = { chave: string; clipe: Clipe; faixa: Faixa; recorte: Recorte; caixa: Caixa };
+/** `segundos` é o instante da mídia que aparece agora. */
+type CamadaNaTela = { chave: string; clipe: Clipe; faixa: Faixa; recorte: Recorte; caixa: Caixa; segundos: number };
 
 type EstadoDoDesenho = {
   camadas: CamadaNaTela[];
@@ -115,7 +114,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [suportado] = useState(webgl2Disponivel);
   const [guias, setGuias] = useState<Guias | null>(null);
-  const elementos = useRef(new Map<string, HTMLVideoElement>());
+  const fontes = useRef(new Map<string, FonteDeQuadros>());
   const desenho = useRef<EstadoDoDesenho>({ camadas: [], fundo: "#000000", quadro: tamanho, tocando: false, sujo: true });
 
   // A primeira faixa da lista é a de cima; no quadro ela tem que ser desenhada por último
@@ -124,17 +123,25 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     midias,
     tempo,
   );
+  // O som vem de todas as faixas com áudio: as de áudio e as de vídeo visíveis
   const sons = itensNoTempo(
-    projeto.faixas.filter((faixa) => faixa.tipo === "audio"),
+    projeto.faixas.filter((faixa) => !faixa.muda && (faixa.tipo === "audio" || !faixa.oculta)),
     midias,
     tempo,
-  );
+  ).filter((item) => item.midia.audio);
   const camadas: CamadaNaTela[] = [];
   for (const item of visuais) {
     const tamanhoMidia = tamanhoDaMidia(item.midia);
     if (!item.ativo || !tamanhoMidia || tamanho.largura <= 0) continue;
     const { clipe, faixa, chave } = item;
-    camadas.push({ chave, clipe, faixa, recorte: clipe.recorte, caixa: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho) });
+    camadas.push({
+      chave,
+      clipe,
+      faixa,
+      recorte: clipe.recorte,
+      caixa: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
+      segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
+    });
   }
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
@@ -158,12 +165,12 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       const prontas = [];
       let faltando = false;
       for (const camada of estado.camadas) {
-        const video = elementos.current.get(camada.chave);
-        if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
+        const quadro = fontes.current.get(camada.chave)?.quadro(camada.segundos);
+        if (!quadro) {
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: video, recorte: camada.recorte, caixa: camada.caixa });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();
@@ -209,21 +216,21 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
             {/* Os vídeos só fornecem os quadros: quem aparece é o canvas, por cima deles */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-0" aria-hidden>
               {visuais.map((item) => (
-                <ElementoDoClipe
+                <FonteDoClipe
                   key={item.chave}
                   item={item}
                   tempo={tempo}
                   tocando={tocando}
-                  tipo="video"
-                  aoRegistrar={(video) => {
-                    if (video) elementos.current.set(item.chave, video);
-                    else elementos.current.delete(item.chave);
+                  aoRegistrar={(fonte) => {
+                    if (fonte) fontes.current.set(item.chave, fonte);
+                    else fontes.current.delete(item.chave);
+                    marcarSujo();
                   }}
                   aoTerQuadro={marcarSujo}
                 />
               ))}
               {sons.map((item) => (
-                <ElementoDoClipe key={item.chave} item={item} tempo={tempo} tocando={tocando} tipo="audio" />
+                <SomDoClipe key={`som:${item.chave}`} item={item} tempo={tempo} tocando={tocando} />
               ))}
             </div>
 
@@ -305,66 +312,5 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
         </div>
       </div>
     </section>
-  );
-}
-
-type PropsElemento = {
-  item: Item;
-  tempo: Tick;
-  tocando: boolean;
-  tipo: "video" | "audio";
-  aoRegistrar?: (video: HTMLVideoElement | null) => void;
-  /** Chamado quando o vídeo tem um quadro novo para mostrar parado (carregou ou terminou de buscar). */
-  aoTerQuadro?: () => void;
-};
-
-/** Um vídeo ou áudio que segue o relógio do editor. */
-function ElementoDoClipe({ item, tempo, tocando, tipo, aoRegistrar, aoTerQuadro }: PropsElemento) {
-  const elementoRef = useRef<HTMLVideoElement & HTMLAudioElement>(null);
-  const { clipe, faixa, midia, ativo } = item;
-  const alvo = (ativo ? tempoNaMidia(clipe, tempo) : clipe.entrada) / TICKS_POR_SEGUNDO;
-  const tocar = ativo && tocando;
-
-  useEffect(() => {
-    const elemento = elementoRef.current;
-    if (!elemento) return;
-    elemento.muted = faixa.muda || !midia.audio;
-    elemento.volume = Math.min(1, Math.max(0, clipe.volume));
-    elemento.playbackRate = clipe.velocidade;
-    const desvio = Math.abs(elemento.currentTime - alvo);
-    if (tocar) {
-      if (elemento.paused) {
-        if (desvio > 0.05) elemento.currentTime = alvo;
-        elemento.play().catch(() => {});
-      } else if (!elemento.seeking && elemento.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && desvio > DESVIO_MAXIMO * clipe.velocidade) {
-        elemento.currentTime = alvo;
-      }
-    } else {
-      if (!elemento.paused) elemento.pause();
-      if (desvio > 0.01) elemento.currentTime = alvo;
-    }
-  }, [alvo, tocar, faixa.muda, midia.audio, clipe.volume, clipe.velocidade]);
-
-  useEffect(() => {
-    if (!aoRegistrar) return;
-    aoRegistrar(elementoRef.current as HTMLVideoElement | null);
-    return () => aoRegistrar(null);
-    // O registro é por elemento: a função muda a cada render, o elemento não
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (tipo === "audio") {
-    return <audio ref={elementoRef} src={arquivoDaMidia(midia.id, "proxy.m4a")} preload="auto" />;
-  }
-  return (
-    <video
-      ref={elementoRef}
-      src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a")}
-      className="absolute inset-0 size-full object-contain"
-      playsInline
-      preload="auto"
-      onLoadedData={aoTerQuadro}
-      onSeeked={aoTerQuadro}
-    />
   );
 }

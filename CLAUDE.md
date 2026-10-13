@@ -39,9 +39,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - A prévia toca a linha do tempo com elementos `<video>` e `<audio>` que seguem o relógio do editor. O compositor em WebCodecs/WebGL2 é da fase 2.
   - As ferramentas além de Mídia mostram em que fase chegam. Exportar aparece desligado.
 - **Fase 2 (prévia e exportação):** em andamento.
-  - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`), selecionar e arrastar, redimensionar e girar direto na prévia, aba Básico nas propriedades e cor de fundo do projeto.
-  - Falta: WebCodecs, Web Audio, render no worker e o teste que compara prévia e render.
-- **Próximo passo:** render no worker (precisa do FFmpeg, então no Nitro ou pelo CI) e WebCodecs na prévia.
+  - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`) com os quadros decodificados pelo WebCodecs (`lib/previa/decodificador.ts`) e o som pelo Web Audio. Dá para selecionar, arrastar, redimensionar e girar direto na prévia; há a aba Básico nas propriedades e a cor de fundo do projeto.
+  - Falta: render no worker e o teste que compara prévia e render.
+- **Próximo passo:** render no worker (precisa do FFmpeg, então no Nitro ou pelo CI).
 
 ## Arquitetura em um minuto
 
@@ -64,7 +64,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Prévia:** um elemento por faixa + mídia, para as duas metades de um clipe dividido usarem o mesmo vídeo sem engasgar. O próximo clipe da faixa já fica montado (escondido) 2 s antes de entrar. O vídeo só é reposicionado quando se afasta mais de 0,3 s do relógio.
 - **Arrastar da biblioteca:** o id da mídia vai no nome do tipo do `DataTransfer` (`application/x-takeone-midia-<id>`), porque durante o arrasto o navegador só deixa ler os tipos.
 - **Posição do clipe em frações do quadro:** `x` e `y` deslocam o centro em frações da largura e da altura do quadro, e `escala` 1 é a mídia inteira cabendo no quadro. Assim o mesmo projeto vale na prévia pequena e no render em 720p, 1080p ou 4K. A conta está em `lib/projeto/geometria.ts` e `core/utils/geometria.py`, e os dois leem os casos de `tests/casos/geometria.json`. Mudou a conta, mude os dois e os casos.
-- **Prévia em canvas:** os `<video>` continuam tocando, escondidos, só para fornecer os quadros. O canvas desenha a cada quadro da tela enquanto toca e, parado, só quando algo muda. Se um vídeo ainda não tem quadro, a prévia mantém o desenho anterior por até 400 ms, para não piscar.
+- **Prévia em canvas:** o canvas desenha a cada quadro da tela enquanto toca e, parado, só quando algo muda. Se uma camada ainda não tem quadro, a prévia mantém o desenho anterior por até 400 ms, para não piscar.
+- **Quadros pelo WebCodecs:** o decodificador lê do proxy só o cabeçalho (mp4box) e depois cada grupo de quadros por Range, e decodifica a partir do quadro-chave anterior. O tempo de cada quadro desconta a lista de edição (`elst`), como o FFmpeg faz. Guarda poucos `VideoFrame` abertos, porque o decodificador trava com muitos. Se o WebCodecs falhar (navegador sem ele, arquivo que o leitor não entende), aquele clipe volta para um `<video>` escondido, que pode errar o quadro por um.
+- **Som separado da imagem:** o som de todo clipe sai de um `<audio>` próprio, ligado a um ganho do Web Audio (`lib/previa/audio.ts`), que segue o relógio do editor. O contexto de áudio só nasce quando a pessoa aperta reproduzir, porque o navegador exige um gesto.
 - **Mudança provisória:** arrastar na prévia ou num controle deslizante do painel muda um `Comando` provisório no `Editor`, que só aparece na tela. Ao soltar, vira comando de verdade e um passo do desfazer.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.

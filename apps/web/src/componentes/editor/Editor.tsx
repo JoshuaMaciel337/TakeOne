@@ -6,6 +6,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 
 import { ErroApi } from "@/lib/api";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
+import { retomarAudio } from "@/lib/previa/audio";
 import type { Contexto } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
 import { duracaoDoQuadro, quadroMaisProximo, segundosParaTicks, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -64,6 +65,8 @@ function useReproducao(duracao: Tick, taxa: Taxa) {
       return;
     }
     if (duracao <= 0) return;
+    // O navegador só libera o som dentro do clique ou da tecla da pessoa
+    retomarAudio();
     const inicio = atual >= duracao ? 0 : atual;
     partida.current = { tempo: inicio, relogio: performance.now() };
     setTempo(inicio);
