@@ -98,6 +98,34 @@ def test_linha_do_tempo_invalida_nao_salva(cliente, db_limpo):
     assert salvar(cliente, projeto, principal_com(projeto, [clipe(midia_id, 0, 5)]) + [audio]).status_code == 200
 
 
+def test_transformacao_e_recorte_sao_salvos_e_conferidos(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente)
+    projeto = cliente.post("/api/projetos", json={}).json()
+
+    # Clipe gravado antes da fase 2, sem transformação nem recorte: volta com o padrão
+    db_limpo.projetos.update_one({"_id": ObjectId(projeto["id"])},
+                                 {"$set": {"faixas": principal_com(projeto, [clipe(midia_id, 0, 2)])}})
+    antigo = cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]
+    assert antigo["transformacao"] == {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}
+    assert antigo["recorte"] == {"x": 0, "y": 0, "largura": 1, "altura": 1}
+
+    transformacao = {"x": 0.1, "y": -0.2, "escala": 1.5, "rotacao": -30, "opacidade": 0.5}
+    recorte = {"x": 0.9, "y": 0, "largura": 0.1, "altura": 1}
+    novo = {**clipe(midia_id, 0, 2), "transformacao": transformacao, "recorte": recorte}
+    salvo = salvar(cliente, projeto, principal_com(projeto, [novo]))
+    assert salvo.status_code == 200
+    assert salvo.json()["faixas"][0]["clipes"][0]["transformacao"] == transformacao
+    assert salvo.json()["faixas"][0]["clipes"][0]["recorte"] == recorte
+
+    projeto = salvo.json()
+    for invalido in ({"recorte": {"x": 0.5, "y": 0, "largura": 0.6, "altura": 1}},
+                     {"transformacao": {**transformacao, "escala": 0}},
+                     {"transformacao": {**transformacao, "rotacao": 270}}):
+        resposta = salvar(cliente, projeto, principal_com(projeto, [{**novo, **invalido}]))
+        assert resposta.status_code == 422, invalido
+
+
 def test_midia_em_projeto_nao_pode_ser_excluida(cliente, db_limpo):
     cadastrar(cliente)
     midia_id = criar_midia(db_limpo, cliente)

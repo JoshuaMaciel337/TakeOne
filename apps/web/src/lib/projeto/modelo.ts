@@ -8,6 +8,28 @@ export type Proporcao = (typeof PROPORCOES)[number];
 /** "principal" é a faixa magnética, sem espaço vazio; "video" fica por cima dela; "audio", embaixo. */
 export type TipoFaixa = "principal" | "video" | "audio";
 
+/**
+ * Onde a imagem do clipe fica no quadro (lib/projeto/geometria.ts). Sem mudança, a mídia aparece
+ * inteira e centralizada, do maior tamanho que cabe.
+ */
+export type Transformacao = {
+  /** Deslocamento do centro, em frações da largura e da altura do quadro (0 é o meio). */
+  x: number;
+  y: number;
+  /** 1 é o tamanho em que a mídia cabe inteira no quadro. */
+  escala: number;
+  /** Em graus, no sentido horário. */
+  rotacao: number;
+  /** De 0 (invisível) a 1. */
+  opacidade: number;
+};
+
+/** Parte da mídia que aparece, em frações da largura e da altura dela. */
+export type Recorte = { x: number; y: number; largura: number; altura: number };
+
+export const TRANSFORMACAO_PADRAO: Transformacao = { x: 0, y: 0, escala: 1, rotacao: 0, opacidade: 1 };
+export const RECORTE_PADRAO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
+
 export type Clipe = {
   id: string;
   midia_id: string;
@@ -18,6 +40,8 @@ export type Clipe = {
   entrada: Tick;
   velocidade: number;
   volume: number;
+  transformacao: Transformacao;
+  recorte: Recorte;
 };
 
 export type Faixa = {
@@ -74,6 +98,24 @@ export function acharClipe(projeto: Projeto, clipeId: string): { faixa: Faixa; c
 
 export function faixaPrincipal(projeto: Projeto): Faixa {
   return projeto.faixas.find((faixa) => faixa.tipo === "principal") ?? projeto.faixas[0];
+}
+
+/**
+ * Completa o que falta num projeto salvo antes da transformação e do recorte existirem. A API já
+ * devolve tudo completo; isto cobre o rascunho guardado no navegador por uma versão antiga do editor.
+ */
+export function completarProjeto(projeto: Projeto): Projeto {
+  return {
+    ...projeto,
+    faixas: projeto.faixas.map((faixa) => ({
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => ({
+        ...clipe,
+        transformacao: { ...TRANSFORMACAO_PADRAO, ...clipe.transformacao },
+        recorte: { ...RECORTE_PADRAO, ...clipe.recorte },
+      })),
+    })),
+  };
 }
 
 /** Faixas que mostram imagem, da que fica por cima para a de baixo. */

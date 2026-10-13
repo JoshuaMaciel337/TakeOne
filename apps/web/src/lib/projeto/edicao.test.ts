@@ -12,8 +12,13 @@ import {
   duplicarClipes,
   ErroEdicao,
   moverClipe,
+  mudarFundo,
+  normalizarRotacao,
+  recortarClipes,
+  restaurarClipes,
+  transformarClipes,
 } from "./edicao.ts";
-import { fimDoClipe, type Projeto } from "./modelo.ts";
+import { completarProjeto, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
 const TAXA = { num: 30, den: 1 };
@@ -181,4 +186,53 @@ test("apagar numa faixa livre deixa o espaço, a não ser que peça para fechar"
   const fechado = apagarClipes(projeto, [primeiro], true);
   assert.equal(fechado.faixas.find((f) => f.tipo === "audio")!.clipes[0].inicio, 10 * S);
   assert.ok(segundo);
+});
+
+test("transformar, recortar e restaurar mudam só a imagem do clipe, com limites", () => {
+  const ctx = contexto();
+  const adicionado = adicionarClipe(vazio(), ctx, "video10");
+  const clipeId = adicionado.clipeId;
+  let projeto = adicionado.projeto;
+  assert.deepEqual(principal(projeto)[0].transformacao, TRANSFORMACAO_PADRAO);
+
+  projeto = transformarClipes(projeto, [clipeId], { x: 0.2, escala: 50, rotacao: 270, opacidade: -1 });
+  assert.deepEqual(principal(projeto)[0].transformacao, { x: 0.2, y: 0, escala: 20, rotacao: -90, opacidade: 0 });
+
+  projeto = recortarClipes(projeto, [clipeId], { x: 0.9, y: -1, largura: 0.5, altura: 2 });
+  const recorte = principal(projeto)[0].recorte;
+  assert.equal(recorte.x, 0.9);
+  assert.equal(recorte.y, 0);
+  assert.ok(Math.abs(recorte.largura - 0.1) < 1e-12, "o recorte não passa da borda da mídia");
+  assert.equal(recorte.altura, 1);
+
+  const dividido = dividirClipes(projeto, ctx, 5 * S, [clipeId]).projeto;
+  assert.deepEqual(principal(dividido)[1].transformacao, principal(projeto)[0].transformacao, "as duas metades ficam iguais");
+
+  projeto = restaurarClipes(projeto, [clipeId]);
+  assert.deepEqual(principal(projeto)[0].transformacao, TRANSFORMACAO_PADRAO);
+  assert.deepEqual(principal(projeto)[0].recorte, RECORTE_PADRAO);
+
+  const comMusica = adicionarClipe(projeto, ctx, "musica");
+  assert.throws(() => transformarClipes(comMusica.projeto, [comMusica.clipeId], { x: 0.1 }), /áudio/);
+  assert.throws(() => transformarClipes(projeto, ["nao-existe"], { x: 0.1 }), ErroEdicao);
+  projeto = alternarFaixa(projeto, "principal", "travada");
+  assert.throws(() => transformarClipes(projeto, [clipeId], { x: 0.1 }), /travada/);
+});
+
+test("fundo aceita só cor em hexadecimal", () => {
+  assert.equal(mudarFundo(vazio(), "#FF6A3D").fundo.cor, "#ff6a3d");
+  assert.throws(() => mudarFundo(vazio(), "vermelho"), ErroEdicao);
+});
+
+test("o giro fica sempre entre -180 e 180 graus", () => {
+  assert.deepEqual([0, 180, 181, -180, 360, 725, -450].map(normalizarRotacao), [0, 180, -179, 180, 0, 5, -90]);
+});
+
+test("projeto antigo, sem transformação nem recorte, é completado", () => {
+  const { projeto } = adicionarClipe(vazio(), contexto(), "video10");
+  const antigo = structuredClone(projeto) as Projeto;
+  const clipe = principal(antigo)[0] as Partial<Projeto["faixas"][number]["clipes"][number]>;
+  delete clipe.transformacao;
+  delete clipe.recorte;
+  assert.deepEqual(completarProjeto(antigo), projeto);
 });

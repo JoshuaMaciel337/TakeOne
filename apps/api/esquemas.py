@@ -4,7 +4,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
@@ -118,6 +118,29 @@ class FundoEntrada(BaseModel):
     cor: str = Field(default="#000000", pattern=r"^#[0-9a-fA-F]{6}$")
 
 
+# Os limites são os mesmos de apps/web/src/lib/projeto/edicao.ts
+class TransformacaoEntrada(BaseModel):
+    x: float = Field(default=0, ge=-10, le=10, description="Deslocamento do centro, em frações da largura do quadro")
+    y: float = Field(default=0, ge=-10, le=10, description="Deslocamento do centro, em frações da altura do quadro")
+    escala: float = Field(default=1, ge=0.01, le=20, description="1: a mídia cabe inteira no quadro")
+    rotacao: float = Field(default=0, ge=-180, le=180, description="Graus, sentido horário")
+    opacidade: float = Field(default=1, ge=0, le=1)
+
+
+class RecorteEntrada(BaseModel):
+    x: float = Field(default=0, ge=0, lt=1)
+    y: float = Field(default=0, ge=0, lt=1)
+    largura: float = Field(default=1, ge=0.02, le=1)
+    altura: float = Field(default=1, ge=0.02, le=1)
+
+    @model_validator(mode="after")
+    def dentro_da_midia(self):
+        # Folga para o arredondamento do navegador (0.9 + 0.1 pode dar 1.0000000000000002)
+        if self.x + self.largura > 1 + 1e-9 or self.y + self.altura > 1 + 1e-9:
+            raise ValueError("O recorte passa da borda da mídia.")
+        return self
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     midia_id: str = Field(min_length=24, max_length=24)
@@ -126,6 +149,9 @@ class ClipeEntrada(BaseModel):
     entrada: int = Field(ge=0, description="De onde começa na mídia, em ticks")
     velocidade: float = Field(default=1.0, ge=0.1, le=100)
     volume: float = Field(default=1.0, ge=0, le=4)
+    # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
+    transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
+    recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
 
 
 class FaixaEntrada(BaseModel):

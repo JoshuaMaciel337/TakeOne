@@ -10,7 +10,18 @@
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick } from "../tempo.ts";
-import { type Clipe, type Faixa, fimDoClipe, type InfoMidia, type Projeto, type TipoFaixa } from "./modelo.ts";
+import {
+  type Clipe,
+  type Faixa,
+  fimDoClipe,
+  type InfoMidia,
+  type Projeto,
+  RECORTE_PADRAO,
+  type Recorte,
+  type TipoFaixa,
+  type Transformacao,
+  TRANSFORMACAO_PADRAO,
+} from "./modelo.ts";
 
 export class ErroEdicao extends Error {}
 
@@ -151,7 +162,17 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
   const duracao = ajustarAoQuadro(projeto.taxa, info.duracao);
   if (duracao < duracaoDoQuadro(projeto.taxa)) throw new ErroEdicao("A mídia é curta demais para a linha do tempo.");
 
-  const clipe: Clipe = { id: ctx.novoId(), midia_id: midiaId, inicio: 0, duracao, entrada: 0, velocidade: 1, volume: 1 };
+  const clipe: Clipe = {
+    id: ctx.novoId(),
+    midia_id: midiaId,
+    inicio: 0,
+    duracao,
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    transformacao: TRANSFORMACAO_PADRAO,
+    recorte: RECORTE_PADRAO,
+  };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
   if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(mensagemDeTipo(info));
 
@@ -317,4 +338,78 @@ export function alternarFaixa(projeto: Projeto, faixaId: string, propriedade: "o
   const faixa = projeto.faixas.find((item) => item.id === faixaId);
   if (!faixa) throw new ErroEdicao("Esta faixa não existe mais.");
   return trocarFaixa(projeto, { ...faixa, [propriedade]: !faixa[propriedade] });
+}
+
+// Limites da transformação e do recorte. Os mesmos de apps/api/esquemas.py.
+export const LIMITES_TRANSFORMACAO = {
+  x: { minimo: -10, maximo: 10 },
+  y: { minimo: -10, maximo: 10 },
+  escala: { minimo: 0.01, maximo: 20 },
+  opacidade: { minimo: 0, maximo: 1 },
+} as const;
+/** O recorte nunca fica menor que isto da mídia, em cada direção. */
+export const RECORTE_MINIMO = 0.02;
+
+function limitar(valor: number, minimo: number, maximo: number): number {
+  return Math.min(maximo, Math.max(minimo, valor));
+}
+
+/** Giro equivalente entre -180 (exclusive) e 180 graus. */
+export function normalizarRotacao(graus: number): number {
+  const resto = ((graus % 360) + 360) % 360;
+  return resto > 180 ? resto - 360 : resto;
+}
+
+function limitarTransformacao(t: Transformacao): Transformacao {
+  const { x, y, escala, opacidade } = LIMITES_TRANSFORMACAO;
+  return {
+    x: limitar(t.x, x.minimo, x.maximo),
+    y: limitar(t.y, y.minimo, y.maximo),
+    escala: limitar(t.escala, escala.minimo, escala.maximo),
+    rotacao: normalizarRotacao(t.rotacao),
+    opacidade: limitar(t.opacidade, opacidade.minimo, opacidade.maximo),
+  };
+}
+
+function limitarRecorte(r: Recorte): Recorte {
+  const x = limitar(r.x, 0, 1 - RECORTE_MINIMO);
+  const y = limitar(r.y, 0, 1 - RECORTE_MINIMO);
+  return { x, y, largura: limitar(r.largura, RECORTE_MINIMO, 1 - x), altura: limitar(r.altura, RECORTE_MINIMO, 1 - y) };
+}
+
+function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe, faixa: Faixa) => Clipe): Projeto {
+  const alvos = new Set(clipeIds);
+  if (!alvos.size) throw new ErroEdicao("Escolha um clipe.");
+  let achou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.clipes.some((clipe) => alvos.has(clipe.id))) return faixa;
+    achou = true;
+    exigirDestravada(faixa);
+    if (faixa.tipo === "audio") throw new ErroEdicao("Clipes de áudio não aparecem na imagem.");
+    return { ...faixa, clipes: faixa.clipes.map((clipe) => (alvos.has(clipe.id) ? mudar(clipe, faixa) : clipe)) };
+  });
+  if (!achou) throw new ErroEdicao("Este clipe não existe mais.");
+  return { ...projeto, faixas };
+}
+
+/** Muda as propriedades informadas da transformação dos clipes; as outras ficam como estão. */
+export function transformarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Transformacao>): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => ({
+    ...clipe,
+    transformacao: limitarTransformacao({ ...clipe.transformacao, ...mudanca }),
+  }));
+}
+
+/** Volta posição, escala, giro, opacidade e recorte ao padrão. */
+export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO }));
+}
+
+export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Recorte): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, recorte: limitarRecorte(recorte) }));
+}
+
+export function mudarFundo(projeto: Projeto, cor: string): Projeto {
+  if (!/^#[0-9a-f]{6}$/i.test(cor)) throw new ErroEdicao("Cor inválida.");
+  return { ...projeto, fundo: { ...projeto.fundo, cor: cor.toLowerCase() } };
 }

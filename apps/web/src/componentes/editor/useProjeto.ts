@@ -14,7 +14,7 @@ import {
   registrar,
 } from "@/lib/projeto/comandos";
 import { type Contexto, ErroEdicao } from "@/lib/projeto/edicao";
-import type { Projeto } from "@/lib/projeto/modelo";
+import { completarProjeto, type Projeto } from "@/lib/projeto/modelo";
 
 export type EstadoSalvamento = "salvo" | "pendente" | "salvando" | "sem-conexao" | "conflito" | "erro";
 
@@ -72,7 +72,7 @@ const chaveRascunho = (projetoId: string) => `takeone-rascunho-${projetoId}`;
 function lerRascunho(projetoId: string, versao: number): Rascunho | null {
   try {
     const rascunho = JSON.parse(localStorage.getItem(chaveRascunho(projetoId)) ?? "null") as Rascunho | null;
-    return rascunho && rascunho.versao === versao ? rascunho : null;
+    return rascunho && rascunho.versao === versao ? { ...rascunho, projeto: completarProjeto(rascunho.projeto) } : null;
   } catch {
     return null;
   }

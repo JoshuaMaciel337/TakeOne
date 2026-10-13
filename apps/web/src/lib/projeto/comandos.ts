@@ -15,8 +15,12 @@ import {
   dividirClipes,
   duplicarClipes,
   moverClipe,
+  mudarFundo,
+  recortarClipes,
+  restaurarClipes,
+  transformarClipes,
 } from "./edicao.ts";
-import type { Projeto, Proporcao } from "./modelo.ts";
+import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 
 export type Comando =
   | { comando: "clipe.adicionar"; parametros: { midiaId: string } & DestinoClipe }
@@ -26,7 +30,11 @@ export type Comando =
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
-  | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } };
+  | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
+  | { comando: "projeto.fundo"; parametros: { cor: string } }
+  | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao> } }
+  | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
+  | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -37,6 +45,10 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.duplicar": "duplicar",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
+  "projeto.fundo": "mudar o fundo",
+  "clipe.transformar": "mudar posição e tamanho",
+  "clipe.recortar": "recortar",
+  "clipe.restaurar": "restaurar posição e tamanho",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -67,6 +79,14 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: alternarFaixa(projeto, parametros.faixaId, parametros.propriedade) };
     case "projeto.proporcao":
       return { projeto: { ...projeto, proporcao: parametros.proporcao } };
+    case "projeto.fundo":
+      return { projeto: mudarFundo(projeto, parametros.cor) };
+    case "clipe.transformar":
+      return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao) };
+    case "clipe.recortar":
+      return { projeto: recortarClipes(projeto, parametros.clipeIds, parametros.recorte) };
+    case "clipe.restaurar":
+      return { projeto: restaurarClipes(projeto, parametros.clipeIds) };
   }
 }
 
