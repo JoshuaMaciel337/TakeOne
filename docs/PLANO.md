@@ -364,11 +364,12 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Prévia tocando a linha do tempo, com as faixas de sobreposição por cima da principal. Por enquanto com elementos `<video>`; o compositor de verdade é a fase 2.
 
 ### Fase 2: prévia e exportação (2 a 3 semanas)
-- Compositor no navegador (WebCodecs + WebGL2): várias camadas, transformação, opacidade, recorte e fundo.
-- Áudio da prévia sincronizado (Web Audio).
-- Manipular elementos na prévia (arrastar, redimensionar, girar), reaproveitando a `CamadaSobreposta` do HolyCut.
-- Render no worker a partir do mesmo JSON, generalizando o `render.py` do HolyCut para várias faixas. Exportar MP4 em 720p, 1080p e 4K, com progresso, download e QR para o celular.
-- Teste automático que compara quadros da prévia e do render.
+- [x] Compositor no navegador em WebGL2: várias camadas, transformação, opacidade, recorte e fundo. A conta da posição de cada clipe (`geometria`) é a mesma no TypeScript e no Python, conferida pelos mesmos casos.
+- [ ] Decodificar os quadros com WebCodecs, no lugar dos elementos `<video>` que hoje alimentam o compositor (quadro exato ao parar e camadas sincronizadas entre si).
+- [ ] Áudio da prévia sincronizado (Web Audio).
+- [x] Manipular elementos na prévia (arrastar, redimensionar, girar, com ímã no centro e nas bordas), adaptado da `CamadaSobreposta` do HolyCut, e a aba Básico nas propriedades.
+- [ ] Render no worker a partir do mesmo JSON, generalizando o `render.py` do HolyCut para várias faixas. Exportar MP4 em 720p, 1080p e 4K, com progresso, download e QR para o celular.
+- [ ] Teste automático que compara quadros da prévia e do render.
 
 ### Fase 3: texto, áudio e legendas (2 semanas)
 - Texto:

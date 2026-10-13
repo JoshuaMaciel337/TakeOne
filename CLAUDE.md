@@ -27,7 +27,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Licenças:** só bibliotecas e modelos com licença permissiva (evite AGPL). Música só com licença. Código portado do FilmCraft ou do LightCraft segue as regras do [THIRD_PARTY.md](THIRD_PARTY.md).
 - **Prévia igual ao render:** toda diferença entre a prévia no navegador e o vídeo exportado é medida em números, não só no olho.
 
-## Estado atual (atualizado em 08/10/2026)
+## Estado atual (atualizado em 13/10/2026)
 
 - **Fase 0 (fundação):** pronta, rodando no Docker e com o CI verde no GitHub ([JoshuaMaciel337/TakeOne](https://github.com/JoshuaMaciel337/TakeOne)).
   - Do HolyCut, sem as partes de igreja: config, Mongo, fila com lease, storage, FFmpeg, sessão com organizações ("espaços"), jobs, eventos SSE, upload tus, mídias, ingestão (proxy 720p, forma de onda, níveis, miniaturas e capa), backup e Compose.
@@ -38,7 +38,10 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Desfazer e refazer de tudo, salvamento automático 1,2 s depois de cada mudança, cópia no navegador enquanto não salva e aviso de conflito quando outra aba salvou antes.
   - A prévia toca a linha do tempo com elementos `<video>` e `<audio>` que seguem o relógio do editor. O compositor em WebCodecs/WebGL2 é da fase 2.
   - As ferramentas além de Mídia mostram em que fase chegam. Exportar aparece desligado.
-- **Próximo passo:** fase 2 (compositor da prévia, transformações na prévia e render no worker).
+- **Fase 2 (prévia e exportação):** em andamento.
+  - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`), selecionar e arrastar, redimensionar e girar direto na prévia, aba Básico nas propriedades e cor de fundo do projeto.
+  - Falta: WebCodecs, Web Audio, render no worker e o teste que compara prévia e render.
+- **Próximo passo:** render no worker (precisa do FFmpeg, então no Nitro ou pelo CI) e WebCodecs na prévia.
 
 ## Arquitetura em um minuto
 
@@ -60,6 +63,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Rascunho no navegador** (`takeone-rascunho-<id>`): só é aplicado ao abrir se foi feito sobre a mesma versão que o banco tem. Se outra aba salvou depois, o rascunho é descartado.
 - **Prévia:** um elemento por faixa + mídia, para as duas metades de um clipe dividido usarem o mesmo vídeo sem engasgar. O próximo clipe da faixa já fica montado (escondido) 2 s antes de entrar. O vídeo só é reposicionado quando se afasta mais de 0,3 s do relógio.
 - **Arrastar da biblioteca:** o id da mídia vai no nome do tipo do `DataTransfer` (`application/x-takeone-midia-<id>`), porque durante o arrasto o navegador só deixa ler os tipos.
+- **Posição do clipe em frações do quadro:** `x` e `y` deslocam o centro em frações da largura e da altura do quadro, e `escala` 1 é a mídia inteira cabendo no quadro. Assim o mesmo projeto vale na prévia pequena e no render em 720p, 1080p ou 4K. A conta está em `lib/projeto/geometria.ts` e `core/utils/geometria.py`, e os dois leem os casos de `tests/casos/geometria.json`. Mudou a conta, mude os dois e os casos.
+- **Prévia em canvas:** os `<video>` continuam tocando, escondidos, só para fornecer os quadros. O canvas desenha a cada quadro da tela enquanto toca e, parado, só quando algo muda. Se um vídeo ainda não tem quadro, a prévia mantém o desenho anterior por até 400 ms, para não piscar.
+- **Mudança provisória:** arrastar na prévia ou num controle deslizante do painel muda um `Comando` provisório no `Editor`, que só aparece na tela. Ao soltar, vira comando de verdade e um passo do desfazer.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.

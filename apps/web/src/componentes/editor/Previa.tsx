@@ -1,21 +1,30 @@
 "use client";
 
-import { Maximize, Pause, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Maximize, Pause, Play, TriangleAlert } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
-import { type Clipe, type Faixa, fimDoClipe, type Projeto, tempoNaMidia } from "@/lib/projeto/modelo";
+import { type Caixa, caixaDoClipe, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
+import { type Clipe, type Faixa, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
+import { Compositor } from "@/lib/previa/compositor";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { razao } from "./proporcoes";
 
 type Props = {
+  /** O projeto como deve aparecer, já com a mudança em curso (arrasto na prévia ou no painel). */
   projeto: Projeto;
   midias: ReadonlyMap<string, Midia>;
   tempo: Tick;
   tocando: boolean;
   aoAlternar: () => void;
+  selecao: string[];
+  aoSelecionar: (ids: string[]) => void;
+  /** Mudança provisória durante um gesto na prévia; `null` quando o gesto termina. */
+  aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
+  aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
   className?: string;
 };
 
@@ -23,11 +32,15 @@ type Props = {
 const DESVIO_MAXIMO = 0.3;
 /** O próximo clipe da faixa começa a carregar quando falta isto para ele entrar. */
 const ANTECEDENCIA = 2 * TICKS_POR_SEGUNDO;
+/** Quanto a prévia espera um vídeo carregar o quadro antes de desenhar sem ele. */
+const ESPERA_QUADRO_MS = 400;
+/** Densidade máxima de pixels do canvas: acima disso o custo cresce e a diferença não aparece. */
+const DENSIDADE_MAXIMA = 2;
 
 /** Mede a área livre e calcula o maior quadro na proporção do projeto que cabe nela. */
 function useQuadro(proporcao: Projeto["proporcao"]) {
   const areaRef = useRef<HTMLDivElement>(null);
-  const [tamanho, setTamanho] = useState({ largura: 0, altura: 0 });
+  const [tamanho, setTamanho] = useState<Tamanho>({ largura: 0, altura: 0 });
 
   useEffect(() => {
     const elemento = areaRef.current;
@@ -72,11 +85,40 @@ function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo
   return itens;
 }
 
-export function Previa({ projeto, midias, tempo, tocando, aoAlternar, className = "" }: Props) {
-  const { areaRef, tamanho } = useQuadro(projeto.proporcao);
-  const quadroRef = useRef<HTMLDivElement>(null);
+/** Tamanho da imagem da mídia, já com a rotação do celular aplicada (a ingestão guarda assim). */
+function tamanhoDaMidia(midia: Midia): Tamanho | null {
+  return midia.video && midia.video.largura > 0 && midia.video.altura > 0 ? { largura: midia.video.largura, altura: midia.video.altura } : null;
+}
 
-  // A primeira faixa da lista é a de cima; na tela ela tem que ser desenhada por último
+/** Uma camada do quadro atual, de baixo para cima. */
+type CamadaNaTela = { chave: string; clipe: Clipe; faixa: Faixa; recorte: Recorte; caixa: Caixa };
+
+type EstadoDoDesenho = {
+  camadas: CamadaNaTela[];
+  fundo: string;
+  quadro: Tamanho;
+  tocando: boolean;
+  /** Algo mudou desde o último desenho. */
+  sujo: boolean;
+};
+
+function webgl2Disponivel(): boolean {
+  try {
+    return typeof document !== "undefined" && Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+}
+
+export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, className = "" }: Props) {
+  const { areaRef, tamanho } = useQuadro(projeto.proporcao);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [suportado] = useState(webgl2Disponivel);
+  const [guias, setGuias] = useState<Guias | null>(null);
+  const elementos = useRef(new Map<string, HTMLVideoElement>());
+  const desenho = useRef<EstadoDoDesenho>({ camadas: [], fundo: "#000000", quadro: tamanho, tocando: false, sujo: true });
+
+  // A primeira faixa da lista é a de cima; no quadro ela tem que ser desenhada por último
   const visuais = itensNoTempo(
     projeto.faixas.filter((faixa) => faixa.tipo !== "audio" && !faixa.oculta).reverse(),
     midias,
@@ -87,25 +129,147 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, className 
     midias,
     tempo,
   );
+  const camadas: CamadaNaTela[] = [];
+  for (const item of visuais) {
+    const tamanhoMidia = tamanhoDaMidia(item.midia);
+    if (!item.ativo || !tamanhoMidia || tamanho.largura <= 0) continue;
+    const { clipe, faixa, chave } = item;
+    camadas.push({ chave, clipe, faixa, recorte: clipe.recorte, caixa: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho) });
+  }
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
+  const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
+
+  useLayoutEffect(() => {
+    desenho.current = { camadas, fundo: projeto.fundo.cor, quadro: tamanho, tocando, sujo: true };
+  });
+
+  // Laço de desenho: a cada quadro da tela enquanto toca; parado, só quando algo muda
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !suportado) return;
+    const compositor = new Compositor(canvas);
+    let pedido = 0;
+    let incompletoDesde = 0;
+
+    const desenhar = () => {
+      pedido = requestAnimationFrame(desenhar);
+      const estado = desenho.current;
+      if (!estado.sujo && !estado.tocando) return;
+      const prontas = [];
+      let faltando = false;
+      for (const camada of estado.camadas) {
+        const video = elementos.current.get(camada.chave);
+        if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
+          faltando = true;
+          continue;
+        }
+        prontas.push({ fonte: video, recorte: camada.recorte, caixa: camada.caixa });
+      }
+      // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
+      const agora = performance.now();
+      if (faltando) {
+        incompletoDesde ||= agora;
+        if (agora - incompletoDesde < ESPERA_QUADRO_MS) return;
+      }
+      incompletoDesde = 0;
+      estado.sujo = false;
+      const densidade = Math.min(window.devicePixelRatio || 1, DENSIDADE_MAXIMA);
+      const resolucao = { largura: Math.round(estado.quadro.largura * densidade), altura: Math.round(estado.quadro.altura * densidade) };
+      if (resolucao.largura > 0 && resolucao.altura > 0) compositor.desenhar(prontas, estado.fundo, estado.quadro, resolucao);
+    };
+    pedido = requestAnimationFrame(desenhar);
+    return () => {
+      cancelAnimationFrame(pedido);
+      compositor.destruir();
+    };
+  }, [suportado]);
+
+  const marcarSujo = () => {
+    desenho.current.sujo = true;
+  };
+
+  /** Clique na prévia: seleciona o clipe de cima que está sob o ponteiro. */
+  function selecionarNoPonto(evento: React.PointerEvent<HTMLDivElement>) {
+    if (evento.button !== 0) return;
+    const retangulo = evento.currentTarget.getBoundingClientRect();
+    const ponto = { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
+    const acima = [...camadas].reverse().find((camada) => camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
+    aoSelecionar(acima ? [acima.clipe.id] : []);
+  }
 
   return (
     <section aria-label="Prévia" className={`flex min-h-0 min-w-0 flex-col bg-fundo ${className}`}>
       <div ref={areaRef} className="relative min-h-0 flex-1 p-4">
         <div className="absolute inset-4 flex items-center justify-center">
           <div
-            ref={quadroRef}
-            className="relative flex items-center justify-center overflow-hidden shadow-lg shadow-black/40"
+            className="relative select-none shadow-lg shadow-black/40"
             style={{ width: tamanho.largura, height: tamanho.altura, backgroundColor: projeto.fundo.cor }}
+            onPointerDown={selecionarNoPonto}
           >
-            {visuais.map((item) => (
-              <ElementoDoClipe key={item.chave} item={item} tempo={tempo} tocando={tocando} tipo="video" />
-            ))}
-            {sons.map((item) => (
-              <ElementoDoClipe key={item.chave} item={item} tempo={tempo} tocando={tocando} tipo="audio" />
-            ))}
+            {/* Os vídeos só fornecem os quadros: quem aparece é o canvas, por cima deles */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-0" aria-hidden>
+              {visuais.map((item) => (
+                <ElementoDoClipe
+                  key={item.chave}
+                  item={item}
+                  tempo={tempo}
+                  tocando={tocando}
+                  tipo="video"
+                  aoRegistrar={(video) => {
+                    if (video) elementos.current.set(item.chave, video);
+                    else elementos.current.delete(item.chave);
+                  }}
+                  aoTerQuadro={marcarSujo}
+                />
+              ))}
+              {sons.map((item) => (
+                <ElementoDoClipe key={item.chave} item={item} tempo={tempo} tocando={tocando} tipo="audio" />
+              ))}
+            </div>
+
+            {suportado ? (
+              <canvas ref={canvasRef} className="absolute inset-0 size-full bg-black object-contain" />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center text-xs text-suave">
+                <TriangleAlert className="size-5 text-aviso" aria-hidden />
+                Este navegador não tem WebGL2, que a prévia usa para desenhar o vídeo. Use o Chrome ou o Edge atualizados.
+              </div>
+            )}
+
+            {guias ? (
+              <>
+                {guias.verticais.map((x) => (
+                  <div key={`v${x}`} className="pointer-events-none absolute inset-y-0 w-px bg-aviso" style={{ left: x }} aria-hidden />
+                ))}
+                {guias.horizontais.map((y) => (
+                  <div key={`h${y}`} className="pointer-events-none absolute inset-x-0 h-px bg-aviso" style={{ top: y }} aria-hidden />
+                ))}
+              </>
+            ) : null}
+
+            {selecionada && !tocando ? (
+              <ManipuladorNaPrevia
+                key={selecionada.clipe.id}
+                caixa={selecionada.caixa}
+                quadro={tamanho}
+                transformacao={selecionada.clipe.transformacao}
+                travado={selecionada.faixa.travada}
+                aoMudar={(mudanca, novasGuias) => {
+                  aoPrever(selecionada.clipe.id, mudanca);
+                  setGuias(novasGuias.verticais.length || novasGuias.horizontais.length ? novasGuias : null);
+                }}
+                aoSoltar={(mudanca) => {
+                  setGuias(null);
+                  aoPrever(selecionada.clipe.id, null);
+                  if (mudanca) aoTransformar(selecionada.clipe.id, mudanca);
+                }}
+              />
+            ) : null}
+
             {vazio ? (
-              <p className="max-w-[80%] text-center text-xs text-suave">Arraste mídias da biblioteca para a linha do tempo para ver aqui.</p>
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center p-[10%] text-center text-xs text-suave">
+                Arraste mídias da biblioteca para a linha do tempo para ver aqui.
+              </p>
             ) : null}
           </div>
         </div>
@@ -131,7 +295,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, className 
           <button
             type="button"
             className="botao-icone"
-            onClick={() => void quadroRef.current?.requestFullscreen()}
+            disabled={!suportado}
+            onClick={() => void canvasRef.current?.requestFullscreen()}
             aria-label="Tela cheia"
             title="Tela cheia"
           >
@@ -143,8 +308,18 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, className 
   );
 }
 
+type PropsElemento = {
+  item: Item;
+  tempo: Tick;
+  tocando: boolean;
+  tipo: "video" | "audio";
+  aoRegistrar?: (video: HTMLVideoElement | null) => void;
+  /** Chamado quando o vídeo tem um quadro novo para mostrar parado (carregou ou terminou de buscar). */
+  aoTerQuadro?: () => void;
+};
+
 /** Um vídeo ou áudio que segue o relógio do editor. */
-function ElementoDoClipe({ item, tempo, tocando, tipo }: { item: Item; tempo: Tick; tocando: boolean; tipo: "video" | "audio" }) {
+function ElementoDoClipe({ item, tempo, tocando, tipo, aoRegistrar, aoTerQuadro }: PropsElemento) {
   const elementoRef = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const { clipe, faixa, midia, ativo } = item;
   const alvo = (ativo ? tempoNaMidia(clipe, tempo) : clipe.entrada) / TICKS_POR_SEGUNDO;
@@ -170,6 +345,14 @@ function ElementoDoClipe({ item, tempo, tocando, tipo }: { item: Item; tempo: Ti
     }
   }, [alvo, tocar, faixa.muda, midia.audio, clipe.volume, clipe.velocidade]);
 
+  useEffect(() => {
+    if (!aoRegistrar) return;
+    aoRegistrar(elementoRef.current as HTMLVideoElement | null);
+    return () => aoRegistrar(null);
+    // O registro é por elemento: a função muda a cada render, o elemento não
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (tipo === "audio") {
     return <audio ref={elementoRef} src={arquivoDaMidia(midia.id, "proxy.m4a")} preload="auto" />;
   }
@@ -177,9 +360,11 @@ function ElementoDoClipe({ item, tempo, tocando, tipo }: { item: Item; tempo: Ti
     <video
       ref={elementoRef}
       src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a")}
-      className={`absolute inset-0 size-full object-contain ${ativo ? "" : "invisible"}`}
+      className="absolute inset-0 size-full object-contain"
       playsInline
       preload="auto"
+      onLoadedData={aoTerQuadro}
+      onSeeked={aoTerQuadro}
     />
   );
 }

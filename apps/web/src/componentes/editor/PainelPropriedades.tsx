@@ -1,22 +1,28 @@
 "use client";
 
-import { MousePointerClick } from "lucide-react";
+import { MousePointerClick, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
-import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import type { Comando } from "@/lib/projeto/comandos";
+import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO } from "@/lib/projeto/edicao";
+import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Taxa } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
-// As abas da seção 5 do plano. Só "Informações" já tem conteúdo; as outras chegam nas próximas fases.
+import { ControleNumerico } from "./ControleNumerico";
+
+// As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
 const ABAS = [
   { id: "info", nome: "Informações", fase: "" },
-  { id: "basico", nome: "Básico", fase: "Fase 2" },
+  { id: "basico", nome: "Básico", fase: "" },
   { id: "audio", nome: "Áudio", fase: "Fase 3" },
   { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
   { id: "animacao", nome: "Animação", fase: "Fase 3" },
   { id: "cor", nome: "Cor", fase: "Fase 4" },
 ] as const;
+
+type IdAba = (typeof ABAS)[number]["id"];
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -36,19 +42,32 @@ type Props = {
   /** O clipe escolhido na linha do tempo; `midia` é a dele. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   taxa: Taxa;
+  /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
+  fundo: string;
+  /** Mudança provisória enquanto um controle é arrastado; `null` para desistir dela. */
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, className = "", style }: Props) {
-  const [aba, setAba] = useState<(typeof ABAS)[number]["id"]>("info");
+export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+  const [abaEscolhida, setAba] = useState<IdAba>("basico");
+  // Mídia da biblioteca, sem clipe, só tem informações
+  const aba = selecionado ? abaEscolhida : "info";
   const atual = ABAS.find((item) => item.id === aba)!;
 
   if (!midia) {
     return (
-      <aside aria-label="Propriedades" style={style} className={`flex shrink-0 flex-col items-center justify-center gap-2 bg-painel p-6 text-center ${className}`}>
-        <MousePointerClick className="size-6 text-suave" aria-hidden />
-        <p className="text-xs text-suave">Selecione uma mídia ou um clipe para ver as propriedades.</p>
+      <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
+        <div className="border-b border-borda p-3">
+          <h3 className="text-sm font-semibold">Projeto</h3>
+          <CorDeFundo cor={fundo} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <MousePointerClick className="size-6 text-suave" aria-hidden />
+          <p className="text-xs text-suave">Selecione um clipe na prévia ou na linha do tempo para ajustar posição, tamanho e recorte.</p>
+        </div>
       </aside>
     );
   }
@@ -62,10 +81,11 @@ export function PainelPropriedades({ midia, selecionado, taxa, className = "", s
             type="button"
             role="tab"
             aria-selected={item.id === aba}
+            disabled={!selecionado && item.id !== "info"}
             onClick={() => setAba(item.id)}
             className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium transition ${
               item.id === aba ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-suave`}
           >
             {item.nome}
           </button>
@@ -111,6 +131,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, className = "", s
               )}
             </dl>
           </>
+        ) : aba === "basico" && selecionado ? (
+          <AbaBasico clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
             Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
@@ -118,5 +140,170 @@ export function PainelPropriedades({ midia, selecionado, taxa, className = "", s
         )}
       </div>
     </aside>
+  );
+}
+
+type PropsAba = {
+  clipe: Clipe;
+  faixa: Faixa;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+};
+
+function Secao({ titulo, children, acao }: { titulo: string; children: React.ReactNode; acao?: React.ReactNode }) {
+  return (
+    <section className="border-b border-borda/60 pb-2 pt-3 first:pt-0 last:border-0">
+      <div className="flex min-h-6 items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">{titulo}</h3>
+        {acao}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+type Bordas = { esquerda: number; topo: number; direita: number; base: number };
+
+/** Bordas cortadas, em frações da mídia, a partir do recorte (que guarda o que sobra). */
+function bordasDoRecorte(r: Recorte): Bordas {
+  return { esquerda: r.x, topo: r.y, direita: 1 - r.x - r.largura, base: 1 - r.y - r.altura };
+}
+
+function recorteDasBordas(b: Bordas): Recorte {
+  return { x: b.esquerda, y: b.topo, largura: 1 - b.esquerda - b.direita, altura: 1 - b.topo - b.base };
+}
+
+/** Diferença abaixo da qual dois valores contam como iguais (evita passo de desfazer sem mudança). */
+const PERTO = 1e-6;
+
+/** Posição, tamanho, giro, opacidade e recorte do clipe. */
+function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
+  if (faixa.tipo === "audio") {
+    return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
+  }
+  const t = clipe.transformacao;
+  const travada = faixa.travada;
+  const ids = [clipe.id];
+
+  const transformar = (mudanca: Partial<Transformacao>): Comando => ({ comando: "clipe.transformar", parametros: { clipeIds: ids, transformacao: mudanca } });
+  /** `fator` converte o valor guardado no que aparece (0,5 → 50%). */
+  const controleDeTransformacao = (chave: keyof Transformacao, fator: number) => ({
+    valor: t[chave] * fator,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(transformar({ [chave]: valor / fator })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / fator - t[chave]) < PERTO) aoPrever(null);
+      else aoExecutar(transformar({ [chave]: valor / fator }));
+    },
+  });
+
+  const bordas = bordasDoRecorte(clipe.recorte);
+  const recortar = (borda: keyof Bordas, valor: number): Comando => ({
+    comando: "clipe.recortar",
+    parametros: { clipeIds: ids, recorte: recorteDasBordas({ ...bordas, [borda]: valor }) },
+  });
+  const controleDeBorda = (borda: keyof Bordas) => ({
+    valor: bordas[borda] * 100,
+    minimo: 0,
+    maximo: (1 - RECORTE_MINIMO) * 100,
+    passo: 0.5,
+    sufixo: "%",
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(recortar(borda, valor / 100)),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - bordas[borda]) < PERTO) aoPrever(null);
+      else aoExecutar(recortar(borda, valor / 100));
+    },
+  });
+
+  const mudado =
+    (Object.keys(TRANSFORMACAO_PADRAO) as (keyof Transformacao)[]).some((chave) => Math.abs(t[chave] - TRANSFORMACAO_PADRAO[chave]) > PERTO) ||
+    (Object.keys(RECORTE_PADRAO) as (keyof Recorte)[]).some((chave) => Math.abs(clipe.recorte[chave] - RECORTE_PADRAO[chave]) > PERTO);
+  const { x, y, escala, opacidade } = LIMITES_TRANSFORMACAO;
+
+  return (
+    <div>
+      {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      <Secao
+        titulo="Posição e tamanho"
+        acao={
+          <button
+            type="button"
+            className="botao-icone size-6"
+            disabled={travada || !mudado}
+            onClick={() => aoExecutar({ comando: "clipe.restaurar", parametros: { clipeIds: ids } })}
+            aria-label="Restaurar posição, tamanho e recorte"
+            title="Restaurar posição, tamanho e recorte"
+          >
+            <RotateCcw className="size-3.5" aria-hidden />
+          </button>
+        }
+      >
+        <ControleNumerico
+          rotulo="Posição horizontal"
+          minimo={-100}
+          maximo={100}
+          minimoDigitado={x.minimo * 100}
+          maximoDigitado={x.maximo * 100}
+          passo={0.1}
+          sufixo="%"
+          {...controleDeTransformacao("x", 100)}
+        />
+        <ControleNumerico
+          rotulo="Posição vertical"
+          minimo={-100}
+          maximo={100}
+          minimoDigitado={y.minimo * 100}
+          maximoDigitado={y.maximo * 100}
+          passo={0.1}
+          sufixo="%"
+          {...controleDeTransformacao("y", 100)}
+        />
+        <ControleNumerico
+          rotulo="Escala"
+          minimo={1}
+          maximo={400}
+          minimoDigitado={escala.minimo * 100}
+          maximoDigitado={escala.maximo * 100}
+          sufixo="%"
+          {...controleDeTransformacao("escala", 100)}
+        />
+        <ControleNumerico rotulo="Giro" minimo={-180} maximo={180} passo={0.5} sufixo="°" {...controleDeTransformacao("rotacao", 1)} />
+        <ControleNumerico rotulo="Opacidade" minimo={opacidade.minimo * 100} maximo={opacidade.maximo * 100} sufixo="%" {...controleDeTransformacao("opacidade", 100)} />
+      </Secao>
+      <Secao titulo="Recorte">
+        <ControleNumerico rotulo="Esquerda" {...controleDeBorda("esquerda")} />
+        <ControleNumerico rotulo="Direita" {...controleDeBorda("direita")} />
+        <ControleNumerico rotulo="Cima" {...controleDeBorda("topo")} />
+        <ControleNumerico rotulo="Baixo" {...controleDeBorda("base")} />
+      </Secao>
+    </div>
+  );
+}
+
+type PropsCor = { cor: string; aoPrever: (comando: Comando | null) => void; aoExecutar: (comando: Comando) => void };
+
+/** Cor atrás das camadas, onde nenhum clipe cobre o quadro. */
+function CorDeFundo({ cor, aoPrever, aoExecutar }: PropsCor) {
+  return (
+    <label className="mt-2 flex items-center justify-between gap-3 text-xs">
+      <span className="text-suave">Cor de fundo</span>
+      <span className="flex items-center gap-2">
+        <span className="font-mono uppercase tabular-nums text-suave">{cor}</span>
+        <input
+          type="color"
+          value={cor}
+          onChange={(evento) => aoPrever({ comando: "projeto.fundo", parametros: { cor: evento.currentTarget.value } })}
+          // O "change" nativo só vem quando a pessoa fecha o seletor: aí vira um passo do desfazer
+          ref={(elemento) => {
+            if (!elemento) return;
+            const confirmar = () => aoExecutar({ comando: "projeto.fundo", parametros: { cor: elemento.value } });
+            elemento.addEventListener("change", confirmar);
+            return () => elemento.removeEventListener("change", confirmar);
+          }}
+          className="h-7 w-10 cursor-pointer rounded border border-borda bg-painel-2"
+        />
+      </span>
+    </label>
   );
 }

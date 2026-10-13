@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
-import type { Comando } from "@/lib/projeto/comandos";
+import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
 import { duracaoDoQuadro, quadroMaisProximo, segundosParaTicks, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -105,6 +105,18 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
+
+  // Mudança em curso (arrastando na prévia ou num controle do painel): aparece na tela, mas só vira
+  // comando, e passo do desfazer, quando a pessoa solta
+  const [provisorio, setProvisorio] = useState<Comando | null>(null);
+  const projetoNaTela = useMemo(() => {
+    if (!projeto || !provisorio) return projeto;
+    try {
+      return executarComando(projeto, provisorio, ctx).projeto;
+    } catch {
+      return projeto;
+    }
+  }, [projeto, provisorio, ctx]);
   const reproducao = useReproducao(projeto?.duracao ?? 0, projeto?.taxa ?? { num: 30, den: 1 });
   const { tempo, buscar, alternar } = reproducao;
 
@@ -119,7 +131,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
   // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
-  const selecionado = projeto && selecaoValida.length === 1 ? acharClipe(projeto, selecaoValida[0]) : null;
+  const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
   const midiaDasPropriedades = selecionado ? (midias.get(selecionado.clipe.midia_id) ?? null) : midiaId ? (midias.get(midiaId) ?? null) : null;
   const ferramentaAtual = FERRAMENTAS.find((item) => item.id === ferramenta)!;
 
@@ -258,7 +270,23 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col max-md:order-1">
           <div className="flex min-h-0 flex-1">
-            <Previa projeto={projeto} midias={midias} tempo={tempo} tocando={reproducao.tocando} aoAlternar={alternar} className="flex-1" />
+            <Previa
+              projeto={projetoNaTela ?? projeto}
+              midias={midias}
+              tempo={tempo}
+              tocando={reproducao.tocando}
+              aoAlternar={alternar}
+              selecao={selecaoValida}
+              aoSelecionar={(ids) => {
+                setSelecao(ids);
+                if (ids.length) setMidiaId(null);
+              }}
+              aoPrever={(clipeId, mudanca) =>
+                setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } } : null)
+              }
+              aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } })}
+              className="flex-1"
+            />
             <Divisor
               direcao="coluna"
               valor={larguraPropriedades}
@@ -273,6 +301,12 @@ export function Editor({ projetoId }: { projetoId: string }) {
               midia={midiaDasPropriedades}
               selecionado={selecionado}
               taxa={projeto.taxa}
+              fundo={(projetoNaTela ?? projeto).fundo.cor}
+              aoPrever={setProvisorio}
+              aoExecutar={(comando) => {
+                setProvisorio(null);
+                executar(comando);
+              }}
               className="w-[var(--largura-propriedades)] max-lg:hidden"
             />
           </div>
