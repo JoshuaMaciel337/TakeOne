@@ -3,11 +3,12 @@
 import { RotateCcw } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
-import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "@/lib/projeto/cor";
+import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 
 import { ControleNumerico } from "./ControleNumerico";
+import { RodaDeCor } from "./RodaDeCor";
 
 type Props = {
   clipe: Clipe;
@@ -16,7 +17,9 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
 };
 
-const AJUSTES: { chave: keyof AjustesCor; nome: string; grupo: "luz" | "cor" | "efeito" }[] = [
+type Grupo = "luz" | "cor" | "efeito";
+
+const AJUSTES: { chave: keyof AjustesCor; nome: string; grupo: Grupo }[] = [
   { chave: "exposicao", nome: "Exposição", grupo: "luz" },
   { chave: "contraste", nome: "Contraste", grupo: "luz" },
   { chave: "realces", nome: "Realces", grupo: "luz" },
@@ -56,6 +59,15 @@ export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
       else aoExecutar(comando({ [chave]: valor / fator(chave) }));
     },
   });
+
+  const secao = (grupo: (typeof GRUPOS)[number]) => (
+    <section key={grupo.id} className="border-b border-borda/60 pb-2 pt-3 last:border-0">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">{grupo.nome}</h3>
+      {AJUSTES.filter((ajuste) => ajuste.grupo === grupo.id).map((ajuste) => (
+        <ControleNumerico key={ajuste.chave} rotulo={ajuste.nome} {...controle(ajuste.chave)} />
+      ))}
+    </section>
+  );
 
   return (
     <div>
@@ -104,14 +116,27 @@ export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
           />
         ) : null}
       </section>
-      {GRUPOS.map((grupo) => (
-        <section key={grupo.id} className="border-b border-borda/60 pb-2 pt-3 last:border-0">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">{grupo.nome}</h3>
-          {AJUSTES.filter((ajuste) => ajuste.grupo === grupo.id).map((ajuste) => (
-            <ControleNumerico key={ajuste.chave} rotulo={ajuste.nome} {...controle(ajuste.chave)} />
+      {GRUPOS.filter((grupo) => grupo.id !== "efeito").map(secao)}
+      <section className="border-b border-borda/60 pb-3 pt-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Rodas de cor</h3>
+        <div className="mt-2 grid grid-cols-3 gap-1">
+          {RODAS.map((roda) => (
+            <RodaDeCor
+              key={roda.id}
+              nome={roda.nome}
+              matiz={cor[roda.matiz]}
+              forca={cor[roda.forca]}
+              desativado={travada}
+              aoPrever={(matiz, forca) => aoPrever(comando({ [roda.matiz]: matiz, [roda.forca]: forca }))}
+              aoConfirmar={(matiz, forca) => {
+                if (Math.abs(matiz - cor[roda.matiz]) < PERTO && Math.abs(forca - cor[roda.forca]) < PERTO) aoPrever(null);
+                else aoExecutar(comando({ [roda.matiz]: matiz, [roda.forca]: forca }));
+              }}
+            />
           ))}
-        </section>
-      ))}
+        </div>
+      </section>
+      {GRUPOS.filter((grupo) => grupo.id === "efeito").map(secao)}
     </div>
   );
 }

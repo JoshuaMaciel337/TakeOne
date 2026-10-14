@@ -4,7 +4,8 @@
 // o TypeScript e o Python.
 //
 // Ordem: exposição e balanço de branco em luz linear; contraste, realces, sombras e saturação nos
-// valores de tela (sRGB). A vinheta depende da posição do pixel e fica à parte.
+// valores de tela (sRGB), com as rodas de cor depois de realces e sombras. A vinheta depende da
+// posição do pixel e fica à parte.
 
 export type AjustesCor = {
   /** -1 (frio, azulado) a 1 (quente, alaranjado). */
@@ -23,7 +24,21 @@ export type AjustesCor = {
   saturacao: number;
   /** 0 a 1: escurece as bordas. */
   vinheta: number;
+  /** Rodas de cor: o matiz (0 a 360°) e a força (0 a 1) que puxam escuros, meios-tons e claros. */
+  matiz_escuros: number;
+  forca_escuros: number;
+  matiz_medios: number;
+  forca_medios: number;
+  matiz_claros: number;
+  forca_claros: number;
 };
+
+/** As três rodas, na ordem dos tons. */
+export const RODAS = [
+  { id: "escuros", nome: "Escuros", matiz: "matiz_escuros", forca: "forca_escuros" },
+  { id: "medios", nome: "Meios-tons", matiz: "matiz_medios", forca: "forca_medios" },
+  { id: "claros", nome: "Claros", matiz: "matiz_claros", forca: "forca_claros" },
+] as const;
 
 export type Cor = AjustesCor & {
   /** Filtro pronto somado aos ajustes, com intensidade de 0 a 2 (200%). */
@@ -31,7 +46,22 @@ export type Cor = AjustesCor & {
   intensidade: number;
 };
 
-export const AJUSTES_NEUTROS: AjustesCor = { temperatura: 0, tom: 0, exposicao: 0, contraste: 0, realces: 0, sombras: 0, saturacao: 0, vinheta: 0 };
+export const AJUSTES_NEUTROS: AjustesCor = {
+  temperatura: 0,
+  tom: 0,
+  exposicao: 0,
+  contraste: 0,
+  realces: 0,
+  sombras: 0,
+  saturacao: 0,
+  vinheta: 0,
+  matiz_escuros: 0,
+  forca_escuros: 0,
+  matiz_medios: 0,
+  forca_medios: 0,
+  matiz_claros: 0,
+  forca_claros: 0,
+};
 export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1 };
 
 export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: number }> = {
@@ -43,7 +73,16 @@ export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: num
   sombras: { minimo: -1, maximo: 1 },
   saturacao: { minimo: -1, maximo: 1 },
   vinheta: { minimo: 0, maximo: 1 },
+  matiz_escuros: { minimo: 0, maximo: 360 },
+  forca_escuros: { minimo: 0, maximo: 1 },
+  matiz_medios: { minimo: 0, maximo: 360 },
+  forca_medios: { minimo: 0, maximo: 1 },
+  matiz_claros: { minimo: 0, maximo: 360 },
+  forca_claros: { minimo: 0, maximo: 1 },
 };
+
+/** O matiz sozinho não muda nada: só conta com força. */
+const MATIZES = new Set<keyof AjustesCor>(["matiz_escuros", "matiz_medios", "matiz_claros"]);
 
 /** Filtros prontos: nomes e valores do TakeOne. */
 export const FILTROS: { id: string; nome: string; ajustes: Partial<AjustesCor> }[] = [
@@ -55,6 +94,11 @@ export const FILTROS: { id: string; nome: string; ajustes: Partial<AjustesCor> }
   { id: "noite", nome: "Noite", ajustes: { temperatura: -0.35, exposicao: -0.4, contraste: 0.15, vinheta: 0.4 } },
   { id: "antigo", nome: "Antigo", ajustes: { temperatura: 0.3, saturacao: -0.35, contraste: -0.15, sombras: 0.2, vinheta: 0.3 } },
   { id: "drama", nome: "Drama", ajustes: { contraste: 0.35, saturacao: -0.15, sombras: -0.2, realces: -0.2, vinheta: 0.25 } },
+  {
+    id: "cinema",
+    nome: "Cinema",
+    ajustes: { contraste: 0.15, matiz_escuros: 195, forca_escuros: 0.5, matiz_claros: 30, forca_claros: 0.35, saturacao: -0.05 },
+  },
 ];
 
 function limitar(valor: number, minimo: number, maximo: number): number {
@@ -68,13 +112,15 @@ export function ajustesEfetivos(cor: Cor | null | undefined): AjustesCor {
   const resultado = { ...AJUSTES_NEUTROS };
   for (const chave of Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]) {
     const { minimo, maximo } = LIMITES_COR[chave];
-    resultado[chave] = limitar(cor[chave] + (filtro[chave] ?? 0) * cor.intensidade, minimo, maximo);
+    // O matiz do filtro substitui o do clipe (somar ângulos não faz sentido); a força soma
+    const valor = MATIZES.has(chave) && filtro[chave] !== undefined ? filtro[chave] : (cor[chave] ?? 0) + (filtro[chave] ?? 0) * cor.intensidade;
+    resultado[chave] = limitar(valor, minimo, maximo);
   }
   return resultado;
 }
 
 export function corNeutra(ajustes: AjustesCor): boolean {
-  return (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).every((chave) => Math.abs(ajustes[chave]) < 1e-9);
+  return (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).every((chave) => MATIZES.has(chave) || Math.abs(ajustes[chave]) < 1e-9);
 }
 
 // -----------------------------------------------
@@ -94,6 +140,22 @@ const FORCA_TEMPERATURA = 0.15;
 const FORCA_TOM = 0.1;
 /** Quanto realces e sombras somam, no máximo. */
 const FORCA_REALCES_SOMBRAS = 0.25;
+/** Quanto uma roda de cor com força 1 desloca a cor. */
+const FORCA_RODAS = 0.3;
+const LUMA = [0.2126, 0.7152, 0.0722];
+
+/** A direção de uma roda: a cor pura do matiz menos a luminância dela (não clareia nem escurece). */
+export function vetorDaRoda(matiz: number): [number, number, number] {
+  const h = (((matiz % 360) + 360) % 360) / 60;
+  const pura = [limitar(Math.abs(h - 3) - 1, 0, 1), limitar(2 - Math.abs(h - 2), 0, 1), limitar(2 - Math.abs(h - 4), 0, 1)];
+  const y = LUMA[0] * pura[0] + LUMA[1] * pura[1] + LUMA[2] * pura[2];
+  return [pura[0] - y, pura[1] - y, pura[2] - y];
+}
+
+/** O deslocamento de cada roda, já com a força: é o que o shader recebe. */
+export function deslocamentosDasRodas(a: AjustesCor): [number, number, number][] {
+  return RODAS.map((roda) => vetorDaRoda(a[roda.matiz]).map((v) => v * a[roda.forca] * FORCA_RODAS) as [number, number, number]);
+}
 
 /** Cor de um pixel (sem a vinheta). */
 export function aplicarCor([r, g, b]: [number, number, number], a: AjustesCor): [number, number, number] {
@@ -112,6 +174,12 @@ export function aplicarCor([r, g, b]: [number, number, number], a: AjustesCor): 
   const y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   const soma = FORCA_REALCES_SOMBRAS * (a.realces * y * y + a.sombras * (1 - y) * (1 - y));
   c = c.map((v) => limitar(v + soma, 0, 1));
+
+  // Rodas de cor: escuros, meios-tons e claros, pesados pela luminância (os pesos somam 1)
+  const yr = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const pesos = [(1 - yr) * (1 - yr), 2 * yr * (1 - yr), yr * yr];
+  const rodas = deslocamentosDasRodas(a);
+  c = c.map((v, k) => limitar(v + pesos[0] * rodas[0][k] + pesos[1] * rodas[1][k] + pesos[2] * rodas[2][k], 0, 1));
 
   // Saturação: afasta ou aproxima cada canal da luminância
   const y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];

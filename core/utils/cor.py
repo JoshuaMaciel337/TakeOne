@@ -13,9 +13,15 @@ import numpy as np
 from PIL import Image
 
 AJUSTES_NEUTROS = {"temperatura": 0, "tom": 0, "exposicao": 0, "contraste": 0, "realces": 0, "sombras": 0,
-                   "saturacao": 0, "vinheta": 0}
+                   "saturacao": 0, "vinheta": 0, "matiz_escuros": 0, "forca_escuros": 0, "matiz_medios": 0,
+                   "forca_medios": 0, "matiz_claros": 0, "forca_claros": 0}
 LIMITES = {"temperatura": (-1, 1), "tom": (-1, 1), "exposicao": (-2, 2), "contraste": (-1, 1), "realces": (-1, 1),
-           "sombras": (-1, 1), "saturacao": (-1, 1), "vinheta": (0, 1)}
+           "sombras": (-1, 1), "saturacao": (-1, 1), "vinheta": (0, 1), "matiz_escuros": (0, 360),
+           "forca_escuros": (0, 1), "matiz_medios": (0, 360), "forca_medios": (0, 1), "matiz_claros": (0, 360),
+           "forca_claros": (0, 1)}
+# Rodas de cor: (matiz, força) de escuros, meios-tons e claros. O matiz sozinho não muda nada.
+RODAS = (("matiz_escuros", "forca_escuros"), ("matiz_medios", "forca_medios"), ("matiz_claros", "forca_claros"))
+MATIZES = {matiz for matiz, _ in RODAS}
 FILTROS = {
     "quente": {"temperatura": 0.45, "saturacao": 0.1},
     "frio": {"temperatura": -0.45, "tom": -0.05},
@@ -25,10 +31,14 @@ FILTROS = {
     "noite": {"temperatura": -0.35, "exposicao": -0.4, "contraste": 0.15, "vinheta": 0.4},
     "antigo": {"temperatura": 0.3, "saturacao": -0.35, "contraste": -0.15, "sombras": 0.2, "vinheta": 0.3},
     "drama": {"contraste": 0.35, "saturacao": -0.15, "sombras": -0.2, "realces": -0.2, "vinheta": 0.25},
+    "cinema": {"contraste": 0.15, "matiz_escuros": 195, "forca_escuros": 0.5, "matiz_claros": 30, "forca_claros": 0.35,
+               "saturacao": -0.05},
 }
 FORCA_TEMPERATURA = 0.15
 FORCA_TOM = 0.1
 FORCA_REALCES_SOMBRAS = 0.25
+FORCA_RODAS = 0.3
+LUMA = (0.2126, 0.7152, 0.0722)
 PONTOS_LUT = 33
 
 
@@ -42,12 +52,19 @@ def ajustes_efetivos(cor: dict | None) -> dict:
         return dict(AJUSTES_NEUTROS)
     filtro = FILTROS.get(cor.get("filtro") or "", {})
     intensidade = cor.get("intensidade", 1)
-    return {chave: _limitar(cor.get(chave, 0) + filtro.get(chave, 0) * intensidade, *LIMITES[chave])
-            for chave in AJUSTES_NEUTROS}
+    efetivos = {}
+    for chave in AJUSTES_NEUTROS:
+        # O matiz do filtro substitui o do clipe (somar ângulos não faz sentido); a força soma
+        if chave in MATIZES and chave in filtro:
+            valor = filtro[chave]
+        else:
+            valor = (cor.get(chave) or 0) + filtro.get(chave, 0) * intensidade
+        efetivos[chave] = _limitar(valor, *LIMITES[chave])
+    return efetivos
 
 
 def cor_neutra(ajustes: dict) -> bool:
-    return all(abs(ajustes[chave]) < 1e-9 for chave in AJUSTES_NEUTROS)
+    return all(chave in MATIZES or abs(ajustes[chave]) < 1e-9 for chave in AJUSTES_NEUTROS)
 
 
 def _linear(c: float) -> float:
@@ -57,6 +74,14 @@ def _linear(c: float) -> float:
 def _tela(c: float) -> float:
     v = _limitar(c)
     return v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055
+
+
+def vetor_da_roda(matiz: float) -> tuple[float, float, float]:
+    """A direção de uma roda: a cor pura do matiz menos a luminância dela (não clareia nem escurece)."""
+    h = (matiz % 360) / 60
+    pura = (_limitar(abs(h - 3) - 1), _limitar(2 - abs(h - 2)), _limitar(2 - abs(h - 4)))
+    y = sum(peso * v for peso, v in zip(LUMA, pura, strict=True))
+    return pura[0] - y, pura[1] - y, pura[2] - y
 
 
 def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float, float]:
@@ -72,6 +97,12 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
     y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     soma = FORCA_REALCES_SOMBRAS * (a["realces"] * y * y + a["sombras"] * (1 - y) * (1 - y))
     c = [_limitar(v + soma) for v in c]
+
+    # Rodas de cor: escuros, meios-tons e claros, pesados pela luminância (os pesos somam 1)
+    yr = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    pesos = ((1 - yr) * (1 - yr), 2 * yr * (1 - yr), yr * yr)
+    rodas = [[v * a[forca] * FORCA_RODAS for v in vetor_da_roda(a[matiz])] for matiz, forca in RODAS]
+    c = [_limitar(c[k] + sum(peso * roda[k] for peso, roda in zip(pesos, rodas, strict=True))) for k in range(3)]
 
     y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     fator = 1 + a["saturacao"]

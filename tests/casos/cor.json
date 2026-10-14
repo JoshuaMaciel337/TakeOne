@@ -728,6 +728,456 @@
     0.573535862,
     0.556536763
    ]
+  },
+  {
+   "nome": "roda dos escuros azul [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "matiz_escuros": 210,
+    "forca_escuros": 1
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.14913517,
+    0.408307843,
+    0.667480516
+   ]
+  },
+  {
+   "nome": "roda dos escuros azul [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "matiz_escuros": 210,
+    "forca_escuros": 1
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.895171198,
+    0.850788697,
+    0.106406195
+   ]
+  },
+  {
+   "nome": "roda dos escuros azul [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "matiz_escuros": 210,
+    "forca_escuros": 1
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.0,
+    0.06900665,
+    0.20438165
+   ]
+  },
+  {
+   "nome": "roda dos escuros azul [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "matiz_escuros": 210,
+    "forca_escuros": 1
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.467765,
+    0.505265,
+    0.542765
+   ]
+  },
+  {
+   "nome": "roda dos escuros azul [0.95, 0.95, 0.95]",
+   "ajustes": {
+    "matiz_escuros": 210,
+    "forca_escuros": 1
+   },
+   "entrada": [
+    0.95,
+    0.95,
+    0.95
+   ],
+   "saida": [
+    0.94967765,
+    0.95005265,
+    0.95042765
+   ]
+  },
+  {
+   "nome": "roda dos meios-tons verde [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "matiz_medios": 120,
+    "forca_medios": 0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.139855696,
+    0.423950081,
+    0.539855696
+   ]
+  },
+  {
+   "nome": "roda dos meios-tons verde [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "matiz_medios": 120,
+    "forca_medios": 0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.859816342,
+    0.866001546,
+    0.059816342
+   ]
+  },
+  {
+   "nome": "roda dos meios-tons verde [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "matiz_medios": 120,
+    "forca_medios": 0.6
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.03777008,
+    0.05487008,
+    0.03777008
+   ]
+  },
+  {
+   "nome": "roda dos meios-tons verde [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "matiz_medios": 120,
+    "forca_medios": 0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.435632,
+    0.525632,
+    0.435632
+   ]
+  },
+  {
+   "nome": "roda dos meios-tons verde [0.95, 0.95, 0.95]",
+   "ajustes": {
+    "matiz_medios": 120,
+    "forca_medios": 0.6
+   },
+   "entrada": [
+    0.95,
+    0.95,
+    0.95
+   ],
+   "saida": [
+    0.93777008,
+    0.95487008,
+    0.93777008
+   ]
+  },
+  {
+   "nome": "roda dos claros laranja [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "matiz_claros": 30,
+    "forca_claros": 0.8
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.214268447,
+    0.397669509,
+    0.581070571
+   ]
+  },
+  {
+   "nome": "roda dos claros laranja [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "matiz_claros": 30,
+    "forca_claros": 0.8
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.967091091,
+    0.839041892,
+    0.010992694
+   ]
+  },
+  {
+   "nome": "roda dos claros laranja [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "matiz_claros": 30,
+    "forca_claros": 0.8
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05025788,
+    0.04995788,
+    0.04965788
+   ]
+  },
+  {
+   "nome": "roda dos claros laranja [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "matiz_claros": 30,
+    "forca_claros": 0.8
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.525788,
+    0.495788,
+    0.465788
+   ]
+  },
+  {
+   "nome": "roda dos claros laranja [0.95, 0.95, 0.95]",
+   "ajustes": {
+    "matiz_claros": 30,
+    "forca_claros": 0.8
+   },
+   "entrada": [
+    0.95,
+    0.95,
+    0.95
+   ],
+   "saida": [
+    1.0,
+    0.93479468,
+    0.82649468
+   ]
+  },
+  {
+   "nome": "três rodas com contraste [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "contraste": 0.3,
+    "matiz_escuros": 300,
+    "forca_escuros": 0.4,
+    "matiz_medios": 60,
+    "forca_medios": 0.3,
+    "matiz_claros": 180,
+    "forca_claros": 0.5,
+    "saturacao": 0.2
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.098754337,
+    0.36680509,
+    0.694762155
+   ]
+  },
+  {
+   "nome": "três rodas com contraste [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "contraste": 0.3,
+    "matiz_escuros": 300,
+    "forca_escuros": 0.4,
+    "matiz_medios": 60,
+    "forca_medios": 0.3,
+    "matiz_claros": 180,
+    "forca_claros": 0.5,
+    "saturacao": 0.2
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.909769723,
+    0.99858374,
+    0.0
+   ]
+  },
+  {
+   "nome": "três rodas com contraste [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "contraste": 0.3,
+    "matiz_escuros": 300,
+    "forca_escuros": 0.4,
+    "matiz_medios": 60,
+    "forca_medios": 0.3,
+    "matiz_claros": 180,
+    "forca_claros": 0.5,
+    "saturacao": 0.2
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.098100265,
+    0.0,
+    0.098100265
+   ]
+  },
+  {
+   "nome": "três rodas com contraste [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "contraste": 0.3,
+    "matiz_escuros": 300,
+    "forca_escuros": 0.4,
+    "matiz_medios": 60,
+    "forca_medios": 0.3,
+    "matiz_claros": 180,
+    "forca_claros": 0.5,
+    "saturacao": 0.2
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.494213,
+    0.503213,
+    0.485213
+   ]
+  },
+  {
+   "nome": "três rodas com contraste [0.95, 0.95, 0.95]",
+   "ajustes": {
+    "contraste": 0.3,
+    "matiz_escuros": 300,
+    "forca_escuros": 0.4,
+    "matiz_medios": 60,
+    "forca_medios": 0.3,
+    "matiz_claros": 180,
+    "forca_claros": 0.5,
+    "saturacao": 0.2
+   },
+   "entrada": [
+    0.95,
+    0.95,
+    0.95
+   ],
+   "saida": [
+    0.863290037,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "nome": "matiz sem força não muda [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "matiz_claros": 90
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.2,
+    0.4,
+    0.6
+   ]
+  },
+  {
+   "nome": "matiz sem força não muda [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "matiz_claros": 90
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.9,
+    0.85,
+    0.1
+   ]
+  },
+  {
+   "nome": "matiz sem força não muda [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "matiz_claros": 90
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05,
+    0.05,
+    0.05
+   ]
+  },
+  {
+   "nome": "matiz sem força não muda [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "matiz_claros": 90
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "matiz sem força não muda [0.95, 0.95, 0.95]",
+   "ajustes": {
+    "matiz_claros": 90
+   },
+   "entrada": [
+    0.95,
+    0.95,
+    0.95
+   ],
+   "saida": [
+    0.95,
+    0.95,
+    0.95
+   ]
   }
  ],
  "vinhetas": [
@@ -833,6 +1283,42 @@
     "sombras": 0.0,
     "saturacao": -0.3,
     "vinheta": 0
+   }
+  },
+  {
+   "cor": {
+    "temperatura": 0,
+    "tom": 0,
+    "exposicao": 0,
+    "contraste": 0,
+    "realces": 0,
+    "sombras": 0,
+    "saturacao": 0,
+    "vinheta": 0,
+    "matiz_escuros": 100,
+    "forca_escuros": 0.2,
+    "matiz_medios": 0,
+    "forca_medios": 0,
+    "matiz_claros": 0,
+    "forca_claros": 0,
+    "filtro": "cinema",
+    "intensidade": 0.5
+   },
+   "ajustes": {
+    "temperatura": 0.0,
+    "tom": 0.0,
+    "exposicao": 0.0,
+    "contraste": 0.075,
+    "realces": 0.0,
+    "sombras": 0.0,
+    "saturacao": -0.025,
+    "vinheta": 0,
+    "matiz_escuros": 195,
+    "forca_escuros": 0.45,
+    "matiz_medios": 0,
+    "forca_medios": 0,
+    "matiz_claros": 30,
+    "forca_claros": 0.175
    }
   }
  ]

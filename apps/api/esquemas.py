@@ -183,7 +183,14 @@ class CorEntrada(BaseModel):
     sombras: float = Field(default=0, ge=-1, le=1)
     saturacao: float = Field(default=0, ge=-1, le=1)
     vinheta: float = Field(default=0, ge=0, le=1)
-    filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama"] | None = None
+    # Rodas de cor: matiz em graus e força de escuros, meios-tons e claros
+    matiz_escuros: float = Field(default=0, ge=0, le=360)
+    forca_escuros: float = Field(default=0, ge=0, le=1)
+    matiz_medios: float = Field(default=0, ge=0, le=360)
+    forca_medios: float = Field(default=0, ge=0, le=1)
+    matiz_claros: float = Field(default=0, ge=0, le=360)
+    forca_claros: float = Field(default=0, ge=0, le=1)
+    filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama", "cinema"] | None = None
     intensidade: float = Field(default=1, ge=0, le=2)
 
 

@@ -49,9 +49,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Animações de entrada e saída (aba Animação), na prévia e no render.
   - Falta: animações de loop e letra a letra, ducking, loudness medido, efeitos de voz e legendas automáticas (Whisper, no Nitro).
 - **Fase 4 (efeitos, transições e cor):** em andamento.
-  - Pronto: ajustes de cor (temperatura, tom, exposição, contraste, realces, sombras, saturação e vinheta) na aba Cor e filtros prontos com intensidade na ferramenta Filtros.
+  - Pronto: ajustes de cor (temperatura, tom, exposição, contraste, realces, sombras, saturação e vinheta) e rodas de cor de escuros, meios-tons e claros na aba Cor, e filtros prontos com intensidade na ferramenta Filtros (entre eles o Cinema, que usa as rodas).
   - Transições na principal: fusão, escurecer, deslizar, empurrar, zoom e cortinas para os quatro lados (a prévia descarta no shader o que não foi revelado; o render usa um `geq` no alfa, ligado só na janela da transição, porque ele é lento).
-  - Falta: transição de desfoque, curvas, rodas de cor, granulação, efeitos, chroma key e keyframes.
+  - Falta: transição de desfoque, curvas, granulação, efeitos, chroma key e keyframes.
 - **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, seguir a fase 4 (efeitos e keyframes) ou adiantar a fase 6 (exportar FCPXML/OTIO, exportação rápida no navegador).
 
 ## Pendente no Nitro
@@ -80,7 +80,7 @@ Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato
 - **Licenças em `licencas/`, não na raiz:** os `LICENSE-*` do FilmCraft e do LightCraft têm o copyright do ArtCraft Team. Na raiz, pareceriam a licença do TakeOne inteiro.
 - **Organização se chama "espaço" na interface.** No cadastro, o nome é opcional; sem ele, vira "Espaço de <primeiro nome>".
 - **Editor:** a lista de mídias fica no `Editor` (um `useMidias` só), e a seleção guarda o id. Assim a prévia e as propriedades acompanham a ingestão sem recarregar.
-- **Edição é pura:** as operações de `lib/projeto/edicao.ts` nunca alteram o projeto recebido e lançam `ErroEdicao` com a mensagem para a pessoa. Toda mudança passa por um `Comando` (`comandos.ts`); o histórico guarda os projetos de antes. Durante um arrasto, a linha do tempo aplica o comando a cada movimento e mostra o resultado, sem registrar no histórico.
+- **Edição é pura:** as operações de `lib/projeto/edicao.ts` nunca alteram o projeto recebido e lançam `ErroEdicao` com a mensagem para a pessoa. Toda mudança passa por um `Comando` (`comandos.ts`); o histórico guarda os projetos de antes. Durante um arrasto, a linha do tempo aplica o comando a cada movimento e mostra o resultado, sem registrar no histórico. Os controles dos painéis comparam o valor solto com a tela, que já tem a prévia; quando mandam `null` ("igual"), o editor transforma a prévia em comando (`preverDoPainel`).
 - **Nome e versão fora do histórico:** desfazer não desfaz o nome do projeto nem volta a `versao` do servidor. O PUT manda a versão que o editor conhece; se o banco tiver outra, a API responde 409 e o editor para de salvar e pede para recarregar.
 - **Rascunho no navegador** (`takeone-rascunho-<id>`): só é aplicado ao abrir se foi feito sobre a mesma versão que o banco tem. Se outra aba salvou depois, o rascunho é descartado.
 - **Prévia:** um elemento por faixa + mídia, para as duas metades de um clipe dividido usarem o mesmo vídeo sem engasgar. O próximo clipe da faixa já fica montado (escondido) 2 s antes de entrar. O vídeo só é reposicionado quando se afasta mais de 0,3 s do relógio.
@@ -101,7 +101,7 @@ Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato
 - **Fades:** `fade_entrada` e `fade_saida` em ticks, sempre somando no máximo a duração do clipe (a edição encolhe os fades ao aparar). Ao dividir, o fade de entrada fica com a primeira metade e o de saída com a segunda.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Som do render em duas passadas:** a primeira mistura o som de todos os clipes num `som.mka` (ponto flutuante) e mede o loudness com o `ebur128`; a segunda gera o vídeo com essa mistura, um ganho fixo até -14 LUFS e o `alimiter` só nos picos. O `loudnorm` numa passada mexia no ganho ao longo do vídeo (uma introdução 26 dB mais baixa saía só 1 dB abaixo do resto) e, sem ele, o grafo único travava no FFmpeg 7 em projetos com transição.
-- **Cor sem marcação:** vídeo sem `colorspace` é lido como BT.601 pelo FFmpeg e como BT.709 pelo Chrome. O render e a prévia ainda batem para quem assiste, porque o player também supõe BT.709 no arquivo exportado; só a leitura do vídeo pelo FFmpeg (nos testes) mostra outra cor. Celular grava com BT.709 marcado, e aí tudo bate.
+- **Cor sempre em BT.709:** vídeo sem marcação de cor é lido como BT.709, como o Chrome faz na prévia (`ler_como_bt709`, com a matriz guardada pela ingestão em `video.matriz`). O proxy e o vídeo exportado saem convertidos para BT.709 e marcados (`MARCAS_BT709`). Sem isso, a marcação do arquivo final mudava conforme o grafo (com vinheta saía BT.601) e cada player mostrava uma cor. HDR (BT.2020) ainda não é convertido.
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.
 - **Next.js 16:** o middleware é `proxy.ts`. O Next guarda na memória o corpo de toda requisição a `/api` e corta em 10 MB; os vídeos passam porque o tus manda pedaços de 8 MB.

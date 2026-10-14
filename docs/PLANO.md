@@ -410,7 +410,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] sombras
   - [x] saturação
   - curvas
-  - rodas de cor
+  - [x] rodas de cor (escuros, meios-tons e claros)
   - [x] vinheta
   - granulação
 - [x] Filtros prontos com intensidade (ferramenta Filtros).

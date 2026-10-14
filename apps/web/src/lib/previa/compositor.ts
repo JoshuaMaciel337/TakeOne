@@ -4,7 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
-import type { AjustesCor } from "../projeto/cor.ts";
+import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
 import type { Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -55,6 +55,8 @@ uniform bool u_comCor;
 uniform vec4 u_cor1;
 // realces, sombras, saturacao, vinheta
 uniform vec4 u_cor2;
+// Rodas de cor (escuros, meios-tons, claros): o deslocamento de cada uma, já com a força
+uniform vec3 u_rodas[3];
 // x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
 uniform vec4 u_revelado;
 out vec4 cor;
@@ -74,6 +76,8 @@ vec3 aplicarCor(vec3 c) {
   l = clamp((l - 0.5) * (1.0 + u_cor1.w) + 0.5, 0.0, 1.0);
   float y = dot(l, LUMA);
   l = clamp(l + 0.25 * (u_cor2.x * y * y + u_cor2.y * (1.0 - y) * (1.0 - y)), 0.0, 1.0);
+  float yr = dot(l, LUMA);
+  l = clamp(l + (1.0 - yr) * (1.0 - yr) * u_rodas[0] + 2.0 * yr * (1.0 - yr) * u_rodas[1] + yr * yr * u_rodas[2], 0.0, 1.0);
   float y2 = dot(l, LUMA);
   return clamp(y2 + (l - y2) * (1.0 + u_cor2.z), 0.0, 1.0);
 }
@@ -113,7 +117,7 @@ export function corParaRgb(hex: string): [number, number, number] {
 type Recursos = {
   programa: WebGLProgram;
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "revelado",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -178,6 +182,7 @@ export class Compositor {
         comCor: local("u_comCor"),
         cor1: local("u_cor1"),
         cor2: local("u_cor2"),
+        rodas: local("u_rodas"),
         revelado: local("u_revelado"),
         textura: local("u_textura"),
       },
@@ -238,6 +243,7 @@ export class Compositor {
       if (ajustes) {
         gl.uniform4f(uniformes.cor1, ajustes.temperatura, ajustes.tom, ajustes.exposicao, ajustes.contraste);
         gl.uniform4f(uniformes.cor2, ajustes.realces, ajustes.sombras, ajustes.saturacao, ajustes.vinheta);
+        gl.uniform3fv(uniformes.rodas, deslocamentosDasRodas(ajustes).flat());
       }
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     });
