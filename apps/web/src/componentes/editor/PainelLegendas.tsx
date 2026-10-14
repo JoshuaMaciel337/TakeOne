@@ -8,6 +8,8 @@ import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLeg
 import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 
+import { LegendasDaFala } from "./LegendasDaFala";
+
 export type PropsLegendas = {
   projeto: Projeto;
   nome: string;
@@ -40,7 +42,7 @@ function nomeDeArquivo(nome: string): string {
   return base || "legendas";
 }
 
-/** Painel da ferramenta Legendas. As automáticas, pela fala, chegam com a transcrição (Whisper). */
+/** Painel da ferramenta Legendas: automáticas pela fala (Whisper no worker de GPU), manuais e SRT/VTT. */
 export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar }: PropsLegendas) {
   const [estiloId, setEstiloId] = useState(ESTILOS_DE_LEGENDA[0].id);
   const arquivoRef = useRef<HTMLInputElement>(null);
@@ -85,8 +87,10 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
         </button>
       ) : null}
 
+      <LegendasDaFala projeto={projeto} estilo={estilo} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="botao-principal px-3 py-2 text-xs" onClick={() => aoExecutar({ comando: "legenda.adicionar", parametros: { inicio: tempo, estilo } })}>
+        <button type="button" className="botao-secundario px-3 py-2 text-xs" onClick={() => aoExecutar({ comando: "legenda.adicionar", parametros: { inicio: tempo, estilo } })}>
           <Plus className="size-4" aria-hidden />
           Adicionar
         </button>

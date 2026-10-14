@@ -111,3 +111,15 @@ export type Exportacao = {
 };
 
 export type LinkCelular = { caminho: string; expira_em: string };
+
+export type IdiomaTranscricao = "auto" | "pt" | "en" | "es";
+
+/** A fala de uma mídia, com o tempo de cada palavra em segundos da mídia (worker de GPU). */
+export type Transcricao = {
+  midia_id: string;
+  status: "processando" | "pronta" | "erro";
+  idioma: string;
+  palavras: { texto: string; inicio: number; fim: number }[];
+  erro: string | null;
+  processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+};

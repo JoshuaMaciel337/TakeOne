@@ -107,7 +107,7 @@ type Arrasto =
   | { tipo: "aparar"; clipe: Clipe; borda: "inicio" | "fim"; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "soltar"; comando: Comando; guia: Tick | null };
 
-function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
+export function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
   if (faixa.tipo === "principal") return "Principal";
   const iguais = projeto.faixas.filter((item) => item.tipo === faixa.tipo);
   // As faixas de imagem contam de baixo para cima; as de áudio, de cima para baixo

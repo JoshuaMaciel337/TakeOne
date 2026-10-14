@@ -390,7 +390,7 @@ Cada fase termina com algo que dá para usar e testar.
   - ducking sob a voz (do HolyCut)
   - loudness medido (`audio-dsp` do FilmCraft)
   - efeitos de voz: EQ, reverb, eco, mudança de tom (SoundCraft)
-- Legendas automáticas (Whisper do HolyCut) com os presets animados.
+- [x] Legendas automáticas pela fala (faster-whisper no worker de GPU), em até duas linhas que cabem no quadro. Falta: os presets animados (karaokê, destaque da palavra).
 - [x] Legendas manuais: faixa de legendas por cima de tudo, estilos prontos aplicados a todas, lista para editar, e importar/exportar SRT e VTT. O leitor foi escrito no TakeOne (o `captions` do FilmCraft fica para SCC e TTML, se um dia precisar).
 
 ### Fase 4: efeitos, transições e cor (2 a 3 semanas)
