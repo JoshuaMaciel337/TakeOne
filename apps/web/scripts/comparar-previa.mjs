@@ -23,6 +23,8 @@ if (!projetoId || !email || !senha) {
 // Bordas finas e a suavização da escala dão uns 3% acima de 32; cor trocada dá bem mais.
 const LIMITE_MEDIA = 6;
 const LIMITE_FORA = 0.08;
+// O vizinho só conta como "quadro errado" se bater claramente melhor: num trecho parado os quadros são iguais
+const FOLGA_VIZINHO = 0.5;
 const PARTES = [0.05, 0.25, 0.5, 0.75, 0.95];
 
 const navegador = await chromium.launch({ channel: "chrome", headless: true, args: ["--use-angle=d3d11"] });
@@ -51,7 +53,7 @@ try {
     for (let i = 0; i < Math.floor(quadro / fps); i++) await pagina.keyboard.press("Shift+ArrowRight");
     for (let i = 0; i < Math.round(quadro % fps); i++) await pagina.keyboard.press("ArrowRight");
     await pagina.waitForTimeout(2000);
-    const medida = await pagina.evaluate(async ({ url, quadro, fps }) => {
+    const medida = await pagina.evaluate(async ({ url, quadro, fps, folga }) => {
       const previa = document.querySelector("canvas");
       const largura = previa.width;
       const altura = previa.height;
@@ -90,8 +92,9 @@ try {
       const mesmo = await comparar(quadro);
       const antes = await comparar(quadro - 1);
       const depois = await comparar(quadro + 1);
-      return { largura, altura, ...mesmo, vizinhoMaisParecido: Math.min(antes.media, depois.media) < mesmo.media };
-    }, { url: `${site}/api/exportacoes/${exportacao.id}/arquivos/video.mp4`, quadro, fps });
+      const vizinho = Math.min(antes.media, depois.media);
+      return { largura, altura, ...mesmo, vizinhoMaisParecido: vizinho < mesmo.media - folga };
+    }, { url: `${site}/api/exportacoes/${exportacao.id}/arquivos/video.mp4`, quadro, fps, folga: FOLGA_VIZINHO });
     const ok = medida.media <= LIMITE_MEDIA && medida.fora <= LIMITE_FORA && !medida.vizinhoMaisParecido;
     resultados.push({ quadro, segundos: (quadro / fps).toFixed(2), ...medida, ok });
   }
