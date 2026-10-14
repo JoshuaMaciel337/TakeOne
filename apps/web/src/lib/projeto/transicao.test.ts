@@ -4,9 +4,18 @@ import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
-import { janelasDaPrincipal, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
+import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
 
-type Caso = { nome: string; tipo: TipoTransicao; papel: "sai" | "entra"; inicio: number; duracao: number; t: number; esperado: Transformacao };
+type Caso = {
+  nome: string;
+  tipo: TipoTransicao;
+  papel: "sai" | "entra";
+  inicio: number;
+  duracao: number;
+  t: number;
+  esperado: Transformacao;
+  revelado?: Revelado;
+};
 const { base, casos } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/transicao.json", import.meta.url), "utf-8")) as {
   base: Transformacao;
   casos: Caso[];
@@ -19,6 +28,12 @@ for (const caso of casos) {
     const resultado = transformacaoNaTransicao(base, [efeito], caso.t * S);
     for (const chave of Object.keys(caso.esperado) as (keyof Transformacao)[]) {
       assert.ok(Math.abs(resultado[chave] - caso.esperado[chave]) < 1e-9, `${chave}: ${resultado[chave]} ≠ ${caso.esperado[chave]}`);
+    }
+    if (caso.revelado) {
+      const revelado = reveladoNaTransicao([efeito], caso.t * S);
+      for (const chave of Object.keys(caso.revelado) as (keyof Revelado)[]) {
+        assert.ok(Math.abs(revelado[chave] - caso.revelado[chave]) < 1e-9, `${chave}: ${revelado[chave]} ≠ ${caso.revelado[chave]}`);
+      }
     }
   });
 }

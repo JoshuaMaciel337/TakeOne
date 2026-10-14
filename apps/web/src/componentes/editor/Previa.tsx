@@ -8,7 +8,7 @@ import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Re
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
-import { janelasDaPrincipal, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -119,6 +119,8 @@ type CamadaNaTela = {
   caixaBase: Caixa;
   segundos: number;
   cor: AjustesCor | null;
+  /** A parte do clipe que aparece numa cortina; sem ela, o clipe inteiro. */
+  revelado?: Revelado;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
   imagem?: ImageBitmap;
 };
@@ -180,6 +182,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, tamanho),
       caixaBase: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
+      revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
@@ -231,7 +234,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();

@@ -1,5 +1,5 @@
 {
-  "descricao": "Transformação dos dois clipes numa transição. A janela vai de 'inicio' a 'inicio' + 'duracao' (segundos). Lidos por apps/web/src/lib/projeto/transicao.test.ts e tests/test_transicao.py.",
+  "descricao": "Transformação dos dois clipes numa transição e, nas cortinas, a parte revelada (frações do clipe). A janela vai de 'inicio' a 'inicio' + 'duracao' (segundos). Lidos por apps/web/src/lib/projeto/transicao.test.ts e tests/test_transicao.py.",
   "base": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
   "casos": [
     {"nome": "fusão: quem entra na metade", "tipo": "fusao", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
@@ -19,6 +19,24 @@
     {"nome": "zoom: quem entra, na metade", "tipo": "zoom", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
      "esperado": {"x": 0, "y": 0, "escala": 0.95, "rotacao": 0, "opacidade": 0.5}},
     {"nome": "depois da janela, quem entra fica normal", "tipo": "empurrar", "papel": "entra", "inicio": 2, "duracao": 1, "t": 3.5,
-     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}}
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}},
+    {"nome": "cortina para a direita: quem entra, na metade", "tipo": "cortina_direita", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0, "y0": 0, "x1": 0.875, "y1": 1}},
+    {"nome": "cortina para a esquerda: quem entra, a um quarto", "tipo": "cortina_esquerda", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.25,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0.421875, "y0": 0, "x1": 1, "y1": 1}},
+    {"nome": "cortina para baixo: quem entra, a três quartos", "tipo": "cortina_baixo", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.75,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 0.984375}},
+    {"nome": "cortina para cima: quem entra, a um quarto", "tipo": "cortina_cima", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.25,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0, "y0": 0.421875, "x1": 1, "y1": 1}},
+    {"nome": "cortina: quem sai fica inteiro", "tipo": "cortina_direita", "papel": "sai", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 1}},
+    {"nome": "cortina: depois da janela, quem entra aparece inteiro", "tipo": "cortina_cima", "papel": "entra", "inicio": 2, "duracao": 1, "t": 3.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+     "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 1}}
   ]
 }

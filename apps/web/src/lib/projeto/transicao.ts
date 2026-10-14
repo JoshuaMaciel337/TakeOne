@@ -10,7 +10,16 @@ import type { Tick } from "../tempo.ts";
 import { suavizar } from "./animacao.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
 
-export type TipoTransicao = "fusao" | "escurecer" | "deslizar" | "empurrar" | "zoom";
+export type TipoTransicao =
+  | "fusao"
+  | "escurecer"
+  | "deslizar"
+  | "empurrar"
+  | "zoom"
+  | "cortina_direita"
+  | "cortina_esquerda"
+  | "cortina_baixo"
+  | "cortina_cima";
 export type Transicao = { tipo: TipoTransicao; duracao: Tick };
 
 export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: string }[] = [
@@ -19,7 +28,18 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "deslizar", nome: "Deslizar", descricao: "O próximo entra pela direita, por cima" },
   { id: "empurrar", nome: "Empurrar", descricao: "O próximo entra empurrando o atual para a esquerda" },
   { id: "zoom", nome: "Zoom", descricao: "O próximo cresce e aparece" },
+  { id: "cortina_direita", nome: "Cortina para a direita", descricao: "O próximo é revelado da esquerda para a direita" },
+  { id: "cortina_esquerda", nome: "Cortina para a esquerda", descricao: "O próximo é revelado da direita para a esquerda" },
+  { id: "cortina_baixo", nome: "Cortina para baixo", descricao: "O próximo é revelado de cima para baixo" },
+  { id: "cortina_cima", nome: "Cortina para cima", descricao: "O próximo é revelado de baixo para cima" },
 ];
+
+/**
+ * A parte do clipe que aparece, em frações dele (0 a 1, com y para baixo), antes de girar.
+ * Fora dela o clipe fica transparente. Sem cortina, o clipe inteiro.
+ */
+export type Revelado = { x0: number; y0: number; x1: number; y1: number };
+export const REVELADO_INTEIRO: Revelado = { x0: 0, y0: 0, x1: 1, y1: 1 };
 
 /** Zoom de onde o clipe que entra parte. */
 export const ZOOM_TRANSICAO = 0.6;
@@ -73,6 +93,20 @@ export function transformacaoNaTransicao(base: Transformacao, efeitos: EfeitoDeT
     }
   }
   return { ...base, x, escala, opacidade };
+}
+
+/** A parte do clipe que aparece no instante `t`: as cortinas revelam quem entra, com a curva do movimento. */
+export function reveladoNaTransicao(efeitos: EfeitoDeTransicao[], t: Tick): Revelado {
+  const revelado = { ...REVELADO_INTEIRO };
+  for (const efeito of efeitos) {
+    if (efeito.papel !== "entra") continue;
+    const e = suavizar(Math.min(1, Math.max(0, (t - efeito.inicio) / efeito.duracao)));
+    if (efeito.tipo === "cortina_direita") revelado.x1 = Math.min(revelado.x1, e);
+    else if (efeito.tipo === "cortina_esquerda") revelado.x0 = Math.max(revelado.x0, 1 - e);
+    else if (efeito.tipo === "cortina_baixo") revelado.y1 = Math.min(revelado.y1, e);
+    else if (efeito.tipo === "cortina_cima") revelado.y0 = Math.max(revelado.y0, 1 - e);
+  }
+  return revelado;
 }
 
 /** A maior duração que a transição pode ter entre os dois clipes. */

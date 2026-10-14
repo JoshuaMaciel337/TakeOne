@@ -7,6 +7,7 @@
 import type { AjustesCor } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
 import type { Recorte } from "../projeto/modelo.ts";
+import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
   /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs ou uma imagem. */
@@ -16,6 +17,8 @@ export type Camada = {
   cor?: AjustesCor | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
+  /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
+  revelado?: Revelado;
 };
 
 const VERTICES = `#version 300 es
@@ -52,6 +55,8 @@ uniform bool u_comCor;
 uniform vec4 u_cor1;
 // realces, sombras, saturacao, vinheta
 uniform vec4 u_cor2;
+// x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
+uniform vec4 u_revelado;
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -74,6 +79,11 @@ vec3 aplicarCor(vec3 c) {
 }
 
 void main() {
+  // Como o geq do render: o centro do pixel dentro da faixa revelada, com as bordas incluídas
+  if (v_local.x < u_revelado.x || v_local.x > u_revelado.z || v_local.y < u_revelado.y || v_local.y > u_revelado.w) {
+    cor = vec4(0.0);
+    return;
+  }
   vec4 texel = texture(u_textura, v_uv);
   if (u_comCor && texel.a > 0.0) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta
@@ -103,7 +113,7 @@ export function corParaRgb(hex: string): [number, number, number] {
 type Recursos = {
   programa: WebGLProgram;
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "revelado",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -168,6 +178,7 @@ export class Compositor {
         comCor: local("u_comCor"),
         cor1: local("u_cor1"),
         cor2: local("u_cor2"),
+        revelado: local("u_revelado"),
         textura: local("u_textura"),
       },
       texturas: [],
@@ -220,6 +231,8 @@ export class Compositor {
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
       gl.uniform4f(uniformes.recorte, recorte.x, recorte.y, recorte.largura, recorte.altura);
       gl.uniform1f(uniformes.opacidade, caixa.opacidade);
+      const revelado = camada.revelado ?? REVELADO_INTEIRO;
+      gl.uniform4f(uniformes.revelado, revelado.x0, revelado.y0, revelado.x1, revelado.y1);
       const ajustes = camada.cor;
       gl.uniform1i(uniformes.comCor, ajustes ? 1 : 0);
       if (ajustes) {

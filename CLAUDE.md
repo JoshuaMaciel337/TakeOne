@@ -50,8 +50,8 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Falta: animações de loop e letra a letra, ducking, loudness medido, efeitos de voz e legendas automáticas (Whisper, no Nitro).
 - **Fase 4 (efeitos, transições e cor):** em andamento.
   - Pronto: ajustes de cor (temperatura, tom, exposição, contraste, realces, sombras, saturação e vinheta) na aba Cor e filtros prontos com intensidade na ferramenta Filtros.
-  - Transições na principal: fusão, escurecer, deslizar, empurrar e zoom.
-  - Falta: transições de desfoque e wipes, curvas, rodas de cor, granulação, efeitos, chroma key e keyframes.
+  - Transições na principal: fusão, escurecer, deslizar, empurrar, zoom e cortinas para os quatro lados (a prévia descarta no shader o que não foi revelado; o render usa um `geq` no alfa, ligado só na janela da transição, porque ele é lento).
+  - Falta: transição de desfoque, curvas, rodas de cor, granulação, efeitos, chroma key e keyframes.
 - **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, seguir a fase 4 (efeitos e keyframes) ou adiantar a fase 6 (exportar FCPXML/OTIO, exportação rápida no navegador).
 
 ## Pendente no Nitro

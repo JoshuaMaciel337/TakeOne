@@ -377,3 +377,40 @@ def test_render_chega_em_14_lufs_sem_mudar_o_equilibrio(cliente, db_limpo):
     # até perto do resto, e a diferença caía para poucos dB.
     diferenca = nivel_db(5, 7.5) - nivel_db(1, 3.5)
     assert 24 <= diferenca <= 28, diferenca
+
+
+def gerar_cor(cor: str):
+    def gerar(caminho):
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                        "-i", f"color=c={cor}:s=640x360:r=30:d=2", "-c:v", "libx264", "-preset", "ultrafast",
+                        "-pix_fmt", "yuv420p", str(caminho)], check=True, timeout=120)
+    return gerar
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_faz_a_cortina_como_a_previa(cliente, db_limpo):
+    cadastrar(cliente)
+    vermelho = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False,
+                           gerar=gerar_cor("0xff0000"))
+    azul = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False,
+                       gerar=gerar_cor("0x0000ff"))
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    base = {"velocidade": 1, "volume": 1, "entrada": 0, "duracao": SEGUNDO}
+    clipes = [{**base, "id": "a", "midia_id": vermelho, "inicio": 0,
+               "transicao": {"tipo": "cortina_direita", "duracao": SEGUNDO}},
+              {**base, "id": "b", "midia_id": azul, "inicio": SEGUNDO}]
+    corpo = {"versao": projeto["versao"], "nome": "Cortina", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    # No corte (metade da janela de 0,5 a 1,5 s) a cortina revelou 87,5% do azul, da esquerda para a direita
+    no_corte = quadro_do_video(video, 1.0, 1280, 720)
+    assert no_corte[360, 1000][2] > 200 and no_corte[360, 1000][0] < 50, no_corte[360, 1000]
+    assert no_corte[360, 1240][0] > 200 and no_corte[360, 1240][2] < 50, no_corte[360, 1240]
+    depois = quadro_do_video(video, 1.8, 1280, 720)
+    assert depois[360, 1240][2] > 200 and depois[360, 1240][0] < 50, "depois da janela o azul aparece inteiro"

@@ -5,10 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from core.utils.transicao import filtros_de_transicao, janelas_da_principal, transformacao_na_transicao
+from core.utils.transicao import (
+    filtro_de_cortina,
+    filtros_de_transicao,
+    janelas_da_principal,
+    revelado_na_transicao,
+    transformacao_na_transicao,
+)
 
 DADOS = json.loads((Path(__file__).parent / "casos" / "transicao.json").read_text(encoding="utf-8"))
 CASOS = DADOS["casos"]
+CORTINAS = [c for c in CASOS if "revelado" in c]
 
 
 def efeito_do(caso):
@@ -54,3 +61,32 @@ def test_janelas_estendem_os_dois_clipes():
     assert (janelas["a"]["inicio"], janelas["a"]["fim"]) == (0, 4.5)
     assert (janelas["b"]["inicio"], janelas["b"]["fim"]) == (3.5, 7)
     assert janelas["b"]["efeitos"] == [{"tipo": "fusao", "papel": "entra", "inicio": 3.5, "duracao": 1}]
+
+
+@pytest.mark.parametrize("caso", CORTINAS, ids=[c["nome"] for c in CORTINAS])
+def test_cortina_revela_o_mesmo_que_a_previa(caso):
+    assert revelado_na_transicao([efeito_do(caso)], caso["t"]) == pytest.approx(caso["revelado"], abs=1e-9)
+
+
+def alfa_do_geq(filtro: str | None, x: float, y: float, t: float, deslocamento: float) -> float:
+    """O alfa que o geq dá ao pixel no centro (x, y), em frações de um clipe de 1000 × 1000."""
+    if filtro is None:
+        return 1.0
+    expressao = filtro.split(":a='")[1].split("'")[0]
+    ambiente = {"X": x * 1000 - 0.5, "Y": y * 1000 - 0.5, "W": 1000, "H": 1000, "T": t - deslocamento,
+                "lte": lambda a, b: float(a <= b), "gte": lambda a, b: float(a >= b),
+                "clip": lambda v, a, b: min(max(v, a), b), "pow": math.pow, "alpha": lambda _x, _y: 1.0}
+    return eval(expressao, {"__builtins__": {}}, ambiente)  # noqa: S307 - expressão montada aqui
+
+
+@pytest.mark.parametrize("caso", CORTINAS, ids=[c["nome"] for c in CORTINAS])
+def test_geq_da_cortina_faz_a_mesma_conta(caso):
+    deslocamento = 1.5   # o geq vê o tempo do clipe, antes do setpts que o leva para o lugar
+    filtro = filtro_de_cortina([efeito_do(caso)], deslocamento)
+    r = caso["revelado"]
+    for x, y in [(0.01, 0.5), (0.99, 0.5), (0.5, 0.01), (0.5, 0.99), (0.5, 0.5)]:
+        dentro = r["x0"] <= x <= r["x1"] and r["y0"] <= y <= r["y1"]
+        assert alfa_do_geq(filtro, x, y, caso["t"], deslocamento) == float(dentro), (x, y)
+    if filtro:
+        # Só fica ligado até o fim da janela: depois, o clipe aparece inteiro sem pagar o geq
+        assert filtro.endswith(f":enable='lt(t,{caso['inicio'] + caso['duracao'] - deslocamento:g})'")

@@ -401,7 +401,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] empurrar
   - [x] zoom
   - desfoque
-  - wipes
+  - [x] wipes (cortinas para a direita, a esquerda, cima e baixo)
 - Ajustes de cor (aba Cor). A conta é do TakeOne, a mesma no shader da prévia e na LUT 3D do render; as do FilmCraft e do LightCraft ficam de referência para curvas e rodas:
   - [x] temperatura e tom
   - [x] exposição

@@ -28,7 +28,7 @@ from core.utils.animacao import filtros_de_animacao
 from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
-from core.utils.transicao import filtros_de_transicao, janelas_da_principal
+from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
 TAXA_AUDIO = 48000
 LUFS_ALVO = -14
@@ -177,6 +177,10 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                           f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
+    # Cortina: some o que ainda não foi revelado, nas coordenadas do clipe (antes de girar, como a prévia)
+    cortina = filtro_de_cortina(list(leitura.efeitos), inicio) if leitura.efeitos else None
+    if cortina:
+        filtros.append(cortina)
     prefixo = ""
     if vinheta is not None:
         # Multiplica pela imagem cinza da vinheta, no tamanho do clipe, antes de girar (como a prévia)
