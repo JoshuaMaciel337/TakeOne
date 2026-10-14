@@ -8,6 +8,7 @@ import {
   adicionarTexto,
   ajustarAudio,
   animarClipes,
+  definirTransicao,
   alternarFaixa,
   apagarClipes,
   apararClipe,
@@ -375,4 +376,21 @@ test("cor: limites, filtro existente e intensidade até 200%", () => {
   assert.throws(() => mudarCor(projeto, [clipeId], { filtro: "inventado" }), /não existe/);
   const comMusica = adicionarClipe(projeto, ctx, "musica");
   assert.throws(() => mudarCor(comMusica.projeto, [comMusica.clipeId], { saturacao: 1 }), /áudio/);
+});
+
+test("transições: só entre vizinhos da principal, cabem nos dois clipes e somem quando o vizinho sai", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  const [a, b] = principal(projeto);
+  projeto = definirTransicao(projeto, a.id, { tipo: "fusao", duracao: 9 * S });
+  assert.deepEqual(principal(projeto)[0].transicao, { tipo: "fusao", duracao: 4 * S }, "no máximo o menor dos dois");
+  assert.throws(() => definirTransicao(projeto, b.id, { tipo: "zoom", duracao: S }), /vizinhos/);
+
+  // Aparar o segundo encolhe a transição; apagar o segundo tira a transição do primeiro
+  const aparado = apararClipe(projeto, ctx, b.id, "fim", 12 * S);
+  assert.equal(principal(aparado)[0].transicao!.duracao, 2 * S);
+  const semVizinho = apagarClipes(projeto, [b.id]);
+  assert.equal(principal(semVizinho)[0].transicao, null);
+  assert.equal(definirTransicao(projeto, a.id, null).faixas[0].clipes[0].transicao, null);
 });

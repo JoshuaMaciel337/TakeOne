@@ -6,12 +6,14 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
+import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
 import { PainelFiltros } from "./PainelFiltros";
+import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
 import { PainelTexto } from "./PainelTexto";
 
@@ -31,6 +33,7 @@ type Props = {
   legendas: PropsLegendas;
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
+  aoPrever: (comando: Comando | null) => void;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   className?: string;
@@ -100,6 +103,7 @@ export function PainelConteudo({
   aoAdicionarTexto,
   legendas,
   selecionado,
+  aoPrever,
   aoFechar,
   className = "",
   style,
@@ -128,6 +132,8 @@ export function PainelConteudo({
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
+        ) : ferramenta.id === "transicoes" ? (
+          <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
         ) : (

@@ -206,3 +206,35 @@ def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     assert plano.filtro.count("lut3d") == 1, "só a cor que muda alguma coisa vira LUT"
     # As imagens das vinhetas entram como imagens paradas, depois dos clipes
     assert [e.imagem for e in plano.entradas] == [False, False, False, True, True]
+
+
+def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
+    # A mídia "deitado" tem 10 s; o primeiro clipe usa de 0 a 4 s, o segundo de 5 a 8 s
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}
+    primeiro = clipe("a", "deitado", 0, 4, transicao={"tipo": "fusao", "duracao": S})
+    segundo = clipe("b", "deitado", 4, 3, entrada=5)
+    plano = planejar_render(projeto([faixa("principal", [primeiro, segundo])], duracao=7), midias, 1080, 1920)
+    # O primeiro lê meio segundo além do fim (até 4,5 s); o segundo, meio segundo antes (de 4,5 s)
+    assert [e.argumentos()[:4] for e in plano.entradas] == [["-ss", "0.000000", "-t", "4.500000"],
+                                                         ["-ss", "4.500000", "-t", "3.500000"]]
+    assert "enable='gte(t,-0.016667)*lt(t,4.483333)'" in plano.filtro
+    assert "enable='gte(t,3.483333)*lt(t,6.983333)'" in plano.filtro
+    assert "fade=t=in:st=3.5:d=1:alpha=1" in plano.filtro, "quem entra aparece aos poucos na fusão"
+    assert "setpts=PTS+3.5/TB" in plano.filtro
+    # O som do segundo começa no corte: pula o meio segundo a mais que a imagem leu
+    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro
+    assert "tpad" not in plano.filtro, "havia sobra nos dois lados"
+
+
+def test_transicao_sem_sobra_na_midia_repete_o_quadro():
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=4)}
+    primeiro = clipe("a", "deitado", 0, 4, transicao={"tipo": "empurrar", "duracao": S})
+    segundo = clipe("b", "deitado", 4, 3)
+    plano = planejar_render(projeto([faixa("principal", [primeiro, segundo])], duracao=7), midias, 1080, 1920)
+    linhas = plano.filtro.split(";\n")
+    # O primeiro clipe acaba junto com a mídia: o último quadro fica meio segundo
+    assert "tpad=start_mode=clone:start_duration=0:stop_mode=clone:stop_duration=0.5" in linhas[1]
+    # O segundo começa no zero da mídia: o primeiro quadro fica meio segundo antes
+    assert "tpad=start_mode=clone:start_duration=0.5:stop_mode=clone:stop_duration=0" in linhas[3]
+    assert "x='540+1080*(-(1-pow(1-clip((t-3.5)/1,0,1),3)))-overlay_w/2'" in linhas[2]
+    assert "x='540+1080*(pow(1-clip((t-3.5)/1,0,1),3))-overlay_w/2'" in linhas[4]

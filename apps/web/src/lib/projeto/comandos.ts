@@ -8,6 +8,7 @@ import type { Tick } from "../tempo.ts";
 import {
   adicionarClipe,
   adicionarLegenda,
+  definirTransicao,
   animarClipes,
   adicionarTexto,
   ajustarAudio,
@@ -34,6 +35,7 @@ import type { Cor } from "./cor.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
+import type { Transicao } from "./transicao.ts";
 
 export type Comando =
   | { comando: "clipe.adicionar"; parametros: { midiaId: string } & DestinoClipe }
@@ -55,7 +57,8 @@ export type Comando =
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
-  | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } };
+  | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
+  | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -78,6 +81,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.estilo": "mudar o estilo das legendas",
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
+  "clipe.transicao": "mudar a transição",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -130,6 +134,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "legenda.estilo":
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
+    case "clipe.transicao":
+      return { projeto: definirTransicao(projeto, parametros.clipeId, parametros.transicao) };
     case "clipe.cor":
       return { projeto: mudarCor(projeto, parametros.clipeIds, parametros.cor) };
     case "clipe.animar":

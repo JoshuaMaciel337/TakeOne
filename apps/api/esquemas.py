@@ -187,6 +187,11 @@ class CorEntrada(BaseModel):
     intensidade: float = Field(default=1, ge=0, le=2)
 
 
+class TransicaoEntrada(BaseModel):
+    tipo: Literal["fusao", "escurecer", "deslizar", "empurrar", "zoom"]
+    duracao: int = Field(gt=0, description="Em ticks")
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -204,6 +209,7 @@ class ClipeEntrada(BaseModel):
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
     animacao: AnimacoesEntrada | None = None
     cor: CorEntrada | None = None
+    transicao: TransicaoEntrada | None = None
 
 
 class FaixaEntrada(BaseModel):

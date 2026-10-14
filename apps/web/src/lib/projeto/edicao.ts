@@ -13,6 +13,7 @@ import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type 
 import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import { type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "./cor.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
+import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
   type Clipe,
   type Faixa,
@@ -120,10 +121,28 @@ function limitarFades(clipe: Clipe): Clipe {
   return resultado;
 }
 
+/**
+ * Transições só entre vizinhos da principal e cabendo nos dois: depois de mover, apagar ou aparar,
+ * a do último clipe some e as longas demais encolhem.
+ */
+function arrumarTransicoes(faixa: Faixa): Faixa {
+  if (!faixa.clipes.some((clipe) => clipe.transicao)) return faixa;
+  if (faixa.tipo !== "principal") return { ...faixa, clipes: faixa.clipes.map((clipe) => (clipe.transicao ? { ...clipe, transicao: null } : clipe)) };
+  const clipes = faixa.clipes.map((clipe, i) => {
+    if (!clipe.transicao) return clipe;
+    const proximo = faixa.clipes[i + 1];
+    if (!proximo) return { ...clipe, transicao: null };
+    const maximo = duracaoMaximaDaTransicao(clipe, proximo);
+    return clipe.transicao.duracao > maximo ? { ...clipe, transicao: { ...clipe.transicao, duracao: maximo } } : clipe;
+  });
+  return clipes.every((clipe, i) => clipe === faixa.clipes[i]) ? faixa : { ...faixa, clipes };
+}
+
 function finalizar(projeto: Projeto): Projeto {
   const faixas = projeto.faixas
     .filter((faixa) => faixa.tipo === "principal" || faixa.clipes.length > 0)
-    .map((faixa) => (faixa.clipes.every((clipe) => limitarFades(clipe) === clipe) ? faixa : { ...faixa, clipes: faixa.clipes.map(limitarFades) }));
+    .map((faixa) => (faixa.clipes.every((clipe) => limitarFades(clipe) === clipe) ? faixa : { ...faixa, clipes: faixa.clipes.map(limitarFades) }))
+    .map(arrumarTransicoes);
   let duracao = 0;
   for (const faixa of faixas) for (const clipe of faixa.clipes) duracao = Math.max(duracao, fimDoClipe(clipe));
   if (duracao > TICK_MAXIMO) throw new ErroEdicao("O projeto pode ter no máximo 6 horas.");
@@ -582,6 +601,22 @@ export function animarClipes(projeto: Projeto, clipeIds: string[], mudanca: Part
     ...clipe,
     animacao: limitarAnimacoes({ ...SEM_ANIMACAO, ...clipe.animacao, ...mudanca }, clipe.duracao),
   }));
+}
+
+/** Duração de uma transição nova. */
+export const DURACAO_TRANSICAO_S = 0.5;
+
+/**
+ * A transição do clipe da principal para o seguinte. `null` tira a transição. A duração fica dentro
+ * do menor dos dois clipes.
+ */
+export function definirTransicao(projeto: Projeto, clipeId: string, transicao: Transicao | null): Projeto {
+  const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  const proximo = faixa.clipes[indice + 1];
+  if (faixa.tipo !== "principal" || (!proximo && transicao)) throw new ErroEdicao("A transição fica entre dois clipes vizinhos da faixa principal.");
+  const nova = transicao && proximo ? { ...transicao, duracao: Math.max(1, Math.min(Math.round(transicao.duracao), duracaoMaximaDaTransicao(clipe, proximo))) } : null;
+  return trocarFaixa(projeto, { ...faixa, clipes: faixa.clipes.map((item) => (item.id === clipeId ? { ...item, transicao: nova } : item)) });
 }
 
 /** Intensidade máxima de um filtro pronto (200%). */

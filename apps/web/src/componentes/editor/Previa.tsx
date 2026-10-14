@@ -8,6 +8,7 @@ import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Re
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
+import { janelasDaPrincipal, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -61,26 +62,40 @@ function useQuadro(proporcao: Projeto["proporcao"]) {
 type Item = ItemDaPrevia;
 
 /**
- * Clipes que precisam de um elemento agora: o que está sob o cursor e o próximo da mesma faixa, para
- * ele já estar carregado quando entrar. A chave é faixa + mídia: depois de dividir um clipe, as duas
- * metades usam o mesmo elemento e o vídeo segue sem engasgar.
+ * Clipes que precisam de um elemento agora: os que estão sob o cursor e o próximo da mesma faixa,
+ * para ele já estar carregado quando entrar. A chave é faixa + mídia: depois de dividir um clipe, as
+ * duas metades usam o mesmo elemento e o vídeo segue sem engasgar.
+ *
+ * Na principal, com `comTransicoes`, uma transição deixa dois clipes na tela ao mesmo tempo (o que
+ * sai e o que entra). Se os dois são da mesma mídia, o que entra ganha uma chave própria. O som não
+ * usa as janelas das transições: cada clipe soa só entre o começo e o fim dele.
  */
-function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick): Item[] {
+function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, comTransicoes = false): Item[] {
   const itens: Item[] = [];
   for (const faixa of faixas) {
     const chaves = new Set<string>();
-    const atual = faixa.clipes.find((clipe) => clipe.inicio <= tempo && tempo < fimDoClipe(clipe));
-    const proximo = faixa.clipes.find((clipe) => clipe.inicio > tempo && clipe.inicio - tempo <= ANTECEDENCIA && clipe.midia_id !== atual?.midia_id);
-    for (const [clipe, ativo] of [
-      [atual, true],
-      [proximo, false],
-    ] as const) {
+    const janelas = comTransicoes && faixa.tipo === "principal" ? janelasDaPrincipal(faixa.clipes) : null;
+    const dentro = (clipe: Clipe) => {
+      const janela = janelas?.get(clipe.id);
+      return janela ? janela.inicio <= tempo && tempo < janela.fim : clipe.inicio <= tempo && tempo < fimDoClipe(clipe);
+    };
+    const comecaEm = (clipe: Clipe) => janelas?.get(clipe.id)?.inicio ?? clipe.inicio;
+    const atuais = faixa.clipes.filter(dentro);
+    const proximo = faixa.clipes.find(
+      (clipe) => comecaEm(clipe) > tempo && comecaEm(clipe) - tempo <= ANTECEDENCIA && !atuais.some((atual) => atual.midia_id === clipe.midia_id),
+    );
+    const candidatos: [Clipe | undefined, boolean][] = [...atuais.map((clipe): [Clipe, boolean] => [clipe, true]), [proximo, false]];
+    for (const [clipe, ativo] of candidatos) {
       const midia = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
       if (!clipe || midia?.status !== "pronta") continue;
-      const chave = `${faixa.id}:${clipe.midia_id}`;
-      if (chaves.has(chave)) continue;
+      let chave = `${faixa.id}:${clipe.midia_id}`;
+      if (chaves.has(chave)) {
+        if (!ativo) continue;
+        chave = `${chave}:entra`;
+      }
       chaves.add(chave);
-      itens.push({ chave, clipe, faixa, midia, ativo });
+      const efeitos = janelas?.get(clipe.id)?.efeitos;
+      itens.push({ chave, clipe, faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
     }
   }
   return itens;
@@ -144,6 +159,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     projeto.faixas.filter((faixa) => faixa.tipo !== "audio" && !faixa.oculta).reverse(),
     midias,
     tempo,
+    true,
   );
   // O som vem de todas as faixas com áudio: as de áudio e as de vídeo visíveis
   const sons = itensNoTempo(
@@ -161,7 +177,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       clipe,
       faixa,
       recorte: clipe.recorte,
-      caixa: caixaDoClipe(transformacaoAnimada(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
+      caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, tamanho),
       caixaBase: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,

@@ -88,6 +88,19 @@ def _conferir_posicao(faixa: dict, clipe: dict, anterior_fim: int) -> str | None
     return None
 
 
+def _conferir_transicoes(faixa: dict, clipes: list[dict]) -> str | None:
+    """Transição só entre vizinhos da principal, e cabendo nos dois clipes."""
+    for indice, clipe in enumerate(clipes):
+        transicao = clipe.get("transicao")
+        if not transicao:
+            continue
+        if faixa["tipo"] != FAIXA_PRINCIPAL or indice == len(clipes) - 1:
+            return "Transição só existe entre dois clipes vizinhos da faixa principal."
+        if transicao["duracao"] > min(clipe["duracao"], clipes[indice + 1]["duracao"]):
+            return "Uma transição é mais longa que um dos clipes dela."
+    return None
+
+
 def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str | None:
     """
     Confere as regras que o editor mantém. Devolve a mensagem do primeiro problema, ou None.
@@ -105,6 +118,9 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
 
     for faixa in faixas:
         clipes = sorted(faixa["clipes"], key=lambda c: c["inicio"])
+        problema = _conferir_transicoes(faixa, clipes)
+        if problema:
+            return problema
         anterior_fim = 0
         for clipe in clipes:
             if faixa["tipo"] in FAIXAS_DE_TEXTO or clipe.get("texto") or not clipe.get("midia_id"):

@@ -1,0 +1,24 @@
+{
+  "descricao": "Transformação dos dois clipes numa transição. A janela vai de 'inicio' a 'inicio' + 'duracao' (segundos). Lidos por apps/web/src/lib/projeto/transicao.test.ts e tests/test_transicao.py.",
+  "base": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+  "casos": [
+    {"nome": "fusão: quem entra na metade", "tipo": "fusao", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5}},
+    {"nome": "fusão: quem sai não muda", "tipo": "fusao", "papel": "sai", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}},
+    {"nome": "escurecer: quem sai, a um quarto", "tipo": "escurecer", "papel": "sai", "inicio": 2, "duracao": 1, "t": 2.25,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5}},
+    {"nome": "escurecer: quem entra, a um quarto, ainda apagado", "tipo": "escurecer", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.25,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0}},
+    {"nome": "escurecer: quem entra, a três quartos", "tipo": "escurecer", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.75,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5}},
+    {"nome": "deslizar: quem entra, na metade", "tipo": "deslizar", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0.125, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}},
+    {"nome": "empurrar: quem sai, na metade", "tipo": "empurrar", "papel": "sai", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": -0.875, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}},
+    {"nome": "zoom: quem entra, na metade", "tipo": "zoom", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 0.95, "rotacao": 0, "opacidade": 0.5}},
+    {"nome": "depois da janela, quem entra fica normal", "tipo": "empurrar", "papel": "entra", "inicio": 2, "duracao": 1, "t": 3.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}}
+  ]
+}

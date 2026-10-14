@@ -122,7 +122,8 @@ def test_transformacao_e_recorte_sao_salvos_e_conferidos(cliente, db_limpo):
     for invalido in ({"recorte": {"x": 0.5, "y": 0, "largura": 0.6, "altura": 1}},
                      {"transformacao": {**transformacao, "escala": 0}},
                      {"transformacao": {**transformacao, "rotacao": 270}},
-                     {"fade_entrada": SEGUNDO, "fade_saida": 2 * SEGUNDO}):
+                     {"fade_entrada": SEGUNDO, "fade_saida": 2 * SEGUNDO},
+                     {"transicao": {"tipo": "fusao", "duracao": SEGUNDO}}):
         resposta = salvar(cliente, projeto, principal_com(projeto, [{**novo, **invalido}]))
         assert resposta.status_code == 422, invalido
 

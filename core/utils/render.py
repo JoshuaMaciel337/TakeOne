@@ -24,6 +24,7 @@ from core.utils.animacao import filtros_de_animacao
 from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
+from core.utils.transicao import filtros_de_transicao, janelas_da_principal
 
 TAXA_AUDIO = 48000
 LUFS_ALVO = -14
@@ -46,6 +47,21 @@ class MidiaDoRender:
     altura: int
     video: bool
     audio: bool
+    duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
+
+
+@dataclass(frozen=True)
+class Leitura:
+    """
+    O trecho de um clipe de mídia que o FFmpeg lê, contando as transições. Sem sobra na mídia antes ou
+    depois, o primeiro ou o último quadro se repete (tpad), em segundos do vídeo final.
+    """
+    inicio: float           # janela no vídeo final
+    fim: float
+    pausa_inicio: float = 0
+    pausa_fim: float = 0
+    pular_audio: float = 0  # segundos da mídia lida antes de onde o som do clipe começa
+    efeitos: tuple = ()     # efeitos das transições, com tempos em segundos
 
 
 @dataclass(frozen=True)
@@ -119,13 +135,16 @@ def cadeia_atempo(velocidade: float) -> list[str]:
 
 
 def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int],
-                    numero: int = 0, lut: str | None = None, vinheta: int | None = None) -> tuple[str, str]:
+                    numero: int = 0, lut: str | None = None, vinheta: int | None = None,
+                    leitura: Leitura | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
+    leitura: a janela do clipe com as transições (só na faixa principal).
     """
     recorte = clipe["recorte"]
-    inicio = segundos(clipe["inicio"])
+    leitura = leitura or Leitura(segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"]))
+    inicio = leitura.inicio
     largura = max(1, round(caixa.largura))
     altura = max(1, round(caixa.altura))
     filtros = [
@@ -138,6 +157,10 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         "setsar=1",
         "format=rgba",
     ]
+    if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
+        # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
+        filtros.insert(2, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
+                          f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
     prefixo = ""
@@ -154,9 +177,21 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         angulo = _numero(math.radians(caixa.rotacao))
         filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=none")
     filtros.append(f"setpts=PTS+{_numero(inicio)}/TB")
-    fim = segundos(clipe["inicio"] + clipe["duracao"])
-    animacao = filtros_de_animacao({**clipe, "inicio": inicio, "duracao": fim - inicio,
-                                    "animacao": _animacao_em_segundos(clipe.get("animacao"))}, inicio, fim)
+    fim = leitura.fim
+    # As animações seguem o começo e o fim do próprio clipe; as transições, a janela delas
+    inicio_clipe = segundos(clipe["inicio"])
+    fim_clipe = segundos(clipe["inicio"] + clipe["duracao"])
+    animacao = filtros_de_animacao({**clipe, "inicio": inicio_clipe, "duracao": fim_clipe - inicio_clipe,
+                                    "animacao": _animacao_em_segundos(clipe.get("animacao"))}, inicio_clipe, fim_clipe)
+    if leitura.efeitos:
+        transicao = filtros_de_transicao(list(leitura.efeitos))
+        escalas = [e for e in (animacao["escala"], transicao["escala"]) if e]
+        animacao = {
+            "fades": animacao["fades"] + transicao["fades"],
+            "escala": "*".join(escalas) or None,
+            "dx": transicao["dx"] if animacao["dx"] == "0" else f"{animacao['dx']}+{transicao['dx']}",
+            "dy": animacao["dy"],
+        }
     filtros += animacao["fades"]
     if animacao["escala"]:
         # O zoom muda o tamanho a cada quadro; o pad devolve sempre o mesmo tamanho para o overlay
@@ -196,11 +231,15 @@ def _animacao_em_segundos(animacao: dict | None) -> dict | None:
     return {nome: {**item, "duracao": segundos(item["duracao"])} for nome, item in animacao.items()}
 
 
-def _som_do_clipe(entrada: int, clipe: dict) -> str:
+def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0) -> str:
+    """pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem)."""
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
-    filtros = [
-        "asetpts=PTS-STARTPTS",
+    filtros = ["asetpts=PTS-STARTPTS"]
+    if pular > 0:
+        filtros += [f"atrim=start={_numero(pular)}:duration={_numero(duracao * clipe['velocidade'])}",
+                    "asetpts=PTS-STARTPTS"]
+    filtros += [
         f"aresample={TAXA_AUDIO}",
         "aformat=sample_fmts=fltp:channel_layouts=stereo",
         *cadeia_atempo(clipe["velocidade"]),
@@ -214,6 +253,28 @@ def _som_do_clipe(entrada: int, clipe: dict) -> str:
         filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}")
     filtros.append(f"adelay={atraso}S:all=1")
     return f"[{entrada}:a]{','.join(filtros)}"
+
+
+def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) -> Leitura:
+    """O trecho a ler, contando a janela da transição e o que a mídia tem de sobra."""
+    inicio, fim = segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"])
+    if not janela:
+        return Leitura(inicio, fim)
+    velocidade = clipe["velocidade"]
+    janela_inicio, janela_fim = segundos(janela["inicio"]), segundos(janela["fim"])
+    entrada = segundos(clipe["entrada"])
+    # Antes do começo: quanto a mídia tem, e o resto vira quadro repetido
+    antes = (inicio - janela_inicio) * velocidade
+    sobra_antes = min(antes, entrada)
+    pausa_inicio = (antes - sobra_antes) / velocidade
+    # Depois do fim: o mesmo, com o fim da mídia (se for conhecido)
+    depois = (janela_fim - fim) * velocidade
+    fim_na_midia = entrada + clipe["duracao"] / TICKS_POR_SEGUNDO * velocidade
+    sobra_depois = min(depois, max(midia.duracao - fim_na_midia, 0)) if midia.duracao else depois
+    pausa_fim = (depois - sobra_depois) / velocidade
+    efeitos = tuple({**e, "inicio": segundos(e["inicio"]), "duracao": segundos(e["duracao"])}
+                    for e in janela["efeitos"])
+    return Leitura(janela_inicio, janela_fim, pausa_inicio, pausa_fim, sobra_antes, efeitos)
 
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
@@ -241,6 +302,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     if len(clipes) > LIMITE_CLIPES_RENDER:
         raise ErroRender(f"O projeto tem mais de {LIMITE_CLIPES_RENDER} clipes para exportar de uma vez.")
 
+    # Na principal, as transições estendem a janela dos clipes vizinhos
+    principal = next((f for f in projeto["faixas"] if f["tipo"] == "principal"), None)
+    janelas = janelas_da_principal(sorted(principal["clipes"], key=lambda c: c["inicio"])) if principal else {}
+    leituras: dict[str, Leitura] = {}
+
     entradas: list[Entrada] = []
     indice_da_entrada: dict[str, int] = {}
     for clipe in clipes:
@@ -254,8 +320,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         midia = midias.get(clipe["midia_id"])
         if midia is None:
             raise ErroRender("Uma mídia usada no projeto foi excluída ou não está pronta.")
-        entradas.append(Entrada(midia.caminho, segundos(clipe["entrada"]),
-                                segundos(clipe["duracao"]) * clipe["velocidade"]))
+        leitura = _leitura_do_clipe(clipe, janelas.get(clipe["id"]), midia)
+        leituras[clipe["id"]] = leitura
+        velocidade = clipe["velocidade"]
+        ss = segundos(clipe["entrada"]) - leitura.pular_audio
+        lido = (leitura.fim - leitura.inicio - leitura.pausa_inicio - leitura.pausa_fim) * velocidade
+        entradas.append(Entrada(midia.caminho, ss, max(lido, 1 / 1000)))
 
     auxiliares: dict[str, ArquivoAuxiliar] = {}
     cor = projeto["fundo"]["cor"].lstrip("#")
@@ -281,10 +351,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))
             auxiliares[imagem_vinheta] = ArquivoAuxiliar(imagem_vinheta, "vinheta", ajustes, *tamanho)
             vinheta = len(entradas)
-            entradas.append(Entrada(imagem_vinheta, 0, segundos(clipe["duracao"]) * clipe["velocidade"],
-                                    imagem=True, taxa=taxa))
+            leitura = leituras.get(clipe["id"])
+            janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
+            # A vinheta encontra o clipe já na velocidade dele: dura a janela no vídeo final
+            entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
         cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro,
-                                          numero, lut, vinheta)
+                                          numero, lut, vinheta, leituras.get(clipe["id"]))
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"
@@ -295,7 +367,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         for clipe in faixa["clipes"]:
             if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
                 sons.append(f"a{len(sons)}")
-                linhas.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe)}[{sons[-1]}]")
+                pular = leituras[clipe["id"]].pular_audio if clipe["id"] in leituras else 0
+                linhas.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe, pular)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")

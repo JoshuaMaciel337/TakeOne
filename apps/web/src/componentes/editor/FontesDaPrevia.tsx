@@ -9,13 +9,22 @@ import { arquivoDaMidia } from "@/lib/api";
 import { aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
+import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 /** Diferença, em segundos, entre a mídia e o relógio do editor a partir da qual ela é reposicionada. */
 const DESVIO_MAXIMO = 0.3;
 
-export type ItemDaPrevia = { chave: string; clipe: Clipe; faixa: Faixa; midia: Midia; ativo: boolean };
+export type ItemDaPrevia = {
+  chave: string;
+  clipe: Clipe;
+  faixa: Faixa;
+  midia: Midia;
+  ativo: boolean;
+  /** Efeitos das transições sobre este clipe (só na principal, durante a janela delas). */
+  efeitos?: EfeitoDeTransicao[];
+};
 
 /** Entrega o quadro de um instante da mídia, em segundos; null enquanto não tem. */
 export type FonteDeQuadros = { quadro: (segundos: number) => TexImageSource | null };

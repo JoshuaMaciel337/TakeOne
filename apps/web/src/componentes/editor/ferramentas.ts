@@ -83,7 +83,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "transicoes",
     nome: "Transições",
     icone: ArrowLeftRight,
-    emBreve: { fase: "Fase 4", descricao: "Fusão, escurecer, deslizar, empurrar, zoom, desfoque e wipes entre os clipes." },
   },
   {
     id: "filtros",

@@ -3,6 +3,7 @@
 import type { Taxa, Tick } from "../tempo.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
+import type { Transicao } from "./transicao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
 export const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] as const;
@@ -63,6 +64,8 @@ export type Clipe = {
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */
   cor?: Cor | null;
+  /** Só na faixa principal: a transição para o clipe seguinte. */
+  transicao?: Transicao | null;
 };
 
 export type Faixa = {

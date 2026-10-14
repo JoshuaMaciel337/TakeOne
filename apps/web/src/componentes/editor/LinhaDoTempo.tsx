@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeftRight,
   Captions,
   Copy,
   Eye,
@@ -523,6 +524,25 @@ export function LinhaDoTempo({
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                     />
                   ))}
+                  {/* Marca de transição no corte: cobre metade antes e metade depois */}
+                  {faixa.tipo === "principal"
+                    ? faixa.clipes.map((clipe) =>
+                        clipe.transicao ? (
+                          <button
+                            key={`t-${clipe.id}`}
+                            type="button"
+                            title={`Transição: ${clipe.transicao.tipo}`}
+                            aria-label="Transição para o próximo clipe"
+                            onPointerDown={(evento) => evento.stopPropagation()}
+                            onClick={() => aoSelecionar([clipe.id])}
+                            className="absolute top-1/2 z-10 flex h-5 -translate-y-1/2 items-center justify-center rounded border border-white/70 bg-destaque/80 text-white shadow"
+                            style={{ left: px(fimDoClipe(clipe) - clipe.transicao.duracao / 2), width: Math.max(10, px(clipe.transicao.duracao)) }}
+                          >
+                            <ArrowLeftRight className="size-3" aria-hidden />
+                          </button>
+                        ) : null,
+                      )
+                    : null}
                 </div>
               ))}
 

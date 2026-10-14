@@ -67,6 +67,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             altura=int(video.get("altura") or 0),
             video=bool(video),
             audio=bool(midia.get("audio")),
+            duracao=float(midia.get("duracao") or 0),
         )
     return preparadas
 

@@ -394,12 +394,12 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Legendas manuais: faixa de legendas por cima de tudo, estilos prontos aplicados a todas, lista para editar, e importar/exportar SRT e VTT. O leitor foi escrito no TakeOne (o `captions` do FilmCraft fica para SCC e TTML, se um dia precisar).
 
 ### Fase 4: efeitos, transições e cor (2 a 3 semanas)
-- Transições entre clipes:
-  - fusão
-  - escurecer
-  - deslizar
-  - empurrar
-  - zoom
+- Transições entre clipes vizinhos da principal (ferramenta Transições), cobrindo o corte pela metade:
+  - [x] fusão
+  - [x] escurecer
+  - [x] deslizar
+  - [x] empurrar
+  - [x] zoom
   - desfoque
   - wipes
 - Ajustes de cor (aba Cor). A conta é do TakeOne, a mesma no shader da prévia e na LUT 3D do render; as do FilmCraft e do LightCraft ficam de referência para curvas e rodas:

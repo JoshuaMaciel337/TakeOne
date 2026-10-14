@@ -298,3 +298,28 @@ def test_render_aplica_a_cor_e_a_vinheta_da_previa(cliente, db_limpo):
     assert max(abs(int(c) - cinza) for c in ponto) <= 20, ponto
     # No canto, a vinheta no máximo deixa tudo quase preto
     assert max(int(c) for c in quadro[3, 3]) <= 25, quadro[3, 3]
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_faz_a_transicao_escurecer_no_corte(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    base = {"midia_id": midia_id, "velocidade": 1, "volume": 1}
+    clipes = [{**base, "id": "a", "inicio": 0, "duracao": SEGUNDO, "entrada": 0,
+               "transicao": {"tipo": "escurecer", "duracao": SEGUNDO // 2}},
+              {**base, "id": "b", "inicio": SEGUNDO, "duracao": SEGUNDO, "entrada": SEGUNDO}]
+    corpo = {"versao": projeto["versao"], "nome": "Transição", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#ff00ff"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    # Bem no corte, os dois estão apagados: aparece a cor de fundo; longe dele, o vermelho do quadrante
+    no_corte = quadro_do_video(video, 1.0, 1280, 720)[180, 320]
+    longe = quadro_do_video(video, 0.4, 1280, 720)[180, 320]
+    assert max(abs(int(a) - b) for a, b in zip(no_corte, FUNDO, strict=True)) <= 40, no_corte
+    assert max(abs(int(a) - b) for a, b in zip(longe, CORES[(0, 0)], strict=True)) <= 40, longe
