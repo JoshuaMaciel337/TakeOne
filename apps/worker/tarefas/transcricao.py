@@ -2,14 +2,16 @@
 # Tarefa "transcricao" — a fala de uma mídia, com o tempo de cada palavra
 #
 # faster-whisper (large-v3-turbo, int8, uns 3 GB de VRAM) ouve o áudio de análise que a ingestão
-# gerou (WAV mono de 16 kHz), em fatias de 10 min. O modelo sai da memória no fim: com 8 GB de VRAM
-# cabe um modelo por vez. No modo simulado (MODO_IA=simulado) não há modelo: as palavras são de
-# exemplo, para desenvolver e testar o fluxo das legendas sem GPU.
+# gerou (WAV mono de 16 kHz), em fatias de 10 min. Ele roda num processo à parte, que termina no fim
+# do job: só assim a RAM e a VRAM do modelo voltam para o sistema (o processo do worker guardava uns
+# 2,5 GB depois de soltar o modelo). Com 8 GB de VRAM cabe um modelo por vez. No modo simulado
+# (MODO_IA=simulado) não há modelo: as palavras são de exemplo, para testar o fluxo das legendas sem GPU.
 # Adaptado da transcrição do HolyCut, sem o alinhamento do WhisperX (o tempo por palavra do
 # faster-whisper basta para as legendas).
 # -----------------------------------------------
-import gc
 import logging
+import multiprocessing
+import queue
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -30,11 +32,6 @@ from core.modelos.transcricao import (
 from core.utils import storage
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg
 from core.utils.mongo import agora
-
-
-def esvaziar_memoria_da_gpu():
-    """Solta o modelo antes do próximo job de GPU."""
-    gc.collect()
 
 
 def _ouvir(modelo, caminho: Path, idioma: str | None, deslocamento: float, duracao: float,
@@ -67,25 +64,62 @@ def transcrever(caminho: Path, idioma: str | None, duracao: float,
     reportar(5, "Carregando o modelo de transcrição")
     modelo = WhisperModel(MODELO, device="cuda", compute_type="int8")
     palavras, detectado = [], idioma
-    try:
-        fatias = fatias_de(duracao)
-        with tempfile.TemporaryDirectory(prefix="takeone-fala-") as pasta:
-            for indice, (inicio, fim) in enumerate(fatias):
-                arquivo = caminho
-                if len(fatias) > 1:
-                    arquivo = Path(pasta) / f"fatia-{indice:02d}.wav"
-                    try:
-                        executar_ffmpeg(["-ss", f"{inicio:.3f}", "-to", f"{fim:.3f}", "-i", str(caminho),
-                                         "-c", "copy", str(arquivo)])
-                    except ErroFFmpeg as erro:
-                        raise ErroDefinitivo("Não foi possível separar um trecho do áudio para transcrever.") from erro
-                # O idioma da primeira fatia vale para as outras
-                da_fatia, detectado = _ouvir(modelo, arquivo, detectado, inicio, duracao, reportar)
-                palavras += da_fatia
-    finally:
-        del modelo
-        esvaziar_memoria_da_gpu()
+    fatias = fatias_de(duracao)
+    with tempfile.TemporaryDirectory(prefix="takeone-fala-") as pasta:
+        for indice, (inicio, fim) in enumerate(fatias):
+            arquivo = caminho
+            if len(fatias) > 1:
+                arquivo = Path(pasta) / f"fatia-{indice:02d}.wav"
+                try:
+                    executar_ffmpeg(["-ss", f"{inicio:.3f}", "-to", f"{fim:.3f}", "-i", str(caminho),
+                                     "-c", "copy", str(arquivo)])
+                except ErroFFmpeg as erro:
+                    raise ErroDefinitivo("Não foi possível separar um trecho do áudio para transcrever.") from erro
+            # O idioma da primeira fatia vale para as outras
+            da_fatia, detectado = _ouvir(modelo, arquivo, detectado, inicio, duracao, reportar)
+            palavras += da_fatia
     return palavras, detectado or "pt"
+
+
+def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, fila) -> None:
+    """Roda no processo filho: manda o progresso e o resultado (ou o erro) pela fila."""
+    try:
+        palavras, detectado = transcrever(Path(caminho), idioma, duracao, lambda p, m: fila.put(("progresso", p, m)))
+        fila.put(("fim", palavras, detectado))
+    except ErroDefinitivo as erro:
+        fila.put(("definitivo", str(erro)))
+    except Exception as erro:  # noqa: BLE001 - o pai decide se tenta de novo
+        fila.put(("erro", f"{type(erro).__name__}: {erro}"))
+
+
+def transcrever_em_outro_processo(caminho: Path, idioma: str | None, duracao: float,
+                                  reportar: Callable[[int, str], None]) -> tuple[list[dict], str]:
+    """A transcrição num processo novo (spawn), que leva o modelo embora quando termina."""
+    contexto = multiprocessing.get_context("spawn")
+    fila = contexto.Queue()
+    filho = contexto.Process(target=_transcrever_no_filho, args=(str(caminho), idioma, duracao, fila), daemon=True)
+    filho.start()
+    try:
+        while True:
+            try:
+                mensagem = fila.get(timeout=5)
+            except queue.Empty:
+                if not filho.is_alive():
+                    codigo = filho.exitcode
+                    raise RuntimeError(f"O processo da transcrição parou sem responder (código {codigo}).") from None
+                continue
+            if mensagem[0] == "progresso":
+                reportar(mensagem[1], mensagem[2])
+            elif mensagem[0] == "fim":
+                return mensagem[1], mensagem[2]
+            elif mensagem[0] == "definitivo":
+                raise ErroDefinitivo(mensagem[1])
+            else:
+                raise RuntimeError(mensagem[1])
+    finally:
+        filho.join(timeout=30)
+        if filho.is_alive():
+            filho.kill()
 
 
 def marcar_transcricao_com_erro(db, job: dict, mensagem: str):
@@ -113,7 +147,7 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
     rotulo = f"[{organizacao_id}] [midia {midia_id}]"
 
     if MODO_IA == "real":
-        brutas, idioma = transcrever(caminho, None if pedido == "auto" else pedido, duracao, reportar)
+        brutas, idioma = transcrever_em_outro_processo(caminho, None if pedido == "auto" else pedido, duracao, reportar)
     else:
         brutas, idioma = palavras_simuladas(duracao), "pt" if pedido == "auto" else pedido
     palavras = limpar_palavras(brutas)

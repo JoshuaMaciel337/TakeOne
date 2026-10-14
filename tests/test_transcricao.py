@@ -1,4 +1,8 @@
-# Transcrição: as funções puras que preparam as palavras para guardar
+# Transcrição: as funções puras que preparam as palavras para guardar, e o processo à parte
+import importlib.util
+
+import pytest
+
 from core.modelos.transcricao import SEGUNDOS_POR_FATIA, fatias_de, limpar_palavras, palavras_simuladas
 
 
@@ -28,3 +32,12 @@ def test_palavras_simuladas_cabem_na_midia():
     palavras = palavras_simuladas(10)
     assert palavras and palavras[-1]["fim"] <= 10
     assert palavras_simuladas(0.2) == []
+
+
+@pytest.mark.skipif(importlib.util.find_spec("faster_whisper") is not None, reason="só sem o faster-whisper")
+def test_erro_no_processo_da_transcricao_chega_ao_worker(tmp_path):
+    from worker.tarefas.transcricao import transcrever_em_outro_processo
+
+    progresso = []
+    with pytest.raises(RuntimeError, match="ModuleNotFoundError"):
+        transcrever_em_outro_processo(tmp_path / "fala.wav", "pt", 10, lambda p, m: progresso.append(p))
