@@ -12,7 +12,17 @@ from core.modelos.exportacao import (
     nome_de_arquivo,
     tamanho_de_saida,
 )
-from core.utils.render import ErroRender, ImagemDoTexto, MidiaDoRender, cadeia_atempo, planejar_render
+from core.utils.render import (
+    ErroRender,
+    ImagemDoTexto,
+    MidiaDoRender,
+    argumentos_do_som,
+    argumentos_do_video,
+    cadeia_atempo,
+    ganho_para_o_alvo,
+    ler_loudness,
+    planejar_render,
+)
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
 S = TICKS_POR_SEGUNDO
@@ -63,7 +73,7 @@ def test_entradas_abrem_so_o_trecho_de_cada_clipe():
         ["-ss", "1.000000", "-t", "4.000000", "-i", "/m/deitado.mp4"],   # 2 s no vídeo, em dobro
     ]
     assert "setpts=(PTS-STARTPTS)/2" in plano.filtro
-    assert "atempo=2" in plano.filtro
+    assert "atempo=2" in plano.filtro_som
 
 
 def test_camadas_de_baixo_para_cima_com_a_caixa_da_geometria():
@@ -99,16 +109,30 @@ def test_som_entra_no_instante_do_clipe_e_respeita_faixa_muda_e_oculta():
     plano = planejar_render(projeto([
         faixa("principal", [clipe("c1", "deitado", 0, 4)]),
         faixa("audio", [musica]),
-    ]), MIDIAS, 1080, 1920)
+    ]), MIDIAS, 1080, 1920, pasta="/tmp/exp")
     assert plano.tem_som
-    assert "[1:a]" in plano.filtro and "adelay=72000S:all=1" in plano.filtro and "volume=0.5" in plano.filtro
-    assert "amix=inputs=2:duration=longest:normalize=0,loudnorm=I=-14" in plano.filtro
+    # O som é misturado na primeira passada, só de áudio, e medido pelo ebur128
+    som = plano.filtro_som
+    assert "[1:a]" in som and "adelay=72000S:all=1" in som and "volume=0.5" in som and "[0:v]" not in som
+    assert som.endswith("amix=inputs=2:duration=longest:normalize=0,aresample=48000,ebur128=framelog=quiet[m]")
+    assert plano.som == "/tmp/exp/som.mka"
+    assert argumentos_do_som(plano, "f.txt")[-4:] == ["[m]", "-c:a", "pcm_f32le", "/tmp/exp/som.mka"]
+    # No vídeo, a mistura entra depois das mídias, com ganho fixo e limitador; sem loudnorm, que sobe os trechos baixos
+    assert argumentos_do_video(plano, "f.txt").count("-i") == len(plano.entradas) + 1
+    assert "[2:a]volume=0dB,alimiter=limit=0.841395:level=0:latency=1,apad" in plano.filtro
+    assert "[1:a]" not in plano.filtro and "loudnorm" not in plano.filtro
+    com_ganho = planejar_render(projeto([
+        faixa("principal", [clipe("c1", "deitado", 0, 4)]),
+        faixa("audio", [musica]),
+    ]), MIDIAS, 1080, 1920, ganho_db=-3.25)
+    assert "[2:a]volume=-3.25dB," in com_ganho.filtro
 
     sem_som = planejar_render(projeto([
         faixa("principal", [clipe("c1", "deitado", 0, 4)], muda=True),
         faixa("video", [clipe("c2", "deitado", 0, 4)], oculta=True),
     ]), MIDIAS, 1080, 1920)
-    assert not sem_som.tem_som
+    assert not sem_som.tem_som and sem_som.filtro_som == ""
+    assert argumentos_do_video(sem_som, "f.txt").count("-i") == len(sem_som.entradas)
     assert "anullsrc" in sem_som.filtro
     assert "[1:v]" not in sem_som.filtro, "faixa oculta não aparece"
 
@@ -149,7 +173,7 @@ def test_link_do_celular_vale_24_horas_e_guarda_so_o_hash():
 def test_fades_no_tempo_do_clipe_antes_do_atraso():
     com_fade = clipe("c1", "deitado", 1, 3, fade_entrada=S // 2, fade_saida=S)
     plano = planejar_render(projeto([faixa("principal", [com_fade])]), MIDIAS, 1080, 1920)
-    assert "volume=1,afade=t=in:st=0:d=0.5,afade=t=out:st=2:d=1,adelay=48000S:all=1" in plano.filtro
+    assert "volume=1,afade=t=in:st=0:d=0.5,afade=t=out:st=2:d=1,adelay=48000S:all=1" in plano.filtro_som
 
 
 def test_texto_entra_como_imagem_parada_com_a_caixa_do_lado_de_referencia():
@@ -162,7 +186,7 @@ def test_texto_entra_como_imagem_parada_com_a_caixa_do_lado_de_referencia():
                                               "-i", "/tmp/texto_t1.png"]
     # Em 720 de lado menor, o PNG medido em 1080 fica com dois terços: 360 × 80
     assert "scale=360:80" in plano.filtro and "setpts=PTS+1/TB" in plano.filtro
-    assert "[1:a]" not in plano.filtro, "texto não tem som"
+    assert "[1:a]" not in plano.filtro_som, "texto não tem som"
     with pytest.raises(ErroRender, match="texto"):
         planejar_render(projeto_com_texto, MIDIAS, 720, 1280, {})
 
@@ -222,7 +246,7 @@ def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     assert "fade=t=in:st=3.5:d=1:alpha=1" in plano.filtro, "quem entra aparece aos poucos na fusão"
     assert "setpts=PTS+3.5/TB" in plano.filtro
     # O som do segundo começa no corte: pula o meio segundo a mais que a imagem leu
-    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro
+    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro_som
     assert "tpad" not in plano.filtro, "havia sobra nos dois lados"
 
 
@@ -238,3 +262,23 @@ def test_transicao_sem_sobra_na_midia_repete_o_quadro():
     assert "tpad=start_mode=clone:start_duration=0.5:stop_mode=clone:stop_duration=0" in linhas[3]
     assert "x='540+1080*(-(1-pow(1-clip((t-3.5)/1,0,1),3)))-overlay_w/2'" in linhas[2]
     assert "x='540+1080*(pow(1-clip((t-3.5)/1,0,1),3))-overlay_w/2'" in linhas[4]
+
+
+def test_ganho_ate_o_alvo_de_loudness():
+    assert ganho_para_o_alvo(-20.5) == 6.5
+    assert ganho_para_o_alvo(-9) == -5
+    assert ganho_para_o_alvo(-70) == 0, "silêncio não ganha volume"
+    assert ganho_para_o_alvo(None) == 0
+    assert ganho_para_o_alvo(-65) == 30, "o ganho tem teto"
+
+
+def test_le_o_loudness_do_resumo_do_ebur128():
+    saida = """[Parsed_ebur128_3 @ 0x5] t: 1.9  TARGET:-23 LUFS    M: -20.1 S: -21.0     I: -21.4 LUFS
+[Parsed_ebur128_3 @ 0x5] Summary:
+
+  Integrated loudness:
+    I:         -21.7 LUFS
+    Threshold: -31.7 LUFS"""
+    assert ler_loudness(saida) == -21.7
+    assert ler_loudness("    I:         -inf LUFS") is None
+    assert ler_loudness("nada aqui") is None

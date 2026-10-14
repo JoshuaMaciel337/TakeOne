@@ -1,7 +1,8 @@
 # -----------------------------------------------
 # TakeOne — planejamento do render com FFmpeg
 #
-# Lê o mesmo projeto que a prévia desenha e monta o grafo de filtros do FFmpeg, numa passada só.
+# Lê o mesmo projeto que a prévia desenha e monta os grafos de filtros do FFmpeg: uma passada para
+# o som e outra para o vídeo.
 # Generaliza o render do HolyCut (uma gravação cortada em partes) para várias faixas:
 #
 #   - cada clipe é uma entrada do FFmpeg, aberta já no trecho dele (-ss e -t antes do -i);
@@ -10,7 +11,10 @@
 #     recorte, o tamanho, o giro e a opacidade da caixa de core/utils/geometria.py;
 #   - a mistura é feita em RGB (overlay format=rgb), como o navegador faz na prévia;
 #   - o som de cada clipe entra no instante dele (adelay em amostras), tudo é misturado sem
-#     normalizar e o resultado vai para -14 LUFS, o padrão das redes sociais.
+#     normalizar e o resultado vai para -14 LUFS, o padrão das redes sociais. A mistura sai numa
+#     primeira passada só do som, que também mede o loudness; na segunda ela leva um ganho fixo e um
+#     limitador nos picos. (O loudnorm numa passada mexe no ganho ao longo do vídeo: uma introdução
+#     baixa subia até quase o volume do resto, diferente da prévia.)
 # -----------------------------------------------
 import math
 import re
@@ -29,6 +33,11 @@ from core.utils.transicao import filtros_de_transicao, janelas_da_principal
 TAXA_AUDIO = 48000
 LUFS_ALVO = -14
 PICO_MAXIMO_DB = -1.5
+# Abaixo disso a mistura é silêncio (o ebur128 não mede menos que -70); e o ganho tem um teto
+SILENCIO_LUFS = -70
+GANHO_MAXIMO_DB = 30
+# A mistura em ponto flutuante: antes do ganho, o volume ainda pode passar de 1
+ARQUIVO_SOM = "som.mka"
 # Abre e fecha o som do vídeo bem de leve, para não estalar no primeiro e no último quadro
 FADE_ENTRADA = 0.02
 FADE_SAIDA = 0.05
@@ -105,6 +114,11 @@ class PlanoDeRender:
     taxa: str          # "30/1", "30000/1001"
     tem_som: bool
     auxiliares: tuple[ArquivoAuxiliar, ...] = ()
+    # Primeira passada: o som de todos os clipes, misturado no arquivo `som` e medido pelo ebur128.
+    # Fica fora do grafo do vídeo porque, num grafo só, o FFmpeg 7 trava em projetos com transição:
+    # o som de um clipe que entra depois (adelay) e o vídeo ficam esperando um pelo outro.
+    filtro_som: str = ""
+    som: str = ""
 
 
 class ErroRender(ValueError):
@@ -278,12 +292,14 @@ def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) ->
 
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
-                    textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".") -> PlanoDeRender:
+                    textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".",
+                    ganho_db: float = 0.0) -> PlanoDeRender:
     """
     projeto: a cópia guardada na exportação (proporcao, taxa, fundo, faixas, duracao).
     midias: id → arquivo e tamanho da imagem de cada mídia usada.
     textos: id do clipe → PNG de cada clipe de texto.
     pasta: onde o worker grava as LUTs e as imagens de vinheta listadas em `auxiliares`.
+    ganho_db: o ganho da mistura, medido na primeira passada (veja ganho_para_o_alvo).
     """
     textos = textos or {}
     duracao = segundos(projeto["duracao"])
@@ -362,27 +378,64 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         anterior = f"base{numero}"
     linhas.append(f"[{anterior}]format=yuv420p[v]")
 
-    sons = []
+    sons, linhas_som = [], []
     for faixa in com_som:
         for clipe in faixa["clipes"]:
             if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
                 sons.append(f"a{len(sons)}")
                 pular = leituras[clipe["id"]].pular_audio if clipe["id"] in leituras else 0
-                linhas.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe, pular)}[{sons[-1]}]")
+                linhas_som.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe, pular)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")
+    filtro_som = som = ""
     if sons:
-        linhas.append(
-            "".join(f"[{rotulo}]" for rotulo in sons)
-            + f"amix=inputs={len(sons)}:duration=longest:normalize=0,"
-            + f"loudnorm=I={LUFS_ALVO}:TP={PICO_MAXIMO_DB}:LRA=11,aresample={TAXA_AUDIO},{fim_do_som}"
-        )
+        # O som é misturado e medido antes, num arquivo (filtro_som); aqui ele entra depois das mídias.
+        # Ganho fixo e limitador só nos picos: o equilíbrio e os fades ficam iguais aos da prévia.
+        som = f"{pasta}/{ARQUIVO_SOM}"
+        filtro_som = ";\n".join([*linhas_som, "".join(f"[{rotulo}]" for rotulo in sons)
+                                 + f"amix=inputs={len(sons)}:duration=longest:normalize=0,"
+                                 + f"aresample={TAXA_AUDIO},ebur128=framelog=quiet[m]"])
+        limite = 10 ** (PICO_MAXIMO_DB / 20)
+        linhas.append(f"[{len(entradas)}:a]volume={_numero(ganho_db)}dB,"
+                      f"alimiter=limit={_numero(limite)}:level=0:latency=1,{fim_do_som}")
     else:
         linhas.append(f"anullsrc=r={TAXA_AUDIO}:cl=stereo,{fim_do_som}")
 
     return PlanoDeRender(entradas=entradas, filtro=";\n".join(linhas), duracao=duracao, taxa=taxa, tem_som=bool(sons),
-                         auxiliares=tuple(auxiliares.values()))
+                         auxiliares=tuple(auxiliares.values()), filtro_som=filtro_som, som=som)
+
+
+def ganho_para_o_alvo(lufs_medido: float | None) -> float:
+    """Quanto subir ou descer a mistura inteira para chegar em -14 LUFS. Silêncio não ganha nada."""
+    if lufs_medido is None or lufs_medido <= SILENCIO_LUFS:
+        return 0.0
+    return min(max(LUFS_ALVO - lufs_medido, -GANHO_MAXIMO_DB), GANHO_MAXIMO_DB)
+
+
+def ler_loudness(saida_ebur128: str) -> float | None:
+    """O loudness integrado (I) do resumo que o ebur128 escreve no fim."""
+    encontrados = re.findall(r"I:\s+(-?\d+(?:\.\d+)?|-inf) LUFS", saida_ebur128)
+    if not encontrados or encontrados[-1] == "-inf":
+        return None
+    return float(encontrados[-1])
+
+
+def argumentos_do_som(plano: PlanoDeRender, caminho_filtro: str) -> list[str]:
+    """
+    Primeira passada: mistura o som de todos os clipes no arquivo `plano.som` e mede o loudness dele.
+    O `filtro_som` fica no arquivo caminho_filtro.
+    """
+    entradas = [argumento for entrada in plano.entradas for argumento in entrada.argumentos()]
+    return [*entradas, *opcao_filtro_em_arquivo(caminho_filtro), "-map", "[m]", "-c:a", "pcm_f32le", plano.som]
+
+
+def argumentos_do_video(plano: PlanoDeRender, caminho_filtro: str) -> list[str]:
+    """Segunda passada: as mídias, o som já misturado (se houver) e o grafo em caminho_filtro."""
+    entradas = [argumento for entrada in plano.entradas for argumento in entrada.argumentos()]
+    if plano.tem_som:
+        entradas += ["-i", plano.som]
+    return [*entradas, *opcao_filtro_em_arquivo(caminho_filtro)]
 
 
 def argumentos_de_saida(plano: PlanoDeRender, caminho_saida: str, lado_maior: int) -> list[str]:

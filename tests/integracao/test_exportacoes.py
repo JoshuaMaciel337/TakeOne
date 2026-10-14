@@ -323,3 +323,57 @@ def test_render_faz_a_transicao_escurecer_no_corte(cliente, db_limpo):
     longe = quadro_do_video(video, 0.4, 1280, 720)[180, 320]
     assert max(abs(int(a) - b) for a, b in zip(no_corte, FUNDO, strict=True)) <= 40, no_corte
     assert max(abs(int(a) - b) for a, b in zip(longe, CORES[(0, 0)], strict=True)) <= 40, longe
+
+
+def som_do_video(caminho) -> np.ndarray:
+    """O som do vídeo em mono, 48 kHz, como números de -1 a 1."""
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(caminho), "-vn",
+                            "-ac", "1", "-ar", "48000", "-f", "f32le", "-"],
+                           capture_output=True, check=True, timeout=60).stdout
+    return np.frombuffer(saida, dtype=np.float32)
+
+
+def loudness_do_video(caminho) -> float:
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(caminho), "-vn",
+                            "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True, timeout=60).stderr
+    return float(saida.rsplit("I:", 1)[1].split("LUFS")[0])
+
+
+def gerar_tom_longo(caminho):
+    """640 × 360, 8 s de cor lisa com um tom de 440 Hz."""
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", "color=c=0x0000ff:s=640x360:r=30:d=8",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=8",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-shortest", str(caminho)], check=True, timeout=120)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_chega_em_14_lufs_sem_mudar_o_equilibrio(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=8.0, gerar=gerar_tom_longo)
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    base = {"midia_id": midia_id, "velocidade": 1, "duracao": 4 * SEGUNDO}
+    # Uma introdução baixa (5%, 26 dB abaixo) e depois o som cheio
+    clipes = [{**base, "id": "baixo", "inicio": 0, "entrada": 0, "volume": 0.05},
+              {**base, "id": "alto", "inicio": 4 * SEGUNDO, "entrada": 4 * SEGUNDO, "volume": 1}]
+    corpo = {"versao": projeto["versao"], "nome": "Volume", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    assert abs(loudness_do_video(video) - (-14)) <= 1
+    som = som_do_video(video)
+
+    def nivel_db(inicio, fim):
+        trecho = som[int(inicio * 48000):int(fim * 48000)]
+        return 20 * math.log10(float(np.sqrt(np.mean(trecho ** 2))))
+
+    # Como na prévia, a introdução continua 26 dB abaixo. O loudnorm numa passada subia o trecho baixo
+    # até perto do resto, e a diferença caía para poucos dB.
+    diferenca = nivel_db(5, 7.5) - nivel_db(1, 3.5)
+    assert 24 <= diferenca <= 28, diferenca

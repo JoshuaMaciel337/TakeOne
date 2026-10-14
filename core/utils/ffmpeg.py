@@ -91,10 +91,11 @@ def ler_progresso(linha: str) -> float | None:
 
 
 def executar_ffmpeg(argumentos: list[str], duracao: float | None = None,
-                    reportar: Callable[[float], None] | None = None) -> None:
+                    reportar: Callable[[float], None] | None = None) -> str:
     """
     Roda o FFmpeg com os argumentos dados. Se houver duração e reportar,
     chama reportar(fração de 0 a 1) conforme o arquivo avança.
+    Devolve as últimas linhas da saída de erro, onde ficam os resumos de filtros como o ebur128.
     Lança ErroFFmpeg com o final da saída de erro se o comando falhar.
     """
     comando = [FFMPEG, "-hide_banner", "-nostdin", "-y", "-progress", "pipe:1", "-nostats", *argumentos]
@@ -118,3 +119,4 @@ def executar_ffmpeg(argumentos: list[str], duracao: float | None = None,
     leitor.join(timeout=5)
     if codigo != 0:
         raise ErroFFmpeg(f"FFmpeg terminou com código {codigo}: " + " | ".join(ultimas_linhas)[-600:])
+    return "\n".join(ultimas_linhas)

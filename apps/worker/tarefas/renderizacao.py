@@ -3,8 +3,9 @@
 #
 #   1. lê a cópia do projeto guardada na exportação e as mídias que ela usa
 #   2. planeja o grafo do FFmpeg (core/utils/render.py), a partir dos arquivos originais
-#   3. renderiza numa passada só, com o progresso indo para o job
-#   4. confere o arquivo gerado e marca a exportação como pronta
+#   3. mistura o som num arquivo e mede o loudness dele (primeira passada, só de áudio)
+#   4. gera o vídeo com o som já misturado (segunda passada), com o progresso indo para o job
+#   5. confere o arquivo gerado e marca a exportação como pronta
 # -----------------------------------------------
 import logging
 from collections.abc import Callable
@@ -33,7 +34,10 @@ from core.utils.render import (
     ImagemDoTexto,
     MidiaDoRender,
     argumentos_de_saida,
-    opcao_filtro_em_arquivo,
+    argumentos_do_som,
+    argumentos_do_video,
+    ganho_para_o_alvo,
+    ler_loudness,
     planejar_render,
 )
 from core.utils.texto import desenhar_texto
@@ -91,6 +95,16 @@ def preparar_textos(faixas: list[dict], largura: int, altura: int, pasta: Path) 
     return textos
 
 
+def misturar_o_som(plano, filtro: Path, reportar: Callable[[float], None], rotulo: str) -> float:
+    """Primeira passada: mistura o som no arquivo `plano.som`, mede o loudness e devolve o ganho até -14 LUFS."""
+    filtro.write_text(plano.filtro_som, encoding="utf-8")
+    saida = executar_ffmpeg(argumentos_do_som(plano, str(filtro)), plano.duracao, reportar)
+    medido = ler_loudness(saida)
+    ganho = ganho_para_o_alvo(medido)
+    logging.info(f"{rotulo} loudness da mistura: {medido} LUFS, ganho de {ganho:+.1f} dB")
+    return ganho
+
+
 def marcar_exportacao_com_erro(db, job: dict, mensagem: str):
     """Chamado quando o render falha de vez: a exportação mostra o erro."""
     exportacao_id = (job.get("entrada") or {}).get("exportacao_id")
@@ -125,26 +139,29 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta))
     except ErroRender as e:
         raise ErroDefinitivo(str(e)) from e
-    # LUTs da cor e imagens das vinhetas que o grafo usa
-    for auxiliar in plano.auxiliares:
-        if auxiliar.tipo == "lut":
-            Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
-        else:
-            desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
     logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
 
-    # O grafo fica num arquivo: com muitos clipes ele passa do limite da linha de comando
+    # Os grafos ficam num arquivo: com muitos clipes eles passam do limite da linha de comando
     filtro = caminho(ARQUIVO_FILTRO)
-    filtro.parent.mkdir(parents=True, exist_ok=True)
-    filtro.write_text(plano.filtro, encoding="utf-8")
     parcial = caminho(ARQUIVO_PARCIAL)
-    argumentos = [argumento for entrada in plano.entradas for argumento in entrada.argumentos()]
-    argumentos += opcao_filtro_em_arquivo(str(filtro))
-    argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))
     try:
-        executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(5 + int(f * 90), "Gerando o vídeo"))
+        # LUTs da cor e imagens das vinhetas que o grafo usa (as duas passadas abrem as mesmas entradas)
+        for auxiliar in plano.auxiliares:
+            if auxiliar.tipo == "lut":
+                Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
+            else:
+                desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
+        if plano.tem_som:
+            ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 12), "Misturando o som"), rotulo)
+            plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho)
+        filtro.write_text(plano.filtro, encoding="utf-8")
+        argumentos = argumentos_do_video(plano, str(filtro))
+        argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))
+        executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(15 + int(f * 80), "Gerando o vídeo"))
     finally:
         filtro.unlink(missing_ok=True)
+        if plano.som:
+            Path(plano.som).unlink(missing_ok=True)
         for imagem in textos.values():
             Path(imagem.caminho).unlink(missing_ok=True)
         for auxiliar in plano.auxiliares:
