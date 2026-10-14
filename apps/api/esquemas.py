@@ -325,6 +325,38 @@ def job_para_saida(doc: dict) -> JobSaida:
     return JobSaida.model_validate({**doc, "id": str(doc["_id"])})
 
 
+class TranscricaoPedirEntrada(BaseModel):
+    idioma: Literal["auto", "pt", "en", "es"] = "auto"
+
+
+class PalavraSaida(BaseModel):
+    texto: str
+    inicio: float = Field(description="Segundos da mídia")
+    fim: float
+
+
+class TranscricaoSaida(BaseModel):
+    midia_id: str
+    status: str
+    idioma: str
+    palavras: list[PalavraSaida] = []
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+
+
+def transcricao_para_saida(doc: dict, job: dict | None = None) -> TranscricaoSaida:
+    """job: o job da transcrição, para mostrar o progresso enquanto ela anda."""
+    processamento = None
+    status, erro = doc["status"], doc.get("erro")
+    if job is not None and status == "processando":
+        processamento = ProcessamentoSaida(status=job["status"], progresso=job.get("progresso", 0),
+                                           mensagem=job.get("mensagem", ""))
+        if job["status"] == STATUS_JOB_ERRO:
+            status, erro = "erro", erro or job.get("erro")
+    return TranscricaoSaida.model_validate({**doc, "midia_id": str(doc["midia_id"]), "status": status, "erro": erro,
+                                            "processamento": processamento})
+
+
 def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
     """job: o job de ingestão, para mostrar o progresso enquanto a mídia é processada."""
     processamento = None

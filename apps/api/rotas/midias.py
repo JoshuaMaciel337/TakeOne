@@ -10,10 +10,20 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import MidiaAtualizarEntrada, MidiaSaida, midia_para_saida
+from api.esquemas import (
+    MidiaAtualizarEntrada,
+    MidiaSaida,
+    TranscricaoPedirEntrada,
+    TranscricaoSaida,
+    midia_para_saida,
+    transcricao_para_saida,
+)
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
-from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_PROCESSANDO, STATUS_PRONTA, chave_arquivo, pasta_da_midia
+from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSANDO
+from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
+from core.modelos.transcricao import montar_transcricao
 from core.utils import storage
 from core.utils.mongo import agora
 
@@ -100,6 +110,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
                   "lease_ate": None, "concluido_em": momento, "atualizado_em": momento}},
     )
     await db.midias.delete_one({"_id": midia["_id"]})
+    await db.transcricoes.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
 
@@ -128,3 +139,46 @@ async def baixar_original(midia_id: str, usuario=Depends(usuario_atual), db=Depe
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
     return FileResponse(caminho, media_type="application/octet-stream", filename=midia["nome_original"],
                         content_disposition_type="attachment")
+
+
+async def _job_da_transcricao(db, doc: dict) -> dict | None:
+    if doc["status"] != TRANSCRICAO_PROCESSANDO or not doc.get("job_id"):
+        return None
+    return await db.jobs.find_one({"_id": doc["job_id"]}, {"status": 1, "progresso": 1, "mensagem": 1, "erro": 1})
+
+
+@router.post("/{midia_id}/transcricao", response_model=TranscricaoSaida)
+async def pedir_transcricao(midia_id: str, dados: TranscricaoPedirEntrada,
+                            usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """
+    Põe a fala da mídia na fila do worker de GPU. Se ela já foi transcrita no idioma pedido (ou em
+    qualquer um, com "auto"), devolve a pronta; se já está na fila, devolve o andamento.
+    """
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("audio"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem áudio para transcrever.')
+    atual = await db.transcricoes.find_one({"midia_id": midia["_id"]})
+    if atual:
+        job = await _job_da_transcricao(db, atual)
+        andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
+        pronta = atual["status"] == TRANSCRICAO_PRONTA and dados.idioma in ("auto", atual["idioma"])
+        if andando or pronta:
+            return transcricao_para_saida(atual, job)
+    documento = montar_transcricao(usuario["organizacao_id"], midia["_id"], dados.idioma)
+    job = montar_job("transcricao", usuario["organizacao_id"], {"midia_id": str(midia["_id"]), "idioma": dados.idioma},
+                     criado_por=usuario["_id"])
+    documento["job_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.transcricoes.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
+    logging.info(f"[{usuario['organizacao_id']}] Transcrição pedida: {midia['nome']} ({dados.idioma})")
+    return transcricao_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.get("/{midia_id}/transcricao", response_model=TranscricaoSaida)
+async def ver_transcricao(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    doc = await db.transcricoes.find_one({"midia_id": midia["_id"]})
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Esta mídia ainda não foi transcrita.")
+    return transcricao_para_saida(doc, await _job_da_transcricao(db, doc))

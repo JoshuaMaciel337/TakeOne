@@ -72,6 +72,27 @@ services:
     depends_on: [api]
     restart: unless-stopped
 
+  # Transcrição na GPU (perfil gpu): docker compose --profile gpu up -d
+  # Divide a placa com o HolyCut: um modelo por vez, cada fila com o seu worker.
+  worker-gpu:
+    profiles: [gpu]
+    build: {context: ., dockerfile: infra/docker/worker-gpu.Dockerfile}
+    image: takeone/worker-gpu:local
+    environment:
+      <<: *ambiente-python
+      MODO_IA: real
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - "${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"
+      - modelos_ia:/cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: unless-stopped
+
   backup:
     build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
     image: takeone/worker:local
@@ -107,3 +128,5 @@ services:
 
 volumes:
   mongo_dados:
+  # Pesos baixados do Hugging Face (o modelo de transcrição, uns 1,6 GB)
+  modelos_ia:

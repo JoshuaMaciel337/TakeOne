@@ -36,6 +36,9 @@ INDICES = {
         # Para recusar a exclusão de uma mídia que ainda está em algum projeto
         ([("organizacao_id", 1), ("midias_usadas", 1)], {}),
     ],
+    "transcricoes": [
+        ([("midia_id", 1)], {"unique": True}),
+    ],
     "exportacoes": [
         ([("organizacao_id", 1), ("projeto_id", 1), ("criado_em", -1)], {}),
         # O link do QR code procura pelo hash do token

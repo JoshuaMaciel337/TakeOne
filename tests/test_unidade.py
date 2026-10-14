@@ -34,7 +34,7 @@ def test_espera_entre_tentativas_cresce_e_para_em_30_min():
 
 def test_tipos_por_recursos():
     assert set(tipos_por_recursos(["cpu"])) == {"teste", "ingestao", "renderizacao"}
-    assert tipos_por_recursos(["gpu"]) == []
+    assert tipos_por_recursos(["gpu"]) == ["transcricao"]
 
 
 def test_extensao_e_nome_da_midia():
