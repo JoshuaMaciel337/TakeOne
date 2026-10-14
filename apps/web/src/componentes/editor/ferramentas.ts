@@ -66,7 +66,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "legendas",
     nome: "Legendas",
     icone: Captions,
-    emBreve: { fase: "Fase 3", descricao: "Legendas automáticas a partir da fala, estilos animados e importar ou exportar SRT e VTT." },
   },
   {
     id: "transcricao",

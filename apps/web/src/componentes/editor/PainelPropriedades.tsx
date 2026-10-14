@@ -44,7 +44,7 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio", texto: "Texto" };
+const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio", texto: "Texto", legenda: "Legendas" };
 
 type Props = {
   midia: Midia | null;

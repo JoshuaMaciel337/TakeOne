@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { duracaoDoQuadro, segundosParaTicks } from "../tempo.ts";
 import {
   adicionarClipe,
+  adicionarLegenda,
   adicionarTexto,
   ajustarAudio,
   alternarFaixa,
@@ -13,6 +14,8 @@ import {
   dividirClipes,
   duplicarClipes,
   ErroEdicao,
+  estiloDasLegendas,
+  importarLegendas,
   moverClipe,
   mudarFundo,
   mudarTexto,
@@ -22,6 +25,7 @@ import {
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
+import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "./texto.ts";
 import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
@@ -303,4 +307,39 @@ test("texto: entra numa faixa de texto por cima de tudo, só anda entre faixas d
   assert.equal(texto.tamanho, 0.3, "o tamanho para no limite");
   assert.equal(texto.cor, "#ffffff", "cor inválida fica a de antes");
   assert.throws(() => mudarTexto(projeto, [video.clipes[0].id], { conteudo: "x" }), /não é um texto/);
+});
+
+test("legendas: importadas numa faixa por cima de tudo, presas aos quadros, e o estilo vale para todas", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  projeto = adicionarTexto(projeto, ctx, 0, TEXTO_PADRAO).projeto;
+  const quadro = duracaoDoQuadro(TAXA);
+  const importadas = importarLegendas(
+    projeto,
+    ctx,
+    [
+      { inicio: Math.round(0.51 * S), fim: 2 * S, conteudo: "Primeira" },
+      { inicio: 2 * S, fim: 2 * S + quadro / 3, conteudo: "Curta demais" },
+      { inicio: 3 * S, fim: 4 * S, conteudo: "Segunda" },
+    ],
+    ESTILO_LEGENDA,
+  );
+  projeto = importadas.projeto;
+  assert.deepEqual(projeto.faixas.map((f) => f.tipo), ["legenda", "texto", "principal"]);
+  const legendas = projeto.faixas[0].clipes;
+  assert.deepEqual(legendas.map((c) => c.texto!.conteudo), ["Primeira", "Segunda"]);
+  assert.equal(legendas[0].inicio % quadro, 0, "começa num quadro");
+  assert.equal(legendas[0].transformacao.y, 0.35);
+  conferir(projeto);
+
+  // Adicionar outra legenda e um texto novo: textos continuam abaixo das legendas
+  projeto = adicionarLegenda(projeto, ctx, 6 * S, ESTILO_LEGENDA).projeto;
+  projeto = adicionarTexto(projeto, ctx, 0, TEXTO_PADRAO).projeto;
+  assert.deepEqual(projeto.faixas.map((f) => f.tipo), ["legenda", "texto", "texto", "principal"]);
+  assert.equal(projeto.faixas[0].clipes.length, 3);
+
+  projeto = estiloDasLegendas(projeto, projeto.faixas[0].id, { cor: "#ffd60a", conteudo: "não pode mudar" });
+  assert.ok(projeto.faixas[0].clipes.every((c) => c.texto!.cor === "#ffd60a"));
+  assert.deepEqual(projeto.faixas[0].clipes.map((c) => c.texto!.conteudo), ["Primeira", "Segunda", "Legenda"]);
+  assert.throws(() => importarLegendas(projeto, ctx, [], ESTILO_LEGENDA), /não tem legendas/);
 });

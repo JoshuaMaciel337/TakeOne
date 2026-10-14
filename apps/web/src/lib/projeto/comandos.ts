@@ -7,6 +7,7 @@
 import type { Tick } from "../tempo.ts";
 import {
   adicionarClipe,
+  adicionarLegenda,
   adicionarTexto,
   ajustarAudio,
   alternarFaixa,
@@ -15,6 +16,8 @@ import {
   type Contexto,
   type DestinoClipe,
   dividirClipes,
+  estiloDasLegendas,
+  importarLegendas,
   type MudancaDeAudio,
   duplicarClipes,
   moverClipe,
@@ -24,6 +27,7 @@ import {
   restaurarClipes,
   transformarClipes,
 } from "./edicao.ts";
+import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
 
@@ -42,7 +46,10 @@ export type Comando =
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
   | { comando: "texto.adicionar"; parametros: { inicio: Tick; texto: Texto } }
-  | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } };
+  | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } }
+  | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
+  | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
+  | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -60,6 +67,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.audio": "mudar o som",
   "texto.adicionar": "adicionar texto",
   "texto.mudar": "mudar o texto",
+  "legenda.adicionar": "adicionar legenda",
+  "legenda.importar": "importar legendas",
+  "legenda.estilo": "mudar o estilo das legendas",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -102,6 +112,16 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = adicionarTexto(projeto, ctx, parametros.inicio, parametros.texto);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "legenda.adicionar": {
+      const resultado = adicionarLegenda(projeto, ctx, parametros.inicio, parametros.estilo);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "legenda.importar": {
+      const resultado = importarLegendas(projeto, ctx, parametros.legendas, parametros.estilo);
+      return { projeto: resultado.projeto, selecao: [] };
+    }
+    case "legenda.estilo":
+      return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
     case "texto.mudar":
       return { projeto: mudarTexto(projeto, parametros.clipeIds, parametros.texto) };
     case "clipe.audio": {

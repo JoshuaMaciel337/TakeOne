@@ -261,6 +261,19 @@ export function Editor({ projetoId }: { projetoId: string }) {
           }}
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
+          legendas={{
+            projeto,
+            nome: edicao.nome,
+            tempo,
+            selecao: selecaoValida,
+            aoExecutar: executar,
+            aoBuscar: buscar,
+            aoSelecionar: (ids) => {
+              setSelecao(ids);
+              if (ids.length) setMidiaId(null);
+            },
+            aoAvisar: mostrarAviso,
+          }}
           aoFechar={() => setPainelNoCelular(false)}
           className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-30 max-md:h-[55dvh] ${
             painelNoCelular ? "" : "max-md:hidden"

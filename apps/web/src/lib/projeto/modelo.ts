@@ -8,9 +8,14 @@ export type Proporcao = (typeof PROPORCOES)[number];
 
 /**
  * "principal" é a faixa magnética, sem espaço vazio; "video" fica por cima dela; "audio", embaixo;
- * "texto" guarda os clipes de texto, por cima de tudo.
+ * "texto" guarda os clipes de texto, por cima dos vídeos; "legenda", as legendas, por cima de tudo.
  */
-export type TipoFaixa = "principal" | "video" | "audio" | "texto";
+export type TipoFaixa = "principal" | "video" | "audio" | "texto" | "legenda";
+
+/** Faixas cujos clipes são textos (sem mídia). */
+export function faixaDeTexto(tipo: TipoFaixa): boolean {
+  return tipo === "texto" || tipo === "legenda";
+}
 
 /**
  * Onde a imagem do clipe fica no quadro (lib/projeto/geometria.ts). Sem mudança, a mídia aparece

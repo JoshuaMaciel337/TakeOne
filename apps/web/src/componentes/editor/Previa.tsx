@@ -4,7 +4,7 @@ import { Maximize, Pause, Play, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
-import { type Clipe, type Faixa, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
+import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -154,7 +154,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     });
   }
   // Os textos ficam por cima de todas as faixas de vídeo (a faixa de texto é sempre a de cima)
-  const faixasDeTexto = projeto.faixas.filter((faixa) => faixa.tipo === "texto" && !faixa.oculta);
+  const faixasDeTexto = projeto.faixas.filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta);
   const imagensDeTexto = useImagensDeTexto(
     faixasDeTexto.flatMap((faixa) => faixa.clipes.flatMap((clipe) => (clipe.texto ? [{ id: clipe.id, texto: clipe.texto }] : []))),
   );

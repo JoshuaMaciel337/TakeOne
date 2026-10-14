@@ -17,8 +17,10 @@ NOME_PADRAO = "Projeto sem título"
 FAIXA_PRINCIPAL = "principal"
 FAIXA_VIDEO = "video"      # sobreposição, por cima da principal
 FAIXA_AUDIO = "audio"
-FAIXA_TEXTO = "texto"      # clipes de texto, sem mídia, por cima de tudo
-TIPOS_FAIXA = (FAIXA_PRINCIPAL, FAIXA_VIDEO, FAIXA_AUDIO, FAIXA_TEXTO)
+FAIXA_TEXTO = "texto"      # clipes de texto, sem mídia, por cima dos vídeos
+FAIXA_LEGENDA = "legenda"  # legendas: também clipes de texto, por cima de tudo
+TIPOS_FAIXA = (FAIXA_PRINCIPAL, FAIXA_VIDEO, FAIXA_AUDIO, FAIXA_TEXTO, FAIXA_LEGENDA)
+FAIXAS_DE_TEXTO = (FAIXA_TEXTO, FAIXA_LEGENDA)
 
 LIMITE_FAIXAS = 30
 LIMITE_CLIPES = 1500
@@ -102,8 +104,8 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
         clipes = sorted(faixa["clipes"], key=lambda c: c["inicio"])
         anterior_fim = 0
         for clipe in clipes:
-            if faixa["tipo"] == FAIXA_TEXTO or clipe.get("texto") or not clipe.get("midia_id"):
-                if faixa["tipo"] != FAIXA_TEXTO or not clipe.get("texto") or clipe.get("midia_id"):
+            if faixa["tipo"] in FAIXAS_DE_TEXTO or clipe.get("texto") or not clipe.get("midia_id"):
+                if faixa["tipo"] not in FAIXAS_DE_TEXTO or not clipe.get("texto") or clipe.get("midia_id"):
                     return "Textos ficam só na faixa de texto, e a faixa de texto só tem textos."
                 problema = _conferir_posicao(faixa, clipe, anterior_fim)
                 if problema:

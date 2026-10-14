@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Captions,
   Copy,
   Eye,
   EyeOff,
@@ -25,7 +26,7 @@ import { formatarTempo } from "@/lib/formatar";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
-import { acharClipe, type Clipe, type Faixa, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
+import { acharClipe, type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -55,7 +56,7 @@ const LARGURA_ROTULOS_COMPACTA = 88;
 const LARGURA_TELA_ESTREITA = 640;
 const ALTURA_REGUA = 24;
 const ALTURA_ZONA_NOVA = 18;
-const ALTURAS: Record<TipoFaixa, number> = { principal: 64, video: 48, audio: 40, texto: 36 };
+const ALTURAS: Record<TipoFaixa, number> = { principal: 64, video: 48, audio: 40, texto: 36, legenda: 32 };
 const TOLERANCIA_IMA_PX = 8;
 const LIMIAR_ARRASTO_PX = 4;
 const INTERVALOS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
@@ -81,8 +82,8 @@ function destinoNaAltura(linhas: Linha[], y: number): { faixa?: Faixa; novaFaixa
 
 /** Se a faixa recebe o clipe: texto só na de texto; mídia com imagem nas de vídeo; som na de áudio. */
 function aceita(tipo: TipoFaixa, midia: Midia | undefined, texto = false): boolean {
-  if (texto) return tipo === "texto";
-  if (tipo === "texto") return false;
+  if (texto) return faixaDeTexto(tipo);
+  if (faixaDeTexto(tipo)) return false;
   if (!midia) return true;
   return tipo === "audio" ? !midia.video : Boolean(midia.video);
 }
@@ -110,7 +111,7 @@ function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
   const iguais = projeto.faixas.filter((item) => item.tipo === faixa.tipo);
   // As faixas de imagem contam de baixo para cima; as de áudio, de cima para baixo
   const numero = faixa.tipo === "audio" ? iguais.indexOf(faixa) + 1 : iguais.length - iguais.indexOf(faixa);
-  const nomes = { video: "Sobreposição", audio: "Áudio", texto: "Texto" } as const;
+  const nomes = { video: "Sobreposição", audio: "Áudio", texto: "Texto", legenda: "Legendas" } as const;
   return `${nomes[faixa.tipo]} ${numero}`;
 }
 
@@ -550,7 +551,7 @@ function CabecalhoDaFaixa({
   altura: number;
   aoAlternar: (propriedade: "oculta" | "muda" | "travada") => void;
 }) {
-  const Icone = { principal: Film, video: Layers, audio: Music, texto: Type }[faixa.tipo];
+  const Icone = { principal: Film, video: Layers, audio: Music, texto: Type, legenda: Captions }[faixa.tipo];
   const botao = "grid size-5 place-items-center rounded text-suave hover:bg-white/10 hover:text-texto";
   return (
     <div
@@ -604,7 +605,9 @@ function BlocoDoClipe({
   const texto = clipe.texto ?? null;
   const alturaInterna = altura - 6;
   const nome = texto ? resumoDoTexto(texto) : (midia?.nome ?? "Mídia não encontrada");
-  const cores = texto
+  const cores = faixa.tipo === "legenda"
+    ? "border-violet-400/50 bg-violet-900/60 text-violet-100"
+    : texto
     ? "border-amber-400/50 bg-amber-900/60 text-amber-100"
     : audio
       ? "border-emerald-500/40 bg-emerald-900/50 text-emerald-300/70"

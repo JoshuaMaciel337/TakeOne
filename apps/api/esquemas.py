@@ -182,7 +182,7 @@ class ClipeEntrada(BaseModel):
 
 class FaixaEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
-    tipo: Literal["principal", "video", "audio", "texto"]
+    tipo: Literal["principal", "video", "audio", "texto", "legenda"]
     oculta: bool = False
     muda: bool = False
     travada: bool = False

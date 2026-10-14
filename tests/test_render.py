@@ -165,3 +165,12 @@ def test_texto_entra_como_imagem_parada_com_a_caixa_do_lado_de_referencia():
     assert "[1:a]" not in plano.filtro, "texto não tem som"
     with pytest.raises(ErroRender, match="texto"):
         planejar_render(projeto_com_texto, MIDIAS, 720, 1280, {})
+
+
+def test_legenda_sai_como_texto_por_cima_de_tudo():
+    legenda = {"id": "l1", "midia_id": None, "texto": {"conteudo": "Oi"}, "inicio": 0, "duracao": 2 * S,
+               "entrada": 0, "velocidade": 1, "volume": 1, **PADRAO}
+    plano = planejar_render(projeto([faixa("legenda", [legenda]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 720, 1280, {"l1": ImagemDoTexto("/tmp/l1.png", 300, 80)})
+    linhas = plano.filtro.split(";\n")
+    assert linhas[1].startswith("[0:v]") and linhas[3].startswith("[1:v]"), "a legenda é a última camada"

@@ -10,6 +10,7 @@ import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
 import { PainelTexto } from "./PainelTexto";
 
 type Biblioteca = {
@@ -25,6 +26,7 @@ type Props = {
   aoSelecionarMidia: (midiaId: string | null) => void;
   aoAdicionarMidia: (midiaId: string) => void;
   aoAdicionarTexto: (texto: Texto) => void;
+  legendas: PropsLegendas;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   className?: string;
@@ -92,6 +94,7 @@ export function PainelConteudo({
   aoSelecionarMidia,
   aoAdicionarMidia,
   aoAdicionarTexto,
+  legendas,
   aoFechar,
   className = "",
   style,
@@ -118,6 +121,8 @@ export function PainelConteudo({
           />
         ) : ferramenta.id === "texto" ? (
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
+        ) : ferramenta.id === "legendas" ? (
+          <PainelLegendas {...legendas} />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}

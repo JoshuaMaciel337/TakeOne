@@ -10,9 +10,11 @@
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
+import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import {
   type Clipe,
   type Faixa,
+  faixaDeTexto,
   fimDoClipe,
   type InfoMidia,
   type Projeto,
@@ -76,7 +78,7 @@ function acharOuErro(projeto: Projeto, clipeId: string): { faixa: Faixa; clipe: 
 
 /** Faixa de áudio só recebe mídia sem imagem; as de vídeo, só mídia com imagem. */
 function combina(tipo: TipoFaixa, info: InfoMidia): boolean {
-  if (tipo === "texto") return false;
+  if (faixaDeTexto(tipo)) return false;
   return tipo === "audio" ? !info.video && info.audio : info.video;
 }
 
@@ -91,14 +93,15 @@ function infoDoClipe(ctx: Contexto, clipe: Clipe, faixa: Faixa): InfoMidia {
 }
 
 /** A faixa livre onde o clipe pode ficar: texto na de texto, imagem na de vídeo, som na de áudio. */
-function tipoLivreDoClipe(clipe: Clipe, info: InfoMidia): TipoLivre {
-  if (clipe.texto) return "texto";
+function tipoLivreDoClipe(clipe: Clipe, info: InfoMidia, origem: TipoFaixa): TipoLivre {
+  // Texto e legenda continuam no tipo de faixa de onde vieram
+  if (clipe.texto) return origem === "legenda" ? "legenda" : "texto";
   return info.video ? "video" : "audio";
 }
 
 function aceitaNaFaixa(tipo: TipoFaixa, clipe: Clipe, info: InfoMidia): boolean {
-  if (clipe.texto) return tipo === "texto";
-  return tipo !== "texto" && combina(tipo, info);
+  if (clipe.texto) return faixaDeTexto(tipo);
+  return combina(tipo, info);
 }
 
 /** Tira as faixas livres que ficaram vazias e confere o tamanho máximo. */
@@ -139,9 +142,13 @@ function criarFaixa(projeto: Projeto, ctx: Contexto, tipo: TipoLivre, perto?: st
   const faixa: Faixa = { id: ctx.novoId(), tipo, oculta: false, muda: false, travada: false, clipes: [] };
   const faixas = [...projeto.faixas];
   const referencia = faixas.findIndex((item) => item.id === perto && item.tipo === tipo);
-  if (tipo === "texto") {
-    // Textos ficam por cima de tudo
+  if (tipo === "legenda") {
+    // Legendas por cima de tudo
     faixas.splice(referencia >= 0 ? referencia : 0, 0, faixa);
+  } else if (tipo === "texto") {
+    // Textos por cima dos vídeos, abaixo das legendas
+    const legendas = faixas.filter((item) => item.tipo === "legenda").length;
+    faixas.splice(referencia >= 0 ? referencia : legendas, 0, faixa);
   } else if (tipo === "video") {
     // Logo acima da faixa de referência, ou logo acima da principal
     const principal = faixas.findIndex((item) => item.tipo === "principal");
@@ -203,7 +210,7 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     recorte: RECORTE_PADRAO,
   };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
-  if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixa.tipo === "texto" ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
+  if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixaDeTexto(faixa.tipo) ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
 
   let resultado: Projeto;
   if (faixa?.tipo === "principal" || (!faixa && !destino.novaFaixa && info.video)) {
@@ -226,7 +233,7 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
 
   const faixa = destino.faixaId ? resultado.faixas.find((item) => item.id === destino.faixaId) : undefined;
   if (faixa && !aceitaNaFaixa(faixa.tipo, clipe, info)) {
-    throw new ErroEdicao(clipe.texto ? "Textos ficam na faixa de texto." : faixa.tipo === "texto" ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
+    throw new ErroEdicao(clipe.texto ? "Textos ficam na faixa de texto." : faixaDeTexto(faixa.tipo) ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
   }
   if (faixa) exigirDestravada(faixa);
 
@@ -236,7 +243,7 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
     const movido = { ...clipe, inicio: Math.max(0, quadroMaisProximo(projeto.taxa, destino.inicio)) };
     // Solto por cima de outro clipe, ganha uma faixa nova ao lado, como no CapCut
     const ocupado = faixa ? !cabe(faixa, movido.inicio, movido.duracao) : false;
-    resultado = colocarLivre(resultado, ctx, tipoLivreDoClipe(clipe, info), movido, faixa?.id, destino.novaFaixa || ocupado);
+    resultado = colocarLivre(resultado, ctx, tipoLivreDoClipe(clipe, info, origem.tipo), movido, faixa?.id, destino.novaFaixa || ocupado);
   }
   return finalizar(resultado);
 }
@@ -491,6 +498,65 @@ export function adicionarTexto(projeto: Projeto, ctx: Contexto, inicio: Tick, te
     recorte: RECORTE_PADRAO,
   };
   return { projeto: finalizar(colocarLivre(projeto, ctx, "texto", clipe)), clipeId: clipe.id };
+}
+
+/** Duração de uma legenda nova, e a menor que uma legenda importada pode ter. */
+export const DURACAO_LEGENDA_S = 2;
+
+function clipeDeTexto(ctx: Contexto, inicio: Tick, duracao: Tick, texto: Texto, y = 0): Clipe {
+  return {
+    id: ctx.novoId(),
+    midia_id: null,
+    texto: ajustarTexto(texto, {}),
+    inicio,
+    duracao,
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: { ...TRANSFORMACAO_PADRAO, y },
+    recorte: RECORTE_PADRAO,
+  };
+}
+
+/** Legenda nova no instante `inicio`, perto da borda de baixo, numa faixa de legenda onde caiba. */
+export function adicionarLegenda(projeto: Projeto, ctx: Contexto, inicio: Tick, estilo: Texto): { projeto: Projeto; clipeId: string } {
+  const duracao = ajustarAoQuadro(projeto.taxa, DURACAO_LEGENDA_S * TICKS_POR_SEGUNDO);
+  const clipe = clipeDeTexto(ctx, Math.max(0, quadroMaisProximo(projeto.taxa, inicio)), duracao, { ...estilo, conteudo: estilo.conteudo || "Legenda" }, POSICAO_LEGENDA);
+  return { projeto: finalizar(colocarLivre(projeto, ctx, "legenda", clipe)), clipeId: clipe.id };
+}
+
+/**
+ * Legendas de um arquivo SRT ou VTT numa faixa nova, com o estilo dado. Os tempos encostam nos
+ * quadros do projeto; a que ficaria com menos de um quadro é deixada de fora.
+ */
+export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Legenda[], estilo: Texto): { projeto: Projeto; clipeIds: string[] } {
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const clipes: Clipe[] = [];
+  let fimAnterior = 0;
+  for (const legenda of legendas) {
+    const inicio = Math.max(quadroMaisProximo(projeto.taxa, legenda.inicio), fimAnterior);
+    const fim = quadroMaisProximo(projeto.taxa, legenda.fim);
+    if (fim - inicio < quadro) continue;
+    clipes.push(clipeDeTexto(ctx, inicio, fim - inicio, { ...estilo, conteudo: legenda.conteudo }, POSICAO_LEGENDA));
+    fimAnterior = fim;
+  }
+  if (!clipes.length) throw new ErroEdicao("O arquivo não tem legendas que deem para usar.");
+  const criada = criarFaixa(projeto, ctx, "legenda");
+  const resultado = trocarFaixa(criada.projeto, { ...criada.faixa, clipes });
+  return { projeto: finalizar(resultado), clipeIds: clipes.map((clipe) => clipe.id) };
+}
+
+/** Aplica o estilo (tudo menos o conteúdo) a todas as legendas da faixa. */
+export function estiloDasLegendas(projeto: Projeto, faixaId: string, estilo: Partial<Texto>): Projeto {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  if (!faixa || faixa.tipo !== "legenda") throw new ErroEdicao("Esta faixa de legendas não existe mais.");
+  exigirDestravada(faixa);
+  const semConteudo = { ...estilo };
+  delete semConteudo.conteudo;
+  const clipes = faixa.clipes.map((clipe) => (clipe.texto ? { ...clipe, texto: ajustarTexto(clipe.texto, semConteudo) } : clipe));
+  return trocarFaixa(projeto, { ...faixa, clipes });
 }
 
 export function mudarTexto(projeto: Projeto, clipeIds: string[], mudanca: Partial<Texto>): Projeto {
