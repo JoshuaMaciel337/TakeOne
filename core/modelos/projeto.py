@@ -76,6 +76,9 @@ def capa_do_projeto(faixas: list[dict]) -> str | None:
 
 
 def _conferir_posicao(faixa: dict, clipe: dict, anterior_fim: int) -> str | None:
+    animacao = clipe.get("animacao")
+    if animacao and animacao["entrada"]["duracao"] + animacao["saida"]["duracao"] > clipe["duracao"]:
+        return "As animações de um clipe passam da duração dele."
     if fim_do_clipe(clipe) > TICK_MAXIMO:
         return "O projeto pode ter no máximo 6 horas."
     if clipe["inicio"] < anterior_fim:

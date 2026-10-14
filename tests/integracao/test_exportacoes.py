@@ -242,3 +242,36 @@ def test_render_poe_o_texto_no_lugar_da_previa(cliente, db_limpo):
     # Fora da caixa, à esquerda dela, aparece o fundo do projeto (a imagem fica mais embaixo)
     fora = quadro[round(caixa.cy), max(round(caixa.cx - caixa.largura / 2 - 30), 0)]
     assert max(abs(int(a) - b) for a, b in zip(fora, FUNDO, strict=True)) <= 40, fora
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_anima_o_texto_como_a_previa(cliente, db_limpo):
+    from core.utils.geometria import LADO_REFERENCIA_TEXTO, caixa_do_texto
+    from core.utils.texto import desenhar_texto
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    projeto = projeto_com(cliente, midia_id)
+    texto = {"conteudo": "Oi", "tamanho": 0.15, "fundo_cor": "#00ffff", "fundo_opacidade": 1}
+    transformacao = {"x": 0, "y": -0.3, "escala": 1, "rotacao": 0, "opacidade": 1}
+    animacao = {"entrada": {"tipo": "aparecer", "duracao": SEGUNDO}, "saida": {"tipo": "nenhuma", "duracao": 0}}
+    clipe_texto = {"id": "t1", "midia_id": None, "texto": texto, "inicio": 0, "duracao": 2 * SEGUNDO, "entrada": 0,
+                   "transformacao": transformacao, "animacao": animacao}
+    faixa_texto = {"id": "ft", "tipo": "texto", "oculta": False, "muda": False, "travada": False,
+                   "clipes": [clipe_texto]}
+    corpo = {campo: projeto[campo] for campo in ("versao", "nome", "proporcao", "taxa", "fundo")}
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json={**corpo, "faixas": [faixa_texto, *projeto["faixas"]]})
+    assert salvo.status_code == 200, salvo.text
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    caixa = caixa_do_texto(transformacao, desenhar_texto(texto, LADO_REFERENCIA_TEXTO).size, (720, 1280))
+    x, y = round(caixa.cx), round(caixa.cy + caixa.altura / 2 - caixa.altura * 0.12)
+    # Na metade do "aparecer", o ciano está pela metade sobre o magenta do fundo; depois, inteiro
+    meio = quadro_do_video(video, 0.5, 720, 1280)[y, x]
+    depois = quadro_do_video(video, 1.5, 720, 1280)[y, x]
+    assert max(abs(int(a) - b) for a, b in zip(meio, (128, 128, 255), strict=True)) <= 48, meio
+    assert max(abs(int(a) - b) for a, b in zip(depois, (0, 255, 255), strict=True)) <= 40, depois

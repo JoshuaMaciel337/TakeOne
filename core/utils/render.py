@@ -20,6 +20,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
+from core.utils.animacao import filtros_de_animacao
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
@@ -105,7 +106,7 @@ def cadeia_atempo(velocidade: float) -> list[str]:
     return filtros
 
 
-def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str) -> tuple[str, str]:
+def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int]) -> tuple[str, str]:
     """(cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro)."""
     recorte = clipe["recorte"]
     inicio = segundos(clipe["inicio"])
@@ -128,13 +129,34 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str) -> tuple
         angulo = _numero(math.radians(caixa.rotacao))
         filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=none")
     filtros.append(f"setpts=PTS+{_numero(inicio)}/TB")
+    fim = segundos(clipe["inicio"] + clipe["duracao"])
+    animacao = filtros_de_animacao({**clipe, "inicio": inicio, "duracao": fim - inicio,
+                                    "animacao": _animacao_em_segundos(clipe.get("animacao"))}, inicio, fim)
+    filtros += animacao["fades"]
+    if animacao["escala"]:
+        # O zoom muda o tamanho a cada quadro; o pad devolve sempre o mesmo tamanho para o overlay
+        cos, sen = abs(math.cos(math.radians(caixa.rotacao))), abs(math.sin(math.radians(caixa.rotacao)))
+        lado_l = math.ceil(largura * cos + altura * sen) + 2
+        lado_a = math.ceil(largura * sen + altura * cos) + 2
+        fator = animacao["escala"]
+        filtros.append(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame")
+        filtros.append(f"pad=w={lado_l}:h={lado_a}:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame")
     # O clipe aparece nos quadros com início <= t < fim, como na prévia. Os limites ficam meio quadro
     # antes: nenhum quadro cai bem na fronteira, e o arredondamento não tira nem põe quadros
     meio = 0.5 / float(taxa_em_fracao(taxa))
-    fim = segundos(clipe["inicio"] + clipe["duracao"])
-    overlay = (f"overlay=x={_numero(caixa.cx)}-overlay_w/2:y={_numero(caixa.cy)}-overlay_h/2:format=rgb"
+    x = f"{_numero(caixa.cx)}" if animacao["dx"] == "0" else f"'{_numero(caixa.cx)}+{quadro[0]}*({animacao['dx']})"
+    y = f"{_numero(caixa.cy)}" if animacao["dy"] == "0" else f"'{_numero(caixa.cy)}+{quadro[1]}*({animacao['dy']})"
+    x += "-overlay_w/2" + ("'" if x.startswith("'") else "")
+    y += "-overlay_h/2" + ("'" if y.startswith("'") else "")
+    overlay = (f"overlay=x={x}:y={y}:format=rgb"
                f":eof_action=pass:enable='gte(t,{_numero(inicio - meio)})*lt(t,{_numero(fim - meio)})'")
     return f"[{entrada}:v]{','.join(filtros)}", overlay
+
+
+def _animacao_em_segundos(animacao: dict | None) -> dict | None:
+    if not animacao:
+        return None
+    return {nome: {**item, "duracao": segundos(item["duracao"])} for nome, item in animacao.items()}
 
 
 def _som_do_clipe(entrada: int, clipe: dict) -> str:
@@ -210,7 +232,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             if not midia.video:
                 continue
             caixa = caixa_do_clipe(clipe["transformacao"], clipe["recorte"], (midia.largura, midia.altura), quadro)
-        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa)
+        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"

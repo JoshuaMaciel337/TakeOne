@@ -8,6 +8,7 @@ import type { Tick } from "../tempo.ts";
 import {
   adicionarClipe,
   adicionarLegenda,
+  animarClipes,
   adicionarTexto,
   ajustarAudio,
   alternarFaixa,
@@ -27,6 +28,7 @@ import {
   restaurarClipes,
   transformarClipes,
 } from "./edicao.ts";
+import type { Animacoes } from "./animacao.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
@@ -49,7 +51,8 @@ export type Comando =
   | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } }
   | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
-  | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } };
+  | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
+  | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -70,6 +73,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.adicionar": "adicionar legenda",
   "legenda.importar": "importar legendas",
   "legenda.estilo": "mudar o estilo das legendas",
+  "clipe.animar": "mudar a animação",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -122,6 +126,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "legenda.estilo":
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
+    case "clipe.animar":
+      return { projeto: animarClipes(projeto, parametros.clipeIds, parametros.animacao) };
     case "texto.mudar":
       return { projeto: mudarTexto(projeto, parametros.clipeIds, parametros.texto) };
     case "clipe.audio": {

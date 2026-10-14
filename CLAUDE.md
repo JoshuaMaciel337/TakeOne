@@ -45,8 +45,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Fase 3 (texto, áudio e legendas):** em andamento.
   - Pronto: volume até 400% e fades na aba Áudio; clipes de texto (ferramenta Texto com estilos prontos, aba Texto com fonte, cor, contorno, sombra e fundo), na prévia e no render.
   - Legendas manuais: ferramenta Legendas com estilos, lista para editar, importar e baixar SRT e VTT (`lib/projeto/legendas.ts`).
-  - Falta: animações de texto, ducking, loudness medido, efeitos de voz e legendas automáticas (Whisper, no Nitro).
-- **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, animações de texto e depois a cor (fase 4).
+  - Animações de entrada e saída (aba Animação), na prévia e no render.
+  - Falta: animações de loop e letra a letra, ducking, loudness medido, efeitos de voz e legendas automáticas (Whisper, no Nitro).
+- **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, a cor (fase 4).
 
 ## Pendente no Nitro
 
@@ -58,6 +59,7 @@ Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto
 - [ ] Comparar a prévia e o vídeo exportado no mesmo instante: camadas e texto no mesmo lugar e do mesmo tamanho. Se der diferença, ela entra no teste que compara prévia e render.
 - [ ] WebCodecs com um proxy de verdade, que tem quadros B e lista de edição: parar em vários pontos e ver se a prévia mostra o mesmo quadro do vídeo, e tocar dois vídeos sobrepostos.
 - [ ] Exportar em 4K e ver o tempo e a memória do worker.
+- [ ] Animações no render: o zoom usa `scale` com `eval=frame` e um `pad` para manter o tamanho; conferir que o FFmpeg do worker aceita e que o movimento bate com a prévia (`test_render_anima_o_texto_como_a_previa`).
 - [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
 - [ ] Wan 2.2 (fase 5): conferir a licença no Hugging Face e medir tempo e memória de um clipe de 5 s com o ComfyUI.
 
@@ -91,6 +93,7 @@ Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto
 - **Texto é imagem do servidor:** o PNG do texto vem de `core/utils/texto.py` (Pillow, motor de layout BASIC, fontes em `core/fontes`), pedido pela prévia em `/api/textos/imagem` e gerado de novo pelo worker no render. A prévia pede sempre com lado menor 1080 (`LADO_REFERENCIA_TEXTO`); o render desenha no tamanho do vídeo, para ficar nítido em 4K, mas estica a imagem até a caixa medida em 1080. Assim o texto fica no mesmo lugar nos dois, mesmo com a medida das letras mudando 1 a 2% entre tamanhos.
 - **Clipe de texto não tem mídia:** `midia_id` é `null` e o clipe tem `texto`. Ele só fica em faixas `texto`, que ficam sempre acima das de vídeo. Não há quebra automática de linha: as linhas são as que a pessoa digitou.
 - **Legendas são textos:** cada legenda é um clipe de texto numa faixa `legenda`, que fica sempre acima das de texto (e estas acima das de vídeo). Aparecem e saem no vídeo pelo mesmo caminho dos textos. O estilo do painel vale para as novas e pode ser aplicado a todas as da faixa (`legenda.estilo`), sem mudar o conteúdo.
+- **Animações:** `transformacaoAnimada` (TS) e `transformacao_animada` (Python) fazem a mesma conta, conferida pelos casos de `tests/casos/animacao.json`; o teste do Python também roda as expressões do FFmpeg nos mesmos casos. A opacidade é linear porque o render usa o `fade` com alfa. As alças da prévia mexem na posição sem animação.
 - **Fades:** `fade_entrada` e `fade_saida` em ticks, sempre somando no máximo a duração do clipe (a edição encolhe os fades ao aparar). Ao dividir, o fade de entrada fica com a primeira metade e o de saída com a segunda.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.

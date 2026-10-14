@@ -174,3 +174,16 @@ def test_legenda_sai_como_texto_por_cima_de_tudo():
                             MIDIAS, 720, 1280, {"l1": ImagemDoTexto("/tmp/l1.png", 300, 80)})
     linhas = plano.filtro.split(";\n")
     assert linhas[1].startswith("[0:v]") and linhas[3].startswith("[1:v]"), "a legenda é a última camada"
+
+
+def test_animacao_vira_fade_zoom_e_movimento_no_grafo():
+    animado = {"id": "t1", "midia_id": None, "texto": {"conteudo": "Oi"}, "inicio": S, "duracao": 3 * S,
+               "entrada": 0, "velocidade": 1, "volume": 1, **PADRAO,
+               "animacao": {"entrada": {"tipo": "subir", "duracao": S // 2}, "saida": {"tipo": "zoom", "duracao": S}}}
+    plano = planejar_render(projeto([faixa("texto", [animado]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 720, 1280, {"t1": ImagemDoTexto("/tmp/t1.png", 540, 120)})
+    assert "fade=t=in:st=1:d=0.5:alpha=1" in plano.filtro
+    assert "fade=t=out:st=3:d=1:alpha=1" in plano.filtro
+    assert "scale=w='max(1,iw*(0.6+0.4*(1-pow(1-clip((4-t)/1,0,1),3))))'" in plano.filtro
+    assert ":eval=frame" in plano.filtro and "pad=w=" in plano.filtro
+    assert "y='640+1280*(1*pow(1-clip((t-1)/0.5,0,1),3)*0.08)-overlay_h/2'" in plano.filtro

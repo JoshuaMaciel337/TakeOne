@@ -7,6 +7,7 @@ import {
   adicionarLegenda,
   adicionarTexto,
   ajustarAudio,
+  animarClipes,
   alternarFaixa,
   apagarClipes,
   apararClipe,
@@ -342,4 +343,24 @@ test("legendas: importadas numa faixa por cima de tudo, presas aos quadros, e o 
   assert.ok(projeto.faixas[0].clipes.every((c) => c.texto!.cor === "#ffd60a"));
   assert.deepEqual(projeto.faixas[0].clipes.map((c) => c.texto!.conteudo), ["Primeira", "Segunda", "Legenda"]);
   assert.throws(() => importarLegendas(projeto, ctx, [], ESTILO_LEGENDA), /não tem legendas/);
+});
+
+test("animações: durações dentro do clipe, e ao dividir a entrada fica à esquerda e a saída à direita", () => {
+  const ctx = contexto();
+  const titulo = adicionarTexto(vazio(), ctx, 0, TEXTO_PADRAO);
+  let projeto = animarClipes(titulo.projeto, [titulo.clipeId], {
+    entrada: { tipo: "subir", duracao: 1 * S },
+    saida: { tipo: "zoom", duracao: 5 * S },
+  });
+  const clipe = () => projeto.faixas[0].clipes.find((c) => c.id === titulo.clipeId)!;
+  assert.equal(clipe().animacao!.saida.duracao, 2 * S, "a saída fica com o que sobra dos 3 s");
+
+  const dividido = dividirClipes(projeto, ctx, 1.5 * S, [titulo.clipeId]).projeto;
+  const [esquerda, direita] = dividido.faixas[0].clipes;
+  assert.deepEqual([esquerda.animacao!.entrada.tipo, esquerda.animacao!.saida.tipo], ["subir", "nenhuma"]);
+  assert.deepEqual([direita.animacao!.entrada.tipo, direita.animacao!.saida.tipo], ["nenhuma", "zoom"]);
+
+  projeto = apararClipe(projeto, ctx, titulo.clipeId, "fim", 2 * S);
+  const encolhido = clipe().animacao!;
+  assert.ok(encolhido.entrada.duracao + encolhido.saida.duracao <= clipe().duracao, "encolhe ao aparar");
 });

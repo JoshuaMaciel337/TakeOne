@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
+import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -96,7 +97,10 @@ type CamadaNaTela = {
   clipe: Clipe;
   faixa: Faixa;
   recorte: Recorte;
+  /** Onde a camada aparece agora, com a animação. */
   caixa: Caixa;
+  /** Sem a animação: é nela que as alças da prévia mexem. */
+  caixaBase: Caixa;
   segundos: number;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
   imagem?: ImageBitmap;
@@ -149,7 +153,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       clipe,
       faixa,
       recorte: clipe.recorte,
-      caixa: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
+      caixa: caixaDoClipe(transformacaoAnimada(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
+      caixaBase: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
@@ -167,7 +172,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       clipe,
       faixa,
       recorte: clipe.recorte,
-      caixa: caixaDoTexto(clipe.transformacao, imagem, tamanho),
+      caixa: caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, tamanho),
+      caixaBase: caixaDoTexto(clipe.transformacao, imagem, tamanho),
       segundos: 0,
       imagem: imagem.bitmap,
     });
@@ -286,7 +292,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
             {selecionada && !tocando ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
-                caixa={selecionada.caixa}
+                caixa={selecionada.caixaBase}
                 quadro={tamanho}
                 transformacao={selecionada.clipe.transformacao}
                 travado={selecionada.faixa.travada}

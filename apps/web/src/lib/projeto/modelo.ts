@@ -1,6 +1,7 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Taxa, Tick } from "../tempo.ts";
+import type { Animacoes } from "./animacao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
 export const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] as const;
@@ -57,6 +58,8 @@ export type Clipe = {
   fade_saida: Tick;
   transformacao: Transformacao;
   recorte: Recorte;
+  /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
+  animacao?: Animacoes | null;
 };
 
 export type Faixa = {

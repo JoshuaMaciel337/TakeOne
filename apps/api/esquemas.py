@@ -163,6 +163,16 @@ class TextoEntrada(BaseModel):
     fundo_opacidade: float = Field(default=0, ge=0, le=1)
 
 
+class AnimacaoEntrada(BaseModel):
+    tipo: Literal["nenhuma", "aparecer", "subir", "descer", "deslizar", "zoom"] = "nenhuma"
+    duracao: int = Field(default=0, ge=0, description="Em ticks")
+
+
+class AnimacoesEntrada(BaseModel):
+    entrada: AnimacaoEntrada = Field(default_factory=AnimacaoEntrada)
+    saida: AnimacaoEntrada = Field(default_factory=AnimacaoEntrada)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -178,6 +188,7 @@ class ClipeEntrada(BaseModel):
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
+    animacao: AnimacoesEntrada | None = None
 
 
 class FaixaEntrada(BaseModel):

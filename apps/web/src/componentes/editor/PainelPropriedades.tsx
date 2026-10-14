@@ -10,6 +10,7 @@ import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformaca
 import { formatarTimecode, type Taxa, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { AbaAnimacao } from "./AbaAnimacao";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
@@ -20,7 +21,7 @@ const ABAS = [
   { id: "basico", nome: "Básico", fase: "" },
   { id: "audio", nome: "Áudio", fase: "" },
   { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
-  { id: "animacao", nome: "Animação", fase: "Fase 3" },
+  { id: "animacao", nome: "Animação", fase: "" },
   { id: "cor", nome: "Cor", fase: "Fase 4" },
 ] as const;
 
@@ -28,7 +29,7 @@ const ABAS = [
 const ABAS_TEXTO = [
   { id: "texto", nome: "Texto", fase: "" },
   { id: "basico", nome: "Básico", fase: "" },
-  { id: "animacao", nome: "Animação", fase: "Fase 4" },
+  { id: "animacao", nome: "Animação", fase: "" },
 ] as const;
 
 type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
@@ -157,6 +158,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
           </>
         ) : aba === "basico" && selecionado ? (
           <AbaBasico clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
+          <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (
           <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} temSom={Boolean(midia?.audio)} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : (

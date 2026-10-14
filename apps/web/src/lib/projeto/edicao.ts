@@ -10,6 +10,7 @@
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
+import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import {
   type Clipe,
@@ -109,7 +110,13 @@ function aceitaNaFaixa(tipo: TipoFaixa, clipe: Clipe, info: InfoMidia): boolean 
 function limitarFades(clipe: Clipe): Clipe {
   const entrada = Math.min(clipe.fade_entrada, clipe.duracao);
   const saida = Math.min(clipe.fade_saida, clipe.duracao - entrada);
-  return entrada === clipe.fade_entrada && saida === clipe.fade_saida ? clipe : { ...clipe, fade_entrada: entrada, fade_saida: saida };
+  let resultado = entrada === clipe.fade_entrada && saida === clipe.fade_saida ? clipe : { ...clipe, fade_entrada: entrada, fade_saida: saida };
+  // As animações também encolhem junto com o clipe
+  const animacao = clipe.animacao;
+  if (animacao && animacao.entrada.duracao + animacao.saida.duracao > clipe.duracao) {
+    resultado = { ...resultado, animacao: limitarAnimacoes(animacao, clipe.duracao) };
+  }
+  return resultado;
 }
 
 function finalizar(projeto: Projeto): Projeto {
@@ -316,10 +323,12 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         inicio: t,
         duracao: fim - t,
         entrada: clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade),
-        // O fade de entrada fica com a metade da esquerda, e o de saída com a da direita
+        // O fade e a animação de entrada ficam com a metade da esquerda; os de saída, com a da direita
         fade_entrada: 0,
+        animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
-      clipes.push({ ...clipe, duracao: t - clipe.inicio, fade_saida: 0 }, direita);
+      const esquerda = { ...clipe, duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
+      clipes.push(esquerda, direita);
       novos.push(direita.id);
     }
     return { ...faixa, clipes };
@@ -564,6 +573,14 @@ export function mudarTexto(projeto: Projeto, clipeIds: string[], mudanca: Partia
     if (!clipe.texto) throw new ErroEdicao("Este clipe não é um texto.");
     return { ...clipe, texto: ajustarTexto(clipe.texto, mudanca) };
   });
+}
+
+/** Muda a animação de entrada, a de saída ou as duas. As durações ficam dentro do clipe. */
+export function animarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Animacoes>): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => ({
+    ...clipe,
+    animacao: limitarAnimacoes({ ...SEM_ANIMACAO, ...clipe.animacao, ...mudanca }, clipe.duracao),
+  }));
 }
 
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {

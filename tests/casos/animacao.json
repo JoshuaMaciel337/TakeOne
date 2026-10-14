@@ -1,0 +1,47 @@
+{
+  "descricao": "Transformação de um clipe animado num instante. Tempos em segundos. Lidos por apps/web/src/lib/projeto/animacao.test.ts e tests/test_animacao.py: a prévia e o render têm de dar o mesmo resultado.",
+  "casos": [
+    {
+      "nome": "aparecer: na metade da entrada, meio transparente",
+      "clipe": {"inicio": 1, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "aparecer", "duracao": 1}, "saida": {"tipo": "nenhuma", "duracao": 0}}},
+      "t": 1.5,
+      "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5}
+    },
+    {
+      "nome": "subir: na metade da entrada, ainda um pouco abaixo",
+      "clipe": {"inicio": 1, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "subir", "duracao": 1}, "saida": {"tipo": "nenhuma", "duracao": 0}}},
+      "t": 1.5,
+      "esperado": {"x": 0, "y": 0.01, "escala": 1, "rotacao": 0, "opacidade": 0.5}
+    },
+    {
+      "nome": "zoom na saída: na metade, menor e meio transparente",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "nenhuma", "duracao": 0}, "saida": {"tipo": "zoom", "duracao": 1}}},
+      "t": 3.5,
+      "esperado": {"x": 0, "y": 0, "escala": 0.95, "rotacao": 0, "opacidade": 0.5}
+    },
+    {
+      "nome": "deslizar na entrada: vem da esquerda",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0.1, "y": 0.2, "escala": 1, "rotacao": 10, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "deslizar", "duracao": 0.5}, "saida": {"tipo": "descer", "duracao": 1}}},
+      "t": 0.25,
+      "esperado": {"x": 0.08125, "y": 0.2, "escala": 1, "rotacao": 10, "opacidade": 0.5}
+    },
+    {
+      "nome": "descer na saída: vai para baixo",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0.1, "y": 0.2, "escala": 1, "rotacao": 10, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "deslizar", "duracao": 0.5}, "saida": {"tipo": "descer", "duracao": 1}}},
+      "t": 3.75,
+      "esperado": {"x": 0.1, "y": 0.23375, "escala": 1, "rotacao": 10, "opacidade": 0.25}
+    },
+    {
+      "nome": "fora das animações, a transformação de sempre",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0.1, "y": 0.2, "escala": 0.8, "rotacao": 10, "opacidade": 0.9},
+                "animacao": {"entrada": {"tipo": "zoom", "duracao": 1}, "saida": {"tipo": "subir", "duracao": 1}}},
+      "t": 2,
+      "esperado": {"x": 0.1, "y": 0.2, "escala": 0.8, "rotacao": 10, "opacidade": 0.9}
+    }
+  ]
+}
