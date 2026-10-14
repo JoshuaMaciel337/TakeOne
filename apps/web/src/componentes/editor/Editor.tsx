@@ -261,6 +261,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
           }}
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
+          selecionado={selecionado}
           legendas={{
             projeto,
             nome: edicao.nome,

@@ -21,6 +21,7 @@ from functools import lru_cache
 
 from core.config import FFMPEG
 from core.utils.animacao import filtros_de_animacao
+from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
@@ -71,12 +72,23 @@ class Entrada:
 
 
 @dataclass(frozen=True)
+class ArquivoAuxiliar:
+    """Arquivo que o worker gera antes de rodar o FFmpeg: a LUT da cor ou a imagem da vinheta."""
+    caminho: str
+    tipo: str          # "lut" ou "vinheta"
+    ajustes: dict
+    largura: int = 0
+    altura: int = 0
+
+
+@dataclass(frozen=True)
 class PlanoDeRender:
     entradas: list[Entrada]
     filtro: str
     duracao: float
     taxa: str          # "30/1", "30000/1001"
     tem_som: bool
+    auxiliares: tuple[ArquivoAuxiliar, ...] = ()
 
 
 class ErroRender(ValueError):
@@ -106,8 +118,12 @@ def cadeia_atempo(velocidade: float) -> list[str]:
     return filtros
 
 
-def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int]) -> tuple[str, str]:
-    """(cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro)."""
+def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int],
+                    numero: int = 0, lut: str | None = None, vinheta: int | None = None) -> tuple[str, str]:
+    """
+    (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
+    lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
+    """
     recorte = clipe["recorte"]
     inicio = segundos(clipe["inicio"])
     largura = max(1, round(caixa.largura))
@@ -122,6 +138,15 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         "setsar=1",
         "format=rgba",
     ]
+    if lut:
+        filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
+    prefixo = ""
+    if vinheta is not None:
+        # Multiplica pela imagem cinza da vinheta, no tamanho do clipe, antes de girar (como a prévia)
+        prefixo = (f"[{entrada}:v]{','.join(filtros)},format=gbrap[va{numero}];\n"
+                   f"[{vinheta}:v]format=gbrap[vb{numero}];\n"
+                   f"[va{numero}][vb{numero}]blend=all_mode=multiply,format=rgba")
+        filtros = []
     if caixa.opacidade < 1:
         filtros.append(f"colorchannelmixer=aa={_numero(caixa.opacidade)}")
     if caixa.rotacao:
@@ -150,7 +175,19 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     y += "-overlay_h/2" + ("'" if y.startswith("'") else "")
     overlay = (f"overlay=x={x}:y={y}:format=rgb"
                f":eof_action=pass:enable='gte(t,{_numero(inicio - meio)})*lt(t,{_numero(fim - meio)})'")
+    if prefixo:
+        return prefixo + "".join(f",{filtro}" for filtro in filtros), overlay
     return f"[{entrada}:v]{','.join(filtros)}", overlay
+
+
+def _escapar_caminho(caminho: str) -> str:
+    """
+    Caminho dentro de aspas simples no grafo do FFmpeg: as aspas já protegem o ":". Os caminhos vêm do
+    próprio worker (pasta da exportação e ids), sem aspas no nome.
+    """
+    if "'" in caminho:
+        raise ErroRender("Caminho de arquivo com aspas não entra no grafo do FFmpeg.")
+    return caminho.replace("\\", "/")
 
 
 def _animacao_em_segundos(animacao: dict | None) -> dict | None:
@@ -180,11 +217,12 @@ def _som_do_clipe(entrada: int, clipe: dict) -> str:
 
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
-                    textos: dict[str, ImagemDoTexto] | None = None) -> PlanoDeRender:
+                    textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".") -> PlanoDeRender:
     """
     projeto: a cópia guardada na exportação (proporcao, taxa, fundo, faixas, duracao).
     midias: id → arquivo e tamanho da imagem de cada mídia usada.
     textos: id do clipe → PNG de cada clipe de texto.
+    pasta: onde o worker grava as LUTs e as imagens de vinheta listadas em `auxiliares`.
     """
     textos = textos or {}
     duracao = segundos(projeto["duracao"])
@@ -219,6 +257,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         entradas.append(Entrada(midia.caminho, segundos(clipe["entrada"]),
                                 segundos(clipe["duracao"]) * clipe["velocidade"]))
 
+    auxiliares: dict[str, ArquivoAuxiliar] = {}
     cor = projeto["fundo"]["cor"].lstrip("#")
     linhas = [f"color=c=0x{cor}:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp[base0]"]
     anterior = "base0"
@@ -232,7 +271,20 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             if not midia.video:
                 continue
             caixa = caixa_do_clipe(clipe["transformacao"], clipe["recorte"], (midia.largura, midia.altura), quadro)
-        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro)
+        ajustes = ajustes_efetivos(clipe.get("cor"))
+        lut = vinheta = None
+        if not cor_neutra({**ajustes, "vinheta": 0}):
+            lut = f"{pasta}/{nome_da_lut(ajustes)}"
+            auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", ajustes))
+        if ajustes["vinheta"] > 0:
+            imagem_vinheta = f"{pasta}/vinheta_{clipe['id']}.png"
+            tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))
+            auxiliares[imagem_vinheta] = ArquivoAuxiliar(imagem_vinheta, "vinheta", ajustes, *tamanho)
+            vinheta = len(entradas)
+            entradas.append(Entrada(imagem_vinheta, 0, segundos(clipe["duracao"]) * clipe["velocidade"],
+                                    imagem=True, taxa=taxa))
+        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro,
+                                          numero, lut, vinheta)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"
@@ -256,7 +308,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     else:
         linhas.append(f"anullsrc=r={TAXA_AUDIO}:cl=stereo,{fim_do_som}")
 
-    return PlanoDeRender(entradas=entradas, filtro=";\n".join(linhas), duracao=duracao, taxa=taxa, tem_som=bool(sons))
+    return PlanoDeRender(entradas=entradas, filtro=";\n".join(linhas), duracao=duracao, taxa=taxa, tem_som=bool(sons),
+                         auxiliares=tuple(auxiliares.values()))
 
 
 def argumentos_de_saida(plano: PlanoDeRender, caminho_saida: str, lado_maior: int) -> list[str]:

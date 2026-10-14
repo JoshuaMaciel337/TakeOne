@@ -275,3 +275,26 @@ def test_render_anima_o_texto_como_a_previa(cliente, db_limpo):
     depois = quadro_do_video(video, 1.5, 720, 1280)[y, x]
     assert max(abs(int(a) - b) for a, b in zip(meio, (128, 128, 255), strict=True)) <= 48, meio
     assert max(abs(int(a) - b) for a, b in zip(depois, (0, 255, 255), strict=True)) <= 40, depois
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_aplica_a_cor_e_a_vinheta_da_previa(cliente, db_limpo):
+    from core.utils.cor import AJUSTES_NEUTROS, aplicar_cor
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    cor = {"saturacao": -1, "vinheta": 1}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", cor=cor)
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    quadro = quadro_do_video(video, 1.0, 1280, 720)
+    # Perto do centro do quadrante vermelho (a vinheta quase não pega): o cinza do vermelho
+    cinza = round(255 * aplicar_cor((1, 0, 0), {**AJUSTES_NEUTROS, "saturacao": -1})[0])
+    ponto = quadro[290, 500]
+    assert max(abs(int(c) - cinza) for c in ponto) <= 20, ponto
+    # No canto, a vinheta no máximo deixa tudo quase preto
+    assert max(int(c) for c in quadro[3, 3]) <= 25, quadro[3, 3]

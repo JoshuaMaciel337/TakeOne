@@ -402,18 +402,18 @@ Cada fase termina com algo que dá para usar e testar.
   - zoom
   - desfoque
   - wipes
-- Ajustes de cor portados do FilmCraft e do LightCraft:
-  - temperatura
-  - exposição
-  - contraste
-  - realces
-  - sombras
-  - saturação
+- Ajustes de cor (aba Cor). A conta é do TakeOne, a mesma no shader da prévia e na LUT 3D do render; as do FilmCraft e do LightCraft ficam de referência para curvas e rodas:
+  - [x] temperatura e tom
+  - [x] exposição
+  - [x] contraste
+  - [x] realces
+  - [x] sombras
+  - [x] saturação
   - curvas
   - rodas de cor
-  - vinheta
+  - [x] vinheta
   - granulação
-- Filtros prontos com intensidade.
+- [x] Filtros prontos com intensidade (ferramenta Filtros).
 - Efeitos de vídeo, escolhidos do catálogo do EffectCraft e do PhotoCraft:
   - desfoque
   - brilho

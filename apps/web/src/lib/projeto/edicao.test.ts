@@ -18,6 +18,7 @@ import {
   estiloDasLegendas,
   importarLegendas,
   moverClipe,
+  mudarCor,
   mudarFundo,
   mudarTexto,
   normalizarRotacao,
@@ -363,4 +364,15 @@ test("animações: durações dentro do clipe, e ao dividir a entrada fica à es
   projeto = apararClipe(projeto, ctx, titulo.clipeId, "fim", 2 * S);
   const encolhido = clipe().animacao!;
   assert.ok(encolhido.entrada.duracao + encolhido.saida.duracao <= clipe().duracao, "encolhe ao aparar");
+});
+
+test("cor: limites, filtro existente e intensidade até 200%", () => {
+  const ctx = contexto();
+  const { projeto, clipeId } = adicionarClipe(vazio(), ctx, "video10");
+  const mudado = mudarCor(projeto, [clipeId], { exposicao: 5, saturacao: -3, filtro: "noite", intensidade: 9 });
+  const cor = principal(mudado)[0].cor!;
+  assert.deepEqual([cor.exposicao, cor.saturacao, cor.filtro, cor.intensidade], [2, -1, "noite", 2]);
+  assert.throws(() => mudarCor(projeto, [clipeId], { filtro: "inventado" }), /não existe/);
+  const comMusica = adicionarClipe(projeto, ctx, "musica");
+  assert.throws(() => mudarCor(comMusica.projeto, [comMusica.clipeId], { saturacao: 1 }), /áudio/);
 });

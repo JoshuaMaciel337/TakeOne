@@ -4,6 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
+import type { AjustesCor } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
 import type { Recorte } from "../projeto/modelo.ts";
 
@@ -11,6 +12,8 @@ export type Camada = {
   /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs ou uma imagem. */
   fonte: TexImageSource;
   recorte: Recorte;
+  /** Ajustes de cor já com o filtro somado (lib/projeto/cor.ts); null quando não há. */
+  cor?: AjustesCor | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
 };
@@ -23,6 +26,7 @@ uniform vec2 u_tamanho;
 uniform float u_rotacao;
 uniform vec4 u_recorte;
 out vec2 v_uv;
+out vec2 v_local;
 
 void main() {
   // a_pos vai de -0.5 a 0.5, com y para baixo, como na tela
@@ -32,17 +36,53 @@ void main() {
   p = u_centro + vec2(p.x * c - p.y * s, p.x * s + p.y * c);
   gl_Position = vec4(p.x / u_quadro.x * 2.0 - 1.0, 1.0 - p.y / u_quadro.y * 2.0, 0.0, 1.0);
   v_uv = u_recorte.xy + (a_pos + 0.5) * u_recorte.zw;
+  // Posição dentro do clipe (0 a 1), para a vinheta
+  v_local = a_pos + 0.5;
 }`;
 
+// A conta da cor é a de lib/projeto/cor.ts (aplicarCor e escurecimentoDaVinheta), linha a linha.
 const FRAGMENTOS = `#version 300 es
 precision highp float;
 in vec2 v_uv;
+in vec2 v_local;
 uniform sampler2D u_textura;
 uniform float u_opacidade;
+uniform bool u_comCor;
+// temperatura, tom, exposicao, contraste
+uniform vec4 u_cor1;
+// realces, sombras, saturacao, vinheta
+uniform vec4 u_cor2;
 out vec4 cor;
 
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+float paraLinear(float c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
+float paraTela(float c) { c = clamp(c, 0.0, 1.0); return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
+
+vec3 aplicarCor(vec3 c) {
+  float ganho = exp2(u_cor1.z);
+  vec3 l = vec3(
+    paraTela(paraLinear(c.r) * ganho * (1.0 + 0.15 * u_cor1.x)),
+    paraTela(paraLinear(c.g) * ganho * (1.0 - 0.1 * u_cor1.y)),
+    paraTela(paraLinear(c.b) * ganho * (1.0 - 0.15 * u_cor1.x))
+  );
+  l = clamp((l - 0.5) * (1.0 + u_cor1.w) + 0.5, 0.0, 1.0);
+  float y = dot(l, LUMA);
+  l = clamp(l + 0.25 * (u_cor2.x * y * y + u_cor2.y * (1.0 - y) * (1.0 - y)), 0.0, 1.0);
+  float y2 = dot(l, LUMA);
+  return clamp(y2 + (l - y2) * (1.0 + u_cor2.z), 0.0, 1.0);
+}
+
 void main() {
-  cor = texture(u_textura, v_uv) * u_opacidade;
+  vec4 texel = texture(u_textura, v_uv);
+  if (u_comCor && texel.a > 0.0) {
+    // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta
+    vec3 c = aplicarCor(texel.rgb / texel.a);
+    float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
+    c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
+    texel = vec4(c * texel.a, texel.a);
+  }
+  cor = texel * u_opacidade;
 }`;
 
 function compilar(gl: WebGL2RenderingContext, tipo: number, codigo: string): WebGLShader {
@@ -62,7 +102,10 @@ export function corParaRgb(hex: string): [number, number, number] {
 
 type Recursos = {
   programa: WebGLProgram;
-  uniformes: Record<"quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura", WebGLUniformLocation | null>;
+  uniformes: Record<
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2",
+    WebGLUniformLocation | null
+  >;
   texturas: WebGLTexture[];
 };
 
@@ -122,6 +165,9 @@ export class Compositor {
         rotacao: local("u_rotacao"),
         recorte: local("u_recorte"),
         opacidade: local("u_opacidade"),
+        comCor: local("u_comCor"),
+        cor1: local("u_cor1"),
+        cor2: local("u_cor2"),
         textura: local("u_textura"),
       },
       texturas: [],
@@ -174,6 +220,12 @@ export class Compositor {
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
       gl.uniform4f(uniformes.recorte, recorte.x, recorte.y, recorte.largura, recorte.altura);
       gl.uniform1f(uniformes.opacidade, caixa.opacidade);
+      const ajustes = camada.cor;
+      gl.uniform1i(uniformes.comCor, ajustes ? 1 : 0);
+      if (ajustes) {
+        gl.uniform4f(uniformes.cor1, ajustes.temperatura, ajustes.tom, ajustes.exposicao, ajustes.contraste);
+        gl.uniform4f(uniformes.cor2, ajustes.realces, ajustes.sombras, ajustes.saturacao, ajustes.vinheta);
+      }
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     });
   }

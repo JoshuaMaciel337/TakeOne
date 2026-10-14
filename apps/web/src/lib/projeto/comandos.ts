@@ -11,6 +11,7 @@ import {
   animarClipes,
   adicionarTexto,
   ajustarAudio,
+  mudarCor,
   alternarFaixa,
   apagarClipes,
   apararClipe,
@@ -29,6 +30,7 @@ import {
   transformarClipes,
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
+import type { Cor } from "./cor.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
@@ -52,7 +54,8 @@ export type Comando =
   | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
-  | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } };
+  | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
+  | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -74,6 +77,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.importar": "importar legendas",
   "legenda.estilo": "mudar o estilo das legendas",
   "clipe.animar": "mudar a animação",
+  "clipe.cor": "mudar a cor",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -126,6 +130,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "legenda.estilo":
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
+    case "clipe.cor":
+      return { projeto: mudarCor(projeto, parametros.clipeIds, parametros.cor) };
     case "clipe.animar":
       return { projeto: animarClipes(projeto, parametros.clipeIds, parametros.animacao) };
     case "texto.mudar":

@@ -173,6 +173,20 @@ class AnimacoesEntrada(BaseModel):
     saida: AnimacaoEntrada = Field(default_factory=AnimacaoEntrada)
 
 
+class CorEntrada(BaseModel):
+    """Os limites são os de apps/web/src/lib/projeto/cor.ts."""
+    temperatura: float = Field(default=0, ge=-1, le=1)
+    tom: float = Field(default=0, ge=-1, le=1)
+    exposicao: float = Field(default=0, ge=-2, le=2)
+    contraste: float = Field(default=0, ge=-1, le=1)
+    realces: float = Field(default=0, ge=-1, le=1)
+    sombras: float = Field(default=0, ge=-1, le=1)
+    saturacao: float = Field(default=0, ge=-1, le=1)
+    vinheta: float = Field(default=0, ge=0, le=1)
+    filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama"] | None = None
+    intensidade: float = Field(default=1, ge=0, le=2)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -189,6 +203,7 @@ class ClipeEntrada(BaseModel):
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
     animacao: AnimacoesEntrada | None = None
+    cor: CorEntrada | None = None
 
 
 class FaixaEntrada(BaseModel):

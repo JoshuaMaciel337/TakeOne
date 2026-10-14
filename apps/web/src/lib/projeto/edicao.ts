@@ -11,6 +11,7 @@
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
+import { type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "./cor.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import {
   type Clipe,
@@ -581,6 +582,22 @@ export function animarClipes(projeto: Projeto, clipeIds: string[], mudanca: Part
     ...clipe,
     animacao: limitarAnimacoes({ ...SEM_ANIMACAO, ...clipe.animacao, ...mudanca }, clipe.duracao),
   }));
+}
+
+/** Intensidade máxima de um filtro pronto (200%). */
+export const INTENSIDADE_MAXIMA = 2;
+
+/** Ajustes de cor e filtro dos clipes; cada valor fica dentro do limite dele. */
+export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<Cor>): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const cor: Cor = { ...COR_PADRAO, ...clipe.cor, ...mudanca };
+    for (const chave of Object.keys(LIMITES_COR) as (keyof AjustesCor)[]) {
+      cor[chave] = limitar(cor[chave], LIMITES_COR[chave].minimo, LIMITES_COR[chave].maximo);
+    }
+    if (cor.filtro !== null && !FILTROS.some((filtro) => filtro.id === cor.filtro)) throw new ErroEdicao("Este filtro não existe.");
+    cor.intensidade = limitar(cor.intensidade, 0, INTENSIDADE_MAXIMA);
+    return { ...clipe, cor };
+  });
 }
 
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {

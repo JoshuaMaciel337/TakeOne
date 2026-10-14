@@ -24,6 +24,7 @@ from core.modelos.midia import ARQUIVO_PROXY_AUDIO, ARQUIVO_PROXY_VIDEO, chave_a
 from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
+from core.utils.cor import desenhar_vinheta, gerar_cube
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.mongo import agora
@@ -120,9 +121,15 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     pasta.mkdir(parents=True, exist_ok=True)
     textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
     try:
-        plano = planejar_render(projeto, midias, largura, altura, textos)
+        plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta))
     except ErroRender as e:
         raise ErroDefinitivo(str(e)) from e
+    # LUTs da cor e imagens das vinhetas que o grafo usa
+    for auxiliar in plano.auxiliares:
+        if auxiliar.tipo == "lut":
+            Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
+        else:
+            desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
     logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
 
     # O grafo fica num arquivo: com muitos clipes ele passa do limite da linha de comando
@@ -139,6 +146,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         filtro.unlink(missing_ok=True)
         for imagem in textos.values():
             Path(imagem.caminho).unlink(missing_ok=True)
+        for auxiliar in plano.auxiliares:
+            Path(auxiliar.caminho).unlink(missing_ok=True)
 
     reportar(97, "Conferindo o vídeo")
     try:

@@ -47,7 +47,10 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Legendas manuais: ferramenta Legendas com estilos, lista para editar, importar e baixar SRT e VTT (`lib/projeto/legendas.ts`).
   - Animações de entrada e saída (aba Animação), na prévia e no render.
   - Falta: animações de loop e letra a letra, ducking, loudness medido, efeitos de voz e legendas automáticas (Whisper, no Nitro).
-- **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, a cor (fase 4).
+- **Fase 4 (efeitos, transições e cor):** em andamento.
+  - Pronto: ajustes de cor (temperatura, tom, exposição, contraste, realces, sombras, saturação e vinheta) na aba Cor e filtros prontos com intensidade na ferramenta Filtros.
+  - Falta: transições, curvas, rodas de cor, granulação, efeitos, chroma key e keyframes.
+- **Próximo passo:** a lista "Pendente no Nitro" abaixo; aqui, as transições (fase 4).
 
 ## Pendente no Nitro
 
@@ -60,6 +63,7 @@ Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto
 - [ ] WebCodecs com um proxy de verdade, que tem quadros B e lista de edição: parar em vários pontos e ver se a prévia mostra o mesmo quadro do vídeo, e tocar dois vídeos sobrepostos.
 - [ ] Exportar em 4K e ver o tempo e a memória do worker.
 - [ ] Animações no render: o zoom usa `scale` com `eval=frame` e um `pad` para manter o tamanho; conferir que o FFmpeg do worker aceita e que o movimento bate com a prévia (`test_render_anima_o_texto_como_a_previa`).
+- [ ] Cor no render: `test_render_aplica_a_cor_e_a_vinheta_da_previa` (LUT no `lut3d` e vinheta no `blend` multiply). Conferir também que a conversão de YUV para RGB do navegador e a do FFmpeg dão as mesmas cores num vídeo de celular (BT.709).
 - [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
 - [ ] Wan 2.2 (fase 5): conferir a licença no Hugging Face e medir tempo e memória de um clipe de 5 s com o ComfyUI.
 
@@ -94,6 +98,7 @@ Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto
 - **Clipe de texto não tem mídia:** `midia_id` é `null` e o clipe tem `texto`. Ele só fica em faixas `texto`, que ficam sempre acima das de vídeo. Não há quebra automática de linha: as linhas são as que a pessoa digitou.
 - **Legendas são textos:** cada legenda é um clipe de texto numa faixa `legenda`, que fica sempre acima das de texto (e estas acima das de vídeo). Aparecem e saem no vídeo pelo mesmo caminho dos textos. O estilo do painel vale para as novas e pode ser aplicado a todas as da faixa (`legenda.estilo`), sem mudar o conteúdo.
 - **Animações:** `transformacaoAnimada` (TS) e `transformacao_animada` (Python) fazem a mesma conta, conferida pelos casos de `tests/casos/animacao.json`; o teste do Python também roda as expressões do FFmpeg nos mesmos casos. A opacidade é linear porque o render usa o `fade` com alfa. As alças da prévia mexem na posição sem animação.
+- **Cor:** `aplicarCor` (TS), o shader do compositor e `aplicar_cor` (Python) fazem a mesma conta; os casos de `tests/casos/cor.json` saem do Python e o TS confere. No render, a conta vira uma LUT 3D de 33 pontos (`lut3d`, interpolação tetraédrica) e a vinheta vira uma imagem cinza multiplicada ao clipe (`blend` multiply), para não escurecer o fundo transparente dos textos. Medido no Chrome: o shader fica a menos de 1/255 da conta.
 - **Fades:** `fade_entrada` e `fade_saida` em ticks, sempre somando no máximo a duração do clipe (a edição encolhe os fades ao aparar). Ao dividir, o fade de entrada fica com a primeira metade e o de saída com a segunda.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.

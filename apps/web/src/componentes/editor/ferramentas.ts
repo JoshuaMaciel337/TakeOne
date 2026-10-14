@@ -89,7 +89,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "filtros",
     nome: "Filtros",
     icone: Palette,
-    emBreve: { fase: "Fase 4", descricao: "Filtros prontos com intensidade e ajustes de cor: temperatura, exposição, curvas e rodas de cor." },
   },
   {
     id: "marca",

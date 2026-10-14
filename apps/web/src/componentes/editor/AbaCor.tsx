@@ -1,0 +1,117 @@
+"use client";
+
+import { RotateCcw } from "lucide-react";
+
+import type { Comando } from "@/lib/projeto/comandos";
+import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "@/lib/projeto/cor";
+import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
+import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+
+import { ControleNumerico } from "./ControleNumerico";
+
+type Props = {
+  clipe: Clipe;
+  faixa: Faixa;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+};
+
+const AJUSTES: { chave: keyof AjustesCor; nome: string; grupo: "luz" | "cor" | "efeito" }[] = [
+  { chave: "exposicao", nome: "Exposição", grupo: "luz" },
+  { chave: "contraste", nome: "Contraste", grupo: "luz" },
+  { chave: "realces", nome: "Realces", grupo: "luz" },
+  { chave: "sombras", nome: "Sombras", grupo: "luz" },
+  { chave: "temperatura", nome: "Temperatura", grupo: "cor" },
+  { chave: "tom", nome: "Tom", grupo: "cor" },
+  { chave: "saturacao", nome: "Saturação", grupo: "cor" },
+  { chave: "vinheta", nome: "Vinheta", grupo: "efeito" },
+];
+const GRUPOS = [
+  { id: "luz", nome: "Luz" },
+  { id: "cor", nome: "Cor" },
+  { id: "efeito", nome: "Efeito" },
+] as const;
+
+const PERTO = 1e-6;
+
+/** Filtro pronto e ajustes de luz e cor do clipe. */
+export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
+  const cor: Cor = { ...COR_PADRAO, ...clipe.cor };
+  const travada = faixa.travada;
+  const comando = (mudanca: Partial<Cor>): Comando => ({ comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: mudanca } });
+  /** Os ajustes aparecem de -100 a 100 (a exposição, em pontos de luz, de -2 a 2). */
+  const fator = (chave: keyof AjustesCor) => (chave === "exposicao" ? 1 : 100);
+  const mudou = (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null;
+
+  const controle = (chave: keyof AjustesCor) => ({
+    valor: cor[chave] * fator(chave),
+    minimo: LIMITES_COR[chave].minimo * fator(chave),
+    maximo: LIMITES_COR[chave].maximo * fator(chave),
+    passo: chave === "exposicao" ? 0.05 : 1,
+    sufixo: chave === "exposicao" ? "EV" : "",
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ [chave]: valor / fator(chave) })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / fator(chave) - cor[chave]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ [chave]: valor / fator(chave) }));
+    },
+  });
+
+  return (
+    <div>
+      {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      <section className="border-b border-borda/60 pb-2">
+        <div className="flex min-h-6 items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Filtro</h3>
+          <button
+            type="button"
+            className="botao-icone size-6"
+            disabled={travada || !mudou}
+            onClick={() => aoExecutar(comando(COR_PADRAO))}
+            aria-label="Voltar à cor original"
+            title="Voltar à cor original"
+          >
+            <RotateCcw className="size-3.5" aria-hidden />
+          </button>
+        </div>
+        <select
+          value={cor.filtro ?? ""}
+          disabled={travada}
+          aria-label="Filtro"
+          onChange={(evento) => aoExecutar(comando({ filtro: evento.currentTarget.value || null }))}
+          className="mt-1 w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+        >
+          <option value="">Nenhum</option>
+          {FILTROS.map((filtro) => (
+            <option key={filtro.id} value={filtro.id}>
+              {filtro.nome}
+            </option>
+          ))}
+        </select>
+        {cor.filtro ? (
+          <ControleNumerico
+            rotulo="Intensidade"
+            valor={cor.intensidade * 100}
+            minimo={0}
+            maximo={INTENSIDADE_MAXIMA * 100}
+            sufixo="%"
+            desativado={travada}
+            aoPrever={(valor) => aoPrever(comando({ intensidade: valor / 100 }))}
+            aoConfirmar={(valor) => {
+              if (Math.abs(valor / 100 - cor.intensidade) < PERTO) aoPrever(null);
+              else aoExecutar(comando({ intensidade: valor / 100 }));
+            }}
+          />
+        ) : null}
+      </section>
+      {GRUPOS.map((grupo) => (
+        <section key={grupo.id} className="border-b border-borda/60 pb-2 pt-3 last:border-0">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">{grupo.nome}</h3>
+          {AJUSTES.filter((ajuste) => ajuste.grupo === grupo.id).map((ajuste) => (
+            <ControleNumerico key={ajuste.chave} rotulo={ajuste.nome} {...controle(ajuste.chave)} />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}

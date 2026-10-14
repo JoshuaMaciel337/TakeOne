@@ -1,0 +1,839 @@
+{
+ "descricao": "Ajustes de cor: saídas calculadas pelo core/utils/cor.py (referência) e conferidas pelo apps/web/src/lib/projeto/cor.test.ts, que roda a mesma conta do shader da prévia. Valores de 0 a 1.",
+ "casos": [
+  {
+   "nome": "neutro [0.2, 0.4, 0.6]",
+   "ajustes": {},
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.2,
+    0.4,
+    0.6
+   ]
+  },
+  {
+   "nome": "neutro [0.9, 0.85, 0.1]",
+   "ajustes": {},
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.9,
+    0.85,
+    0.1
+   ]
+  },
+  {
+   "nome": "neutro [0.05, 0.05, 0.05]",
+   "ajustes": {},
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05,
+    0.05,
+    0.05
+   ]
+  },
+  {
+   "nome": "neutro [0.5, 0.5, 0.5]",
+   "ajustes": {},
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "quente [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "temperatura": 0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.209322756,
+    0.4,
+    0.574760205
+   ]
+  },
+  {
+   "nome": "quente [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "temperatura": 0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.934914637,
+    0.85,
+    0.094027224
+   ]
+  },
+  {
+   "nome": "quente [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "temperatura": 0.6
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.053838782,
+    0.05,
+    0.045953926
+   ]
+  },
+  {
+   "nome": "quente [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "temperatura": 0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.520290705,
+    0.5,
+    0.478613608
+   ]
+  },
+  {
+   "nome": "frio e magenta [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "temperatura": -0.5,
+    "tom": 0.4
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.19184968,
+    0.392326277,
+    0.620037905
+   ]
+  },
+  {
+   "nome": "frio e magenta [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "temperatura": -0.5,
+    "tom": 0.4
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.869476254,
+    0.834736881,
+    0.104741794
+   ]
+  },
+  {
+   "nome": "frio e magenta [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "temperatura": -0.5,
+    "tom": 0.4
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.046643986,
+    0.048229141,
+    0.053212183
+   ]
+  },
+  {
+   "nome": "frio e magenta [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "temperatura": -0.5,
+    "tom": 0.4
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.482261069,
+    0.490639744,
+    0.516978683
+   ]
+  },
+  {
+   "nome": "mais exposição [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "exposicao": 1
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.285384163,
+    0.552352134,
+    0.819320104
+   ]
+  },
+  {
+   "nome": "mais exposição [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "exposicao": 1
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    1.0,
+    1.0,
+    0.151900177
+   ]
+  },
+  {
+   "nome": "mais exposição [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "exposicao": 1
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.085158185,
+    0.085158185,
+    0.085158185
+   ]
+  },
+  {
+   "nome": "mais exposição [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "exposicao": 1
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.685836119,
+    0.685836119,
+    0.685836119
+   ]
+  },
+  {
+   "nome": "menos exposição [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "exposicao": -1.5
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.110347043,
+    0.240030999,
+    0.369714954
+   ]
+  },
+  {
+   "nome": "menos exposição [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "exposicao": -1.5
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.564240887,
+    0.531819898,
+    0.045505065
+   ]
+  },
+  {
+   "nome": "menos exposição [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "exposicao": -1.5
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.017979017,
+    0.017979017,
+    0.017979017
+   ]
+  },
+  {
+   "nome": "menos exposição [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "exposicao": -1.5
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.304872976,
+    0.304872976,
+    0.304872976
+   ]
+  },
+  {
+   "nome": "contraste [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "contraste": 0.5
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.05,
+    0.35,
+    0.65
+   ]
+  },
+  {
+   "nome": "contraste [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "contraste": 0.5
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    1.0,
+    1.0,
+    0.0
+   ]
+  },
+  {
+   "nome": "contraste [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "contraste": 0.5
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "nome": "contraste [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "contraste": 0.5
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "pouco contraste [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "contraste": -0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.38,
+    0.46,
+    0.54
+   ]
+  },
+  {
+   "nome": "pouco contraste [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "contraste": -0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.66,
+    0.64,
+    0.34
+   ]
+  },
+  {
+   "nome": "pouco contraste [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "contraste": -0.6
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.32,
+    0.32,
+    0.32
+   ]
+  },
+  {
+   "nome": "pouco contraste [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "contraste": -0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "realces e sombras [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "realces": -0.8,
+    "sombras": 0.7
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.241369888,
+    0.441369888,
+    0.641369888
+   ]
+  },
+  {
+   "nome": "realces e sombras [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "realces": -0.8,
+    "sombras": 0.7
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.77647175,
+    0.72647175,
+    0.0
+   ]
+  },
+  {
+   "nome": "realces e sombras [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "realces": -0.8,
+    "sombras": 0.7
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.2074375,
+    0.2074375,
+    0.2074375
+   ]
+  },
+  {
+   "nome": "realces e sombras [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "realces": -0.8,
+    "sombras": 0.7
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.49375,
+    0.49375,
+    0.49375
+   ]
+  },
+  {
+   "nome": "saturado [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "saturacao": 0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.096848,
+    0.416848,
+    0.736848
+   ]
+  },
+  {
+   "nome": "saturado [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "saturacao": 0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.956112,
+    0.876112,
+    0.0
+   ]
+  },
+  {
+   "nome": "saturado [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "saturacao": 0.6
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05,
+    0.05,
+    0.05
+   ]
+  },
+  {
+   "nome": "saturado [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "saturacao": 0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "preto e branco [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "saturacao": -1
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.37192,
+    0.37192,
+    0.37192
+   ]
+  },
+  {
+   "nome": "preto e branco [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "saturacao": -1
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.80648,
+    0.80648,
+    0.80648
+   ]
+  },
+  {
+   "nome": "preto e branco [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "saturacao": -1
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05,
+    0.05,
+    0.05
+   ]
+  },
+  {
+   "nome": "preto e branco [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "saturacao": -1
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "tudo junto [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "temperatura": 0.3,
+    "tom": -0.2,
+    "exposicao": 0.4,
+    "contraste": 0.25,
+    "realces": -0.3,
+    "sombras": 0.2,
+    "saturacao": -0.2
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.223258222,
+    0.446684107,
+    0.652974488
+   ]
+  },
+  {
+   "nome": "tudo junto [0.9, 0.85, 0.1]",
+   "ajustes": {
+    "temperatura": 0.3,
+    "tom": -0.2,
+    "exposicao": 0.4,
+    "contraste": 0.25,
+    "realces": -0.3,
+    "sombras": 0.2,
+    "saturacao": -0.2
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.1
+   ],
+   "saida": [
+    0.921984016,
+    0.921984016,
+    0.173589993
+   ]
+  },
+  {
+   "nome": "tudo junto [0.05, 0.05, 0.05]",
+   "ajustes": {
+    "temperatura": 0.3,
+    "tom": -0.2,
+    "exposicao": 0.4,
+    "contraste": 0.25,
+    "realces": -0.3,
+    "sombras": 0.2,
+    "saturacao": -0.2
+   },
+   "entrada": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "saida": [
+    0.05,
+    0.05,
+    0.05
+   ]
+  },
+  {
+   "nome": "tudo junto [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "temperatura": 0.3,
+    "tom": -0.2,
+    "exposicao": 0.4,
+    "contraste": 0.25,
+    "realces": -0.3,
+    "sombras": 0.2,
+    "saturacao": -0.2
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.579905294,
+    0.573535862,
+    0.556536763
+   ]
+  }
+ ],
+ "vinhetas": [
+  {
+   "u": 0.5,
+   "v": 0.5,
+   "vinheta": 1,
+   "escurecimento": 0.0
+  },
+  {
+   "u": 0,
+   "v": 0,
+   "vinheta": 1,
+   "escurecimento": 1.0
+  },
+  {
+   "u": 1,
+   "v": 1,
+   "vinheta": 0.5,
+   "escurecimento": 0.5
+  },
+  {
+   "u": 0.2,
+   "v": 0.5,
+   "vinheta": 0.8,
+   "escurecimento": 0.06668131
+  },
+  {
+   "u": 0.9,
+   "v": 0.1,
+   "vinheta": 0.6,
+   "escurecimento": 0.481049563
+  }
+ ],
+ "filtros": [
+  {
+   "cor": {
+    "temperatura": 0,
+    "tom": 0,
+    "exposicao": 0,
+    "contraste": 0,
+    "realces": 0,
+    "sombras": 0,
+    "saturacao": 0,
+    "vinheta": 0,
+    "filtro": "noite",
+    "intensidade": 1
+   },
+   "ajustes": {
+    "temperatura": -0.35,
+    "tom": 0,
+    "exposicao": -0.4,
+    "contraste": 0.15,
+    "realces": 0,
+    "sombras": 0,
+    "saturacao": 0,
+    "vinheta": 0.4
+   }
+  },
+  {
+   "cor": {
+    "temperatura": 0,
+    "tom": 0,
+    "exposicao": 0,
+    "contraste": 0.9,
+    "realces": 0,
+    "sombras": 0,
+    "saturacao": 0,
+    "vinheta": 0,
+    "filtro": "drama",
+    "intensidade": 2
+   },
+   "ajustes": {
+    "temperatura": 0,
+    "tom": 0,
+    "exposicao": 0,
+    "contraste": 1,
+    "realces": -0.4,
+    "sombras": -0.4,
+    "saturacao": -0.3,
+    "vinheta": 0.5
+   }
+  },
+  {
+   "cor": {
+    "temperatura": 0,
+    "tom": 0,
+    "exposicao": 0,
+    "contraste": 0,
+    "realces": 0,
+    "sombras": 0,
+    "saturacao": 0.2,
+    "vinheta": 0,
+    "filtro": "pb",
+    "intensidade": 0.5
+   },
+   "ajustes": {
+    "temperatura": 0.0,
+    "tom": 0.0,
+    "exposicao": 0.0,
+    "contraste": 0.05,
+    "realces": 0.0,
+    "sombras": 0.0,
+    "saturacao": -0.3,
+    "vinheta": 0
+   }
+  }
+ ]
+}

@@ -2,6 +2,7 @@
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Taxa, Tick } from "../tempo.ts";
 import type { Animacoes } from "./animacao.ts";
+import type { Cor } from "./cor.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
 export const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] as const;
@@ -60,6 +61,8 @@ export type Clipe = {
   recorte: Recorte;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;
+  /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */
+  cor?: Cor | null;
 };
 
 export type Faixa = {

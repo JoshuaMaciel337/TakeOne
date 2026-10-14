@@ -187,3 +187,22 @@ def test_animacao_vira_fade_zoom_e_movimento_no_grafo():
     assert "scale=w='max(1,iw*(0.6+0.4*(1-pow(1-clip((4-t)/1,0,1),3))))'" in plano.filtro
     assert ":eval=frame" in plano.filtro and "pad=w=" in plano.filtro
     assert "y='640+1280*(1*pow(1-clip((t-1)/0.5,0,1),3)*0.08)-overlay_h/2'" in plano.filtro
+
+
+def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
+    com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
+    so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})
+    neutro = clipe("c3", "empe", 0, 4, cor={"filtro": None, "intensidade": 1})
+    faixas = [faixa("video", [neutro]), faixa("video", [so_vinheta]), faixa("principal", [com_cor])]
+    plano = planejar_render(projeto(faixas), MIDIAS, 1080, 1920, pasta="/trabalho")
+    luts = [a for a in plano.auxiliares if a.tipo == "lut"]
+    vinhetas = [a for a in plano.auxiliares if a.tipo == "vinheta"]
+    assert len(luts) == 1 and luts[0].caminho.startswith("/trabalho/cor_") and luts[0].caminho.endswith(".cube")
+    assert f"lut3d=file='{luts[0].caminho}':interp=tetrahedral" in plano.filtro
+    assert sorted(v.caminho for v in vinhetas) == ["/trabalho/vinheta_c1.png", "/trabalho/vinheta_c2.png"]
+    # A vinheta do vídeo deitado tem o tamanho da caixa dele no quadro: 1080 x 607,5 → 1080 x 608
+    assert next(v for v in vinhetas if v.caminho.endswith("c1.png")).largura == 1080
+    assert plano.filtro.count("blend=all_mode=multiply") == 2
+    assert plano.filtro.count("lut3d") == 1, "só a cor que muda alguma coisa vira LUT"
+    # As imagens das vinhetas entram como imagens paradas, depois dos clipes
+    assert [e.imagem for e in plano.entradas] == [False, False, False, True, True]

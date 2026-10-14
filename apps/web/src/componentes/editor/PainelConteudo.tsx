@@ -6,10 +6,12 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
+import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelFiltros } from "./PainelFiltros";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
 import { PainelTexto } from "./PainelTexto";
 
@@ -27,6 +29,8 @@ type Props = {
   aoAdicionarMidia: (midiaId: string) => void;
   aoAdicionarTexto: (texto: Texto) => void;
   legendas: PropsLegendas;
+  /** O clipe escolhido, para a ferramenta Filtros. */
+  selecionado: { clipe: Clipe; faixa: Faixa } | null;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   className?: string;
@@ -95,6 +99,7 @@ export function PainelConteudo({
   aoAdicionarMidia,
   aoAdicionarTexto,
   legendas,
+  selecionado,
   aoFechar,
   className = "",
   style,
@@ -123,6 +128,8 @@ export function PainelConteudo({
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
+        ) : ferramenta.id === "filtros" ? (
+          <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}

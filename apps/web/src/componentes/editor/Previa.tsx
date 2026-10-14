@@ -7,6 +7,7 @@ import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type T
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
+import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -102,6 +103,7 @@ type CamadaNaTela = {
   /** Sem a animação: é nela que as alças da prévia mexem. */
   caixaBase: Caixa;
   segundos: number;
+  cor: AjustesCor | null;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
   imagem?: ImageBitmap;
 };
@@ -114,6 +116,12 @@ type EstadoDoDesenho = {
   /** Algo mudou desde o último desenho. */
   sujo: boolean;
 };
+
+/** Os ajustes que o shader aplica, ou null quando a cor é a original. */
+function corDoClipe(clipe: Clipe): AjustesCor | null {
+  const ajustes = ajustesEfetivos(clipe.cor);
+  return corNeutra(ajustes) ? null : ajustes;
+}
 
 function webgl2Disponivel(): boolean {
   try {
@@ -155,6 +163,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       recorte: clipe.recorte,
       caixa: caixaDoClipe(transformacaoAnimada(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
       caixaBase: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
+      cor: corDoClipe(clipe),
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
@@ -174,6 +183,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       recorte: clipe.recorte,
       caixa: caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, tamanho),
       caixaBase: caixaDoTexto(clipe.transformacao, imagem, tamanho),
+      cor: corDoClipe(clipe),
       segundos: 0,
       imagem: imagem.bitmap,
     });
@@ -205,7 +215,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();
