@@ -8,7 +8,8 @@
     "start": "next start -p 3010",
     "lint": "eslint",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning \"src/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "comparar-previa": "node scripts/comparar-previa.mjs"
   },
   "dependencies": {
     "lucide-react": "1.48.0",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
+    "playwright-core": "^1.51.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

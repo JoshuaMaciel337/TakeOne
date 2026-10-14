@@ -370,7 +370,7 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Áudio da prévia pelo Web Audio, com volume até 400%.
 - [x] Manipular elementos na prévia (arrastar, redimensionar, girar, com ímã no centro e nas bordas), adaptado da `CamadaSobreposta` do HolyCut, e a aba Básico nas propriedades.
 - [x] Render no worker a partir do mesmo JSON, generalizando o `render.py` do HolyCut para várias faixas. Exportar MP4 em 720p, 1080p e 4K, com progresso, download e QR para o celular. Conferido com o FFmpeg no Nitro. O som é misturado e medido numa passada própria e leva um ganho fixo até -14 LUFS, para manter o equilíbrio da prévia.
-- [ ] Teste automático que compara quadros da prévia e do render. Feito pela metade: o render é conferido ponto a ponto contra a geometria (`test_render_segue_a_geometria_da_previa`, roda com FFmpeg), e a prévia contra a mesma geometria só por script no navegador, fora do CI.
+- [x] Teste automático que compara quadros da prévia e do render: o render é conferido contra a geometria no CI (`test_render_segue_a_geometria_da_previa`), e a prévia contra o vídeo exportado no Chrome pelo `npm run comparar-previa`, fora do CI (precisa da pilha e do navegador).
 
 ### Fase 3: texto, áudio e legendas (2 semanas)
 - Texto (faixa de texto por cima de tudo; o PNG do texto é desenhado pela API e é o mesmo no render):

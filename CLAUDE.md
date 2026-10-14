@@ -42,7 +42,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Pronto: cada clipe tem `transformacao` (x, y, escala, rotação, opacidade) e `recorte`. A prévia desenha num canvas WebGL2 (`lib/previa/compositor.ts`) com os quadros decodificados pelo WebCodecs (`lib/previa/decodificador.ts`) e o som pelo Web Audio. Dá para selecionar, arrastar, redimensionar e girar direto na prévia; há a aba Básico nas propriedades e a cor de fundo do projeto.
   - Exportação: botão Exportar com 720p, 1080p e 4K, render na fila do worker (`core/utils/render.py` e `apps/worker/tarefas/renderizacao.py`), progresso, download e QR para o celular. Conferido no Nitro em 14/10/2026: todos os testes com FFmpeg passam, e uma exportação pela API (vídeo em pé com rotação, sobreposição girada e meio transparente, texto com fundo e música com fades) saiu com tudo no lugar e em -14 LUFS. O 4K de 6 s levou 23,5 s, com pico de 4,5 GiB de memória no worker.
   - O som sai numa passada própria (mistura e mede o loudness) antes do vídeo; veja "Decisões técnicas".
-  - Falta: a parte da prévia no teste que compara prévia e render.
+  - Prévia contra render: `npm run comparar-previa` (em `apps/web`) abre o editor no Chrome e compara o canvas com a última exportação tocada no mesmo navegador, quadro a quadro. Fica fora do CI. Em 14/10/2026 deu média de 2 a 3 níveis em 255, com o quadro exato.
 - **Fase 3 (texto, áudio e legendas):** em andamento.
   - Pronto: volume até 400% e fades na aba Áudio; clipes de texto (ferramenta Texto com estilos prontos, aba Texto com fonte, cor, contorno, sombra e fundo), na prévia e no render.
   - Legendas manuais: ferramenta Legendas com estilos, lista para editar, importar e baixar SRT e VTT (`lib/projeto/legendas.ts`).
@@ -58,13 +58,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 
 Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto só dá para conferir no Nitro (ou, no caso dos testes, no CI). Tire da lista o que for conferido.
 
-Conferido em 14/10/2026: pilha no Docker, todos os testes com FFmpeg (render, texto, animação, cor, vinheta e transição), exportação de 1080p e 4K pela API, transição sem sobra na mídia e licença do Wan 2.2 (Apache 2.0, sem cadastro). Falta:
+Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato com quadros B, cores com BT.709), pilha no Docker, todos os testes com FFmpeg (render, texto, animação, cor, vinheta e transição), exportação de 1080p e 4K pela API, transição sem sobra na mídia e licença do Wan 2.2 (Apache 2.0, sem cadastro). Falta:
 
-- [ ] Ver o CI do GitHub verde (o `gh` não está instalado no Nitro).
 - [ ] Exportar com um vídeo gravado no celular de verdade. O teste usou um vídeo gerado com rotação de 90° e quadros B, que passou.
-- [ ] Comparar a prévia e o vídeo exportado no mesmo instante: camadas e texto no mesmo lugar e do mesmo tamanho. Se der diferença, ela entra no teste que compara prévia e render.
-- [ ] WebCodecs com um proxy de verdade, que tem quadros B e lista de edição: parar em vários pontos e ver se a prévia mostra o mesmo quadro do vídeo, e tocar dois vídeos sobrepostos.
-- [ ] Conferir que a conversão de YUV para RGB do navegador e a do FFmpeg dão as mesmas cores num vídeo de celular (BT.709).
 - [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
 - [ ] Wan 2.2 (fase 5): medir tempo e memória de um clipe de 5 s com o ComfyUI (uns 20 GB de pesos para baixar).
 - [ ] 4K longo: o de 6 s usou 4,5 GiB dos 7,4 GiB que o Docker tem no WSL. Medir um de alguns minutos, com várias camadas, antes de liberar 4K sem limite.
@@ -105,6 +101,7 @@ Conferido em 14/10/2026: pilha no Docker, todos os testes com FFmpeg (render, te
 - **Fades:** `fade_entrada` e `fade_saida` em ticks, sempre somando no máximo a duração do clipe (a edição encolhe os fades ao aparar). Ao dividir, o fade de entrada fica com a primeira metade e o de saída com a segunda.
 - **Tick em `number`:** exato até cerca de 9 h 50 min; o projeto vai até 6 h. Contas com taxa de quadros são feitas em BigInt (`BigInt(0)` em vez de `0n`, porque o alvo do TypeScript é ES2017).
 - **Som do render em duas passadas:** a primeira mistura o som de todos os clipes num `som.mka` (ponto flutuante) e mede o loudness com o `ebur128`; a segunda gera o vídeo com essa mistura, um ganho fixo até -14 LUFS e o `alimiter` só nos picos. O `loudnorm` numa passada mexia no ganho ao longo do vídeo (uma introdução 26 dB mais baixa saía só 1 dB abaixo do resto) e, sem ele, o grafo único travava no FFmpeg 7 em projetos com transição.
+- **Cor sem marcação:** vídeo sem `colorspace` é lido como BT.601 pelo FFmpeg e como BT.709 pelo Chrome. O render e a prévia ainda batem para quem assiste, porque o player também supõe BT.709 no arquivo exportado; só a leitura do vídeo pelo FFmpeg (nos testes) mostra outra cor. Celular grava com BT.709 marcado, e aí tudo bate.
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.
 - **Next.js 16:** o middleware é `proxy.ts`. O Next guarda na memória o corpo de toda requisição a `/api` e corta em 10 MB; os vídeos passam porque o tus manda pedaços de 8 MB.
