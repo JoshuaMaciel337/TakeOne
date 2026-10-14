@@ -16,6 +16,7 @@ from core.utils.render import (
     ErroRender,
     ImagemDoTexto,
     MidiaDoRender,
+    argumentos_de_saida,
     argumentos_do_som,
     argumentos_do_video,
     cadeia_atempo,
@@ -47,7 +48,7 @@ def projeto(faixas, duracao=4):
 
 MIDIAS = {
     "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True),
-    "empe": MidiaDoRender("/m/empe.mp4", 720, 1280, video=True, audio=False),
+    "empe": MidiaDoRender("/m/empe.mp4", 720, 1280, video=True, audio=False, matriz="smpte170m"),
     "musica": MidiaDoRender("/m/musica.m4a", 0, 0, video=False, audio=True),
 }
 
@@ -94,7 +95,13 @@ def test_camadas_de_baixo_para_cima_com_a_caixa_da_geometria():
     assert "colorchannelmixer=aa=0.5" in sobreposicao
     assert "rotate=a=0.523599" in sobreposicao
     assert "overlay=x=648-overlay_w/2:y=480-overlay_h/2:format=rgb" in linhas[4]
-    assert linhas[5] == "[base2]format=yuv420p[v]"
+    assert linhas[5] == "[base2]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]"
+    # Sem marcação de cor, o vídeo é lido como BT.709 (como o Chrome na prévia); com marcação, como ela diz
+    assert linhas[1].startswith("[0:v]setparams=colorspace=bt709,setpts=")
+    assert linhas[3].startswith("[1:v]setpts=")
+    # E o vídeo final sai marcado como BT.709
+    saida = argumentos_de_saida(plano, "/tmp/v.mp4", 1920)
+    assert saida[saida.index("-colorspace") + 1] == "bt709" and saida[saida.index("-color_range") + 1] == "tv"
 
 
 def test_clipe_aparece_do_inicio_ao_fim_com_meio_quadro_de_folga():

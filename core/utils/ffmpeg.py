@@ -12,6 +12,9 @@ from pathlib import Path
 from core.config import FFMPEG, FFPROBE
 
 TIMEOUT_FFPROBE_SEGUNDOS = 60
+# Cor: a prévia (Chrome) lê vídeo sem marcação de cor como BT.709. O render e o proxy fazem igual, e
+# tudo o que o TakeOne gera sai convertido para BT.709 e marcado, para todo player mostrar a mesma cor.
+MARCAS_BT709 = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
 LINHAS_ERRO_GUARDADAS = 15
 
 
@@ -60,6 +63,8 @@ def resumir_sondagem(sondagem: dict) -> dict:
             "altura": altura,
             "fps": _fracao(video.get("avg_frame_rate") or "") or _fracao(video.get("r_frame_rate") or ""),
             "rotacao": rotacao,
+            # Matriz de cor marcada no arquivo (bt709, smpte170m...), ou None sem marcação
+            "matriz": video.get("color_space") if video.get("color_space") not in (None, "unknown") else None,
         }
     if audio:
         resumo["audio"] = {
@@ -68,6 +73,11 @@ def resumir_sondagem(sondagem: dict) -> dict:
             "taxa": int(audio.get("sample_rate") or 0),
         }
     return resumo
+
+
+def ler_como_bt709(matriz: str | None) -> list[str]:
+    """Filtro para o começo da cadeia de um vídeo: sem marcação de cor, ele é lido como BT.709."""
+    return [] if matriz else ["setparams=colorspace=bt709"]
 
 
 def _rotacao(video: dict) -> int:

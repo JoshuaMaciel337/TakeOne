@@ -26,6 +26,7 @@ from functools import lru_cache
 from core.config import FFMPEG
 from core.utils.animacao import filtros_de_animacao
 from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
+from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
@@ -57,6 +58,7 @@ class MidiaDoRender:
     video: bool
     audio: bool
     duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
+    matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
 
 
 @dataclass(frozen=True)
@@ -150,11 +152,12 @@ def cadeia_atempo(velocidade: float) -> list[str]:
 
 def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int],
                     numero: int = 0, lut: str | None = None, vinheta: int | None = None,
-                    leitura: Leitura | None = None) -> tuple[str, str]:
+                    leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
     leitura: a janela do clipe com as transições (só na faixa principal).
+    entrada_de_cor: filtros do começo que dizem como ler a cor do vídeo (ler_como_bt709).
     """
     recorte = clipe["recorte"]
     leitura = leitura or Leitura(segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"]))
@@ -162,6 +165,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     largura = max(1, round(caixa.largura))
     altura = max(1, round(caixa.altura))
     filtros = [
+        *(entrada_de_cor or []),
         f"setpts=(PTS-STARTPTS)/{_numero(clipe['velocidade'])}",
         f"fps={taxa}",
         # Recorte em frações da imagem, como o compositor da prévia faz nas coordenadas da textura
@@ -173,7 +177,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     ]
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
-        filtros.insert(2, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
+        depois_do_fps = len(entrada_de_cor or []) + 2
+        filtros.insert(depois_do_fps, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
                           f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
@@ -375,12 +380,14 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
             # A vinheta encontra o clipe já na velocidade dele: dura a janela no vídeo final
             entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
+        entrada_de_cor = None if clipe.get("texto") else ler_como_bt709(midias[clipe["midia_id"]].matriz)
         cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro,
-                                          numero, lut, vinheta, leituras.get(clipe["id"]))
+                                          numero, lut, vinheta, leituras.get(clipe["id"]), entrada_de_cor)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"
-    linhas.append(f"[{anterior}]format=yuv420p[v]")
+    # A saída é sempre BT.709, marcada (argumentos_de_saida): todo player mostra a cor da prévia
+    linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]")
 
     sons, linhas_som = [], []
     for faixa in com_som:
@@ -448,7 +455,7 @@ def argumentos_de_saida(plano: PlanoDeRender, caminho_saida: str, lado_maior: in
     preset = "fast" if lado_maior > 2000 else "medium"
     return [
         "-map", "[v]", "-map", "[a]",
-        "-c:v", "libx264", "-preset", preset, "-crf", "18", "-pix_fmt", "yuv420p", "-r", plano.taxa,
+        "-c:v", "libx264", "-preset", preset, "-crf", "18", "-pix_fmt", "yuv420p", *MARCAS_BT709, "-r", plano.taxa,
         "-c:a", "aac", "-b:a", "192k", "-ar", str(TAXA_AUDIO),
         "-t", _numero(plano.duracao), "-movflags", "+faststart", caminho_saida,
     ]

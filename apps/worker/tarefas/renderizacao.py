@@ -65,6 +65,11 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
         if caminho is None:
             raise ErroDefinitivo(f'O arquivo de "{midia["nome"]}" não foi encontrado no servidor.')
         video = midia.get("video") or {}
+        # Mídias enviadas antes de a ingestão guardar a matriz de cor: lê do arquivo
+        if "matriz" in video:
+            matriz = video["matriz"]
+        else:
+            matriz = (resumir_sondagem(sondar(caminho))["video"] or {}).get("matriz")
         preparadas[str(midia["_id"])] = MidiaDoRender(
             caminho=str(caminho),
             largura=int(video.get("largura") or 0),
@@ -72,6 +77,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             video=bool(video),
             audio=bool(midia.get("audio")),
             duracao=float(midia.get("duracao") or 0),
+            matriz=matriz,
         )
     return preparadas
 

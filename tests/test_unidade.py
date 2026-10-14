@@ -7,7 +7,7 @@ import pytest
 from api.seguranca import LimitadorTentativas, criar_token, gerar_slug, ler_token
 from core.modelos.job import calcular_espera_retry, montar_job, tipos_por_recursos
 from core.modelos.midia import extensao_aceita, montar_midia, nome_para_exibir
-from core.utils.ffmpeg import ler_progresso, resumir_sondagem
+from core.utils.ffmpeg import ler_como_bt709, ler_progresso, resumir_sondagem
 from core.utils.storage import caminho_local
 from core.utils.tempo import (
     TICK_MAXIMO,
@@ -91,7 +91,11 @@ def test_resumo_da_sondagem_com_video_girado():
     assert resumo["duracao"] == 12.5
     assert (resumo["video"]["largura"], resumo["video"]["altura"], resumo["video"]["rotacao"]) == (1080, 1920, 270)
     assert resumo["video"]["fps"] == 29.97
+    assert resumo["video"]["matriz"] is None, "sem marcação de cor"
     assert resumo["audio"] == {"codec": "aac", "canais": 2, "taxa": 48000}
+    sondagem["streams"][0]["color_space"] = "smpte170m"
+    assert resumir_sondagem(sondagem)["video"]["matriz"] == "smpte170m"
+    assert ler_como_bt709(None) == ["setparams=colorspace=bt709"] and ler_como_bt709("bt709") == []
 
 
 def test_progresso_do_ffmpeg():

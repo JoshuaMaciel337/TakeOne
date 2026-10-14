@@ -33,7 +33,7 @@ from core.modelos.midia import (
     chave_arquivo,
 )
 from core.utils import storage
-from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
+from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709, resumir_sondagem, sondar
 from core.utils.mongo import agora
 
 # -----------------------------------------------
@@ -48,10 +48,11 @@ MIN_MINIATURAS, MAX_MINIATURAS = 10, 100
 SEGUNDOS_POR_MINIATURA = 10
 LARGURA_CAPA = 640
 
-# Reduz o lado menor para 720 sem aumentar vídeos menores, sempre com dimensões pares
+# Reduz o lado menor para 720 sem aumentar vídeos menores, sempre com dimensões pares, e converte a cor
+# para BT.709 (o proxy é o que a prévia mostra; ele sai marcado, como o vídeo exportado)
 FILTRO_PROXY = (
     "scale=w='if(gte(iw,ih),-2,trunc(min(720,iw)/2)*2)'"
-    ":h='if(gte(iw,ih),trunc(min(720,ih)/2)*2,-2)',setsar=1"
+    ":h='if(gte(iw,ih),trunc(min(720,ih)/2)*2,-2)':out_color_matrix=bt709:out_range=tv,setsar=1"
 )
 
 
@@ -150,8 +151,9 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     arquivos = []
     argumentos = ["-i", str(original)]
     if tem_video:
-        argumentos += ["-map", "0:v:0", "-map", "0:a:0?", "-vf", FILTRO_PROXY, "-fpsmax", str(FPS_MAXIMO_PROXY),
-                       "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
+        filtro = ",".join([*ler_como_bt709(resumo["video"]["matriz"]), FILTRO_PROXY])
+        argumentos += ["-map", "0:v:0", "-map", "0:a:0?", "-vf", filtro, "-fpsmax", str(FPS_MAXIMO_PROXY),
+                       "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", *MARCAS_BT709,
                        "-g", str(FPS_MAXIMO_PROXY * 2), "-c:a", "aac", "-b:a", "128k", "-ac", "2",
                        "-movflags", "+faststart", str(caminho(ARQUIVO_PROXY_VIDEO))]
         arquivos.append(ARQUIVO_PROXY_VIDEO)
