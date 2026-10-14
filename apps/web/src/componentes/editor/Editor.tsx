@@ -137,6 +137,19 @@ export function Editor({ projetoId }: { projetoId: string }) {
   // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
   const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
+  /**
+   * Os controles dos painéis comparam o valor solto com o que está na tela, que já tem a prévia, e
+   * mandam null quando são iguais. Com uma prévia ativa, isso quer dizer que o valor final é o dela:
+   * ela vira comando (sem passo no desfazer se não mudou nada em relação ao projeto salvo).
+   */
+  const preverDoPainel = (comando: Comando | null) => {
+    if (comando !== null || !provisorio) {
+      setProvisorio(comando);
+      return;
+    }
+    setProvisorio(null);
+    if (JSON.stringify(projetoNaTela) !== JSON.stringify(projeto)) executar(provisorio);
+  };
   const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
   const midiaDasPropriedades = selecionado ? midiaDoClipe : midiaId ? (midias.get(midiaId) ?? null) : null;
   const ferramentaAtual = FERRAMENTAS.find((item) => item.id === ferramenta)!;
@@ -262,7 +275,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
           selecionado={selecionado}
-          aoPrever={setProvisorio}
+          aoPrever={preverDoPainel}
           legendas={{
             projeto,
             nome: edicao.nome,
@@ -325,7 +338,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
               selecionado={selecionado}
               taxa={projeto.taxa}
               fundo={(projetoNaTela ?? projeto).fundo.cor}
-              aoPrever={setProvisorio}
+              aoPrever={preverDoPainel}
               aoExecutar={(comando) => {
                 setProvisorio(null);
                 executar(comando);
