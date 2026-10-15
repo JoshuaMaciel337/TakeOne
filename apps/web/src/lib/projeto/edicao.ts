@@ -560,9 +560,9 @@ export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Re
 
 export const VOLUME_MAXIMO = 4;
 
-export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick };
+export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick; voz_limpa?: boolean };
 
-/** Volume e fades. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
+/** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
 export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: MudancaDeAudio): Projeto {
   const alvos = new Set(clipeIds);
   if (!alvos.size) throw new ErroEdicao("Escolha um clipe.");
@@ -576,7 +576,8 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
       const volume = mudanca.volume === undefined ? clipe.volume : limitar(mudanca.volume, 0, VOLUME_MAXIMO);
       const fadeEntrada = Math.round(limitar(mudanca.fade_entrada ?? clipe.fade_entrada, 0, clipe.duracao));
       const fadeSaida = Math.round(limitar(mudanca.fade_saida ?? clipe.fade_saida, 0, clipe.duracao - fadeEntrada));
-      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida };
+      const vozLimpa = mudanca.voz_limpa ?? clipe.voz_limpa ?? false;
+      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, voz_limpa: vozLimpa };
     });
     return { ...faixa, clipes };
   });

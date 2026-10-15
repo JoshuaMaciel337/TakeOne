@@ -431,7 +431,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Já existem no HolyCut e só precisam ser generalizados:
   - [x] edição pelo texto (Transcrição)
   - [x] cortar silêncios e vícios (limpeza de fala na ferramenta Transcrição)
-  - limpar a voz
+  - [x] limpar a voz (DeepFilterNet3 no worker de CPU, opção na aba Áudio)
   - reenquadrar seguindo o rosto
   - redução de ruído na imagem
   - "Criar automaticamente"

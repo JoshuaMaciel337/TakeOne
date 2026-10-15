@@ -3,6 +3,7 @@
 import { MousePointerClick, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
+import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
@@ -165,7 +166,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (
-          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} temSom={Boolean(midia?.audio)} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
             Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
@@ -320,12 +321,13 @@ function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
 const FADE_MAXIMO_S = 10;
 
 /** Volume e fades de entrada e saída do som do clipe. */
-function AbaAudio({ clipe, faixa, temSom, aoPrever, aoExecutar }: PropsAba & { temSom: boolean }) {
-  if (!temSom) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
+function AbaAudio({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null }) {
+  const [erroDoPedido, setErroDoPedido] = useState("");
+  if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
   const travada = faixa.travada;
   const ids = [clipe.id];
   const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
-  const comando = (mudanca: { volume?: number; fade_entrada?: number; fade_saida?: number }): Comando => ({
+  const comando = (mudanca: { volume?: number; fade_entrada?: number; fade_saida?: number; voz_limpa?: boolean }): Comando => ({
     comando: "clipe.audio",
     parametros: { clipeIds: ids, ...mudanca },
   });
@@ -339,6 +341,21 @@ function AbaAudio({ clipe, faixa, temSom, aoPrever, aoExecutar }: PropsAba & { t
     },
   });
   const emTicks = (segundos: number) => Math.round(segundos * TICKS_POR_SEGUNDO);
+  const voz = midia.voz_limpa;
+
+  /** Pede ao worker a voz limpa da mídia (a API não repete o que já está pronto ou andando). */
+  function pedirLimpeza() {
+    setErroDoPedido("");
+    chamarApi(`/midias/${midia!.id}/voz-limpa`, { metodo: "POST" }).catch((erro: unknown) =>
+      setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir a limpeza agora."),
+    );
+  }
+
+  /** Liga ou desliga a voz limpa no clipe. Ligar pede a limpeza da mídia, se ela ainda não foi feita. */
+  function mudarVozLimpa(ligar: boolean) {
+    aoExecutar(comando({ voz_limpa: ligar }));
+    if (ligar && voz?.status !== "pronta" && voz?.status !== "processando") pedirLimpeza();
+  }
 
   return (
     <div>
@@ -370,6 +387,26 @@ function AbaAudio({ clipe, faixa, temSom, aoPrever, aoExecutar }: PropsAba & { t
           sufixo="s"
           {...controle(clipe.fade_saida / TICKS_POR_SEGUNDO, (valor) => ({ fade_saida: emTicks(valor) }))}
         />
+      </Secao>
+      <Secao titulo="Voz">
+        <label className="mt-1 flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={Boolean(clipe.voz_limpa)} disabled={travada} onChange={(evento) => mudarVozLimpa(evento.currentTarget.checked)} />
+          <span className="flex-1">Limpar a voz (tira ruído de fundo e eco)</span>
+        </label>
+        {clipe.voz_limpa ? (
+          <p className="mt-1 text-[11px] text-suave" role="status">
+            {voz?.status === "pronta"
+              ? "Pronta. A prévia e o vídeo exportado usam a voz limpa."
+              : voz?.status === "erro" || erroDoPedido
+                ? `A limpeza falhou: ${erroDoPedido || voz?.erro}`
+                : `Preparando a voz limpa${voz?.progresso ? ` · ${voz.progresso}%` : ""}. Até terminar, a prévia toca o som original.`}
+          </p>
+        ) : null}
+        {clipe.voz_limpa && (voz?.status === "erro" || erroDoPedido) ? (
+          <button type="button" className="mt-1 text-[11px] text-destaque underline-offset-2 hover:underline" onClick={pedirLimpeza}>
+            Tentar de novo
+          </button>
+        ) : null}
       </Secao>
     </div>
   );

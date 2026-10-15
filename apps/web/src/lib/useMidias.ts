@@ -37,8 +37,18 @@ export function useMidias() {
   }, [recarregar, versao]);
 
   useEventosJobs((job) => {
-    if (job.tipo !== "ingestao") return;
     const midiaId = String(job.entrada.midia_id ?? "");
+    if (job.tipo === "limpeza_voz") {
+      if (job.status === "concluido" || job.status === "erro") {
+        void recarregar();
+        return;
+      }
+      setMidias((lista) =>
+        lista?.map((midia) => (midia.id === midiaId ? { ...midia, voz_limpa: { status: "processando", erro: null, progresso: job.progresso } } : midia)) ?? lista,
+      );
+      return;
+    }
+    if (job.tipo !== "ingestao") return;
     if (job.status === "concluido" || job.status === "erro") {
       void recarregar();
       return;

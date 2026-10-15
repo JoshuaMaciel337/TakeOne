@@ -58,6 +58,8 @@ export type Clipe = {
   /** Quanto o som leva para subir do zero no começo e descer a zero no fim. */
   fade_entrada: Tick;
   fade_saida: Tick;
+  /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
+  voz_limpa?: boolean;
   transformacao: Transformacao;
   recorte: Recorte;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */

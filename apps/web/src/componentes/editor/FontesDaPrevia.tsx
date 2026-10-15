@@ -138,6 +138,17 @@ function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFon
   );
 }
 
+/** A voz limpa, quando o clipe pede e ela já está pronta (o mesmo tempo do original); senão, o som do proxy. */
+export function usaVozLimpa(item: ItemDaPrevia): boolean {
+  return Boolean(item.clipe.voz_limpa) && item.midia.arquivos.includes("voz_limpa.m4a");
+}
+
+function arquivoDoSom(item: ItemDaPrevia): string {
+  const { midia } = item;
+  if (usaVozLimpa(item)) return arquivoDaMidia(midia.id, "voz_limpa.m4a");
+  return arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a");
+}
+
 /** O som de um clipe, com o volume e os fades pelo Web Audio (até 400%). */
 export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo: Tick; tocando: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -149,6 +160,5 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);
   }, [ganho, tocando]);
 
-  const { midia } = item;
-  return <audio ref={audioRef} src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a")} preload="auto" />;
+  return <audio ref={audioRef} src={arquivoDoSom(item)} preload="auto" />;
 }

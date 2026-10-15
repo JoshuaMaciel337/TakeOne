@@ -64,6 +64,8 @@ export type Midia = {
   arquivos: string[];
   erro: string | null;
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+  /** A voz sem ruído (worker de CPU); null se nunca foi pedida. O progresso vem dos eventos do job. */
+  voz_limpa: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;
