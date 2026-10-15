@@ -339,6 +339,8 @@ export function Editor({ projetoId }: { projetoId: string }) {
               taxa={projeto.taxa}
               tempo={tempo}
               aoBuscar={buscar}
+              proporcao={projeto.proporcao}
+              aoAvisar={mostrarAviso}
               fundo={(projetoNaTela ?? projeto).fundo.cor}
               aoPrever={preverDoPainel}
               aoExecutar={(comando) => {

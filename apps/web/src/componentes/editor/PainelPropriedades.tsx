@@ -17,6 +17,7 @@ import { AbaCor } from "./AbaCor";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
+import { SeguirRosto } from "./SeguirRosto";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
 const ABAS = [
@@ -59,6 +60,9 @@ type Props = {
   /** O instante do cursor: os keyframes do clipe são lidos e gravados nele. */
   tempo: Tick;
   aoBuscar: (tempo: Tick) => void;
+  /** "9:16", "16:9"... do projeto: o "Seguir o rosto" cobre esse quadro. */
+  proporcao: string;
+  aoAvisar: (mensagem: string) => void;
   /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
   fundo: string;
   /** Mudança provisória enquanto um controle é arrastado; `null` para desistir dela. */
@@ -68,7 +72,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, aoAvisar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -170,6 +174,9 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             tempo={tempo}
             taxa={taxa}
             aoBuscar={aoBuscar}
+            midia={midia}
+            proporcao={proporcao}
+            aoAvisar={aoAvisar}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
           />
@@ -223,7 +230,14 @@ function recorteDasBordas(b: Bordas): Recorte {
 const PERTO = 1e-6;
 
 /** Posição, tamanho, giro, opacidade e recorte do clipe. */
-type PropsBasico = PropsAba & { tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void };
+type PropsBasico = PropsAba & {
+  tempo: Tick;
+  taxa: Taxa;
+  aoBuscar: (tempo: Tick) => void;
+  midia: Midia | null;
+  proporcao: string;
+  aoAvisar: (mensagem: string) => void;
+};
 
 /** O losango do keyframe: cheio com ponto no instante, vazado com pontos em outros instantes. */
 function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: Keyframe[] | undefined; noInstante: boolean; desativado: boolean; aoClicar: () => void }) {
@@ -247,7 +261,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, aoPrever, aoExecutar }: PropsBasico) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, aoPrever, aoExecutar }: PropsBasico) {
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
@@ -401,6 +415,9 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, aoPrever, aoExecutar }
               <span className="ml-auto">{pontosDoClipe.length} keyframes</span>
             )}
           </div>
+        ) : null}
+        {!clipe.texto && midia?.video ? (
+          <SeguirRosto clipe={clipe} faixa={faixa} midia={midia} proporcao={proporcao} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
         ) : null}
       </Secao>
       {clipe.texto ? null : (

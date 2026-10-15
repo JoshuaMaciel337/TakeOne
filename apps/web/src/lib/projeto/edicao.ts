@@ -24,6 +24,7 @@ import {
   transformacaoNoTempo,
 } from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
+import type { Reenquadramento } from "./reenquadrar.ts";
 import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
   type Clipe,
@@ -800,4 +801,34 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {
   if (!/^#[0-9a-f]{6}$/i.test(cor)) throw new ErroEdicao("Cor inválida.");
   return { ...projeto, fundo: { ...projeto.fundo, cor: cor.toLowerCase() } };
+}
+
+/**
+ * Aplica o reenquadramento pelo rosto (lib/projeto/reenquadrar.ts): a escala que cobre o quadro, a
+ * posição e o caminho da câmera nos keyframes de x e y. O giro volta a zero (a conta supõe a imagem
+ * reta); os keyframes de escala e giro saem, os de opacidade ficam.
+ */
+export function reenquadrarClipe(projeto: Projeto, clipeId: string, r: Reenquadramento): Projeto {
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    if (clipe.texto) throw new ErroEdicao("Textos não têm rosto para seguir.");
+    // Os pontos no quadro e dentro do clipe, sem dois no mesmo quadro
+    const noQuadro = (pontos: Keyframe[] | undefined) => {
+      if (!pontos) return undefined;
+      const alinhados: Keyframe[] = [];
+      for (const ponto of pontos) {
+        const t = Math.min(Math.max(quadroMaisProximo(projeto.taxa, ponto.t), 0), clipe.duracao);
+        if (alinhados.length && t - alinhados[alinhados.length - 1].t < quadro) continue;
+        alinhados.push({ ...ponto, t });
+      }
+      return alinhados.length > 1 ? alinhados : undefined;
+    };
+    const keyframes: Keyframes = { opacidade: clipe.keyframes?.opacidade, x: noQuadro(r.keyframes.x), y: noQuadro(r.keyframes.y) };
+    const vazios = PROPRIEDADES_ANIMAVEIS.every((p) => !keyframes[p]?.length);
+    return {
+      ...clipe,
+      transformacao: limitarTransformacao({ ...clipe.transformacao, escala: r.escala, x: r.x, y: r.y, rotacao: 0 }),
+      keyframes: vazios ? null : keyframes,
+    };
+  });
 }
