@@ -381,7 +381,8 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] fundo
   - [x] estilos prontos
   - [x] animações de entrada e saída (aparecer, subir, descer, deslizar e zoom), na aba Animação de qualquer clipe de imagem
-  - animações de loop e letra a letra (animadores de texto do EffectCraft)
+  - [x] animações de loop (pulsar, balançar, flutuar e tremer), em qualquer clipe de imagem
+  - animações letra a letra (animadores de texto do EffectCraft)
   - estilos de contorno, sombra e brilho (estilos de camada do PhotoCraft)
 - Áudio:
   - faixas de música e efeitos sonoros

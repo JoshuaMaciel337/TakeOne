@@ -20,9 +20,11 @@ const S = TICKS_POR_SEGUNDO;
 for (const caso of casos) {
   test(`animação: ${caso.nome}`, () => {
     const { clipe } = caso;
+    const { loop } = clipe.animacao;
     const animacao = {
       entrada: { ...clipe.animacao.entrada, duracao: clipe.animacao.entrada.duracao * S },
       saida: { ...clipe.animacao.saida, duracao: clipe.animacao.saida.duracao * S },
+      loop: loop ? { ...loop, periodo: loop.periodo * S } : null,
     };
     const resultado = transformacaoAnimada({ ...clipe, inicio: clipe.inicio * S, duracao: clipe.duracao * S, animacao }, caso.t * S);
     for (const chave of Object.keys(caso.esperado) as (keyof Transformacao)[]) {
@@ -35,4 +37,9 @@ test("as durações das animações nunca passam do clipe", () => {
   const limitadas = limitarAnimacoes({ entrada: { tipo: "zoom", duracao: 3 * S }, saida: { tipo: "subir", duracao: 3 * S } }, 4 * S);
   assert.equal(limitadas.entrada.duracao, 3 * S);
   assert.equal(limitadas.saida.duracao, 1 * S);
+});
+
+test("limitar as durações mantém o loop", () => {
+  const loop = { tipo: "pulsar" as const, periodo: S, intensidade: 1 };
+  assert.deepEqual(limitarAnimacoes({ entrada: { tipo: "nenhuma", duracao: 0 }, saida: { tipo: "nenhuma", duracao: 0 }, loop }, 4 * S).loop, loop);
 });

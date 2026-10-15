@@ -24,7 +24,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
-from core.utils.animacao import filtros_de_animacao
+from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
@@ -215,15 +215,19 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     fim = leitura.fim
     # As animações seguem o começo e o fim do próprio clipe; as transições, a janela delas
     inicio_clipe = segundos(clipe["inicio"])
-    if "rotacao" in com_keyframes:
-        # Giro por quadro (graus, sentido horário); a saída é um quadrado na diagonal, cabe qualquer ângulo.
-        # O que sobra fora do clipe é pintado de transparente a cada quadro: com c=none ficava o rastro
-        # dos ângulos anteriores
-        giro = expressao(pontos["rotacao"], inicio_clipe)
-        filtros.append(f"rotate=a='({giro})*PI/180':ow='hypot(iw,ih)':oh=ow:c=black@0")
     fim_clipe = segundos(clipe["inicio"] + clipe["duracao"])
     animacao = filtros_de_animacao({**clipe, "inicio": inicio_clipe, "duracao": fim_clipe - inicio_clipe,
                                     "animacao": _animacao_em_segundos(clipe.get("animacao"))}, inicio_clipe, fim_clipe)
+    gira = "rotacao" in com_keyframes or animacao["rotacao"] is not None
+    if gira:
+        # Giro por quadro (graus, sentido horário); a saída é um quadrado na diagonal, cabe qualquer ângulo.
+        # O que sobra fora do clipe é pintado de transparente a cada quadro: com c=none ficava o rastro
+        # dos ângulos anteriores. O balanço do loop soma ao giro dos keyframes (ou ao fixo)
+        giro = (expressao(pontos["rotacao"], inicio_clipe) if "rotacao" in com_keyframes
+                else _numero(clipe["transformacao"]["rotacao"]))
+        if animacao["rotacao"]:
+            giro = f"{giro}+{animacao['rotacao']}"
+        filtros.append(f"rotate=a='({giro})*PI/180':ow='hypot(iw,ih)':oh=ow:c=black@0")
     if leitura.efeitos:
         transicao = filtros_de_transicao(list(leitura.efeitos))
         escalas = [e for e in (animacao["escala"], transicao["escala"]) if e]
@@ -232,6 +236,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
             "escala": "*".join(escalas) or None,
             "dx": transicao["dx"] if animacao["dx"] == "0" else f"{animacao['dx']}+{transicao['dx']}",
             "dy": animacao["dy"],
+            "rotacao": animacao["rotacao"],
         }
     # Keyframes de posição e escala: somam às animações e transições (partem do valor de base)
     base = clipe["transformacao"]
@@ -244,6 +249,10 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     if "escala" in com_keyframes:
         maior = max(ponto["valor"] for ponto in pontos["escala"])
         termos["escala"].append(f"({expressao(pontos['escala'], inicio_clipe)})/{_numero(maior)}")
+    zoom_do_loop = maior_zoom_do_loop(clipe)
+    if zoom_do_loop != 1:
+        # O pulsar cresce até zoom_do_loop: a caixa já tem esse tamanho e o fator volta ao normal
+        termos["escala"].append(f"(1/{_numero(zoom_do_loop)})")
     animacao = {
         **animacao,
         "dx": "+".join(termo for termo in termos["dx"] if termo != "0") or "0",
@@ -256,7 +265,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         cos, sen = abs(math.cos(math.radians(caixa.rotacao))), abs(math.sin(math.radians(caixa.rotacao)))
         lado_l = math.ceil(largura * cos + altura * sen) + 2
         lado_a = math.ceil(largura * sen + altura * cos) + 2
-        if "rotacao" in com_keyframes:
+        if gira:
             lado_l = lado_a = math.ceil(math.hypot(largura, altura)) + 2
         fator = animacao["escala"]
         filtros.append(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame")
@@ -288,7 +297,23 @@ def _escapar_caminho(caminho: str) -> str:
 def _animacao_em_segundos(animacao: dict | None) -> dict | None:
     if not animacao:
         return None
-    return {nome: {**item, "duracao": segundos(item["duracao"])} for nome, item in animacao.items()}
+    resultado = {nome: {**animacao[nome], "duracao": segundos(animacao[nome]["duracao"])}
+                 for nome in ("entrada", "saida")}
+    if animacao.get("loop"):
+        resultado["loop"] = {**animacao["loop"], "periodo": segundos(animacao["loop"]["periodo"])}
+    return resultado
+
+
+def base_do_render(clipe: dict) -> dict:
+    """
+    A transformação que dá o tamanho da caixa no render: a dos keyframes (transformacao_de_base), no
+    maior tamanho do pulsar e sem o giro, quando o balanço gira o clipe por quadro.
+    """
+    base = transformacao_de_base(clipe)
+    base["escala"] *= maior_zoom_do_loop(clipe)
+    if loop_gira(clipe):
+        base["rotacao"] = 0
+    return base
 
 
 def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0) -> str:
@@ -397,13 +422,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         if clipe.get("texto"):
             imagem = textos[clipe["id"]]
             referencia = (imagem.largura_referencia, imagem.altura_referencia)
-            caixa = caixa_do_texto(transformacao_de_base(clipe), referencia, quadro)
+            caixa = caixa_do_texto(base_do_render(clipe), referencia, quadro)
         else:
             midia = midias[clipe["midia_id"]]
             if not midia.video:
                 continue
             midia_tamanho = (midia.largura, midia.altura)
-            caixa = caixa_do_clipe(transformacao_de_base(clipe), clipe["recorte"], midia_tamanho, quadro)
+            caixa = caixa_do_clipe(base_do_render(clipe), clipe["recorte"], midia_tamanho, quadro)
         ajustes = ajustes_efetivos(clipe.get("cor"))
         lut = vinheta = None
         if not cor_neutra({**ajustes, "vinheta": 0}):

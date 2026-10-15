@@ -11,6 +11,7 @@ from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
+from core.utils.tempo import TICKS_POR_SEGUNDO
 
 
 def _limpar_espacos(valor):
@@ -201,9 +202,17 @@ class AnimacaoEntrada(BaseModel):
     duracao: int = Field(default=0, ge=0, description="Em ticks")
 
 
+class LoopEntrada(BaseModel):
+    """Os limites são os de apps/web/src/lib/projeto/animacao.ts."""
+    tipo: Literal["nenhum", "pulsar", "balancar", "flutuar", "tremer"] = "nenhum"
+    periodo: int = Field(default=TICKS_POR_SEGUNDO, gt=0, description="Em ticks")
+    intensidade: float = Field(default=1, ge=0, le=3)
+
+
 class AnimacoesEntrada(BaseModel):
     entrada: AnimacaoEntrada = Field(default_factory=AnimacaoEntrada)
     saida: AnimacaoEntrada = Field(default_factory=AnimacaoEntrada)
+    loop: LoopEntrada | None = None
 
 
 class CorEntrada(BaseModel):

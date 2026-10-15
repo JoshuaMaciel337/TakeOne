@@ -42,6 +42,34 @@
                 "animacao": {"entrada": {"tipo": "zoom", "duracao": 1}, "saida": {"tipo": "subir", "duracao": 1}}},
       "t": 2,
       "esperado": {"x": 0.1, "y": 0.2, "escala": 0.8, "rotacao": 10, "opacidade": 0.9}
+    },
+    {
+      "nome": "pulsar: no meio do ciclo, no maior tamanho",
+      "clipe": {"inicio": 1, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 0.5, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "nenhuma", "duracao": 0}, "saida": {"tipo": "nenhuma", "duracao": 0}, "loop": {"tipo": "pulsar", "periodo": 1, "intensidade": 1}}},
+      "t": 2.5,
+      "esperado": {"x": 0, "y": 0, "escala": 0.53, "rotacao": 0, "opacidade": 1}
+    },
+    {
+      "nome": "balançar: um quarto do ciclo, inclinado ao máximo, somado ao giro do clipe",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 10, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "nenhuma", "duracao": 0}, "saida": {"tipo": "nenhuma", "duracao": 0}, "loop": {"tipo": "balancar", "periodo": 2, "intensidade": 0.5}}},
+      "t": 0.5,
+      "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 13, "opacidade": 1}
+    },
+    {
+      "nome": "flutuar: três quartos do ciclo, embaixo",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "nenhuma", "duracao": 0}, "saida": {"tipo": "nenhuma", "duracao": 0}, "loop": {"tipo": "flutuar", "periodo": 2, "intensidade": 2}}},
+      "t": 1.5,
+      "esperado": {"x": 0, "y": 0.04, "escala": 1, "rotacao": 0, "opacidade": 1}
+    },
+    {
+      "nome": "tremer junto com a entrada",
+      "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0.1, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+                "animacao": {"entrada": {"tipo": "aparecer", "duracao": 0.5}, "saida": {"tipo": "nenhuma", "duracao": 0}, "loop": {"tipo": "tremer", "periodo": 1, "intensidade": 1}}},
+      "t": 0.1,
+      "esperado": {"x": 0.10187236412683147, "y": -0.007748542666003516, "escala": 1, "rotacao": 0, "opacidade": 0.2}
     }
   ]
 }

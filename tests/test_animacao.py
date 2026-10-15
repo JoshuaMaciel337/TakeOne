@@ -17,7 +17,8 @@ def test_transformacao_igual_a_da_previa(caso):
 
 def avaliar(expressao: str, t: float) -> float:
     """Avalia uma expressão do FFmpeg que só usa clip, pow e a variável t."""
-    ambiente = {"clip": lambda v, a, b: min(max(v, a), b), "pow": math.pow, "t": t}
+    ambiente = {"clip": lambda v, a, b: min(max(v, a), b), "pow": math.pow, "sin": math.sin, "cos": math.cos,
+                "PI": math.pi, "t": t}
     return eval(expressao, {"__builtins__": {}}, ambiente)  # noqa: S307 - expressão montada aqui
 
 
@@ -31,6 +32,8 @@ def test_expressoes_do_ffmpeg_dao_o_mesmo_movimento(caso):
     assert base["y"] + avaliar(filtros["dy"], caso["t"]) == pytest.approx(esperado["y"], abs=1e-9)
     zoom = avaliar(filtros["escala"], caso["t"]) if filtros["escala"] else 1
     assert base["escala"] * zoom == pytest.approx(esperado["escala"], abs=1e-9)
+    giro = avaliar(filtros["rotacao"], caso["t"]) if filtros["rotacao"] else 0
+    assert base["rotacao"] + giro == pytest.approx(esperado["rotacao"], abs=1e-9)
 
 
 def test_fades_lineares_nos_instantes_certos():

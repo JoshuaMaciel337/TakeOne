@@ -220,6 +220,22 @@ def test_animacao_vira_fade_zoom_e_movimento_no_grafo():
     assert "y='640+1280*(1*pow(1-clip((t-1)/0.5,0,1),3)*0.08)-overlay_h/2'" in plano.filtro
 
 
+def test_loop_vira_seno_no_giro_no_zoom_e_na_posicao():
+    def animado(id_, tipo, intensidade=1.0):
+        nada = {"tipo": "nenhuma", "duracao": 0}
+        loop = {"tipo": tipo, "periodo": 2 * S, "intensidade": intensidade}
+        return clipe(id_, "deitado", 0, 4, animacao={"entrada": nada, "saida": nada, "loop": loop})
+    faixas = [faixa("video", [animado("c2", "balancar")]), faixa("video", [animado("c3", "flutuar")]),
+              faixa("principal", [animado("c1", "pulsar")])]
+    plano = planejar_render(projeto(faixas), MIDIAS, 1080, 1920)
+    # Pulsar: a caixa nasce 6% maior e o fator por quadro volta ao tamanho normal
+    assert "scale=1145:644" in plano.filtro
+    assert "(1+0.03*(1-cos(2*PI*((t-0)/2))))*(1/1.06)" in plano.filtro
+    # Balançar: giro por quadro, na diagonal; flutuar: seno no y do overlay
+    assert "rotate=a='(0+6*sin(2*PI*1*((t-0)/2)))*PI/180':ow='hypot(iw,ih)'" in plano.filtro
+    assert "-0.02*sin(2*PI*1*((t-0)/2))" in plano.filtro
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})
