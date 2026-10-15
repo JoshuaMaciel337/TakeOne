@@ -46,6 +46,11 @@ function Karaoke({ frase }: { frase: string }) {
   );
 }
 
+/** O que a home mostra e o TakeOne ainda não tem. */
+function EmBreve() {
+  return <span className="em-breve">Em breve</span>;
+}
+
 function Marca({ tamanho = 30 }: { tamanho?: number }) {
   return (
     <span className="wordmark">
@@ -397,7 +402,9 @@ export default function PaginaInicial() {
                   <div className="card-ic">
                     <Icone nome="tesoura" />
                   </div>
-                  <h3>Corte inteligente</h3>
+                  <h3>
+                    Corte inteligente <EmBreve />
+                  </h3>
                   <p>A IA analisa seu vídeo e encontra os melhores momentos para corte, com ritmo perfeito.</p>
                 </div>
                 <div className="viz cut-viz" style={{ marginBottom: 28 }}>
@@ -573,7 +580,9 @@ export default function PaginaInicial() {
                   <div className="card-ic">
                     <Icone nome="brilho" />
                   </div>
-                  <h3>Um assistente de edição que entende o que você pede.</h3>
+                  <h3>
+                    Um assistente de edição que entende o que você pede. <EmBreve />
+                  </h3>
                   <p>
                     Descreva a alteração em texto e acompanhe cada passo na timeline. Você revisa, ajusta e decide — a IA nunca tira o
                     controle criativo das suas mãos.
@@ -652,7 +661,9 @@ export default function PaginaInicial() {
           <div className="wrap">
             <div className="head">
               <div>
-                <div className="eyebrow reveal">Templates para Stories · 9:16</div>
+                <div className="eyebrow reveal">
+                  Templates para Stories · 9:16 <EmBreve />
+                </div>
                 <h2 className="reveal d1">
                   Comece com um template.
                   <br />
@@ -762,7 +773,9 @@ export default function PaginaInicial() {
         <section className="section creators" id="planos">
           <div className="wrap">
             <div className="head center">
-              <div className="eyebrow reveal">Planos</div>
+              <div className="eyebrow reveal">
+                Planos <EmBreve />
+              </div>
               <h2 className="reveal d1">
                 Comece grátis.
                 <br />

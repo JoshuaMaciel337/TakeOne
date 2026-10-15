@@ -504,6 +504,7 @@ html:has(.inicio) {
   /* O botão "Aplicar" do editor desenhado troca de rótulo */
   .ai-apply .feito,.ai-apply.done .aplicar{display:none}
   .ai-apply.done .feito{display:inline}
+  .em-breve{display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px;padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--coral) 45%,transparent);background:color-mix(in srgb,var(--coral) 12%,transparent);color:var(--coral);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.4;white-space:nowrap;-webkit-text-fill-color:currentColor}
   .nav-actions .botao-tema{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:var(--secondary);transition:color .2s,background-color .2s}
   .nav-actions .botao-tema:hover{color:var(--text);background:var(--surface)}
 }
