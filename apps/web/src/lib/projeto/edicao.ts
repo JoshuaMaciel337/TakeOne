@@ -33,6 +33,7 @@ import {
   faixaDeTexto,
   fimDoClipe,
   type InfoMidia,
+  tempoNaMidia,
   type Chroma,
   MESCLAGENS,
   type Mesclagem,
@@ -44,6 +45,7 @@ import {
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
 import { type Efeito, EFEITOS } from "./efeitos.ts";
 import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
@@ -150,7 +152,8 @@ function arrumarTransicoes(faixa: Faixa): Faixa {
   const clipes = faixa.clipes.map((clipe, i) => {
     if (!clipe.transicao) return clipe;
     const proximo = faixa.clipes[i + 1];
-    if (!proximo) return { ...clipe, transicao: null };
+    // A curva de velocidade não combina com transição: a transição sai
+    if (!proximo || clipe.curva_velocidade || proximo.curva_velocidade) return { ...clipe, transicao: null };
     const maximo = duracaoMaximaDaTransicao(clipe, proximo);
     return clipe.transicao.duracao > maximo ? { ...clipe, transicao: { ...clipe.transicao, duracao: maximo } } : clipe;
   });
@@ -297,6 +300,34 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
 export const LIMITES_VELOCIDADE = { minimo: 0.1, maximo: 10 } as const;
 
 /**
+ * Onde o pedaço [de, ate) do clipe começa na mídia, e a velocidade dele. Com curva de velocidade, o
+ * pedaço leva a curva recortada (lib/projeto/velocidade.ts); sem ela, a conta é a reta de sempre.
+ */
+function pedacoDoClipe(clipe: Clipe, de: Tick, ate: Tick): Pick<Clipe, "entrada" | "velocidade" | "curva_velocidade"> {
+  if (clipe.curva_velocidade && clipe.midia_id) return pedacoComCurva({ ...clipe, curva_velocidade: clipe.curva_velocidade }, de, ate);
+  return { entrada: Math.max(0, clipe.entrada + Math.round((de - clipe.inicio) * clipe.velocidade)), velocidade: clipe.velocidade, curva_velocidade: clipe.curva_velocidade };
+}
+
+/**
+ * A curva de velocidade do clipe de mídia (null tira). A duração e o trecho da mídia não mudam. Não
+ * combina com transição: o clipe com curva não pode ter transição de nenhum lado.
+ */
+export function curvarVelocidade(projeto: Projeto, clipeId: string, pontos: PontoDeVelocidade[] | null): Projeto {
+  const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  if (!clipe.midia_id) throw new ErroEdicao("Textos não têm velocidade.");
+  if (pontos) {
+    const anterior = faixa.clipes[indice - 1];
+    if (clipe.transicao || anterior?.transicao) throw new ErroEdicao("Tire a transição deste clipe antes de usar a curva de velocidade.");
+    if (pontos.length < 2 || pontos[0][0] !== 0 || pontos[pontos.length - 1][0] !== 1) throw new ErroEdicao("A curva precisa ir do começo ao fim do clipe.");
+  }
+  const curva = pontos?.map(([u, s]) => [u, limitar(s, LIMITES_DA_CURVA.minimo, LIMITES_DA_CURVA.maximo)] as PontoDeVelocidade) ?? null;
+  const clipes = [...faixa.clipes];
+  clipes[indice] = { ...clipe, curva_velocidade: curva };
+  return finalizar(trocarFaixa(projeto, { ...faixa, clipes }));
+}
+
+/**
  * Muda a velocidade do clipe de mídia. O trecho da mídia fica o mesmo: a duração muda (na principal,
  * os clipes seguintes andam junto). Keyframes, curva do abaixar na fala e fades acompanham a nova duração.
  */
@@ -342,15 +373,18 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
   if (borda === "fim") {
     // Sem mídia limitando (texto, ou mídia que sumiu da biblioteca), o limite é o tamanho máximo do projeto
     let maximo = Number.isFinite(info.duracao)
-      ? ajustarAoQuadro(projeto.taxa, (info.duracao - clipe.entrada) / clipe.velocidade)
+      ? clipe.curva_velocidade
+        ? ajustarAoQuadro(projeto.taxa, clipe.duracao + (info.duracao - tempoNaMidia(clipe, fimDoClipe(clipe))) / velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, 1))
+        : ajustarAoQuadro(projeto.taxa, (info.duracao - clipe.entrada) / clipe.velocidade)
       : TICK_MAXIMO - clipe.inicio;
     const proximo = livre ? faixa.clipes.find((item) => item.inicio >= fimDoClipe(clipe) && item.id !== clipe.id) : undefined;
     if (proximo) maximo = Math.min(maximo, proximo.inicio - clipe.inicio);
     const duracao = Math.min(Math.max(alvo - clipe.inicio, quadro), maximo);
-    novo = { ...clipe, duracao };
+    novo = { ...clipe, duracao, ...pedacoDoClipe(clipe, clipe.inicio, clipe.inicio + duracao) };
   } else {
     // delta > 0 encurta pelo começo; delta < 0 mostra o que vinha antes na mídia (o texto não tem limite)
-    let minimo = clipe.texto ? Number.NEGATIVE_INFINITY : -ajustarAoQuadro(projeto.taxa, clipe.entrada / clipe.velocidade);
+    const velocidadeNaPonta = clipe.curva_velocidade ? velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, 0) : clipe.velocidade;
+    let minimo = clipe.texto ? Number.NEGATIVE_INFINITY : -ajustarAoQuadro(projeto.taxa, clipe.entrada / velocidadeNaPonta);
     if (livre) {
       const anterior = [...faixa.clipes].reverse().find((item) => fimDoClipe(item) <= clipe.inicio && item.id !== clipe.id);
       minimo = Math.max(minimo, (anterior ? fimDoClipe(anterior) : 0) - clipe.inicio);
@@ -361,7 +395,7 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       ...clipe,
       inicio: clipe.inicio + delta,
       duracao: clipe.duracao - delta,
-      entrada: Math.max(0, clipe.entrada + Math.round(delta * clipe.velocidade)),
+      ...pedacoDoClipe(clipe, clipe.inicio + delta, fimDoClipe(clipe)),
       // Os keyframes e as palavras da legenda ficam no mesmo instante da linha do tempo
       keyframes: deslocarKeyframes(clipe.keyframes, delta),
       texto: deslocarTempos(clipe.texto, delta),
@@ -400,7 +434,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         id: ctx.novoId(),
         inicio: t,
         duracao: fim - t,
-        entrada: clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade),
+        ...pedacoDoClipe(clipe, t, fim),
         // O fade e a animação de entrada ficam com a metade da esquerda; os de saída, com a da direita
         fade_entrada: 0,
         keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
@@ -408,7 +442,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         abaixamento: deslocarAbaixamento(clipe.abaixamento, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
-      const esquerda = { ...clipe, duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
+      const esquerda = { ...clipe, ...pedacoDoClipe(clipe, clipe.inicio, t), duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
       clipes.push(esquerda, direita);
       novos.push(direita.id);
     }
@@ -509,7 +543,7 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 id: primeiro ? clipe.id : ctx.novoId(),
                 inicio: pedaco.inicio - removidoAntes(pedaco.inicio),
                 duracao: pedaco.fim - pedaco.inicio,
-                entrada: clipe.entrada + Math.round((pedaco.inicio - clipe.inicio) * clipe.velocidade),
+                ...pedacoDoClipe(clipe, pedaco.inicio, pedaco.fim),
                 fade_entrada: primeiro ? clipe.fade_entrada : 0,
                 fade_saida: ultimo ? clipe.fade_saida : 0,
                 keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
@@ -873,6 +907,7 @@ export function definirTransicao(projeto: Projeto, clipeId: string, transicao: T
   exigirDestravada(faixa);
   const proximo = faixa.clipes[indice + 1];
   if (faixa.tipo !== "principal" || (!proximo && transicao)) throw new ErroEdicao("A transição fica entre dois clipes vizinhos da faixa principal.");
+  if (transicao && (clipe.curva_velocidade || proximo?.curva_velocidade)) throw new ErroEdicao("Clipe com curva de velocidade não tem transição. Tire a curva antes.");
   const nova = transicao && proximo ? { ...transicao, duracao: Math.max(1, Math.min(Math.round(transicao.duracao), duracaoMaximaDaTransicao(clipe, proximo))) } : null;
   return trocarFaixa(projeto, { ...faixa, clipes: faixa.clipes.map((item) => (item.id === clipeId ? { ...item, transicao: nova } : item)) });
 }

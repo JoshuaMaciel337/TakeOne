@@ -7,6 +7,7 @@ import type { Cor } from "./cor.ts";
 import type { Efeito } from "./efeitos.ts";
 import type { Keyframes } from "./keyframes.ts";
 import { type CurvaDoFade, type EfeitosVoz, ganhoDoFade } from "./som.ts";
+import { type PontoDeVelocidade, tempoNaMidiaComCurva } from "./velocidade.ts";
 import type { Transicao } from "./transicao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
@@ -102,6 +103,8 @@ export type Clipe = {
   efeito?: Efeito | null;
   /** Tela verde: a cor que some (só em vídeos e imagens). */
   chroma?: Chroma | null;
+  /** Velocidade com curva (lib/projeto/velocidade.ts); sem ela, a velocidade é a mesma o clipe todo. */
+  curva_velocidade?: PontoDeVelocidade[] | null;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */
@@ -153,8 +156,9 @@ export function fatorDosFades(clipe: Clipe, t: Tick): number {
   return fator;
 }
 
-/** Instante da mídia que aparece no instante `t` da linha do tempo. */
+/** Instante da mídia que aparece no instante `t` da linha do tempo (com a curva de velocidade, se houver). */
 export function tempoNaMidia(clipe: Clipe, t: Tick): Tick {
+  if (clipe.curva_velocidade) return tempoNaMidiaComCurva({ ...clipe, curva_velocidade: clipe.curva_velocidade }, t);
   return clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade);
 }
 

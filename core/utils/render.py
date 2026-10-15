@@ -57,6 +57,7 @@ from core.utils.som import (
 )
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import desfoque_na_transicao, filtro_de_cortina, filtros_de_transicao, janelas_da_principal
+from core.utils.velocidade import atempo_necessarios, comandos_do_andamento, expressao_do_tempo
 
 TAXA_AUDIO = 48000
 LUFS_ALVO = -14
@@ -213,10 +214,22 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     inicio = leitura.inicio
     largura = max(1, round(caixa.largura))
     altura = max(1, round(caixa.altura))
+    curva = clipe.get("curva_velocidade")
+    if curva:
+        # Velocidade com curva: o tempo da mídia vai ao do clipe pela inversa da conta (velocidade.py)
+        duracao_s = segundos(clipe["duracao"])
+        # A base de tempo fina não deixa o setpts arredondar para a grade da mídia, e o fps com
+        # round=up mostra o último quadro que já chegou: o mesmo que o decodificador da prévia
+        tempo = ["settb=1/90000", "setpts=PTS-STARTPTS",
+                 f"setpts='({expressao_do_tempo(curva, duracao_s, duracao_s * clipe['velocidade'])})/TB'"]
+        fps = f"fps={taxa}:round=up"
+    else:
+        tempo = [f"setpts=(PTS-STARTPTS)/{_numero(clipe['velocidade'])}"]
+        fps = f"fps={taxa}"
     filtros = [
         *(entrada_de_cor or []),
-        f"setpts=(PTS-STARTPTS)/{_numero(clipe['velocidade'])}",
-        f"fps={taxa}",
+        *tempo,
+        fps,
         # Recorte em frações da imagem, como o compositor da prévia faz nas coordenadas da textura
         f"crop=w=iw*{_numero(recorte['largura'])}:h=ih*{_numero(recorte['altura'])}"
         f":x=iw*{_numero(recorte['x'])}:y=ih*{_numero(recorte['y'])}",
@@ -244,7 +257,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                        f":blend={_numero(chroma['suavidade'])}")
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
-        depois_do_fps = len(entrada_de_cor or []) + 2
+        depois_do_fps = filtros.index(fps) + 1
         filtros.insert(depois_do_fps, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
                           f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
     cabeca = f"[{entrada}:v]"
@@ -503,12 +516,14 @@ def base_do_render(clipe: dict) -> dict:
 
 
 def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None,
-                  igualar_db: float = 0, reverb: tuple[int, str] | None = None) -> str:
+                  igualar_db: float = 0, reverb: tuple[int, str] | None = None,
+                  andamento: tuple[str, list[str]] | None = None) -> str:
     """
     pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
     abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala.
     igualar_db: o ganho que leva a mídia a -14 LUFS, com o "Igualar o volume" ligado.
     reverb: (entrada do FFmpeg com a resposta ao impulso, nome único) quando o clipe tem reverb.
+    andamento: (roteiro do asendcmd, nomes dos atempo) da velocidade com curva.
     Os efeitos de voz vêm depois da velocidade e antes do volume, como os nós da prévia, que ficam
     entre o elemento (já na velocidade) e o ganho.
     """
@@ -521,7 +536,7 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
     filtros += [
         f"aresample={TAXA_AUDIO}",
         "aformat=sample_fmts=fltp:channel_layouts=stereo",
-        *cadeia_atempo(clipe["velocidade"]),
+        *(_atempo_com_roteiro(*andamento) if andamento else cadeia_atempo(clipe["velocidade"])),
     ]
     efeitos = clipe.get("efeitos_voz") or {}
     filtros += filtros_de_voz(efeitos)
@@ -552,6 +567,11 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
     if prefixo:
         return prefixo + "".join(f",{filtro}" for filtro in filtros)
     return f"[{entrada}:a]{','.join(filtros)}"
+
+
+def _atempo_com_roteiro(roteiro: str, alvos: list[str]) -> list[str]:
+    """Os atempo em série que recebem o andamento da curva pelo roteiro (no tempo da mídia)."""
+    return [f"asendcmd=f='{_escapar_caminho(roteiro)}'", *(f"{alvo}=tempo=1" for alvo in alvos)]
 
 
 def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) -> Leitura:
@@ -769,7 +789,18 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                     auxiliares[caminho_ir] = ArquivoAuxiliar(caminho_ir, "reverb", {})
                     reverb = (len(entradas), f"rv{len(sons)}")
                     entradas.append(Entrada(caminho_ir, 0, REVERB_DURACAO_S))
-                cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb)
+                andamento = None
+                if clipe.get("curva_velocidade"):
+                    # O som segue a curva: o andamento muda a cada 50 ms, dividido pelos atempo que fazem falta
+                    necessarios = atempo_necessarios(clipe["curva_velocidade"], clipe["velocidade"],
+                                                     segundos(clipe["duracao"]))
+                    alvos = [f"atempo@an{len(sons)}{letra}" for letra in "abc"[:necessarios]]
+                    roteiro_andamento = f"{pasta}/andamento_{clipe['id']}.txt"
+                    auxiliares[roteiro_andamento] = ArquivoAuxiliar(roteiro_andamento, "comandos", {}, conteudo=(
+                        comandos_do_andamento(clipe["curva_velocidade"], clipe["velocidade"],
+                                              segundos(clipe["duracao"]), alvos)))
+                    andamento = (roteiro_andamento, alvos)
+                cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb, andamento)
                 linhas_som.append(f"{cadeia}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"

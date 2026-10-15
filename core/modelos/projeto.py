@@ -98,6 +98,8 @@ def _conferir_transicoes(faixa: dict, clipes: list[dict]) -> str | None:
             return "Transição só existe entre dois clipes vizinhos da faixa principal."
         if transicao["duracao"] > min(clipe["duracao"], clipes[indice + 1]["duracao"]):
             return "Uma transição é mais longa que um dos clipes dela."
+        if clipe.get("curva_velocidade") or clipes[indice + 1].get("curva_velocidade"):
+            return "Clipe com curva de velocidade não tem transição."
     return None
 
 

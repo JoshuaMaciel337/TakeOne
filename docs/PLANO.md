@@ -427,7 +427,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] modos de mesclagem: multiplicar, tela e somar
 - [x] Chroma key (tela verde), pelo colorkey do FFmpeg e a mesma conta no shader.
 - [x] Keyframes de posição, escala, rotação e opacidade, com curva linear ou suave (a conta é do TakeOne; o `keyframe` do EffectCraft fica de referência para Bezier e hold).
-- Velocidade com curva, mantendo o tom da voz (SoundCraft).
+- [x] Velocidade constante e com curva, mantendo o tom da voz (aba Velocidade).
 
 ### Fase 5: IA no estilo CapCut (3+ semanas)
 - Já existem no HolyCut e só precisam ser generalizados:

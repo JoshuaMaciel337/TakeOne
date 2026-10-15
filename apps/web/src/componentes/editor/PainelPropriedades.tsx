@@ -6,6 +6,7 @@ import { useState } from "react";
 import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
+import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
@@ -530,7 +531,49 @@ function AbaVelocidade({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
           Duração: {duracaoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
         </p>
       </Secao>
+      <Secao titulo="Curva">
+        <p className="mb-1 text-[11px] text-suave">Muda a velocidade ao longo do clipe, sem mudar a duração dele.</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            disabled={travada}
+            aria-pressed={!clipe.curva_velocidade}
+            onClick={() => aoExecutar({ comando: "clipe.curvaVelocidade", parametros: { clipeId: clipe.id, pontos: null } })}
+            className={`rounded-md border px-2 py-1.5 text-left text-[11px] transition disabled:opacity-50 ${!clipe.curva_velocidade ? "border-destaque bg-destaque/10" : "border-borda hover:border-suave"}`}
+          >
+            Nenhuma
+          </button>
+          {CURVAS_PRONTAS.map((curva) => {
+            const escolhida = JSON.stringify(clipe.curva_velocidade) === JSON.stringify(curva.pontos);
+            return (
+              <button
+                key={curva.id}
+                type="button"
+                disabled={travada}
+                aria-pressed={escolhida}
+                onClick={() => aoExecutar({ comando: "clipe.curvaVelocidade", parametros: { clipeId: clipe.id, pontos: curva.pontos } })}
+                className={`flex flex-col gap-1 rounded-md border px-2 py-1.5 text-left text-[11px] transition disabled:opacity-50 ${escolhida ? "border-destaque bg-destaque/10" : "border-borda hover:border-suave"}`}
+              >
+                <DesenhoDaCurva pontos={curva.pontos} />
+                {curva.nome}
+              </button>
+            );
+          })}
+        </div>
+      </Secao>
     </div>
+  );
+}
+
+/** A curva de velocidade num desenho pequeno: em cima, mais rápido; embaixo, mais devagar. */
+function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
+  // Escala logarítmica: 0,2× embaixo, 5× em cima, 1× no meio
+  const y = (s: number) => 10 - (Math.log(s) / Math.log(5)) * 9;
+  return (
+    <svg viewBox="0 0 60 20" className="h-5 w-full" aria-hidden>
+      <line x1={0} y1={10} x2={60} y2={10} stroke="rgba(255,255,255,0.15)" strokeDasharray="2 2" />
+      <polyline points={pontos.map(([u, s]) => `${(u * 60).toFixed(1)},${y(s).toFixed(1)}`).join(" ")} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    </svg>
   );
 }
 

@@ -11,6 +11,7 @@ import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodifi
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
+import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -40,7 +41,11 @@ function segundosNaMidia(item: ItemDaPrevia, tempo: Tick): number {
 function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>, item: ItemDaPrevia, tempo: Tick, tocando: boolean) {
   const alvo = segundosNaMidia(item, tempo);
   const tocar = item.ativo && tocando;
-  const { velocidade } = item.clipe;
+  // Com curva, a velocidade do instante (o elemento muda o andamento sem mudar o tom)
+  const { clipe } = item;
+  const velocidade = clipe.curva_velocidade
+    ? Math.max(ANDAMENTO_MINIMO, velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, (tempo - clipe.inicio) / clipe.duracao))
+    : clipe.velocidade;
 
   useEffect(() => {
     const elemento = elementoRef.current;

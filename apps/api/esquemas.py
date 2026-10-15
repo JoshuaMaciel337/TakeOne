@@ -337,6 +337,20 @@ class ClipeEntrada(BaseModel):
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
+    # Velocidade com curva: (u, s) do começo (u = 0) ao fim (u = 1) do clipe; s de 0,2 a 5
+    curva_velocidade: list[tuple[float, float]] | None = Field(default=None, min_length=2, max_length=16)
+
+    @field_validator("curva_velocidade")
+    @classmethod
+    def curva_do_comeco_ao_fim(cls, pontos):
+        if pontos is None:
+            return pontos
+        em_ordem = all(b[0] > a[0] for a, b in zip(pontos, pontos[1:], strict=False))
+        if pontos[0][0] != 0 or pontos[-1][0] != 1 or not em_ordem:
+            raise ValueError("A curva de velocidade vai do começo ao fim do clipe, com os pontos em ordem.")
+        if any(not 0.2 <= s <= 5 for _, s in pontos):
+            raise ValueError("A curva de velocidade vai de 0,2 a 5 vezes.")
+        return pontos
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 
