@@ -2,6 +2,7 @@
 # TakeOne API — cadastro, login e sessão
 # -----------------------------------------------
 import logging
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pymongo.errors import DuplicateKeyError
@@ -30,7 +31,10 @@ from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 limitador = LimitadorTentativas()
-MAX_TENTATIVAS_SLUG = 20
+# Primeiro nome-2, nome-3...; depois de tantos, um sufixo aleatório, para o cadastro nunca travar
+# num nome comum (o padrão é "Espaço de <primeiro nome>")
+TENTATIVAS_EM_SEQUENCIA = 20
+TENTATIVAS_ALEATORIAS = 5
 
 
 # -----------------------------------------------
@@ -67,8 +71,9 @@ async def criar_organizacao(db, nome: str):
     """Insere a organização com um slug único. Retorna (_id, slug)."""
     base = gerar_slug(nome)
     momento = agora()
-    for tentativa in range(MAX_TENTATIVAS_SLUG):
-        slug = base if tentativa == 0 else f"{base}-{tentativa + 1}"
+    candidatos = [base, *(f"{base}-{n}" for n in range(2, TENTATIVAS_EM_SEQUENCIA + 1))]
+    candidatos += [f"{base}-{secrets.token_hex(3)}" for _ in range(TENTATIVAS_ALEATORIAS)]
+    for slug in candidatos:
         if await db.organizacoes.find_one({"slug": slug}, {"_id": 1}):
             continue
         try:

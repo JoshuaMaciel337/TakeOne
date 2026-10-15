@@ -55,6 +55,16 @@ def test_slug_repetido_ganha_sufixo_e_email_repetido_e_recusado(cliente):
     assert repetido.status_code == 409
 
 
+def test_nome_muito_repetido_ainda_cadastra(cliente, db_limpo):
+    # "Espaço de Ana" é o nome padrão: depois de nome-2 ... nome-20, o slug ganha um sufixo aleatório
+    db_limpo.organizacoes.insert_many([{"nome": "Espaço de Ana", "slug": "espaco-de-ana"}]
+                                      + [{"nome": "Espaço de Ana", "slug": f"espaco-de-ana-{n}"} for n in range(2, 21)])
+    resposta, _ = cadastrar(cliente, nome="Ana Souza")
+    assert resposta.status_code == 201, resposta.text
+    slug = resposta.json()["organizacao"]["slug"]
+    assert slug.startswith("espaco-de-ana-") and len(slug) == len("espaco-de-ana-") + 6
+
+
 def test_validacao_responde_em_portugues(cliente):
     resposta = cliente.post("/api/auth/cadastro", json={
         "nome": "Pessoa", "email": "a@exemplo.com", "senha": "curta",
