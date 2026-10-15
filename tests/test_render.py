@@ -349,12 +349,21 @@ def test_remover_fundo_le_a_mascara_como_o_clipe_e_usa_alphamerge():
     mascara = next(e for e in plano.entradas if e.caminho == "/m/mascara.mp4")
     video = next(e for e in plano.entradas if e.caminho == "/m/empe.mp4")
     assert (mascara.inicio, mascara.duracao) == (video.inicio, video.duracao), "o mesmo trecho"
-    assert "scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-STARTPTS)/1,fps=30/1,crop=" in plano.filtro
+    assert "scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-STARTPTS)/1,fps=30/1:round=up,crop=" in plano.filtro
     assert "[vf2][mf2]alphamerge" in plano.filtro
     sem_mascara = {**MIDIAS}
     with pytest.raises(ErroRender, match="recorte do fundo"):
         planejar_render(projeto([faixa("principal", [clipe("c1", "empe", 0, 4, remover_fundo=True)])]), sem_mascara,
                         720, 1280)
+
+
+def test_imagem_sem_ruido_le_o_video_limpo_e_o_som_do_original():
+    limpa = MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, matriz=None, imagem_limpa="/m/limpo.mp4")
+    plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, imagem_limpa=True)])]),
+                            {**MIDIAS, "deitado": limpa}, 720, 1280)
+    assert [e.caminho for e in plano.entradas] == ["/m/deitado.mp4", "/m/limpo.mp4"]
+    assert "[1:v]setpts=" in plano.filtro, "a imagem vem do limpo, já em BT.709 (sem setparams)"
+    assert "[0:a]" in plano.filtro_som, "o som continua vindo do original"
 
 
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():

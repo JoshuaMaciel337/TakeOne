@@ -94,6 +94,7 @@ class MidiaDoRender:
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
     mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
+    imagem_limpa: str | None = None  # a imagem sem ruído, em resolução cheia e já em BT.709
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
 
 
@@ -230,7 +231,10 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         fps = f"fps={taxa}:round=up"
     else:
         tempo = [f"setpts=(PTS-STARTPTS)/{_numero(clipe['velocidade'])}"]
-        fps = f"fps={taxa}"
+        # round=up: cada quadro do vídeo mostra o último quadro da mídia que já chegou, como o
+        # decodificador da prévia. Com o padrão (o mais próximo), um vídeo de 29,97 num projeto de 30
+        # saía sempre um quadro adiantado (medido: 1 de 200 quadros iguais; com round=up, 200 de 200)
+        fps = f"fps={taxa}:round=up"
     filtros = [
         *(entrada_de_cor or []),
         *tempo,
@@ -726,6 +730,16 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                            max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
             auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
         entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
+        if clipe.get("imagem_limpa") and not clipe.get("texto"):
+            # A imagem sem ruído no lugar da original (o som continua vindo da original)
+            midia = midias[clipe["midia_id"]]
+            if not midia.imagem_limpa:
+                raise ErroRender("A imagem sem ruído de um clipe ainda está sendo preparada. Espere terminar "
+                                 "ou desligue \"Tirar o ruído\" para exportar.")
+            lida = entradas[entrada]
+            entrada = len(entradas)
+            entradas.append(Entrada(midia.imagem_limpa, lida.inicio, lida.duracao))
+            entrada_de_cor = []
         caminho_desfoque = f"{pasta}/desfoque_{clipe['id']}_{numero}.txt"
         desfoque, roteiro_desfoque = _desfoque(clipe, leituras.get(clipe["id"]), max(1, round(caixa.altura)),
                                                float(taxa_em_fracao(taxa)), f"d{numero}", caminho_desfoque)
