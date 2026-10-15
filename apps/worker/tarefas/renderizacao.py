@@ -157,6 +157,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         for auxiliar in plano.auxiliares:
             if auxiliar.tipo == "lut":
                 Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
+            elif auxiliar.tipo == "comandos":
+                Path(auxiliar.caminho).write_text(auxiliar.conteudo, encoding="utf-8")
             else:
                 desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
         if plano.tem_som:

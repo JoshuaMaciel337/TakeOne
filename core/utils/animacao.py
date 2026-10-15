@@ -7,6 +7,8 @@
 #   - movimento: expressões de tempo no x e no y do `overlay`;
 #   - zoom: `scale` com eval=frame, depois do giro (escala uniforme dá no mesmo antes ou depois).
 # -----------------------------------------------
+from core.utils.keyframes import transformacao_no_tempo
+
 DISTANCIA_VERTICAL = 0.08
 DISTANCIA_HORIZONTAL = 0.15
 ZOOM_INICIAL = 0.6
@@ -26,9 +28,12 @@ def _ativa(animacao: dict) -> bool:
 
 
 def transformacao_animada(clipe: dict, t: float) -> dict:
-    """A transformação do clipe no instante `t`. Tempos todos na mesma unidade (ticks ou segundos)."""
+    """
+    A transformação do clipe no instante `t`, com os keyframes e as animações. Tempos todos na mesma
+    unidade (ticks ou segundos), também os dos keyframes.
+    """
     animacao = clipe.get("animacao") or SEM_ANIMACAO
-    resultado = dict(clipe["transformacao"])
+    resultado = transformacao_no_tempo(clipe, t)
     fim = clipe["inicio"] + clipe["duracao"]
 
     def aplicar(item: dict, p: float, sentido: int):

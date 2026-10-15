@@ -1,0 +1,22 @@
+{
+ "descricao": "Keyframes: o valor de uma propriedade num instante (segundos desde o começo do clipe) e a transformação de um clipe com keyframes e animação. Lidos por apps/web/src/lib/projeto/keyframes.test.ts e tests/test_keyframes.py; o teste do Python também roda a expressão do FFmpeg.",
+ "valores": [
+  {"nome": "antes do primeiro ponto vale o primeiro", "pontos": [{"t": 1, "valor": 0.2, "curva": "linear"}, {"t": 3, "valor": 0.6, "curva": "linear"}], "t": 0.5, "valor": 0.2},
+  {"nome": "linear na metade", "pontos": [{"t": 1, "valor": 0.2, "curva": "linear"}, {"t": 3, "valor": 0.6, "curva": "linear"}], "t": 2, "valor": 0.4},
+  {"nome": "suave a um quarto anda menos que o linear", "pontos": [{"t": 0, "valor": 0, "curva": "suave"}, {"t": 4, "valor": 1, "curva": "linear"}], "t": 1, "valor": 0.15625},
+  {"nome": "depois do último vale o último", "pontos": [{"t": 0, "valor": 1, "curva": "linear"}, {"t": 2, "valor": 1.5, "curva": "linear"}], "t": 9, "valor": 1.5},
+  {"nome": "três pontos, no segundo trecho", "pontos": [{"t": 0, "valor": 0, "curva": "linear"}, {"t": 1, "valor": 90, "curva": "linear"}, {"t": 3, "valor": -90, "curva": "linear"}], "t": 2, "valor": 0},
+  {"nome": "um ponto só vale sempre", "pontos": [{"t": 2, "valor": 0.7, "curva": "linear"}], "t": 5, "valor": 0.7},
+  {"nome": "valor negativo", "pontos": [{"t": 0, "valor": -0.5, "curva": "linear"}, {"t": 2, "valor": 0.5, "curva": "linear"}], "t": 0.5, "valor": -0.25}
+ ],
+ "transformacoes": [
+  {"nome": "keyframes na posição e zoom de entrada por cima",
+   "clipe": {"inicio": 2, "duracao": 4, "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+             "keyframes": {"x": [{"t": 0, "valor": -0.2, "curva": "linear"}, {"t": 2, "valor": 0.2, "curva": "linear"}]},
+             "animacao": {"entrada": {"tipo": "zoom", "duracao": 1}, "saida": {"tipo": "nenhuma", "duracao": 0}}},
+   "t": 2.5, "esperado": {"x": -0.1, "y": 0, "escala": 0.95, "rotacao": 0, "opacidade": 0.5}},
+  {"nome": "sem keyframes é a transformação do clipe",
+   "clipe": {"inicio": 0, "duracao": 4, "transformacao": {"x": 0.1, "y": 0.2, "escala": 0.5, "rotacao": 30, "opacidade": 0.8}},
+   "t": 1, "esperado": {"x": 0.1, "y": 0.2, "escala": 0.5, "rotacao": 30, "opacidade": 0.8}}
+ ]
+}

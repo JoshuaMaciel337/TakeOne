@@ -132,6 +132,37 @@ class TransformacaoEntrada(BaseModel):
     opacidade: float = Field(default=1, ge=0, le=1)
 
 
+class KeyframeEntrada(BaseModel):
+    t: int = Field(description="Ticks desde o começo do clipe (pode ser negativo depois de aparar o começo)")
+    valor: float
+    curva: Literal["linear", "suave"] = "linear"
+
+
+# Os mesmos limites da TransformacaoEntrada; no máximo 100 pontos por propriedade (o render monta
+# uma expressão com todos)
+LIMITES_ANIMAVEIS = {"x": (-10, 10), "y": (-10, 10), "escala": (0.01, 20), "rotacao": (-180, 180), "opacidade": (0, 1)}
+
+
+class KeyframesEntrada(BaseModel):
+    x: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+    y: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+    escala: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+    rotacao: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+    opacidade: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def em_ordem_e_nos_limites(self):
+        for nome, (minimo, maximo) in LIMITES_ANIMAVEIS.items():
+            pontos = getattr(self, nome)
+            if not pontos:
+                continue
+            if any(b.t <= a.t for a, b in zip(pontos, pontos[1:], strict=False)):
+                raise ValueError(f"Os keyframes de {nome} precisam estar em ordem, sem dois no mesmo instante.")
+            if any(not minimo <= ponto.valor <= maximo for ponto in pontos):
+                raise ValueError(f"Um keyframe de {nome} passa do limite.")
+        return self
+
+
 class RecorteEntrada(BaseModel):
     x: float = Field(default=0, ge=0, lt=1)
     y: float = Field(default=0, ge=0, lt=1)
@@ -219,6 +250,7 @@ class ClipeEntrada(BaseModel):
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
+    keyframes: KeyframesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None

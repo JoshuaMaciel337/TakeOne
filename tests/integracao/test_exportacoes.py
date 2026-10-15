@@ -414,3 +414,62 @@ def test_render_faz_a_cortina_como_a_previa(cliente, db_limpo):
     assert no_corte[360, 1240][0] > 200 and no_corte[360, 1240][2] < 50, no_corte[360, 1240]
     depois = quadro_do_video(video, 1.8, 1280, 720)
     assert depois[360, 1240][2] > 200 and depois[360, 1240][0] < 50, "depois da janela o azul aparece inteiro"
+
+
+def _exportar(cliente, db, projeto_id: str):
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto_id, "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db, ["renderizacao"], "w-teste")
+    assert processar_job(db, job, "w-teste") == "concluido", db.jobs.find_one({"_id": job["_id"]})["erro"]
+    doc = db.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    return storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+
+
+def _perto(cor, esperada, tolerancia=40):
+    return max(abs(int(a) - b) for a, b in zip(cor, esperada, strict=True)) <= tolerancia
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_segue_os_keyframes_de_posicao_e_opacidade(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    linear = "linear"
+    # x vai de -0,25 a +0,25 em 2 s; a escala 0,5 deixa o clipe com 640 × 360 no quadro de 1280 × 720
+    keyframes = {"x": [{"t": 0, "valor": -0.25, "curva": linear}, {"t": 2 * SEGUNDO, "valor": 0.25, "curva": linear}]}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", transformacao={"x": 0, "y": 0, "escala": 0.5,
+                                                                            "rotacao": 0, "opacidade": 1},
+                          keyframes=keyframes)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    # O centro do quadrante vermelho fica 160 px à esquerda e 90 px acima do centro do clipe
+    for t, cx in ((0.0, 320), (1.0, 640)):
+        quadro = quadro_do_video(video, t, 1280, 720)
+        assert _perto(quadro[270, cx - 160], CORES[(0, 0)]), (t, quadro[270, cx - 160])
+    assert _perto(quadro_do_video(video, 1.0, 1280, 720)[270, 160], FUNDO), "o clipe já saiu dali"
+
+    opacidade = {"opacidade": [{"t": 0, "valor": 0, "curva": linear}, {"t": 2 * SEGUNDO, "valor": 1, "curva": linear}]}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", keyframes=opacidade)
+    db_limpo.jobs.delete_many({})
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    # Na metade, o vermelho do quadrante aparece meio a meio com o fundo magenta
+    meio = quadro_do_video(video, 1.0, 1280, 720)[180, 320]
+    assert _perto(meio, (255, 0, 128), 25), meio
+    assert _perto(quadro_do_video(video, 0.0, 1280, 720)[180, 320], FUNDO, 25)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_aceita_giro_e_escala_com_keyframes(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    fim = 2 * SEGUNDO
+    keyframes = {"rotacao": [{"t": 0, "valor": 0, "curva": "suave"}, {"t": fim, "valor": 90, "curva": "linear"}],
+                 "escala": [{"t": 0, "valor": 0.3, "curva": "linear"}, {"t": fim, "valor": 0.8, "curva": "linear"}]}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", keyframes=keyframes)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    # No começo o clipe é pequeno e reto: o centro do quadro tem a divisa dos quadrantes, as bordas têm o fundo
+    comeco = quadro_do_video(video, 0.0, 1280, 720)
+    assert _perto(comeco[30, 30], FUNDO) and _perto(comeco[360 - 40, 640 - 80], CORES[(0, 0)])
+    # Em 1,95 s: giro de 89,8° (curva suave) e escala 0,7875 (1008 × 567). O centro do quadrante vermelho,
+    # 252 px à esquerda e 142 px acima do centro do clipe, gira no sentido horário para (+142, -252)
+    fim_do_giro = quadro_do_video(video, 1.95, 1280, 720)
+    assert _perto(fim_do_giro[360 - 252, 640 + 142], CORES[(0, 0)]), fim_do_giro[360 - 252, 640 + 142]
+    # Fora do clipe girado (que vai de x = 356 a 924), mas dentro da área do giro: só o fundo, sem rastro
+    assert _perto(fim_do_giro[360, 220], FUNDO), fim_do_giro[360, 220]

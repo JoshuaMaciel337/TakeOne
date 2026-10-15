@@ -28,6 +28,7 @@ from core.utils.animacao import filtros_de_animacao
 from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
+from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -101,12 +102,13 @@ class Entrada:
 
 @dataclass(frozen=True)
 class ArquivoAuxiliar:
-    """Arquivo que o worker gera antes de rodar o FFmpeg: a LUT da cor ou a imagem da vinheta."""
+    """Arquivo que o worker gera antes do FFmpeg: a LUT da cor, a imagem da vinheta ou o roteiro do sendcmd."""
     caminho: str
-    tipo: str          # "lut" ou "vinheta"
+    tipo: str          # "lut", "vinheta" ou "comandos"
     ajustes: dict
     largura: int = 0
     altura: int = 0
+    conteudo: str = ""   # o texto do roteiro, nos "comandos"
 
 
 @dataclass(frozen=True)
@@ -153,13 +155,18 @@ def cadeia_atempo(velocidade: float) -> list[str]:
 
 def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int],
                     numero: int = 0, lut: str | None = None, vinheta: int | None = None,
-                    leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None) -> tuple[str, str]:
+                    leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None,
+                    roteiro_de_opacidade: str | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
     leitura: a janela do clipe com as transições (só na faixa principal).
     entrada_de_cor: filtros do começo que dizem como ler a cor do vídeo (ler_como_bt709).
+    roteiro_de_opacidade: o roteiro do sendcmd com a opacidade por quadro, quando ela tem keyframes.
+    A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
+    com_keyframes = animadas(clipe)
+    pontos = clipe.get("keyframes") or {}
     recorte = clipe["recorte"]
     leitura = leitura or Leitura(segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"]))
     inicio = leitura.inicio
@@ -194,16 +201,26 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                    f"[{vinheta}:v]format=gbrap[vb{numero}];\n"
                    f"[va{numero}][vb{numero}]blend=all_mode=multiply,format=rgba")
         filtros = []
-    if caixa.opacidade < 1:
+    if roteiro_de_opacidade:
+        # A opacidade com keyframes muda por quadro, pelo roteiro (no tempo da janela do clipe)
+        filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro_de_opacidade)}'")
+        filtros.append(f"colorchannelmixer@op{numero}=aa=1")
+    elif caixa.opacidade < 1:
         filtros.append(f"colorchannelmixer=aa={_numero(caixa.opacidade)}")
     if caixa.rotacao:
         # Sentido horário, como a prévia; os cantos que sobram ficam transparentes
         angulo = _numero(math.radians(caixa.rotacao))
-        filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=none")
+        filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=black@0")
     filtros.append(f"setpts=PTS+{_numero(inicio)}/TB")
     fim = leitura.fim
     # As animações seguem o começo e o fim do próprio clipe; as transições, a janela delas
     inicio_clipe = segundos(clipe["inicio"])
+    if "rotacao" in com_keyframes:
+        # Giro por quadro (graus, sentido horário); a saída é um quadrado na diagonal, cabe qualquer ângulo.
+        # O que sobra fora do clipe é pintado de transparente a cada quadro: com c=none ficava o rastro
+        # dos ângulos anteriores
+        giro = expressao(pontos["rotacao"], inicio_clipe)
+        filtros.append(f"rotate=a='({giro})*PI/180':ow='hypot(iw,ih)':oh=ow:c=black@0")
     fim_clipe = segundos(clipe["inicio"] + clipe["duracao"])
     animacao = filtros_de_animacao({**clipe, "inicio": inicio_clipe, "duracao": fim_clipe - inicio_clipe,
                                     "animacao": _animacao_em_segundos(clipe.get("animacao"))}, inicio_clipe, fim_clipe)
@@ -216,12 +233,31 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
             "dx": transicao["dx"] if animacao["dx"] == "0" else f"{animacao['dx']}+{transicao['dx']}",
             "dy": animacao["dy"],
         }
+    # Keyframes de posição e escala: somam às animações e transições (partem do valor de base)
+    base = clipe["transformacao"]
+    termos = {"dx": [animacao["dx"]], "dy": [animacao["dy"]],
+              "escala": [animacao["escala"]] if animacao["escala"] else []}
+    if "x" in com_keyframes:
+        termos["dx"].append(f"({expressao(pontos['x'], inicio_clipe)})-({_numero(base['x'])})")
+    if "y" in com_keyframes:
+        termos["dy"].append(f"({expressao(pontos['y'], inicio_clipe)})-({_numero(base['y'])})")
+    if "escala" in com_keyframes:
+        maior = max(ponto["valor"] for ponto in pontos["escala"])
+        termos["escala"].append(f"({expressao(pontos['escala'], inicio_clipe)})/{_numero(maior)}")
+    animacao = {
+        **animacao,
+        "dx": "+".join(termo for termo in termos["dx"] if termo != "0") or "0",
+        "dy": "+".join(termo for termo in termos["dy"] if termo != "0") or "0",
+        "escala": "*".join(termos["escala"]) or None,
+    }
     filtros += animacao["fades"]
     if animacao["escala"]:
         # O zoom muda o tamanho a cada quadro; o pad devolve sempre o mesmo tamanho para o overlay
         cos, sen = abs(math.cos(math.radians(caixa.rotacao))), abs(math.sin(math.radians(caixa.rotacao)))
         lado_l = math.ceil(largura * cos + altura * sen) + 2
         lado_a = math.ceil(largura * sen + altura * cos) + 2
+        if "rotacao" in com_keyframes:
+            lado_l = lado_a = math.ceil(math.hypot(largura, altura)) + 2
         fator = animacao["escala"]
         filtros.append(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame")
         filtros.append(f"pad=w={lado_l}:h={lado_a}:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame")
@@ -361,12 +397,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         if clipe.get("texto"):
             imagem = textos[clipe["id"]]
             referencia = (imagem.largura_referencia, imagem.altura_referencia)
-            caixa = caixa_do_texto(clipe["transformacao"], referencia, quadro)
+            caixa = caixa_do_texto(transformacao_de_base(clipe), referencia, quadro)
         else:
             midia = midias[clipe["midia_id"]]
             if not midia.video:
                 continue
-            caixa = caixa_do_clipe(clipe["transformacao"], clipe["recorte"], (midia.largura, midia.altura), quadro)
+            midia_tamanho = (midia.largura, midia.altura)
+            caixa = caixa_do_clipe(transformacao_de_base(clipe), clipe["recorte"], midia_tamanho, quadro)
         ajustes = ajustes_efetivos(clipe.get("cor"))
         lut = vinheta = None
         if not cor_neutra({**ajustes, "vinheta": 0}):
@@ -382,8 +419,18 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             # A vinheta encontra o clipe já na velocidade dele: dura a janela no vídeo final
             entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
         entrada_de_cor = None if clipe.get("texto") else ler_como_bt709(midias[clipe["midia_id"]].matriz)
+        roteiro = None
+        if "opacidade" in animadas(clipe):
+            # A opacidade por quadro, contando do começo da janela do clipe (com a sobra das transições)
+            leitura = leituras.get(clipe["id"])
+            fim_do_clipe = segundos(clipe["inicio"] + clipe["duracao"])
+            janela = (leitura.inicio, leitura.fim) if leitura else (segundos(clipe["inicio"]), fim_do_clipe)
+            roteiro = f"{pasta}/opacidade_{clipe['id']}.txt"
+            conteudo = comandos_de_opacidade(clipe["keyframes"]["opacidade"], segundos(clipe["inicio"]), janela,
+                                             float(taxa_em_fracao(taxa)), f"colorchannelmixer@op{numero}")
+            auxiliares[roteiro] = ArquivoAuxiliar(roteiro, "comandos", {}, conteudo=conteudo)
         cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro,
-                                          numero, lut, vinheta, leituras.get(clipe["id"]), entrada_de_cor)
+                                          numero, lut, vinheta, leituras.get(clipe["id"]), entrada_de_cor, roteiro)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"
