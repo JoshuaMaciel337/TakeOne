@@ -384,6 +384,83 @@ export function apagarClipes(projeto: Projeto, clipeIds: string[], fecharEspaco 
   return finalizar({ ...projeto, faixas });
 }
 
+export type Intervalo = { inicio: Tick; fim: Tick };
+
+/** Os intervalos no quadro, em ordem e sem sobreposição; os menores que um quadro somem. */
+function juntarIntervalos(projeto: Projeto, intervalos: Intervalo[]): Intervalo[] {
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const alinhados = intervalos
+    .map((item) => ({ inicio: Math.max(0, quadroMaisProximo(projeto.taxa, item.inicio)), fim: quadroMaisProximo(projeto.taxa, item.fim) }))
+    .filter((item) => item.fim - item.inicio >= quadro)
+    .sort((a, b) => a.inicio - b.inicio);
+  const juntos: Intervalo[] = [];
+  for (const item of alinhados) {
+    const ultimo = juntos.at(-1);
+    if (ultimo && item.inicio <= ultimo.fim) ultimo.fim = Math.max(ultimo.fim, item.fim);
+    else juntos.push({ ...item });
+  }
+  return juntos;
+}
+
+/**
+ * Tira os intervalos da linha do tempo inteira e fecha o espaço, em todas as faixas, para a fala,
+ * as legendas, as sobreposições e a música continuarem juntas. Um clipe que atravessa um intervalo
+ * vira pedaços: o primeiro guarda o id, o fade e a animação de entrada; o último, os de saída e a
+ * transição. É a base da limpeza de fala e da edição pelo texto.
+ */
+export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: Intervalo[]): Projeto {
+  const cortes = juntarIntervalos(projeto, intervalos);
+  if (!cortes.length) throw new ErroEdicao("Não há trechos para remover.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  /** Quanto foi removido antes do instante `t`. */
+  const removidoAntes = (t: Tick) => cortes.reduce((soma, corte) => soma + Math.max(0, Math.min(t, corte.fim) - corte.inicio), 0);
+
+  const faixas = projeto.faixas.map((faixa) => {
+    const atingida = faixa.clipes.some((clipe) => cortes.some((corte) => corte.inicio < fimDoClipe(clipe)));
+    if (!atingida) return faixa;
+    exigirDestravada(faixa);
+    const clipes: Clipe[] = [];
+    for (const clipe of ordenar(faixa.clipes)) {
+      const fim = fimDoClipe(clipe);
+      // Os pedaços do clipe que ficam fora dos intervalos
+      const pedacos: Intervalo[] = [];
+      let t = clipe.inicio;
+      for (const corte of cortes) {
+        if (corte.fim <= t || corte.inicio >= fim) continue;
+        if (corte.inicio > t) pedacos.push({ inicio: t, fim: corte.inicio });
+        t = Math.max(t, corte.fim);
+      }
+      if (t < fim) pedacos.push({ inicio: t, fim });
+      const validos = pedacos.filter((p) => p.fim - p.inicio >= quadro);
+      validos.forEach((pedaco, i) => {
+        const primeiro = i === 0;
+        const ultimo = i === validos.length - 1;
+        const inteiro = pedaco.inicio === clipe.inicio && pedaco.fim === fim;
+        clipes.push(
+          inteiro
+            ? { ...clipe, inicio: clipe.inicio - removidoAntes(clipe.inicio) }
+            : {
+                ...clipe,
+                id: primeiro ? clipe.id : ctx.novoId(),
+                inicio: pedaco.inicio - removidoAntes(pedaco.inicio),
+                duracao: pedaco.fim - pedaco.inicio,
+                entrada: clipe.entrada + Math.round((pedaco.inicio - clipe.inicio) * clipe.velocidade),
+                fade_entrada: primeiro ? clipe.fade_entrada : 0,
+                fade_saida: ultimo ? clipe.fade_saida : 0,
+                transicao: ultimo ? clipe.transicao : null,
+                animacao: clipe.animacao
+                  ? { entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
+                  : clipe.animacao,
+              },
+        );
+      });
+    }
+    const alterada = { ...faixa, clipes };
+    return faixa.tipo === "principal" ? compactar(alterada) : alterada;
+  });
+  return finalizar({ ...projeto, faixas });
+}
+
 /** Cada clipe ganha uma cópia logo depois dele. Devolve os ids das cópias. */
 export function duplicarClipes(projeto: Projeto, ctx: Contexto, clipeIds: string[]): { projeto: Projeto; novos: string[] } {
   if (!clipeIds.length) throw new ErroEdicao("Escolha um clipe para duplicar.");

@@ -1,12 +1,12 @@
-// Legendas automáticas: as palavras da transcrição de cada mídia (em segundos da mídia) viram linhas
-// de legenda no tempo da linha do tempo. Cada clipe mostra só a fala do trecho da mídia que ele usa,
-// na velocidade dele, e uma linha nunca passa de um clipe para o outro. Função pura.
-import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
+// Legendas automáticas: a fala dos clipes (lib/projeto/fala.ts) vira linhas de legenda. Uma linha
+// nunca passa de um clipe para o outro, quebra em pausas e fins de frase e cabe na largura do quadro.
+// Função pura.
+import { TICKS_POR_SEGUNDO } from "../tempo.ts";
+import { falaDosClipes, type Palavra, type PalavraNoTempo } from "./fala.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Clipe } from "./modelo.ts";
 
-/** Uma palavra da transcrição, em segundos da mídia. */
-export type Palavra = { texto: string; inicio: number; fim: number };
+export type { Palavra } from "./fala.ts";
 
 export type OpcoesDaFala = {
   /** Caracteres que cabem numa linha (veja opcoesParaOQuadro). */
@@ -54,39 +54,26 @@ export function quebrarEmLinhas(palavras: string[], max: number, maxLinhas: numb
 /** Fim de frase: a linha termina aqui, mesmo com espaço sobrando. */
 const FIM_DE_FRASE = /[.!?…]["»”)]?$/;
 
-/**
- * As legendas da fala dos clipes, em ordem e sem sobreposição.
- * palavras: id da mídia → palavras da transcrição dela (as mídias sem transcrição ficam de fora).
- */
+/** As legendas da fala dos clipes, em ordem e sem sobreposição. */
 export function legendasDaFala(clipes: Clipe[], palavras: Map<string, Palavra[]>, opcoes: OpcoesDaFala = OPCOES_DA_FALA): Legenda[] {
   const legendas: Legenda[] = [];
-  for (const clipe of [...clipes].sort((a, b) => a.inicio - b.inicio)) {
-    const daMidia = clipe.midia_id ? palavras.get(clipe.midia_id) : undefined;
-    if (!daMidia?.length) continue;
-    const entrada = clipe.entrada / TICKS_POR_SEGUNDO;
-    const fimNaMidia = entrada + (clipe.duracao / TICKS_POR_SEGUNDO) * clipe.velocidade;
-    const fimDoClipe = clipe.inicio + clipe.duracao;
-    // Segundos da mídia → tick da linha do tempo, dentro do clipe
-    const noTempo = (s: number): Tick =>
-      Math.min(fimDoClipe, Math.max(clipe.inicio, clipe.inicio + Math.round(((s - entrada) / clipe.velocidade) * TICKS_POR_SEGUNDO)));
-
-    let linha: Palavra[] = [];
+  for (const { palavras: doClipe } of falaDosClipes(clipes, palavras)) {
+    let linha: PalavraNoTempo[] = [];
     const fechar = () => {
       if (!linha.length) return;
-      const inicio = noTempo(linha[0].inicio);
-      const fim = noTempo(linha[linha.length - 1].fim);
       const textos = linha.map((p) => p.texto);
       const conteudo = (quebrarEmLinhas(textos, opcoes.maxCaracteres, opcoes.maxLinhas) ?? [textos.join(" ")]).join("\n");
+      const inicio = linha[0].inicio;
+      const fim = linha[linha.length - 1].fim;
       if (fim > inicio) legendas.push({ inicio, fim, conteudo });
       linha = [];
     };
-    // Só as palavras que começam dentro do trecho que o clipe usa
-    for (const palavra of daMidia.filter((p) => p.inicio >= entrada && p.inicio < fimNaMidia)) {
+    for (const palavra of doClipe) {
       const anterior = linha.at(-1);
       if (anterior) {
         const cabe = quebrarEmLinhas([...linha, palavra].map((p) => p.texto), opcoes.maxCaracteres, opcoes.maxLinhas) !== null;
-        const pausa = (palavra.inicio - anterior.fim) / clipe.velocidade;
-        const duracao = (palavra.fim - linha[0].inicio) / clipe.velocidade;
+        const pausa = (palavra.inicio - anterior.fim) / TICKS_POR_SEGUNDO;
+        const duracao = (palavra.fim - linha[0].inicio) / TICKS_POR_SEGUNDO;
         if (pausa > opcoes.pausa || !cabe || duracao > opcoes.maxSegundos) fechar();
       }
       linha.push(palavra);

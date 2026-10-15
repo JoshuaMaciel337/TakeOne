@@ -18,6 +18,8 @@ import {
   apararClipe,
   type Contexto,
   type DestinoClipe,
+  type Intervalo,
+  removerIntervalos,
   dividirClipes,
   estiloDasLegendas,
   importarLegendas,
@@ -43,6 +45,7 @@ export type Comando =
   | { comando: "clipe.aparar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
+  | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
@@ -66,6 +69,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.aparar": "aparar clipe",
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
+  "linha.removerIntervalos": "remover trechos",
   "clipe.duplicar": "duplicar",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
@@ -102,6 +106,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = dividirClipes(projeto, ctx, parametros.tempo, parametros.clipeIds);
       return { projeto: resultado.projeto, selecao: resultado.novos };
     }
+    case "linha.removerIntervalos":
+      return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
     case "clipe.apagar":
       return { projeto: apagarClipes(projeto, parametros.clipeIds, parametros.fecharEspaco), selecao: [] };
     case "clipe.duplicar": {

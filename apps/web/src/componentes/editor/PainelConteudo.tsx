@@ -15,6 +15,7 @@ import { type Ferramenta } from "./ferramentas";
 import { PainelFiltros } from "./PainelFiltros";
 import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
+import { PainelTranscricao } from "./PainelTranscricao";
 import { PainelTexto } from "./PainelTexto";
 
 type Biblioteca = {
@@ -132,6 +133,8 @@ export function PainelConteudo({
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
+        ) : ferramenta.id === "transcricao" ? (
+          <PainelTranscricao projeto={legendas.projeto} aoExecutar={legendas.aoExecutar} aoBuscar={legendas.aoBuscar} aoAvisar={legendas.aoAvisar} />
         ) : ferramenta.id === "transicoes" ? (
           <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (

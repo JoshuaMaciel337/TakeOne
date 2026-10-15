@@ -430,7 +430,7 @@ Cada fase termina com algo que dá para usar e testar.
 ### Fase 5: IA no estilo CapCut (3+ semanas)
 - Já existem no HolyCut e só precisam ser generalizados:
   - edição pelo texto (Transcrição)
-  - cortar silêncios e vícios
+  - [x] cortar silêncios e vícios (limpeza de fala na ferramenta Transcrição)
   - limpar a voz
   - reenquadrar seguindo o rosto
   - redução de ruído na imagem

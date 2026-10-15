@@ -24,6 +24,7 @@ import {
   mudarTexto,
   normalizarRotacao,
   recortarClipes,
+  removerIntervalos,
   restaurarClipes,
   transformarClipes,
   VOLUME_MAXIMO,
@@ -393,4 +394,40 @@ test("transições: só entre vizinhos da principal, cabem nos dois clipes e som
   const semVizinho = apagarClipes(projeto, [b.id]);
   assert.equal(principal(semVizinho)[0].transicao, null);
   assert.equal(definirTransicao(projeto, a.id, null).faixas[0].clipes[0].transicao, null);
+});
+
+test("remover intervalos corta os clipes e fecha o espaço em todas as faixas", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  projeto = importarLegendas(projeto, ctx, [
+    { inicio: 1 * S, fim: 2 * S, conteudo: "antes" },
+    { inicio: 3 * S, fim: 4 * S, conteudo: "no corte" },
+    { inicio: 11 * S, fim: 12 * S, conteudo: "depois" },
+  ], ESTILO_LEGENDA).projeto;
+  const [a, b] = principal(projeto);
+  projeto = { ...projeto, faixas: projeto.faixas.map((f) => (f.tipo === "principal" ? { ...f, clipes: f.clipes.map((c) => (c.id === a.id ? { ...c, fade_entrada: S / 2, fade_saida: S / 2 } : c)) } : f)) };
+
+  // Tira 2,5 s a 4 s do primeiro clipe e 9 s a 11 s, que pega o fim do primeiro e o começo do segundo
+  const resultado = removerIntervalos(projeto, ctx, [{ inicio: 9 * S, fim: 11 * S }, { inicio: 2.5 * S, fim: 4 * S }]);
+  conferir(resultado);
+  const clipes = principal(resultado);
+  assert.deepEqual(clipes.map((c) => [c.inicio / S, c.duracao / S, c.entrada / S]), [
+    [0, 2.5, 0],     // o começo do primeiro, com o mesmo id e o fade de entrada
+    [2.5, 5, 4],     // de 4 s a 9 s da mídia, com o fade de saída
+    [7.5, 3, 1],     // o segundo, sem o primeiro segundo dele
+  ]);
+  assert.equal(clipes[0].id, a.id);
+  // O fade de entrada fica no primeiro pedaço; o de saída, no último pedaço do mesmo clipe
+  assert.deepEqual([clipes[0].fade_entrada, clipes[0].fade_saida, clipes[1].fade_entrada, clipes[1].fade_saida], [S / 2, 0, 0, S / 2]);
+  assert.equal(clipes[2].id, b.id, "o segundo clipe perdeu só o começo e guarda o id");
+  assert.equal(resultado.duracao, 10.5 * S);
+
+  // As legendas andam junto: a que estava dentro do corte some, a de depois recua os 3,5 s tirados antes dela
+  const legendas = resultado.faixas.find((f) => f.tipo === "legenda")!.clipes;
+  assert.deepEqual(legendas.map((c) => [c.inicio / S, c.duracao / S, c.texto?.conteudo]), [
+    [1, 1, "antes"],
+    [7.5, 1, "depois"],
+  ]);
+  assert.throws(() => removerIntervalos(projeto, ctx, [{ inicio: 0, fim: QUADRO / 2 }]), ErroEdicao);
 });

@@ -3,12 +3,12 @@
 import { AudioLines, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { chamarApi, ErroApi } from "@/lib/api";
 import type { Comando } from "@/lib/projeto/comandos";
-import { legendasDaFala, opcoesParaOQuadro, type Palavra } from "@/lib/projeto/legendasDaFala";
+import { legendasDaFala, opcoesParaOQuadro } from "@/lib/projeto/legendasDaFala";
 import type { Projeto } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
-import type { IdiomaTranscricao, Transcricao } from "@/lib/tipos";
+import type { IdiomaTranscricao } from "@/lib/tipos";
+import { transcreverMidias } from "@/lib/transcricao";
 
 import { nomeDaFaixa } from "./LinhaDoTempo";
 
@@ -19,13 +19,12 @@ type Props = {
   aoAvisar: (mensagem: string) => void;
 };
 
-const IDIOMAS: { id: IdiomaTranscricao; nome: string }[] = [
+export const IDIOMAS: { id: IdiomaTranscricao; nome: string }[] = [
   { id: "auto", nome: "Detectar" },
   { id: "pt", nome: "Português" },
   { id: "en", nome: "Inglês" },
   { id: "es", nome: "Espanhol" },
 ];
-const INTERVALO_MS = 2000;
 
 /** Legendas automáticas: transcreve a fala das mídias de uma faixa e cria as legendas no tempo dela. */
 export function LegendasDaFala({ projeto, estilo, aoExecutar, aoAvisar }: Props) {
@@ -47,34 +46,9 @@ export function LegendasDaFala({ projeto, estilo, aoExecutar, aoAvisar }: Props)
   async function gerar() {
     if (!faixa) return;
     const midias = [...new Set(faixa.clipes.flatMap((clipe) => (clipe.midia_id ? [clipe.midia_id] : [])))];
-    setAndamento("Pedindo a transcrição");
     try {
-      let transcricoes = await Promise.all(
-        midias.map((id) =>
-          chamarApi<Transcricao>(`/midias/${id}/transcricao`, { metodo: "POST", corpo: { idioma } }).catch((erro: unknown) => {
-            // Mídia sem áudio fica de fora; o resto continua
-            if (erro instanceof ErroApi && erro.status === 409) return null;
-            throw erro;
-          }),
-        ),
-      );
-      while (ativo.current && transcricoes.some((t) => t?.status === "processando")) {
-        const prontas = transcricoes.filter((t) => t?.status === "pronta").length;
-        const andando = transcricoes.find((t) => t?.status === "processando")?.processamento;
-        const progresso = andando ? ` · ${andando.status === "pendente" ? "na fila do worker de GPU" : `${andando.progresso}%`}` : "";
-        setAndamento(`Transcrevendo ${prontas + 1} de ${midias.length}${progresso}`);
-        await new Promise((ok) => setTimeout(ok, INTERVALO_MS));
-        transcricoes = await Promise.all(
-          transcricoes.map((t) => (t?.status === "processando" ? chamarApi<Transcricao>(`/midias/${t.midia_id}/transcricao`) : Promise.resolve(t))),
-        );
-      }
-      if (!ativo.current) return;
-      const falha = transcricoes.find((t) => t?.status === "erro");
-      if (falha) {
-        aoAvisar(`A transcrição falhou: ${falha.erro ?? "erro desconhecido"}`);
-        return;
-      }
-      const palavras = new Map<string, Palavra[]>(transcricoes.flatMap((t) => (t ? [[t.midia_id, t.palavras] as const] : [])));
+      const palavras = await transcreverMidias(midias, idioma, setAndamento, () => ativo.current);
+      if (!palavras) return;
       // As linhas cabem na largura do quadro do projeto, com o tamanho de letra do estilo escolhido
       const legendas = legendasDaFala(faixa.clipes, palavras, opcoesParaOQuadro(projeto.proporcao, estilo.tamanho));
       if (!legendas.length) {

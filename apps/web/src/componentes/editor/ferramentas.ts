@@ -71,7 +71,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "transcricao",
     nome: "Transcrição",
     icone: ScrollText,
-    emBreve: { fase: "Fase 5", descricao: "Editar o vídeo pelo texto: apagar uma frase corta o trecho. Limpeza de pausas, vícios e retakes." },
   },
   {
     id: "efeitos",
