@@ -30,7 +30,14 @@ from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
-from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE, comandos_de_volume, ganho_para_igualar
+from core.utils.som import (
+    CURVA_PADRAO,
+    CURVAS_DO_FADE,
+    REVERB_DURACAO_S,
+    comandos_de_volume,
+    filtros_de_voz,
+    ganho_para_igualar,
+)
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -42,6 +49,7 @@ SILENCIO_LUFS = -70
 GANHO_MAXIMO_DB = 30
 # A mistura em ponto flutuante: antes do ganho, o volume ainda pode passar de 1
 ARQUIVO_SOM = "som.mka"
+ARQUIVO_REVERB = "reverb.wav"
 # Abre e fecha o som do vídeo bem de leve, para não estalar no primeiro e no último quadro
 FADE_ENTRADA = 0.02
 FADE_SAIDA = 0.05
@@ -112,7 +120,7 @@ class Entrada:
 class ArquivoAuxiliar:
     """Arquivo que o worker gera antes do FFmpeg: a LUT da cor, a imagem da vinheta ou o roteiro do sendcmd."""
     caminho: str
-    tipo: str          # "lut", "vinheta" ou "comandos"
+    tipo: str          # "lut", "vinheta", "comandos" ou "reverb"
     ajustes: dict
     largura: int = 0
     altura: int = 0
@@ -341,11 +349,14 @@ def base_do_render(clipe: dict) -> dict:
 
 
 def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None,
-                  igualar_db: float = 0) -> str:
+                  igualar_db: float = 0, reverb: tuple[int, str] | None = None) -> str:
     """
     pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
     abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala.
     igualar_db: o ganho que leva a mídia a -14 LUFS, com o "Igualar o volume" ligado.
+    reverb: (entrada do FFmpeg com a resposta ao impulso, nome único) quando o clipe tem reverb.
+    Os efeitos de voz vêm depois da velocidade e antes do volume, como os nós da prévia, que ficam
+    entre o elemento (já na velocidade) e o ganho.
     """
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
@@ -357,8 +368,19 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
         f"aresample={TAXA_AUDIO}",
         "aformat=sample_fmts=fltp:channel_layouts=stereo",
         *cadeia_atempo(clipe["velocidade"]),
-        f"volume={_numero(clipe['volume'])}",
     ]
+    efeitos = clipe.get("efeitos_voz") or {}
+    filtros += filtros_de_voz(efeitos)
+    prefixo = ""
+    if reverb:
+        # A cauda da sala somada ao som seco: a convolução sem normalizar (afir) num ramo, depois a soma
+        entrada_ir, nome = reverb
+        mistura = f"amix=inputs=2:weights='1 {_numero(efeitos['reverb'])}':normalize=0:duration=first"
+        prefixo = (f"[{entrada}:a]{','.join(filtros)},asplit=2[{nome}s][{nome}c];\n"
+                   f"[{nome}c][{entrada_ir}:a]afir=irnorm=-1:irgain=1:irfmt=mono:dry=1:wet=1[{nome}r];\n"
+                   f"[{nome}s][{nome}r]{mistura}")
+        filtros = []
+    filtros.append(f"volume={_numero(clipe['volume'])}")
     if igualar_db:
         filtros.append(f"volume={_numero(igualar_db)}dB")
     if abaixar:
@@ -373,6 +395,8 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
     if fade_saida > 0:
         filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}:curve={curva}")
     filtros.append(f"adelay={atraso}S:all=1")
+    if prefixo:
+        return prefixo + "".join(f",{filtro}" for filtro in filtros)
     return f"[{entrada}:a]{','.join(filtros)}"
 
 
@@ -538,7 +562,15 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                                   f"volume@{abaixar[1]}")
                     auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
                 igualar = ganho_para_igualar(midias[clipe["midia_id"]].lufs) if clipe.get("igualar_volume") else 0
-                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar)}[{sons[-1]}]")
+                reverb = None
+                if ((clipe.get("efeitos_voz") or {}).get("reverb") or 0) > 0:
+                    # A resposta ao impulso da sala: o mesmo arquivo, uma entrada para cada clipe
+                    caminho_ir = f"{pasta}/{ARQUIVO_REVERB}"
+                    auxiliares[caminho_ir] = ArquivoAuxiliar(caminho_ir, "reverb", {})
+                    reverb = (len(entradas), f"rv{len(sons)}")
+                    entradas.append(Entrada(caminho_ir, 0, REVERB_DURACAO_S))
+                cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb)
+                linhas_som.append(f"{cadeia}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")

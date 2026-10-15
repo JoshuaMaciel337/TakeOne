@@ -6,6 +6,8 @@
 # render. Os casos de tests/casos/fades.json conferem as três pontas: a fórmula aqui, o FFmpeg e o TS.
 # -----------------------------------------------
 import math
+import random
+import struct
 
 from core.utils.keyframes import valor_no_tempo
 from core.utils.tempo import TICKS_POR_SEGUNDO
@@ -64,3 +66,64 @@ def ganho_para_igualar(lufs: float | None) -> float:
     if lufs is None or lufs <= -70:
         return 0.0
     return min(max(LUFS_IGUALAR - lufs, -GANHO_IGUALAR_MAXIMO_DB), GANHO_IGUALAR_MAXIMO_DB)
+
+
+# -----------------------------------------------
+# Efeitos de voz: equalizador de três faixas, eco e reverb
+#
+# Os mesmos nós do Web Audio na prévia (apps/web/src/lib/previa/audio.ts): os filtros do FFmpeg
+# (lowshelf, equalizer, highshelf) e o BiquadFilterNode seguem as fórmulas do "Audio EQ Cookbook";
+# o eco é a mesma soma de três atrasos; o reverb é a mesma convolução, com a resposta ao impulso
+# gerada aqui (servida à prévia pela API), sem normalizar nos dois lados.
+# -----------------------------------------------
+# Faixa → (filtro do FFmpeg, frequência, largura). Prateleiras com inclinação 1; o meio com Q 1
+FAIXAS_DO_EQ = {"grave": ("lowshelf", 120, "t=s:w=1"), "medio": ("equalizer", 1000, "t=q:w=1"),
+                "agudo": ("highshelf", 6000, "t=s:w=1")}
+EQ_LIMITE_DB = 12
+# Três repetições, cada uma mais fraca: o volume da primeira é o "eco" escolhido
+ECO_ATRASO_S = 0.18
+ECO_REPETICOES = 3
+REVERB_DURACAO_S = 1.6
+REVERB_PRE_ATRASO_S = 0.02
+REVERB_QUEDA_S = 0.35   # constante de tempo do decaimento
+REVERB_SEMENTE = 7
+REVERB_TAXA = 48000
+
+
+def filtros_de_voz(efeitos: dict) -> list[str]:
+    """Equalizador e eco, em ordem. O reverb precisa de outra entrada (veja render.py)."""
+    filtros = []
+    for faixa, (filtro, frequencia, largura) in FAIXAS_DO_EQ.items():
+        ganho = efeitos.get(faixa) or 0
+        if abs(ganho) > 1e-9:
+            filtros.append(f"{filtro}=f={frequencia}:g={ganho:g}:{largura}")
+    eco = efeitos.get("eco") or 0
+    if eco > 0:
+        atrasos = "|".join(f"{round(ECO_ATRASO_S * 1000 * (i + 1))}" for i in range(ECO_REPETICOES))
+        quedas = "|".join(f"{eco ** (i + 1):.6f}" for i in range(ECO_REPETICOES))
+        filtros.append(f"aecho=in_gain=1:out_gain=1:delays={atrasos}:decays={quedas}")
+    return filtros
+
+
+def resposta_do_reverb() -> list[float]:
+    """
+    A resposta ao impulso da sala: ruído que decai, sempre o mesmo (semente fixa). A energia soma 1,
+    para o "reverb" do clipe ser o volume da cauda.
+    """
+    sorteio = random.Random(REVERB_SEMENTE)
+    total = round(REVERB_DURACAO_S * REVERB_TAXA)
+    inicio = round(REVERB_PRE_ATRASO_S * REVERB_TAXA)
+    amostras = [0.0] * total
+    for i in range(inicio, total):
+        t = (i - inicio) / REVERB_TAXA
+        amostras[i] = sorteio.gauss(0, 1) * math.exp(-t / REVERB_QUEDA_S)
+    energia = math.sqrt(sum(a * a for a in amostras))
+    return [a / energia for a in amostras]
+
+
+def wav_do_reverb() -> bytes:
+    """A resposta ao impulso num WAV mono em ponto flutuante de 32 bits."""
+    dados = struct.pack(f"<{round(REVERB_DURACAO_S * REVERB_TAXA)}f", *resposta_do_reverb())
+    formato = struct.pack("<HHIIHH", 3, 1, REVERB_TAXA, REVERB_TAXA * 4, 4, 32)
+    return (b"RIFF" + struct.pack("<I", 4 + 8 + len(formato) + 8 + len(dados)) + b"WAVE"
+            + b"fmt " + struct.pack("<I", len(formato)) + formato + b"data" + struct.pack("<I", len(dados)) + dados)

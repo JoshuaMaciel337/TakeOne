@@ -41,7 +41,7 @@ import {
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
-import type { CurvaDoFade } from "./som.ts";
+import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
@@ -661,6 +661,8 @@ export type MudancaDeAudio = {
   curva_fade?: CurvaDoFade;
   voz_limpa?: boolean;
   igualar_volume?: boolean;
+  /** null tira os efeitos. */
+  efeitos_voz?: EfeitosVoz | null;
 };
 
 /** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
@@ -680,7 +682,17 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
       const vozLimpa = mudanca.voz_limpa ?? clipe.voz_limpa ?? false;
       const curva = mudanca.curva_fade ?? clipe.curva_fade ?? "linear";
       const igualar = mudanca.igualar_volume ?? clipe.igualar_volume ?? false;
-      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, curva_fade: curva, voz_limpa: vozLimpa, igualar_volume: igualar };
+      const efeitos = mudanca.efeitos_voz === undefined ? clipe.efeitos_voz : mudanca.efeitos_voz && efeitosAtivos(mudanca.efeitos_voz) ? limitarEfeitos(mudanca.efeitos_voz) : null;
+      return {
+        ...clipe,
+        volume,
+        fade_entrada: fadeEntrada,
+        fade_saida: fadeSaida,
+        curva_fade: curva,
+        voz_limpa: vozLimpa,
+        igualar_volume: igualar,
+        efeitos_voz: efeitos ?? null,
+      };
     });
     return { ...faixa, clipes };
   });

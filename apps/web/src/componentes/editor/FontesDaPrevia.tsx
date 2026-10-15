@@ -6,11 +6,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
-import { aplicarVolume } from "@/lib/previa/audio";
+import { aplicarEfeitos, aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
-import { ganhoParaIgualar } from "@/lib/projeto/som";
+import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -162,6 +162,11 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
   useEffect(() => {
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);
   }, [ganho, tocando]);
+  // Os efeitos de voz mudam pouco: só quando o clipe muda (ou a reprodução cria o contexto)
+  const efeitos = JSON.stringify(item.clipe.efeitos_voz ?? null);
+  useEffect(() => {
+    if (audioRef.current) aplicarEfeitos(audioRef.current, JSON.parse(efeitos) as EfeitosVoz | null);
+  }, [efeitos, tocando]);
 
   return <audio ref={audioRef} src={arquivoDoSom(item)} preload="auto" />;
 }

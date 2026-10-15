@@ -9,7 +9,16 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { LIMITES_TRANSFORMACAO, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
-import { CURVAS_DO_FADE, type CurvaDoFade, ganhoParaIgualar, LUFS_IGUALAR } from "@/lib/projeto/som";
+import {
+  CURVAS_DO_FADE,
+  type CurvaDoFade,
+  ECO_MAXIMO,
+  EFEITOS_PRONTOS,
+  EQ_LIMITE_DB,
+  ganhoParaIgualar,
+  LUFS_IGUALAR,
+  SEM_EFEITOS_VOZ,
+} from "@/lib/projeto/som";
 import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -478,6 +487,7 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
   });
   const emTicks = (segundos: number) => Math.round(segundos * TICKS_POR_SEGUNDO);
   const voz = midia.voz_limpa;
+  const efeitos = clipe.efeitos_voz ?? SEM_EFEITOS_VOZ;
 
   /** Pede ao worker a voz limpa da mídia (a API não repete o que já está pronto ou andando). */
   function pedirLimpeza() {
@@ -556,6 +566,32 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
             </select>
           </label>
         ) : null}
+      </Secao>
+      <Secao titulo="Efeitos de voz">
+        <select
+          aria-label="Efeito pronto"
+          disabled={travada}
+          value={EFEITOS_PRONTOS.find((pronto) => JSON.stringify(pronto.efeitos) === JSON.stringify(efeitos))?.id ?? ""}
+          onChange={(evento) => {
+            const pronto = EFEITOS_PRONTOS.find((item) => item.id === evento.currentTarget.value);
+            if (pronto) aoExecutar(comando({ efeitos_voz: pronto.efeitos }));
+          }}
+          className="mt-1 w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+        >
+          <option value="" disabled>
+            Ajuste próprio
+          </option>
+          {EFEITOS_PRONTOS.map(({ id, nome }) => (
+            <option key={id} value={id}>
+              {nome}
+            </option>
+          ))}
+        </select>
+        <ControleNumerico rotulo="Graves" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.grave, (valor) => ({ efeitos_voz: { ...efeitos, grave: valor } }))} />
+        <ControleNumerico rotulo="Médios" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.medio, (valor) => ({ efeitos_voz: { ...efeitos, medio: valor } }))} />
+        <ControleNumerico rotulo="Agudos" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.agudo, (valor) => ({ efeitos_voz: { ...efeitos, agudo: valor } }))} />
+        <ControleNumerico rotulo="Eco" minimo={0} maximo={ECO_MAXIMO * 100} sufixo="%" {...controle(efeitos.eco * 100, (valor) => ({ efeitos_voz: { ...efeitos, eco: valor / 100 } }))} />
+        <ControleNumerico rotulo="Reverb" minimo={0} maximo={100} sufixo="%" {...controle(efeitos.reverb * 100, (valor) => ({ efeitos_voz: { ...efeitos, reverb: valor / 100 } }))} />
       </Secao>
       <Secao titulo="Abaixar na fala">
         <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />

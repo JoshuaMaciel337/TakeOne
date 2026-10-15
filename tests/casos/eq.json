@@ -1,0 +1,100 @@
+{
+  "descricao": "Resposta do equalizador de voz (dB) em cada frequência, pela fórmula do Audio EQ Cookbook, a mesma do BiquadFilterNode do Web Audio. tests/test_som.py confere os filtros do FFmpeg e o teste da prévia no Chrome confere o Web Audio.",
+  "taxa": 48000,
+  "casos": [
+    {
+      "efeitos": {
+        "grave": 6
+      },
+      "frequencias": [
+        50,
+        120,
+        400,
+        1000,
+        2500,
+        6000,
+        12000
+      ],
+      "db": [
+        5.8115,
+        3.0,
+        0.05199,
+        0.001338,
+        3.3e-05,
+        1e-06,
+        0.0
+      ]
+    },
+    {
+      "efeitos": {
+        "medio": -8
+      },
+      "frequencias": [
+        50,
+        120,
+        400,
+        1000,
+        2500,
+        6000,
+        12000
+      ],
+      "db": [
+        -0.022916,
+        -0.132843,
+        -1.578474,
+        -8.0,
+        -1.557342,
+        -0.232943,
+        -0.039529
+      ]
+    },
+    {
+      "efeitos": {
+        "agudo": 9
+      },
+      "frequencias": [
+        50,
+        120,
+        400,
+        1000,
+        2500,
+        6000,
+        12000
+      ],
+      "db": [
+        0.0,
+        1e-06,
+        0.000171,
+        0.006701,
+        0.259731,
+        4.5,
+        8.69898
+      ]
+    },
+    {
+      "efeitos": {
+        "grave": -4,
+        "medio": 3,
+        "agudo": -10
+      },
+      "frequencias": [
+        50,
+        120,
+        400,
+        1000,
+        2500,
+        6000,
+        12000
+      ],
+      "db": [
+        -3.871519,
+        -1.955469,
+        0.525237,
+        2.991405,
+        0.251807,
+        -4.921584,
+        -9.640488
+      ]
+    }
+  ]
+}

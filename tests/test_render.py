@@ -268,6 +268,19 @@ def test_abaixar_na_fala_vira_roteiro_de_volume_no_som():
     assert "asendcmd" not in plano.filtro_som.split(";")[0], "o clipe sem curva fica como estava"
 
 
+def test_efeitos_de_voz_viram_filtros_e_reverb_com_a_sala():
+    efeitos = {"grave": -4, "medio": 0, "agudo": 3, "eco": 0.5, "reverb": 0.4}
+    voz = clipe("c1", "deitado", 0, 4, efeitos_voz=efeitos)
+    plano = planejar_render(projeto([faixa("principal", [voz])]), MIDIAS, 720, 1280, pasta="/trabalho")
+    # A sala entra como mais uma entrada, escrita pelo worker; o efeito vem antes do volume
+    assert [a.tipo for a in plano.auxiliares] == ["reverb"]
+    assert plano.entradas[-1].caminho == "/trabalho/reverb.wav"
+    assert "lowshelf=f=120:g=-4:t=s:w=1,highshelf=f=6000:g=3:t=s:w=1,aecho=" in plano.filtro_som
+    assert "equalizer" not in plano.filtro_som, "faixa em 0 dB fica de fora"
+    assert f"[{len(plano.entradas) - 1}:a]afir=irnorm=-1" in plano.filtro_som
+    assert "amix=inputs=2:weights='1 0.4':normalize=0:duration=first,volume=1," in plano.filtro_som
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

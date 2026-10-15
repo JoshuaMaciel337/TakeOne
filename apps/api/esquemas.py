@@ -164,6 +164,15 @@ class KeyframesEntrada(BaseModel):
         return self
 
 
+class EfeitosVozEntrada(BaseModel):
+    """Os limites são os de apps/web/src/lib/projeto/som.ts."""
+    grave: float = Field(default=0, ge=-12, le=12, description="dB")
+    medio: float = Field(default=0, ge=-12, le=12, description="dB")
+    agudo: float = Field(default=0, ge=-12, le=12, description="dB")
+    eco: float = Field(default=0, ge=0, le=0.8)
+    reverb: float = Field(default=0, ge=0, le=1)
+
+
 class AbaixamentoEntrada(BaseModel):
     """Abaixar na fala (apps/web/src/lib/projeto/abaixar.ts): o fator do volume, de 0 a 1, ao longo do clipe."""
     db: float = Field(ge=-40, le=0)
@@ -283,6 +292,7 @@ class ClipeEntrada(BaseModel):
     abaixamento: AbaixamentoEntrada | None = None
     # Leva a mídia a -14 LUFS pelo loudness medido na ingestão
     igualar_volume: bool = False
+    efeitos_voz: EfeitosVozEntrada | None = None
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)

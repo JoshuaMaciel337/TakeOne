@@ -5,7 +5,7 @@ import type { Abaixamento } from "./abaixar.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { Keyframes } from "./keyframes.ts";
-import { type CurvaDoFade, ganhoDoFade } from "./som.ts";
+import { type CurvaDoFade, type EfeitosVoz, ganhoDoFade } from "./som.ts";
 import type { Transicao } from "./transicao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
@@ -65,6 +65,8 @@ export type Clipe = {
   curva_fade?: CurvaDoFade;
   /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
   voz_limpa?: boolean;
+  /** Equalizador, eco e reverb (lib/projeto/som.ts); sem eles, o som como veio. */
+  efeitos_voz?: EfeitosVoz | null;
   /** Leva a mídia a -14 LUFS pelo loudness medido na ingestão (lib/projeto/som.ts). */
   igualar_volume?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */

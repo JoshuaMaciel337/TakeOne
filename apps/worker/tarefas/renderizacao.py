@@ -41,6 +41,7 @@ from core.utils.render import (
     ler_loudness,
     planejar_render,
 )
+from core.utils.som import wav_do_reverb
 from core.utils.texto import desenhar_texto, layout_do_texto
 
 ARQUIVO_FILTRO = "filtro.txt"
@@ -170,6 +171,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
                 Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
             elif auxiliar.tipo == "comandos":
                 Path(auxiliar.caminho).write_text(auxiliar.conteudo, encoding="utf-8")
+            elif auxiliar.tipo == "reverb":
+                Path(auxiliar.caminho).write_bytes(wav_do_reverb())
             else:
                 desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
         if plano.tem_som:

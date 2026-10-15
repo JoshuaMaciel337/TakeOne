@@ -1,5 +1,7 @@
 # Formato dos fades: a fórmula de core/utils/som.py, os casos que a prévia confere e o próprio afade
+import cmath
 import json
+import math
 import shutil
 import subprocess
 from array import array
@@ -8,7 +10,16 @@ from pathlib import Path
 import pytest
 
 from core.config import FFMPEG
-from core.utils.som import CURVAS_DO_FADE, comandos_de_volume, ganho_do_fade, ganho_para_igualar
+from core.utils.som import (
+    CURVAS_DO_FADE,
+    ECO_ATRASO_S,
+    comandos_de_volume,
+    filtros_de_voz,
+    ganho_do_fade,
+    ganho_para_igualar,
+    resposta_do_reverb,
+    wav_do_reverb,
+)
 
 CASOS = json.loads((Path(__file__).parent / "casos" / "fades.json").read_text(encoding="utf-8"))["casos"]
 TEM_FFMPEG = shutil.which("ffmpeg") is not None
@@ -69,3 +80,52 @@ def test_ganho_para_igualar_leva_a_14_lufs_com_limite():
     assert ganho_para_igualar(-8.5) == -5.5
     assert ganho_para_igualar(-60) == 20, "no máximo 20 dB"
     assert ganho_para_igualar(None) == 0 and ganho_para_igualar(-80) == 0, "sem medida ou silêncio: nada"
+
+
+# -----------------------------------------------
+# Efeitos de voz: o impulso passado pelos filtros do FFmpeg, medido
+# -----------------------------------------------
+EQ = json.loads((Path(__file__).parent / "casos" / "eq.json").read_text(encoding="utf-8"))
+IMPULSO = f"aevalsrc='if(eq(n,0),1,0)':s={TAXA}:d=2"
+
+
+def resposta_ao_impulso(filtros: str, entradas: list[str] | None = None, grafo: bool = False) -> array:
+    argumentos = [FFMPEG, "-loglevel", "error", "-f", "lavfi", "-i", IMPULSO]
+    for entrada in entradas or []:
+        argumentos += ["-i", entrada]
+    argumentos += (["-filter_complex", filtros] if grafo else ["-af", filtros]) + ["-ac", "1", "-f", "f64le", "-"]
+    return array("d", subprocess.run(argumentos, capture_output=True, check=True, timeout=60).stdout)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+@pytest.mark.parametrize("caso", EQ["casos"], ids=[json.dumps(c["efeitos"]) for c in EQ["casos"]])
+def test_equalizador_do_ffmpeg_tem_a_resposta_do_web_audio(caso):
+    h = resposta_ao_impulso(",".join(filtros_de_voz(caso["efeitos"])))
+    for frequencia, esperado in zip(caso["frequencias"], caso["db"], strict=True):
+        w = 2 * math.pi * frequencia / TAXA
+        medido = 20 * math.log10(abs(sum(v * cmath.exp(-1j * w * n) for n, v in enumerate(h))))
+        assert medido == pytest.approx(esperado, abs=0.05), frequencia
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_eco_repete_tres_vezes_cada_uma_mais_fraca():
+    h = resposta_ao_impulso(",".join(filtros_de_voz({"eco": 0.5})))
+    atraso = round(ECO_ATRASO_S * TAXA)
+    assert h[0] == pytest.approx(1)
+    assert [round(h[atraso * i], 6) for i in (1, 2, 3)] == [0.5, 0.25, 0.125]
+    assert max(abs(v) for i, v in enumerate(h) if i % atraso) < 1e-9
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_reverb_soma_a_resposta_da_sala_sem_normalizar(tmp_path):
+    ir = tmp_path / "reverb.wav"
+    ir.write_bytes(wav_do_reverb())
+    grafo = ("[0:a]asplit=2[s][c];[c][1:a]afir=irnorm=-1:irgain=1:irfmt=mono:dry=1:wet=1[r];"
+             "[s][r]amix=inputs=2:weights='1 0.5':normalize=0:duration=first")
+    h = resposta_ao_impulso(grafo, [str(ir)], grafo=True)
+    sala = resposta_do_reverb()
+    assert sum(v * v for v in sala) == pytest.approx(1)
+    # O som seco no começo e, depois, a cauda da sala com metade do volume
+    assert h[0] == pytest.approx(1 + 0.5 * sala[0], abs=1e-4)
+    for n in (round(0.03 * TAXA), round(0.2 * TAXA), round(0.8 * TAXA)):
+        assert h[n] == pytest.approx(0.5 * sala[n], abs=1e-4), n
