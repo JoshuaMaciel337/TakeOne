@@ -6,9 +6,12 @@ import pytest
 from core.modelos.transcricao import (
     SEGUNDOS_POR_FATIA,
     aparar_no_silencio,
+    encaixar_recuperadas,
     fatias_de,
     limpar_palavras,
     palavras_simuladas,
+    repete_vizinhas,
+    trechos_suspeitos,
 )
 
 
@@ -63,3 +66,38 @@ def test_pontas_das_palavras_em_silencio_sao_aparadas():
     so_silencio = aparar_no_silencio([{"texto": "x", "inicio": 1.0, "fim": 1.5}], [-90] * 300, 100)
     assert so_silencio[0]["fim"] - so_silencio[0]["inicio"] >= 0.08 - 1e-9
     assert aparar_no_silencio(palavras, [], 100) == palavras
+
+
+def _fala(texto: str, inicio: float, passo: float = 0.4) -> list[dict]:
+    return [{"texto": w, "inicio": round(inicio + i * passo, 3), "fim": round(inicio + i * passo + 0.3, 3)}
+            for i, w in enumerate(texto.split())]
+
+
+def test_trechos_suspeitos_palavra_longa_e_voz_sem_palavra():
+    # Voz (-12 dB) de 0 a 8 s; o resto é silêncio
+    niveis = [-12] * 800 + [-90] * 200
+    palavras = [*_fala("Essa ferramenta edita", 0.0), {"texto": "vídeos", "inicio": 1.2, "fim": 2.6},
+                *_fala("sozinhos dentro do", 2.6)]
+    # "vídeos" dura 1,4 s (o ritmo é 0,3 s por palavra curta) e de 3,7 s a 8 s há voz sem palavra
+    assert trechos_suspeitos(palavras, niveis, 100, 10.0) == [(1.2, 2.6), (3.7, 10.0)]
+    assert trechos_suspeitos(palavras, [-90] * 1000, 100, 10.0) == [], "sem voz nenhuma não há o que rever"
+
+
+def test_recuperadas_so_entram_se_repetirem_a_fala_vizinha():
+    palavras = [*_fala("Essa ferramenta edita", 0.0), {"texto": "vídeos", "inicio": 1.2, "fim": 2.6}]
+    retake = _fala("Essa ferramenta edita vídeos", 1.2, 0.35)
+    assert repete_vizinhas(retake, palavras, 1.2, 2.6)
+    assert not repete_vizinhas(_fala("E aí", 1.2), palavras, 1.2, 2.6), "invenção do Whisper fica de fora"
+    juntas = encaixar_recuperadas(palavras, retake, 1.2, 2.6)
+    assert [p["texto"] for p in juntas] == ["Essa", "ferramenta", "edita", "Essa", "ferramenta", "edita", "vídeos"]
+    # A palavra inventada no fim, por cima de uma palavra que ficou, não entra
+    depois = [*palavras, {"texto": "sozinhos", "inicio": 2.6, "fim": 3.0}]
+    inventada = [*retake, {"texto": "áudio...", "inicio": 2.62, "fim": 2.8}]
+    assert [p["texto"] for p in encaixar_recuperadas(depois, inventada, 1.2, 2.6)][-1] == "sozinhos"
+    # Encostar uns centésimos na vizinha não tira a palavra: ela só termina onde a outra começa
+    encostada = [*retake[:-1], {"texto": "vídeos", "inicio": 2.25, "fim": 2.85}]
+    juntas = encaixar_recuperadas(depois, encostada, 1.2, 2.6)
+    assert [p["texto"] for p in juntas][-2:] == ["vídeos", "sozinhos"] and juntas[-2]["fim"] == 2.6
+    com_reticencias = [*retake[:-1], {"texto": "vídeos...", "inicio": 2.25, "fim": 2.5}]
+    cortada = encaixar_recuperadas(palavras, com_reticencias, 1.2, 2.6)
+    assert cortada[-1]["texto"] == "vídeos", "sem as reticências da palavra cortada na borda"

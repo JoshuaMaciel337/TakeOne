@@ -27,9 +27,12 @@ from core.modelos.transcricao import (
     STATUS_ERRO,
     STATUS_PRONTA,
     aparar_no_silencio,
+    encaixar_recuperadas,
     fatias_de,
     limpar_palavras,
     palavras_simuladas,
+    repete_vizinhas,
+    trechos_suspeitos,
 )
 from core.utils import storage
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg
@@ -56,8 +59,42 @@ def _ouvir(modelo, caminho: Path, idioma: str | None, deslocamento: float, durac
     return palavras, info.language
 
 
+# Na recuperação da fala omitida: folga em volta de cada trecho, e no máximo tantos trechos por mídia
+FOLGA_DO_TRECHO_S = 0.15
+MAXIMO_DE_TRECHOS = 200
+TAXA_DO_WHISPER = 16000
+
+
+def recuperar_omitidas(modelo, caminho: Path, palavras: list[dict], niveis, idioma: str | None,
+                       duracao: float) -> list[dict]:
+    """
+    Ouve de novo, sozinhos, os trechos onde o Whisper pode ter omitido fala (core/modelos/transcricao.py)
+    e encaixa o que voltar, se repetir palavras vizinhas. É o que deixa os retakes aparecerem no texto.
+    """
+    from faster_whisper import decode_audio
+
+    palavras = aparar_no_silencio(limpar_palavras(palavras), niveis, NIVEIS_POR_SEGUNDO)
+    trechos = trechos_suspeitos(palavras, niveis, NIVEIS_POR_SEGUNDO, duracao)[:MAXIMO_DE_TRECHOS]
+    if not trechos:
+        return palavras
+    audio = decode_audio(str(caminho), sampling_rate=TAXA_DO_WHISPER)
+    recuperados = 0
+    for inicio, fim in trechos:
+        a, b = max(0.0, inicio - FOLGA_DO_TRECHO_S), min(duracao, fim + FOLGA_DO_TRECHO_S)
+        segmentos, _ = modelo.transcribe(audio[int(a * TAXA_DO_WHISPER):int(b * TAXA_DO_WHISPER)], language=idioma,
+                                         vad_filter=True, word_timestamps=True, condition_on_previous_text=False,
+                                         beam_size=5)
+        novas = [{"texto": w.word, "inicio": a + w.start, "fim": a + w.end} for s in segmentos for w in s.words or []]
+        novas = aparar_no_silencio(limpar_palavras(novas), niveis, NIVEIS_POR_SEGUNDO)
+        if len(novas) > 1 and repete_vizinhas(novas, palavras, inicio, fim):
+            palavras = encaixar_recuperadas(palavras, novas, inicio, fim)
+            recuperados += 1
+    logging.info(f"Fala omitida: {len(trechos)} trechos suspeitos, {recuperados} com repetição recuperada.")
+    return palavras
+
+
 def transcrever(caminho: Path, idioma: str | None, duracao: float,
-                reportar: Callable[[int, str], None]) -> tuple[list[dict], str]:
+                reportar: Callable[[int, str], None], niveis=None) -> tuple[list[dict], str]:
     import ctranslate2
     from faster_whisper import WhisperModel
 
@@ -80,13 +117,19 @@ def transcrever(caminho: Path, idioma: str | None, duracao: float,
             # O idioma da primeira fatia vale para as outras
             da_fatia, detectado = _ouvir(modelo, arquivo, detectado, inicio, duracao, reportar)
             palavras += da_fatia
+    if niveis:
+        reportar(96, "Procurando fala repetida")
+        palavras = recuperar_omitidas(modelo, caminho, palavras, niveis, detectado, duracao)
     return palavras, detectado or "pt"
 
 
-def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, fila) -> None:
+def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, caminho_niveis: str | None, fila) -> None:
     """Roda no processo filho: manda o progresso e o resultado (ou o erro) pela fila."""
     try:
-        palavras, detectado = transcrever(Path(caminho), idioma, duracao, lambda p, m: fila.put(("progresso", p, m)))
+        # Os níveis são int8 com sinal (dB), um por janela de 10 ms
+        niveis = array("b", Path(caminho_niveis).read_bytes()) if caminho_niveis else None
+        palavras, detectado = transcrever(Path(caminho), idioma, duracao, lambda p, m: fila.put(("progresso", p, m)),
+                                          niveis)
         fila.put(("fim", palavras, detectado))
     except ErroDefinitivo as erro:
         fila.put(("definitivo", str(erro)))
@@ -95,11 +138,14 @@ def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, fila
 
 
 def transcrever_em_outro_processo(caminho: Path, idioma: str | None, duracao: float,
-                                  reportar: Callable[[int, str], None]) -> tuple[list[dict], str]:
+                                  reportar: Callable[[int, str], None],
+                                  caminho_niveis: Path | None = None) -> tuple[list[dict], str]:
     """A transcrição num processo novo (spawn), que leva o modelo embora quando termina."""
     contexto = multiprocessing.get_context("spawn")
     fila = contexto.Queue()
-    filho = contexto.Process(target=_transcrever_no_filho, args=(str(caminho), idioma, duracao, fila), daemon=True)
+    niveis = str(caminho_niveis) if caminho_niveis else None
+    filho = contexto.Process(target=_transcrever_no_filho, args=(str(caminho), idioma, duracao, niveis, fila),
+                             daemon=True)
     filho.start()
     try:
         while True:
@@ -148,12 +194,13 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
     duracao = float(midia.get("duracao") or 0)
     rotulo = f"[{organizacao_id}] [midia {midia_id}]"
 
+    niveis = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS))
     if MODO_IA == "real":
-        brutas, idioma = transcrever_em_outro_processo(caminho, None if pedido == "auto" else pedido, duracao, reportar)
+        brutas, idioma = transcrever_em_outro_processo(caminho, None if pedido == "auto" else pedido, duracao, reportar,
+                                                       niveis if niveis.is_file() else None)
     else:
         brutas, idioma = palavras_simuladas(duracao), "pt" if pedido == "auto" else pedido
     palavras = limpar_palavras(brutas)
-    niveis = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS))
     if niveis.is_file():
         # Os níveis são int8 com sinal (dB), um por janela de 10 ms
         palavras = aparar_no_silencio(palavras, array("b", niveis.read_bytes()), NIVEIS_POR_SEGUNDO)
