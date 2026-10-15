@@ -21,6 +21,11 @@ jobs:
           cache-dependency-path: "**/requirements*.txt"
       - name: Instalar o FFmpeg (testes de ingestão)
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+      - name: Instalar o deep-filter (testes da voz limpa)
+        run: |
+          sudo curl -sSL -o /usr/local/bin/deep-filter https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-unknown-linux-musl
+          echo "70775e251eee44c0f2451a1e833326cf8bcbbe304d3e7cd12851e6fce72ef7da  /usr/local/bin/deep-filter" | sha256sum -c -
+          sudo chmod 755 /usr/local/bin/deep-filter
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: pytest -q

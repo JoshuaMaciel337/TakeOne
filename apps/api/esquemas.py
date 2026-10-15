@@ -98,6 +98,8 @@ class MidiaSaida(BaseModel):
     arquivos: list[str] = []
     erro: str | None = None
     processamento: ProcessamentoSaida | None = None
+    # A voz sem ruído: {"status": "processando" | "pronta" | "erro", "erro"}; sem ela, nunca foi pedida
+    voz_limpa: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
@@ -212,6 +214,8 @@ class ClipeEntrada(BaseModel):
     volume: float = Field(default=1.0, ge=0, le=4)
     fade_entrada: int = Field(default=0, ge=0, description="Em ticks")
     fade_saida: int = Field(default=0, ge=0, description="Em ticks")
+    # Usa a voz sem ruído da mídia (DeepFilterNet) no lugar do som original
+    voz_limpa: bool = False
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
@@ -373,6 +377,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
         "erro": erro,
         "arquivos": [nome for nome in doc.get("arquivos", []) if nome in ARQUIVOS_PUBLICOS],
         "processamento": processamento,
+        # Sem o job_id, que é interno
+        "voz_limpa": {"status": voz["status"], "erro": voz.get("erro")} if (voz := doc.get("voz_limpa")) else None,
     })
 
 

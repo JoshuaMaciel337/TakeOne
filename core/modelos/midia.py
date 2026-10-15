@@ -23,7 +23,10 @@ ARQUIVO_CAPA = "capa.jpg"
 # Nível do áudio em dB a cada 10 ms (int8). Base do corte de silêncios. Uso interno.
 ARQUIVO_NIVEIS = "niveis.bin"
 NIVEIS_POR_SEGUNDO = 100
-ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA, ARQUIVO_MINIATURAS, ARQUIVO_CAPA}
+# A voz sem ruído (DeepFilterNet), gerada sob pedido, no mesmo tempo do original. Serve a prévia e o render.
+ARQUIVO_VOZ_LIMPA = "voz_limpa.m4a"
+ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA, ARQUIVO_MINIATURAS, ARQUIVO_CAPA,
+                     ARQUIVO_VOZ_LIMPA}
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:

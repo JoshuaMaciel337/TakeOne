@@ -21,7 +21,7 @@ from core.modelos.exportacao import (
     chave_exportacao,
 )
 from core.modelos.job import ErroDefinitivo
-from core.modelos.midia import ARQUIVO_PROXY_AUDIO, ARQUIVO_PROXY_VIDEO, chave_arquivo
+from core.modelos.midia import ARQUIVO_PROXY_AUDIO, ARQUIVO_PROXY_VIDEO, ARQUIVO_VOZ_LIMPA, chave_arquivo
 from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
@@ -65,6 +65,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
         if caminho is None:
             raise ErroDefinitivo(f'O arquivo de "{midia["nome"]}" não foi encontrado no servidor.')
         video = midia.get("video") or {}
+        voz = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_VOZ_LIMPA))
         # Mídias enviadas antes de a ingestão guardar a matriz de cor: lê do arquivo
         if "matriz" in video:
             matriz = video["matriz"]
@@ -78,6 +79,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             audio=bool(midia.get("audio")),
             duracao=float(midia.get("duracao") or 0),
             matriz=matriz,
+            voz_limpa=str(voz) if voz.is_file() else None,
         )
     return preparadas
 

@@ -37,6 +37,8 @@ EXTENSOES_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 # -----------------------------------------------
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
+# DeepFilterNet (binário do projeto, sem PyTorch): tira o ruído da voz na CPU. Vem na imagem do worker.
+DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
 
 # -----------------------------------------------
 # SESSÃO

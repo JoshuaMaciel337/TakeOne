@@ -20,7 +20,14 @@ from api.esquemas import (
 )
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
-from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_PROCESSANDO, STATUS_PRONTA, chave_arquivo, pasta_da_midia
+from core.modelos.midia import (
+    ARQUIVO_VOZ_LIMPA,
+    ARQUIVOS_PUBLICOS,
+    STATUS_PROCESSANDO,
+    STATUS_PRONTA,
+    chave_arquivo,
+    pasta_da_midia,
+)
 from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSANDO
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
@@ -182,3 +189,25 @@ async def ver_transcricao(midia_id: str, usuario=Depends(usuario_atual), db=Depe
     if doc is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Esta mídia ainda não foi transcrita.")
     return transcricao_para_saida(doc, await _job_da_transcricao(db, doc))
+
+
+@router.post("/{midia_id}/voz-limpa", response_model=MidiaSaida)
+async def pedir_voz_limpa(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe a limpeza da voz na fila do worker de CPU. Se já está pronta ou andando, só devolve a mídia."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("audio"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem áudio para limpar.')
+    atual = midia.get("voz_limpa") or {}
+    pronta = atual.get("status") == "pronta" and ARQUIVO_VOZ_LIMPA in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronta or andando):
+        job = montar_job("limpeza_voz", usuario["organizacao_id"], {"midia_id": str(midia["_id"])},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"voz_limpa": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Limpeza da voz pedida: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "voz_limpa": atual}]))[0]

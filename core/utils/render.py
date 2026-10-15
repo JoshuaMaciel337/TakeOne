@@ -59,6 +59,7 @@ class MidiaDoRender:
     audio: bool
     duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
     matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
+    voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
 
 
 @dataclass(frozen=True)
@@ -395,7 +396,17 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
                 sons.append(f"a{len(sons)}")
                 pular = leituras[clipe["id"]].pular_audio if clipe["id"] in leituras else 0
-                linhas_som.append(f"{_som_do_clipe(indice_da_entrada[clipe['id']], clipe, pular)}[{sons[-1]}]")
+                entrada_do_som = indice_da_entrada[clipe["id"]]
+                if clipe.get("voz_limpa"):
+                    # A voz limpa tem o mesmo tempo do original: abre o mesmo trecho dela
+                    midia = midias[clipe["midia_id"]]
+                    if not midia.voz_limpa:
+                        raise ErroRender("A voz limpa de um clipe ainda está sendo preparada. Espere terminar "
+                                         "ou desligue \"Limpar a voz\" para exportar.")
+                    lida = entradas[entrada_do_som]
+                    entrada_do_som = len(entradas)
+                    entradas.append(Entrada(midia.voz_limpa, lida.inicio, lida.duracao))
+                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")

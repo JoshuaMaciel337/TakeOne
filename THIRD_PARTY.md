@@ -40,3 +40,10 @@ O sistema de comandos (`lib/projeto/comandos.ts`) segue a ideia do `crates/engin
 ## Bibliotecas
 
 As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e as fontes Inter e Sora (OFL) vêm do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.
+
+## Programas e modelos usados pelos workers
+
+Não fazem parte do código do repositório: são baixados quando a imagem do Docker é montada.
+
+- **DeepFilterNet 0.5.6** ([Rikorose/DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)), MIT ou Apache-2.0: o binário `deep-filter`, com o modelo DeepFilterNet3 dentro, tira o ruído da voz no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
+- **faster-whisper** (MIT) e o modelo **large-v3-turbo** do Whisper (MIT): transcrição no worker de GPU. O modelo vem do Hugging Face na primeira transcrição e fica no volume `modelos_ia`.

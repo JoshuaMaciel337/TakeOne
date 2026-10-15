@@ -289,3 +289,16 @@ def test_le_o_loudness_do_resumo_do_ebur128():
     assert ler_loudness(saida) == -21.7
     assert ler_loudness("    I:         -inf LUFS") is None
     assert ler_loudness("nada aqui") is None
+
+
+def test_voz_limpa_entra_no_lugar_do_som_original():
+    com_voz = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True,
+                                                  voz_limpa="/m/voz_limpa.m4a")}
+    plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, entrada=1, voz_limpa=True)])]),
+                            com_voz, 1080, 1920)
+    # O mesmo trecho da voz limpa, numa entrada a mais; o som do clipe sai dela, não do vídeo
+    assert plano.entradas[1].argumentos() == ["-ss", "1.000000", "-t", "4.000000", "-i", "/m/voz_limpa.m4a"]
+    assert "[1:a]asetpts" in plano.filtro_som and "[0:a]" not in plano.filtro_som
+    with pytest.raises(ErroRender, match="voz limpa"):
+        sem_voz = projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, voz_limpa=True)])])
+        planejar_render(sem_voz, MIDIAS, 1080, 1920)
