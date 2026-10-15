@@ -321,6 +321,7 @@ class ClipeEntrada(BaseModel):
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
     keyframes: KeyframesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
+    mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 

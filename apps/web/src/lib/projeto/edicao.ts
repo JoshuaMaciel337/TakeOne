@@ -33,6 +33,8 @@ import {
   faixaDeTexto,
   fimDoClipe,
   type InfoMidia,
+  MESCLAGENS,
+  type Mesclagem,
   type Projeto,
   RECORTE_PADRAO,
   type Recorte,
@@ -859,6 +861,12 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
     }
     return { ...clipe, cor };
   });
+}
+
+/** O modo de mesclagem dos clipes (de imagem: os de áudio não aparecem). */
+export function mesclarClipes(projeto: Projeto, clipeIds: string[], mesclagem: Mesclagem): Projeto {
+  if (!MESCLAGENS.some((item) => item.id === mesclagem)) throw new ErroEdicao("Este modo de mesclagem não existe.");
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, mesclagem }));
 }
 
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {

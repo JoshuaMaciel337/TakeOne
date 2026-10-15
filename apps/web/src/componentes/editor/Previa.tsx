@@ -269,7 +269,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque, curvas: camada.curvas });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque, curvas: camada.curvas, mesclagem: camada.clipe.mesclagem });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();

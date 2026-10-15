@@ -296,6 +296,17 @@ def test_transicao_de_desfoque_vira_gblur_por_roteiro_com_borda_repetida():
     assert "premultiply" not in plano.filtro, "vídeo sem transparência não precisa"
 
 
+def test_mesclagem_achata_a_camada_na_cor_neutra_e_usa_o_blend():
+    sobre = [clipe("s1", "empe", 0, 2, mesclagem="multiplicar"), clipe("s2", "empe", 2, 2, mesclagem="tela")]
+    faixas = [faixa("video", sobre), faixa("principal", [clipe("c1", "deitado", 0, 4)])]
+    plano = planejar_render(projeto(faixas), MIDIAS, 720, 1280)
+    assert "color=c=white:s=720x1280:r=30/1:d=4,format=gbrp[n2]" in plano.filtro
+    assert "[n2][c2]overlay=" in plano.filtro
+    assert "[base1][l2]blend=all_mode=multiply,format=gbrp[base2]" in plano.filtro
+    assert "color=c=black:" in plano.filtro and "[base2][l3]blend=all_mode=screen" in plano.filtro
+    assert "[base0][c1]overlay=" in plano.filtro, "o normal continua no overlay"
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

@@ -425,7 +425,7 @@ Cada fase termina com algo que dá para usar e testar.
   - glitch
   - VHS
   - distorções
-  - modos de mesclagem
+  - [x] modos de mesclagem: multiplicar, tela e somar
 - Chroma key (tela verde), com o `keying` do EffectCraft.
 - [x] Keyframes de posição, escala, rotação e opacidade, com curva linear ou suave (a conta é do TakeOne; o `keyframe` do EffectCraft fica de referência para Bezier e hold).
 - Velocidade com curva, mantendo o tom da voz (SoundCraft).

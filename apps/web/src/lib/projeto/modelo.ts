@@ -42,6 +42,19 @@ export type Transformacao = {
 /** Parte da mídia que aparece, em frações da largura e da altura dela. */
 export type Recorte = { x: number; y: number; largura: number; altura: number };
 
+/**
+ * Como o clipe se mistura com o que está embaixo. "normal" cobre; "multiplicar" escurece; "tela"
+ * clareia; "somar" soma a luz. A conta é a mesma no compositor da prévia e no blend do render.
+ */
+export type Mesclagem = "normal" | "multiplicar" | "tela" | "somar";
+
+export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
+  { id: "normal", nome: "Normal" },
+  { id: "multiplicar", nome: "Multiplicar" },
+  { id: "tela", nome: "Tela" },
+  { id: "somar", nome: "Somar" },
+];
+
 export const TRANSFORMACAO_PADRAO: Transformacao = { x: 0, y: 0, escala: 1, rotacao: 0, opacidade: 1 };
 export const RECORTE_PADRAO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
 
@@ -75,6 +88,8 @@ export type Clipe = {
   /** Posição, escala, rotação e opacidade mudando ao longo do clipe (lib/projeto/keyframes.ts). */
   keyframes?: Keyframes | null;
   recorte: Recorte;
+  /** Mistura com o que está embaixo; sem ela, normal. */
+  mesclagem?: Mesclagem;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */

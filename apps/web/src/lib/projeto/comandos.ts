@@ -28,6 +28,7 @@ import {
   mudarKeyframe,
   reenquadrarClipe,
   abaixarClipe,
+  mesclarClipes,
   duplicarClipes,
   moverClipe,
   mudarFundo,
@@ -41,6 +42,7 @@ import type { Cor } from "./cor.ts";
 import type { PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import type { Mesclagem } from "./modelo.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
@@ -61,6 +63,7 @@ export type Comando =
   | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
+  | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
@@ -88,6 +91,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.keyframe": "mudar keyframe",
   "clipe.reenquadrar": "seguir o rosto",
   "clipe.abaixar": "abaixar na fala",
+  "clipe.mesclar": "mudar a mesclagem",
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
   "clipe.audio": "mudar o som",
@@ -135,6 +139,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: mudarFundo(projeto, parametros.cor) };
     case "clipe.transformar":
       return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao, parametros.tempo) };
+    case "clipe.mesclar":
+      return { projeto: mesclarClipes(projeto, parametros.clipeIds, parametros.mesclagem) };
     case "clipe.abaixar":
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":

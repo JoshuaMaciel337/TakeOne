@@ -7,7 +7,7 @@
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Recorte } from "../projeto/modelo.ts";
+import type { Mesclagem, Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
@@ -26,7 +26,14 @@ export type Camada = {
   desfoque?: number;
   /** As curvas de cor numa tabela de 256 tons (lib/projeto/cor.ts, tabelaDasCurvas); null sem curvas. */
   curvas?: Uint8Array | null;
+  /** Mistura com o que já foi desenhado; sem ela, normal. */
+  mesclagem?: Mesclagem;
 };
+
+// Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
+// pré-multiplicado): multiplicar = fundo × (cor·a + 1 − a); tela = cor·a + fundo × (1 − cor·a);
+// somar = fundo + cor·a. É a conta do blend do render sobre uma camada achatada na cor neutra.
+const CODIGO_DA_MESCLAGEM: Record<Mesclagem, number> = { normal: 0, multiplicar: 1, tela: 2, somar: 3 };
 
 // Desfoque em duas passadas (horizontal e vertical) num framebuffer, antes de desenhar a camada.
 // Com sigma grande, a primeira passada lê um nível menor do mipmap da textura: o sigma ali fica entre
@@ -109,6 +116,8 @@ uniform vec4 u_revelado;
 // Letra a letra (lib/projeto/letras.ts): y0, y1 e x de onde o trecho começa e de onde ele termina
 uniform vec3 u_corteDe;
 uniform vec3 u_corteAte;
+// 0 normal, 1 multiplicar (a cor sai já misturada ao branco pela opacidade), 2 tela, 3 somar
+uniform int u_mesclagem;
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -135,14 +144,12 @@ vec3 aplicarCor(vec3 c) {
 void main() {
   // Como o geq do render: o centro do pixel dentro da faixa revelada, com as bordas incluídas
   if (v_local.x < u_revelado.x || v_local.x > u_revelado.z || v_local.y < u_revelado.y || v_local.y > u_revelado.w) {
-    cor = vec4(0.0);
-    return;
+    discard;
   }
   // Como as caixas do render: pelo centro do pixel, antes do começo do trecho e a partir do fim
   if (v_local.y < u_corteDe.x || (v_local.y < u_corteDe.y && v_local.x < u_corteDe.z) ||
       v_local.y >= u_corteAte.y || (v_local.y >= u_corteAte.x && v_local.x >= u_corteAte.z)) {
-    cor = vec4(0.0);
-    return;
+    discard;
   }
   vec4 texel = texture(u_textura, v_uv);
   if ((u_comCor || u_comCurvas) && texel.a > 0.0) {
@@ -161,6 +168,7 @@ void main() {
     texel = vec4(c * texel.a, texel.a);
   }
   cor = texel * u_opacidade;
+  if (u_mesclagem == 1) cor = vec4(cor.rgb + (1.0 - cor.a), 1.0);
 }`;
 
 /** Largura e altura em pixels de uma fonte de textura. */
@@ -196,7 +204,7 @@ type Recursos = {
   /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
   tabelas: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -282,6 +290,7 @@ export class Compositor {
         revelado: local("u_revelado"),
         corteDe: local("u_corteDe"),
         comCurvas: local("u_comCurvas"),
+        mesclagem: local("u_mesclagem"),
         curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
@@ -449,7 +458,13 @@ export class Compositor {
         gl.uniform4f(uniformes.cor2, ajustes.realces, ajustes.sombras, ajustes.saturacao, ajustes.vinheta);
         gl.uniform3fv(uniformes.rodas, deslocamentosDasRodas(ajustes).flat());
       }
+      const mesclagem = camada.mesclagem ?? "normal";
+      gl.uniform1i(uniformes.mesclagem, CODIGO_DA_MESCLAGEM[mesclagem]);
+      if (mesclagem === "multiplicar") gl.blendFunc(gl.DST_COLOR, gl.ZERO);
+      else if (mesclagem === "tela") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+      else if (mesclagem === "somar") gl.blendFunc(gl.ONE, gl.ONE);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (mesclagem !== "normal") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     });
   }
 

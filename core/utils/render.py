@@ -60,6 +60,8 @@ LIMITE_CLIPES_RENDER = 400
 ATEMPO_MINIMO = 0.5
 
 FAIXA_AUDIO = "audio"
+# Mesclagem do clipe → modo do blend do FFmpeg
+MODOS_DE_MESCLAGEM = {"multiplicar": "multiply", "tela": "screen", "somar": "addition"}
 
 
 @dataclass(frozen=True)
@@ -578,7 +580,16 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara, desfoque)
         linhas.append(f"{cadeia}[c{numero}]")
-        linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
+        mesclagem = clipe.get("mesclagem") or "normal"
+        if mesclagem == "normal":
+            linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
+        else:
+            # A camada achatada num quadro da cor que não muda nada no modo (a opacidade vira mistura
+            # com essa cor), depois o blend com o que está embaixo: a conta das funções de mistura da prévia
+            neutra = "white" if mesclagem == "multiplicar" else "black"
+            linhas.append(f"color=c={neutra}:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp[n{numero}]")
+            linhas.append(f"[n{numero}][c{numero}]{overlay}[l{numero}]")
+            linhas.append(f"[{anterior}][l{numero}]blend=all_mode={MODOS_DE_MESCLAGEM[mesclagem]},format=gbrp[base{numero}]")
         anterior = f"base{numero}"
     # A saída é sempre BT.709, marcada (argumentos_de_saida): todo player mostra a cor da prévia
     linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]")
