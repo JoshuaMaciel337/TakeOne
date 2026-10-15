@@ -111,13 +111,16 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
 
 
 def gerar_cube(ajustes: dict, pontos: int = PONTOS_LUT) -> str:
-    """LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede)."""
+    """
+    LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede). As curvas, se houver
+    (ajustes["curvas"]), entram depois dos ajustes.
+    """
     linhas = ["# TakeOne: ajustes de cor", f"LUT_3D_SIZE {pontos}"]
     passo = pontos - 1
     for b in range(pontos):
         for g in range(pontos):
             for r in range(pontos):
-                saida = aplicar_cor((r / passo, g / passo, b / passo), ajustes)
+                saida = aplicar_curvas(aplicar_cor((r / passo, g / passo, b / passo), ajustes), ajustes.get("curvas"))
                 linhas.append(" ".join(f"{v:.6f}" for v in saida))
     return "\n".join(linhas) + "\n"
 
@@ -125,6 +128,8 @@ def gerar_cube(ajustes: dict, pontos: int = PONTOS_LUT) -> str:
 def nome_da_lut(ajustes: dict) -> str:
     """Nome de arquivo estável para os ajustes (clipes com a mesma cor usam a mesma LUT)."""
     chave = ",".join(f"{ajustes[nome]:.6f}" for nome in sorted(AJUSTES_NEUTROS) if nome != "vinheta")
+    if ajustes.get("curvas"):
+        chave += repr(sorted(ajustes["curvas"].items()))
     return f"cor_{hashlib.sha1(chave.encode()).hexdigest()[:12]}.cube"
 
 
@@ -148,3 +153,57 @@ def desenhar_vinheta(largura: int, altura: int, vinheta: float) -> Image.Image:
     rgba = np.full((altura, largura, 4), 255, dtype=np.uint8)
     rgba[..., 0] = rgba[..., 1] = rgba[..., 2] = cinza
     return Image.fromarray(rgba, mode="RGBA")
+
+
+# -----------------------------------------------
+# Curvas: RGB (as três juntas) e uma por canal, aplicadas depois dos ajustes
+# -----------------------------------------------
+CANAIS_DA_CURVA = ("rgb", "r", "g", "b")
+CURVA_NEUTRA = [[0.0, 0.0], [1.0, 1.0]]
+
+
+def _tangentes(xs: list[float], ys: list[float]) -> list[float]:
+    """Fritsch–Carlson: tangentes que mantêm a curva sem passar dos pontos (monótona entre eles)."""
+    n = len(xs)
+    d = [(ys[k + 1] - ys[k]) / (xs[k + 1] - xs[k]) for k in range(n - 1)]
+    m = [d[0]] + [(d[k - 1] + d[k]) / 2 if d[k - 1] * d[k] > 0 else 0.0 for k in range(1, n - 1)] + [d[-1]]
+    for k in range(n - 1):
+        if d[k] == 0:
+            m[k] = m[k + 1] = 0.0
+            continue
+        a, b = m[k] / d[k], m[k + 1] / d[k]
+        s = a * a + b * b
+        if s > 9:
+            t = 3 / math.sqrt(s)
+            m[k], m[k + 1] = t * a * d[k], t * b * d[k]
+    return m
+
+
+def valor_da_curva(pontos: list[list[float]], x: float) -> float:
+    """A curva no ponto x (0 a 1): cúbica monótona pelos pontos, reta fora deles, de 0 a 1."""
+    xs, ys = [p[0] for p in pontos], [p[1] for p in pontos]
+    if x <= xs[0]:
+        return _limitar(ys[0])
+    if x >= xs[-1]:
+        return _limitar(ys[-1])
+    m = _tangentes(xs, ys)
+    k = max(i for i in range(len(xs) - 1) if xs[i] <= x)
+    h = xs[k + 1] - xs[k]
+    t = (x - xs[k]) / h
+    t2, t3 = t * t, t * t * t
+    valor = ((2 * t3 - 3 * t2 + 1) * ys[k] + (t3 - 2 * t2 + t) * h * m[k] + (-2 * t3 + 3 * t2) * ys[k + 1]
+             + (t3 - t2) * h * m[k + 1])
+    return _limitar(valor)
+
+
+def curvas_neutras(curvas: dict | None) -> bool:
+    return not curvas or all(curvas.get(canal, CURVA_NEUTRA) == CURVA_NEUTRA for canal in CANAIS_DA_CURVA)
+
+
+def aplicar_curvas(rgb: tuple[float, float, float], curvas: dict | None) -> tuple[float, float, float]:
+    """A curva RGB nos três canais, depois a de cada canal."""
+    if curvas_neutras(curvas):
+        return rgb
+    geral = curvas.get("rgb", CURVA_NEUTRA)
+    return tuple(valor_da_curva(curvas.get(canal, CURVA_NEUTRA), valor_da_curva(geral, v))
+                 for canal, v in zip(("r", "g", "b"), rgb, strict=True))

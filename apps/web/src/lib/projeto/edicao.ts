@@ -11,7 +11,7 @@
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
-import { type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "./cor.ts";
+import { type AjustesCor, type Cor, COR_PADRAO, CURVA_NEUTRA, curvasNeutras, FILTROS, LIMITES_COR, PONTOS_MAXIMOS_DA_CURVA, type PontoDaCurva } from "./cor.ts";
 import {
   type Curva,
   deslocarKeyframes,
@@ -850,6 +850,13 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
     }
     if (cor.filtro !== null && !FILTROS.some((filtro) => filtro.id === cor.filtro)) throw new ErroEdicao("Este filtro não existe.");
     cor.intensidade = limitar(cor.intensidade, 0, INTENSIDADE_MAXIMA);
+    // Curva neutra não fica guardada; os pontos ficam de 0 a 1, em ordem
+    if (curvasNeutras(cor.curvas)) cor.curvas = null;
+    else {
+      const ajustar = (pontos: PontoDaCurva[] | undefined) =>
+        (pontos ?? CURVA_NEUTRA).slice(0, PONTOS_MAXIMOS_DA_CURVA).map(([x, y]) => [limitar(x, 0, 1), limitar(y, 0, 1)] as PontoDaCurva).sort((a, b) => a[0] - b[0]);
+      cor.curvas = { rgb: ajustar(cor.curvas!.rgb), r: ajustar(cor.curvas!.r), g: ajustar(cor.curvas!.g), b: ajustar(cor.curvas!.b) };
+    }
     return { ...clipe, cor };
   });
 }

@@ -8,10 +8,13 @@ from core.utils.cor import (
     AJUSTES_NEUTROS,
     ajustes_efetivos,
     aplicar_cor,
+    aplicar_curvas,
+    curvas_neutras,
     desenhar_vinheta,
     escurecimento_da_vinheta,
     gerar_cube,
     nome_da_lut,
+    valor_da_curva,
 )
 
 DADOS = json.loads((Path(__file__).parent / "casos" / "cor.json").read_text(encoding="utf-8"))
@@ -41,6 +44,32 @@ def test_lut_no_formato_cube():
     assert [float(v) for v in linhas[3].split()] == pytest.approx(aplicar_cor((0.25, 0, 0), ajustes), abs=1e-6)
     assert nome_da_lut(ajustes) == nome_da_lut({**ajustes, "vinheta": 0.9}), "a vinheta não entra na LUT"
     assert nome_da_lut(ajustes) != nome_da_lut(AJUSTES_NEUTROS)
+
+
+CURVAS = json.loads((Path(__file__).parent / "casos" / "curvas.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("caso", CURVAS["casos"], ids=[c["nome"] for c in CURVAS["casos"]])
+def test_curva_igual_a_da_previa(caso):
+    assert [valor_da_curva(caso["pontos"], x) for x in caso["x"]] == pytest.approx(caso["y"], abs=1e-12)
+
+
+def test_curva_passa_pelos_pontos_sem_passar_deles():
+    pontos = [[0, 0], [0.4, 0.05], [0.45, 0.9], [1, 1]]
+    assert [valor_da_curva(pontos, x) for x, _ in pontos] == pytest.approx([y for _, y in pontos])
+    valores = [valor_da_curva(pontos, i / 200) for i in range(201)]
+    assert all(b >= a for a, b in zip(valores, valores[1:], strict=False)), "monótona: sem voltar"
+
+
+def test_curvas_entram_na_lut_depois_dos_ajustes():
+    composta = CURVAS["composta"]
+    assert list(aplicar_curvas(tuple(composta["rgb"]), composta["curvas"])) == pytest.approx(composta["esperado"])
+    ajustes = {**AJUSTES_NEUTROS, "saturacao": 0.3, "curvas": composta["curvas"]}
+    linhas = gerar_cube(ajustes, pontos=5).strip().split("\n")
+    esperado = aplicar_curvas(aplicar_cor((0.25, 0, 0), ajustes), composta["curvas"])
+    assert [float(v) for v in linhas[3].split()] == pytest.approx(esperado, abs=1e-6)
+    assert nome_da_lut(ajustes) != nome_da_lut({**ajustes, "curvas": None})
+    assert curvas_neutras({"rgb": [[0, 0], [1, 1]]}) and curvas_neutras(None)
 
 
 def test_imagem_da_vinheta_tem_o_cinza_da_conta():

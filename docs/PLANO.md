@@ -411,7 +411,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] realces
   - [x] sombras
   - [x] saturação
-  - curvas
+  - [x] curvas (RGB e por canal)
   - [x] rodas de cor (escuros, meios-tons e claros)
   - [x] vinheta
   - granulação

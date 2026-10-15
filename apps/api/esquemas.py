@@ -247,6 +247,28 @@ class AnimacoesEntrada(BaseModel):
     loop: LoopEntrada | None = None
 
 
+# Curva: de 2 a 16 pontos (x, y) de 0 a 1, com x crescendo
+PontoDaCurva = tuple[float, float]
+
+
+class CurvasEntrada(BaseModel):
+    """As curvas de apps/web/src/lib/projeto/cor.ts: a geral (rgb) e uma por canal."""
+    rgb: list[PontoDaCurva] = Field(default=[(0, 0), (1, 1)], min_length=2, max_length=16)
+    r: list[PontoDaCurva] = Field(default=[(0, 0), (1, 1)], min_length=2, max_length=16)
+    g: list[PontoDaCurva] = Field(default=[(0, 0), (1, 1)], min_length=2, max_length=16)
+    b: list[PontoDaCurva] = Field(default=[(0, 0), (1, 1)], min_length=2, max_length=16)
+
+    @model_validator(mode="after")
+    def em_ordem_e_nos_limites(self):
+        for nome in ("rgb", "r", "g", "b"):
+            pontos = getattr(self, nome)
+            if any(not (0 <= x <= 1 and 0 <= y <= 1) for x, y in pontos):
+                raise ValueError("Os pontos da curva vão de 0 a 1.")
+            if any(b[0] <= a[0] for a, b in zip(pontos, pontos[1:], strict=False)):
+                raise ValueError("Os pontos da curva precisam estar em ordem, sem dois no mesmo lugar.")
+        return self
+
+
 class CorEntrada(BaseModel):
     """Os limites são os de apps/web/src/lib/projeto/cor.ts."""
     temperatura: float = Field(default=0, ge=-1, le=1)
@@ -266,6 +288,7 @@ class CorEntrada(BaseModel):
     forca_claros: float = Field(default=0, ge=0, le=1)
     filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama", "cinema"] | None = None
     intensidade: float = Field(default=1, ge=0, le=2)
+    curvas: CurvasEntrada | None = None
 
 
 class TransicaoEntrada(BaseModel):

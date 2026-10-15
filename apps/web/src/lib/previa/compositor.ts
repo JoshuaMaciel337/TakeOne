@@ -24,6 +24,8 @@ export type Camada = {
   mascara?: Cortes;
   /** Desfoque gaussiano: sigma em frações da altura do clipe (o render faz a mesma conta). */
   desfoque?: number;
+  /** As curvas de cor numa tabela de 256 tons (lib/projeto/cor.ts, tabelaDasCurvas); null sem curvas. */
+  curvas?: Uint8Array | null;
 };
 
 // Desfoque em duas passadas (horizontal e vertical) num framebuffer, antes de desenhar a camada.
@@ -99,6 +101,9 @@ uniform vec4 u_cor1;
 uniform vec4 u_cor2;
 // Rodas de cor (escuros, meios-tons, claros): o deslocamento de cada uma, já com a força
 uniform vec3 u_rodas[3];
+// Curvas: o tom de cada canal (0 a 255) lido numa tabela de 256, depois dos ajustes e antes da vinheta
+uniform bool u_comCurvas;
+uniform sampler2D u_curvas;
 // x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
 uniform vec4 u_revelado;
 // Letra a letra (lib/projeto/letras.ts): y0, y1 e x de onde o trecho começa e de onde ele termina
@@ -140,11 +145,19 @@ void main() {
     return;
   }
   vec4 texel = texture(u_textura, v_uv);
-  if (u_comCor && texel.a > 0.0) {
-    // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta
-    vec3 c = aplicarCor(texel.rgb / texel.a);
-    float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
-    c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
+  if ((u_comCor || u_comCurvas) && texel.a > 0.0) {
+    // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
+    // A ordem é a do render: a LUT (ajustes e curvas) e depois a vinheta
+    vec3 c = texel.rgb / texel.a;
+    if (u_comCor) c = aplicarCor(c);
+    if (u_comCurvas) {
+      vec3 i = (clamp(c, 0.0, 1.0) * 255.0 + 0.5) / 256.0;
+      c = vec3(texture(u_curvas, vec2(i.r, 0.5)).r, texture(u_curvas, vec2(i.g, 0.5)).g, texture(u_curvas, vec2(i.b, 0.5)).b);
+    }
+    if (u_comCor) {
+      float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
+      c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
+    }
     texel = vec4(c * texel.a, texel.a);
   }
   cor = texel * u_opacidade;
@@ -180,8 +193,10 @@ type Recursos = {
   desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
   /** Os dois framebuffers das passadas do desfoque. */
   alvos: Alvo[];
+  /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
+  tabelas: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -266,10 +281,13 @@ export class Compositor {
         rodas: local("u_rodas"),
         revelado: local("u_revelado"),
         corteDe: local("u_corteDe"),
+        comCurvas: local("u_comCurvas"),
+        curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
       },
       texturas: [],
+      tabelas: [],
       desfoque,
       alvos: [],
     };
@@ -405,6 +423,25 @@ export class Compositor {
       const mascara = camada.mascara ?? SEM_MASCARA;
       gl.uniform3f(uniformes.corteDe, ...mascara.de);
       gl.uniform3f(uniformes.corteAte, ...mascara.ate);
+      gl.uniform1i(uniformes.comCurvas, camada.curvas ? 1 : 0);
+      if (camada.curvas) {
+        let tabela = recursos.tabelas[indice];
+        if (!tabela) {
+          tabela = gl.createTexture()!;
+          recursos.tabelas[indice] = tabela;
+        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, tabela);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, camada.curvas);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.uniform1i(uniformes.curvas, 1);
+        gl.activeTexture(gl.TEXTURE0);
+      }
       const ajustes = camada.cor;
       gl.uniform1i(uniformes.comCor, ajustes ? 1 : 0);
       if (ajustes) {
@@ -421,7 +458,7 @@ export class Compositor {
     this.canvas.removeEventListener("webglcontextrestored", this.aoRestaurar);
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
-      for (const textura of recursos.texturas) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.tabelas]) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         this.gl.deleteTexture(alvo.textura);
         this.gl.deleteFramebuffer(alvo.buffer);

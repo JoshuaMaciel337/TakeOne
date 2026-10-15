@@ -3,11 +3,12 @@
 import { RotateCcw } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
-import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
+import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, CURVAS_NEUTRAS, curvasNeutras, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 
 import { ControleNumerico } from "./ControleNumerico";
+import { EditorDeCurva } from "./EditorDeCurva";
 import { RodaDeCor } from "./RodaDeCor";
 
 type Props = {
@@ -44,7 +45,8 @@ export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
   const comando = (mudanca: Partial<Cor>): Comando => ({ comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: mudanca } });
   /** Os ajustes aparecem de -100 a 100 (a exposição, em pontos de luz, de -2 a 2). */
   const fator = (chave: keyof AjustesCor) => (chave === "exposicao" ? 1 : 100);
-  const mudou = (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null;
+  const mudou =
+    (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null || !curvasNeutras(cor.curvas);
 
   const controle = (chave: keyof AjustesCor) => ({
     valor: cor[chave] * fator(chave),
@@ -135,6 +137,15 @@ export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
             />
           ))}
         </div>
+      </section>
+      <section className="border-b border-borda/60 pb-3 pt-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Curvas</h3>
+        <EditorDeCurva
+          curvas={{ ...CURVAS_NEUTRAS, ...cor.curvas }}
+          desativado={travada}
+          aoPrever={(curvas) => aoPrever(curvas ? comando({ curvas }) : null)}
+          aoConfirmar={(curvas) => aoExecutar(comando({ curvas }))}
+        />
       </section>
       {GRUPOS.filter((grupo) => grupo.id === "efeito").map(secao)}
     </div>

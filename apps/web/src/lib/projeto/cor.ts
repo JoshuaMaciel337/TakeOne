@@ -44,6 +44,8 @@ export type Cor = AjustesCor & {
   /** Filtro pronto somado aos ajustes, com intensidade de 0 a 2 (200%). */
   filtro: string | null;
   intensidade: number;
+  /** Curvas depois dos ajustes; sem elas, nada muda. */
+  curvas?: Curvas | null;
 };
 
 export const AJUSTES_NEUTROS: AjustesCor = {
@@ -62,7 +64,7 @@ export const AJUSTES_NEUTROS: AjustesCor = {
   matiz_claros: 0,
   forca_claros: 0,
 };
-export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1 };
+export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null };
 
 export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: number }> = {
   temperatura: { minimo: -1, maximo: 1 },
@@ -197,4 +199,84 @@ function suave(borda0: number, borda1: number, x: number): number {
 export function escurecimentoDaVinheta(u: number, v: number, vinheta: number): number {
   const distancia = Math.hypot((u - 0.5) * 2, (v - 0.5) * 2) / Math.SQRT2;
   return vinheta * suave(0.3, 1, distancia);
+}
+
+// -----------------------------------------------
+// Curvas: RGB (as três juntas) e uma por canal, aplicadas depois dos ajustes. A mesma conta de
+// core/utils/cor.py (casos em tests/casos/curvas.json). O shader lê a curva numa tabela de 256 tons.
+// -----------------------------------------------
+export type PontoDaCurva = [number, number];
+export type CanalDaCurva = "rgb" | "r" | "g" | "b";
+export type Curvas = Record<CanalDaCurva, PontoDaCurva[]>;
+
+export const CURVA_NEUTRA: PontoDaCurva[] = [
+  [0, 0],
+  [1, 1],
+];
+export const CURVAS_NEUTRAS: Curvas = { rgb: CURVA_NEUTRA, r: CURVA_NEUTRA, g: CURVA_NEUTRA, b: CURVA_NEUTRA };
+export const PONTOS_MAXIMOS_DA_CURVA = 16;
+
+/** Fritsch–Carlson: tangentes que mantêm a curva sem passar dos pontos (monótona entre eles). */
+function tangentes(xs: number[], ys: number[]): number[] {
+  const n = xs.length;
+  const d = xs.slice(0, -1).map((x, k) => (ys[k + 1] - ys[k]) / (xs[k + 1] - x));
+  const m = [d[0], ...d.slice(1).map((dk, i) => (d[i] * dk > 0 ? (d[i] + dk) / 2 : 0)), d[n - 2]];
+  for (let k = 0; k < n - 1; k++) {
+    if (d[k] === 0) {
+      m[k] = 0;
+      m[k + 1] = 0;
+      continue;
+    }
+    const a = m[k] / d[k];
+    const b = m[k + 1] / d[k];
+    const s = a * a + b * b;
+    if (s > 9) {
+      const t = 3 / Math.sqrt(s);
+      m[k] = t * a * d[k];
+      m[k + 1] = t * b * d[k];
+    }
+  }
+  return m;
+}
+
+/** A curva no ponto x (0 a 1): cúbica monótona pelos pontos, reta fora deles, de 0 a 1. */
+export function valorDaCurva(pontos: PontoDaCurva[], x: number): number {
+  const xs = pontos.map((p) => p[0]);
+  const ys = pontos.map((p) => p[1]);
+  if (x <= xs[0]) return limitar(ys[0], 0, 1);
+  if (x >= xs[xs.length - 1]) return limitar(ys[ys.length - 1], 0, 1);
+  const m = tangentes(xs, ys);
+  let k = 0;
+  while (k < xs.length - 2 && xs[k + 1] <= x) k++;
+  const h = xs[k + 1] - xs[k];
+  const t = (x - xs[k]) / h;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const valor = (2 * t3 - 3 * t2 + 1) * ys[k] + (t3 - 2 * t2 + t) * h * m[k] + (-2 * t3 + 3 * t2) * ys[k + 1] + (t3 - t2) * h * m[k + 1];
+  return limitar(valor, 0, 1);
+}
+
+const ehNeutra = (pontos: PontoDaCurva[] | undefined) =>
+  !pontos || (pontos.length === 2 && pontos[0][0] === 0 && pontos[0][1] === 0 && pontos[1][0] === 1 && pontos[1][1] === 1);
+
+export function curvasNeutras(curvas: Partial<Curvas> | null | undefined): boolean {
+  return !curvas || (["rgb", "r", "g", "b"] as const).every((canal) => ehNeutra(curvas[canal]));
+}
+
+/** A curva RGB nos três canais, depois a de cada canal. */
+export function aplicarCurvas([r, g, b]: [number, number, number], curvas: Partial<Curvas> | null | undefined): [number, number, number] {
+  if (curvasNeutras(curvas)) return [r, g, b];
+  const geral = curvas!.rgb ?? CURVA_NEUTRA;
+  const canal = (pontos: PontoDaCurva[] | undefined, v: number) => valorDaCurva(pontos ?? CURVA_NEUTRA, valorDaCurva(geral, v));
+  return [canal(curvas!.r, r), canal(curvas!.g, g), canal(curvas!.b, b)];
+}
+
+/** A tabela que o shader lê: 256 tons, cada um com o vermelho, o verde e o azul da curva (RGBA de 8 bits). */
+export function tabelaDasCurvas(curvas: Partial<Curvas>): Uint8Array {
+  const tabela = new Uint8Array(256 * 4);
+  for (let i = 0; i < 256; i++) {
+    const [r, g, b] = aplicarCurvas([i / 255, i / 255, i / 255], curvas);
+    tabela.set([Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255], i * 4);
+  }
+  return tabela;
 }

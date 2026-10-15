@@ -25,7 +25,7 @@ from functools import lru_cache
 
 from core.config import FFMPEG
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
-from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
+from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
@@ -532,10 +532,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             midia_tamanho = (midia.largura, midia.altura)
             caixa = caixa_do_clipe(base_do_render(clipe), clipe["recorte"], midia_tamanho, quadro)
         ajustes = ajustes_efetivos(clipe.get("cor"))
+        curvas = (clipe.get("cor") or {}).get("curvas")
         lut = vinheta = None
-        if not cor_neutra({**ajustes, "vinheta": 0}):
-            lut = f"{pasta}/{nome_da_lut(ajustes)}"
-            auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", ajustes))
+        if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas):
+            # As curvas entram na mesma LUT, depois dos ajustes
+            com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas}
+            lut = f"{pasta}/{nome_da_lut(com_curvas)}"
+            auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
         if ajustes["vinheta"] > 0:
             imagem_vinheta = f"{pasta}/vinheta_{clipe['id']}.png"
             tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))

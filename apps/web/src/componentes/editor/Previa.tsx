@@ -7,7 +7,7 @@ import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type T
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
-import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
+import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, tabelaDasCurvas } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
@@ -129,6 +129,8 @@ type CamadaNaTela = {
   mascara?: Cortes;
   /** Sigma do desfoque, em frações da altura do clipe. */
   desfoque?: number;
+  /** A tabela das curvas de cor; null sem curvas. */
+  curvas?: Uint8Array | null;
 };
 
 type EstadoDoDesenho = {
@@ -144,6 +146,22 @@ type EstadoDoDesenho = {
 function corDoClipe(clipe: Clipe): AjustesCor | null {
   const ajustes = ajustesEfetivos(clipe.cor);
   return corNeutra(ajustes) ? null : ajustes;
+}
+
+/** As tabelas das curvas, guardadas pelas curvas (a mesma para todo quadro do clipe). */
+const tabelasDasCurvas = new Map<string, Uint8Array>();
+
+function tabelaDoClipe(clipe: Clipe): Uint8Array | null {
+  const curvas = clipe.cor?.curvas;
+  if (curvasNeutras(curvas)) return null;
+  const chave = JSON.stringify(curvas);
+  let tabela = tabelasDasCurvas.get(chave);
+  if (!tabela) {
+    tabela = tabelaDasCurvas(curvas!);
+    if (tabelasDasCurvas.size > 50) tabelasDasCurvas.clear();
+    tabelasDasCurvas.set(chave, tabela);
+  }
+  return tabela;
 }
 
 function webgl2Disponivel(): boolean {
@@ -189,6 +207,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
       caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
+      curvas: tabelaDoClipe(clipe),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
@@ -214,7 +233,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     const caixaBase = caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, tamanho);
     // Letra a letra: só o trecho que já apareceu
     const trecho = imagem.layout && temLetraALetra(clipe.animacao) ? trechoVisivel(clipe, imagem.layout, tempo) : null;
-    const comum = { clipe, faixa, recorte: clipe.recorte, caixa, caixaBase, cor: corDoClipe(clipe), segundos: 0 };
+    const comum = { clipe, faixa, recorte: clipe.recorte, caixa, caixaBase, cor: corDoClipe(clipe), curvas: tabelaDoClipe(clipe), segundos: 0 };
     camadas.push({ ...comum, chave: `texto:${clipe.id}`, imagem: imagem.bitmap, mascara: trecho ? cortesDoTrecho(imagem.layout!, trecho) : undefined });
     // O destaque: a mesma caixa, com a imagem na outra cor, só no trecho da palavra falada
     const destaque = clipe.texto?.destaque ? imagensDeTexto.get(`${clipe.id}:destaque`) : undefined;
@@ -250,7 +269,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque, curvas: camada.curvas });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();
