@@ -8,12 +8,16 @@
 //
 // Precisa da pilha rodando e do Chrome instalado. Fica fora do CI.
 //   TAKEONE_EMAIL=... TAKEONE_SENHA=... npm run comparar-previa -- <id do projeto> [site]
-// Sai com código 1 se algum instante passar dos limites.
+// Sai com código 1 se algum instante passar dos limites. Com TAKEONE_SALVAR=<pasta>, guarda a prévia e
+// o vídeo de cada instante em PNG, para ver onde está a diferença.
 // -----------------------------------------------
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { chromium } from "playwright-core";
 
 const [projetoId, site = "http://localhost:3010"] = process.argv.slice(2);
-const { TAKEONE_EMAIL: email, TAKEONE_SENHA: senha } = process.env;
+const { TAKEONE_EMAIL: email, TAKEONE_SENHA: senha, TAKEONE_SALVAR: pastaSalvar } = process.env;
 if (!projetoId || !email || !senha) {
   console.error("Uso: TAKEONE_EMAIL=... TAKEONE_SENHA=... npm run comparar-previa -- <id do projeto> [site]");
   process.exit(2);
@@ -53,7 +57,7 @@ try {
     for (let i = 0; i < Math.floor(quadro / fps); i++) await pagina.keyboard.press("Shift+ArrowRight");
     for (let i = 0; i < Math.round(quadro % fps); i++) await pagina.keyboard.press("ArrowRight");
     await pagina.waitForTimeout(2000);
-    const medida = await pagina.evaluate(async ({ url, quadro, fps, folga }) => {
+    const medida = await pagina.evaluate(async ({ url, quadro, fps, folga, salvar }) => {
       const previa = document.querySelector("canvas");
       const largura = previa.width;
       const altura = previa.height;
@@ -89,12 +93,25 @@ try {
         const pixels = daPrevia.length / 4;
         return { media: soma / (pixels * 3), fora: fora / pixels };
       };
-      const mesmo = await comparar(quadro);
       const antes = await comparar(quadro - 1);
       const depois = await comparar(quadro + 1);
+      const mesmo = await comparar(quadro);
       const vizinho = Math.min(antes.media, depois.media);
-      return { largura, altura, ...mesmo, vizinhoMaisParecido: vizinho < mesmo.media - folga };
-    }, { url: `${site}/api/exportacoes/${exportacao.id}/arquivos/video.mp4`, quadro, fps, folga: FOLGA_VIZINHO });
+      // As duas imagens do instante, em PNG (o vídeo já está no quadro certo)
+      const png = async (fonte) => {
+        const c = new OffscreenCanvas(largura, altura);
+        c.getContext("2d").drawImage(fonte, 0, 0, largura, altura);
+        const blob = await c.convertToBlob({ type: "image/png" });
+        return Array.from(new Uint8Array(await blob.arrayBuffer()));
+      };
+      const imagens = salvar ? { previa: await png(previa), video: await png(video) } : null;
+      return { largura, altura, ...mesmo, vizinhoMaisParecido: vizinho < mesmo.media - folga, imagens };
+    }, { url: `${site}/api/exportacoes/${exportacao.id}/arquivos/video.mp4`, quadro, fps, folga: FOLGA_VIZINHO, salvar: Boolean(pastaSalvar) });
+    if (medida.imagens) {
+      writeFileSync(join(pastaSalvar, `previa_${quadro}.png`), Buffer.from(medida.imagens.previa));
+      writeFileSync(join(pastaSalvar, `video_${quadro}.png`), Buffer.from(medida.imagens.video));
+      delete medida.imagens;
+    }
     const ok = medida.media <= LIMITE_MEDIA && medida.fora <= LIMITE_FORA && !medida.vizinhoMaisParecido;
     resultados.push({ quadro, segundos: (quadro / fps).toFixed(2), ...medida, ok });
   }
