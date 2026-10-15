@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
-import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
+import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
 
 type Caso = {
   nome: string;
@@ -15,6 +15,7 @@ type Caso = {
   t: number;
   esperado: Transformacao;
   revelado?: Revelado;
+  desfoque?: number;
 };
 const { base, casos } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/transicao.json", import.meta.url), "utf-8")) as {
   base: Transformacao;
@@ -28,6 +29,9 @@ for (const caso of casos) {
     const resultado = transformacaoNaTransicao(base, [efeito], caso.t * S);
     for (const chave of Object.keys(caso.esperado) as (keyof Transformacao)[]) {
       assert.ok(Math.abs(resultado[chave] - caso.esperado[chave]) < 1e-9, `${chave}: ${resultado[chave]} ≠ ${caso.esperado[chave]}`);
+    }
+    if (caso.desfoque !== undefined) {
+      assert.ok(Math.abs(desfoqueNaTransicao([efeito], caso.t * S) - caso.desfoque) < 1e-12);
     }
     if (caso.revelado) {
       const revelado = reveladoNaTransicao([efeito], caso.t * S);

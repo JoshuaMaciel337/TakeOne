@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from core.utils.transicao import (
+    desfoque_na_transicao,
     filtro_de_cortina,
     filtros_de_transicao,
     janelas_da_principal,
@@ -61,6 +62,14 @@ def test_janelas_estendem_os_dois_clipes():
     assert (janelas["a"]["inicio"], janelas["a"]["fim"]) == (0, 4.5)
     assert (janelas["b"]["inicio"], janelas["b"]["fim"]) == (3.5, 7)
     assert janelas["b"]["efeitos"] == [{"tipo": "fusao", "papel": "entra", "inicio": 3.5, "duracao": 1}]
+
+
+DESFOQUES = [c for c in CASOS if "desfoque" in c]
+
+
+@pytest.mark.parametrize("caso", DESFOQUES, ids=[c["nome"] for c in DESFOQUES])
+def test_desfoque_igual_ao_da_previa(caso):
+    assert desfoque_na_transicao([efeito_do(caso)], caso["t"]) == pytest.approx(caso["desfoque"], abs=1e-12)
 
 
 @pytest.mark.parametrize("caso", CORTINAS, ids=[c["nome"] for c in CORTINAS])

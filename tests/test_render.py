@@ -281,6 +281,20 @@ def test_efeitos_de_voz_viram_filtros_e_reverb_com_a_sala():
     assert "amix=inputs=2:weights='1 0.4':normalize=0:duration=first,volume=1," in plano.filtro_som
 
 
+def test_transicao_de_desfoque_vira_gblur_por_roteiro_com_borda_repetida():
+    principal = [clipe("c1", "deitado", 0, 4, transicao={"tipo": "desfoque", "duracao": S}), clipe("c2", "empe", 4, 4)]
+    plano = planejar_render(projeto([faixa("principal", principal)], duracao=8), MIDIAS, 1080, 1920, pasta="/trabalho")
+    roteiros = {a.caminho: a.conteudo for a in plano.auxiliares if a.tipo == "comandos"}
+    assert set(roteiros) == {"/trabalho/desfoque_c1_1.txt", "/trabalho/desfoque_c2_2.txt"}
+    # O mais desfocado é no corte, no meio da janela: 3% da altura do clipe (608 px no deitado)
+    linhas = roteiros["/trabalho/desfoque_c1_1.txt"].splitlines()
+    sigmas = [float(linha.split(" sigma ")[1].split(",")[0]) for linha in linhas]
+    assert max(sigmas) == pytest.approx(0.03 * 608, abs=0.01) and sigmas[0] == 0
+    assert "gblur@d1 sigmaV" in linhas[1], "o vertical muda junto"
+    assert "fillborders=" in plano.filtro and "gblur@d1=sigma=0:steps=6,crop=" in plano.filtro
+    assert "premultiply" not in plano.filtro, "vídeo sem transparência não precisa"
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

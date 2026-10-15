@@ -11,6 +11,8 @@
 from core.utils.animacao import suavizar
 
 ZOOM_TRANSICAO = 0.6
+# Desfoque no meio da transição "desfoque": sigma em frações da altura do clipe
+DESFOQUE_TRANSICAO = 0.03
 CORTINAS = ("cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima")
 REVELADO_INTEIRO = {"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0}
 
@@ -53,7 +55,22 @@ def transformacao_na_transicao(base: dict, efeitos: list[dict], t: float) -> dic
         elif efeito["tipo"] == "zoom" and entra:
             resultado["escala"] *= ZOOM_TRANSICAO + (1 - ZOOM_TRANSICAO) * e
             resultado["opacidade"] *= p
+        elif efeito["tipo"] == "desfoque" and entra:
+            resultado["opacidade"] *= p
     return resultado
+
+
+def desfoque_na_transicao(efeitos: list[dict], t: float) -> float:
+    """
+    O desfoque (sigma em frações da altura do clipe) no instante t: os dois clipes desfocam até o
+    meio da janela, o corte, e voltam a ficar nítidos depois.
+    """
+    desfoque = 0.0
+    for efeito in efeitos:
+        if efeito["tipo"] == "desfoque":
+            p = min(1.0, max(0.0, (t - efeito["inicio"]) / efeito["duracao"]))
+            desfoque = max(desfoque, DESFOQUE_TRANSICAO * (1 - abs(2 * p - 1)))
+    return desfoque
 
 
 def revelado_na_transicao(efeitos: list[dict], t: float) -> dict:
@@ -128,6 +145,8 @@ def filtros_de_transicao(efeitos: list[dict], var_tempo: str = "t") -> dict:
             dx.append(falta)
         elif tipo == "empurrar":
             dx.append(falta if entra else f"-(1-{falta})")
+        elif tipo == "desfoque" and entra:
+            fades.append(f"fade=t=in:st={_n(inicio)}:d={_n(duracao)}:alpha=1")
         elif tipo == "zoom" and entra:
             fades.append(f"fade=t=in:st={_n(inicio)}:d={_n(duracao)}:alpha=1")
             escala.append(f"({_n(ZOOM_TRANSICAO)}+{_n(1 - ZOOM_TRANSICAO)}*(1-{falta}))")

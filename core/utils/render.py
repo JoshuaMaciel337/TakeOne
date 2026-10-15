@@ -39,7 +39,7 @@ from core.utils.som import (
     ganho_para_igualar,
 )
 from core.utils.tempo import TICKS_POR_SEGUNDO
-from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
+from core.utils.transicao import desfoque_na_transicao, filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
 TAXA_AUDIO = 48000
 LUFS_ALVO = -14
@@ -173,7 +173,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     numero: int = 0, lut: str | None = None, vinheta: int | None = None,
                     leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None,
                     roteiro_de_opacidade: str | None = None,
-                    mascara: tuple[str, str] | None = None) -> tuple[str, str]:
+                    mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -181,6 +181,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     entrada_de_cor: filtros do começo que dizem como ler a cor do vídeo (ler_como_bt709).
     roteiro_de_opacidade: o roteiro do sendcmd com a opacidade por quadro, quando ela tem keyframes.
     mascara: (roteiro do sendcmd, nome das caixas) que escondem as letras fora do trecho (letras.py).
+    desfoque: os filtros do desfoque (veja _desfoque), logo depois do tamanho, como na prévia.
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -206,6 +207,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         roteiro, alvo = mascara
         filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro)}'")
         filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
+    filtros += desfoque or []
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
         depois_do_fps = len(entrada_de_cor or []) + 2
@@ -305,6 +307,39 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     if prefixo:
         return prefixo + "".join(f",{filtro}" for filtro in filtros), overlay
     return f"[{entrada}:v]{','.join(filtros)}", overlay
+
+
+def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alvo: str,
+              roteiro: str) -> tuple[list[str], str | None]:
+    """
+    (filtros, conteúdo do roteiro do sendcmd) do desfoque do clipe, ou ([], None) sem desfoque. O
+    sigma é uma fração da altura do clipe (a mesma conta da prévia, que desfoca a textura) e muda por
+    quadro na transição. A imagem ganha bordas repetidas antes do gblur e perde depois: assim a borda
+    se comporta como o CLAMP_TO_EDGE da prévia. Com transparência (textos), o desfoque é feito no
+    alfa pré-multiplicado, como na textura da prévia.
+    """
+    if leitura is None or not leitura.efeitos:
+        return [], None
+    efeitos = list(leitura.efeitos)
+    quadros = round((leitura.fim - leitura.inicio) * fps) + 1
+    sigmas = [desfoque_na_transicao(efeitos, leitura.inicio + n / fps) * altura for n in range(quadros)]
+    maior = max(sigmas)
+    if maior < 0.05:
+        return [], None
+    borda = math.ceil(3 * maior) + 2
+    linhas, anterior = [], None
+    for n, sigma in enumerate(sigmas):
+        if anterior is None or abs(sigma - anterior) > 1e-3:
+            linhas.append(f"{n / fps:.6f} gblur@{alvo} sigma {sigma:.4f}, gblur@{alvo} sigmaV {sigma:.4f};")
+            anterior = sigma
+    filtros = [f"pad=w=iw+{2 * borda}:h=ih+{2 * borda}:x={borda}:y={borda}:color=black@0",
+               f"fillborders=left={borda}:right={borda}:top={borda}:bottom={borda}:mode=smear",
+               f"sendcmd=f='{_escapar_caminho(roteiro)}'",
+               f"gblur@{alvo}=sigma=0:steps=6",
+               f"crop=w=iw-{2 * borda}:h=ih-{2 * borda}:x={borda}:y={borda}"]
+    if clipe.get("texto"):
+        filtros = ["premultiply=inplace=1", *filtros, "unpremultiply=inplace=1"]
+    return filtros, "\n".join(linhas) + "\n"
 
 
 def _escapar_caminho(caminho: str) -> str:
@@ -531,8 +566,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                            max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
             auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
         entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
+        caminho_desfoque = f"{pasta}/desfoque_{clipe['id']}_{numero}.txt"
+        desfoque, roteiro_desfoque = _desfoque(clipe, leituras.get(clipe["id"]), max(1, round(caixa.altura)),
+                                               float(taxa_em_fracao(taxa)), f"d{numero}", caminho_desfoque)
+        if roteiro_desfoque:
+            auxiliares[caminho_desfoque] = ArquivoAuxiliar(caminho_desfoque, "comandos", {}, conteudo=roteiro_desfoque)
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
-                                          leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara)
+                                          leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara, desfoque)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"

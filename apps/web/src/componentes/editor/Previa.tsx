@@ -10,7 +10,7 @@ import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
-import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -127,6 +127,8 @@ type CamadaNaTela = {
   imagem?: ImageBitmap;
   /** As letras do texto que aparecem; sem ela, todas. */
   mascara?: Cortes;
+  /** Sigma do desfoque, em frações da altura do clipe. */
+  desfoque?: number;
 };
 
 type EstadoDoDesenho = {
@@ -188,6 +190,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
+      desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
@@ -247,7 +250,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();

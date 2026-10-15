@@ -270,7 +270,7 @@ class CorEntrada(BaseModel):
 
 class TransicaoEntrada(BaseModel):
     tipo: Literal["fusao", "escurecer", "deslizar", "empurrar", "zoom",
-                  "cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima"]
+                  "cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima", "desfoque"]
     duracao: int = Field(gt=0, description="Em ticks")
 
 

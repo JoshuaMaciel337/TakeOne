@@ -37,6 +37,12 @@
      "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 1}},
     {"nome": "cortina: depois da janela, quem entra aparece inteiro", "tipo": "cortina_cima", "papel": "entra", "inicio": 2, "duracao": 1, "t": 3.5,
      "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
-     "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 1}}
+     "revelado": {"x0": 0, "y0": 0, "x1": 1, "y1": 1}},
+    {"nome": "desfoque: quem entra, a um quarto, meio desfocado e aparecendo", "tipo": "desfoque", "papel": "entra", "inicio": 2, "duracao": 1, "t": 2.25,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.25}, "desfoque": 0.015},
+    {"nome": "desfoque: quem sai, no corte, no mais desfocado", "tipo": "desfoque", "papel": "sai", "inicio": 2, "duracao": 1, "t": 2.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}, "desfoque": 0.03},
+    {"nome": "desfoque: depois da janela, nítido", "tipo": "desfoque", "papel": "entra", "inicio": 2, "duracao": 1, "t": 3.5,
+     "esperado": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}, "desfoque": 0}
   ]
 }

@@ -19,7 +19,8 @@ export type TipoTransicao =
   | "cortina_direita"
   | "cortina_esquerda"
   | "cortina_baixo"
-  | "cortina_cima";
+  | "cortina_cima"
+  | "desfoque";
 export type Transicao = { tipo: TipoTransicao; duracao: Tick };
 
 export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: string }[] = [
@@ -32,6 +33,7 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "cortina_esquerda", nome: "Cortina para a esquerda", descricao: "O próximo é revelado da direita para a esquerda" },
   { id: "cortina_baixo", nome: "Cortina para baixo", descricao: "O próximo é revelado de cima para baixo" },
   { id: "cortina_cima", nome: "Cortina para cima", descricao: "O próximo é revelado de baixo para cima" },
+  { id: "desfoque", nome: "Desfoque", descricao: "Os dois desfocam no corte e o próximo aparece nítido" },
 ];
 
 /**
@@ -43,6 +45,8 @@ export const REVELADO_INTEIRO: Revelado = { x0: 0, y0: 0, x1: 1, y1: 1 };
 
 /** Zoom de onde o clipe que entra parte. */
 export const ZOOM_TRANSICAO = 0.6;
+/** Desfoque no meio da transição "desfoque": sigma em frações da altura do clipe. */
+export const DESFOQUE_TRANSICAO = 0.03;
 
 /** Uma transição vista de um dos dois clipes. */
 export type EfeitoDeTransicao = { tipo: TipoTransicao; papel: "sai" | "entra"; inicio: Tick; duracao: Tick };
@@ -90,9 +94,22 @@ export function transformacaoNaTransicao(base: Transformacao, efeitos: EfeitoDeT
     } else if (efeito.tipo === "zoom" && entra) {
       escala *= ZOOM_TRANSICAO + (1 - ZOOM_TRANSICAO) * e;
       opacidade *= p;
+    } else if (efeito.tipo === "desfoque" && entra) {
+      opacidade *= p;
     }
   }
   return { ...base, x, escala, opacidade };
+}
+
+/** O desfoque no instante `t`: os dois clipes desfocam até o corte e voltam a ficar nítidos depois. */
+export function desfoqueNaTransicao(efeitos: EfeitoDeTransicao[], t: Tick): number {
+  let desfoque = 0;
+  for (const efeito of efeitos) {
+    if (efeito.tipo !== "desfoque") continue;
+    const p = Math.min(1, Math.max(0, (t - efeito.inicio) / efeito.duracao));
+    desfoque = Math.max(desfoque, DESFOQUE_TRANSICAO * (1 - Math.abs(2 * p - 1)));
+  }
+  return desfoque;
 }
 
 /** A parte do clipe que aparece no instante `t`: as cortinas revelam quem entra, com a curva do movimento. */

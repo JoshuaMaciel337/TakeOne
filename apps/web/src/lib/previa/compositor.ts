@@ -22,7 +22,44 @@ export type Camada = {
   revelado?: Revelado;
   /** As letras do texto que aparecem (lib/projeto/letras.ts); sem ela, todas. */
   mascara?: Cortes;
+  /** Desfoque gaussiano: sigma em frações da altura do clipe (o render faz a mesma conta). */
+  desfoque?: number;
 };
+
+// Desfoque em duas passadas (horizontal e vertical) num framebuffer, antes de desenhar a camada.
+// Com sigma grande, a primeira passada lê um nível menor do mipmap da textura: o sigma ali fica entre
+// 4 e 8 pixels e a conta não pesa. A borda (e a do recorte) se repete, como no render.
+const VERTICES_DESFOQUE = `#version 300 es
+in vec2 a_pos;
+out vec2 v_pos;
+void main() {
+  gl_Position = vec4(a_pos * 2.0, 0.0, 1.0);
+  v_pos = a_pos + 0.5;
+}`;
+
+const FRAGMENTOS_DESFOQUE = `#version 300 es
+precision highp float;
+in vec2 v_pos;
+uniform sampler2D u_fonte;
+uniform vec2 u_passo;
+uniform float u_sigma;
+uniform float u_lod;
+uniform vec4 u_limite;
+out vec4 cor;
+void main() {
+  int raio = int(ceil(3.0 * u_sigma));
+  vec4 soma = vec4(0.0);
+  float pesos = 0.0;
+  for (int i = -raio; i <= raio; i++) {
+    float peso = exp(-float(i * i) / (2.0 * u_sigma * u_sigma));
+    soma += peso * textureLod(u_fonte, clamp(v_pos + u_passo * float(i), u_limite.xy, u_limite.zw), u_lod);
+    pesos += peso;
+  }
+  cor = soma / pesos;
+}`;
+
+/** Sigma (em pixels do nível do mipmap) acima do qual a passada lê um nível menor. */
+const SIGMA_POR_NIVEL = 4;
 
 const SEM_MASCARA: Cortes = { de: [0, 0, 0], ate: [1, 1, 1] };
 
@@ -113,6 +150,14 @@ void main() {
   cor = texel * u_opacidade;
 }`;
 
+/** Largura e altura em pixels de uma fonte de textura. */
+function tamanhoDaFonte(fonte: TexImageSource): { largura: number; altura: number } {
+  if (typeof VideoFrame !== "undefined" && fonte instanceof VideoFrame) return { largura: fonte.displayWidth, altura: fonte.displayHeight };
+  if (fonte instanceof HTMLVideoElement) return { largura: fonte.videoWidth, altura: fonte.videoHeight };
+  const { width, height } = fonte as { width: number; height: number };
+  return { largura: width, altura: height };
+}
+
 function compilar(gl: WebGL2RenderingContext, tipo: number, codigo: string): WebGLShader {
   const shader = gl.createShader(tipo)!;
   gl.shaderSource(shader, codigo);
@@ -128,8 +173,13 @@ export function corParaRgb(hex: string): [number, number, number] {
   return [((valor >> 16) & 255) / 255, ((valor >> 8) & 255) / 255, (valor & 255) / 255];
 }
 
+type Alvo = { buffer: WebGLFramebuffer; textura: WebGLTexture; largura: number; altura: number };
+
 type Recursos = {
   programa: WebGLProgram;
+  desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
+  /** Os dois framebuffers das passadas do desfoque. */
+  alvos: Alvo[];
   uniformes: Record<
     "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte",
     WebGLUniformLocation | null
@@ -168,16 +218,33 @@ export class Compositor {
     const programa = gl.createProgram()!;
     gl.attachShader(programa, compilar(gl, gl.VERTEX_SHADER, VERTICES));
     gl.attachShader(programa, compilar(gl, gl.FRAGMENT_SHADER, FRAGMENTOS));
+    gl.bindAttribLocation(programa, 0, "a_pos");
     gl.linkProgram(programa);
     if (!gl.getProgramParameter(programa, gl.LINK_STATUS)) throw new Error(`Programa da prévia: ${gl.getProgramInfoLog(programa)}`);
+    const programaDesfoque = gl.createProgram()!;
+    gl.attachShader(programaDesfoque, compilar(gl, gl.VERTEX_SHADER, VERTICES_DESFOQUE));
+    gl.attachShader(programaDesfoque, compilar(gl, gl.FRAGMENT_SHADER, FRAGMENTOS_DESFOQUE));
+    gl.bindAttribLocation(programaDesfoque, 0, "a_pos");
+    gl.linkProgram(programaDesfoque);
+    if (!gl.getProgramParameter(programaDesfoque, gl.LINK_STATUS)) throw new Error(`Desfoque da prévia: ${gl.getProgramInfoLog(programaDesfoque)}`);
+    const localDesfoque = (nome: string) => gl.getUniformLocation(programaDesfoque, nome);
+    const desfoque = {
+      programa: programaDesfoque,
+      uniformes: {
+        fonte: localDesfoque("u_fonte"),
+        passo: localDesfoque("u_passo"),
+        sigma: localDesfoque("u_sigma"),
+        lod: localDesfoque("u_lod"),
+        limite: localDesfoque("u_limite"),
+      },
+    };
     gl.useProgram(programa);
 
     const vertices = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5]), gl.STATIC_DRAW);
-    const posicao = gl.getAttribLocation(programa, "a_pos");
-    gl.enableVertexAttribArray(posicao);
-    gl.vertexAttribPointer(posicao, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -203,7 +270,78 @@ export class Compositor {
         textura: local("u_textura"),
       },
       texturas: [],
+      desfoque,
+      alvos: [],
     };
+  }
+
+  /** O framebuffer `indice` com uma textura do tamanho pedido. */
+  private alvo(indice: number, largura: number, altura: number): Alvo {
+    const gl = this.gl;
+    const recursos = this.recursos!;
+    let alvo = recursos.alvos[indice];
+    if (!alvo) {
+      alvo = { buffer: gl.createFramebuffer()!, textura: gl.createTexture()!, largura: 0, altura: 0 };
+      recursos.alvos[indice] = alvo;
+    }
+    if (alvo.largura !== largura || alvo.altura !== altura) {
+      gl.bindTexture(gl.TEXTURE_2D, alvo.textura);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, largura, altura, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, alvo.buffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, alvo.textura, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      alvo.largura = largura;
+      alvo.altura = altura;
+    }
+    return alvo;
+  }
+
+  /**
+   * Desfoca a textura já carregada (largura × altura) e devolve a textura desfocada, do mesmo
+   * enquadramento. sigma em pixels da textura; o recorte limita a área lida, como o crop do render.
+   */
+  private desfocar(textura: WebGLTexture, largura: number, altura: number, sigma: number, recorte: Recorte): WebGLTexture {
+    const gl = this.gl;
+    const { desfoque, programa } = this.recursos!;
+    const nivel = Math.max(0, Math.floor(Math.log2(sigma / SIGMA_POR_NIVEL)));
+    const fator = 2 ** nivel;
+    const w = Math.max(1, Math.ceil(largura / fator));
+    const h = Math.max(1, Math.ceil(altura / fator));
+    const primeiro = this.alvo(0, w, h);
+    const segundo = this.alvo(1, w, h);
+    gl.bindTexture(gl.TEXTURE_2D, textura);
+    if (nivel > 0) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    }
+    gl.useProgram(desfoque.programa);
+    gl.disable(gl.BLEND);
+    gl.uniform1i(desfoque.uniformes.fonte, 0);
+    gl.uniform1f(desfoque.uniformes.sigma, sigma / fator);
+    // Os centros dos pixels das bordas do recorte, no nível lido
+    gl.uniform4f(desfoque.uniformes.limite, recorte.x + 0.5 / w, recorte.y + 0.5 / h, recorte.x + recorte.largura - 0.5 / w, recorte.y + recorte.altura - 0.5 / h);
+    gl.viewport(0, 0, w, h);
+    // Horizontal: da textura (no nível do mipmap) para o primeiro framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, primeiro.buffer);
+    gl.uniform2f(desfoque.uniformes.passo, 1 / w, 0);
+    gl.uniform1f(desfoque.uniformes.lod, nivel);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // Vertical: do primeiro para o segundo
+    gl.bindFramebuffer(gl.FRAMEBUFFER, segundo.buffer);
+    gl.bindTexture(gl.TEXTURE_2D, primeiro.textura);
+    gl.uniform2f(desfoque.uniformes.passo, 0, 1 / h);
+    gl.uniform1f(desfoque.uniformes.lod, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, textura);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.enable(gl.BLEND);
+    gl.useProgram(programa);
+    return segundo.textura;
   }
 
   private textura(indice: number): WebGLTexture {
@@ -247,6 +385,16 @@ export class Compositor {
       if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
       gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
+      if (camada.desfoque && camada.desfoque > 0) {
+        // O sigma é uma fração da altura do clipe; na textura, da altura do recorte
+        const { largura, altura } = tamanhoDaFonte(camada.fonte);
+        const sigma = camada.desfoque * recorte.altura * altura;
+        if (sigma >= 0.05 && largura > 0 && altura > 0) {
+          const desfocada = this.desfocar(this.textura(indice), largura, altura, sigma, recorte);
+          gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+          gl.bindTexture(gl.TEXTURE_2D, desfocada);
+        }
+      }
       gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
       gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
@@ -274,7 +422,12 @@ export class Compositor {
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
       for (const textura of recursos.texturas) this.gl.deleteTexture(textura);
+      for (const alvo of recursos.alvos) {
+        this.gl.deleteTexture(alvo.textura);
+        this.gl.deleteFramebuffer(alvo.buffer);
+      }
       this.gl.deleteProgram(recursos.programa);
+      this.gl.deleteProgram(recursos.desfoque.programa);
     }
     this.recursos = null;
   }
