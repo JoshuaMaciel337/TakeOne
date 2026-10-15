@@ -27,6 +27,7 @@ import {
   type MudancaDeAudio,
   mudarKeyframe,
   reenquadrarClipe,
+  abaixarClipe,
   duplicarClipes,
   moverClipe,
   mudarFundo,
@@ -39,6 +40,7 @@ import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
+import type { Abaixamento } from "./abaixar.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
@@ -58,6 +60,7 @@ export type Comando =
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
   | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
+  | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
@@ -84,6 +87,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.transformar": "mudar posição e tamanho",
   "clipe.keyframe": "mudar keyframe",
   "clipe.reenquadrar": "seguir o rosto",
+  "clipe.abaixar": "abaixar na fala",
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
   "clipe.audio": "mudar o som",
@@ -131,6 +135,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: mudarFundo(projeto, parametros.cor) };
     case "clipe.transformar":
       return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao, parametros.tempo) };
+    case "clipe.abaixar":
+      return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":
       return { projeto: reenquadrarClipe(projeto, parametros.clipeId, parametros.reenquadramento) };
     case "clipe.keyframe":

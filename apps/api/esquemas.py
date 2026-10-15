@@ -164,6 +164,20 @@ class KeyframesEntrada(BaseModel):
         return self
 
 
+class AbaixamentoEntrada(BaseModel):
+    """Abaixar na fala (apps/web/src/lib/projeto/abaixar.ts): o fator do volume, de 0 a 1, ao longo do clipe."""
+    db: float = Field(ge=-40, le=0)
+    pontos: list[KeyframeEntrada] = Field(min_length=1, max_length=4000)
+
+    @model_validator(mode="after")
+    def em_ordem_e_nos_limites(self):
+        if any(b.t <= a.t for a, b in zip(self.pontos, self.pontos[1:], strict=False)):
+            raise ValueError("Os pontos do abaixar na fala precisam estar em ordem.")
+        if any(not 0 <= ponto.valor <= 1 for ponto in self.pontos):
+            raise ValueError("Um ponto do abaixar na fala passa do limite.")
+        return self
+
+
 class RecorteEntrada(BaseModel):
     x: float = Field(default=0, ge=0, lt=1)
     y: float = Field(default=0, ge=0, lt=1)
@@ -266,6 +280,7 @@ class ClipeEntrada(BaseModel):
     curva_fade: Literal["linear", "suave", "s", "exponencial"] = "linear"
     # Usa a voz sem ruído da mídia (DeepFilterNet) no lugar do som original
     voz_limpa: bool = False
+    abaixamento: AbaixamentoEntrada | None = None
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)

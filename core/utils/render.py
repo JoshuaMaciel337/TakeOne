@@ -30,7 +30,7 @@ from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
-from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE
+from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE, comandos_de_volume
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -339,8 +339,11 @@ def base_do_render(clipe: dict) -> dict:
     return base
 
 
-def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0) -> str:
-    """pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem)."""
+def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None) -> str:
+    """
+    pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
+    abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala.
+    """
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
     filtros = ["asetpts=PTS-STARTPTS"]
@@ -353,6 +356,10 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0) -> str:
         *cadeia_atempo(clipe["velocidade"]),
         f"volume={_numero(clipe['volume'])}",
     ]
+    if abaixar:
+        # Abaixar na fala: o fator da curva muda a cada 10 ms (blocos de 480 amostras), pelo roteiro
+        roteiro, alvo = abaixar
+        filtros += ["asetnsamples=n=480:p=0", f"asendcmd=f='{_escapar_caminho(roteiro)}'", f"volume@{alvo}=volume=1"]
     # Fades no tempo do próprio clipe (depois da velocidade), antes de ir para o instante dele
     fade_entrada, fade_saida = segundos(clipe.get("fade_entrada", 0)), segundos(clipe.get("fade_saida", 0))
     curva = CURVAS_DO_FADE[clipe.get("curva_fade") or CURVA_PADRAO]
@@ -519,7 +526,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                     lida = entradas[entrada_do_som]
                     entrada_do_som = len(entradas)
                     entradas.append(Entrada(midia.voz_limpa, lida.inicio, lida.duracao))
-                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular)}[{sons[-1]}]")
+                abaixar = None
+                if (clipe.get("abaixamento") or {}).get("pontos"):
+                    abaixar = (f"{pasta}/volume_{clipe['id']}.txt", f"ab{len(sons)}")
+                    conteudo = comandos_de_volume(clipe["abaixamento"]["pontos"], segundos(clipe["duracao"]),
+                                                  f"volume@{abaixar[1]}")
+                    auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
+                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular, abaixar)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")

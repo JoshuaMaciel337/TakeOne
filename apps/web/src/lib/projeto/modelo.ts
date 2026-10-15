@@ -1,6 +1,7 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Taxa, Tick } from "../tempo.ts";
+import type { Abaixamento } from "./abaixar.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { Keyframes } from "./keyframes.ts";
@@ -64,6 +65,8 @@ export type Clipe = {
   curva_fade?: CurvaDoFade;
   /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
   voz_limpa?: boolean;
+  /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
+  abaixamento?: Abaixamento | null;
   transformacao: Transformacao;
   /** Posição, escala, rotação e opacidade mudando ao longo do clipe (lib/projeto/keyframes.ts). */
   keyframes?: Keyframes | null;

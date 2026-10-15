@@ -340,6 +340,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
               tempo={tempo}
               aoBuscar={buscar}
               proporcao={projeto.proporcao}
+              faixas={projeto.faixas}
               aoAvisar={mostrarAviso}
               fundo={(projetoNaTela ?? projeto).fundo.cor}
               aoPrever={preverDoPainel}

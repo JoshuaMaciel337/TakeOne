@@ -388,7 +388,7 @@ Cada fase termina com algo que dá para usar e testar.
   - faixas de música e efeitos sonoros
   - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render
   - [x] fades em outros formatos: suave, em S e exponencial (as curvas do `afade`, com a mesma fórmula na prévia)
-  - ducking sob a voz (do HolyCut)
+  - [x] abaixar a música sob a voz (curva gravada no clipe a partir da transcrição das outras faixas)
   - loudness medido (`audio-dsp` do FilmCraft)
   - efeitos de voz: EQ, reverb, eco, mudança de tom (SoundCraft)
 - [x] Legendas automáticas pela fala (faster-whisper no worker de GPU), em até duas linhas que cabem no quadro. Com destaque da fala: karaokê e palavra falada, na cor escolhida.

@@ -27,6 +27,7 @@ import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
+  acharClipe,
   type Clipe,
   type Faixa,
   faixaDeTexto,
@@ -39,6 +40,7 @@ import {
   type Transformacao,
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
+import type { Abaixamento } from "./abaixar.ts";
 import type { CurvaDoFade } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
 
@@ -324,6 +326,7 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       // Os keyframes e as palavras da legenda ficam no mesmo instante da linha do tempo
       keyframes: deslocarKeyframes(clipe.keyframes, delta),
       texto: deslocarTempos(clipe.texto, delta),
+      abaixamento: deslocarAbaixamento(clipe.abaixamento, delta),
     };
   }
 
@@ -363,6 +366,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         fade_entrada: 0,
         keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
         texto: deslocarTempos(clipe.texto, t - clipe.inicio),
+        abaixamento: deslocarAbaixamento(clipe.abaixamento, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
       const esquerda = { ...clipe, duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
@@ -471,6 +475,7 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 fade_saida: ultimo ? clipe.fade_saida : 0,
                 keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
                 texto: deslocarTempos(clipe.texto, pedaco.inicio - clipe.inicio),
+                abaixamento: deslocarAbaixamento(clipe.abaixamento, pedaco.inicio - clipe.inicio),
                 transicao: ultimo ? clipe.transicao : null,
                 animacao: clipe.animacao
                   ? { ...clipe.animacao, entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
@@ -751,6 +756,22 @@ export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Lege
 function deslocarTempos(texto: Texto | null | undefined, delta: Tick): Texto | null | undefined {
   if (!texto?.tempos || delta === 0) return texto;
   return { ...texto, tempos: texto.tempos.map((t) => t - delta) };
+}
+
+/** A curva do abaixar na fala continua no mesmo instante da linha do tempo. */
+function deslocarAbaixamento(abaixamento: Abaixamento | null | undefined, delta: Tick): Abaixamento | null | undefined {
+  if (!abaixamento || delta === 0) return abaixamento;
+  return { ...abaixamento, pontos: abaixamento.pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta })) };
+}
+
+/** Grava (ou tira, com null) a curva do abaixar na fala de um clipe com som. */
+export function abaixarClipe(projeto: Projeto, clipeId: string, abaixamento: Abaixamento | null): Projeto {
+  const achado = acharClipe(projeto, clipeId);
+  if (!achado) throw new ErroEdicao("Este clipe não existe mais.");
+  exigirDestravada(achado.faixa);
+  if (!achado.clipe.midia_id) throw new ErroEdicao("Este clipe não tem som.");
+  const clipes = achado.faixa.clipes.map((clipe) => (clipe.id === clipeId ? { ...clipe, abaixamento } : clipe));
+  return trocarFaixa(projeto, { ...achado.faixa, clipes });
 }
 
 /** Aplica o estilo (tudo menos o conteúdo) a todas as legendas da faixa. */

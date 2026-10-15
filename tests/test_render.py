@@ -257,6 +257,17 @@ def test_letra_a_letra_e_destaque_viram_caixas_transparentes_por_roteiro():
     assert letras[0].startswith("0.000000 ") and letras[1].startswith("0.500000 ")
 
 
+def test_abaixar_na_fala_vira_roteiro_de_volume_no_som():
+    pontos = [{"t": 0, "valor": 1, "curva": "linear"}, {"t": S, "valor": 0.25, "curva": "linear"}]
+    musica = clipe("m1", "deitado", 0, 4, abaixamento={"db": -12, "pontos": pontos})
+    plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4)]), faixa("audio", [musica])]),
+                            MIDIAS, 720, 1280, pasta="/trabalho")
+    roteiro = next(a for a in plano.auxiliares if a.caminho == "/trabalho/volume_m1.txt")
+    assert roteiro.conteudo.startswith("0.00 volume@ab2 volume 1.000000;")
+    assert "asetnsamples=n=480:p=0,asendcmd=f='/trabalho/volume_m1.txt',volume@ab2=volume=1" in plano.filtro_som
+    assert "asendcmd" not in plano.filtro_som.split(";")[0], "o clipe sem curva fica como estava"
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

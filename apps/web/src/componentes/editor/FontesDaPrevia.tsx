@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { arquivoDaMidia } from "@/lib/api";
 import { aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
+import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -154,8 +155,8 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
   const audioRef = useRef<HTMLAudioElement>(null);
   useSeguirRelogio(audioRef, item, tempo, tocando);
 
-  // Os fades mudam o ganho a cada quadro da tela enquanto toca, como o afade do render
-  const ganho = item.ativo ? item.clipe.volume * fatorDosFades(item.clipe, tempo) : 0;
+  // Os fades e o abaixar na fala mudam o ganho a cada quadro da tela enquanto toca, como no render
+  const ganho = item.ativo ? item.clipe.volume * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) : 0;
   useEffect(() => {
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);
   }, [ganho, tocando]);

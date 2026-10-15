@@ -14,6 +14,7 @@ import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGU
 import type { Midia } from "@/lib/tipos";
 
 import { AbaAnimacao } from "./AbaAnimacao";
+import { AbaixarNaFala } from "./AbaixarNaFala";
 import { AbaCor } from "./AbaCor";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
@@ -36,6 +37,13 @@ const ABAS_TEXTO = [
   { id: "basico", nome: "Básico", fase: "" },
   { id: "animacao", nome: "Animação", fase: "" },
   { id: "cor", nome: "Cor", fase: "" },
+] as const;
+
+// Clipe numa faixa de áudio: não aparece na imagem, então só o som e a velocidade
+const ABAS_AUDIO = [
+  { id: "info", nome: "Informações", fase: "" },
+  { id: "audio", nome: "Áudio", fase: "" },
+  { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
 ] as const;
 
 type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
@@ -63,6 +71,8 @@ type Props = {
   aoBuscar: (tempo: Tick) => void;
   /** "9:16", "16:9"... do projeto: o "Seguir o rosto" cobre esse quadro. */
   proporcao: string;
+  /** As faixas do projeto: o "Abaixar na fala" procura a fala nelas. */
+  faixas: Faixa[];
   aoAvisar: (mensagem: string) => void;
   /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
   fundo: string;
@@ -73,16 +83,18 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, aoAvisar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
   const ehTexto = Boolean(selecionado?.clipe.texto);
   const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
   const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
-  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ABAS;
+  const ehAudio = selecionado?.faixa.tipo === "audio";
+  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : ABAS;
   // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
-  const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : abas[0].id;
+  // Num clipe de áudio, a aba que não existe vira a do som
+  const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio ? "audio" : abas[0].id;
   const atual = abas.find((item) => item.id === aba)!;
 
   if (!midia && !selecionado) {
@@ -186,7 +198,15 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (
-          <AbaAudio clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaAudio
+            clipe={selecionado.clipe}
+            faixa={selecionado.faixa}
+            midia={midia}
+            faixas={faixas}
+            aoAvisar={aoAvisar}
+            aoPrever={aoPrever}
+            aoExecutar={aoExecutar}
+          />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
             Os ajustes de {atual.nome.toLowerCase()} do clipe chegam na {atual.fase.toLowerCase()}.
@@ -437,7 +457,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
 const FADE_MAXIMO_S = 10;
 
 /** Volume e fades de entrada e saída do som do clipe. */
-function AbaAudio({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null }) {
+function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null; faixas: Faixa[]; aoAvisar: (mensagem: string) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
   const travada = faixa.travada;
@@ -520,6 +540,9 @@ function AbaAudio({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { mi
             </select>
           </label>
         ) : null}
+      </Secao>
+      <Secao titulo="Abaixar na fala">
+        <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Voz">
         <label className="mt-1 flex items-center gap-2 text-xs">
