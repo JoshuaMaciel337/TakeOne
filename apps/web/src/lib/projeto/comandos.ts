@@ -31,6 +31,7 @@ import {
   mesclarClipes,
   aplicarEfeito,
   chromaClipes,
+  mudarVelocidade,
   duplicarClipes,
   moverClipe,
   mudarFundo,
@@ -69,6 +70,7 @@ export type Comando =
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
+  | { comando: "clipe.velocidade"; parametros: { clipeId: string; velocidade: number } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
@@ -99,6 +101,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
+  "clipe.velocidade": "mudar a velocidade",
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
   "clipe.audio": "mudar o som",
@@ -146,6 +149,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: mudarFundo(projeto, parametros.cor) };
     case "clipe.transformar":
       return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao, parametros.tempo) };
+    case "clipe.velocidade":
+      return { projeto: mudarVelocidade(projeto, parametros.clipeId, parametros.velocidade) };
     case "clipe.chroma":
       return { projeto: chromaClipes(projeto, parametros.clipeIds, parametros.chroma) };
     case "clipe.efeito":

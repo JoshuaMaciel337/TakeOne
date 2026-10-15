@@ -23,6 +23,7 @@ import {
   mudarKeyframe,
   mudarFundo,
   mudarTexto,
+  mudarVelocidade,
   normalizarRotacao,
   recortarClipes,
   removerIntervalos,
@@ -487,4 +488,22 @@ test("keyframes: aparar, dividir e cortar trechos não mudam o movimento na tela
   assert.equal(clipe.inicio, 0);
   assert.ok(Math.abs(transformacaoNoTempo(clipe, 3 * S).escala - em4) < 1e-9);
   conferir(aparado);
+});
+
+test("velocidade: o mesmo trecho da mídia em outra duração, empurrando a principal", () => {
+  const ctx = contexto();
+  let p = adicionarClipe(vazio(), ctx, "video10").projeto;
+  p = adicionarClipe(p, ctx, "video4").projeto;
+  const [primeiro, segundo] = principal(p);
+  p = mudarKeyframe(p, primeiro.id, "x", 4 * S, "alternar");
+  p = mudarVelocidade(p, primeiro.id, 2);
+  conferir(p);
+  const [rapido, depois] = principal(p);
+  assert.equal(rapido.velocidade, 2);
+  assert.equal(rapido.duracao, 5 * S, "10 s de mídia em 5 s");
+  assert.equal(depois.id, segundo.id);
+  assert.equal(depois.inicio, 5 * S, "o seguinte encosta");
+  assert.equal(rapido.keyframes?.x?.[0].t, 2 * S, "o keyframe anda junto");
+  // Os limites: de 0,1× a 10×
+  assert.equal(principal(mudarVelocidade(p, primeiro.id, 50))[0].velocidade, 10);
 });

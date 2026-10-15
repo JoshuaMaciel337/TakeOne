@@ -294,6 +294,41 @@ export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, des
   return finalizar(resultado);
 }
 
+export const LIMITES_VELOCIDADE = { minimo: 0.1, maximo: 10 } as const;
+
+/**
+ * Muda a velocidade do clipe de mídia. O trecho da mídia fica o mesmo: a duração muda (na principal,
+ * os clipes seguintes andam junto). Keyframes, curva do abaixar na fala e fades acompanham a nova duração.
+ */
+export function mudarVelocidade(projeto: Projeto, clipeId: string, velocidade: number): Projeto {
+  const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  if (!clipe.midia_id) throw new ErroEdicao("Textos não têm velocidade.");
+  const nova = limitar(velocidade, LIMITES_VELOCIDADE.minimo, LIMITES_VELOCIDADE.maximo);
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const duracao = Math.max(quadro, ajustarAoQuadro(projeto.taxa, (clipe.duracao * clipe.velocidade) / nova));
+  if (faixa.tipo !== "principal") {
+    const proximo = faixa.clipes.find((item) => item.inicio >= fimDoClipe(clipe) && item.id !== clipe.id);
+    if (proximo && clipe.inicio + duracao > proximo.inicio) throw new ErroEdicao("Mais devagar, o clipe passaria por cima do próximo da faixa.");
+  }
+  const fator = duracao / clipe.duracao;
+  const escalar = (pontos: Keyframe[] | undefined) => pontos?.map((ponto) => ({ ...ponto, t: Math.round(ponto.t * fator) }));
+  const keyframes = clipe.keyframes
+    ? (Object.fromEntries(Object.entries(clipe.keyframes).map(([nome, pontos]) => [nome, escalar(pontos as Keyframe[] | undefined)])) as Keyframes)
+    : clipe.keyframes;
+  const novo: Clipe = {
+    ...clipe,
+    velocidade: nova,
+    duracao,
+    keyframes,
+    abaixamento: clipe.abaixamento ? { ...clipe.abaixamento, pontos: escalar(clipe.abaixamento.pontos)! } : clipe.abaixamento,
+  };
+  const clipes = [...faixa.clipes];
+  clipes[indice] = novo;
+  const alterada = { ...faixa, clipes };
+  return finalizar(trocarFaixa(projeto, faixa.tipo === "principal" ? compactar(alterada) : alterada));
+}
+
 /** Puxa a borda do começo ou do fim do clipe até `tempo`, sem passar do que a mídia tem nem do vizinho. */
 export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, borda: "inicio" | "fim", tempo: Tick): Projeto {
   const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);

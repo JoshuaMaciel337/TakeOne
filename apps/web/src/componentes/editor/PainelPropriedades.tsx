@@ -6,7 +6,7 @@ import { useState } from "react";
 import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
-import { LIMITES_TRANSFORMACAO, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
+import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import {
@@ -35,7 +35,7 @@ const ABAS = [
   { id: "info", nome: "Informações", fase: "" },
   { id: "basico", nome: "Básico", fase: "" },
   { id: "audio", nome: "Áudio", fase: "" },
-  { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
+  { id: "velocidade", nome: "Velocidade", fase: "" },
   { id: "animacao", nome: "Animação", fase: "" },
   { id: "cor", nome: "Cor", fase: "" },
 ] as const;
@@ -52,7 +52,7 @@ const ABAS_TEXTO = [
 const ABAS_AUDIO = [
   { id: "info", nome: "Informações", fase: "" },
   { id: "audio", nome: "Áudio", fase: "" },
-  { id: "velocidade", nome: "Velocidade", fase: "Fase 4" },
+  { id: "velocidade", nome: "Velocidade", fase: "" },
 ] as const;
 
 type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
@@ -202,6 +202,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
           />
+        ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
+          <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
@@ -482,6 +484,56 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
 const FADE_MAXIMO_S = 10;
 
 /** Volume e fades de entrada e saída do som do clipe. */
+const VELOCIDADES_RAPIDAS = [0.5, 1, 1.5, 2, 3];
+
+/** Velocidade do clipe de mídia: o trecho da mídia fica o mesmo e a duração muda; o som mantém o tom. */
+function AbaVelocidade({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
+  const travada = faixa.travada;
+  const comando = (velocidade: number): Comando => ({ comando: "clipe.velocidade", parametros: { clipeId: clipe.id, velocidade } });
+  const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
+  return (
+    <div>
+      {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      <Secao titulo="Velocidade">
+        <ControleNumerico
+          rotulo="Velocidade"
+          valor={clipe.velocidade * 100}
+          minimo={LIMITES_VELOCIDADE.minimo * 100}
+          maximo={400}
+          maximoDigitado={LIMITES_VELOCIDADE.maximo * 100}
+          passo={5}
+          sufixo="%"
+          desativado={travada}
+          aoPrever={(valor) => aoPrever(comando(valor / 100))}
+          aoConfirmar={(valor) => {
+            if (Math.abs(valor / 100 - clipe.velocidade) < PERTO) aoPrever(null);
+            else aoExecutar(comando(valor / 100));
+          }}
+        />
+        <div className="mt-2 grid grid-cols-5 gap-1">
+          {VELOCIDADES_RAPIDAS.map((velocidade) => (
+            <button
+              key={velocidade}
+              type="button"
+              disabled={travada}
+              aria-pressed={Math.abs(clipe.velocidade - velocidade) < PERTO}
+              onClick={() => aoExecutar(comando(velocidade))}
+              className={`rounded-md border px-1 py-1 text-[11px] transition disabled:opacity-50 ${
+                Math.abs(clipe.velocidade - velocidade) < PERTO ? "border-destaque bg-destaque/10 text-texto" : "border-borda text-suave hover:text-texto"
+              }`}
+            >
+              {velocidade.toLocaleString("pt-BR")}×
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-suave">
+          Duração: {duracaoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
+        </p>
+      </Secao>
+    </div>
+  );
+}
+
 /** Tela verde (chroma key) de um clipe de mídia: a cor que some, a semelhança e a suavidade. */
 function TelaVerde({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
   const chroma = clipe.chroma ?? null;

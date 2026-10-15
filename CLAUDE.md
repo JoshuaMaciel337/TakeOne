@@ -63,6 +63,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Modos de mesclagem na aba Básico: normal, multiplicar, tela e somar. Conferido no Chrome: prévia e exportação a 2,2 níveis em 255.
   - Ferramenta Efeitos (um efeito por clipe, com intensidade): desfoque, brilho, olho de peixe, VHS, glitch, luz e granulação (os dois últimos só em vídeos e imagens). Conferido no Chrome: prévia e exportação a 2,0–2,1 níveis em 255; 3,4 com as linhas finas do VHS e 3,8 com o grão, que a prévia menor mistura.
   - Tela verde (chroma key) na aba Básico, para vídeos e imagens: cor, semelhança e suavidade. Conferido no Chrome: prévia e exportação a 2,2–2,3 níveis em 255.
+  - Aba Velocidade: de 0,1× a 10×, com atalhos; o trecho da mídia fica e a duração muda (a principal anda junto), e o som mantém o tom. Conferido no Chrome: a 2× e a 0,5×, prévia e exportação a 1,5 nível em 255.
   - Falta: velocidade com curva.
 - **Fase 5 (IA):** começou.
   - Pronto: limpeza de fala na ferramenta Transcrição. A fala da faixa principal é transcrita; pausas longas (mínimo ajustável, com 0,15 s de folga em volta da fala) e hesitações (“ahn”, “hum”) viram trechos, e "Remover" tira todos de uma vez (`lib/projeto/limpezaDeFala.ts` e o comando `linha.removerIntervalos`).
