@@ -65,6 +65,8 @@ export type Clipe = {
   curva_fade?: CurvaDoFade;
   /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
   voz_limpa?: boolean;
+  /** Leva a mídia a -14 LUFS pelo loudness medido na ingestão (lib/projeto/som.ts). */
+  igualar_volume?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
   abaixamento?: Abaixamento | null;
   transformacao: Transformacao;

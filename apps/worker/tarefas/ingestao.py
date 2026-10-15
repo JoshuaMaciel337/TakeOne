@@ -35,6 +35,8 @@ from core.modelos.midia import (
 from core.utils import storage
 from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709, resumir_sondagem, sondar
 from core.utils.mongo import agora
+from core.utils.render import ler_loudness
+from core.utils.som import FILTRO_MEDIR_LOUDNESS
 
 # -----------------------------------------------
 # CONFIGURAÇÕES
@@ -164,7 +166,11 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     if tem_audio:
         argumentos += ["-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
                        str(caminho(ARQUIVO_AUDIO_ANALISE))]
-    executar_ffmpeg(argumentos, duracao, lambda f: reportar(5 + int(f * 70), "Gerando a cópia leve do vídeo"))
+        # O loudness, medido como o render mede (para o "Igualar o volume" do clipe)
+        argumentos += ["-map", "0:a:0", "-vn", "-af", FILTRO_MEDIR_LOUDNESS, "-f", "null", "-"]
+    saida = executar_ffmpeg(argumentos, duracao, lambda f: reportar(5 + int(f * 70), "Gerando a cópia leve do vídeo"))
+    if tem_audio:
+        resumo["audio"]["lufs"] = ler_loudness(saida)
     if tem_audio:
         arquivos.append(ARQUIVO_AUDIO_ANALISE)  # uso interno: a API não serve este arquivo
 

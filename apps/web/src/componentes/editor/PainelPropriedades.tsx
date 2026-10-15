@@ -9,7 +9,7 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { LIMITES_TRANSFORMACAO, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
-import { CURVAS_DO_FADE, type CurvaDoFade } from "@/lib/projeto/som";
+import { CURVAS_DO_FADE, type CurvaDoFade, ganhoParaIgualar, LUFS_IGUALAR } from "@/lib/projeto/som";
 import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -505,6 +505,22 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
           sufixo="%"
           {...controle(clipe.volume * 100, (valor) => ({ volume: valor / 100 }))}
         />
+        <label className="mt-1 flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={Boolean(clipe.igualar_volume)}
+            disabled={travada || typeof midia.audio.lufs !== "number"}
+            onChange={(evento) => aoExecutar(comando({ igualar_volume: evento.currentTarget.checked }))}
+          />
+          <span className="flex-1">Igualar o volume ({LUFS_IGUALAR} LUFS)</span>
+        </label>
+        <p className="text-[11px] text-suave">
+          {typeof midia.audio.lufs === "number"
+            ? `Volume medido: ${midia.audio.lufs.toFixed(1).replace(".", ",")} LUFS${
+                clipe.igualar_volume ? ` · ${ganhoParaIgualar(midia.audio.lufs) >= 0 ? "sobe" : "desce"} ${Math.abs(ganhoParaIgualar(midia.audio.lufs)).toFixed(1).replace(".", ",")} dB` : ""
+              }`
+            : "Esta mídia foi enviada antes da medição de volume. Envie de novo para medir."}
+        </p>
         <ControleNumerico
           rotulo="Aparecer aos poucos"
           minimo={0}

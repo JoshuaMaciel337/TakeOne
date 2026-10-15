@@ -654,7 +654,14 @@ export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Re
 
 export const VOLUME_MAXIMO = 4;
 
-export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick; curva_fade?: CurvaDoFade; voz_limpa?: boolean };
+export type MudancaDeAudio = {
+  volume?: number;
+  fade_entrada?: Tick;
+  fade_saida?: Tick;
+  curva_fade?: CurvaDoFade;
+  voz_limpa?: boolean;
+  igualar_volume?: boolean;
+};
 
 /** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
 export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: MudancaDeAudio): Projeto {
@@ -672,7 +679,8 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
       const fadeSaida = Math.round(limitar(mudanca.fade_saida ?? clipe.fade_saida, 0, clipe.duracao - fadeEntrada));
       const vozLimpa = mudanca.voz_limpa ?? clipe.voz_limpa ?? false;
       const curva = mudanca.curva_fade ?? clipe.curva_fade ?? "linear";
-      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, curva_fade: curva, voz_limpa: vozLimpa };
+      const igualar = mudanca.igualar_volume ?? clipe.igualar_volume ?? false;
+      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, curva_fade: curva, voz_limpa: vozLimpa, igualar_volume: igualar };
     });
     return { ...faixa, clipes };
   });

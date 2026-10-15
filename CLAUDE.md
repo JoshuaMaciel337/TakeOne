@@ -51,7 +51,8 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Loops na aba Animação: pulsar, balançar, flutuar e tremer, com ciclo e intensidade, em qualquer clipe de imagem. Conferido no Chrome: prévia e exportação a 2 níveis em 255.
   - Letra a letra: entrada e saída "Letra a letra" e "Palavra a palavra" nos textos, e destaque da fala nas legendas (karaokê ou só a palavra falada, na cor escolhida, pelos tempos das palavras do Whisper). Conferido no Chrome: prévia e exportação a 2,4 níveis em 255 no meio das animações.
   - Abaixar na fala (ducking), na aba Áudio: o editor transcreve as outras faixas e grava no clipe uma curva que abaixa o som dele quando alguém fala. Clipes de faixa de áudio abrem direto na aba Áudio. Conferido no Nitro: o tom de teste no vídeo exportado seguiu a curva a no máximo 0,44 dB.
-  - Falta: loudness medido e efeitos de voz.
+  - Loudness medido: a ingestão mede cada mídia em LUFS (como o render mede a mistura) e a aba Áudio mostra o valor e a opção "Igualar o volume", que leva o clipe a -14 LUFS (até 20 dB) na prévia e no render. Conferido no Nitro: dois tons 17 LU distantes saíram os dois a -14,0 LUFS.
+  - Falta: efeitos de voz.
 - **Fase 4 (efeitos, transições e cor):** em andamento.
   - Pronto: ajustes de cor (temperatura, tom, exposição, contraste, realces, sombras, saturação e vinheta) e rodas de cor de escuros, meios-tons e claros na aba Cor, e filtros prontos com intensidade na ferramenta Filtros (entre eles o Cinema, que usa as rodas).
   - Transições na principal: fusão, escurecer, deslizar, empurrar, zoom e cortinas para os quatro lados (a prévia descarta no shader o que não foi revelado; o render usa um `geq` no alfa, ligado só na janela da transição, porque ele é lento).

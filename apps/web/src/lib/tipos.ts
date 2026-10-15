@@ -59,7 +59,8 @@ export type Midia = {
   bytes_recebidos: number;
   duracao: number | null;
   video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number } | null;
-  audio: { codec: string; canais: number; taxa: number } | null;
+  /** lufs: loudness medido na ingestão (falta nas mídias enviadas antes da medição). */
+  audio: { codec: string; canais: number; taxa: number; lufs?: number | null } | null;
   miniaturas: Miniaturas | null;
   arquivos: string[];
   erro: string | null;

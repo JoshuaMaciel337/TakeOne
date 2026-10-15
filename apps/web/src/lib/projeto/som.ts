@@ -19,3 +19,13 @@ export function ganhoDoFade(curva: CurvaDoFade | undefined, p: number): number {
   if (curva === "exponencial") return Math.exp(-11.512925464970227 * (1 - p));
   return p;
 }
+
+// Igualar o volume: cada mídia medida na ingestão (LUFS integrado), como em core/utils/som.py
+export const LUFS_IGUALAR = -14;
+const GANHO_IGUALAR_MAXIMO_DB = 20;
+
+/** Os dB que levam a mídia a -14 LUFS; 0 se ela não foi medida ou é silêncio. */
+export function ganhoParaIgualar(lufs: number | null | undefined): number {
+  if (lufs === null || lufs === undefined || lufs <= -70) return 0;
+  return Math.min(Math.max(LUFS_IGUALAR - lufs, -GANHO_IGUALAR_MAXIMO_DB), GANHO_IGUALAR_MAXIMO_DB);
+}

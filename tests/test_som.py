@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from core.config import FFMPEG
-from core.utils.som import CURVAS_DO_FADE, comandos_de_volume, ganho_do_fade
+from core.utils.som import CURVAS_DO_FADE, comandos_de_volume, ganho_do_fade, ganho_para_igualar
 
 CASOS = json.loads((Path(__file__).parent / "casos" / "fades.json").read_text(encoding="utf-8"))["casos"]
 TEM_FFMPEG = shutil.which("ffmpeg") is not None
@@ -62,3 +62,10 @@ def test_volume_do_ffmpeg_segue_a_curva(tmp_path):
     for segundos, esperado in ((0.5, 1), (0.855, 0.6250), (1.5, 0.25), (2.255, 0.6325), (2.8, 1)):
         # O ganho muda a cada bloco de 10 ms: no máximo um passo de diferença da curva
         assert amostras[round(segundos * TAXA)] == pytest.approx(esperado, abs=0.03), segundos
+
+
+def test_ganho_para_igualar_leva_a_14_lufs_com_limite():
+    assert ganho_para_igualar(-23) == 9
+    assert ganho_para_igualar(-8.5) == -5.5
+    assert ganho_para_igualar(-60) == 20, "no máximo 20 dB"
+    assert ganho_para_igualar(None) == 0 and ganho_para_igualar(-80) == 0, "sem medida ou silêncio: nada"

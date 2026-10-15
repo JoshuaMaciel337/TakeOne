@@ -81,6 +81,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             duracao=float(midia.get("duracao") or 0),
             matriz=matriz,
             voz_limpa=str(voz) if voz.is_file() else None,
+            lufs=(midia.get("audio") or {}).get("lufs"),
         )
     return preparadas
 

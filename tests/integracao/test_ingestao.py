@@ -100,6 +100,8 @@ def test_ingestao_de_audio(db_limpo):
     assert midia["video"] is None
     assert set(midia["arquivos"]) == {"proxy.m4a", "audio.wav", "forma_de_onda.json", "niveis.bin"}
     assert midia["miniaturas"] is None
+    # O loudness é medido como o render mede a mistura (em estéreo, a 48 kHz)
+    assert midia["audio"]["lufs"] == pytest.approx(-22, abs=0.5)
 
 
 def test_arquivo_invalido_falha_na_hora_sem_novas_tentativas(db_limpo):

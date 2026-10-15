@@ -281,6 +281,8 @@ class ClipeEntrada(BaseModel):
     # Usa a voz sem ruído da mídia (DeepFilterNet) no lugar do som original
     voz_limpa: bool = False
     abaixamento: AbaixamentoEntrada | None = None
+    # Leva a mídia a -14 LUFS pelo loudness medido na ingestão
+    igualar_volume: bool = False
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)

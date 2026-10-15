@@ -389,7 +389,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render
   - [x] fades em outros formatos: suave, em S e exponencial (as curvas do `afade`, com a mesma fórmula na prévia)
   - [x] abaixar a música sob a voz (curva gravada no clipe a partir da transcrição das outras faixas)
-  - loudness medido (`audio-dsp` do FilmCraft)
+  - [x] loudness medido na ingestão e "Igualar o volume" no clipe (ebur128, como o render mede a mistura)
   - efeitos de voz: EQ, reverb, eco, mudança de tom (SoundCraft)
 - [x] Legendas automáticas pela fala (faster-whisper no worker de GPU), em até duas linhas que cabem no quadro. Com destaque da fala: karaokê e palavra falada, na cor escolhida.
 - [x] Legendas manuais: faixa de legendas por cima de tudo, estilos prontos aplicados a todas, lista para editar, e importar/exportar SRT e VTT. O leitor foi escrito no TakeOne (o `captions` do FilmCraft fica para SCC e TTML, se um dia precisar).

@@ -30,7 +30,7 @@ from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
-from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE, comandos_de_volume
+from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE, comandos_de_volume, ganho_para_igualar
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -63,6 +63,7 @@ class MidiaDoRender:
     duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
     matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
+    lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
 
 
 @dataclass(frozen=True)
@@ -339,10 +340,12 @@ def base_do_render(clipe: dict) -> dict:
     return base
 
 
-def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None) -> str:
+def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None,
+                  igualar_db: float = 0) -> str:
     """
     pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
     abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala.
+    igualar_db: o ganho que leva a mídia a -14 LUFS, com o "Igualar o volume" ligado.
     """
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
@@ -356,6 +359,8 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
         *cadeia_atempo(clipe["velocidade"]),
         f"volume={_numero(clipe['volume'])}",
     ]
+    if igualar_db:
+        filtros.append(f"volume={_numero(igualar_db)}dB")
     if abaixar:
         # Abaixar na fala: o fator da curva muda a cada 10 ms (blocos de 480 amostras), pelo roteiro
         roteiro, alvo = abaixar
@@ -532,7 +537,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                     conteudo = comandos_de_volume(clipe["abaixamento"]["pontos"], segundos(clipe["duracao"]),
                                                   f"volume@{abaixar[1]}")
                     auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
-                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular, abaixar)}[{sons[-1]}]")
+                igualar = ganho_para_igualar(midias[clipe["midia_id"]].lufs) if clipe.get("igualar_volume") else 0
+                linhas_som.append(f"{_som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar)}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
                   f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")

@@ -48,3 +48,19 @@ def comandos_de_volume(pontos: list[dict], duracao: float, alvo: str) -> str:
             linhas.append(f"{local:.2f} {alvo} volume {valor:.6f};")
             anterior = valor
     return "\n".join(linhas) + "\n"
+
+
+# -----------------------------------------------
+# Igualar o volume: cada mídia medida na ingestão (LUFS integrado, como o render mede a mistura)
+# -----------------------------------------------
+LUFS_IGUALAR = -14
+GANHO_IGUALAR_MAXIMO_DB = 20
+# A mesma conversão que o render faz no som de cada clipe: o número medido é o que entra na mistura
+FILTRO_MEDIR_LOUDNESS = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,ebur128=framelog=quiet"
+
+
+def ganho_para_igualar(lufs: float | None) -> float:
+    """Os dB que levam a mídia a -14 LUFS; 0 se ela não foi medida ou é silêncio."""
+    if lufs is None or lufs <= -70:
+        return 0.0
+    return min(max(LUFS_IGUALAR - lufs, -GANHO_IGUALAR_MAXIMO_DB), GANHO_IGUALAR_MAXIMO_DB)
