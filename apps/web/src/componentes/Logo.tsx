@@ -6,21 +6,19 @@ type Props = {
   className?: string;
 };
 
-export function Simbolo({ tamanho = 28 }: { tamanho?: number }) {
+/** O símbolo do kit da marca (public/marca/simbolo.svg), desenhado aqui para não esperar um arquivo. */
+export function Simbolo({ tamanho = 28, className = "" }: { tamanho?: number; className?: string }) {
   return (
-    <svg width={tamanho} height={tamanho} viewBox="0 0 64 64" aria-hidden className="shrink-0">
+    <svg width={tamanho} height={tamanho} viewBox="0 0 64 64" aria-hidden className={`shrink-0 ${className}`}>
       <defs>
         <linearGradient id="takeone-simbolo" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ff6a3d" />
-          <stop offset="1" stopColor="#ff3d77" />
+          <stop offset="0" stopColor="#ff624a" />
+          <stop offset="1" stopColor="#ff3478" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="16" fill="url(#takeone-simbolo)" />
-      <path
-        d="M25 19.5v25a1.5 1.5 0 0 0 2.3 1.27l19.6-12.5a1.5 1.5 0 0 0 0-2.54L27.3 18.23A1.5 1.5 0 0 0 25 19.5Z"
-        fill="#fff"
-      />
-      <rect x="14" y="19" width="5" height="26" rx="2.5" fill="#fff" fillOpacity=".85" />
+      <rect x="2" y="2" width="60" height="60" rx="17" fill="url(#takeone-simbolo)" />
+      <path d="M26 16c0-2.8 2.8-4.4 5.2-2.8l19 14.1c2.1 1.5 2.1 4.6 0 6.1l-19 14.1C28.8 49.2 26 47.6 26 44.8V16z" fill="#fff" />
+      <path d="M15 20v24" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -32,7 +30,7 @@ export function Logo({ tamanho = 28, soSimbolo = false, className = "" }: Props)
       {soSimbolo ? (
         <span className="sr-only">TakeOne</span>
       ) : (
-        <span className="font-display font-bold tracking-tight" style={{ fontSize: tamanho * 0.68 }}>
+        <span className="font-bold leading-none" style={{ fontSize: tamanho * 0.76, fontWeight: 750, letterSpacing: "-0.037em" }}>
           Take<span className="texto-gradiente">One</span>
         </span>
       )}

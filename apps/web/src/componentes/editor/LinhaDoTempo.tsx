@@ -504,7 +504,7 @@ export function LinhaDoTempo({
               {layout.linhas.map(({ faixa, topo, altura }) => (
                 <div
                   key={faixa.id}
-                  className={`absolute inset-x-0 border-b border-borda/60 ${faixa.tipo === "principal" ? "bg-white/[0.03]" : ""}`}
+                  className={`absolute inset-x-0 border-b border-borda/60 ${faixa.tipo === "principal" ? "bg-texto/[0.03]" : ""}`}
                   style={{ top: topo, height: altura }}
                 >
                   {faixa.tipo === "principal" && faixa.clipes.length === 0 ? (
@@ -596,7 +596,7 @@ function CabecalhoDaFaixa({
   aoAlternar: (propriedade: "oculta" | "muda" | "travada") => void;
 }) {
   const Icone = { principal: Film, video: Layers, audio: Music, texto: Type, legenda: Captions }[faixa.tipo];
-  const botao = "grid size-5 place-items-center rounded text-suave hover:bg-white/10 hover:text-texto";
+  const botao = "grid size-5 place-items-center rounded text-suave hover:bg-texto/10 hover:text-texto";
   return (
     <div
       className={`absolute inset-x-0 flex items-center gap-1 border-b border-borda/60 px-2 text-[11px] text-suave ${compacto ? "justify-end" : ""}`}

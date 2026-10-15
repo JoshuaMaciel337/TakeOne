@@ -574,7 +574,7 @@ function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
   const y = (s: number) => 10 - (Math.log(s) / Math.log(5)) * 9;
   return (
     <svg viewBox="0 0 60 20" className="h-5 w-full" aria-hidden>
-      <line x1={0} y1={10} x2={60} y2={10} stroke="rgba(255,255,255,0.15)" strokeDasharray="2 2" />
+      <line x1={0} y1={10} x2={60} y2={10} stroke="currentColor" strokeOpacity={0.2} strokeDasharray="2 2" />
       <polyline points={pontos.map(([u, s]) => `${(u * 60).toFixed(1)},${y(s).toFixed(1)}`).join(" ")} fill="none" stroke="currentColor" strokeWidth={1.5} />
     </svg>
   );

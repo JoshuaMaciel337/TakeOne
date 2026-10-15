@@ -3,6 +3,7 @@
 import { Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
 
+import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 
 import { NOMES_PROPORCAO, PROPORCOES, type Proporcao } from "./proporcoes";
@@ -103,6 +104,7 @@ export function BarraSuperior({
         >
           <Redo2 className="size-4" aria-hidden />
         </button>
+        <BotaoTema />
       </div>
 
       <label className="sr-only" htmlFor="proporcao">
