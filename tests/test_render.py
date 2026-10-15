@@ -307,6 +307,21 @@ def test_mesclagem_achata_a_camada_na_cor_neutra_e_usa_o_blend():
     assert "[base0][c1]overlay=" in plano.filtro, "o normal continua no overlay"
 
 
+def test_efeitos_desfoque_brilho_e_olho_de_peixe_no_grafo():
+    sobre = [clipe("s1", "empe", 0, 2, efeito={"tipo": "desfoque", "intensidade": 0.8}),
+             clipe("s2", "empe", 2, 2, efeito={"tipo": "distorcao", "intensidade": 1})]
+    principal = clipe("c1", "deitado", 0, 4, efeito={"tipo": "brilho", "intensidade": 0.5})
+    plano = planejar_render(projeto([faixa("video", sobre), faixa("principal", [principal])]), MIDIAS, 1080, 1920)
+    # Desfoque fixo: gblur sem roteiro, sigma de 2% da altura do clipe (1920)
+    assert "gblur=sigma=38.4000:steps=6" in plano.filtro and "sendcmd" not in plano.filtro
+    # Brilho: o clipe desfocado na força 0,5, somado em tela no alfa pré-multiplicado
+    assert "premultiply=inplace=1,split[ba1][bb1]" in plano.filtro
+    assert "colorchannelmixer=rr=0.5:gg=0.5:bb=0.5:aa=0.5[bc1]" in plano.filtro
+    assert "[ba1][bc1]blend=all_mode=screen,unpremultiply=inplace=1" in plano.filtro
+    # Olho de peixe: a lente e o zoom de 1,5 que tira o canto vazio
+    assert "lenscorrection=k1=0.5:k2=0:i=bilinear,scale=1620:2880:flags=bilinear,crop=1080:1920" in plano.filtro
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

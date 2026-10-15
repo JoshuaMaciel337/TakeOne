@@ -43,6 +43,7 @@ import {
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import { type Efeito, EFEITOS } from "./efeitos.ts";
 import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
 
@@ -861,6 +862,13 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
     }
     return { ...clipe, cor };
   });
+}
+
+/** O efeito de vídeo dos clipes; null tira. A intensidade fica de 0 a 1. */
+export function aplicarEfeito(projeto: Projeto, clipeIds: string[], efeito: Efeito | null): Projeto {
+  if (efeito && !EFEITOS.some((item) => item.id === efeito.tipo)) throw new ErroEdicao("Este efeito não existe.");
+  const limpo = efeito ? { tipo: efeito.tipo, intensidade: limitar(efeito.intensidade, 0, 1) } : null;
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, efeito: limpo }));
 }
 
 /** O modo de mesclagem dos clipes (de imagem: os de áudio não aparecem). */

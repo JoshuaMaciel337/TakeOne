@@ -4,6 +4,7 @@ import type { Taxa, Tick } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
+import type { Efeito } from "./efeitos.ts";
 import type { Keyframes } from "./keyframes.ts";
 import { type CurvaDoFade, type EfeitosVoz, ganhoDoFade } from "./som.ts";
 import type { Transicao } from "./transicao.ts";
@@ -90,6 +91,8 @@ export type Clipe = {
   recorte: Recorte;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
+  /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
+  efeito?: Efeito | null;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */

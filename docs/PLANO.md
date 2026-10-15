@@ -417,14 +417,13 @@ Cada fase termina com algo que dá para usar e testar.
   - granulação
 - [x] Filtros prontos com intensidade (ferramenta Filtros).
 - Efeitos de vídeo, escolhidos do catálogo do EffectCraft e do PhotoCraft:
-  - desfoque
-  - brilho
-  - tremor
-  - zoom
+  - [x] desfoque
+  - [x] brilho
+  - [x] tremor e zoom (pelos loops de animação: tremer e pulsar)
   - luz
   - glitch
   - VHS
-  - distorções
+  - [x] distorções (olho de peixe)
   - [x] modos de mesclagem: multiplicar, tela e somar
 - Chroma key (tela verde), com o `keying` do EffectCraft.
 - [x] Keyframes de posição, escala, rotação e opacidade, com curva linear ou suave (a conta é do TakeOne; o `keyframe` do EffectCraft fica de referência para Bezier e hold).

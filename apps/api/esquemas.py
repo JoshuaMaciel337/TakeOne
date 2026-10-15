@@ -173,6 +173,12 @@ class EfeitosVozEntrada(BaseModel):
     reverb: float = Field(default=0, ge=0, le=1)
 
 
+class EfeitoEntrada(BaseModel):
+    """Os tipos são os de apps/web/src/lib/projeto/efeitos.ts."""
+    tipo: Literal["desfoque", "brilho", "distorcao"]
+    intensidade: float = Field(default=0.6, ge=0, le=1)
+
+
 class AbaixamentoEntrada(BaseModel):
     """Abaixar na fala (apps/web/src/lib/projeto/abaixar.ts): o fator do volume, de 0 a 1, ao longo do clipe."""
     db: float = Field(ge=-40, le=0)
@@ -322,6 +328,7 @@ class ClipeEntrada(BaseModel):
     keyframes: KeyframesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
+    efeito: EfeitoEntrada | None = None
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 

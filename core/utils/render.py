@@ -26,6 +26,7 @@ from functools import lru_cache
 from core.config import FFMPEG
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut
+from core.utils.efeitos import BRILHO_SIGMA, brilho_do_efeito, desfoque_do_efeito, distorcao_do_efeito
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
@@ -211,23 +212,40 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro)}'")
         filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
     filtros += desfoque or []
+    distorcao = distorcao_do_efeito(clipe)
+    if distorcao:
+        # Olho de peixe: a lente do FFmpeg e um zoom de (1 + k) no meio, para não sobrar canto vazio
+        filtros += [f"lenscorrection=k1={_numero(distorcao)}:k2=0:i=bilinear",
+                    f"scale={round(largura * (1 + distorcao))}:{round(altura * (1 + distorcao))}:flags=bilinear",
+                    f"crop={largura}:{altura}"]
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
         depois_do_fps = len(entrada_de_cor or []) + 2
         filtros.insert(depois_do_fps, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
                           f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
+    cabeca = f"[{entrada}:v]"
+    brilho = brilho_do_efeito(clipe)
+    if brilho:
+        # Brilho: o clipe desfocado, na força do brilho, somado em "tela" ao clipe (no alfa
+        # pré-multiplicado, como a prévia), antes da cor
+        sigma = BRILHO_SIGMA * altura
+        k = _numero(brilho)
+        desfocar = _filtros_do_gblur(f"gblur=sigma={sigma:.4f}:steps=6", sigma, False)
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'premultiply=inplace=1', 'split'])}[ba{numero}][bb{numero}];\n"
+                  f"[bb{numero}]{','.join(desfocar)},colorchannelmixer=rr={k}:gg={k}:bb={k}:aa={k}[bc{numero}];\n"
+                  f"[ba{numero}][bc{numero}]blend=all_mode=screen,unpremultiply=inplace=1")
+        filtros = []
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
     # Cortina: some o que ainda não foi revelado, nas coordenadas do clipe (antes de girar, como a prévia)
     cortina = filtro_de_cortina(list(leitura.efeitos), inicio) if leitura.efeitos else None
     if cortina:
         filtros.append(cortina)
-    prefixo = ""
     if vinheta is not None:
         # Multiplica pela imagem cinza da vinheta, no tamanho do clipe, antes de girar (como a prévia)
-        prefixo = (f"[{entrada}:v]{','.join(filtros)},format=gbrap[va{numero}];\n"
-                   f"[{vinheta}:v]format=gbrap[vb{numero}];\n"
-                   f"[va{numero}][vb{numero}]blend=all_mode=multiply,format=rgba")
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap'])}[va{numero}];\n"
+                  f"[{vinheta}:v]format=gbrap[vb{numero}];\n"
+                  f"[va{numero}][vb{numero}]blend=all_mode=multiply,format=rgba")
         filtros = []
     if roteiro_de_opacidade:
         # A opacidade com keyframes muda por quadro, pelo roteiro (no tempo da janela do clipe)
@@ -307,9 +325,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     y += "-overlay_h/2" + ("'" if y.startswith("'") else "")
     overlay = (f"overlay=x={x}:y={y}:format=rgb"
                f":eof_action=pass:enable='gte(t,{_numero(inicio - meio)})*lt(t,{_numero(fim - meio)})'")
-    if prefixo:
-        return prefixo + "".join(f",{filtro}" for filtro in filtros), overlay
-    return f"[{entrada}:v]{','.join(filtros)}", overlay
+    return _continuar(cabeca, filtros), overlay
 
 
 def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alvo: str,
@@ -321,28 +337,49 @@ def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alv
     se comporta como o CLAMP_TO_EDGE da prévia. Com transparência (textos), o desfoque é feito no
     alfa pré-multiplicado, como na textura da prévia.
     """
-    if leitura is None or not leitura.efeitos:
+    efeitos = list(leitura.efeitos) if leitura else []
+    fixo = desfoque_do_efeito(clipe)
+    if not fixo and not any(efeito["tipo"] == "desfoque" for efeito in efeitos):
         return [], None
-    efeitos = list(leitura.efeitos)
-    quadros = round((leitura.fim - leitura.inicio) * fps) + 1
-    sigmas = [desfoque_na_transicao(efeitos, leitura.inicio + n / fps) * altura for n in range(quadros)]
+    inicio = leitura.inicio if leitura else segundos(clipe["inicio"])
+    fim = leitura.fim if leitura else segundos(clipe["inicio"] + clipe["duracao"])
+    quadros = round((fim - inicio) * fps) + 1
+    sigmas = [(fixo + desfoque_na_transicao(efeitos, inicio + n / fps)) * altura for n in range(quadros)]
     maior = max(sigmas)
     if maior < 0.05:
         return [], None
-    borda = math.ceil(3 * maior) + 2
+    if max(sigmas) - min(sigmas) < 1e-3:
+        # Sigma fixo (só o efeito): sem roteiro
+        return _filtros_do_gblur(f"gblur=sigma={maior:.4f}:steps=6", maior, bool(clipe.get("texto"))), None
     linhas, anterior = [], None
     for n, sigma in enumerate(sigmas):
         if anterior is None or abs(sigma - anterior) > 1e-3:
             linhas.append(f"{n / fps:.6f} gblur@{alvo} sigma {sigma:.4f}, gblur@{alvo} sigmaV {sigma:.4f};")
             anterior = sigma
+    gblur = f"sendcmd=f='{_escapar_caminho(roteiro)}',gblur@{alvo}=sigma=0:steps=6"
+    return _filtros_do_gblur(gblur, maior, bool(clipe.get("texto"))), "\n".join(linhas) + "\n"
+
+
+def _filtros_do_gblur(gblur: str, maior: float, transparente: bool) -> list[str]:
+    """
+    O gblur com bordas repetidas antes (pad + fillborders) e cortadas depois, como o CLAMP_TO_EDGE
+    da prévia. Com transparência, no alfa pré-multiplicado.
+    """
+    borda = math.ceil(3 * maior) + 2
     filtros = [f"pad=w=iw+{2 * borda}:h=ih+{2 * borda}:x={borda}:y={borda}:color=black@0",
                f"fillborders=left={borda}:right={borda}:top={borda}:bottom={borda}:mode=smear",
-               f"sendcmd=f='{_escapar_caminho(roteiro)}'",
-               f"gblur@{alvo}=sigma=0:steps=6",
+               gblur,
                f"crop=w=iw-{2 * borda}:h=ih-{2 * borda}:x={borda}:y={borda}"]
-    if clipe.get("texto"):
+    if transparente:
         filtros = ["premultiply=inplace=1", *filtros, "unpremultiply=inplace=1"]
-    return filtros, "\n".join(linhas) + "\n"
+    return filtros
+
+
+def _continuar(cabeca: str, filtros: list[str]) -> str:
+    """A cadeia `cabeca` (um rótulo como [3:v] ou uma cadeia já começada) seguida dos filtros."""
+    if not filtros:
+        return cabeca
+    return cabeca + ("" if cabeca.endswith("]") else ",") + ",".join(filtros)
 
 
 def _escapar_caminho(caminho: str) -> str:

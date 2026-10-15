@@ -55,7 +55,7 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "audio",
     nome: "Áudio",
     icone: Music,
-    emBreve: { fase: "Fase 3", descricao: "Músicas com licença, efeitos sonoros, fades e volume que abaixa sob a voz." },
+    emBreve: { fase: "Fase 6", descricao: "Banco de músicas e efeitos sonoros com licença. Volume, fades, abaixar na fala e efeitos de voz já estão na aba Áudio do clipe." },
   },
   {
     id: "texto",
@@ -76,7 +76,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "efeitos",
     nome: "Efeitos",
     icone: Sparkles,
-    emBreve: { fase: "Fase 4", descricao: "Desfoque, brilho, tremor, zoom, glitch, VHS, tela verde e keyframes em qualquer propriedade." },
   },
   {
     id: "transicoes",

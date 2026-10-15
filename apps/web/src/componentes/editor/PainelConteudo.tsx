@@ -12,6 +12,7 @@ import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelEfeitos } from "./PainelEfeitos";
 import { PainelFiltros } from "./PainelFiltros";
 import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
@@ -137,6 +138,8 @@ export function PainelConteudo({
           <PainelTranscricao projeto={legendas.projeto} tempo={legendas.tempo} aoExecutar={legendas.aoExecutar} aoBuscar={legendas.aoBuscar} aoAvisar={legendas.aoAvisar} />
         ) : ferramenta.id === "transicoes" ? (
           <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
+        ) : ferramenta.id === "efeitos" ? (
+          <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
         ) : (

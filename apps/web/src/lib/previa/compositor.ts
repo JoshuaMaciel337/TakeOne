@@ -6,6 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
+import { BRILHO_SIGMA } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
 import type { Mesclagem, Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -28,12 +29,19 @@ export type Camada = {
   curvas?: Uint8Array | null;
   /** Mistura com o que já foi desenhado; sem ela, normal. */
   mesclagem?: Mesclagem;
+  /** Efeito brilho: quanto da cópia desfocada soma em "tela" (lib/projeto/efeitos.ts). */
+  brilho?: number;
+  /** Efeito olho de peixe: o k1 da lente. */
+  lente?: number;
 };
 
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
 // pré-multiplicado): multiplicar = fundo × (cor·a + 1 − a); tela = cor·a + fundo × (1 − cor·a);
 // somar = fundo + cor·a. É a conta do blend do render sobre uma camada achatada na cor neutra.
 const CODIGO_DA_MESCLAGEM: Record<Mesclagem, number> = { normal: 0, multiplicar: 1, tela: 2, somar: 3 };
+
+/** Sigma do brilho, em frações da altura do clipe (o mesmo de lib/projeto/efeitos.ts). */
+const SIGMA_DO_BRILHO = BRILHO_SIGMA;
 
 // Desfoque em duas passadas (horizontal e vertical) num framebuffer, antes de desenhar a camada.
 // Com sigma grande, a primeira passada lê um nível menor do mipmap da textura: o sigma ali fica entre
@@ -118,6 +126,13 @@ uniform vec3 u_corteDe;
 uniform vec3 u_corteAte;
 // 0 normal, 1 multiplicar (a cor sai já misturada ao branco pela opacidade), 2 tela, 3 somar
 uniform int u_mesclagem;
+// Brilho: a cópia desfocada (unidade 2) somada em "tela", na força u_brilho
+uniform float u_brilho;
+uniform sampler2D u_desfocada;
+// Olho de peixe: o k1 da lente e o tamanho do clipe (só a proporção conta), como o lenscorrection
+uniform float u_lente;
+uniform vec2 u_tamanho;
+uniform vec4 u_recorte;
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -151,7 +166,21 @@ void main() {
       v_local.y >= u_corteAte.y || (v_local.y >= u_corteAte.x && v_local.x >= u_corteAte.z)) {
     discard;
   }
-  vec4 texel = texture(u_textura, v_uv);
+  vec2 uv = v_uv;
+  if (u_lente > 0.0) {
+    // O zoom de (1 + k) no meio e depois a lente: o ponto da imagem que cai neste pixel
+    vec2 s = 0.5 + (v_local - 0.5) / (1.0 + u_lente);
+    vec2 desvio = (s - 0.5) * u_tamanho;
+    float r2 = dot(desvio, desvio) / (dot(u_tamanho, u_tamanho) / 4.0);
+    vec2 p = 0.5 + (s - 0.5) * (1.0 + u_lente * r2);
+    if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
+    uv = u_recorte.xy + p * u_recorte.zw;
+  }
+  vec4 texel = texture(u_textura, uv);
+  if (u_brilho > 0.0) {
+    vec4 luz = texture(u_desfocada, uv) * u_brilho;
+    texel = texel + luz - texel * luz;
+  }
   if ((u_comCor || u_comCurvas) && texel.a > 0.0) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas) e depois a vinheta
@@ -204,7 +233,7 @@ type Recursos = {
   /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
   tabelas: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -291,6 +320,9 @@ export class Compositor {
         corteDe: local("u_corteDe"),
         comCurvas: local("u_comCurvas"),
         mesclagem: local("u_mesclagem"),
+        brilho: local("u_brilho"),
+        desfocada: local("u_desfocada"),
+        lente: local("u_lente"),
         curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
@@ -331,15 +363,15 @@ export class Compositor {
    * Desfoca a textura já carregada (largura × altura) e devolve a textura desfocada, do mesmo
    * enquadramento. sigma em pixels da textura; o recorte limita a área lida, como o crop do render.
    */
-  private desfocar(textura: WebGLTexture, largura: number, altura: number, sigma: number, recorte: Recorte): WebGLTexture {
+  private desfocar(textura: WebGLTexture, largura: number, altura: number, sigma: number, recorte: Recorte, primeiroAlvo = 0): WebGLTexture {
     const gl = this.gl;
     const { desfoque, programa } = this.recursos!;
     const nivel = Math.max(0, Math.floor(Math.log2(sigma / SIGMA_POR_NIVEL)));
     const fator = 2 ** nivel;
     const w = Math.max(1, Math.ceil(largura / fator));
     const h = Math.max(1, Math.ceil(altura / fator));
-    const primeiro = this.alvo(0, w, h);
-    const segundo = this.alvo(1, w, h);
+    const primeiro = this.alvo(primeiroAlvo, w, h);
+    const segundo = this.alvo(primeiroAlvo + 1, w, h);
     gl.bindTexture(gl.TEXTURE_2D, textura);
     if (nivel > 0) {
       gl.generateMipmap(gl.TEXTURE_2D);
@@ -412,9 +444,9 @@ export class Compositor {
       if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
       gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
+      const { largura, altura } = tamanhoDaFonte(camada.fonte);
       if (camada.desfoque && camada.desfoque > 0) {
         // O sigma é uma fração da altura do clipe; na textura, da altura do recorte
-        const { largura, altura } = tamanhoDaFonte(camada.fonte);
         const sigma = camada.desfoque * recorte.altura * altura;
         if (sigma >= 0.05 && largura > 0 && altura > 0) {
           const desfocada = this.desfocar(this.textura(indice), largura, altura, sigma, recorte);
@@ -422,6 +454,20 @@ export class Compositor {
           gl.bindTexture(gl.TEXTURE_2D, desfocada);
         }
       }
+      const brilho = camada.brilho ?? 0;
+      gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
+      if (brilho > 0 && largura > 0) {
+        // A cópia desfocada do brilho, nos framebuffers 2 e 3, na unidade 2
+        const atual = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
+        const luz = this.desfocar(atual, largura, altura, SIGMA_DO_BRILHO * recorte.altura * altura, recorte, 2);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, luz);
+        gl.uniform1i(uniformes.desfocada, 2);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, atual);
+      }
+      gl.uniform1f(uniformes.lente, camada.lente ?? 0);
       gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
       gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);

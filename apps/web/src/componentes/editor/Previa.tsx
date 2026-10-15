@@ -9,6 +9,7 @@ import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, tabelaDasCurvas } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { brilhoDoEfeito, desfoqueDoEfeito, distorcaoDoEfeito } from "@/lib/projeto/efeitos";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
@@ -269,7 +270,14 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara, desfoque: camada.desfoque, curvas: camada.curvas, mesclagem: camada.clipe.mesclagem });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado,
+          mascara: camada.mascara,
+          desfoque: (camada.desfoque ?? 0) + desfoqueDoEfeito(camada.clipe.efeito),
+          curvas: camada.curvas,
+          mesclagem: camada.clipe.mesclagem,
+          brilho: brilhoDoEfeito(camada.clipe.efeito),
+          lente: distorcaoDoEfeito(camada.clipe.efeito),
+        });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();
