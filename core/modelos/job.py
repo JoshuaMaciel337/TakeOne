@@ -22,6 +22,7 @@ TAREFAS = {
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "limpeza_voz": RECURSO_CPU,
+    "rosto": RECURSO_CPU,
 }
 
 

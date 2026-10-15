@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.renderizacao import executar_renderizacao, marcar_exportacao_com_erro
+from worker.tarefas.rosto import executar_rosto, marcar_rosto_com_erro
 from worker.tarefas.teste import executar_teste
 from worker.tarefas.transcricao import executar_transcricao, marcar_transcricao_com_erro
 
@@ -23,4 +24,5 @@ REGISTRO = {
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "transcricao": Tarefa(executar_transcricao, ao_falhar=marcar_transcricao_com_erro),
     "limpeza_voz": Tarefa(executar_limpeza_voz, ao_falhar=marcar_voz_com_erro),
+    "rosto": Tarefa(executar_rosto, ao_falhar=marcar_rosto_com_erro),
 }

@@ -380,6 +380,34 @@ class TranscricaoSaida(BaseModel):
     processamento: ProcessamentoSaida | None = None
 
 
+class AmostraDeRosto(BaseModel):
+    t: float = Field(description="Segundos da mídia")
+    x: float = Field(description="Centro do rosto, em frações da largura da imagem")
+    y: float
+    a: float = Field(description="Área do rosto, em frações da imagem")
+
+
+class RostoSaida(BaseModel):
+    midia_id: str
+    status: str
+    amostras: list[AmostraDeRosto] = []
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+
+
+def rosto_para_saida(doc: dict, job: dict | None = None) -> RostoSaida:
+    """job: o job da busca do rosto, para mostrar o progresso enquanto ela anda."""
+    processamento = None
+    status, erro = doc["status"], doc.get("erro")
+    if job is not None and status == "processando":
+        processamento = ProcessamentoSaida(status=job["status"], progresso=job.get("progresso", 0),
+                                           mensagem=job.get("mensagem", ""))
+        if job["status"] == STATUS_JOB_ERRO:
+            status, erro = "erro", erro or job.get("erro")
+    return RostoSaida.model_validate({**doc, "midia_id": str(doc["midia_id"]), "status": status, "erro": erro,
+                                      "processamento": processamento})
+
+
 def transcricao_para_saida(doc: dict, job: dict | None = None) -> TranscricaoSaida:
     """job: o job da transcrição, para mostrar o progresso enquanto ela anda."""
     processamento = None

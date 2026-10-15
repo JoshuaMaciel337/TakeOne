@@ -3,3 +3,5 @@ pillow==12.3.0
 pymongo==4.18.2
 schedule==1.2.2
 tzdata==2026.4
+# Detector de rostos (YuNet) para o reenquadramento: OpenCV sem as dependências gráficas
+opencv-python-headless==4.13.0.92

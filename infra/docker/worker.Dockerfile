@@ -11,6 +11,11 @@ ADD --checksum=sha256:70775e251eee44c0f2451a1e833326cf8bcbbe304d3e7cd12851e6fce7
     https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-unknown-linux-musl \
     /usr/local/bin/deep-filter
 RUN chmod 755 /usr/local/bin/deep-filter
+# YuNet 2023mar (detector de rostos do OpenCV Zoo, MIT), para o reenquadramento seguindo o rosto
+ADD --checksum=sha256:8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4 \
+    https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx \
+    /app/modelos/yunet.onnx
+RUN chmod 644 /app/modelos/yunet.onnx
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

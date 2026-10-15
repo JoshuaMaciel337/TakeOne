@@ -13,9 +13,11 @@ from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     MidiaAtualizarEntrada,
     MidiaSaida,
+    RostoSaida,
     TranscricaoPedirEntrada,
     TranscricaoSaida,
     midia_para_saida,
+    rosto_para_saida,
     transcricao_para_saida,
 )
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
@@ -28,6 +30,9 @@ from core.modelos.midia import (
     chave_arquivo,
     pasta_da_midia,
 )
+from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
+from core.modelos.rosto import STATUS_PRONTO as ROSTO_PRONTO
+from core.modelos.rosto import montar_rosto
 from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSANDO
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
@@ -118,6 +123,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     )
     await db.midias.delete_one({"_id": midia["_id"]})
     await db.transcricoes.delete_one({"midia_id": midia["_id"]})
+    await db.rostos.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
 
@@ -211,3 +217,40 @@ async def pedir_voz_limpa(midia_id: str, usuario=Depends(usuario_atual), db=Depe
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"voz_limpa": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Limpeza da voz pedida: {midia['nome']}")
     return (await para_saida(db, [{**midia, "voz_limpa": atual}]))[0]
+
+
+async def _job_do_rosto(db, doc: dict) -> dict | None:
+    if doc["status"] != ROSTO_PROCESSANDO or not doc.get("job_id"):
+        return None
+    return await db.jobs.find_one({"_id": doc["job_id"]}, {"status": 1, "progresso": 1, "mensagem": 1, "erro": 1})
+
+
+@router.post("/{midia_id}/rosto", response_model=RostoSaida)
+async def pedir_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe a busca do rosto na fila do worker de CPU. Se já está pronta ou andando, só devolve."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para seguir o rosto.')
+    atual = await db.rostos.find_one({"midia_id": midia["_id"]})
+    if atual:
+        job = await _job_do_rosto(db, atual)
+        andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
+        if andando or atual["status"] == ROSTO_PRONTO:
+            return rosto_para_saida(atual, job)
+    documento = montar_rosto(usuario["organizacao_id"], midia["_id"])
+    job = montar_job("rosto", usuario["organizacao_id"], {"midia_id": str(midia["_id"])}, criado_por=usuario["_id"])
+    documento["job_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.rostos.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
+    logging.info(f"[{usuario['organizacao_id']}] Busca do rosto pedida: {midia['nome']}")
+    return rosto_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.get("/{midia_id}/rosto", response_model=RostoSaida)
+async def ver_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    doc = await db.rostos.find_one({"midia_id": midia["_id"]})
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "O rosto desta mídia ainda não foi procurado.")
+    return rosto_para_saida(doc, await _job_do_rosto(db, doc))

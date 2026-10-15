@@ -46,4 +46,5 @@ As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirement
 Não fazem parte do código do repositório: são baixados quando a imagem do Docker é montada.
 
 - **DeepFilterNet 0.5.6** ([Rikorose/DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)), MIT ou Apache-2.0: o binário `deep-filter`, com o modelo DeepFilterNet3 dentro, tira o ruído da voz no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
+- **YuNet 2023mar** ([opencv/opencv_zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)), MIT, Copyright (c) 2020 Shiqi Yu: o detector de rostos do reenquadramento, rodado pelo OpenCV (Apache-2.0) no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
 - **faster-whisper** (MIT) e o modelo **large-v3-turbo** do Whisper (MIT): transcrição no worker de GPU. O modelo vem do Hugging Face na primeira transcrição e fica no volume `modelos_ia`.

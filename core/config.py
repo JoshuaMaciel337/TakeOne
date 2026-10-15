@@ -39,6 +39,8 @@ FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 # DeepFilterNet (binário do projeto, sem PyTorch): tira o ruído da voz na CPU. Vem na imagem do worker.
 DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
+# YuNet (detector de rostos do OpenCV, MIT): o modelo vem na imagem do worker
+MODELO_ROSTO = Path(os.environ.get("MODELO_ROSTO", "/app/modelos/yunet.onnx"))
 
 # -----------------------------------------------
 # SESSÃO
