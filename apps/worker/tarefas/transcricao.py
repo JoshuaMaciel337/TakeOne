@@ -13,6 +13,7 @@ import logging
 import multiprocessing
 import queue
 import tempfile
+from array import array
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,11 +21,12 @@ from bson import ObjectId
 
 from core.config import MODO_IA
 from core.modelos.job import ErroDefinitivo
-from core.modelos.midia import ARQUIVO_AUDIO_ANALISE, chave_arquivo
+from core.modelos.midia import ARQUIVO_AUDIO_ANALISE, ARQUIVO_NIVEIS, NIVEIS_POR_SEGUNDO, chave_arquivo
 from core.modelos.transcricao import (
     MODELO,
     STATUS_ERRO,
     STATUS_PRONTA,
+    aparar_no_silencio,
     fatias_de,
     limpar_palavras,
     palavras_simuladas,
@@ -151,6 +153,10 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
     else:
         brutas, idioma = palavras_simuladas(duracao), "pt" if pedido == "auto" else pedido
     palavras = limpar_palavras(brutas)
+    niveis = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS))
+    if niveis.is_file():
+        # Os níveis são int8 com sinal (dB), um por janela de 10 ms
+        palavras = aparar_no_silencio(palavras, array("b", niveis.read_bytes()), NIVEIS_POR_SEGUNDO)
 
     db.transcricoes.update_one({"midia_id": midia_id}, {"$set": {
         "status": STATUS_PRONTA, "idioma": idioma, "modelo": MODELO if MODO_IA == "real" else "simulado",

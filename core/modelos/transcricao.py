@@ -68,6 +68,44 @@ def limpar_palavras(brutas: list[dict]) -> list[dict]:
     return palavras
 
 
+# Uma palavra nunca encolhe abaixo disto ao tirar o silêncio das pontas, em segundos
+PALAVRA_MINIMA = 0.08
+# Silêncio é o que fica tantos dB abaixo da fala típica da gravação, dentro destes limites
+ABAIXO_DA_FALA_DB = 25
+LIMIAR_DB = (-60, -30)
+
+
+def aparar_no_silencio(palavras: list[dict], niveis, por_segundo: int) -> list[dict]:
+    """
+    Tira das pontas de cada palavra o que é silêncio nos níveis de áudio da ingestão (picos em dB, por
+    janela). O Whisper costuma esticar a palavra para dentro da pausa seguinte; sem isso, uma pausa de
+    2 s parecia ter 1 s. O limiar acompanha o volume da fala, para valer em gravação limpa e com ruído.
+    """
+    if not palavras or len(niveis) == 0:
+        return palavras
+    total = len(niveis)
+
+    def indice(s: float) -> int:
+        return min(max(int(round(s * por_segundo)), 0), total)
+
+    na_fala = [n for p in palavras for n in niveis[indice(p["inicio"]):indice(p["fim"])]]
+    if not na_fala:
+        return palavras
+    tipico = sorted(na_fala)[len(na_fala) // 2]
+    limiar = min(max(tipico - ABAIXO_DA_FALA_DB, LIMIAR_DB[0]), LIMIAR_DB[1])
+    minima = round(PALAVRA_MINIMA * por_segundo)
+    aparadas = []
+    for palavra in palavras:
+        ini, fim = indice(palavra["inicio"]), indice(palavra["fim"])
+        while fim - ini > minima and niveis[fim - 1] < limiar:
+            fim -= 1
+        while fim - ini > minima and niveis[ini] < limiar:
+            ini += 1
+        aparadas.append({**palavra, "inicio": round(max(palavra["inicio"], ini / por_segundo), 3),
+                         "fim": round(min(palavra["fim"], fim / por_segundo), 3)})
+    return aparadas
+
+
 def palavras_simuladas(duracao: float) -> list[dict]:
     """Palavras de mentira que cobrem a mídia: 0,35 s cada, com uma pausa de 0,8 s depois de cada frase."""
     palavras, t, i = [], 0.2, 0

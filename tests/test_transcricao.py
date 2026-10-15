@@ -3,7 +3,13 @@ import importlib.util
 
 import pytest
 
-from core.modelos.transcricao import SEGUNDOS_POR_FATIA, fatias_de, limpar_palavras, palavras_simuladas
+from core.modelos.transcricao import (
+    SEGUNDOS_POR_FATIA,
+    aparar_no_silencio,
+    fatias_de,
+    limpar_palavras,
+    palavras_simuladas,
+)
 
 
 def test_palavras_limpas_em_ordem_e_sem_sobreposicao():
@@ -41,3 +47,19 @@ def test_erro_no_processo_da_transcricao_chega_ao_worker(tmp_path):
     progresso = []
     with pytest.raises(RuntimeError, match="ModuleNotFoundError"):
         transcrever_em_outro_processo(tmp_path / "fala.wav", "pt", 10, lambda p, m: progresso.append(p))
+
+
+def test_pontas_das_palavras_em_silencio_sao_aparadas():
+    # 100 níveis por segundo: fala a -12 dB de 0,5 s a 1,2 s e de 3,0 s a 3,6 s; silêncio (-90 dB) no resto
+    niveis = [-90] * 400
+    for i in [*range(50, 120), *range(300, 360)]:
+        niveis[i] = -12
+    # O Whisper esticou "fim." até 2,4 s, dentro da pausa, e começou "Depois" cedo, em 2,7 s
+    palavras = [{"texto": "o", "inicio": 0.5, "fim": 0.8}, {"texto": "fim.", "inicio": 0.8, "fim": 2.4},
+                {"texto": "Depois", "inicio": 2.7, "fim": 3.6}]
+    aparadas = aparar_no_silencio(palavras, niveis, 100)
+    assert [(p["inicio"], p["fim"]) for p in aparadas] == [(0.5, 0.8), (0.8, 1.2), (3.0, 3.6)]
+    # Nunca some uma palavra: em silêncio total ela fica com o tamanho mínimo
+    so_silencio = aparar_no_silencio([{"texto": "x", "inicio": 1.0, "fim": 1.5}], [-90] * 300, 100)
+    assert so_silencio[0]["fim"] - so_silencio[0]["inicio"] >= 0.08 - 1e-9
+    assert aparar_no_silencio(palavras, [], 100) == palavras
