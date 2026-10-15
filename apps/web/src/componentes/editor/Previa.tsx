@@ -28,7 +28,7 @@ import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
-import { type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
+import { arquivoDoTom, type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { razao } from "./proporcoes";
 
@@ -388,7 +388,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
               ))}
               {sons.map((item) => (
                 // A voz limpa é outro arquivo: outro elemento, para não recarregar o som ao trocar de clipe
-                <SomDoClipe key={`som:${item.chave}${usaVozLimpa(item) ? ":limpa" : ""}`} item={item} tempo={tempo} tocando={tocando} />
+                <SomDoClipe key={`som:${item.chave}${usaVozLimpa(item) ? ":limpa" : ""}${arquivoDoTom(item) ? `:${arquivoDoTom(item)}` : ""}`} item={item} tempo={tempo} tocando={tocando} />
               ))}
             </div>
 

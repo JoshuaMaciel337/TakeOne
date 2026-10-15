@@ -24,6 +24,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
+from core.modelos.midia import chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
@@ -91,6 +92,7 @@ class MidiaDoRender:
     duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
     matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
+    tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
 
 
@@ -766,7 +768,17 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 sons.append(f"a{len(sons)}")
                 pular = leituras[clipe["id"]].pular_audio if clipe["id"] in leituras else 0
                 entrada_do_som = indice_da_entrada[clipe["id"]]
-                if clipe.get("voz_limpa"):
+                if clipe.get("tom"):
+                    # A voz em outro tom (sobre a voz limpa, se ela está ligada) tem o mesmo tempo do original
+                    midia = midias[clipe["midia_id"]]
+                    caminho_tom = dict(midia.tons).get(chave_do_tom(clipe["tom"], bool(clipe.get("voz_limpa"))))
+                    if not caminho_tom:
+                        raise ErroRender("O tom da voz de um clipe ainda está sendo preparado. Espere terminar "
+                                         "ou volte o tom ao original para exportar.")
+                    lida = entradas[entrada_do_som]
+                    entrada_do_som = len(entradas)
+                    entradas.append(Entrada(caminho_tom, lida.inicio, lida.duracao))
+                elif clipe.get("voz_limpa"):
                     # A voz limpa tem o mesmo tempo do original: abre o mesmo trecho dela
                     midia = midias[clipe["midia_id"]]
                     if not midia.voz_limpa:

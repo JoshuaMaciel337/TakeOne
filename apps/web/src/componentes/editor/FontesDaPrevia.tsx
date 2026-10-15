@@ -10,7 +10,7 @@ import { aplicarEfeitos, aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
-import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
+import { chaveDoTom, type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -150,8 +150,18 @@ export function usaVozLimpa(item: ItemDaPrevia): boolean {
   return Boolean(item.clipe.voz_limpa) && item.midia.arquivos.includes("voz_limpa.m4a");
 }
 
+/** O arquivo da voz no tom do clipe, quando ele pede e o arquivo já está pronto; senão, null. */
+export function arquivoDoTom(item: ItemDaPrevia): string | null {
+  const tom = item.clipe.tom ?? 0;
+  if (!tom) return null;
+  const nome = `${chaveDoTom(tom, usaVozLimpa(item))}.m4a`;
+  return item.midia.arquivos.includes(nome) ? nome : null;
+}
+
 function arquivoDoSom(item: ItemDaPrevia): string {
   const { midia } = item;
+  const tom = arquivoDoTom(item);
+  if (tom) return arquivoDaMidia(midia.id, tom);
   if (usaVozLimpa(item)) return arquivoDaMidia(midia.id, "voz_limpa.m4a");
   return arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a");
 }

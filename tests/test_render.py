@@ -330,6 +330,16 @@ def test_tela_verde_vira_colorkey_so_na_midia():
     assert plano.filtro.count("colorkey=color=0x00ff00:similarity=0.3:blend=0.1") == 1
 
 
+def test_tom_da_voz_usa_o_arquivo_do_tom():
+    voz = clipe("c1", "deitado", 0, 4, tom=-3)
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1920, 1080, video=True, audio=True,
+                                                 tons=(("tom_m3", "/m/tom_m3.m4a"),))}
+    plano = planejar_render(projeto([faixa("principal", [voz])]), midias, 720, 1280)
+    assert plano.entradas[-1].caminho == "/m/tom_m3.m4a"
+    with pytest.raises(ErroRender, match="tom da voz"):
+        planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, tom=2)])]), midias, 720, 1280)
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

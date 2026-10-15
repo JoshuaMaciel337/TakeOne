@@ -14,6 +14,7 @@ from api.esquemas import (
     MidiaAtualizarEntrada,
     MidiaSaida,
     RostoSaida,
+    TomEntrada,
     TranscricaoPedirEntrada,
     TranscricaoSaida,
     midia_para_saida,
@@ -24,10 +25,12 @@ from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
     ARQUIVO_VOZ_LIMPA,
-    ARQUIVOS_PUBLICOS,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
+    arquivo_do_tom,
+    arquivo_publico,
     chave_arquivo,
+    chave_do_tom,
     pasta_da_midia,
 )
 from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
@@ -132,7 +135,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
 async def baixar_arquivo(midia_id: str, nome: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Serve a cópia leve, a capa, as miniaturas e a forma de onda. Aceita Range para o player."""
     midia = await buscar_midia(db, midia_id, usuario)
-    if nome not in ARQUIVOS_PUBLICOS or nome not in midia.get("arquivos", []):
+    if not arquivo_publico(nome) or nome not in midia.get("arquivos", []):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
     caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], nome))
     if not caminho.is_file():
@@ -217,6 +220,39 @@ async def pedir_voz_limpa(midia_id: str, usuario=Depends(usuario_atual), db=Depe
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"voz_limpa": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Limpeza da voz pedida: {midia['nome']}")
     return (await para_saida(db, [{**midia, "voz_limpa": atual}]))[0]
+
+
+@router.post("/{midia_id}/tom", response_model=MidiaSaida)
+async def pedir_tom(midia_id: str, dados: TomEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """
+    Põe na fila a voz no tom pedido (sobre a voz limpa, com limpa=true). Se já está pronta ou andando,
+    só devolve a mídia.
+    """
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("audio"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem áudio.')
+    if dados.semitons == 0:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Escolha um tom diferente do original.")
+    if dados.limpa and ARQUIVO_VOZ_LIMPA not in midia.get("arquivos", []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "A voz limpa ainda não está pronta.")
+    chave = chave_do_tom(dados.semitons, dados.limpa)
+    atual = (midia.get("tons") or {}).get(chave) or {}
+    arquivo = arquivo_do_tom(dados.semitons, dados.limpa)
+    pronto = atual.get("status") == "pronta" and arquivo in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronto or andando):
+        job = montar_job("tom", usuario["organizacao_id"],
+                         {"midia_id": str(midia["_id"]), "semitons": dados.semitons, "limpa": dados.limpa},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {f"tons.{chave}": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Tom {dados.semitons:+d} pedido: {midia['nome']}")
+    tons = {**(midia.get("tons") or {}), chave: atual}
+    return (await para_saida(db, [{**midia, "tons": tons}]))[0]
 
 
 async def _job_do_rosto(db, doc: dict) -> dict | None:

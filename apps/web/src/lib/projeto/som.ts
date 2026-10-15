@@ -3,6 +3,14 @@
 
 export type CurvaDoFade = "linear" | "suave" | "s" | "exponencial";
 
+/** Tom da voz: até uma oitava para cada lado. */
+export const TOM_LIMITE = 12;
+
+/** O nome do arquivo da voz no tom (o mesmo de core/modelos/midia.py): tom_p3, tom_m2_limpa. */
+export function chaveDoTom(semitons: number, limpa: boolean): string {
+  return `tom_${semitons < 0 ? "m" : "p"}${Math.abs(semitons)}${limpa ? "_limpa" : ""}`;
+}
+
 export const CURVAS_DO_FADE: { id: CurvaDoFade; nome: string }[] = [
   { id: "linear", nome: "Linear" },
   { id: "suave", nome: "Suave" },

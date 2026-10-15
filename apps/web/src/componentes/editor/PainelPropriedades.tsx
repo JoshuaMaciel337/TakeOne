@@ -11,6 +11,7 @@ import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE
 import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import {
+  chaveDoTom,
   CURVAS_DO_FADE,
   type CurvaDoFade,
   ECO_MAXIMO,
@@ -19,6 +20,7 @@ import {
   ganhoParaIgualar,
   LUFS_IGUALAR,
   SEM_EFEITOS_VOZ,
+  TOM_LIMITE,
 } from "@/lib/projeto/som";
 import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -648,7 +650,21 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
   function mudarVozLimpa(ligar: boolean) {
     aoExecutar(comando({ voz_limpa: ligar }));
     if (ligar && voz?.status !== "pronta" && voz?.status !== "processando") pedirLimpeza();
+    else pedirTom(clipe.tom ?? 0, ligar);
   }
+
+  /** Pede ao worker a voz no tom (sobre a voz limpa, se ela está ligada e pronta), se ainda não existe. */
+  function pedirTom(semitons: number, vozLimpa: boolean) {
+    const limpa = vozLimpa && voz?.status === "pronta";
+    const estado = midia!.tons?.[chaveDoTom(semitons, limpa)]?.status;
+    if (!semitons || estado === "pronta" || estado === "processando") return;
+    setErroDoPedido("");
+    chamarApi(`/midias/${midia!.id}/tom`, { metodo: "POST", corpo: { semitons, limpa } }).catch((erro: unknown) =>
+      setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir o tom agora."),
+    );
+  }
+  const tom = clipe.tom ?? 0;
+  const estadoDoTom = tom ? midia.tons?.[chaveDoTom(tom, Boolean(clipe.voz_limpa) && voz?.status === "pronta")] : undefined;
 
   return (
     <div>
@@ -744,6 +760,31 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
         <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Voz">
+        <ControleNumerico
+          rotulo="Tom da voz"
+          valor={tom}
+          minimo={-TOM_LIMITE}
+          maximo={TOM_LIMITE}
+          passo={1}
+          sufixo="st"
+          desativado={travada}
+          aoPrever={() => aoPrever(null)}
+          aoConfirmar={(valor) => {
+            const semitons = Math.round(valor);
+            if (semitons === tom) return;
+            aoExecutar(comando({ tom: semitons }));
+            pedirTom(semitons, Boolean(clipe.voz_limpa));
+          }}
+        />
+        {tom ? (
+          <p className="text-[11px] text-suave" role="status">
+            {estadoDoTom?.status === "pronta"
+              ? `${tom > 0 ? "Mais aguda" : "Mais grave"} em ${Math.abs(tom)} semitons, sem mudar a velocidade.`
+              : estadoDoTom?.status === "erro" || erroDoPedido
+                ? `O tom falhou: ${erroDoPedido || estadoDoTom?.erro}`
+                : "Preparando a voz no tom. Até terminar, a prévia toca o tom original."}
+          </p>
+        ) : null}
         <label className="mt-1 flex items-center gap-2 text-xs">
           <input type="checkbox" checked={Boolean(clipe.voz_limpa)} disabled={travada} onChange={(evento) => mudarVozLimpa(evento.currentTarget.checked)} />
           <span className="flex-1">Limpar a voz (tira ruído de fundo e eco)</span>

@@ -10,7 +10,7 @@ from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
-from core.modelos.midia import ARQUIVOS_PUBLICOS, STATUS_ERRO, STATUS_PROCESSANDO
+from core.modelos.midia import STATUS_ERRO, STATUS_PROCESSANDO, arquivo_publico
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
 
@@ -101,6 +101,8 @@ class MidiaSaida(BaseModel):
     processamento: ProcessamentoSaida | None = None
     # A voz sem ruído: {"status": "processando" | "pronta" | "erro", "erro"}; sem ela, nunca foi pedida
     voz_limpa: dict | None = None
+    # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
+    tons: dict = Field(default_factory=dict)
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
@@ -328,6 +330,8 @@ class ClipeEntrada(BaseModel):
     abaixamento: AbaixamentoEntrada | None = None
     # Leva a mídia a -14 LUFS pelo loudness medido na ingestão
     igualar_volume: bool = False
+    # Tom da voz, em semitons (o som vem do arquivo que o worker gera para o tom)
+    tom: int = Field(default=0, ge=-12, le=12)
     efeitos_voz: EfeitosVozEntrada | None = None
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
@@ -362,6 +366,11 @@ class FaixaEntrada(BaseModel):
     muda: bool = False
     travada: bool = False
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
+
+
+class TomEntrada(BaseModel):
+    semitons: int = Field(ge=-12, le=12)
+    limpa: bool = False
 
 
 class ImagemTextoEntrada(BaseModel):
@@ -534,10 +543,12 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
         "id": str(doc["_id"]),
         "status": status,
         "erro": erro,
-        "arquivos": [nome for nome in doc.get("arquivos", []) if nome in ARQUIVOS_PUBLICOS],
+        "arquivos": [nome for nome in doc.get("arquivos", []) if arquivo_publico(nome)],
         "processamento": processamento,
         # Sem o job_id, que é interno
         "voz_limpa": {"status": voz["status"], "erro": voz.get("erro")} if (voz := doc.get("voz_limpa")) else None,
+        "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
+                 for chave, tom in (doc.get("tons") or {}).items()},
     })
 
 

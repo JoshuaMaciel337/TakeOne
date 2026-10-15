@@ -2,6 +2,7 @@
 # TakeOne — modelo de mídia (um vídeo ou áudio enviado para a biblioteca)
 # Funções puras: montam e calculam, sem acessar o banco.
 # -----------------------------------------------
+import re
 from datetime import datetime
 from pathlib import PurePosixPath
 
@@ -27,6 +28,22 @@ NIVEIS_POR_SEGUNDO = 100
 ARQUIVO_VOZ_LIMPA = "voz_limpa.m4a"
 ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA, ARQUIVO_MINIATURAS, ARQUIVO_CAPA,
                      ARQUIVO_VOZ_LIMPA}
+# A voz em outro tom (tarefa "tom"), uma por tom pedido: tom_p3.m4a, tom_m2_limpa.m4a (sobre a voz limpa)
+TOM_LIMITE = 12
+_ARQUIVO_DO_TOM = re.compile(r"tom_[mp]\d{1,2}(_limpa)?\.m4a")
+
+
+def chave_do_tom(semitons: int, limpa: bool) -> str:
+    return f"tom_{'m' if semitons < 0 else 'p'}{abs(semitons)}{'_limpa' if limpa else ''}"
+
+
+def arquivo_do_tom(semitons: int, limpa: bool) -> str:
+    return f"{chave_do_tom(semitons, limpa)}.m4a"
+
+
+def arquivo_publico(nome: str) -> bool:
+    """Os arquivos da mídia que a API serve: os fixos e as vozes em outro tom."""
+    return nome in ARQUIVOS_PUBLICOS or bool(_ARQUIVO_DO_TOM.fullmatch(nome))
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:

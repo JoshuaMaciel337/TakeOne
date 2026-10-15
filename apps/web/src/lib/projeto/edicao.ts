@@ -47,7 +47,7 @@ import {
 import type { Abaixamento } from "./abaixar.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
 import { type Efeito, EFEITOS } from "./efeitos.ts";
-import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos } from "./som.ts";
+import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos, TOM_LIMITE } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
@@ -736,6 +736,8 @@ export type MudancaDeAudio = {
   igualar_volume?: boolean;
   /** null tira os efeitos. */
   efeitos_voz?: EfeitosVoz | null;
+  /** Semitons, de -12 a 12. */
+  tom?: number;
 };
 
 /** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
@@ -765,6 +767,7 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
         voz_limpa: vozLimpa,
         igualar_volume: igualar,
         efeitos_voz: efeitos ?? null,
+        tom: Math.round(limitar(mudanca.tom ?? clipe.tom ?? 0, -TOM_LIMITE, TOM_LIMITE)),
       };
     });
     return { ...faixa, clipes };

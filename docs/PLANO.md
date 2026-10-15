@@ -385,13 +385,13 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] animações letra a letra e palavra a palavra (máscara sobre o PNG do texto, na prévia e no render)
   - [x] brilho em volta das letras (contorno e sombra já existiam), desenhado no PNG do texto
 - Áudio:
-  - faixas de música e efeitos sonoros
+  - faixas de música e efeitos sonoros com licença: vão para a fase 6, com o banco da Pixabay (as faixas de áudio já existem)
   - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render
   - [x] fades em outros formatos: suave, em S e exponencial (as curvas do `afade`, com a mesma fórmula na prévia)
   - [x] abaixar a música sob a voz (curva gravada no clipe a partir da transcrição das outras faixas)
   - [x] loudness medido na ingestão e "Igualar o volume" no clipe (ebur128, como o render mede a mistura)
   - [x] efeitos de voz: equalizador de três faixas, eco e reverb, com prontos
-  - mudança de tom da voz (precisa de um processador próprio na prévia)
+  - [x] mudança de tom da voz (arquivo gerado no worker, o mesmo na prévia e no render)
 - [x] Legendas automáticas pela fala (faster-whisper no worker de GPU), em até duas linhas que cabem no quadro. Com destaque da fala: karaokê e palavra falada, na cor escolhida.
 - [x] Legendas manuais: faixa de legendas por cima de tudo, estilos prontos aplicados a todas, lista para editar, e importar/exportar SRT e VTT. O leitor foi escrito no TakeOne (o `captions` do FilmCraft fica para SCC e TTML, se um dia precisar).
 

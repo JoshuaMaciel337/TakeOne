@@ -89,6 +89,8 @@ export type Clipe = {
   voz_limpa?: boolean;
   /** Equalizador, eco e reverb (lib/projeto/som.ts); sem eles, o som como veio. */
   efeitos_voz?: EfeitosVoz | null;
+  /** Tom da voz em semitons (-12 a 12); o som vem do arquivo que o worker gera para o tom. */
+  tom?: number;
   /** Leva a mídia a -14 LUFS pelo loudness medido na ingestão (lib/projeto/som.ts). */
   igualar_volume?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
