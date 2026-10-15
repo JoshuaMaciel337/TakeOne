@@ -134,7 +134,7 @@ export function PainelConteudo({
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
         ) : ferramenta.id === "transcricao" ? (
-          <PainelTranscricao projeto={legendas.projeto} aoExecutar={legendas.aoExecutar} aoBuscar={legendas.aoBuscar} aoAvisar={legendas.aoAvisar} />
+          <PainelTranscricao projeto={legendas.projeto} tempo={legendas.tempo} aoExecutar={legendas.aoExecutar} aoBuscar={legendas.aoBuscar} aoAvisar={legendas.aoAvisar} />
         ) : ferramenta.id === "transicoes" ? (
           <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (

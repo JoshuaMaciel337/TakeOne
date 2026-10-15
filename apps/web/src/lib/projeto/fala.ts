@@ -36,3 +36,24 @@ export function falaDosClipes(clipes: Clipe[], palavras: Map<string, Palavra[]>)
   }
   return falas;
 }
+
+/** Uma palavra da fala em ordem na linha do tempo, com o clipe dela. */
+export type PalavraDaLinha = PalavraNoTempo & { clipeId: string; fimDoClipe: Tick };
+
+/** Todas as palavras dos clipes, em ordem, numa lista só (para mostrar e selecionar como texto). */
+export function palavrasDaLinha(falas: FalaDoClipe[]): PalavraDaLinha[] {
+  return falas.flatMap(({ clipe, palavras }) => palavras.map((p) => ({ ...p, clipeId: clipe.id, fimDoClipe: clipe.inicio + clipe.duracao })));
+}
+
+/**
+ * O trecho a cortar quando as palavras de `de` a `ate` (índices, inclusivos) são apagadas: do começo
+ * da primeira até o começo da palavra seguinte do mesmo clipe, levando junto a pausa que vinha
+ * depois. Se não há palavra seguinte no clipe, vai até o fim da última apagada.
+ */
+export function trechoDasPalavras(palavras: PalavraDaLinha[], de: number, ate: number): { inicio: Tick; fim: Tick } {
+  const [a, b] = de <= ate ? [de, ate] : [ate, de];
+  const ultima = palavras[b];
+  const seguinte = palavras[b + 1];
+  const fim = seguinte && seguinte.clipeId === ultima.clipeId ? seguinte.inicio : ultima.fim;
+  return { inicio: palavras[a].inicio, fim };
+}

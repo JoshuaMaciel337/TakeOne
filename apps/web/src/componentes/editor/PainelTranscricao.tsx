@@ -1,10 +1,10 @@
 "use client";
 
-import { LoaderCircle, ScrollText, Scissors } from "lucide-react";
+import { Eraser, LoaderCircle, ScrollText, Scissors } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Comando } from "@/lib/projeto/comandos";
-import type { Palavra } from "@/lib/projeto/fala";
+import { falaDosClipes, type Palavra, palavrasDaLinha, trechoDasPalavras } from "@/lib/projeto/fala";
 import { OPCOES_DE_LIMPEZA, type OpcoesDeLimpeza, segundosDosTrechos, trechosParaLimpar } from "@/lib/projeto/limpezaDeFala";
 import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
@@ -16,6 +16,7 @@ import { IDIOMAS } from "./LegendasDaFala";
 
 export type PropsTranscricao = {
   projeto: Projeto;
+  tempo: Tick;
   aoExecutar: (comando: Comando) => void;
   aoBuscar: (tempo: Tick) => void;
   aoAvisar: (mensagem: string) => void;
@@ -28,8 +29,8 @@ function segundos(valor: number): string {
   return `${valor.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`;
 }
 
-/** Ferramenta Transcrição: a fala da faixa principal, para limpar pausas e vícios. */
-export function PainelTranscricao({ projeto, aoExecutar, aoBuscar, aoAvisar }: PropsTranscricao) {
+/** Ferramenta Transcrição: a fala da faixa principal, para limpar pausas e vícios e editar pelo texto. */
+export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvisar }: PropsTranscricao) {
   const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
   const clipes = useMemo(() => principal?.clipes ?? [], [principal]);
   const [palavras, setPalavras] = useState<Map<string, Palavra[]> | null>(null);
@@ -45,6 +46,10 @@ export function PainelTranscricao({ projeto, aoExecutar, aoBuscar, aoAvisar }: P
   }, []);
 
   const trechos = useMemo(() => (palavras ? trechosParaLimpar(clipes, palavras, opcoes) : []), [clipes, palavras, opcoes]);
+  const texto = useMemo(() => (palavras ? palavrasDaLinha(falaDosClipes(clipes, palavras)) : []), [clipes, palavras]);
+  // A seleção vale só para a linha do tempo em que foi feita: depois de qualquer corte, some
+  const [selecao, setSelecao] = useState<{ clipes: typeof clipes; de: number; ate: number } | null>(null);
+  const selecionadas = selecao && selecao.clipes === clipes ? { de: Math.min(selecao.de, selecao.ate), ate: Math.max(selecao.de, selecao.ate) } : null;
   const pausas = trechos.filter((t) => t.tipo === "pausa");
   const vicios = trechos.filter((t) => t.tipo === "vicio");
   const total = segundosDosTrechos(trechos);
@@ -68,6 +73,20 @@ export function PainelTranscricao({ projeto, aoExecutar, aoBuscar, aoAvisar }: P
   function remover() {
     aoExecutar({ comando: "linha.removerIntervalos", parametros: { intervalos: trechos.map(({ inicio, fim }) => ({ inicio, fim })) } });
     aoAvisar(`${segundos(total)} removidos. Ctrl+Z desfaz.`);
+  }
+
+  function clicarPalavra(indice: number, estender: boolean) {
+    if (estender && selecionadas) setSelecao({ clipes, de: selecao!.de, ate: indice });
+    else setSelecao({ clipes, de: indice, ate: indice });
+    if (!estender) aoBuscar(texto[indice].inicio);
+  }
+
+  function apagarSelecionadas() {
+    if (!selecionadas) return;
+    const quantas = selecionadas.ate - selecionadas.de + 1;
+    aoExecutar({ comando: "linha.removerIntervalos", parametros: { intervalos: [trechoDasPalavras(texto, selecionadas.de, selecionadas.ate)] } });
+    setSelecao(null);
+    aoAvisar(`${quantas === 1 ? "1 palavra apagada" : `${quantas} palavras apagadas`} do vídeo. Ctrl+Z desfaz.`);
   }
 
   if (!palavras) {
@@ -134,6 +153,35 @@ export function PainelTranscricao({ projeto, aoExecutar, aoBuscar, aoAvisar }: P
         <button type="button" className="text-left text-[11px] text-suave underline-offset-2 hover:underline" disabled={andamento !== null} onClick={() => void analisar()}>
           {andamento ?? "Analisar de novo"}
         </button>
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-lg border border-borda p-2" aria-label="Editar pelo texto">
+        <h3 className="font-semibold uppercase tracking-wide text-suave">Editar pelo texto</h3>
+        <p className="text-[11px] text-suave">Clique numa palavra para ir até ela. Com Shift, marque um trecho e apague: o vídeo é cortado junto.</p>
+        <button type="button" className="botao-secundario px-3 py-1.5" disabled={!selecionadas} onClick={apagarSelecionadas}>
+          <Eraser className="size-4" aria-hidden />
+          {selecionadas ? `Apagar ${selecionadas.ate - selecionadas.de + 1} palavras do vídeo` : "Marque as palavras para apagar"}
+        </button>
+        <p className="max-h-80 overflow-y-auto rounded-md bg-painel-2 p-2 text-sm leading-relaxed" aria-label="Transcrição da faixa principal">
+          {texto.map((palavra, indice) => {
+            const marcada = selecionadas !== null && indice >= selecionadas.de && indice <= selecionadas.ate;
+            const falando = tempo >= palavra.inicio && tempo < palavra.fim;
+            const novoClipe = indice > 0 && texto[indice - 1].clipeId !== palavra.clipeId;
+            return (
+              <span key={`${palavra.clipeId}-${indice}`}>
+                {novoClipe ? <span className="mx-1 text-suave" aria-hidden>¦</span> : indice > 0 ? " " : null}
+                <button
+                  type="button"
+                  aria-pressed={marcada}
+                  onClick={(evento) => clicarPalavra(indice, evento.shiftKey)}
+                  className={`rounded px-0.5 ${marcada ? "bg-destaque/40 line-through" : falando ? "bg-painel-3 underline" : "hover:bg-painel-3"}`}
+                >
+                  {palavra.texto}
+                </button>
+              </span>
+            );
+          })}
+        </p>
       </section>
 
       {trechos.length ? (

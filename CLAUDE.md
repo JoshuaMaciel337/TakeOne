@@ -55,8 +55,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Falta: transição de desfoque, curvas, granulação, efeitos, chroma key e keyframes.
 - **Fase 5 (IA):** começou.
   - Pronto: limpeza de fala na ferramenta Transcrição. A fala da faixa principal é transcrita; pausas longas (mínimo ajustável, com 0,15 s de folga em volta da fala) e hesitações (“ahn”, “hum”) viram trechos, e "Remover" tira todos de uma vez (`lib/projeto/limpezaDeFala.ts` e o comando `linha.removerIntervalos`).
-  - Falta: edição pelo texto, retakes, limpar a voz, reenquadrar pelo rosto, recorte de fundo, geração de vídeo (Wan 2.2) e o resto da seção 6 do plano.
-- **Próximo passo:** edição pelo texto (apagar palavras da transcrição corta o vídeo), com o mesmo `linha.removerIntervalos`; depois, voltar à fase 4 (efeitos e keyframes).
+  - Edição pelo texto: a transcrição da faixa principal aparece como texto; Shift+clique marca palavras e "Apagar" corta do começo da primeira até o começo da palavra seguinte (`trechoDasPalavras` em `lib/projeto/fala.ts`).
+  - Falta: retakes, limpar a voz, reenquadrar pelo rosto, recorte de fundo, geração de vídeo (Wan 2.2) e o resto da seção 6 do plano.
+- **Próximo passo:** detectar retakes (frases repetidas) na mesma ferramenta, ou voltar à fase 4 (efeitos e keyframes).
 
 ## Pendente no Nitro
 
