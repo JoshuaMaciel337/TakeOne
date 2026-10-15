@@ -9,7 +9,19 @@ import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, somarAjustes, tabelaDasCurvas } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
-import { ajustesDoEfeito, brilhoDoEfeito, desfoqueDoEfeito, desvioDeCor, distorcaoDoEfeito, linhasDoEfeito } from "@/lib/projeto/efeitos";
+import {
+  ajustesDoEfeito,
+  brilhoDoEfeito,
+  colunasDoGrao,
+  desfoqueDoEfeito,
+  deslocamentoDoGrao,
+  desvioDeCor,
+  distorcaoDoEfeito,
+  graoDoEfeito,
+  linhasDoEfeito,
+  luzDoEfeito,
+  posicaoDaLuz,
+} from "@/lib/projeto/efeitos";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
@@ -132,6 +144,8 @@ type CamadaNaTela = {
   desfoque?: number;
   /** VHS e glitch: o desvio do vermelho e do azul neste quadro, em frações da largura. */
   desvio?: number;
+  luz?: { forca: number; posicao: number };
+  grao?: { forca: number; colunas: number; deslocamento: [number, number] };
   /** A tabela das curvas de cor; null sem curvas. */
   curvas?: Uint8Array | null;
 };
@@ -155,6 +169,17 @@ function corDoClipe(clipe: Clipe): AjustesCor | null {
 /** O quadro desde o começo do clipe, na taxa do projeto (o glitch muda de quadro em quadro). */
 function quadroDoClipe(clipe: Clipe, tempo: Tick, taxa: Taxa): number {
   return Math.floor(((tempo - clipe.inicio) * taxa.num) / (taxa.den * TICKS_POR_SEGUNDO) + 1e-6);
+}
+
+/** Luz e granulação do clipe de mídia neste instante (os textos não têm). */
+function luzEGrao(clipe: Clipe, caixa: Caixa, tempo: Tick, taxa: Taxa): Pick<CamadaNaTela, "luz" | "grao"> {
+  const forcaDaLuz = luzDoEfeito(clipe.efeito);
+  const forcaDoGrao = graoDoEfeito(clipe.efeito);
+  const colunas = colunasDoGrao(caixa.largura, caixa.altura);
+  return {
+    luz: forcaDaLuz ? { forca: forcaDaLuz, posicao: posicaoDaLuz((tempo - clipe.inicio) / TICKS_POR_SEGUNDO) } : undefined,
+    grao: forcaDoGrao ? { forca: forcaDoGrao, colunas, deslocamento: deslocamentoDoGrao(quadroDoClipe(clipe, tempo, taxa), colunas) } : undefined,
+  };
 }
 
 /** As tabelas das curvas, guardadas pelas curvas (a mesma para todo quadro do clipe). */
@@ -218,6 +243,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       cor: corDoClipe(clipe),
       curvas: tabelaDoClipe(clipe),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
+      ...luzEGrao(clipe, caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho), tempo, projeto.taxa),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
@@ -298,6 +324,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           lente: distorcaoDoEfeito(camada.clipe.efeito),
           desvio: camada.desvio,
           linhas: linhasDoEfeito(camada.clipe.efeito),
+          luz: camada.luz,
+          grao: camada.grao,
         });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele

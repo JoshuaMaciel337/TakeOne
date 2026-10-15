@@ -5,7 +5,15 @@ from pathlib import Path
 import pytest
 
 from core.utils.cor import desenhar_vinheta
-from core.utils.efeitos import ajustes_do_efeito, desvio_de_cor, hash32, linhas_do_efeito
+from core.utils.efeitos import (
+    ajustes_do_efeito,
+    deslocamento_do_grao,
+    desvio_de_cor,
+    hash32,
+    linhas_do_efeito,
+    posicao_da_luz,
+    valores_do_grao,
+)
 
 CASOS = json.loads((Path(__file__).parent / "casos" / "efeitos.json").read_text(encoding="utf-8"))
 
@@ -33,3 +41,11 @@ def test_linhas_do_vhs_na_imagem_da_vinheta():
     imagem = desenhar_vinheta(40, 540, 0, linhas=0.2, faixas=270)
     # Faixa 0 (linhas 0 e 1) clara, faixa 1 (linhas 2 e 3) escura
     assert [imagem.getpixel((20, y))[0] for y in (0, 1, 2, 3)] == [255, 255, 204, 204]
+
+
+def test_grao_e_luz_iguais_aos_da_previa():
+    grao, luz = CASOS["grao"], CASOS["luz"]
+    assert [list(deslocamento_do_grao(q, grao["colunas"])) for q in grao["quadros"]] == grao["deslocamentos"]
+    valores = valores_do_grao().ravel()
+    assert [round(float(valores[i]) * 255) for i, _ in grao["celulas"]] == [v for _, v in grao["celulas"]]
+    assert [posicao_da_luz(s) for s in luz["segundos"]] == pytest.approx(luz["posicoes"], abs=1e-12)

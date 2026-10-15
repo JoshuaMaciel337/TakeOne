@@ -28,13 +28,19 @@ from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_lo
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
     BRILHO_SIGMA,
+    GRAO_LINHAS,
+    LUZ_PERIODO,
     ajustes_do_efeito,
     brilho_do_efeito,
+    colunas_do_grao,
     desfoque_do_efeito,
+    deslocamento_do_grao,
     desvio_de_cor,
     distorcao_do_efeito,
     efeito_do_clipe,
+    grao_do_efeito,
     linhas_do_efeito,
+    luz_do_efeito,
 )
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
@@ -133,7 +139,7 @@ class Entrada:
 class ArquivoAuxiliar:
     """Arquivo que o worker gera antes do FFmpeg: a LUT da cor, a imagem da vinheta ou o roteiro do sendcmd."""
     caminho: str
-    tipo: str          # "lut", "vinheta", "comandos" ou "reverb"
+    tipo: str          # "lut", "vinheta", "comandos", "reverb", "luz" ou "grao"
     ajustes: dict
     largura: int = 0
     altura: int = 0
@@ -186,7 +192,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     numero: int = 0, lut: str | None = None, vinheta: int | None = None,
                     leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None,
                     roteiro_de_opacidade: str | None = None,
-                    mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None) -> tuple[str, str]:
+                    mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None,
+                    luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -195,6 +202,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     roteiro_de_opacidade: o roteiro do sendcmd com a opacidade por quadro, quando ela tem keyframes.
     mascara: (roteiro do sendcmd, nome das caixas) que escondem as letras fora do trecho (letras.py).
     desfoque: os filtros do desfoque (veja _desfoque), logo depois do tamanho, como na prévia.
+    luz: (entrada com a tira de luz, segundos do começo da janela até o começo do clipe).
+    grao: (entrada com a imagem do grão, roteiro do sendcmd do recorte, colunas de células).
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -255,6 +264,24 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap'])}[va{numero}];\n"
                   f"[{vinheta}:v]format=gbrap[vb{numero}];\n"
                   f"[va{numero}][vb{numero}]blend=all_mode=multiply,format=rgba")
+        filtros = []
+    if luz:
+        # A faixa de luz anda pela tira (3 vezes a largura) a cada quadro; somada em "tela" depois da cor
+        entrada_luz, ate_o_clipe = luz
+        posicao = f"(-0.3+1.6*mod((t-{_numero(ate_o_clipe)})/{_numero(LUZ_PERIODO)},1))"
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap'])}[la{numero}];\n"
+                  f"[{entrada_luz}:v]crop=w={largura}:h={altura}:x='floor((1.5-{posicao})*{largura})':y=0,"
+                  f"format=gbrap[lz{numero}];\n"
+                  f"[la{numero}][lz{numero}]blend=all_mode=screen,format=rgba")
+        filtros = []
+    if grao:
+        # O recorte da imagem do grão muda a cada quadro (roteiro); as células crescem até o clipe
+        entrada_grao, roteiro_grao, colunas = grao
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrp'])}[ga{numero}];\n"
+                  f"[{entrada_grao}:v]sendcmd=f='{_escapar_caminho(roteiro_grao)}',"
+                  f"crop@gr{numero}=w={colunas}:h={GRAO_LINHAS}:x=0:y=0,scale={largura}:{altura}:flags=neighbor,"
+                  f"format=gbrp[gz{numero}];\n"
+                  f"[ga{numero}][gz{numero}]blend=all_mode=grainmerge,format=rgba")
         filtros = []
     if roteiro_de_opacidade:
         # A opacidade com keyframes muda por quadro, pelo roteiro (no tempo da janela do clipe)
@@ -394,6 +421,16 @@ def _cores_separadas(clipe: dict, leitura: Leitura | None, largura: int, fps: fl
             anterior = desvio
     return ([f"sendcmd=f='{_escapar_caminho(roteiro)}'", f"rgbashift@{alvo}=rh=0:bh=0:edge=smear"],
             "\n".join(linhas) + "\n")
+
+
+def _roteiro_do_grao(clipe: dict, inicio: float, fim: float, fps: float, alvo: str, colunas: int) -> str:
+    """Onde o recorte do grão começa em cada quadro da janela (sorteado pelo quadro do clipe)."""
+    linhas = []
+    for n in range(round((fim - inicio) * fps) + 1):
+        quadro = math.floor((inicio + n / fps - segundos(clipe["inicio"])) * fps + 1e-6)
+        x, y = deslocamento_do_grao(quadro, colunas)
+        linhas.append(f"{n / fps:.6f} {alvo} x {x}, {alvo} y {y};")
+    return "\n".join(linhas) + "\n"
 
 
 def _filtros_do_gblur(gblur: str, maior: float, transparente: bool) -> list[str]:
@@ -660,8 +697,27 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         if roteiro_cores:
             auxiliares[caminho_cores] = ArquivoAuxiliar(caminho_cores, "comandos", {}, conteudo=roteiro_cores)
         desfoque += cores
+        leitura = leituras.get(clipe["id"])
+        inicio_janela = leitura.inicio if leitura else segundos(clipe["inicio"])
+        fim_janela = leitura.fim if leitura else segundos(clipe["inicio"] + clipe["duracao"])
+        luz = grao = None
+        if luz_do_efeito(clipe):
+            tira = f"{pasta}/luz_{clipe['id']}.png"
+            auxiliares[tira] = ArquivoAuxiliar(tira, "luz", {"forca": luz_do_efeito(clipe)},
+                                               max(1, round(caixa.largura)), max(1, round(caixa.altura)))
+            luz = (len(entradas), segundos(clipe["inicio"]) - inicio_janela)
+            entradas.append(Entrada(tira, 0, fim_janela - inicio_janela, imagem=True, taxa=taxa))
+        if grao_do_efeito(clipe):
+            imagem_grao = f"{pasta}/grao_{clipe['id']}.png"
+            auxiliares[imagem_grao] = ArquivoAuxiliar(imagem_grao, "grao", {"forca": grao_do_efeito(clipe)})
+            colunas = colunas_do_grao(caixa.largura, caixa.altura)
+            roteiro_grao = f"{pasta}/grao_{clipe['id']}_{numero}.txt"
+            auxiliares[roteiro_grao] = ArquivoAuxiliar(roteiro_grao, "comandos", {}, conteudo=_roteiro_do_grao(
+                clipe, inicio_janela, fim_janela, float(taxa_em_fracao(taxa)), f"crop@gr{numero}", colunas))
+            grao = (len(entradas), roteiro_grao, colunas)
+            entradas.append(Entrada(imagem_grao, 0, fim_janela - inicio_janela, imagem=True, taxa=taxa))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
-                                          leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara, desfoque)
+                                          leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao)
         linhas.append(f"{cadeia}[c{numero}]")
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":

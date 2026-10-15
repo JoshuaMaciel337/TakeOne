@@ -175,7 +175,7 @@ class EfeitosVozEntrada(BaseModel):
 
 class EfeitoEntrada(BaseModel):
     """Os tipos são os de apps/web/src/lib/projeto/efeitos.ts."""
-    tipo: Literal["desfoque", "brilho", "distorcao", "vhs", "glitch"]
+    tipo: Literal["desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao"]
     intensidade: float = Field(default=0.6, ge=0, le=1)
 
 

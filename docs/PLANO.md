@@ -414,13 +414,13 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] curvas (RGB e por canal)
   - [x] rodas de cor (escuros, meios-tons e claros)
   - [x] vinheta
-  - granulação
+  - [x] granulação (na ferramenta Efeitos)
 - [x] Filtros prontos com intensidade (ferramenta Filtros).
 - Efeitos de vídeo, escolhidos do catálogo do EffectCraft e do PhotoCraft:
   - [x] desfoque
   - [x] brilho
   - [x] tremor e zoom (pelos loops de animação: tremer e pulsar)
-  - luz
+  - [x] luz (faixa de luz quente que atravessa a imagem)
   - [x] glitch
   - [x] VHS
   - [x] distorções (olho de peixe)

@@ -26,7 +26,7 @@ from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
 from core.utils.cor import desenhar_vinheta, gerar_cube
-from core.utils.efeitos import LINHAS_POR_ALTURA
+from core.utils.efeitos import LINHAS_POR_ALTURA, imagem_do_grao, tira_de_luz
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
@@ -174,6 +174,10 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
                 Path(auxiliar.caminho).write_text(auxiliar.conteudo, encoding="utf-8")
             elif auxiliar.tipo == "reverb":
                 Path(auxiliar.caminho).write_bytes(wav_do_reverb())
+            elif auxiliar.tipo == "luz":
+                tira_de_luz(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["forca"]).save(auxiliar.caminho)
+            elif auxiliar.tipo == "grao":
+                imagem_do_grao(auxiliar.ajustes["forca"]).save(auxiliar.caminho)
             else:
                 desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"],
                                  auxiliar.ajustes.get("linhas", 0), LINHAS_POR_ALTURA).save(auxiliar.caminho)

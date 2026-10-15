@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { ajustesDoEfeito, desvioDeCor, type Efeito, hash32, linhasDoEfeito } from "./efeitos.ts";
+import { ajustesDoEfeito, colunasDoGrao, deslocamentoDoGrao, desvioDeCor, type Efeito, hash32, linhasDoEfeito, posicaoDaLuz, valoresDoGrao } from "./efeitos.ts";
 
 // Os mesmos casos que tests/test_efeitos.py confere no render
 const casos = JSON.parse(readFileSync(new URL("../../../../../tests/casos/efeitos.json", import.meta.url), "utf-8")) as {
@@ -26,4 +26,22 @@ test("VHS: desvio fixo, linhas e cor iguais aos do render", () => {
   assert.equal(desvioDeCor(casos.vhs.efeito, 10), casos.vhs.desvio);
   assert.equal(linhasDoEfeito(casos.vhs.efeito), casos.vhs.linhas);
   assert.deepEqual(ajustesDoEfeito(casos.vhs.efeito), casos.vhs.ajustes);
+});
+
+test("grão e luz iguais aos do render", () => {
+  const { grao, luz } = casos as unknown as {
+    grao: { colunas: number; quadros: number[]; deslocamentos: [number, number][]; celulas: [number, number][] };
+    luz: { segundos: number[]; posicoes: number[] };
+  };
+  assert.equal(colunasDoGrao(1080, 1920), grao.colunas);
+  assert.deepEqual(
+    grao.quadros.map((q) => deslocamentoDoGrao(q, grao.colunas)),
+    grao.deslocamentos,
+  );
+  const valores = valoresDoGrao();
+  assert.deepEqual(
+    grao.celulas.map(([i]) => valores[i]),
+    grao.celulas.map(([, v]) => v),
+  );
+  luz.segundos.forEach((s, i) => assert.ok(Math.abs(posicaoDaLuz(s) - luz.posicoes[i]) < 1e-12));
 });

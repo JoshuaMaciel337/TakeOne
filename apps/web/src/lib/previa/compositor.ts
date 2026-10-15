@@ -6,7 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
-import { BRILHO_SIGMA, LINHAS_POR_ALTURA } from "../projeto/efeitos.ts";
+import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
 import type { Mesclagem, Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -37,6 +37,10 @@ export type Camada = {
   desvio?: number;
   /** VHS: quanto as linhas escuras escurecem. */
   linhas?: number;
+  /** Luz: a força e o centro da faixa (frações da largura do clipe). */
+  luz?: { forca: number; posicao: number };
+  /** Granulação: a força, as colunas de células e o recorte sorteado deste quadro. */
+  grao?: { forca: number; colunas: number; deslocamento: [number, number] };
 };
 
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
@@ -142,6 +146,18 @@ uniform float u_desvio;
 // VHS: as faixas ímpares (de LINHAS_POR_ALTURA na altura do clipe) escurecem
 uniform float u_linhas;
 const float LINHAS = ${LINHAS_POR_ALTURA.toFixed(1)};
+// Luz: a faixa quente somada em "tela", depois da cor
+uniform float u_luz;
+uniform float u_luzPosicao;
+const vec3 LUZ_COR = vec3(${LUZ_COR.map((v) => v.toFixed(3)).join(", ")});
+const float LUZ_LARGURA = ${LUZ_LARGURA.toFixed(3)};
+// Granulação: a célula do grão lida na imagem fixa (unidade 3), no recorte deste quadro
+uniform float u_grao;
+uniform float u_graoColunas;
+uniform vec2 u_graoDeslocamento;
+uniform sampler2D u_graoTextura;
+const vec2 GRAO_TEXTURA = vec2(${GRAO_TEXTURA[0].toFixed(1)}, ${GRAO_TEXTURA[1].toFixed(1)});
+const float GRAO_LINHAS = ${GRAO_LINHAS.toFixed(1)};
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -197,7 +213,7 @@ void main() {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
     texel = texel + luz - texel * luz;
   }
-  if ((u_comCor || u_comCurvas || u_linhas > 0.0) && texel.a > 0.0) {
+  if ((u_comCor || u_comCurvas || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0) && texel.a > 0.0) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas) e depois a vinheta
     vec3 c = texel.rgb / texel.a;
@@ -211,6 +227,16 @@ void main() {
       c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
     }
     if (u_linhas > 0.0 && mod(floor(v_local.y * LINHAS), 2.0) >= 1.0) c *= 1.0 - u_linhas;
+    if (u_luz > 0.0) {
+      float s = v_local.x - u_luzPosicao;
+      vec3 luz = u_luz * LUZ_COR * exp(-(s * s) / (2.0 * LUZ_LARGURA * LUZ_LARGURA));
+      c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 - luz);
+    }
+    if (u_grao > 0.0) {
+      vec2 celula = floor(v_local * vec2(u_graoColunas, GRAO_LINHAS));
+      float n = texture(u_graoTextura, (celula + u_graoDeslocamento + 0.5) / GRAO_TEXTURA).r;
+      c = clamp(c + (n - 0.5) * u_grao, 0.0, 1.0);
+    }
     texel = vec4(c * texel.a, texel.a);
   }
   cor = texel * u_opacidade;
@@ -249,8 +275,10 @@ type Recursos = {
   alvos: Alvo[];
   /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
   tabelas: WebGLTexture[];
+  /** A imagem fixa do grão, feita na primeira vez que um clipe usa granulação. */
+  grao: WebGLTexture | null;
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -342,15 +370,41 @@ export class Compositor {
         lente: local("u_lente"),
         desvio: local("u_desvio"),
         linhas: local("u_linhas"),
+        luz: local("u_luz"),
+        luzPosicao: local("u_luzPosicao"),
+        grao: local("u_grao"),
+        graoColunas: local("u_graoColunas"),
+        graoDeslocamento: local("u_graoDeslocamento"),
+        graoTextura: local("u_graoTextura"),
         curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
       },
       texturas: [],
       tabelas: [],
+      grao: null,
       desfoque,
       alvos: [],
     };
+  }
+
+  /** A imagem fixa do grão (lib/projeto/efeitos.ts), feita uma vez, na unidade 3. */
+  private texturaDoGrao(): WebGLTexture {
+    const recursos = this.recursos!;
+    if (!recursos.grao) {
+      const gl = this.gl;
+      const textura = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, textura);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, GRAO_TEXTURA[0], GRAO_TEXTURA[1], 0, gl.RED, gl.UNSIGNED_BYTE, valoresDoGrao());
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      recursos.grao = textura;
+    }
+    return recursos.grao;
   }
 
   /** O framebuffer `indice` com uma textura do tamanho pedido. */
@@ -489,6 +543,17 @@ export class Compositor {
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
       gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
       gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
+      gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);
+      gl.uniform1f(uniformes.luzPosicao, camada.luz?.posicao ?? 0);
+      gl.uniform1f(uniformes.grao, camada.grao?.forca ?? 0);
+      if (camada.grao) {
+        gl.uniform1f(uniformes.graoColunas, camada.grao.colunas);
+        gl.uniform2f(uniformes.graoDeslocamento, ...camada.grao.deslocamento);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.texturaDoGrao());
+        gl.uniform1i(uniformes.graoTextura, 3);
+        gl.activeTexture(gl.TEXTURE0);
+      }
       gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
       gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
@@ -540,7 +605,7 @@ export class Compositor {
     this.canvas.removeEventListener("webglcontextrestored", this.aoRestaurar);
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
-      for (const textura of [...recursos.texturas, ...recursos.tabelas]) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...(recursos.grao ? [recursos.grao] : [])]) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         this.gl.deleteTexture(alvo.textura);
         this.gl.deleteFramebuffer(alvo.buffer);

@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
-import { type Efeito, EFEITOS, INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
+import { type Efeito, EFEITOS, INTENSIDADE_PADRAO, SO_EM_MIDIA, type TipoEfeito } from "@/lib/projeto/efeitos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 
 import { ControleNumerico } from "./ControleNumerico";
@@ -21,6 +21,7 @@ export function PainelEfeitos({ selecionado, aoPrever, aoExecutar }: Props) {
   const podeAplicar = selecionado !== null && selecionado.faixa.tipo !== "audio";
   const travada = podeAplicar && selecionado.faixa.travada;
   const atual = podeAplicar ? (selecionado.clipe.efeito ?? null) : null;
+  const ehTexto = podeAplicar && Boolean(selecionado.clipe.texto);
   const comando = (efeito: Efeito | null): Comando => ({ comando: "clipe.efeito", parametros: { clipeIds: [selecionado!.clipe.id], efeito } });
   const escolher = (tipo: TipoEfeito | null) => {
     if (!podeAplicar || travada) return;
@@ -49,7 +50,8 @@ export function PainelEfeitos({ selecionado, aoPrever, aoExecutar }: Props) {
           <button
             key={efeito.id}
             type="button"
-            disabled={!podeAplicar || travada}
+            disabled={!podeAplicar || travada || (ehTexto && SO_EM_MIDIA.includes(efeito.id))}
+            title={ehTexto && SO_EM_MIDIA.includes(efeito.id) ? "Só em vídeos e imagens" : undefined}
             onClick={() => escolher(efeito.id)}
             aria-pressed={atual?.tipo === efeito.id}
             className={botao(atual?.tipo === efeito.id)}
