@@ -49,3 +49,20 @@ test("clipe sem fala e mídia sem transcrição não são tocados; o tempo é o 
   // O clipe c usa de 9,8 s a 12,8 s da mídia e começa em 5 s na linha do tempo
   assert.deepEqual(emSegundos(trechos), [["pausa", 5.65, 7.05]]);
 });
+
+test("retake: a frase começada e abandonada sai, até o começo da versão boa", () => {
+  const fala = (texto: string, inicio: number) => texto.split(" ").map((w, i) => p(w, inicio + i * 0.4, inicio + i * 0.4 + 0.3));
+  const palavras = new Map([["m", [
+    ...fala("Hoje eu vou", 0),                                  // abandonada (pausa de 1 s depois)
+    ...fala("Hoje eu vou mostrar como editar.", 2.1),           // a versão boa
+    ...fala("Eu quero isso. Eu quero aquilo.", 5),             // repetição de estilo, do mesmo tamanho: fica
+  ]]]);
+  const opcoes = { ...OPCOES_DE_LIMPEZA, pausas: false, vicios: false };
+  const trechos = trechosParaLimpar([clipe("c", "m", 0, 10)], palavras, opcoes);
+  assert.deepEqual(trechos.map((t) => [t.tipo, t.inicio / S, t.fim / S, t.texto]), [["retake", 0, 2.1, "Hoje eu vou"]]);
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 10)], palavras, { ...opcoes, retakes: false }), []);
+
+  const repetida = new Map([["m", [...fala("Olha só isso.", 0), ...fala("Olha só isso.", 1.5), ...fala("Pronto.", 3)]]]);
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 5)], repetida, opcoes).map((t) => [t.tipo, t.inicio / S, t.fim / S]), [["retake", 0, 1.5]],
+    "a mesma frase dita duas vezes: fica a segunda");
+});

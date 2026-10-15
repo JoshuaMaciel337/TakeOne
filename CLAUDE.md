@@ -56,8 +56,9 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Fase 5 (IA):** começou.
   - Pronto: limpeza de fala na ferramenta Transcrição. A fala da faixa principal é transcrita; pausas longas (mínimo ajustável, com 0,15 s de folga em volta da fala) e hesitações (“ahn”, “hum”) viram trechos, e "Remover" tira todos de uma vez (`lib/projeto/limpezaDeFala.ts` e o comando `linha.removerIntervalos`).
   - Edição pelo texto: a transcrição da faixa principal aparece como texto; Shift+clique marca palavras e "Apagar" corta do começo da primeira até o começo da palavra seguinte (`trechoDasPalavras` em `lib/projeto/fala.ts`).
-  - Falta: retakes, limpar a voz, reenquadrar pelo rosto, recorte de fundo, geração de vídeo (Wan 2.2) e o resto da seção 6 do plano.
-- **Próximo passo:** detectar retakes (frases repetidas) na mesma ferramenta, ou voltar à fase 4 (efeitos e keyframes).
+  - Retakes: a limpeza também acha a frase começada e abandonada antes da versão boa (ou a mesma frase dita duas vezes). **Quase nunca dispara hoje:** o Whisper large-v3-turbo descarta a tentativa repetida da transcrição (testado no Nitro, com e sem prompt, VAD e beam). Transcrever cada trecho de fala separado (VAD do faster-whisper) mantém as duas, mas o Whisper inventa o fim da frase cortada; fica para quando der para afinar isso.
+  - Falta: limpar a voz, reenquadrar pelo rosto, recorte de fundo, geração de vídeo (Wan 2.2) e o resto da seção 6 do plano.
+- **Próximo passo:** seguir a fase 5 (limpar a voz com o DeepFilterNet, reenquadrar pelo rosto) ou voltar à fase 4 (efeitos e keyframes).
 
 ## Pendente no Nitro
 

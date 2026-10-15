@@ -52,6 +52,7 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
   const selecionadas = selecao && selecao.clipes === clipes ? { de: Math.min(selecao.de, selecao.ate), ate: Math.max(selecao.de, selecao.ate) } : null;
   const pausas = trechos.filter((t) => t.tipo === "pausa");
   const vicios = trechos.filter((t) => t.tipo === "vicio");
+  const repetidas = trechos.filter((t) => t.tipo === "retake");
   const total = segundosDosTrechos(trechos);
 
   async function analisar() {
@@ -93,7 +94,8 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
     return (
       <div className="flex flex-col gap-3 text-xs">
         <p className="text-suave">
-          A fala da faixa principal é transcrita no worker de GPU. Depois dá para tirar as pausas longas e as hesitações (“ahn”, “hum”) de uma vez.
+          A fala da faixa principal é transcrita no worker de GPU. Depois dá para tirar as pausas longas, as hesitações (“ahn”, “hum”) e os retakes de uma vez, e
+          editar o vídeo pelo texto.
         </p>
         <label className="flex items-center justify-between gap-2">
           <span className="text-suave">Idioma</span>
@@ -146,6 +148,11 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
           <span className="flex-1">Hesitações (“ahn”, “hum”)</span>
           <span className="tabular-nums text-suave">{vicios.length}</span>
         </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={opcoes.retakes} onChange={(evento) => setOpcoes({ ...opcoes, retakes: evento.currentTarget.checked })} />
+          <span className="flex-1">Retakes (frase começada de novo)</span>
+          <span className="tabular-nums text-suave">{repetidas.length}</span>
+        </label>
         <button type="button" className="botao-principal px-3 py-2" disabled={!trechos.length} onClick={remover}>
           <Scissors className="size-4" aria-hidden />
           {trechos.length ? `Remover ${trechos.length} trechos (${segundos(total)})` : "Nada para remover"}
@@ -194,7 +201,7 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
                 className="flex w-full items-center justify-between gap-2 rounded-md bg-painel-2 px-2 py-1.5 text-left hover:bg-painel-3"
               >
                 <span className="tabular-nums text-suave">{formatarTimecode(trecho.inicio, projeto.taxa)}</span>
-                <span className="flex-1 truncate">{trecho.tipo === "pausa" ? "Pausa" : `“${trecho.texto}”`}</span>
+                <span className="flex-1 truncate">{trecho.tipo === "pausa" ? "Pausa" : trecho.tipo === "retake" ? `Retake: “${trecho.texto}”` : `“${trecho.texto}”`}</span>
                 <span className="tabular-nums text-suave">{segundos(segundosDosTrechos([trecho]))}</span>
               </button>
             </li>
