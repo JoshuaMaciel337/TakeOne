@@ -21,7 +21,13 @@ from core.modelos.exportacao import (
     chave_exportacao,
 )
 from core.modelos.job import ErroDefinitivo
-from core.modelos.midia import ARQUIVO_PROXY_AUDIO, ARQUIVO_PROXY_VIDEO, ARQUIVO_VOZ_LIMPA, chave_arquivo
+from core.modelos.midia import (
+    ARQUIVO_MASCARA,
+    ARQUIVO_PROXY_AUDIO,
+    ARQUIVO_PROXY_VIDEO,
+    ARQUIVO_VOZ_LIMPA,
+    chave_arquivo,
+)
 from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
@@ -83,6 +89,8 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             duracao=float(midia.get("duracao") or 0),
             matriz=matriz,
             voz_limpa=str(voz) if voz.is_file() else None,
+            mascara=str(mascara) if (mascara := storage.caminho_local(chave_arquivo(
+                midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA))).is_file() else None,
             tons=tuple((chave, str(caminho)) for chave, tom in (midia.get("tons") or {}).items()
                        if tom.get("status") == "pronta"
                        and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],

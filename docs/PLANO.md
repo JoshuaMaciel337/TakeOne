@@ -438,7 +438,7 @@ Cada fase termina com algo que dá para usar e testar.
   - redução de ruído na imagem
   - "Criar automaticamente"
 - Novos:
-  - recortar o fundo do vídeo (`segment` do EffectCraft, com MediaPipe ou MobileSAM)
+  - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
   - **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto ou de uma imagem, com o Wan 2.2 TI2V-5B. Detalhes na seção 9.
   - batida automática: cortar e animar no ritmo da música (detecção de batidas do SoundCraft)
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)

@@ -83,8 +83,18 @@ export function FonteDoClipe(props: PropsFonte) {
   return <FonteWebCodecs {...props} aoFalhar={() => setUsarVideo(true)} />;
 }
 
-function FonteWebCodecs({ item, tempo, aoRegistrar, aoTerQuadro, aoFalhar }: PropsFonte & { aoFalhar: () => void }) {
-  const url = arquivoDaMidia(item.midia.id, "proxy.mp4");
+/**
+ * A máscara da pessoa (recorte do fundo): outro vídeo, no tempo da cópia leve, decodificado junto com
+ * ela. Sem WebCodecs, não há máscara na prévia (o clipe aparece inteiro).
+ */
+export function FonteDaMascara(props: PropsFonte) {
+  const [falhou, setFalhou] = useState(() => !webCodecsDisponivel());
+  if (falhou) return null;
+  return <FonteWebCodecs {...props} arquivo="mascara.mp4" aoFalhar={() => setFalhou(true)} />;
+}
+
+function FonteWebCodecs({ item, tempo, aoRegistrar, aoTerQuadro, aoFalhar, arquivo = "proxy.mp4" }: PropsFonte & { aoFalhar: () => void; arquivo?: string }) {
+  const url = arquivoDaMidia(item.midia.id, arquivo);
   const decodificadorRef = useRef<DecodificadorDeVideo | null>(null);
   // As funções mudam a cada render; o decodificador é criado uma vez por arquivo
   const avisos = useRef({ aoRegistrar, aoTerQuadro, aoFalhar });

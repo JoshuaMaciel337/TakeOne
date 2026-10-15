@@ -103,6 +103,8 @@ export type Clipe = {
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
   efeito?: Efeito | null;
+  /** Recorta o fundo pela máscara da pessoa que o worker gera (só em vídeos). */
+  remover_fundo?: boolean;
   /** Tela verde: a cor que some (só em vídeos e imagens). */
   chroma?: Chroma | null;
   /** Velocidade com curva (lib/projeto/velocidade.ts); sem ela, a velocidade é a mesma o clipe todo. */

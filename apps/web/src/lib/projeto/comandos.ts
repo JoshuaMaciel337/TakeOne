@@ -31,6 +31,7 @@ import {
   mesclarClipes,
   aplicarEfeito,
   chromaClipes,
+  removerFundo,
   mudarVelocidade,
   curvarVelocidade,
   duplicarClipes,
@@ -72,6 +73,7 @@ export type Comando =
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
+  | { comando: "clipe.removerFundo"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.velocidade"; parametros: { clipeId: string; velocidade: number } }
   | { comando: "clipe.curvaVelocidade"; parametros: { clipeId: string; pontos: PontoDeVelocidade[] | null } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
@@ -104,6 +106,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
+  "clipe.removerFundo": "recortar o fundo",
   "clipe.velocidade": "mudar a velocidade",
   "clipe.curvaVelocidade": "mudar a curva de velocidade",
   "clipe.recortar": "recortar",
@@ -157,6 +160,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: curvarVelocidade(projeto, parametros.clipeId, parametros.pontos) };
     case "clipe.velocidade":
       return { projeto: mudarVelocidade(projeto, parametros.clipeId, parametros.velocidade) };
+    case "clipe.removerFundo":
+      return { projeto: removerFundo(projeto, parametros.clipeIds, parametros.ligar) };
     case "clipe.chroma":
       return { projeto: chromaClipes(projeto, parametros.clipeIds, parametros.chroma) };
     case "clipe.efeito":

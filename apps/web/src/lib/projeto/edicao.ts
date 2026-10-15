@@ -938,6 +938,14 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
   });
 }
 
+/** Liga ou desliga o recorte do fundo dos clipes de vídeo. */
+export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
+    return { ...clipe, remover_fundo: ligar };
+  });
+}
+
 /** A tela verde dos clipes de mídia; null tira. */
 export function chromaClipes(projeto: Projeto, clipeIds: string[], chroma: Chroma | null): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {

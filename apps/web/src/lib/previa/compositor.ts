@@ -43,6 +43,8 @@ export type Camada = {
   grao?: { forca: number; colunas: number; deslocamento: [number, number] };
   /** Tela verde (lib/projeto/modelo.ts): a cor que some, como o colorkey do render. */
   chroma?: Chroma | null;
+  /** Recorte do fundo: o quadro da máscara da pessoa (o alfa), no mesmo enquadramento do vídeo. */
+  mascaraDoFundo?: TexImageSource | null;
 };
 
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
@@ -145,6 +147,9 @@ uniform vec2 u_tamanho;
 uniform vec4 u_recorte;
 // VHS e glitch: o vermelho e o azul lidos deslocados (como o rgbashift, com a borda repetida)
 uniform float u_desvio;
+// Recorte do fundo: o alfa vem da máscara da pessoa (unidade 4), como o alphamerge do render
+uniform bool u_comMascaraDoFundo;
+uniform sampler2D u_mascaraDoFundo;
 // Tela verde: o alfa vira a distância à cor (em RGB, de 0 a 1), como o colorkey do FFmpeg
 uniform bool u_comChroma;
 uniform vec3 u_chromaCor;
@@ -216,6 +221,7 @@ void main() {
     texel.r = texture(u_textura, clamp(uv - d, minimo, maximo)).r;
     texel.b = texture(u_textura, clamp(uv + d, minimo, maximo)).b;
   }
+  if (u_comMascaraDoFundo) texel *= texture(u_mascaraDoFundo, uv).r;
   if (u_comChroma && texel.a > 0.0) {
     vec3 c = texel.rgb / texel.a;
     float d = length(c - u_chromaCor) / sqrt(3.0);
@@ -290,8 +296,10 @@ type Recursos = {
   tabelas: WebGLTexture[];
   /** A imagem fixa do grão, feita na primeira vez que um clipe usa granulação. */
   grao: WebGLTexture | null;
+  /** O quadro da máscara do fundo de cada camada, na unidade 4. */
+  mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -390,6 +398,8 @@ export class Compositor {
         graoDeslocamento: local("u_graoDeslocamento"),
         graoTextura: local("u_graoTextura"),
         comChroma: local("u_comChroma"),
+        comMascaraDoFundo: local("u_comMascaraDoFundo"),
+        mascaraDoFundo: local("u_mascaraDoFundo"),
         chromaCor: local("u_chromaCor"),
         semelhanca: local("u_semelhanca"),
         suavidade: local("u_suavidade"),
@@ -400,6 +410,7 @@ export class Compositor {
       texturas: [],
       tabelas: [],
       grao: null,
+      mascaras: [],
       desfoque,
       alvos: [],
     };
@@ -560,6 +571,24 @@ export class Compositor {
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
       gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
       gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
+      gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo ? 1 : 0);
+      if (camada.mascaraDoFundo) {
+        let textura = recursos.mascaras[indice];
+        if (!textura) {
+          textura = gl.createTexture()!;
+          gl.bindTexture(gl.TEXTURE_2D, textura);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          recursos.mascaras[indice] = textura;
+        }
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, textura);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.mascaraDoFundo);
+        gl.uniform1i(uniformes.mascaraDoFundo, 4);
+        gl.activeTexture(gl.TEXTURE0);
+      }
       gl.uniform1i(uniformes.comChroma, camada.chroma ? 1 : 0);
       if (camada.chroma) {
         gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
@@ -628,7 +657,7 @@ export class Compositor {
     this.canvas.removeEventListener("webglcontextrestored", this.aoRestaurar);
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
-      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...(recursos.grao ? [recursos.grao] : [])]) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...recursos.mascaras, ...(recursos.grao ? [recursos.grao] : [])]) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         this.gl.deleteTexture(alvo.textura);
         this.gl.deleteFramebuffer(alvo.buffer);

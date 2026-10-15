@@ -422,6 +422,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           </select>
         </label>
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
+        {!clipe.texto && midia?.video ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
         {pontosDoClipe.length ? (
           <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
             <button
@@ -576,6 +577,40 @@ function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
       <line x1={0} y1={10} x2={60} y2={10} stroke="rgba(255,255,255,0.15)" strokeDasharray="2 2" />
       <polyline points={pontos.map(([u, s]) => `${(u * 60).toFixed(1)},${y(s).toFixed(1)}`).join(" ")} fill="none" stroke="currentColor" strokeWidth={1.5} />
     </svg>
+  );
+}
+
+/**
+ * Remover o fundo sem tela verde: o worker acha a pessoa em cada quadro (MODNet) e a prévia e o
+ * render usam a mesma máscara.
+ */
+function RemoverFundo({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+  const [erroDoPedido, setErroDoPedido] = useState("");
+  const recorte = midia.recorte_fundo;
+  function mudar(ligar: boolean) {
+    aoExecutar({ comando: "clipe.removerFundo", parametros: { clipeIds: [clipe.id], ligar } });
+    if (!ligar || recorte?.status === "pronta" || recorte?.status === "processando") return;
+    setErroDoPedido("");
+    chamarApi(`/midias/${midia.id}/recorte-fundo`, { metodo: "POST" }).catch((erro: unknown) =>
+      setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir o recorte agora."),
+    );
+  }
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={Boolean(clipe.remover_fundo)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
+        <span className="flex-1">Remover o fundo (fica a pessoa)</span>
+      </label>
+      {clipe.remover_fundo ? (
+        <p className="mt-1 text-[11px] text-suave" role="status">
+          {recorte?.status === "pronta"
+            ? "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
+            : recorte?.status === "erro" || erroDoPedido
+              ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
+              : `Achando a pessoa em cada quadro${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}. Até terminar, a prévia mostra o clipe inteiro.`}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

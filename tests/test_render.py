@@ -340,6 +340,23 @@ def test_tom_da_voz_usa_o_arquivo_do_tom():
         planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, tom=2)])]), midias, 720, 1280)
 
 
+def test_remover_fundo_le_a_mascara_como_o_clipe_e_usa_alphamerge():
+    com_mascara = MidiaDoRender("/m/empe.mp4", 1080, 1920, video=True, audio=True, mascara="/m/mascara.mp4")
+    midias = {**MIDIAS, "empe": com_mascara}
+    sobre = clipe("s1", "empe", 0, 4, entrada=1, remover_fundo=True)
+    plano = planejar_render(projeto([faixa("video", [sobre]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            midias, 720, 1280)
+    mascara = next(e for e in plano.entradas if e.caminho == "/m/mascara.mp4")
+    video = next(e for e in plano.entradas if e.caminho == "/m/empe.mp4")
+    assert (mascara.inicio, mascara.duracao) == (video.inicio, video.duracao), "o mesmo trecho"
+    assert "scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-STARTPTS)/1,fps=30/1,crop=" in plano.filtro
+    assert "[vf2][mf2]alphamerge" in plano.filtro
+    sem_mascara = {**MIDIAS}
+    with pytest.raises(ErroRender, match="recorte do fundo"):
+        planejar_render(projeto([faixa("principal", [clipe("c1", "empe", 0, 4, remover_fundo=True)])]), sem_mascara,
+                        720, 1280)
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

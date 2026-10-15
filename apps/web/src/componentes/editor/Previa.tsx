@@ -28,7 +28,7 @@ import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
-import { arquivoDoTom, type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
+import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { razao } from "./proporcoes";
 
@@ -311,6 +311,13 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       let faltando = false;
       for (const camada of estado.camadas) {
         const quadro = camada.imagem ?? fontes.current.get(camada.chave)?.quadro(camada.segundos);
+        // Recorte do fundo: a máscara do mesmo instante; sem ela ainda, espera como espera o quadro
+        const fonteDaMascara = camada.clipe.remover_fundo && !camada.imagem ? fontes.current.get(`${camada.chave}:mascara`) : undefined;
+        const mascaraDoFundo = fonteDaMascara?.quadro(camada.segundos) ?? null;
+        if (fonteDaMascara && !mascaraDoFundo) {
+          faltando = true;
+          continue;
+        }
         if (!quadro) {
           faltando = true;
           continue;
@@ -327,6 +334,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           luz: camada.luz,
           grao: camada.grao,
           chroma: camada.clipe.texto ? null : camada.clipe.chroma,
+          mascaraDoFundo,
         });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
@@ -386,6 +394,22 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
                   aoTerQuadro={marcarSujo}
                 />
               ))}
+              {visuais
+                .filter((item) => item.clipe.remover_fundo && item.midia.arquivos.includes("mascara.mp4"))
+                .map((item) => (
+                  <FonteDaMascara
+                    key={`mascara:${item.chave}`}
+                    item={item}
+                    tempo={tempo}
+                    tocando={tocando}
+                    aoRegistrar={(fonte) => {
+                      if (fonte) fontes.current.set(`${item.chave}:mascara`, fonte);
+                      else fontes.current.delete(`${item.chave}:mascara`);
+                      marcarSujo();
+                    }}
+                    aoTerQuadro={marcarSujo}
+                  />
+                ))}
               {sons.map((item) => (
                 // A voz limpa é outro arquivo: outro elemento, para não recarregar o som ao trocar de clipe
                 <SomDoClipe key={`som:${item.chave}${usaVozLimpa(item) ? ":limpa" : ""}${arquivoDoTom(item) ? `:${arquivoDoTom(item)}` : ""}`} item={item} tempo={tempo} tocando={tocando} />

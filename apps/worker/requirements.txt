@@ -5,3 +5,5 @@ schedule==1.2.2
 tzdata==2026.4
 # Detector de rostos (YuNet) para o reenquadramento: OpenCV sem as dependências gráficas
 opencv-python-headless==4.13.0.92
+# MODNet (recorte do fundo) pelo onnxruntime na CPU (MIT)
+onnxruntime==1.31.0

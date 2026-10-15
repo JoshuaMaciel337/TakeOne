@@ -41,6 +41,8 @@ FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
 # YuNet (detector de rostos do OpenCV, MIT): o modelo vem na imagem do worker
 MODELO_ROSTO = Path(os.environ.get("MODELO_ROSTO", "/app/modelos/yunet.onnx"))
+# MODNet (recorte de retrato) para recortar o fundo do vídeo
+MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx"))
 
 # -----------------------------------------------
 # SESSÃO

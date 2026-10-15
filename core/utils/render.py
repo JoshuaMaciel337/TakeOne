@@ -93,6 +93,7 @@ class MidiaDoRender:
     matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
+    mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
 
 
@@ -196,7 +197,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None,
                     roteiro_de_opacidade: str | None = None,
                     mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None,
-                    luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None) -> tuple[str, str]:
+                    luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None,
+                    mascara_do_fundo: int | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -207,6 +209,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     desfoque: os filtros do desfoque (veja _desfoque), logo depois do tamanho, como na prévia.
     luz: (entrada com a tira de luz, segundos do começo da janela até o começo do clipe).
     grao: (entrada com a imagem do grão, roteiro do sendcmd do recorte, colunas de células).
+    mascara_do_fundo: entrada com o vídeo da máscara da pessoa (recorte do fundo), lida como o clipe.
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -239,12 +242,27 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         "setsar=1",
         "format=rgba",
     ]
+    if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
+        # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
+        filtros.insert(filtros.index(fps) + 1, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
+                                              f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
+    cabeca = f"[{entrada}:v]"
     if mascara:
         # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram)
         roteiro, alvo = mascara
         filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro)}'")
         filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
     filtros += desfoque or []
+    if mascara_do_fundo is not None:
+        # Recorte do fundo: o alfa vem do vídeo da máscara, lido, cortado e redimensionado como o clipe
+        # (depois do desfoque e das cores separadas, antes da lente: como o shader da prévia)
+        inicio_da_mascara = len(entrada_de_cor or [])
+        da_mascara = ["scale=in_range=tv:out_range=pc", "format=gray",
+                      *[f for f in filtros[inicio_da_mascara:filtros.index("format=rgba")]]]
+        cabeca = (f"{_continuar(cabeca, filtros)}[vf{numero}];\n"
+                  f"[{mascara_do_fundo}:v]{','.join(da_mascara)}[mf{numero}];\n"
+                  f"[vf{numero}][mf{numero}]alphamerge")
+        filtros = []
     distorcao = distorcao_do_efeito(clipe)
     if distorcao:
         # Olho de peixe: a lente do FFmpeg e um zoom de (1 + k) no meio, para não sobrar canto vazio
@@ -257,12 +275,6 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         semelhanca = _numero(max(chroma["semelhanca"], 1e-5))
         filtros.append(f"colorkey=color=0x{chroma['cor'].lstrip('#')}:similarity={semelhanca}"
                        f":blend={_numero(chroma['suavidade'])}")
-    if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
-        # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
-        depois_do_fps = filtros.index(fps) + 1
-        filtros.insert(depois_do_fps, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
-                          f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
-    cabeca = f"[{entrada}:v]"
     brilho = brilho_do_efeito(clipe)
     if brilho:
         # Brilho: o clipe desfocado, na força do brilho, somado em "tela" ao clipe (no alfa
@@ -744,8 +756,18 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 clipe, inicio_janela, fim_janela, float(taxa_em_fracao(taxa)), f"crop@gr{numero}", colunas))
             grao = (len(entradas), roteiro_grao, colunas)
             entradas.append(Entrada(imagem_grao, 0, fim_janela - inicio_janela, imagem=True, taxa=taxa))
+        mascara_do_fundo = None
+        if clipe.get("remover_fundo") and not clipe.get("texto"):
+            midia = midias[clipe["midia_id"]]
+            if not midia.mascara:
+                raise ErroRender("O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar "
+                                 "ou desligue \"Remover o fundo\" para exportar.")
+            lida = entradas[indice_da_entrada[clipe["id"]]]
+            mascara_do_fundo = len(entradas)
+            entradas.append(Entrada(midia.mascara, lida.inicio, lida.duracao))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
-                                          leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao)
+                                          leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao,
+                                          mascara_do_fundo)
         linhas.append(f"{cadeia}[c{numero}]")
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":
