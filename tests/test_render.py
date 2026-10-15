@@ -24,6 +24,7 @@ from core.utils.render import (
     ler_loudness,
     planejar_render,
 )
+from core.utils.som import afir_sem_normalizar
 from core.utils.tempo import TICKS_POR_SEGUNDO
 
 S = TICKS_POR_SEGUNDO
@@ -277,7 +278,7 @@ def test_efeitos_de_voz_viram_filtros_e_reverb_com_a_sala():
     assert plano.entradas[-1].caminho == "/trabalho/reverb.wav"
     assert "lowshelf=f=120:g=-4:t=s:w=1,highshelf=f=6000:g=3:t=s:w=1,aecho=" in plano.filtro_som
     assert "equalizer" not in plano.filtro_som, "faixa em 0 dB fica de fora"
-    assert f"[{len(plano.entradas) - 1}:a]afir=irnorm=-1" in plano.filtro_som
+    assert f"[{len(plano.entradas) - 1}:a]{afir_sem_normalizar()}" in plano.filtro_som
     assert "amix=inputs=2:weights='1 0.4':normalize=0:duration=first,volume=1," in plano.filtro_som
 
 

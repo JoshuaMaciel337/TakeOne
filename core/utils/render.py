@@ -34,6 +34,7 @@ from core.utils.som import (
     CURVA_PADRAO,
     CURVAS_DO_FADE,
     REVERB_DURACAO_S,
+    afir_sem_normalizar,
     comandos_de_volume,
     filtros_de_voz,
     ganho_para_igualar,
@@ -412,7 +413,7 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
         entrada_ir, nome = reverb
         mistura = f"amix=inputs=2:weights='1 {_numero(efeitos['reverb'])}':normalize=0:duration=first"
         prefixo = (f"[{entrada}:a]{','.join(filtros)},asplit=2[{nome}s][{nome}c];\n"
-                   f"[{nome}c][{entrada_ir}:a]afir=irnorm=-1:irgain=1:irfmt=mono:dry=1:wet=1[{nome}r];\n"
+                   f"[{nome}c][{entrada_ir}:a]{afir_sem_normalizar()}[{nome}r];\n"
                    f"[{nome}s][{nome}r]{mistura}")
         filtros = []
     filtros.append(f"volume={_numero(clipe['volume'])}")

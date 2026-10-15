@@ -13,6 +13,7 @@ from core.config import FFMPEG
 from core.utils.som import (
     CURVAS_DO_FADE,
     ECO_ATRASO_S,
+    afir_sem_normalizar,
     comandos_de_volume,
     filtros_de_voz,
     ganho_do_fade,
@@ -120,7 +121,7 @@ def test_eco_repete_tres_vezes_cada_uma_mais_fraca():
 def test_reverb_soma_a_resposta_da_sala_sem_normalizar(tmp_path):
     ir = tmp_path / "reverb.wav"
     ir.write_bytes(wav_do_reverb())
-    grafo = ("[0:a]asplit=2[s][c];[c][1:a]afir=irnorm=-1:irgain=1:irfmt=mono:dry=1:wet=1[r];"
+    grafo = (f"[0:a]asplit=2[s][c];[c][1:a]{afir_sem_normalizar()}[r];"
              "[s][r]amix=inputs=2:weights='1 0.5':normalize=0:duration=first")
     h = resposta_ao_impulso(grafo, [str(ir)], grafo=True)
     sala = resposta_do_reverb()

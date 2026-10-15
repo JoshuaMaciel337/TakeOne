@@ -127,3 +127,14 @@ def wav_do_reverb() -> bytes:
     formato = struct.pack("<HHIIHH", 3, 1, REVERB_TAXA, REVERB_TAXA * 4, 4, 32)
     return (b"RIFF" + struct.pack("<I", 4 + 8 + len(formato) + 8 + len(dados)) + b"WAVE"
             + b"fmt " + struct.pack("<I", len(formato)) + formato + b"data" + struct.pack("<I", len(dados)) + dados)
+
+
+def afir_sem_normalizar() -> str:
+    """
+    As opções do afir para a convolução pura (sem ganho automático). O FFmpeg 7 normaliza pelo
+    irnorm; o 6 (o do CI, no Ubuntu) pelo gtype, que no 7 ficou obsoleto.
+    """
+    from core.utils.render import versao_principal_ffmpeg
+
+    normalizar = "irnorm=-1" if versao_principal_ffmpeg() >= 7 else "gtype=none"
+    return f"afir={normalizar}:irgain=1:irfmt=mono:dry=1:wet=1"
