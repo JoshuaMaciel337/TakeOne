@@ -30,6 +30,7 @@ from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
+from core.utils.som import CURVA_PADRAO, CURVAS_DO_FADE
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -354,10 +355,11 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0) -> str:
     ]
     # Fades no tempo do próprio clipe (depois da velocidade), antes de ir para o instante dele
     fade_entrada, fade_saida = segundos(clipe.get("fade_entrada", 0)), segundos(clipe.get("fade_saida", 0))
+    curva = CURVAS_DO_FADE[clipe.get("curva_fade") or CURVA_PADRAO]
     if fade_entrada > 0:
-        filtros.append(f"afade=t=in:st=0:d={_numero(fade_entrada)}")
+        filtros.append(f"afade=t=in:st=0:d={_numero(fade_entrada)}:curve={curva}")
     if fade_saida > 0:
-        filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}")
+        filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}:curve={curva}")
     filtros.append(f"adelay={atraso}S:all=1")
     return f"[{entrada}:a]{','.join(filtros)}"
 

@@ -387,7 +387,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Áudio:
   - faixas de música e efeitos sonoros
   - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render
-  - fades em outros formatos (SoundCraft)
+  - [x] fades em outros formatos: suave, em S e exponencial (as curvas do `afade`, com a mesma fórmula na prévia)
   - ducking sob a voz (do HolyCut)
   - loudness medido (`audio-dsp` do FilmCraft)
   - efeitos de voz: EQ, reverb, eco, mudança de tom (SoundCraft)

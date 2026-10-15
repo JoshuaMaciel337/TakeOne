@@ -4,6 +4,7 @@ import type { Taxa, Tick } from "../tempo.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { Keyframes } from "./keyframes.ts";
+import { type CurvaDoFade, ganhoDoFade } from "./som.ts";
 import type { Transicao } from "./transicao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
@@ -59,6 +60,8 @@ export type Clipe = {
   /** Quanto o som leva para subir do zero no começo e descer a zero no fim. */
   fade_entrada: Tick;
   fade_saida: Tick;
+  /** Formato dos dois fades (lib/projeto/som.ts); sem ele, linear. */
+  curva_fade?: CurvaDoFade;
   /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
   voz_limpa?: boolean;
   transformacao: Transformacao;
@@ -108,12 +111,12 @@ export function duracaoDoProjeto(projeto: Pick<Projeto, "faixas">): Tick {
   return fim;
 }
 
-/** Quanto do volume do clipe vale no instante `t`, pelos fades (de 0 a 1). */
+/** Quanto do volume do clipe vale no instante `t`, pelos fades (de 0 a 1), como os dois afade do render. */
 export function fatorDosFades(clipe: Clipe, t: Tick): number {
   let fator = 1;
-  if (clipe.fade_entrada > 0) fator = Math.min(fator, (t - clipe.inicio) / clipe.fade_entrada);
-  if (clipe.fade_saida > 0) fator = Math.min(fator, (fimDoClipe(clipe) - t) / clipe.fade_saida);
-  return Math.min(1, Math.max(0, fator));
+  if (clipe.fade_entrada > 0) fator *= ganhoDoFade(clipe.curva_fade, (t - clipe.inicio) / clipe.fade_entrada);
+  if (clipe.fade_saida > 0) fator *= ganhoDoFade(clipe.curva_fade, (fimDoClipe(clipe) - t) / clipe.fade_saida);
+  return fator;
 }
 
 /** Instante da mídia que aparece no instante `t` da linha do tempo. */

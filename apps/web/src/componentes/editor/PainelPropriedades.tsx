@@ -6,9 +6,10 @@ import { useState } from "react";
 import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
-import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
+import { LIMITES_TRANSFORMACAO, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { CURVAS_DO_FADE, type CurvaDoFade } from "@/lib/projeto/som";
 import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -442,7 +443,7 @@ function AbaAudio({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { mi
   const travada = faixa.travada;
   const ids = [clipe.id];
   const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
-  const comando = (mudanca: { volume?: number; fade_entrada?: number; fade_saida?: number; voz_limpa?: boolean }): Comando => ({
+  const comando = (mudanca: MudancaDeAudio): Comando => ({
     comando: "clipe.audio",
     parametros: { clipeIds: ids, ...mudanca },
   });
@@ -502,6 +503,23 @@ function AbaAudio({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { mi
           sufixo="s"
           {...controle(clipe.fade_saida / TICKS_POR_SEGUNDO, (valor) => ({ fade_saida: emTicks(valor) }))}
         />
+        {clipe.fade_entrada > 0 || clipe.fade_saida > 0 ? (
+          <label className="mt-1 flex items-center gap-2 text-xs">
+            <span className="flex-1 text-suave">Formato dos fades</span>
+            <select
+              value={clipe.curva_fade ?? "linear"}
+              disabled={travada}
+              onChange={(evento) => aoExecutar(comando({ curva_fade: evento.currentTarget.value as CurvaDoFade }))}
+              className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque"
+            >
+              {CURVAS_DO_FADE.map(({ id, nome }) => (
+                <option key={id} value={id}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </Secao>
       <Secao titulo="Voz">
         <label className="mt-1 flex items-center gap-2 text-xs">

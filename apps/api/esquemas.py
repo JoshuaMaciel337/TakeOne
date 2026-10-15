@@ -263,6 +263,7 @@ class ClipeEntrada(BaseModel):
     volume: float = Field(default=1.0, ge=0, le=4)
     fade_entrada: int = Field(default=0, ge=0, description="Em ticks")
     fade_saida: int = Field(default=0, ge=0, description="Em ticks")
+    curva_fade: Literal["linear", "suave", "s", "exponencial"] = "linear"
     # Usa a voz sem ruído da mídia (DeepFilterNet) no lugar do som original
     voz_limpa: bool = False
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão

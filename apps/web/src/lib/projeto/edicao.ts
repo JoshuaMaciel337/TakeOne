@@ -39,6 +39,7 @@ import {
   type Transformacao,
   TRANSFORMACAO_PADRAO,
 } from "./modelo.ts";
+import type { CurvaDoFade } from "./som.ts";
 import { ajustarTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
@@ -648,7 +649,7 @@ export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Re
 
 export const VOLUME_MAXIMO = 4;
 
-export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick; voz_limpa?: boolean };
+export type MudancaDeAudio = { volume?: number; fade_entrada?: Tick; fade_saida?: Tick; curva_fade?: CurvaDoFade; voz_limpa?: boolean };
 
 /** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
 export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: MudancaDeAudio): Projeto {
@@ -665,7 +666,8 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
       const fadeEntrada = Math.round(limitar(mudanca.fade_entrada ?? clipe.fade_entrada, 0, clipe.duracao));
       const fadeSaida = Math.round(limitar(mudanca.fade_saida ?? clipe.fade_saida, 0, clipe.duracao - fadeEntrada));
       const vozLimpa = mudanca.voz_limpa ?? clipe.voz_limpa ?? false;
-      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, voz_limpa: vozLimpa };
+      const curva = mudanca.curva_fade ?? clipe.curva_fade ?? "linear";
+      return { ...clipe, volume, fade_entrada: fadeEntrada, fade_saida: fadeSaida, curva_fade: curva, voz_limpa: vozLimpa };
     });
     return { ...faixa, clipes };
   });

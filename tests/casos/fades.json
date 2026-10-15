@@ -1,0 +1,125 @@
+{
+  "descricao": "Ganho dos fades de som em cada formato, pela fórmula do afade do FFmpeg. Lidos por apps/web/src/lib/projeto/som.test.ts e tests/test_som.py (que também confere o próprio FFmpeg).",
+  "casos": [
+    {
+      "curva": "linear",
+      "p": 0,
+      "ganho": 0.0
+    },
+    {
+      "curva": "linear",
+      "p": 0.1,
+      "ganho": 0.1
+    },
+    {
+      "curva": "linear",
+      "p": 0.25,
+      "ganho": 0.25
+    },
+    {
+      "curva": "linear",
+      "p": 0.5,
+      "ganho": 0.5
+    },
+    {
+      "curva": "linear",
+      "p": 0.8,
+      "ganho": 0.8
+    },
+    {
+      "curva": "linear",
+      "p": 1,
+      "ganho": 1.0
+    },
+    {
+      "curva": "suave",
+      "p": 0,
+      "ganho": 0.0
+    },
+    {
+      "curva": "suave",
+      "p": 0.1,
+      "ganho": 0.15643446504023087
+    },
+    {
+      "curva": "suave",
+      "p": 0.25,
+      "ganho": 0.3826834323650898
+    },
+    {
+      "curva": "suave",
+      "p": 0.5,
+      "ganho": 0.7071067811865476
+    },
+    {
+      "curva": "suave",
+      "p": 0.8,
+      "ganho": 0.9510565162951535
+    },
+    {
+      "curva": "suave",
+      "p": 1,
+      "ganho": 1.0
+    },
+    {
+      "curva": "s",
+      "p": 0,
+      "ganho": 0.0
+    },
+    {
+      "curva": "s",
+      "p": 0.1,
+      "ganho": 0.024471741852423234
+    },
+    {
+      "curva": "s",
+      "p": 0.25,
+      "ganho": 0.1464466094067262
+    },
+    {
+      "curva": "s",
+      "p": 0.5,
+      "ganho": 0.49999999999999994
+    },
+    {
+      "curva": "s",
+      "p": 0.8,
+      "ganho": 0.9045084971874737
+    },
+    {
+      "curva": "s",
+      "p": 1,
+      "ganho": 1.0
+    },
+    {
+      "curva": "exponencial",
+      "p": 0,
+      "ganho": 1.0000000000000016e-05
+    },
+    {
+      "curva": "exponencial",
+      "p": 0.1,
+      "ganho": 3.16227766016838e-05
+    },
+    {
+      "curva": "exponencial",
+      "p": 0.25,
+      "ganho": 0.00017782794100389232
+    },
+    {
+      "curva": "exponencial",
+      "p": 0.5,
+      "ganho": 0.003162277660168382
+    },
+    {
+      "curva": "exponencial",
+      "p": 0.8,
+      "ganho": 0.10000000000000006
+    },
+    {
+      "curva": "exponencial",
+      "p": 1,
+      "ganho": 1.0
+    }
+  ]
+}
