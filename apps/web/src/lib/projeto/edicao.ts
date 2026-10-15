@@ -33,6 +33,7 @@ import {
   faixaDeTexto,
   fimDoClipe,
   type InfoMidia,
+  type Chroma,
   MESCLAGENS,
   type Mesclagem,
   type Projeto,
@@ -861,6 +862,16 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
       cor.curvas = { rgb: ajustar(cor.curvas!.rgb), r: ajustar(cor.curvas!.r), g: ajustar(cor.curvas!.g), b: ajustar(cor.curvas!.b) };
     }
     return { ...clipe, cor };
+  });
+}
+
+/** A tela verde dos clipes de mídia; null tira. */
+export function chromaClipes(projeto: Projeto, clipeIds: string[], chroma: Chroma | null): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto) throw new ErroEdicao("A tela verde vale só em vídeos e imagens.");
+    if (!chroma) return { ...clipe, chroma: null };
+    if (!/^#[0-9a-f]{6}$/i.test(chroma.cor)) throw new ErroEdicao("Cor inválida.");
+    return { ...clipe, chroma: { cor: chroma.cor.toLowerCase(), semelhanca: limitar(chroma.semelhanca, 0.001, 1), suavidade: limitar(chroma.suavidade, 0, 1) } };
   });
 }
 

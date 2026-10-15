@@ -236,6 +236,12 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros += [f"lenscorrection=k1={_numero(distorcao)}:k2=0:i=bilinear",
                     f"scale={round(largura * (1 + distorcao))}:{round(altura * (1 + distorcao))}:flags=bilinear",
                     f"crop={largura}:{altura}"]
+    chroma = clipe.get("chroma")
+    if chroma and not clipe.get("texto"):
+        # Tela verde: o alfa vira a distância à cor em RGB (o shader da prévia faz a mesma conta)
+        semelhanca = _numero(max(chroma["semelhanca"], 1e-5))
+        filtros.append(f"colorkey=color=0x{chroma['cor'].lstrip('#')}:similarity={semelhanca}"
+                       f":blend={_numero(chroma['suavidade'])}")
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
         depois_do_fps = len(entrada_de_cor or []) + 2

@@ -326,6 +326,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           linhas: linhasDoEfeito(camada.clipe.efeito),
           luz: camada.luz,
           grao: camada.grao,
+          chroma: camada.clipe.texto ? null : camada.clipe.chroma,
         });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele

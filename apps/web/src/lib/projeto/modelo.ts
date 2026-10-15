@@ -56,6 +56,13 @@ export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
   { id: "somar", nome: "Somar" },
 ];
 
+/**
+ * Tela verde (chroma key): some o que tem cor perto de `cor`. A distância é a do colorkey do FFmpeg
+ * (em RGB, de 0 a 1); até `semelhanca` some de vez, e some aos poucos por mais `suavidade`.
+ */
+export type Chroma = { cor: string; semelhanca: number; suavidade: number };
+export const CHROMA_PADRAO: Chroma = { cor: "#00ff00", semelhanca: 0.3, suavidade: 0.1 };
+
 export const TRANSFORMACAO_PADRAO: Transformacao = { x: 0, y: 0, escala: 1, rotacao: 0, opacidade: 1 };
 export const RECORTE_PADRAO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
 
@@ -93,6 +100,8 @@ export type Clipe = {
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
   efeito?: Efeito | null;
+  /** Tela verde: a cor que some (só em vídeos e imagens). */
+  chroma?: Chroma | null;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */

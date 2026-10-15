@@ -297,6 +297,13 @@ class CorEntrada(BaseModel):
     curvas: CurvasEntrada | None = None
 
 
+class ChromaEntrada(BaseModel):
+    """Tela verde: os limites são os de apps/web/src/lib/projeto/edicao.ts (chromaClipes)."""
+    cor: str = Field(default="#00ff00", pattern=COR)
+    semelhanca: float = Field(default=0.3, ge=0.001, le=1)
+    suavidade: float = Field(default=0.1, ge=0, le=1)
+
+
 class TransicaoEntrada(BaseModel):
     tipo: Literal["fusao", "escurecer", "deslizar", "empurrar", "zoom",
                   "cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima", "desfoque"]
@@ -329,6 +336,7 @@ class ClipeEntrada(BaseModel):
     animacao: AnimacoesEntrada | None = None
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
     efeito: EfeitoEntrada | None = None
+    chroma: ChromaEntrada | None = None
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 

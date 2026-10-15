@@ -8,7 +8,7 @@ import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
 import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Mesclagem, Recorte } from "../projeto/modelo.ts";
+import type { Chroma, Mesclagem, Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
@@ -41,6 +41,8 @@ export type Camada = {
   luz?: { forca: number; posicao: number };
   /** Granulação: a força, as colunas de células e o recorte sorteado deste quadro. */
   grao?: { forca: number; colunas: number; deslocamento: [number, number] };
+  /** Tela verde (lib/projeto/modelo.ts): a cor que some, como o colorkey do render. */
+  chroma?: Chroma | null;
 };
 
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
@@ -143,6 +145,11 @@ uniform vec2 u_tamanho;
 uniform vec4 u_recorte;
 // VHS e glitch: o vermelho e o azul lidos deslocados (como o rgbashift, com a borda repetida)
 uniform float u_desvio;
+// Tela verde: o alfa vira a distância à cor (em RGB, de 0 a 1), como o colorkey do FFmpeg
+uniform bool u_comChroma;
+uniform vec3 u_chromaCor;
+uniform float u_semelhanca;
+uniform float u_suavidade;
 // VHS: as faixas ímpares (de LINHAS_POR_ALTURA na altura do clipe) escurecem
 uniform float u_linhas;
 const float LINHAS = ${LINHAS_POR_ALTURA.toFixed(1)};
@@ -208,6 +215,12 @@ void main() {
     vec2 maximo = u_recorte.xy + u_recorte.zw;
     texel.r = texture(u_textura, clamp(uv - d, minimo, maximo)).r;
     texel.b = texture(u_textura, clamp(uv + d, minimo, maximo)).b;
+  }
+  if (u_comChroma && texel.a > 0.0) {
+    vec3 c = texel.rgb / texel.a;
+    float d = length(c - u_chromaCor) / sqrt(3.0);
+    float k = u_suavidade > 0.0001 ? clamp((d - u_semelhanca) / u_suavidade, 0.0, 1.0) : (d > u_semelhanca ? 1.0 : 0.0);
+    texel = vec4(c * k, k);
   }
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
@@ -278,7 +291,7 @@ type Recursos = {
   /** A imagem fixa do grão, feita na primeira vez que um clipe usa granulação. */
   grao: WebGLTexture | null;
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -376,6 +389,10 @@ export class Compositor {
         graoColunas: local("u_graoColunas"),
         graoDeslocamento: local("u_graoDeslocamento"),
         graoTextura: local("u_graoTextura"),
+        comChroma: local("u_comChroma"),
+        chromaCor: local("u_chromaCor"),
+        semelhanca: local("u_semelhanca"),
+        suavidade: local("u_suavidade"),
         curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
@@ -543,6 +560,12 @@ export class Compositor {
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
       gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
       gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
+      gl.uniform1i(uniformes.comChroma, camada.chroma ? 1 : 0);
+      if (camada.chroma) {
+        gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
+        gl.uniform1f(uniformes.semelhanca, camada.chroma.semelhanca);
+        gl.uniform1f(uniformes.suavidade, camada.chroma.suavidade);
+      }
       gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);
       gl.uniform1f(uniformes.luzPosicao, camada.luz?.posicao ?? 0);
       gl.uniform1f(uniformes.grao, camada.grao?.forca ?? 0);

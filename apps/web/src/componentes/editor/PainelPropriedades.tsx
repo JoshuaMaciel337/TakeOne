@@ -7,7 +7,7 @@ import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { LIMITES_TRANSFORMACAO, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
-import { type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
+import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import {
   CURVAS_DO_FADE,
@@ -416,6 +416,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             ))}
           </select>
         </label>
+        {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {pontosDoClipe.length ? (
           <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
             <button
@@ -481,6 +482,42 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
 const FADE_MAXIMO_S = 10;
 
 /** Volume e fades de entrada e saída do som do clipe. */
+/** Tela verde (chroma key) de um clipe de mídia: a cor que some, a semelhança e a suavidade. */
+function TelaVerde({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
+  const chroma = clipe.chroma ?? null;
+  const comando = (valor: Chroma | null): Comando => ({ comando: "clipe.chroma", parametros: { clipeIds: [clipe.id], chroma: valor } });
+  const controle = (chave: "semelhanca" | "suavidade") => ({
+    valor: (chroma?.[chave] ?? 0) * 100,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ ...chroma!, [chave]: valor / 100 })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - chroma![chave]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ ...chroma!, [chave]: valor / 100 }));
+    },
+  });
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={chroma !== null} disabled={travada} onChange={(evento) => aoExecutar(comando(evento.currentTarget.checked ? CHROMA_PADRAO : null))} />
+        <span className="flex-1">Tela verde (some com a cor do fundo)</span>
+      </label>
+      {chroma ? (
+        <>
+          <CampoCor
+            rotulo="Cor que some"
+            cor={chroma.cor}
+            desativado={travada}
+            aoPrever={(cor) => aoPrever(comando({ ...chroma, cor }))}
+            aoConfirmar={(cor) => aoExecutar(comando({ ...chroma, cor }))}
+          />
+          <ControleNumerico rotulo="Semelhança" minimo={1} maximo={100} sufixo="%" {...controle("semelhanca")} />
+          <ControleNumerico rotulo="Suavidade" minimo={0} maximo={100} sufixo="%" {...controle("suavidade")} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null; faixas: Faixa[]; aoAvisar: (mensagem: string) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
