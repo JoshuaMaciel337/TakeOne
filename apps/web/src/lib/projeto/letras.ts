@@ -113,5 +113,5 @@ export function temLetraALetra(animacao: Animacoes | null | undefined): boolean 
 
 /** O texto na cor do destaque, sem fundo nem sombra: ele cobre as letras do texto de baixo. */
 export function textoDoDestaque(texto: Texto): Texto {
-  return { ...texto, cor: texto.destaque!.cor, fundo_opacidade: 0, sombra: 0, destaque: null };
+  return { ...texto, cor: texto.destaque!.cor, fundo_opacidade: 0, sombra: 0, brilho: 0, destaque: null };
 }

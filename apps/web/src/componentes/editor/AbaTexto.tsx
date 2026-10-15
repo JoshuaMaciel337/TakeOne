@@ -62,7 +62,7 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
   const travada = faixa.travada;
   const mudar = (mudanca: Partial<Texto>): Comando => ({ comando: "texto.mudar", parametros: { clipeIds: [clipe.id], texto: mudanca } });
   /** Controle deslizante: `fator` converte o valor guardado no que aparece (0,07 → 7%). */
-  const controle = (chave: "tamanho" | "contorno_espessura" | "sombra" | "fundo_opacidade", fator: number) => ({
+  const controle = (chave: "tamanho" | "contorno_espessura" | "sombra" | "fundo_opacidade" | "brilho", fator: number) => ({
     valor: texto[chave] * fator,
     desativado: travada,
     aoPrever: (valor: number) => aoPrever(mudar({ [chave]: valor / fator })),
@@ -71,7 +71,7 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
       else aoExecutar(mudar({ [chave]: valor / fator }));
     },
   });
-  const cor = (chave: "cor" | "contorno_cor" | "fundo_cor") => ({
+  const cor = (chave: "cor" | "contorno_cor" | "fundo_cor" | "brilho_cor") => ({
     cor: texto[chave],
     desativado: travada,
     aoPrever: (valor: string) => aoPrever(mudar({ [chave]: valor })),
@@ -149,6 +149,10 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
         <ControleNumerico rotulo="Sombra" minimo={0} maximo={100} sufixo="%" {...controle("sombra", 100)} />
         <ControleNumerico rotulo="Fundo" minimo={0} maximo={100} sufixo="%" {...controle("fundo_opacidade", 100)} />
         <CampoCor rotulo="Cor do fundo" {...cor("fundo_cor")} />
+      </Secao>
+      <Secao titulo="Brilho">
+        <ControleNumerico rotulo="Brilho" minimo={0} maximo={100} sufixo="%" {...controle("brilho", 100)} />
+        <CampoCor rotulo="Cor do brilho" {...cor("brilho_cor")} />
       </Secao>
       <Secao titulo="Destaque da fala">
         <select

@@ -200,6 +200,8 @@ class TextoEntrada(BaseModel):
     sombra: float = Field(default=0, ge=0, le=1)
     fundo_cor: str = Field(default="#000000", pattern=COR)
     fundo_opacidade: float = Field(default=0, ge=0, le=1)
+    brilho: float = Field(default=0, ge=0, le=1)
+    brilho_cor: str = Field(default="#ffffff", pattern=COR)
     destaque: DestaqueEntrada | None = None
     tempos: list[int] | None = Field(default=None, max_length=500, description="Começo de cada palavra, em ticks")
 

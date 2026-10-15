@@ -383,7 +383,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] animações de entrada e saída (aparecer, subir, descer, deslizar e zoom), na aba Animação de qualquer clipe de imagem
   - [x] animações de loop (pulsar, balançar, flutuar e tremer), em qualquer clipe de imagem
   - [x] animações letra a letra e palavra a palavra (máscara sobre o PNG do texto, na prévia e no render)
-  - estilos de contorno, sombra e brilho (estilos de camada do PhotoCraft)
+  - [x] brilho em volta das letras (contorno e sombra já existiam), desenhado no PNG do texto
 - Áudio:
   - faixas de música e efeitos sonoros
   - [x] volume (até 400%) e fades de entrada e saída lineares, na prévia e no render

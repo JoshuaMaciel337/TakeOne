@@ -44,7 +44,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - O som sai numa passada própria (mistura e mede o loudness) antes do vídeo; veja "Decisões técnicas".
   - Prévia contra render: `npm run comparar-previa` (em `apps/web`) abre o editor no Chrome e compara o canvas com a última exportação tocada no mesmo navegador, quadro a quadro. Fica fora do CI. Em 14/10/2026 deu média de 2 a 3 níveis em 255, com o quadro exato.
 - **Fase 3 (texto, áudio e legendas):** em andamento.
-  - Pronto: volume até 400% e fades na aba Áudio; clipes de texto (ferramenta Texto com estilos prontos, aba Texto com fonte, cor, contorno, sombra e fundo), na prévia e no render.
+  - Pronto: volume até 400% e fades na aba Áudio; clipes de texto (ferramenta Texto com estilos prontos, aba Texto com fonte, cor, contorno, sombra, fundo e brilho), na prévia e no render.
   - Legendas manuais: ferramenta Legendas com estilos, lista para editar, importar e baixar SRT e VTT (`lib/projeto/legendas.ts`).
   - Legendas automáticas: o worker de GPU transcreve a fala de cada mídia (faster-whisper large-v3-turbo, `apps/worker/tarefas/transcricao.py`) e o editor transforma as palavras em legendas no tempo da linha do tempo, em até duas linhas que cabem no quadro (`lib/projeto/legendasDaFala.ts`). Testado no Nitro: um vídeo de 47 s em 30 s, com o modelo em cache.
   - Animações de entrada e saída (aba Animação), na prévia e no render.

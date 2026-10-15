@@ -27,6 +27,9 @@ export type Texto = {
   fundo_cor: string;
   /** 0 é sem fundo. */
   fundo_opacidade: number;
+  /** Luz em volta das letras; 0 é sem brilho. */
+  brilho: number;
+  brilho_cor: string;
   destaque?: Destaque | null;
   /** Quando cada palavra começa, em ticks desde o começo do clipe (legendas da fala). */
   tempos?: number[] | null;
@@ -57,6 +60,8 @@ export const TEXTO_PADRAO: Texto = {
   sombra: 0,
   fundo_cor: "#000000",
   fundo_opacidade: 0,
+  brilho: 0,
+  brilho_cor: "#ffffff",
 };
 
 /** Estilos prontos do painel de texto. Os nomes e os valores são do TakeOne. */
@@ -67,6 +72,7 @@ export const ESTILOS_DE_TEXTO: { id: string; nome: string; texto: Texto }[] = [
   { id: "contorno", nome: "Contorno", texto: { ...TEXTO_PADRAO, conteudo: "Contorno", caixa_alta: true, tamanho: 0.08, contorno_espessura: 0.12 } },
   { id: "caixa", nome: "Caixa escura", texto: { ...TEXTO_PADRAO, conteudo: "Legenda em caixa", fonte: "texto", tamanho: 0.05, fundo_opacidade: 0.6 } },
   { id: "manuscrito", nome: "À mão", texto: { ...TEXTO_PADRAO, conteudo: "Escrito à mão", fonte: "manuscrita", tamanho: 0.1, sombra: 0.5 } },
+  { id: "neon", nome: "Neon", texto: { ...TEXTO_PADRAO, conteudo: "Neon", fonte: "manuscrita", tamanho: 0.1, cor: "#fff4fb", brilho: 0.8, brilho_cor: "#ff2bd6" } },
 ];
 
 function limitar(valor: number, minimo: number, maximo: number): number {
@@ -86,6 +92,8 @@ export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
     contorno_espessura: limitar(texto.contorno_espessura, LIMITES_TEXTO.contorno.minimo, LIMITES_TEXTO.contorno.maximo),
     sombra: limitar(texto.sombra, 0, 1),
     fundo_opacidade: limitar(texto.fundo_opacidade, 0, 1),
+    brilho: limitar(texto.brilho, 0, 1),
+    brilho_cor: cor(texto.brilho_cor, atual.brilho_cor ?? TEXTO_PADRAO.brilho_cor),
     cor: cor(texto.cor, atual.cor),
     contorno_cor: cor(texto.contorno_cor, atual.contorno_cor),
     fundo_cor: cor(texto.fundo_cor, atual.fundo_cor),

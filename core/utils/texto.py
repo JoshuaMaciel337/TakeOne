@@ -34,6 +34,8 @@ RAIO_FUNDO = 0.25
 # Sombra deslocada para baixo e para a direita, e desfocada
 DESLOCAMENTO_SOMBRA = 0.06
 DESFOQUE_SOMBRA = 0.08
+# Brilho: o texto desfocado na cor do brilho, por baixo dele, com este raio (fração da letra)
+RAIO_BRILHO = 0.18
 MAXIMO_LINHAS = 12
 
 TEXTO_PADRAO = {
@@ -49,6 +51,8 @@ TEXTO_PADRAO = {
     "sombra": 0.0,
     "fundo_cor": "#000000",
     "fundo_opacidade": 0.0,
+    "brilho": 0.0,
+    "brilho_cor": "#ffffff",
 }
 
 
@@ -87,7 +91,8 @@ def _medidas(texto: dict, lado_menor: int) -> dict:
     altura_texto = altura_linha * (len(linhas) - 1) + subida + descida
 
     contorno = round(texto["contorno_espessura"] * tamanho)
-    folga = round(tamanho * FOLGA) + contorno
+    # O brilho espalha em volta das letras: a imagem cresce para ele não ser cortado
+    folga = round(tamanho * FOLGA) + contorno + (round(tamanho * RAIO_BRILHO) if texto["brilho"] > 0 else 0)
     posicoes = []
     for indice, largura_linha in enumerate(larguras):
         if texto["alinhamento"] == "esquerda":
@@ -156,6 +161,15 @@ def desenhar_texto(texto: dict, lado_menor: int) -> Image.Image:
         sombra.paste((0, 0, 0, 255), (deslocamento, deslocamento), alfa.crop((0, 0, largura - deslocamento,
                                                                               altura - deslocamento)))
         resultado.alpha_composite(sombra.filter(ImageFilter.GaussianBlur(radius=max(tamanho * DESFOQUE_SOMBRA, 1))))
+    if texto["brilho"] > 0:
+        # Duas camadas desfocadas: uma larga e fraca, outra justa e forte, para a luz não virar mancha
+        alfa = camada.getchannel("A")
+        for raio, peso in ((RAIO_BRILHO, 0.7), (RAIO_BRILHO / 3, 1.0)):
+            desfocado = alfa.filter(ImageFilter.GaussianBlur(radius=max(tamanho * raio, 1)))
+            forca = min(1.0, texto["brilho"] * peso * 1.6)
+            luz = Image.new("RGBA", (largura, altura), (*_rgb(texto["brilho_cor"]), 255))
+            luz.putalpha(desfocado.point(lambda valor, forca=forca: min(255, round(valor * forca))))
+            resultado.alpha_composite(luz)
     resultado.alpha_composite(camada)
     return resultado
 

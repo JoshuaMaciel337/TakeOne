@@ -189,4 +189,4 @@ def tem_destaque(clipe: dict) -> bool:
 
 def texto_do_destaque(texto: dict) -> dict:
     """O texto na cor do destaque, sem fundo nem sombra: ele cobre as letras do texto de baixo."""
-    return {**texto, "cor": texto["destaque"]["cor"], "fundo_opacidade": 0, "sombra": 0, "destaque": None}
+    return {**texto, "cor": texto["destaque"]["cor"], "fundo_opacidade": 0, "sombra": 0, "brilho": 0, "destaque": None}

@@ -36,3 +36,13 @@ def test_alinhamento_muda_onde_a_linha_curta_fica():
     direita = desenhar_texto({**base, "alinhamento": "direita"}, 1080)
     y = int(esquerda.height * 0.72)   # na segunda linha
     assert primeira_coluna_com_tinta(esquerda, y) < primeira_coluna_com_tinta(direita, y)
+
+
+def test_brilho_espalha_a_cor_em_volta_das_letras():
+    base = {"conteudo": "Oi", "cor": "#ffffff"}
+    sem = desenhar_texto(base, 1080)
+    com = desenhar_texto({**base, "brilho": 0.8, "brilho_cor": "#ff0000"}, 1080)
+    assert com.width > sem.width, "a imagem cresce para o brilho não ser cortado"
+    # Na borda de cima, longe das letras, a luz é vermelha e meio transparente
+    vermelhos = [com.getpixel((x, com.height // 8)) for x in range(com.width)]
+    assert any(r > 200 and g < 80 and 0 < a < 255 for r, g, _, a in vermelhos)
