@@ -318,9 +318,9 @@ export function Editor({ projetoId }: { projetoId: string }) {
                 if (ids.length) setMidiaId(null);
               }}
               aoPrever={(clipeId, mudanca) =>
-                setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } } : null)
+                setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null)
               }
-              aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } })}
+              aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } })}
               className="flex-1"
             />
             <Divisor
@@ -337,6 +337,8 @@ export function Editor({ projetoId }: { projetoId: string }) {
               midia={midiaDasPropriedades}
               selecionado={selecionado}
               taxa={projeto.taxa}
+              tempo={tempo}
+              aoBuscar={buscar}
               fundo={(projetoNaTela ?? projeto).fundo.cor}
               aoPrever={preverDoPainel}
               aoExecutar={(comando) => {

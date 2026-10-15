@@ -15,6 +15,8 @@ type Props = {
   aoPrever: (valor: number) => void;
   /** Ao soltar o controle ou confirmar o número. */
   aoConfirmar: (valor: number) => void;
+  /** Um botão ao lado do rótulo (o keyframe da propriedade). */
+  acao?: React.ReactNode;
 };
 
 function arredondar(valor: number, passo: number): number {
@@ -34,6 +36,7 @@ export function ControleNumerico({
   desativado = false,
   aoPrever,
   aoConfirmar,
+  acao,
 }: Props) {
   const exibido = Number(arredondar(valor, passo).toFixed(4));
 
@@ -50,7 +53,10 @@ export function ControleNumerico({
 
   return (
     <label className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 py-1.5 text-xs">
-      <span className="text-suave">{rotulo}</span>
+      <span className="flex items-center gap-1 text-suave">
+        {acao}
+        {rotulo}
+      </span>
       <span className="flex items-center gap-1">
         <input
           // Remonta quando o valor muda por fora (arrasto na prévia, desfazer)

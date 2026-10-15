@@ -12,6 +12,17 @@
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import { type AjustesCor, type Cor, COR_PADRAO, FILTROS, LIMITES_COR } from "./cor.ts";
+import {
+  type Curva,
+  deslocarKeyframes,
+  type Keyframe,
+  type Keyframes,
+  KEYFRAMES_POR_PROPRIEDADE,
+  keyframeEm,
+  type PropriedadeAnimavel,
+  PROPRIEDADES_ANIMAVEIS,
+  transformacaoNoTempo,
+} from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
@@ -308,6 +319,8 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       inicio: clipe.inicio + delta,
       duracao: clipe.duracao - delta,
       entrada: Math.max(0, clipe.entrada + Math.round(delta * clipe.velocidade)),
+      // Os keyframes ficam no mesmo instante da linha do tempo
+      keyframes: deslocarKeyframes(clipe.keyframes, delta),
     };
   }
 
@@ -345,6 +358,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         entrada: clipe.entrada + Math.round((t - clipe.inicio) * clipe.velocidade),
         // O fade e a animação de entrada ficam com a metade da esquerda; os de saída, com a da direita
         fade_entrada: 0,
+        keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
       const esquerda = { ...clipe, duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
@@ -451,6 +465,7 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 entrada: clipe.entrada + Math.round((pedaco.inicio - clipe.inicio) * clipe.velocidade),
                 fade_entrada: primeiro ? clipe.fade_entrada : 0,
                 fade_saida: ultimo ? clipe.fade_saida : 0,
+                keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
                 transicao: ultimo ? clipe.transicao : null,
                 animacao: clipe.animacao
                   ? { entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
@@ -545,17 +560,82 @@ function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe,
   return { ...projeto, faixas };
 }
 
-/** Muda as propriedades informadas da transformação dos clipes; as outras ficam como estão. */
-export function transformarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Transformacao>): Projeto {
-  return mudarClipes(projeto, clipeIds, (clipe) => ({
-    ...clipe,
-    transformacao: limitarTransformacao({ ...clipe.transformacao, ...mudanca }),
-  }));
+/**
+ * Muda as propriedades informadas da transformação dos clipes; as outras ficam como estão. Com o
+ * instante `tempo`, a propriedade que tem keyframes ganha (ou muda) o ponto daquele instante, como nos
+ * editores conhecidos; as que não têm mudam o valor fixo.
+ */
+export function transformarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Transformacao>, tempo?: Tick): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const atual = tempo === undefined ? clipe.transformacao : transformacaoNoTempo(clipe, tempo);
+    const nova = limitarTransformacao({ ...atual, ...mudanca });
+    const transformacao = { ...clipe.transformacao };
+    let keyframes = clipe.keyframes;
+    for (const propriedade of Object.keys(mudanca) as (keyof Transformacao)[]) {
+      const pontos = clipe.keyframes?.[propriedade];
+      if (tempo !== undefined && pontos?.length) {
+        const t = quadroDoClipe(projeto, clipe, tempo);
+        keyframes = { ...keyframes, [propriedade]: comPonto(pontos, { t, valor: nova[propriedade], curva: curvaEm(pontos, t) }, projeto) };
+      } else {
+        transformacao[propriedade] = nova[propriedade];
+      }
+    }
+    return { ...clipe, transformacao, keyframes };
+  });
 }
 
-/** Volta posição, escala, giro, opacidade e recorte ao padrão. */
+/** O instante do clipe (desde o começo dele) no quadro mais próximo de `tempo`, dentro do clipe. */
+function quadroDoClipe(projeto: Projeto, clipe: Clipe, tempo: Tick): Tick {
+  return Math.min(Math.max(quadroMaisProximo(projeto.taxa, tempo) - clipe.inicio, 0), clipe.duracao);
+}
+
+/** A curva que um ponto novo herda: a do ponto anterior, para não mudar o jeito do movimento. */
+function curvaEm(pontos: Keyframe[], t: Tick): Curva {
+  return [...pontos].reverse().find((ponto) => ponto.t <= t)?.curva ?? "linear";
+}
+
+/** Os pontos com `novo` no lugar do que estava no mesmo instante (ou somado, em ordem). */
+function comPonto(pontos: Keyframe[], novo: Keyframe, projeto: Projeto): Keyframe[] {
+  const meioQuadro = duracaoDoQuadro(projeto.taxa) / 2;
+  const outros = pontos.filter((ponto) => Math.abs(ponto.t - novo.t) > meioQuadro);
+  if (outros.length >= KEYFRAMES_POR_PROPRIEDADE) throw new ErroEdicao(`Cada propriedade pode ter no máximo ${KEYFRAMES_POR_PROPRIEDADE} keyframes.`);
+  return [...outros, novo].sort((a, b) => a.t - b.t);
+}
+
+export type AcaoDeKeyframe = "alternar" | Curva;
+
+/**
+ * "alternar": põe um keyframe da propriedade no instante, com o valor que ela tem ali, ou tira o que
+ * já estava. Tirar o último deixa o clipe parado no valor dele. "linear" ou "suave": muda a curva do
+ * ponto do instante até o seguinte.
+ */
+export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: PropriedadeAnimavel, tempo: Tick, acao: AcaoDeKeyframe): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    if (tempo < clipe.inicio || tempo > clipe.inicio + clipe.duracao) throw new ErroEdicao("Leve o cursor para dentro do clipe.");
+    const t = quadroDoClipe(projeto, clipe, tempo);
+    const pontos = clipe.keyframes?.[propriedade] ?? [];
+    const meioQuadro = duracaoDoQuadro(projeto.taxa) / 2;
+    const existente = keyframeEm(pontos, t, meioQuadro);
+    if (acao !== "alternar") {
+      if (!existente) throw new ErroEdicao("Não há keyframe neste instante.");
+      return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: pontos.map((p) => (p === existente ? { ...p, curva: acao } : p)) } };
+    }
+    if (existente) {
+      const restantes = pontos.filter((p) => p !== existente);
+      const keyframes: Keyframes = { ...clipe.keyframes, [propriedade]: restantes };
+      if (restantes.length) return { ...clipe, keyframes };
+      delete keyframes[propriedade];
+      const vazios = PROPRIEDADES_ANIMAVEIS.every((p) => !keyframes[p]?.length);
+      return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: existente.valor } };
+    }
+    const valor = transformacaoNoTempo(clipe, tempo)[propriedade];
+    return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: comPonto(pontos, { t, valor, curva: curvaEm(pontos, t) }, projeto) } };
+  });
+}
+
+/** Volta posição, escala, giro, opacidade e recorte ao padrão, sem keyframes. */
 export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
-  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO }));
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null }));
 }
 
 export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Recorte): Projeto {

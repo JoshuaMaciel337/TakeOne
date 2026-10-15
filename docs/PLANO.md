@@ -425,7 +425,8 @@ Cada fase termina com algo que dá para usar e testar.
   - distorções
   - modos de mesclagem
 - Chroma key (tela verde), com o `keying` do EffectCraft.
-- Keyframes em qualquer propriedade (`keyframe` do EffectCraft) e velocidade com curva, mantendo o tom da voz (SoundCraft).
+- [x] Keyframes de posição, escala, rotação e opacidade, com curva linear ou suave (a conta é do TakeOne; o `keyframe` do EffectCraft fica de referência para Bezier e hold).
+- Velocidade com curva, mantendo o tom da voz (SoundCraft).
 
 ### Fase 5: IA no estilo CapCut (3+ semanas)
 - Já existem no HolyCut e só precisam ser generalizados:

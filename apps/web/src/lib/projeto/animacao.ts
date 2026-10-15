@@ -5,6 +5,7 @@
 // A opacidade muda em linha reta, porque o render usa o filtro `fade` com alfa, que é linear.
 // Movimento e zoom seguem uma curva que desacelera no fim (cúbica).
 import type { Tick } from "../tempo.ts";
+import { transformacaoNoTempo } from "./keyframes.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
 
 export type TipoAnimacao = "nenhuma" | "aparecer" | "subir" | "descer" | "deslizar" | "zoom";
@@ -49,11 +50,16 @@ export function progressoDasAnimacoes(clipe: Pick<Clipe, "inicio" | "duracao" | 
   };
 }
 
-/** A transformação do clipe no instante `t`, com as animações aplicadas. */
-export function transformacaoAnimada(clipe: Pick<Clipe, "inicio" | "duracao" | "animacao" | "transformacao">, t: Tick): Transformacao {
+/** A transformação do clipe no instante `t`, com os keyframes e as animações aplicados. */
+export function transformacaoAnimada(
+  clipe: Pick<Clipe, "inicio" | "duracao" | "animacao" | "transformacao" | "keyframes">,
+  t: Tick,
+): Transformacao {
   const animacao = clipe.animacao ?? SEM_ANIMACAO;
   const progresso = progressoDasAnimacoes(clipe, t);
-  let { x, y, escala, opacidade } = clipe.transformacao;
+  // As animações partem do valor que os keyframes dão no instante
+  const base = transformacaoNoTempo(clipe, t);
+  let { x, y, escala, opacidade } = base;
   // Na saída o sentido se inverte: quem entrou subindo sai subindo
   const aplicar = (tipo: TipoAnimacao, p: number, sentido: 1 | -1) => {
     if (tipo === "nenhuma") return;
@@ -66,7 +72,7 @@ export function transformacaoAnimada(clipe: Pick<Clipe, "inicio" | "duracao" | "
   };
   aplicar(animacao.entrada.tipo, progresso.entrada, 1);
   aplicar(animacao.saida.tipo, progresso.saida, -1);
-  return { ...clipe.transformacao, x, y, escala, opacidade };
+  return { ...base, x, y, escala, opacidade };
 }
 
 /** As durações nunca passam do clipe: a de entrada primeiro, a de saída no que sobra. */

@@ -8,6 +8,7 @@ import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Re
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
+import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
 import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -180,7 +181,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       faixa,
       recorte: clipe.recorte,
       caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, tamanho),
-      caixaBase: caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, tamanho),
+      // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
+      caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
@@ -201,7 +203,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       faixa,
       recorte: clipe.recorte,
       caixa: caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, tamanho),
-      caixaBase: caixaDoTexto(clipe.transformacao, imagem, tamanho),
+      caixaBase: caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, tamanho),
       cor: corDoClipe(clipe),
       segundos: 0,
       imagem: imagem.bitmap,

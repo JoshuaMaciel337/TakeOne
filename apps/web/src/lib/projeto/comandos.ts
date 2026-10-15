@@ -16,6 +16,7 @@ import {
   alternarFaixa,
   apagarClipes,
   apararClipe,
+  type AcaoDeKeyframe,
   type Contexto,
   type DestinoClipe,
   type Intervalo,
@@ -24,6 +25,7 @@ import {
   estiloDasLegendas,
   importarLegendas,
   type MudancaDeAudio,
+  mudarKeyframe,
   duplicarClipes,
   moverClipe,
   mudarFundo,
@@ -34,6 +36,7 @@ import {
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
+import type { PropriedadeAnimavel } from "./keyframes.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { Texto } from "./texto.ts";
@@ -50,7 +53,8 @@ export type Comando =
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
   | { comando: "projeto.fundo"; parametros: { cor: string } }
-  | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao> } }
+  | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
+  | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
@@ -75,6 +79,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "projeto.proporcao": "mudar a proporção",
   "projeto.fundo": "mudar o fundo",
   "clipe.transformar": "mudar posição e tamanho",
+  "clipe.keyframe": "mudar keyframe",
   "clipe.recortar": "recortar",
   "clipe.restaurar": "restaurar posição e tamanho",
   "clipe.audio": "mudar o som",
@@ -121,7 +126,9 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     case "projeto.fundo":
       return { projeto: mudarFundo(projeto, parametros.cor) };
     case "clipe.transformar":
-      return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao) };
+      return { projeto: transformarClipes(projeto, parametros.clipeIds, parametros.transformacao, parametros.tempo) };
+    case "clipe.keyframe":
+      return { projeto: mudarKeyframe(projeto, parametros.clipeId, parametros.propriedade, parametros.tempo, parametros.acao) };
     case "clipe.recortar":
       return { projeto: recortarClipes(projeto, parametros.clipeIds, parametros.recorte) };
     case "clipe.restaurar":

@@ -3,6 +3,7 @@
 import type { Taxa, Tick } from "../tempo.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
+import type { Keyframes } from "./keyframes.ts";
 import type { Transicao } from "./transicao.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
@@ -61,6 +62,8 @@ export type Clipe = {
   /** Toca a voz sem ruído da mídia (gerada pelo worker) no lugar do som original. */
   voz_limpa?: boolean;
   transformacao: Transformacao;
+  /** Posição, escala, rotação e opacidade mudando ao longo do clipe (lib/projeto/keyframes.ts). */
+  keyframes?: Keyframes | null;
   recorte: Recorte;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */
   animacao?: Animacoes | null;

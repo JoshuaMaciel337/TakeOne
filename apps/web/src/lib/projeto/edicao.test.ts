@@ -20,6 +20,7 @@ import {
   importarLegendas,
   moverClipe,
   mudarCor,
+  mudarKeyframe,
   mudarFundo,
   mudarTexto,
   normalizarRotacao,
@@ -29,6 +30,7 @@ import {
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
+import { transformacaoNoTempo } from "./keyframes.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "./texto.ts";
 import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
@@ -430,4 +432,59 @@ test("remover intervalos corta os clipes e fecha o espaço em todas as faixas", 
     [7.5, 1, "depois"],
   ]);
   assert.throws(() => removerIntervalos(projeto, ctx, [{ inicio: 0, fim: QUADRO / 2 }]), ErroEdicao);
+});
+
+test("keyframes: pôr, mexer no instante, mudar a curva e tirar", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  // Sem keyframes, mexer muda o valor fixo
+  projeto = transformarClipes(projeto, [id], { x: 0.1 }, 2 * S);
+  assert.equal(principal(projeto)[0].transformacao.x, 0.1);
+
+  // Dois pontos em x: em 1 s com o valor atual, em 3 s movido para 0,5
+  projeto = mudarKeyframe(projeto, id, "x", 1 * S, "alternar");
+  projeto = mudarKeyframe(projeto, id, "x", 3 * S, "alternar");
+  projeto = transformarClipes(projeto, [id], { x: 0.5, escala: 0.8 }, 3 * S);
+  let clipe = principal(projeto)[0];
+  assert.deepEqual(clipe.keyframes?.x?.map((k) => [k.t / S, k.valor]), [[1, 0.1], [3, 0.5]]);
+  assert.equal(clipe.transformacao.x, 0.1, "com keyframes, o valor fixo não muda");
+  assert.equal(clipe.transformacao.escala, 0.8, "a escala não tem keyframes: muda o valor fixo");
+  assert.ok(Math.abs(transformacaoNoTempo(clipe, 2 * S).x - 0.3) < 1e-9);
+  // Mexer entre os pontos cria outro, no instante
+  projeto = transformarClipes(projeto, [id], { x: 0 }, 2 * S);
+  assert.deepEqual(principal(projeto)[0].keyframes?.x?.map((k) => [k.t / S, k.valor]), [[1, 0.1], [2, 0], [3, 0.5]]);
+
+  projeto = mudarKeyframe(projeto, id, "x", 2 * S, "suave");
+  assert.equal(principal(projeto)[0].keyframes?.x?.[1].curva, "suave");
+  assert.throws(() => mudarKeyframe(projeto, id, "x", 2.5 * S, "suave"), ErroEdicao);
+
+  // Tirar todos: o clipe fica parado no valor do último ponto tirado
+  for (const t of [1, 2, 3]) projeto = mudarKeyframe(projeto, id, "x", t * S, "alternar");
+  clipe = principal(projeto)[0];
+  assert.equal(clipe.keyframes, null);
+  assert.equal(clipe.transformacao.x, 0.5);
+});
+
+test("keyframes: aparar, dividir e cortar trechos não mudam o movimento na tela", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  projeto = mudarKeyframe(projeto, id, "escala", 2 * S, "alternar");
+  projeto = mudarKeyframe(projeto, id, "escala", 6 * S, "alternar");
+  projeto = transformarClipes(projeto, [id], { escala: 2 }, 6 * S);
+  const antes = (t: number) => transformacaoNoTempo(principal(projeto)[0], t * S).escala;
+  const em4 = antes(4);
+
+  // Dividir em 3 s: a metade da direita continua de onde a esquerda parou
+  const dividido = dividirClipes(projeto, ctx, 3 * S, [id]).projeto;
+  const direita = principal(dividido)[1];
+  assert.ok(Math.abs(transformacaoNoTempo(direita, 4 * S).escala - em4) < 1e-9);
+
+  // Aparar o começo para 1 s: o clipe vai para 0 na principal, e o movimento acompanha o mesmo trecho da mídia
+  const aparado = apararClipe(projeto, ctx, id, "inicio", 1 * S);
+  const clipe = principal(aparado)[0];
+  assert.equal(clipe.inicio, 0);
+  assert.ok(Math.abs(transformacaoNoTempo(clipe, 3 * S).escala - em4) < 1e-9);
+  conferir(aparado);
 });

@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   Captions,
   Copy,
+  Diamond,
   Eye,
   EyeOff,
   Film,
@@ -13,8 +14,8 @@ import {
   Magnet,
   Music,
   Scissors,
-  Type,
   Trash2,
+  Type,
   Volume2,
   VolumeX,
   ZoomIn,
@@ -27,6 +28,7 @@ import { formatarTempo } from "@/lib/formatar";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
+import { PROPRIEDADES_ANIMAVEIS } from "@/lib/projeto/keyframes";
 import { acharClipe, type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -524,6 +526,28 @@ export function LinhaDoTempo({
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                     />
                   ))}
+                  {/* Keyframes do clipe (de qualquer propriedade): clicar leva o cursor até o ponto */}
+                  {faixa.clipes.flatMap((clipe) =>
+                    [...new Set(PROPRIEDADES_ANIMAVEIS.flatMap((p) => clipe.keyframes?.[p] ?? []).map((k) => k.t))]
+                      .filter((t) => t >= 0 && t <= clipe.duracao)
+                      .map((t) => (
+                        <button
+                          key={`k-${clipe.id}-${t}`}
+                          type="button"
+                          title="Keyframe"
+                          aria-label="Ir para o keyframe"
+                          onPointerDown={(evento) => evento.stopPropagation()}
+                          onClick={() => {
+                            aoSelecionar([clipe.id]);
+                            aoBuscar(clipe.inicio + t);
+                          }}
+                          className="absolute bottom-0.5 z-10 grid size-3 -translate-x-1/2 place-items-center text-white drop-shadow"
+                          style={{ left: px(clipe.inicio + t) }}
+                        >
+                          <Diamond className="size-2.5" fill="currentColor" aria-hidden />
+                        </button>
+                      )),
+                  )}
                   {/* Marca de transição no corte: cobre metade antes e metade depois */}
                   {faixa.tipo === "principal"
                     ? faixa.clipes.map((clipe) =>

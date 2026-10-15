@@ -1,6 +1,6 @@
 "use client";
 
-import { MousePointerClick, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, MousePointerClick, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -8,7 +8,8 @@ import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { LIMITES_TRANSFORMACAO, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Clipe, type Faixa, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
-import { formatarTimecode, type Taxa, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { duracaoDoQuadro, formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { AbaAnimacao } from "./AbaAnimacao";
@@ -55,6 +56,9 @@ type Props = {
   /** O clipe escolhido na linha do tempo; `midia` é a dele. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   taxa: Taxa;
+  /** O instante do cursor: os keyframes do clipe são lidos e gravados nele. */
+  tempo: Tick;
+  aoBuscar: (tempo: Tick) => void;
   /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
   fundo: string;
   /** Mudança provisória enquanto um controle é arrastado; `null` para desistir dela. */
@@ -64,7 +68,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -160,7 +164,15 @@ export function PainelPropriedades({ midia, selecionado, taxa, fundo, aoPrever, 
             </dl>
           </>
         ) : aba === "basico" && selecionado ? (
-          <AbaBasico clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaBasico
+            clipe={selecionado.clipe}
+            faixa={selecionado.faixa}
+            tempo={tempo}
+            taxa={taxa}
+            aoBuscar={aoBuscar}
+            aoPrever={aoPrever}
+            aoExecutar={aoExecutar}
+          />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
@@ -211,17 +223,49 @@ function recorteDasBordas(b: Bordas): Recorte {
 const PERTO = 1e-6;
 
 /** Posição, tamanho, giro, opacidade e recorte do clipe. */
-function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
+type PropsBasico = PropsAba & { tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void };
+
+/** O losango do keyframe: cheio com ponto no instante, vazado com pontos em outros instantes. */
+function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: Keyframe[] | undefined; noInstante: boolean; desativado: boolean; aoClicar: () => void }) {
+  const tem = Boolean(pontos?.length);
+  const titulo = noInstante ? "Tirar o keyframe deste instante" : "Pôr um keyframe neste instante";
+  return (
+    <button
+      type="button"
+      disabled={desativado}
+      aria-pressed={noInstante}
+      aria-label={titulo}
+      title={titulo}
+      onClick={(evento) => {
+        evento.preventDefault();
+        aoClicar();
+      }}
+      className={`grid size-4 place-items-center rounded disabled:opacity-40 ${tem ? "text-destaque" : "text-suave hover:text-texto"}`}
+    >
+      <Diamond className="size-3" fill={noInstante ? "currentColor" : "none"} aria-hidden />
+    </button>
+  );
+}
+
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, aoPrever, aoExecutar }: PropsBasico) {
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
-  const t = clipe.transformacao;
+  // Os valores do instante do cursor: com keyframes, mexer grava um ponto ali
+  const t = transformacaoNoTempo(clipe, tempo);
   const travada = faixa.travada;
   const ids = [clipe.id];
+  const dentro = tempo >= clipe.inicio && tempo <= clipe.inicio + clipe.duracao;
+  const meioQuadro = duracaoDoQuadro(taxa) / 2;
+  const noClipe = tempo - clipe.inicio;
+  const pontosDoClipe = PROPRIEDADES_ANIMAVEIS.flatMap((p) => clipe.keyframes?.[p] ?? []).filter((p) => p.t >= 0 && p.t <= clipe.duracao);
+  const anterior = Math.max(...pontosDoClipe.map((p) => p.t).filter((x) => x < noClipe - meioQuadro));
+  const seguinte = Math.min(...pontosDoClipe.map((p) => p.t).filter((x) => x > noClipe + meioQuadro));
+  const noInstante = PROPRIEDADES_ANIMAVEIS.filter((p) => keyframeEm(clipe.keyframes?.[p], noClipe, meioQuadro));
 
-  const transformar = (mudanca: Partial<Transformacao>): Comando => ({ comando: "clipe.transformar", parametros: { clipeIds: ids, transformacao: mudanca } });
+  const transformar = (mudanca: Partial<Transformacao>): Comando => ({ comando: "clipe.transformar", parametros: { clipeIds: ids, transformacao: mudanca, tempo } });
   /** `fator` converte o valor guardado no que aparece (0,5 → 50%). */
-  const controleDeTransformacao = (chave: keyof Transformacao, fator: number) => ({
+  const controleDeTransformacao = (chave: PropriedadeAnimavel, fator: number) => ({
     valor: t[chave] * fator,
     desativado: travada,
     aoPrever: (valor: number) => aoPrever(transformar({ [chave]: valor / fator })),
@@ -229,7 +273,16 @@ function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
       if (Math.abs(valor / fator - t[chave]) < PERTO) aoPrever(null);
       else aoExecutar(transformar({ [chave]: valor / fator }));
     },
+    acao: (
+      <BotaoKeyframe
+        pontos={clipe.keyframes?.[chave] ?? undefined}
+        noInstante={noInstante.includes(chave)}
+        desativado={travada || !dentro}
+        aoClicar={() => aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade: chave, tempo, acao: "alternar" } })}
+      />
+    ),
   });
+  const curvaAtual = noInstante.map((p) => keyframeEm(clipe.keyframes?.[p], noClipe, meioQuadro)?.curva)[0];
 
   const bordas = bordasDoRecorte(clipe.recorte);
   const recortar = (borda: keyof Bordas, valor: number): Comando => ({
@@ -304,6 +357,51 @@ function AbaBasico({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
         />
         <ControleNumerico rotulo="Giro" minimo={-180} maximo={180} passo={0.5} sufixo="°" {...controleDeTransformacao("rotacao", 1)} />
         <ControleNumerico rotulo="Opacidade" minimo={opacidade.minimo * 100} maximo={opacidade.maximo * 100} sufixo="%" {...controleDeTransformacao("opacidade", 100)} />
+        {pontosDoClipe.length ? (
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
+            <button
+              type="button"
+              className="botao-icone size-6"
+              disabled={!Number.isFinite(anterior)}
+              onClick={() => aoBuscar(clipe.inicio + anterior)}
+              aria-label="Keyframe anterior"
+              title="Keyframe anterior"
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="botao-icone size-6"
+              disabled={!Number.isFinite(seguinte)}
+              onClick={() => aoBuscar(clipe.inicio + seguinte)}
+              aria-label="Keyframe seguinte"
+              title="Keyframe seguinte"
+            >
+              <ChevronRight className="size-3.5" aria-hidden />
+            </button>
+            {curvaAtual ? (
+              <label className="ml-auto flex items-center gap-1">
+                Até o próximo
+                <select
+                  value={curvaAtual}
+                  disabled={travada}
+                  onChange={(evento) => {
+                    const acao = evento.currentTarget.value as "linear" | "suave";
+                    for (const propriedade of noInstante) {
+                      aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade, tempo, acao } });
+                    }
+                  }}
+                  className="rounded-md border border-borda bg-painel-2 px-1 py-0.5 text-[11px] text-texto outline-none focus:border-destaque"
+                >
+                  <option value="linear">Linear</option>
+                  <option value="suave">Suave</option>
+                </select>
+              </label>
+            ) : (
+              <span className="ml-auto">{pontosDoClipe.length} keyframes</span>
+            )}
+          </div>
+        ) : null}
       </Secao>
       {clipe.texto ? null : (
         <Secao titulo="Recorte">
