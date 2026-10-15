@@ -7,13 +7,13 @@ import { type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, type Guias, type T
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
-import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, tabelaDasCurvas } from "@/lib/projeto/cor";
+import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, somarAjustes, tabelaDasCurvas } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
-import { brilhoDoEfeito, desfoqueDoEfeito, distorcaoDoEfeito } from "@/lib/projeto/efeitos";
+import { ajustesDoEfeito, brilhoDoEfeito, desfoqueDoEfeito, desvioDeCor, distorcaoDoEfeito, linhasDoEfeito } from "@/lib/projeto/efeitos";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
-import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
@@ -130,6 +130,8 @@ type CamadaNaTela = {
   mascara?: Cortes;
   /** Sigma do desfoque, em frações da altura do clipe. */
   desfoque?: number;
+  /** VHS e glitch: o desvio do vermelho e do azul neste quadro, em frações da largura. */
+  desvio?: number;
   /** A tabela das curvas de cor; null sem curvas. */
   curvas?: Uint8Array | null;
 };
@@ -145,8 +147,14 @@ type EstadoDoDesenho = {
 
 /** Os ajustes que o shader aplica, ou null quando a cor é a original. */
 function corDoClipe(clipe: Clipe): AjustesCor | null {
-  const ajustes = ajustesEfetivos(clipe.cor);
+  // O efeito (VHS) soma aos ajustes de cor do clipe, como no render
+  const ajustes = somarAjustes(ajustesEfetivos(clipe.cor), ajustesDoEfeito(clipe.efeito));
   return corNeutra(ajustes) ? null : ajustes;
+}
+
+/** O quadro desde o começo do clipe, na taxa do projeto (o glitch muda de quadro em quadro). */
+function quadroDoClipe(clipe: Clipe, tempo: Tick, taxa: Taxa): number {
+  return Math.floor(((tempo - clipe.inicio) * taxa.num) / (taxa.den * TICKS_POR_SEGUNDO) + 1e-6);
 }
 
 /** As tabelas das curvas, guardadas pelas curvas (a mesma para todo quadro do clipe). */
@@ -209,6 +217,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, tamanho),
       cor: corDoClipe(clipe),
       curvas: tabelaDoClipe(clipe),
+      desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
@@ -234,7 +243,17 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     const caixaBase = caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, tamanho);
     // Letra a letra: só o trecho que já apareceu
     const trecho = imagem.layout && temLetraALetra(clipe.animacao) ? trechoVisivel(clipe, imagem.layout, tempo) : null;
-    const comum = { clipe, faixa, recorte: clipe.recorte, caixa, caixaBase, cor: corDoClipe(clipe), curvas: tabelaDoClipe(clipe), segundos: 0 };
+    const comum = {
+      clipe,
+      faixa,
+      recorte: clipe.recorte,
+      caixa,
+      caixaBase,
+      cor: corDoClipe(clipe),
+      curvas: tabelaDoClipe(clipe),
+      desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
+      segundos: 0,
+    };
     camadas.push({ ...comum, chave: `texto:${clipe.id}`, imagem: imagem.bitmap, mascara: trecho ? cortesDoTrecho(imagem.layout!, trecho) : undefined });
     // O destaque: a mesma caixa, com a imagem na outra cor, só no trecho da palavra falada
     const destaque = clipe.texto?.destaque ? imagensDeTexto.get(`${clipe.id}:destaque`) : undefined;
@@ -277,6 +296,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           mesclagem: camada.clipe.mesclagem,
           brilho: brilhoDoEfeito(camada.clipe.efeito),
           lente: distorcaoDoEfeito(camada.clipe.efeito),
+          desvio: camada.desvio,
+          linhas: linhasDoEfeito(camada.clipe.efeito),
         });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele

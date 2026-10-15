@@ -26,6 +26,7 @@ from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
 from core.utils import storage
 from core.utils.cor import desenhar_vinheta, gerar_cube
+from core.utils.efeitos import LINHAS_POR_ALTURA
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
@@ -174,7 +175,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
             elif auxiliar.tipo == "reverb":
                 Path(auxiliar.caminho).write_bytes(wav_do_reverb())
             else:
-                desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"]).save(auxiliar.caminho)
+                desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"],
+                                 auxiliar.ajustes.get("linhas", 0), LINHAS_POR_ALTURA).save(auxiliar.caminho)
         if plano.tem_som:
             ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 12), "Misturando o som"), rotulo)
             plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho)

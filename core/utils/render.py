@@ -25,8 +25,17 @@ from functools import lru_cache
 
 from core.config import FFMPEG
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
-from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut
-from core.utils.efeitos import BRILHO_SIGMA, brilho_do_efeito, desfoque_do_efeito, distorcao_do_efeito
+from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
+from core.utils.efeitos import (
+    BRILHO_SIGMA,
+    ajustes_do_efeito,
+    brilho_do_efeito,
+    desfoque_do_efeito,
+    desvio_de_cor,
+    distorcao_do_efeito,
+    efeito_do_clipe,
+    linhas_do_efeito,
+)
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
@@ -360,6 +369,33 @@ def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alv
     return _filtros_do_gblur(gblur, maior, bool(clipe.get("texto"))), "\n".join(linhas) + "\n"
 
 
+def _cores_separadas(clipe: dict, leitura: Leitura | None, largura: int, fps: float, alvo: str,
+                     roteiro: str) -> tuple[list[str], str | None]:
+    """
+    (filtros, roteiro) do vermelho e do azul separados (VHS e glitch): o rgbashift anda em pixels
+    inteiros da largura do clipe; no glitch, o roteiro muda o desvio nos quadros em que ele salta.
+    """
+    if not efeito_do_clipe(clipe) or clipe["efeito"]["tipo"] not in ("vhs", "glitch"):
+        return [], None
+    inicio_clipe = segundos(clipe["inicio"])
+    inicio = leitura.inicio if leitura else inicio_clipe
+    fim = leitura.fim if leitura else segundos(clipe["inicio"] + clipe["duracao"])
+    desvios = []
+    for n in range(round((fim - inicio) * fps) + 1):
+        quadro = math.floor((inicio + n / fps - inicio_clipe) * fps + 1e-6)
+        desvios.append(round(desvio_de_cor(clipe, quadro) * largura))
+    if len(set(desvios)) == 1:
+        desvio = desvios[0]
+        return ([f"rgbashift=rh={desvio}:bh={-desvio}:edge=smear"] if desvio else []), None
+    linhas, anterior = [], None
+    for n, desvio in enumerate(desvios):
+        if desvio != anterior:
+            linhas.append(f"{n / fps:.6f} rgbashift@{alvo} rh {desvio}, rgbashift@{alvo} bh {-desvio};")
+            anterior = desvio
+    return ([f"sendcmd=f='{_escapar_caminho(roteiro)}'", f"rgbashift@{alvo}=rh=0:bh=0:edge=smear"],
+            "\n".join(linhas) + "\n")
+
+
 def _filtros_do_gblur(gblur: str, maior: float, transparente: bool) -> list[str]:
     """
     O gblur com bordas repetidas antes (pad + fillborders) e cortadas depois, como o CLAMP_TO_EDGE
@@ -571,18 +607,22 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 continue
             midia_tamanho = (midia.largura, midia.altura)
             caixa = caixa_do_clipe(base_do_render(clipe), clipe["recorte"], midia_tamanho, quadro)
-        ajustes = ajustes_efetivos(clipe.get("cor"))
+        # O efeito (VHS) soma aos ajustes de cor do clipe
+        ajustes = somar_ajustes(ajustes_efetivos(clipe.get("cor")), ajustes_do_efeito(clipe))
         curvas = (clipe.get("cor") or {}).get("curvas")
+        linhas_vhs = linhas_do_efeito(clipe)
         lut = vinheta = None
         if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas):
             # As curvas entram na mesma LUT, depois dos ajustes
             com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas}
             lut = f"{pasta}/{nome_da_lut(com_curvas)}"
             auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
-        if ajustes["vinheta"] > 0:
+        if ajustes["vinheta"] > 0 or linhas_vhs > 0:
+            # As linhas do VHS entram na mesma imagem multiplicada da vinheta
             imagem_vinheta = f"{pasta}/vinheta_{clipe['id']}.png"
             tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))
-            auxiliares[imagem_vinheta] = ArquivoAuxiliar(imagem_vinheta, "vinheta", ajustes, *tamanho)
+            auxiliares[imagem_vinheta] = ArquivoAuxiliar(imagem_vinheta, "vinheta", {**ajustes, "linhas": linhas_vhs},
+                                                         *tamanho)
             vinheta = len(entradas)
             leitura = leituras.get(clipe["id"])
             janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
@@ -614,6 +654,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                                float(taxa_em_fracao(taxa)), f"d{numero}", caminho_desfoque)
         if roteiro_desfoque:
             auxiliares[caminho_desfoque] = ArquivoAuxiliar(caminho_desfoque, "comandos", {}, conteudo=roteiro_desfoque)
+        caminho_cores = f"{pasta}/cores_{clipe['id']}_{numero}.txt"
+        cores, roteiro_cores = _cores_separadas(clipe, leituras.get(clipe["id"]), max(1, round(caixa.largura)),
+                                                float(taxa_em_fracao(taxa)), f"g{numero}", caminho_cores)
+        if roteiro_cores:
+            auxiliares[caminho_cores] = ArquivoAuxiliar(caminho_cores, "comandos", {}, conteudo=roteiro_cores)
+        desfoque += cores
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara, desfoque)
         linhas.append(f"{cadeia}[c{numero}]")

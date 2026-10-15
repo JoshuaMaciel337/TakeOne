@@ -421,8 +421,8 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] brilho
   - [x] tremor e zoom (pelos loops de animação: tremer e pulsar)
   - luz
-  - glitch
-  - VHS
+  - [x] glitch
+  - [x] VHS
   - [x] distorções (olho de peixe)
   - [x] modos de mesclagem: multiplicar, tela e somar
 - Chroma key (tela verde), com o `keying` do EffectCraft.

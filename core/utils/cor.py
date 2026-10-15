@@ -63,6 +63,11 @@ def ajustes_efetivos(cor: dict | None) -> dict:
     return efetivos
 
 
+def somar_ajustes(ajustes: dict, mais: dict) -> dict:
+    """Os ajustes com outros somados (os de um efeito), dentro dos limites."""
+    return {chave: _limitar(valor + mais.get(chave, 0), *LIMITES[chave]) for chave, valor in ajustes.items()}
+
+
 def cor_neutra(ajustes: dict) -> bool:
     return all(chave in MATIZES or abs(ajustes[chave]) < 1e-9 for chave in AJUSTES_NEUTROS)
 
@@ -143,13 +148,20 @@ def escurecimento_da_vinheta(u: float, v: float, vinheta: float) -> float:
     return vinheta * _suave(0.3, 1, distancia)
 
 
-def desenhar_vinheta(largura: int, altura: int, vinheta: float) -> Image.Image:
-    """Cinza (1 - escurecimento), opaco, do tamanho do clipe no quadro (medido no centro de cada pixel)."""
+def desenhar_vinheta(largura: int, altura: int, vinheta: float, linhas: float = 0, faixas: int = 270) -> Image.Image:
+    """
+    Cinza (1 - escurecimento), opaco, do tamanho do clipe no quadro (medido no centro de cada pixel).
+    linhas: as linhas do VHS, que escurecem uma faixa sim, outra não (`faixas` na altura do clipe).
+    """
     u = (np.arange(largura) + 0.5) / largura
     v = (np.arange(altura) + 0.5) / altura
     distancia = np.hypot((u[None, :] - 0.5) * 2, (v[:, None] - 0.5) * 2) / math.sqrt(2)
     t = np.clip((distancia - 0.3) / 0.7, 0, 1)
-    cinza = np.round(255 * (1 - vinheta * t * t * (3 - 2 * t))).astype(np.uint8)
+    fator = 1 - vinheta * t * t * (3 - 2 * t)
+    if linhas > 0:
+        impar = (np.floor(v * faixas) % 2 == 1)[:, None]
+        fator = fator * np.where(impar, 1 - linhas, 1.0)
+    cinza = np.round(255 * fator).astype(np.uint8)
     rgba = np.full((altura, largura, 4), 255, dtype=np.uint8)
     rgba[..., 0] = rgba[..., 1] = rgba[..., 2] = cinza
     return Image.fromarray(rgba, mode="RGBA")

@@ -121,6 +121,15 @@ export function ajustesEfetivos(cor: Cor | null | undefined): AjustesCor {
   return resultado;
 }
 
+/** Os ajustes com outros somados (os de um efeito), dentro dos limites. */
+export function somarAjustes(ajustes: AjustesCor, mais: Partial<AjustesCor>): AjustesCor {
+  const resultado = { ...ajustes };
+  for (const chave of Object.keys(mais) as (keyof AjustesCor)[]) {
+    resultado[chave] = limitar(ajustes[chave] + (mais[chave] ?? 0), LIMITES_COR[chave].minimo, LIMITES_COR[chave].maximo);
+  }
+  return resultado;
+}
+
 export function corNeutra(ajustes: AjustesCor): boolean {
   return (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).every((chave) => MATIZES.has(chave) || Math.abs(ajustes[chave]) < 1e-9);
 }

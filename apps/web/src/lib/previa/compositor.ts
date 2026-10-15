@@ -6,7 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
-import { BRILHO_SIGMA } from "../projeto/efeitos.ts";
+import { BRILHO_SIGMA, LINHAS_POR_ALTURA } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
 import type { Mesclagem, Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -33,6 +33,10 @@ export type Camada = {
   brilho?: number;
   /** Efeito olho de peixe: o k1 da lente. */
   lente?: number;
+  /** VHS e glitch: quanto o vermelho anda para a direita (e o azul para a esquerda), em frações da largura. */
+  desvio?: number;
+  /** VHS: quanto as linhas escuras escurecem. */
+  linhas?: number;
 };
 
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
@@ -133,6 +137,11 @@ uniform sampler2D u_desfocada;
 uniform float u_lente;
 uniform vec2 u_tamanho;
 uniform vec4 u_recorte;
+// VHS e glitch: o vermelho e o azul lidos deslocados (como o rgbashift, com a borda repetida)
+uniform float u_desvio;
+// VHS: as faixas ímpares (de LINHAS_POR_ALTURA na altura do clipe) escurecem
+uniform float u_linhas;
+const float LINHAS = ${LINHAS_POR_ALTURA.toFixed(1)};
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -177,11 +186,18 @@ void main() {
     uv = u_recorte.xy + p * u_recorte.zw;
   }
   vec4 texel = texture(u_textura, uv);
+  if (u_desvio != 0.0) {
+    vec2 d = vec2(u_desvio * u_recorte.z, 0.0);
+    vec2 minimo = u_recorte.xy;
+    vec2 maximo = u_recorte.xy + u_recorte.zw;
+    texel.r = texture(u_textura, clamp(uv - d, minimo, maximo)).r;
+    texel.b = texture(u_textura, clamp(uv + d, minimo, maximo)).b;
+  }
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
     texel = texel + luz - texel * luz;
   }
-  if ((u_comCor || u_comCurvas) && texel.a > 0.0) {
+  if ((u_comCor || u_comCurvas || u_linhas > 0.0) && texel.a > 0.0) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas) e depois a vinheta
     vec3 c = texel.rgb / texel.a;
@@ -194,6 +210,7 @@ void main() {
       float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
       c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
     }
+    if (u_linhas > 0.0 && mod(floor(v_local.y * LINHAS), 2.0) >= 1.0) c *= 1.0 - u_linhas;
     texel = vec4(c * texel.a, texel.a);
   }
   cor = texel * u_opacidade;
@@ -233,7 +250,7 @@ type Recursos = {
   /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
   tabelas: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -323,6 +340,8 @@ export class Compositor {
         brilho: local("u_brilho"),
         desfocada: local("u_desfocada"),
         lente: local("u_lente"),
+        desvio: local("u_desvio"),
+        linhas: local("u_linhas"),
         curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
@@ -468,6 +487,8 @@ export class Compositor {
         gl.bindTexture(gl.TEXTURE_2D, atual);
       }
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
+      gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
+      gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
       gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
       gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
