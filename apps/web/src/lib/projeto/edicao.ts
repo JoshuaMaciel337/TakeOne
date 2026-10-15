@@ -386,11 +386,15 @@ export function apagarClipes(projeto: Projeto, clipeIds: string[], fecharEspaco 
 
 export type Intervalo = { inicio: Tick; fim: Tick };
 
-/** Os intervalos no quadro, em ordem e sem sobreposição; os menores que um quadro somem. */
+/**
+ * Os intervalos no quadro, em ordem e sem sobreposição; os menores que um quadro somem. As duas pontas
+ * vão para o começo do quadro: os cortes da fala começam e terminam no começo de uma palavra (ou numa
+ * pausa), e arredondar para a frente deixaria um pedaço da palavra cortada ou comeria o da seguinte.
+ */
 function juntarIntervalos(projeto: Projeto, intervalos: Intervalo[]): Intervalo[] {
   const quadro = duracaoDoQuadro(projeto.taxa);
   const alinhados = intervalos
-    .map((item) => ({ inicio: Math.max(0, quadroMaisProximo(projeto.taxa, item.inicio)), fim: quadroMaisProximo(projeto.taxa, item.fim) }))
+    .map((item) => ({ inicio: Math.max(0, ajustarAoQuadro(projeto.taxa, item.inicio)), fim: ajustarAoQuadro(projeto.taxa, item.fim) }))
     .filter((item) => item.fim - item.inicio >= quadro)
     .sort((a, b) => a.inicio - b.inicio);
   const juntos: Intervalo[] = [];

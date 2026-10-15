@@ -65,4 +65,19 @@ test("retake: a frase começada e abandonada sai, até o começo da versão boa"
   const repetida = new Map([["m", [...fala("Olha só isso.", 0), ...fala("Olha só isso.", 1.5), ...fala("Pronto.", 3)]]]);
   assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 5)], repetida, opcoes).map((t) => [t.tipo, t.inicio / S, t.fim / S]), [["retake", 0, 1.5]],
     "a mesma frase dita duas vezes: fica a segunda");
+
+  // Sem ponto entre as tentativas: a repetição fica no meio da mesma frase, depois de uma pausa curta (0,4 s, como na transcrição real)
+  const noMeio = new Map([["m", [...fala("Essa ferramenta edita", 0), ...fala("Essa ferramenta edita vídeos sozinhos.", 1.5)]]]);
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 5)], noMeio, opcoes).map((t) => [t.tipo, t.inicio / S, t.fim / S, t.texto]),
+    [["retake", 0, 1.5, "Essa ferramenta edita"]]);
+  // Uma palavra só repetida ("muito, muito") não é retake
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 5)], new Map([["m", fala("Ficou muito muito bom.", 0)]]), opcoes), []);
+});
+
+test("retake: pares comuns repetidos na fala não contam, só o recomeço depois de uma pausa", () => {
+  const fala = (texto: string, inicio: number) => texto.split(" ").map((w, i) => p(w, inicio + i * 0.4, inicio + i * 0.4 + 0.3));
+  // "do editor" aparece duas vezes, mas a segunda não é um recomeço: segue a frase sem pausa
+  const palavras = new Map([["m", fala("Abra o painel do editor e use as funções do editor com calma.", 0)]]);
+  const opcoes = { ...OPCOES_DE_LIMPEZA, pausas: false, vicios: false };
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 10)], palavras, opcoes), []);
 });

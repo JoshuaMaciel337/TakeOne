@@ -24,12 +24,16 @@ export type OpcoesDeLimpeza = {
 
 export const OPCOES_DE_LIMPEZA: OpcoesDeLimpeza = { pausas: true, vicios: true, retakes: true, pausaMinima: 0.7, folga: 0.15 };
 
-/** Uma frase acaba no ponto final (ou ! ? …) ou numa pausa maior que esta, em segundos. */
-const PAUSA_ENTRE_FRASES = 0.5;
-/** O retake vem até este tempo depois da tentativa abandonada, em segundos. */
+/** Uma tentativa abandonada tem no máximo tantas palavras e começa até tanto tempo antes do retake. */
+const PALAVRAS_DA_TENTATIVA = 20;
 const DISTANCIA_DO_RETAKE = 15;
-/** Quantas palavras do começo as duas frases precisam ter iguais (ou a frase inteira, se for menor). */
-const PALAVRAS_IGUAIS = 3;
+/** Quantas palavras seguidas a versão boa precisa repetir da tentativa. */
+const PALAVRAS_IGUAIS = 2;
+const FIM_DE_FRASE = /[.!?…]["»”)]?$/;
+const PONTUACAO = /[,;:.!?…]["»”)]?$/;
+/** Pausa (segundos) que marca o começo de uma frase e o recomeço da fala. */
+const PAUSA_DE_FRASE = 0.3;
+const PAUSA_DO_RECOMECO = 0.25;
 
 /** Hesitações, com as letras repetidas que a transcrição escreve ("ahnn", "éééh", "hummm"). */
 const VICIO = /^(a+h+n*|a+n+|ã+h*|h+ã+|h+u+m+|h+m+|u+h+m*|e+h+|é{2,}h*|a+h+m+|m+h*m+)$/;
@@ -43,48 +47,34 @@ export function ehVicio(texto: string): boolean {
   return VICIO.test(normalizar(texto));
 }
 
-/** As frases da fala de um clipe: quebram no fim de frase ou numa pausa. */
-function frases(palavras: PalavraNoTempo[]): PalavraNoTempo[][] {
-  const resultado: PalavraNoTempo[][] = [];
-  let atual: PalavraNoTempo[] = [];
-  for (const palavra of palavras) {
-    const anterior = atual.at(-1);
-    if (anterior && (palavra.inicio - anterior.fim) / TICKS_POR_SEGUNDO > PAUSA_ENTRE_FRASES) {
-      resultado.push(atual);
-      atual = [];
-    }
-    atual.push(palavra);
-    if (/[.!?…]["»”)]?$/.test(palavra.texto)) {
-      resultado.push(atual);
-      atual = [];
-    }
-  }
-  if (atual.length) resultado.push(atual);
-  return resultado;
-}
-
 /**
- * Retake: a tentativa começa igual à versão boa (as primeiras palavras, ou ela inteira se for curta) e
- * é mais curta, ou as duas frases são idênticas (a mesma frase dita duas vezes, fica a segunda).
+ * Os retakes de um clipe: a pessoa começa, para e diz de novo. A versão boa começa repetindo as
+ * palavras da tentativa (pelo menos duas). Conta como retake quando a tentativa é repetida inteira
+ * ("Olha só isso. Olha só isso.") ou quando ela foi abandonada no meio, sem fim de frase ("Hoje eu
+ * vou… Hoje eu vou mostrar"). "Eu quero isso. Eu quero aquilo." não é: a primeira frase terminou.
+ * A tentativa começa num início de frase (depois de um ponto ou de uma pausa) e a versão boa
+ * recomeça depois de uma pausa ou de uma pontuação; sem isso, pares comuns que se repetem na fala
+ * ("do Premiere... funções do Premiere") viravam retake. O corte vai da primeira palavra da
+ * tentativa até a primeira da versão boa.
  */
-function ehRetake(tentativa: PalavraNoTempo[], boa: PalavraNoTempo[]): boolean {
-  const texto = (frase: PalavraNoTempo[]) => frase.map((p) => normalizar(p.texto)).join(" ");
-  if (tentativa.length === boa.length && tentativa.length >= 2) return texto(tentativa) === texto(boa);
-  if (tentativa.length > boa.length) return false;
-  const quantas = Math.min(PALAVRAS_IGUAIS, tentativa.length);
-  if (quantas < 2) return false;
-  for (let i = 0; i < quantas; i++) if (normalizar(tentativa[i].texto) !== normalizar(boa[i].texto)) return false;
-  return true;
-}
-
-/** Os retakes de um clipe: da primeira palavra da tentativa até a primeira da versão boa. */
 function retakes(palavras: PalavraNoTempo[]): Trecho[] {
-  const lista = frases(palavras.filter((p) => !ehVicio(p.texto)));
+  const lista = palavras.filter((p) => !ehVicio(p.texto));
+  const normais = lista.map((p) => normalizar(p.texto));
   const trechos: Trecho[] = [];
+  const pausaAntes = (k: number) => (k === 0 ? Number.POSITIVE_INFINITY : (lista[k].inicio - lista[k - 1].fim) / TICKS_POR_SEGUNDO);
+  const comecaFrase = (k: number) => k === 0 || FIM_DE_FRASE.test(lista[k - 1].texto) || pausaAntes(k) >= PAUSA_DE_FRASE;
+  const recomeca = (k: number) => PONTUACAO.test(lista[k - 1].texto) || pausaAntes(k) >= PAUSA_DO_RECOMECO;
   for (let i = 0; i < lista.length; i++) {
-    for (let j = i + 1; j < lista.length && (lista[j][0].inicio - lista[i][0].inicio) / TICKS_POR_SEGUNDO <= DISTANCIA_DO_RETAKE; j++) {
-      if (!ehRetake(lista[i], lista[j])) continue;
-      trechos.push({ tipo: "retake", inicio: lista[i][0].inicio, fim: lista[j][0].inicio, texto: lista.slice(i, j).flat().map((p) => p.texto).join(" ") });
+    if (!comecaFrase(i)) continue;
+    for (let j = i + 1; j < lista.length && j - i <= PALAVRAS_DA_TENTATIVA; j++) {
+      if ((lista[j].inicio - lista[i].inicio) / TICKS_POR_SEGUNDO > DISTANCIA_DO_RETAKE) break;
+      let iguais = 0;
+      while (j + iguais < lista.length && i + iguais < j && normais[i + iguais] === normais[j + iguais]) iguais++;
+      if (iguais < PALAVRAS_IGUAIS || !recomeca(j)) continue;
+      const inteira = iguais === j - i;
+      const abandonada = !FIM_DE_FRASE.test(lista[j - 1].texto);
+      if (!inteira && !abandonada) continue;
+      trechos.push({ tipo: "retake", inicio: lista[i].inicio, fim: lista[j].inicio, texto: lista.slice(i, j).map((p) => p.texto).join(" ") });
       i = j - 1;
       break;
     }
