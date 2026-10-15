@@ -236,6 +236,26 @@ def test_loop_vira_seno_no_giro_no_zoom_e_na_posicao():
     assert "-0.02*sin(2*PI*1*((t-0)/2))" in plano.filtro
 
 
+def test_letra_a_letra_e_destaque_viram_caixas_transparentes_por_roteiro():
+    layout = {"n": 2, "palavras": [[0, 2]], "linhas": [{"y0": 0, "y1": 1, "xs": [0, 0.5, 1]}]}
+    legenda = {"id": "t1", "midia_id": None, "inicio": S, "duracao": 2 * S, "entrada": 0, "velocidade": 1, "volume": 1,
+               **PADRAO, "texto": {"conteudo": "Oi", "destaque": {"modo": "karaoke", "cor": "#ffd400"}, "tempos": [0]},
+               "animacao": {"entrada": {"tipo": "letras", "duracao": S}, "saida": {"tipo": "nenhuma", "duracao": 0}}}
+    imagem = ImagemDoTexto("/tmp/t1.png", 540, 120, layout=layout, destaque="/tmp/t1_destaque.png")
+    plano = planejar_render(projeto([faixa("legenda", [legenda]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 720, 1280, {"t1": imagem}, pasta="/trabalho")
+    # O texto e o destaque entram como imagens, um por cima do outro, cada um com a sua máscara
+    assert [e.caminho for e in plano.entradas if e.imagem] == ["/tmp/t1.png", "/tmp/t1_destaque.png"]
+    roteiros = sorted(a.caminho for a in plano.auxiliares if a.tipo == "comandos")
+    assert roteiros == ["/trabalho/letras_t1.txt", "/trabalho/letras_t1_destaque.txt"]
+    caixa = "drawbox@m2c0=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1"
+    assert f"sendcmd=f='/trabalho/letras_t1.txt',{caixa}" in plano.filtro
+    assert "drawbox@m3c3" in plano.filtro and "[base2][c3]overlay" in plano.filtro
+    # Letra a letra: no começo some tudo; na metade da entrada, só a segunda letra
+    letras = next(a.conteudo for a in plano.auxiliares if a.caminho.endswith("letras_t1.txt")).splitlines()
+    assert letras[0].startswith("0.000000 ") and letras[1].startswith("0.500000 ")
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

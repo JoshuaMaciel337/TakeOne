@@ -28,6 +28,7 @@ from core.utils import storage
 from core.utils.cor import desenhar_vinheta, gerar_cube
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
+from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
 from core.utils.mongo import agora
 from core.utils.render import (
     ErroRender,
@@ -40,7 +41,7 @@ from core.utils.render import (
     ler_loudness,
     planejar_render,
 )
-from core.utils.texto import desenhar_texto
+from core.utils.texto import desenhar_texto, layout_do_texto
 
 ARQUIVO_FILTRO = "filtro.txt"
 ARQUIVO_PARCIAL = "video.parcial.mp4"
@@ -97,9 +98,18 @@ def preparar_textos(faixas: list[dict], largura: int, altura: int, pasta: Path) 
             if not clipe.get("texto"):
                 continue
             referencia = desenhar_texto(clipe["texto"], LADO_REFERENCIA_TEXTO).size
+            lado = min(largura, altura)
             caminho = pasta / f"texto_{clipe['id']}.png"
-            desenhar_texto(clipe["texto"], min(largura, altura)).save(caminho, format="PNG")
-            textos[clipe["id"]] = ImagemDoTexto(str(caminho), *referencia)
+            desenhar_texto(clipe["texto"], lado).save(caminho, format="PNG")
+            # Letra a letra e destaque: onde cada letra fica no PNG, e o PNG na cor do destaque
+            layout = destaque = None
+            if tem_letra_a_letra(clipe) or tem_destaque(clipe):
+                layout = layout_do_texto(clipe["texto"], lado)
+            if tem_destaque(clipe):
+                destaque = pasta / f"texto_{clipe['id']}_destaque.png"
+                desenhar_texto(texto_do_destaque(clipe["texto"]), lado).save(destaque, format="PNG")
+            textos[clipe["id"]] = ImagemDoTexto(str(caminho), *referencia, layout=layout,
+                                                destaque=str(destaque) if destaque else None)
     return textos
 
 

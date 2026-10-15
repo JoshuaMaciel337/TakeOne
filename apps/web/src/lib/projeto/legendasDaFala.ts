@@ -65,7 +65,7 @@ export function legendasDaFala(clipes: Clipe[], palavras: Map<string, Palavra[]>
       const conteudo = (quebrarEmLinhas(textos, opcoes.maxCaracteres, opcoes.maxLinhas) ?? [textos.join(" ")]).join("\n");
       const inicio = linha[0].inicio;
       const fim = linha[linha.length - 1].fim;
-      if (fim > inicio) legendas.push({ inicio, fim, conteudo });
+      if (fim > inicio) legendas.push({ inicio, fim, conteudo, tempos: linha.map((p) => p.inicio) });
       linha = [];
     };
     for (const palavra of doClipe) {

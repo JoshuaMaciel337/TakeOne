@@ -47,7 +47,7 @@ export function AbaAnimacao({ clipe, faixa, aoPrever, aoExecutar }: Props) {
       <section key={nome} className="border-b border-borda/60 pb-2 pt-3 first:pt-0 last:border-0">
         <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-suave">{titulo}</h3>
         <div className="grid grid-cols-3 gap-1.5">
-          {TIPOS_ANIMACAO.map((tipo) => (
+          {TIPOS_ANIMACAO.filter((tipo) => clipe.texto || (tipo.id !== "letras" && tipo.id !== "palavras")).map((tipo) => (
             <button
               key={tipo.id}
               type="button"

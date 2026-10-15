@@ -320,8 +320,9 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       inicio: clipe.inicio + delta,
       duracao: clipe.duracao - delta,
       entrada: Math.max(0, clipe.entrada + Math.round(delta * clipe.velocidade)),
-      // Os keyframes ficam no mesmo instante da linha do tempo
+      // Os keyframes e as palavras da legenda ficam no mesmo instante da linha do tempo
       keyframes: deslocarKeyframes(clipe.keyframes, delta),
+      texto: deslocarTempos(clipe.texto, delta),
     };
   }
 
@@ -360,6 +361,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         // O fade e a animação de entrada ficam com a metade da esquerda; os de saída, com a da direita
         fade_entrada: 0,
         keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
+        texto: deslocarTempos(clipe.texto, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
       const esquerda = { ...clipe, duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
@@ -467,9 +469,10 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 fade_entrada: primeiro ? clipe.fade_entrada : 0,
                 fade_saida: ultimo ? clipe.fade_saida : 0,
                 keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
+                texto: deslocarTempos(clipe.texto, pedaco.inicio - clipe.inicio),
                 transicao: ultimo ? clipe.transicao : null,
                 animacao: clipe.animacao
-                  ? { entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
+                  ? { ...clipe.animacao, entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
                   : clipe.animacao,
               },
         );
@@ -731,7 +734,9 @@ export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Lege
     const inicio = Math.max(quadroMaisProximo(projeto.taxa, legenda.inicio), fimAnterior);
     const fim = quadroMaisProximo(projeto.taxa, legenda.fim);
     if (fim - inicio < quadro) continue;
-    clipes.push(clipeDeTexto(ctx, inicio, fim - inicio, { ...estilo, conteudo: legenda.conteudo }, POSICAO_LEGENDA));
+    // Os tempos das palavras passam a contar do começo do clipe
+    const tempos = legenda.tempos?.map((t) => t - inicio) ?? null;
+    clipes.push(clipeDeTexto(ctx, inicio, fim - inicio, { ...estilo, conteudo: legenda.conteudo, tempos }, POSICAO_LEGENDA));
     fimAnterior = fim;
   }
   if (!clipes.length) throw new ErroEdicao("O arquivo não tem legendas que deem para usar.");
@@ -740,13 +745,21 @@ export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Lege
   return { projeto: finalizar(resultado), clipeIds: clipes.map((clipe) => clipe.id) };
 }
 
+/** As palavras da legenda continuam no mesmo instante quando o começo do clipe anda `delta`. */
+function deslocarTempos(texto: Texto | null | undefined, delta: Tick): Texto | null | undefined {
+  if (!texto?.tempos || delta === 0) return texto;
+  return { ...texto, tempos: texto.tempos.map((t) => t - delta) };
+}
+
 /** Aplica o estilo (tudo menos o conteúdo) a todas as legendas da faixa. */
 export function estiloDasLegendas(projeto: Projeto, faixaId: string, estilo: Partial<Texto>): Projeto {
   const faixa = projeto.faixas.find((item) => item.id === faixaId);
   if (!faixa || faixa.tipo !== "legenda") throw new ErroEdicao("Esta faixa de legendas não existe mais.");
   exigirDestravada(faixa);
-  const semConteudo = { ...estilo };
+  // O destaque é do estilo (sem ele no estilo, sai); o conteúdo e os tempos das palavras ficam
+  const semConteudo = { ...estilo, destaque: estilo.destaque ?? null };
   delete semConteudo.conteudo;
+  delete semConteudo.tempos;
   const clipes = faixa.clipes.map((clipe) => (clipe.texto ? { ...clipe, texto: ajustarTexto(clipe.texto, semConteudo) } : clipe));
   return trocarFaixa(projeto, { ...faixa, clipes });
 }

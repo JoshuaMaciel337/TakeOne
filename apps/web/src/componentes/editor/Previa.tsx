@@ -9,6 +9,7 @@ import { Compositor } from "@/lib/previa/compositor";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra } from "@/lib/projeto/cor";
 import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -124,6 +125,8 @@ type CamadaNaTela = {
   revelado?: Revelado;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
   imagem?: ImageBitmap;
+  /** As letras do texto que aparecem; sem ela, todas. */
+  mascara?: Cortes;
 };
 
 type EstadoDoDesenho = {
@@ -190,24 +193,32 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
   }
   // Os textos ficam por cima de todas as faixas de vídeo (a faixa de texto é sempre a de cima)
   const faixasDeTexto = projeto.faixas.filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta);
+  // O texto com destaque pede também a imagem na cor do destaque, que vai por cima
   const imagensDeTexto = useImagensDeTexto(
-    faixasDeTexto.flatMap((faixa) => faixa.clipes.flatMap((clipe) => (clipe.texto ? [{ id: clipe.id, texto: clipe.texto }] : []))),
+    faixasDeTexto.flatMap((faixa) =>
+      faixa.clipes.flatMap((clipe) =>
+        !clipe.texto
+          ? []
+          : [{ id: clipe.id, texto: clipe.texto }, ...(clipe.texto.destaque ? [{ id: `${clipe.id}:destaque`, texto: textoDoDestaque(clipe.texto) }] : [])],
+      ),
+    ),
   );
   for (const faixa of [...faixasDeTexto].reverse()) {
     const clipe = faixa.clipes.find((item) => item.inicio <= tempo && tempo < fimDoClipe(item));
     const imagem = clipe ? imagensDeTexto.get(clipe.id) : undefined;
     if (!clipe || !imagem || tamanho.largura <= 0) continue;
-    camadas.push({
-      chave: `texto:${clipe.id}`,
-      clipe,
-      faixa,
-      recorte: clipe.recorte,
-      caixa: caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, tamanho),
-      caixaBase: caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, tamanho),
-      cor: corDoClipe(clipe),
-      segundos: 0,
-      imagem: imagem.bitmap,
-    });
+    const caixa = caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, tamanho);
+    const caixaBase = caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, tamanho);
+    // Letra a letra: só o trecho que já apareceu
+    const trecho = imagem.layout && temLetraALetra(clipe.animacao) ? trechoVisivel(clipe, imagem.layout, tempo) : null;
+    const comum = { clipe, faixa, recorte: clipe.recorte, caixa, caixaBase, cor: corDoClipe(clipe), segundos: 0 };
+    camadas.push({ ...comum, chave: `texto:${clipe.id}`, imagem: imagem.bitmap, mascara: trecho ? cortesDoTrecho(imagem.layout!, trecho) : undefined });
+    // O destaque: a mesma caixa, com a imagem na outra cor, só no trecho da palavra falada
+    const destaque = clipe.texto?.destaque ? imagensDeTexto.get(`${clipe.id}:destaque`) : undefined;
+    if (destaque?.layout) {
+      const mascara = cortesDoTrecho(destaque.layout, trechoVisivel(clipe, destaque.layout, tempo, true)!);
+      camadas.push({ ...comum, chave: `destaque:${clipe.id}`, imagem: destaque.bitmap, mascara });
+    }
   }
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
@@ -236,7 +247,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
           faltando = true;
           continue;
         }
-        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado });
+        prontas.push({ fonte: quadro, recorte: camada.recorte, caixa: camada.caixa, cor: camada.cor, revelado: camada.revelado, mascara: camada.mascara });
       }
       // Enquanto um vídeo carrega, fica o quadro anterior em vez de piscar sem ele
       const agora = performance.now();

@@ -29,6 +29,7 @@ from core.utils.cor import ajustes_efetivos, cor_neutra, nome_da_lut
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
+from core.utils.letras import comandos_das_letras, tem_letra_a_letra
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.transicao import filtro_de_cortina, filtros_de_transicao, janelas_da_principal
 
@@ -79,10 +80,15 @@ class Leitura:
 
 @dataclass(frozen=True)
 class ImagemDoTexto:
-    """O PNG de um clipe de texto, desenhado no tamanho do vídeo, e o tamanho dele no lado de referência."""
+    """
+    O PNG de um clipe de texto, desenhado no tamanho do vídeo, e o tamanho dele no lado de referência.
+    layout: onde fica cada letra (texto letra a letra ou com destaque); destaque: o PNG na cor do destaque.
+    """
     caminho: str
     largura_referencia: int
     altura_referencia: int
+    layout: dict | None = None
+    destaque: str | None = None
 
 
 @dataclass(frozen=True)
@@ -156,13 +162,15 @@ def cadeia_atempo(velocidade: float) -> list[str]:
 def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: tuple[int, int],
                     numero: int = 0, lut: str | None = None, vinheta: int | None = None,
                     leitura: Leitura | None = None, entrada_de_cor: list[str] | None = None,
-                    roteiro_de_opacidade: str | None = None) -> tuple[str, str]:
+                    roteiro_de_opacidade: str | None = None,
+                    mascara: tuple[str, str] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
     leitura: a janela do clipe com as transições (só na faixa principal).
     entrada_de_cor: filtros do começo que dizem como ler a cor do vídeo (ler_como_bt709).
     roteiro_de_opacidade: o roteiro do sendcmd com a opacidade por quadro, quando ela tem keyframes.
+    mascara: (roteiro do sendcmd, nome das caixas) que escondem as letras fora do trecho (letras.py).
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -183,6 +191,11 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         "setsar=1",
         "format=rgba",
     ]
+    if mascara:
+        # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram)
+        roteiro, alvo = mascara
+        filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro)}'")
+        filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
     if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
         # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
         depois_do_fps = len(entrada_de_cor or []) + 2
@@ -304,6 +317,15 @@ def _animacao_em_segundos(animacao: dict | None) -> dict | None:
     return resultado
 
 
+def _clipe_em_segundos(clipe: dict) -> dict:
+    """O clipe de texto com início, duração, animações e tempos das palavras em segundos."""
+    texto = clipe["texto"]
+    tempos = texto.get("tempos")
+    return {**clipe, "inicio": segundos(clipe["inicio"]), "duracao": segundos(clipe["duracao"]),
+            "animacao": _animacao_em_segundos(clipe.get("animacao")),
+            "texto": {**texto, "tempos": [segundos(t) for t in tempos] if tempos else None}}
+
+
 def base_do_render(clipe: dict) -> dict:
     """
     A transformação que dá o tamanho da caixa no render: a dos keyframes (transformacao_de_base), no
@@ -396,6 +418,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
 
     entradas: list[Entrada] = []
     indice_da_entrada: dict[str, int] = {}
+    indice_do_destaque: dict[str, int] = {}
     for clipe in clipes:
         indice_da_entrada[clipe["id"]] = len(entradas)
         if clipe.get("texto"):
@@ -403,6 +426,9 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             if imagem is None:
                 raise ErroRender("Faltou a imagem de um texto do projeto.")
             entradas.append(Entrada(imagem.caminho, 0, segundos(clipe["duracao"]), imagem=True, taxa=taxa))
+            if imagem.destaque:
+                indice_do_destaque[clipe["id"]] = len(entradas)
+                entradas.append(Entrada(imagem.destaque, 0, segundos(clipe["duracao"]), imagem=True, taxa=taxa))
             continue
         midia = midias.get(clipe["midia_id"])
         if midia is None:
@@ -418,7 +444,10 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     cor = projeto["fundo"]["cor"].lstrip("#")
     linhas = [f"color=c=0x{cor}:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp[base0]"]
     anterior = "base0"
-    for numero, clipe in enumerate((c for f in visuais for c in f["clipes"]), start=1):
+    # Cada clipe é uma camada; o texto com destaque ganha outra por cima, com a imagem do destaque
+    camadas = [(c, destaque) for f in visuais for c in f["clipes"]
+               for destaque in ((False, True) if c["id"] in indice_do_destaque else (False,))]
+    for numero, (clipe, destaque) in enumerate(camadas, start=1):
         if clipe.get("texto"):
             imagem = textos[clipe["id"]]
             referencia = (imagem.largura_referencia, imagem.altura_referencia)
@@ -450,12 +479,22 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             leitura = leituras.get(clipe["id"])
             fim_do_clipe = segundos(clipe["inicio"] + clipe["duracao"])
             janela = (leitura.inicio, leitura.fim) if leitura else (segundos(clipe["inicio"]), fim_do_clipe)
-            roteiro = f"{pasta}/opacidade_{clipe['id']}.txt"
+            roteiro = f"{pasta}/opacidade_{clipe['id']}_{numero}.txt"
             conteudo = comandos_de_opacidade(clipe["keyframes"]["opacidade"], segundos(clipe["inicio"]), janela,
                                              float(taxa_em_fracao(taxa)), f"colorchannelmixer@op{numero}")
             auxiliares[roteiro] = ArquivoAuxiliar(roteiro, "comandos", {}, conteudo=conteudo)
-        cadeia, overlay = _video_do_clipe(indice_da_entrada[clipe["id"]], clipe, caixa, taxa, quadro,
-                                          numero, lut, vinheta, leituras.get(clipe["id"]), entrada_de_cor, roteiro)
+        mascara = None
+        if clipe.get("texto") and (destaque or tem_letra_a_letra(clipe)):
+            # O trecho de letras que aparece muda por quadro, pelo roteiro (no tempo do clipe)
+            mascara = (f"{pasta}/letras_{clipe['id']}{'_destaque' if destaque else ''}.txt", f"m{numero}c")
+            conteudo = comandos_das_letras(_clipe_em_segundos(clipe), textos[clipe["id"]].layout,
+                                           (segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"])),
+                                           float(taxa_em_fracao(taxa)), f"drawbox@{mascara[1]}",
+                                           max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
+            auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
+        entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
+        cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
+                                          leituras.get(clipe["id"]), entrada_de_cor, roteiro, mascara)
         linhas.append(f"{cadeia}[c{numero}]")
         linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
         anterior = f"base{numero}"

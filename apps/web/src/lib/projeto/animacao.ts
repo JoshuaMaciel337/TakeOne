@@ -8,7 +8,8 @@ import type { Tick } from "../tempo.ts";
 import { transformacaoNoTempo } from "./keyframes.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
 
-export type TipoAnimacao = "nenhuma" | "aparecer" | "subir" | "descer" | "deslizar" | "zoom";
+/** "letras" e "palavras" só valem para textos: mostram o texto aos poucos (lib/projeto/letras.ts). */
+export type TipoAnimacao = "nenhuma" | "aparecer" | "subir" | "descer" | "deslizar" | "zoom" | "letras" | "palavras";
 
 export type Animacao = { tipo: TipoAnimacao; duracao: Tick };
 
@@ -26,6 +27,8 @@ export const TIPOS_ANIMACAO: { id: TipoAnimacao; nome: string }[] = [
   { id: "descer", nome: "Descer" },
   { id: "deslizar", nome: "Deslizar" },
   { id: "zoom", nome: "Zoom" },
+  { id: "letras", nome: "Letra a letra" },
+  { id: "palavras", nome: "Palavra a palavra" },
 ];
 
 export const TIPOS_LOOP: { id: TipoLoop; nome: string; periodo: number }[] = [
@@ -105,7 +108,8 @@ export function transformacaoAnimada(
   let { x, y, escala, rotacao, opacidade } = base;
   // Na saída o sentido se inverte: quem entrou subindo sai subindo
   const aplicar = (tipo: TipoAnimacao, p: number, sentido: 1 | -1) => {
-    if (tipo === "nenhuma") return;
+    // Letra a letra não mexe na caixa: só no trecho que aparece
+    if (tipo === "nenhuma" || tipo === "letras" || tipo === "palavras") return;
     opacidade *= p;
     const falta = 1 - suavizar(p);
     if (tipo === "subir") y += sentido * falta * DISTANCIA_VERTICAL;

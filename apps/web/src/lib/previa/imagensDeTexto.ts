@@ -5,9 +5,11 @@
 import { useEffect, useState } from "react";
 
 import { LADO_REFERENCIA_TEXTO } from "@/lib/projeto/geometria";
+import type { LayoutDoTexto } from "@/lib/projeto/letras";
 import type { Texto } from "@/lib/projeto/texto";
 
-export type ImagemDeTexto = { bitmap: ImageBitmap; largura: number; altura: number };
+/** layout: onde fica cada letra, para o texto letra a letra (null se a API não mandou). */
+export type ImagemDeTexto = { bitmap: ImageBitmap; largura: number; altura: number; layout: LayoutDoTexto | null };
 
 /** Espera depois da última mudança antes de pedir a imagem (enquanto a pessoa digita). */
 const ESPERA_MS = 120;
@@ -18,8 +20,17 @@ const pedidos = new Map<string, Promise<void>>();
 /** A última imagem mostrada de cada clipe: fica na tela enquanto a do texto editado não chega. */
 const ultimaDoClipe = new Map<string, ImagemDeTexto>();
 
+/** O destaque e os tempos das palavras não mudam a imagem: ficam fora da chave. */
 function chaveDoTexto(texto: Texto): string {
-  return JSON.stringify(texto);
+  return JSON.stringify({ ...texto, destaque: null, tempos: null });
+}
+
+function lerLayout(cabecalho: string | null): LayoutDoTexto | null {
+  try {
+    return cabecalho ? (JSON.parse(cabecalho) as LayoutDoTexto) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function pedirImagem(chave: string, ladoMenor = LADO_REFERENCIA_TEXTO): Promise<ImagemDeTexto> {
@@ -31,7 +42,7 @@ async function pedirImagem(chave: string, ladoMenor = LADO_REFERENCIA_TEXTO): Pr
   });
   if (!resposta.ok) throw new Error(`A imagem do texto respondeu ${resposta.status}.`);
   const bitmap = await createImageBitmap(await resposta.blob(), { premultiplyAlpha: "none" });
-  return { bitmap, largura: bitmap.width, altura: bitmap.height };
+  return { bitmap, largura: bitmap.width, altura: bitmap.height, layout: lerLayout(resposta.headers.get("X-Layout-Texto")) };
 }
 
 /**

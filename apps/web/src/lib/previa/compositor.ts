@@ -6,6 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import type { Caixa, Tamanho } from "../projeto/geometria.ts";
+import type { Cortes } from "../projeto/letras.ts";
 import type { Recorte } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
@@ -19,7 +20,11 @@ export type Camada = {
   caixa: Caixa;
   /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
   revelado?: Revelado;
+  /** As letras do texto que aparecem (lib/projeto/letras.ts); sem ela, todas. */
+  mascara?: Cortes;
 };
+
+const SEM_MASCARA: Cortes = { de: [0, 0, 0], ate: [1, 1, 1] };
 
 const VERTICES = `#version 300 es
 in vec2 a_pos;
@@ -59,6 +64,9 @@ uniform vec4 u_cor2;
 uniform vec3 u_rodas[3];
 // x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
 uniform vec4 u_revelado;
+// Letra a letra (lib/projeto/letras.ts): y0, y1 e x de onde o trecho começa e de onde ele termina
+uniform vec3 u_corteDe;
+uniform vec3 u_corteAte;
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -85,6 +93,12 @@ vec3 aplicarCor(vec3 c) {
 void main() {
   // Como o geq do render: o centro do pixel dentro da faixa revelada, com as bordas incluídas
   if (v_local.x < u_revelado.x || v_local.x > u_revelado.z || v_local.y < u_revelado.y || v_local.y > u_revelado.w) {
+    cor = vec4(0.0);
+    return;
+  }
+  // Como as caixas do render: pelo centro do pixel, antes do começo do trecho e a partir do fim
+  if (v_local.y < u_corteDe.x || (v_local.y < u_corteDe.y && v_local.x < u_corteDe.z) ||
+      v_local.y >= u_corteAte.y || (v_local.y >= u_corteAte.x && v_local.x >= u_corteAte.z)) {
     cor = vec4(0.0);
     return;
   }
@@ -117,7 +131,7 @@ export function corParaRgb(hex: string): [number, number, number] {
 type Recursos = {
   programa: WebGLProgram;
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -184,6 +198,8 @@ export class Compositor {
         cor2: local("u_cor2"),
         rodas: local("u_rodas"),
         revelado: local("u_revelado"),
+        corteDe: local("u_corteDe"),
+        corteAte: local("u_corteAte"),
         textura: local("u_textura"),
       },
       texturas: [],
@@ -238,6 +254,9 @@ export class Compositor {
       gl.uniform1f(uniformes.opacidade, caixa.opacidade);
       const revelado = camada.revelado ?? REVELADO_INTEIRO;
       gl.uniform4f(uniformes.revelado, revelado.x0, revelado.y0, revelado.x1, revelado.y1);
+      const mascara = camada.mascara ?? SEM_MASCARA;
+      gl.uniform3f(uniformes.corteDe, ...mascara.de);
+      gl.uniform3f(uniformes.corteAte, ...mascara.ate);
       const ajustes = camada.cor;
       gl.uniform1i(uniformes.comCor, ajustes ? 1 : 0);
       if (ajustes) {

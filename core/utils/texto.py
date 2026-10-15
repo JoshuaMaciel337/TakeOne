@@ -15,6 +15,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from core.utils.letras import palavras_das_letras
+
 PASTA_FONTES = Path(__file__).resolve().parent.parent / "fontes"
 
 # Família → (arquivo, eixos da fonte variável no peso normal e no negrito). Os eixos vão em números:
@@ -72,9 +74,8 @@ def linhas_do_texto(texto: dict) -> list[str]:
     return linhas or [""]
 
 
-def desenhar_texto(texto: dict, lado_menor: int) -> Image.Image:
-    """O bloco de texto num PNG transparente, para um quadro cujo lado menor tem `lado_menor` pixels."""
-    texto = {**TEXTO_PADRAO, **texto}
+def _medidas(texto: dict, lado_menor: int) -> dict:
+    """Fonte, tamanho da imagem e onde cada linha começa, para desenhar e para o layout das letras."""
     tamanho = max(int(round(texto["tamanho"] * lado_menor)), 6)
     fonte = carregar_fonte(texto["fonte"], bool(texto["negrito"]), tamanho)
     linhas = linhas_do_texto(texto)
@@ -87,21 +88,58 @@ def desenhar_texto(texto: dict, lado_menor: int) -> Image.Image:
 
     contorno = round(texto["contorno_espessura"] * tamanho)
     folga = round(tamanho * FOLGA) + contorno
-    largura = int(largura_texto) + 2 * folga
-    altura = altura_texto + 2 * folga
-
-    # Texto e contorno numa camada; a sombra sai dela
-    camada = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
-    desenho = ImageDraw.Draw(camada)
-    for linha, largura_linha, indice in zip(linhas, larguras, range(len(linhas)), strict=True):
+    posicoes = []
+    for indice, largura_linha in enumerate(larguras):
         if texto["alinhamento"] == "esquerda":
             x = folga
         elif texto["alinhamento"] == "direita":
             x = folga + largura_texto - largura_linha
         else:
             x = folga + (largura_texto - largura_linha) / 2
-        y = folga + indice * altura_linha
-        desenho.text((x, y), linha, font=fonte, fill=(*_rgb(texto["cor"]), 255),
+        posicoes.append((x, folga + indice * altura_linha))
+    return {"tamanho": tamanho, "fonte": fonte, "linhas": linhas, "posicoes": posicoes, "contorno": contorno,
+            "folga": folga, "largura": int(largura_texto) + 2 * folga, "altura": altura_texto + 2 * folga}
+
+
+def layout_do_texto(texto: dict, lado_menor: int) -> dict:
+    """
+    Onde fica cada letra no PNG de desenhar_texto, em frações da imagem (core/utils/letras.py):
+    n: quantas letras, sem as quebras de linha; palavras: [de, ate) de cada uma;
+    linhas: a faixa y0–y1 de cada linha e o x onde cada letra começa, mais o fim (xs).
+    As faixas cobrem a imagem inteira, e a primeira e a última letra de cada linha vão até a borda,
+    para o contorno e a sombra aparecerem junto com a letra.
+    """
+    texto = {**TEXTO_PADRAO, **texto}
+    medidas = _medidas(texto, lado_menor)
+    largura, altura = medidas["largura"], medidas["altura"]
+    linhas = []
+    for indice, (linha, (x, y)) in enumerate(zip(medidas["linhas"], medidas["posicoes"], strict=True)):
+        xs = [(x + medidas["fonte"].getlength(linha[:k])) / largura for k in range(len(linha) + 1)]
+        if xs:
+            xs[0], xs[-1] = 0.0, 1.0
+        y0 = 0.0 if indice == 0 else y / altura
+        y1 = 1.0 if indice == len(medidas["linhas"]) - 1 else medidas["posicoes"][indice + 1][1] / altura
+        linhas.append({"y0": round(y0, 6), "y1": round(y1, 6), "xs": [round(v, 6) for v in xs]})
+    # As palavras não passam de uma linha para a outra
+    palavras, contadas = [], 0
+    for linha in medidas["linhas"]:
+        palavras += [[de + contadas, ate + contadas] for de, ate in palavras_das_letras(linha)]
+        contadas += len(linha)
+    return {"n": contadas, "palavras": palavras, "linhas": linhas}
+
+
+def desenhar_texto(texto: dict, lado_menor: int) -> Image.Image:
+    """O bloco de texto num PNG transparente, para um quadro cujo lado menor tem `lado_menor` pixels."""
+    texto = {**TEXTO_PADRAO, **texto}
+    medidas = _medidas(texto, lado_menor)
+    tamanho, fonte, contorno, folga = medidas["tamanho"], medidas["fonte"], medidas["contorno"], medidas["folga"]
+    largura, altura = medidas["largura"], medidas["altura"]
+
+    # Texto e contorno numa camada; a sombra sai dela
+    camada = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    desenho = ImageDraw.Draw(camada)
+    for linha, posicao in zip(medidas["linhas"], medidas["posicoes"], strict=True):
+        desenho.text(posicao, linha, font=fonte, fill=(*_rgb(texto["cor"]), 255),
                      stroke_width=contorno, stroke_fill=(*_rgb(texto["contorno_cor"]), 255))
 
     resultado = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))

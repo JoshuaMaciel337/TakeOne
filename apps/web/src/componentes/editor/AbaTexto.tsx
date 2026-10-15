@@ -4,7 +4,7 @@ import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper } from "lucide-reac
 
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
-import { type Alinhamento, FONTES_TEXTO, type FonteTexto, LIMITES_TEXTO, type Texto } from "@/lib/projeto/texto";
+import { type Alinhamento, type Destaque, FONTES_TEXTO, type FonteTexto, LIMITES_TEXTO, type Texto } from "@/lib/projeto/texto";
 
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
@@ -15,6 +15,13 @@ type Props = {
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
 };
+
+const MODOS_DESTAQUE: { id: Destaque["modo"] | "nenhum"; nome: string }[] = [
+  { id: "nenhum", nome: "Nenhum" },
+  { id: "karaoke", nome: "Karaokê (pinta até a palavra falada)" },
+  { id: "palavra", nome: "Só a palavra falada" },
+];
+const COR_DESTAQUE = "#ffd60a";
 
 const ALINHAMENTOS: { id: Alinhamento; nome: string; icone: typeof AlignLeft }[] = [
   { id: "esquerda", nome: "Alinhar à esquerda", icone: AlignLeft },
@@ -142,6 +149,34 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
         <ControleNumerico rotulo="Sombra" minimo={0} maximo={100} sufixo="%" {...controle("sombra", 100)} />
         <ControleNumerico rotulo="Fundo" minimo={0} maximo={100} sufixo="%" {...controle("fundo_opacidade", 100)} />
         <CampoCor rotulo="Cor do fundo" {...cor("fundo_cor")} />
+      </Secao>
+      <Secao titulo="Destaque da fala">
+        <select
+          aria-label="Destaque da fala"
+          className="w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+          disabled={travada}
+          value={texto.destaque?.modo ?? "nenhum"}
+          onChange={(evento) => {
+            const modo = evento.currentTarget.value as Destaque["modo"] | "nenhum";
+            aoExecutar(mudar({ destaque: modo === "nenhum" ? null : { modo, cor: texto.destaque?.cor ?? COR_DESTAQUE } }));
+          }}
+        >
+          {MODOS_DESTAQUE.map(({ id, nome }) => (
+            <option key={id} value={id}>
+              {nome}
+            </option>
+          ))}
+        </select>
+        {texto.destaque ? (
+          <CampoCor
+            rotulo="Cor da palavra"
+            cor={texto.destaque.cor}
+            desativado={travada}
+            aoPrever={(valor) => aoPrever(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
+            aoConfirmar={(valor) => aoExecutar(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
+          />
+        ) : null}
+        {texto.destaque && !texto.tempos ? <p className="mt-1 text-[11px] text-suave">Sem os tempos da fala, as palavras dividem a duração da legenda.</p> : null}
       </Secao>
     </div>
   );

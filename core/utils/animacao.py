@@ -81,7 +81,8 @@ def transformacao_animada(clipe: dict, t: float) -> dict:
     fim = clipe["inicio"] + clipe["duracao"]
 
     def aplicar(item: dict, p: float, sentido: int):
-        if item["tipo"] == "nenhuma":
+        # Letra a letra não mexe na caixa: só no trecho que aparece (core/utils/letras.py)
+        if item["tipo"] in ("nenhuma", "letras", "palavras"):
             return
         resultado["opacidade"] *= p
         falta = 1 - suavizar(p)
@@ -140,7 +141,7 @@ def filtros_de_animacao(clipe: dict, inicio: float, fim: float, var_tempo: str =
     fades, escala, dx, dy = [], [], [], []
     for nome, sentido in (("entrada", 1), ("saida", -1)):
         item = animacao[nome]
-        if not _ativa(item):
+        if not _ativa(item) or item["tipo"] in ("letras", "palavras"):
             continue
         duracao = item["duracao"]
         if nome == "entrada":

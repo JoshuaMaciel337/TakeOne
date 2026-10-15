@@ -4,6 +4,12 @@
 export type FonteTexto = "display" | "texto" | "manuscrita";
 export type Alinhamento = "esquerda" | "centro" | "direita";
 
+/**
+ * Palavra falada em outra cor (lib/projeto/letras.ts): "karaoke" pinta até a palavra atual,
+ * "palavra" pinta só ela.
+ */
+export type Destaque = { modo: "karaoke" | "palavra"; cor: string };
+
 export type Texto = {
   conteudo: string;
   fonte: FonteTexto;
@@ -21,6 +27,9 @@ export type Texto = {
   fundo_cor: string;
   /** 0 é sem fundo. */
   fundo_opacidade: number;
+  destaque?: Destaque | null;
+  /** Quando cada palavra começa, em ticks desde o começo do clipe (legendas da fala). */
+  tempos?: number[] | null;
 };
 
 export const FONTES_TEXTO: { id: FonteTexto; nome: string }[] = [
@@ -80,6 +89,7 @@ export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
     cor: cor(texto.cor, atual.cor),
     contorno_cor: cor(texto.contorno_cor, atual.contorno_cor),
     fundo_cor: cor(texto.fundo_cor, atual.fundo_cor),
+    destaque: texto.destaque ? { ...texto.destaque, cor: cor(texto.destaque.cor, atual.destaque?.cor ?? "#ffd60a") } : null,
   };
 }
 

@@ -6,7 +6,8 @@ import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Faixa } from "./modelo.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
-export type Legenda = { inicio: Tick; fim: Tick; conteudo: string };
+/** tempos: quando cada palavra começa, na linha do tempo (só nas legendas da fala). */
+export type Legenda = { inicio: Tick; fim: Tick; conteudo: string; tempos?: Tick[] };
 
 /** Centro das legendas, em fração da altura do quadro a partir do meio: perto da borda de baixo. */
 export const POSICAO_LEGENDA = 0.35;
@@ -26,6 +27,13 @@ export const ESTILOS_DE_LEGENDA: { id: string; nome: string; texto: Texto }[] = 
   { id: "caixa", nome: "Caixa escura", texto: { ...ESTILO_LEGENDA, contorno_espessura: 0, sombra: 0, fundo_opacidade: 0.65 } },
   { id: "amarela", nome: "Amarela", texto: { ...ESTILO_LEGENDA, cor: "#ffd60a" } },
   { id: "destaque", nome: "Destaque", texto: { ...ESTILO_LEGENDA, fonte: "display", contorno_espessura: 0, sombra: 0, fundo_cor: "#ff3d77", fundo_opacidade: 1 } },
+  // Com destaque, a palavra falada muda de cor (lib/projeto/letras.ts)
+  { id: "karaoke", nome: "Karaokê", texto: { ...ESTILO_LEGENDA, fonte: "display", destaque: { modo: "karaoke", cor: "#ffd60a" } } },
+  {
+    id: "palavra",
+    nome: "Palavra falada",
+    texto: { ...ESTILO_LEGENDA, fonte: "display", caixa_alta: true, tamanho: 0.06, destaque: { modo: "palavra", cor: "#2ee6a6" } },
+  },
 ];
 
 // -----------------------------------------------

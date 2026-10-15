@@ -181,6 +181,11 @@ class RecorteEntrada(BaseModel):
 COR = r"^#[0-9a-fA-F]{6}$"
 
 
+class DestaqueEntrada(BaseModel):
+    modo: Literal["karaoke", "palavra"] = "karaoke"
+    cor: str = Field(default="#ffd400", pattern=COR)
+
+
 # Os limites são os mesmos de apps/web/src/lib/projeto/texto.ts
 class TextoEntrada(BaseModel):
     conteudo: str = Field(max_length=500)
@@ -195,10 +200,12 @@ class TextoEntrada(BaseModel):
     sombra: float = Field(default=0, ge=0, le=1)
     fundo_cor: str = Field(default="#000000", pattern=COR)
     fundo_opacidade: float = Field(default=0, ge=0, le=1)
+    destaque: DestaqueEntrada | None = None
+    tempos: list[int] | None = Field(default=None, max_length=500, description="Começo de cada palavra, em ticks")
 
 
 class AnimacaoEntrada(BaseModel):
-    tipo: Literal["nenhuma", "aparecer", "subir", "descer", "deslizar", "zoom"] = "nenhuma"
+    tipo: Literal["nenhuma", "aparecer", "subir", "descer", "deslizar", "zoom", "letras", "palavras"] = "nenhuma"
     duracao: int = Field(default=0, ge=0, description="Em ticks")
 
 
