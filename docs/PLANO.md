@@ -435,7 +435,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] cortar silêncios e vícios (limpeza de fala na ferramenta Transcrição)
   - [x] limpar a voz (DeepFilterNet3 no worker de CPU, opção na aba Áudio)
   - [x] reenquadrar seguindo o rosto (YuNet no worker de CPU, botão na aba Básico)
-  - redução de ruído na imagem
+  - [x] redução de ruído na imagem (hqdn3d no worker de CPU; a mesma imagem limpa na prévia e no render)
   - "Criar automaticamente"
 - Novos:
   - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
