@@ -208,7 +208,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
-          <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (

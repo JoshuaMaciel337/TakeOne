@@ -67,6 +67,8 @@ export type Midia = {
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
   /** A voz sem ruído (worker de CPU); null se nunca foi pedida. O progresso vem dos eventos do job. */
   voz_limpa: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
+  /** A imagem sem ruído (limpo.mp4 para o render, limpo_proxy.mp4 para a prévia). */
+  imagem_limpa?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   /** A máscara da pessoa em cada quadro (recorte do fundo). */
   recorte_fundo?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */

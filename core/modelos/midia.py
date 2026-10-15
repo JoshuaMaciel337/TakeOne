@@ -30,7 +30,10 @@ ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_
                      ARQUIVO_VOZ_LIMPA}
 # A máscara da pessoa em cada quadro (tarefa "recorte_fundo"), no tempo da cópia leve
 ARQUIVO_MASCARA = "mascara.mp4"
-ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA}
+# A imagem sem ruído (tarefa "limpeza_imagem"): a de resolução cheia é só do render; a cópia leve, da prévia
+ARQUIVO_IMAGEM_LIMPA = "limpo.mp4"
+ARQUIVO_IMAGEM_LIMPA_PROXY = "limpo_proxy.mp4"
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_PROXY}
 # A voz em outro tom (tarefa "tom"), uma por tom pedido: tom_p3.m4a, tom_m2_limpa.m4a (sobre a voz limpa)
 TOM_LIMITE = 12
 _ARQUIVO_DO_TOM = re.compile(r"tom_[mp]\d{1,2}(_limpa)?\.m4a")

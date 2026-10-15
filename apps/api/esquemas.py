@@ -103,6 +103,8 @@ class MidiaSaida(BaseModel):
     voz_limpa: dict | None = None
     # A máscara da pessoa (recorte do fundo): {status, erro}
     recorte_fundo: dict | None = None
+    # A imagem sem ruído: {status, erro}
+    imagem_limpa: dict | None = None
     # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
     tons: dict = Field(default_factory=dict)
     criado_em: datetime
@@ -334,6 +336,8 @@ class ClipeEntrada(BaseModel):
     igualar_volume: bool = False
     # Recorta o fundo (a pessoa fica; o resto some), pela máscara gerada no worker
     remover_fundo: bool = False
+    # Usa a imagem sem ruído (gerada no worker) no lugar da original
+    imagem_limpa: bool = False
     # Tom da voz, em semitons (o som vem do arquivo que o worker gera para o tom)
     tom: int = Field(default=0, ge=-12, le=12)
     efeitos_voz: EfeitosVozEntrada | None = None
@@ -553,6 +557,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
         "voz_limpa": {"status": voz["status"], "erro": voz.get("erro")} if (voz := doc.get("voz_limpa")) else None,
         "recorte_fundo": ({"status": recorte["status"], "erro": recorte.get("erro")}
                           if (recorte := doc.get("recorte_fundo")) else None),
+        "imagem_limpa": ({"status": limpa["status"], "erro": limpa.get("erro")}
+                         if (limpa := doc.get("imagem_limpa")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
                  for chave, tom in (doc.get("tons") or {}).items()},
     })

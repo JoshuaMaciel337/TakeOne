@@ -938,6 +938,14 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
   });
 }
 
+/** Liga ou desliga a imagem sem ruído dos clipes de vídeo. */
+export function limparImagem(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto) throw new ErroEdicao("Textos não têm ruído para tirar.");
+    return { ...clipe, imagem_limpa: ligar };
+  });
+}
+
 /** Liga ou desliga o recorte do fundo dos clipes de vídeo. */
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {

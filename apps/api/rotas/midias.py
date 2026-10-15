@@ -24,6 +24,7 @@ from api.esquemas import (
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
+    ARQUIVO_IMAGEM_LIMPA_PROXY,
     ARQUIVO_MASCARA,
     ARQUIVO_VOZ_LIMPA,
     STATUS_PROCESSANDO,
@@ -221,6 +222,28 @@ async def pedir_voz_limpa(midia_id: str, usuario=Depends(usuario_atual), db=Depe
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"voz_limpa": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Limpeza da voz pedida: {midia['nome']}")
     return (await para_saida(db, [{**midia, "voz_limpa": atual}]))[0]
+
+
+@router.post("/{midia_id}/limpeza-imagem", response_model=MidiaSaida)
+async def pedir_limpeza_imagem(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila a imagem sem ruído. Se já está pronta ou andando, só devolve a mídia."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para limpar.')
+    atual = midia.get("imagem_limpa") or {}
+    pronta = atual.get("status") == "pronta" and ARQUIVO_IMAGEM_LIMPA_PROXY in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronta or andando):
+        job = montar_job("limpeza_imagem", usuario["organizacao_id"], {"midia_id": str(midia["_id"])},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"imagem_limpa": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Limpeza da imagem pedida: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "imagem_limpa": atual}]))[0]
 
 
 @router.post("/{midia_id}/recorte-fundo", response_model=MidiaSaida)

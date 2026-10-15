@@ -24,6 +24,7 @@ TAREFAS = {
     "limpeza_voz": RECURSO_CPU,
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,
+    "limpeza_imagem": RECURSO_CPU,
     "rosto": RECURSO_CPU,
 }
 

@@ -22,6 +22,7 @@ from core.modelos.exportacao import (
 )
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import (
+    ARQUIVO_IMAGEM_LIMPA,
     ARQUIVO_MASCARA,
     ARQUIVO_PROXY_AUDIO,
     ARQUIVO_PROXY_VIDEO,
@@ -89,6 +90,8 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             duracao=float(midia.get("duracao") or 0),
             matriz=matriz,
             voz_limpa=str(voz) if voz.is_file() else None,
+            imagem_limpa=str(limpa) if (limpa := storage.caminho_local(chave_arquivo(
+                midia["organizacao_id"], midia["_id"], ARQUIVO_IMAGEM_LIMPA))).is_file() else None,
             mascara=str(mascara) if (mascara := storage.caminho_local(chave_arquivo(
                 midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA))).is_file() else None,
             tons=tuple((chave, str(caminho)) for chave, tom in (midia.get("tons") or {}).items()

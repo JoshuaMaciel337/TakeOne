@@ -80,7 +80,12 @@ export function FonteDoClipe(props: PropsFonte) {
   const temProxy = props.item.midia.arquivos.includes("proxy.mp4");
   const [usarVideo, setUsarVideo] = useState(() => !temProxy || !webCodecsDisponivel());
   if (usarVideo) return <FonteVideo {...props} />;
-  return <FonteWebCodecs {...props} aoFalhar={() => setUsarVideo(true)} />;
+  return <FonteWebCodecs {...props} arquivo={arquivoDaImagem(props.item)} aoFalhar={() => setUsarVideo(true)} />;
+}
+
+/** A cópia leve da imagem sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
+function arquivoDaImagem(item: ItemDaPrevia): string {
+  return item.clipe.imagem_limpa && item.midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";
 }
 
 /**
@@ -144,7 +149,7 @@ function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFon
   return (
     <video
       ref={videoRef}
-      src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a")}
+      src={arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? arquivoDaImagem(item) : "proxy.m4a")}
       className="absolute inset-0 size-full object-contain"
       muted
       playsInline

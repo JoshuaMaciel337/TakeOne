@@ -1,19 +1,56 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
+import { useState } from "react";
 
+import { chamarApi } from "@/lib/api";
 import type { Comando } from "@/lib/projeto/comandos";
 import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, CURVAS_NEUTRAS, curvasNeutras, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import type { Midia } from "@/lib/tipos";
 
 import { ControleNumerico } from "./ControleNumerico";
 import { EditorDeCurva } from "./EditorDeCurva";
+
+/** Tirar o ruído (o granulado) da imagem: o worker gera a versão limpa e a prévia e o render usam ela. */
+function TirarRuido({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+  const [erroDoPedido, setErroDoPedido] = useState("");
+  const limpa = midia.imagem_limpa;
+  function mudar(ligar: boolean) {
+    aoExecutar({ comando: "clipe.limparImagem", parametros: { clipeIds: [clipe.id], ligar } });
+    if (!ligar || limpa?.status === "pronta" || limpa?.status === "processando") return;
+    setErroDoPedido("");
+    chamarApi(`/midias/${midia.id}/limpeza-imagem`, { metodo: "POST" }).catch((erro: unknown) =>
+      setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir a limpeza agora."),
+    );
+  }
+  return (
+    <section className="pt-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Ruído</h3>
+      <label className="mt-1 flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={Boolean(clipe.imagem_limpa)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
+        <span className="flex-1">Tirar o ruído da imagem (o granulado de pouca luz)</span>
+      </label>
+      {clipe.imagem_limpa ? (
+        <p className="mt-1 text-[11px] text-suave" role="status">
+          {limpa?.status === "pronta"
+            ? "Pronta. A prévia e o vídeo exportado usam a imagem sem ruído."
+            : limpa?.status === "erro" || erroDoPedido
+              ? `A limpeza falhou: ${erroDoPedido || limpa?.erro}`
+              : `Tirando o ruído${limpa?.progresso ? ` · ${limpa.progresso}%` : ""}. Até terminar, a prévia mostra a imagem original.`}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 import { RodaDeCor } from "./RodaDeCor";
 
 type Props = {
   clipe: Clipe;
   faixa: Faixa;
+  /** A mídia do clipe: a limpeza do ruído é dela. */
+  midia: Midia | null;
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
 };
@@ -39,7 +76,7 @@ const GRUPOS = [
 const PERTO = 1e-6;
 
 /** Filtro pronto e ajustes de luz e cor do clipe. */
-export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
+export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
   const cor: Cor = { ...COR_PADRAO, ...clipe.cor };
   const travada = faixa.travada;
   const comando = (mudanca: Partial<Cor>): Comando => ({ comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: mudanca } });
@@ -148,6 +185,7 @@ export function AbaCor({ clipe, faixa, aoPrever, aoExecutar }: Props) {
         />
       </section>
       {GRUPOS.filter((grupo) => grupo.id === "efeito").map(secao)}
+      {!clipe.texto && midia?.video ? <TirarRuido clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
     </div>
   );
 }
