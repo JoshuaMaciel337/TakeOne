@@ -63,7 +63,6 @@ Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato
 
 - [ ] Exportar com um vídeo gravado no celular de verdade. O teste usou um vídeo gerado com rotação de 90° e quadros B, que passou.
 - [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
-- [ ] Wan 2.2 (fase 5): medir tempo e memória de um clipe de 5 s com o ComfyUI (uns 20 GB de pesos para baixar).
 - [ ] 4K longo: o de 6 s usou 4,5 GiB dos 7,4 GiB que o Docker tem no WSL. Medir um de alguns minutos, com várias camadas, antes de liberar 4K sem limite.
 
 ## Arquitetura em um minuto
@@ -104,6 +103,7 @@ Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato
 - **Som do render em duas passadas:** a primeira mistura o som de todos os clipes num `som.mka` (ponto flutuante) e mede o loudness com o `ebur128`; a segunda gera o vídeo com essa mistura, um ganho fixo até -14 LUFS e o `alimiter` só nos picos. O `loudnorm` numa passada mexia no ganho ao longo do vídeo (uma introdução 26 dB mais baixa saía só 1 dB abaixo do resto) e, sem ele, o grafo único travava no FFmpeg 7 em projetos com transição.
 - **Cor sempre em BT.709:** vídeo sem marcação de cor é lido como BT.709, como o Chrome faz na prévia (`ler_como_bt709`, com a matriz guardada pela ingestão em `video.matriz`). O proxy e o vídeo exportado saem convertidos para BT.709 e marcados (`MARCAS_BT709`). Sem isso, a marcação do arquivo final mudava conforme o grafo (com vinheta saía BT.601) e cada player mostrava uma cor. HDR (BT.2020) ainda não é convertido.
 - **Worker de GPU sem PyTorch:** a transcrição usa só o faster-whisper (ctranslate2 com o cuBLAS e o cuDNN 9 do pip), sem o WhisperX do HolyCut: o tempo por palavra dele basta para as legendas e a imagem fica menor. A placa é dividida com o HolyCut (cada um com a sua fila); o Whisper usa uns 3 GB de VRAM. Cada transcrição roda num processo filho (spawn) que termina no fim do job, porque o processo do worker não devolvia uns 2,5 GB de RAM depois de soltar o modelo.
+- **Wan 2.2 medido no Nitro (14/10/2026):** 5 s em 832×480 (121 quadros a 24 fps, 20 passos, pesos em fp8) levou 12 min 43 s, dos quais 10 min 40 s gerando (32 s por passo). Pico de 9,7 GB de RAM, 7,8 GB de VRAM e 81 °C na placa. Precisou de 12 GB de RAM no WSL (`%USERPROFILE%\.wslconfig`, com 8 GB de swap) e do HolyCut parado: com 7,4 GB o Docker inteiro travou. Os pesos ficam no volume `takeone_comfyui_modelos` (ler da pasta do Windows dava `errno=12`).
 - **Testes do site:** `npm test` usa o `node --test` com `--experimental-strip-types`. Por isso os arquivos de `lib/tempo.ts` e `lib/projeto/` importam uns aos outros pelo caminho relativo com `.ts`, sem o alias `@/`.
 - **Lint do React 19:** a regra `react-hooks/set-state-in-effect` acusa `setState` depois de `await` dentro de um efeito. Use `.then()`, como em `useMidias`. Props que recebem um ref terminam em `Ref`, senão a regra `react-hooks/immutability` reclama ao atribuir.
 - **Next.js 16:** o middleware é `proxy.ts`. O Next guarda na memória o corpo de toda requisição a `/api` e corta em 10 MB; os vídeos passam porque o tus manda pedaços de 8 MB.

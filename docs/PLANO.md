@@ -493,3 +493,4 @@ Escolhido entre Wan 2.2, LTX-Video, HunyuanVideo, LTX Desktop e ComfyUI, pelo qu
 - **Memória:** 16 GB de RAM no Nitro 5 é o limite com o offload ligado. A tarefa roda sozinha na GPU e libera a memória ao terminar.
 - **Ficaram de fora:** LTX-Video (a licença só é grátis para empresas com menos de US$ 10 milhões de faturamento, e na prática pede mais de 8 GB), HunyuanVideo (licença própria com exclusão de países e uns 14 GB no mínimo) e LTX Desktop (é um editor separado e pede 32 GB).
 - **Antes de começar:** conferir a licença na página do modelo no Hugging Face e medir no Nitro 5 o tempo e a memória de um clipe de 5 s.
+- **Medido no Nitro 5 (14/10/2026):** licença Apache 2.0. Um clipe de 5 s em 480p levou 12 min 43 s, com pico de 9,7 GB de RAM e 7,8 GB de VRAM. Roda só com 12 GB de RAM no WSL e com a GPU livre (HolyCut parado ou sem modelo carregado); a tarefa precisa esperar a placa ficar livre e avisar que leva uns 13 minutos por clipe.
