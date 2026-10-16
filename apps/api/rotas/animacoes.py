@@ -15,11 +15,13 @@ from api.dependencias import obter_db, usuario_atual
 from api.esquemas import AnimacaoDescritaEntrada, AnimacaoHtmlEntrada, MidiaSaida
 from api.rotas.midias import para_saida
 from core.modelos.animacao_html import (
+    ARQUIVOS_COMUNS,
     DURACAO_MAXIMA,
     DURACAO_MINIMA,
     LIVRE,
     MODELOS,
     PASTA_FONTES,
+    PASTA_MODELOS,
     QUADROS,
     ErroAnimacao,
     conferir_campos,
@@ -33,16 +35,20 @@ router = APIRouter(prefix="/api/animacoes", tags=["animacoes"])
 
 FONTES = {"Inter[opsz,wght].ttf", "Montserrat[wght].ttf", "Caveat[wght].ttf"}
 
-# Na prévia a animação recomeça sozinha a cada volta, com o mesmo relógio que o worker usa
+# Na prévia a animação recomeça sozinha a cada volta, com o mesmo relógio que o worker usa (as animações
+# CSS e o renderAt dos modelos em Canvas)
 _LACO_DA_PREVIA = """<script>
 (() => {
-  const ms = %d, inicio = performance.now();
+  const ms = %d;
+  let inicio = 0;
   const passo = (agora) => {
     const t = (agora - inicio) %% ms;
     for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+    if (typeof window.renderAt === "function") window.renderAt(t / 1000);
     requestAnimationFrame(passo);
   };
-  document.fonts.ready.then(() => requestAnimationFrame(passo));
+  Promise.all([document.fonts.ready, window.TO ? window.TO.carregado : null, window.prontoParaGravar || null])
+    .then(() => { inicio = performance.now(); requestAnimationFrame(passo); });
 })();
 </script>"""
 
@@ -63,13 +69,25 @@ async def previa(modelo: str, proporcao: str = "16:9", duracao: float = Query(de
         valores = json.loads(campos)
         if not isinstance(valores, dict):
             raise ValueError
-        pagina = montar_html(modelo, valores, duracao, proporcao, "/api/animacoes/fontes")
+        pagina = montar_html(modelo, valores, duracao, proporcao, "/api/animacoes/fontes", "/api/animacoes/arquivos")
     except (ValueError, ErroAnimacao) as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e) or "Campos inválidos.") from e
+    # O laço entra depois dos módulos do modelo (que definem o renderAt)
     pagina = pagina.replace("</body>", _LACO_DA_PREVIA % round(duracao * 1000) + "</body>")
-    # O iframe não tem permissão de nada além de rodar a animação
-    return HTMLResponse(pagina, headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; "
-                                                                    "script-src 'unsafe-inline'; font-src *"})
+    # O iframe não tem permissão de nada além de rodar a animação: scripts da própria API, fontes e imagens
+    # geradas na página. Nada de rede (connect-src fica em 'none').
+    return HTMLResponse(pagina, headers={"Content-Security-Policy": (
+        "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' *; font-src *; "
+        "img-src data: blob:")})
+
+
+@router.get("/arquivos/{caminho:path}")
+async def arquivo_comum(caminho: str):
+    """O comum.js e o Three.js (vendor/) dos modelos em Canvas. Públicos, como as fontes."""
+    if not ARQUIVOS_COMUNS.fullmatch(caminho):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
+    return FileResponse(PASTA_MODELOS / caminho, media_type="text/javascript",
+                        headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"})
 
 
 @router.get("/fontes/{nome}")

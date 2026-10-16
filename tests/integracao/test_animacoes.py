@@ -43,7 +43,7 @@ def test_animacao_vira_midia_com_transparencia(cliente, db_limpo):
                                                     "proporcao": "9:16", "duracao": 2})
     assert resposta.status_code == 201
     midia = resposta.json()
-    assert midia["nome"] == "Animação · Chamada (CTA): Siga o perfil" and midia["status"] == "processando"
+    assert midia["nome"] == "Animação · Chamada com seta: Siga o perfil" and midia["status"] == "processando"
     job = pegar_proximo_job(db_limpo, ["animacao_html"], "w-teste")
     assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
     ingestao = pegar_proximo_job(db_limpo, ["ingestao"], "w-teste")

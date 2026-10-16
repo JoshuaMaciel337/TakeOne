@@ -1,3 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título cinético",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "As palavras entram uma a uma, no centro; a última em destaque.",
+ "campos": [
+  {
+   "id": "texto",
+   "rotulo": "Título",
+   "tipo": "texto",
+   "padrao": "Edite melhor. Conte mais.",
+   "maximo": 60
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Destaque (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Destaque (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do texto",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Título cinético: cada palavra entra crescendo e saindo do desfoque; a última leva o degradê -->
 <style>
 .titulo{position:absolute;inset:0;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;
@@ -12,4 +48,4 @@
 @keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*3)) scale(.7);filter:blur(calc(var(--u)*1))}}
 @keyframes sair{to{opacity:0;transform:scale(1.08)}}
 </style>
-<div class="titulo">{{palavras}}</div>
+<div class="titulo">{{texto:palavras}}</div>

@@ -1,3 +1,46 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Revelação de nome",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 3.5,
+ "descricao": "Um bloco de cor atravessa e revela o nome, com uma linha embaixo.",
+ "campos": [
+  {
+   "id": "texto",
+   "rotulo": "Nome",
+   "tipo": "texto",
+   "padrao": "TakeOne",
+   "maximo": 30
+  },
+  {
+   "id": "subtitulo",
+   "rotulo": "Linha de baixo",
+   "tipo": "texto",
+   "padrao": "Edite melhor. Conte mais.",
+   "maximo": 60
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Cor do bloco (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor do bloco (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do texto",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Revelação de nome: um bloco de cor cresce, encolhe para a direita e deixa o nome; a linha de baixo vem depois -->
 <style>
 .revelacao{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;

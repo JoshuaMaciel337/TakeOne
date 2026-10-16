@@ -1,33 +1,154 @@
 # -----------------------------------------------
 # Tarefa "animacao_html" — grava uma animação em HTML (tarja, título, CTA...) num vídeo com transparência
 #
-# A página do modelo abre num Chromium sem tela (Playwright). Todas as animações CSS ficam pausadas e o
-# relógio delas avança quadro a quadro (document.getAnimations), então a mesma página dá sempre os mesmos
-# quadros. Cada quadro sai com o fundo transparente e vira dois vídeos, como no recorte do fundo: a cor
+# A página do modelo abre num Chromium sem tela (Playwright), servida por um servidor HTTP mínimo só neste
+# processo (os módulos do Three.js não carregam de file://); o Chromium não fala com mais nada. Todas as
+# animações CSS ficam pausadas e o relógio delas avança quadro a quadro (document.getAnimations); modelos
+# em Canvas ou Three.js definem window.renderAt(t), chamado em cada quadro. A mesma página dá sempre os
+# mesmos quadros. Cada quadro sai com o fundo transparente e vira dois vídeos, como no recorte do fundo: a cor
 # (original.mp4, que o render usa) e a transparência (mascara.mp4, a mesma de clipe.remover_fundo). Antes de
 # ir para o vídeo, a cor de cada borda é espalhada para os pixels transparentes em volta, para o H.264 não
 # misturar preto nas beiradas das letras. Depois, a mídia segue para a ingestão como um envio comum.
 # -----------------------------------------------
 import logging
 import subprocess
-import tempfile
+import threading
 from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import cv2
 import numpy as np
 from bson import ObjectId
 
 from core.config import FFMPEG
-from core.modelos.animacao_html import FPS, PASTA_FONTES, QUADROS, montar_html, quadros_da_animacao
+from core.modelos.animacao_html import (
+    ARQUIVOS_COMUNS,
+    FPS,
+    PASTA_FONTES,
+    PASTA_MODELOS,
+    QUADROS,
+    montar_html,
+    quadros_da_animacao,
+)
 from core.modelos.job import ErroDefinitivo, montar_job
 from core.modelos.midia import ARQUIVO_MASCARA, PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo
 from core.utils import storage
 from core.utils.ffmpeg import MARCAS_BT709
 from core.utils.mongo import agora
 
-# Pausa todas as animações e põe o relógio delas no instante pedido (ms)
-_IR_PARA = """t => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; } }"""
+# Pausa todas as animações CSS no instante pedido (ms) e desenha o quadro dos modelos em Canvas (s)
+_IR_PARA = """async t => {
+  for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+  if (typeof window.renderAt === "function") await window.renderAt(t / 1000);
+  // Espera dois quadros de tela: as animações de opacidade e posição rodam noutra linha do Chrome
+  await new Promise((pronto) => requestAnimationFrame(() => requestAnimationFrame(pronto)));
+}"""
+# Antes do 1º quadro: as fontes, o que o comum.js pediu e o que o modelo disser que falta (prontoParaGravar)
+_ESPERAR = """() => Promise.all([document.fonts.ready, window.TO ? window.TO.carregado : null,
+  window.prontoParaGravar || null]).then(() => typeof window.renderAt)"""
+FONTES = {"Inter[opsz,wght].ttf", "Montserrat[wght].ttf", "Caveat[wght].ttf"}
+TIPOS = {".js": "text/javascript; charset=utf-8", ".ttf": "font/ttf", ".html": "text/html; charset=utf-8"}
+
+
+class _Servidor:
+    """Serve a página da animação, as fontes e os arquivos comuns (comum.js, vendor/) em 127.0.0.1."""
+
+    def __init__(self, pagina_html: str):
+        pagina = pagina_html.encode("utf-8")
+
+        class Atendente(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802 (nome do http.server)
+                caminho = unquote(urlparse(self.path).path)
+                if caminho == "/pagina.html":
+                    self._enviar(pagina, TIPOS[".html"])
+                elif caminho.startswith("/fontes/") and caminho[8:] in FONTES:
+                    self._enviar((PASTA_FONTES / caminho[8:]).read_bytes(), TIPOS[".ttf"])
+                elif caminho.startswith("/animacoes/") and ARQUIVOS_COMUNS.fullmatch(caminho[11:]):
+                    self._enviar((PASTA_MODELOS / caminho[11:]).read_bytes(), TIPOS[".js"])
+                else:
+                    self.send_error(404)
+
+            def _enviar(self, dados: bytes, tipo: str):
+                self.send_response(200)
+                self.send_header("Content-Type", tipo)
+                self.send_header("Content-Length", str(len(dados)))
+                self.end_headers()
+                self.wfile.write(dados)
+
+            def log_message(self, *_):
+                pass
+
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Atendente)
+        self.origem = f"http://127.0.0.1:{self.http.server_address[1]}"
+        threading.Thread(target=self.http.serve_forever, daemon=True).start()
+
+    def fechar(self):
+        self.http.shutdown()
+        self.http.server_close()
+
+
+def abrir_navegador():
+    """(playwright, Chromium) para gravar animações. WebGL em software (SwiftShader), porque o worker não tem
+    placa de vídeo; o Canvas 2D fica na CPU (o Skia direto é bem mais rápido que passando pelo SwiftShader)."""
+    from playwright.sync_api import sync_playwright
+
+    playwright = sync_playwright().start()
+    navegador = playwright.chromium.launch(args=["--font-render-hinting=none", "--use-angle=swiftshader",
+                                                 "--enable-unsafe-swiftshader", "--disable-accelerated-2d-canvas"])
+    return playwright, navegador
+
+
+class Estudio:
+    """Abre a página de uma animação e devolve qualquer quadro dela (BGRA, fundo transparente).
+    Uso: with Estudio(pagina, largura, altura) as estudio: quadro = estudio.quadro(1.5)"""
+
+    def __init__(self, pagina_html: str, largura: int, altura: int, navegador=None):
+        """navegador: um Chromium já aberto (os testes abrem um para todos os modelos); sem ele, abre e fecha."""
+        self.pagina_html, self.largura, self.altura = pagina_html, largura, altura
+        self._emprestado = navegador
+        self.navegador = navegador
+        self._playwright = self.servidor = self.pagina = None
+
+    def __enter__(self):
+        self.servidor = _Servidor(self.pagina_html)
+        try:
+            if self.navegador is None:
+                self._playwright, self.navegador = abrir_navegador()
+            self.pagina = self.navegador.new_page(viewport={"width": self.largura, "height": self.altura},
+                                                  device_scale_factor=1)
+            origem = self.servidor.origem
+            self.pagina.route("**/*", lambda rota: rota.continue_() if rota.request.url.startswith(origem)
+                              else rota.abort())
+            erros: list[str] = []
+            self.pagina.on("pageerror", lambda erro: erros.append(str(erro)))
+            self.pagina.goto(f"{origem}/pagina.html", wait_until="load")
+            self.motor = self.pagina.evaluate(_ESPERAR)
+            if erros:
+                raise ErroDefinitivo(f"A animação tem um erro de script: {erros[0][:200]}")
+        except BaseException:
+            self.__exit__(None, None, None)
+            raise
+        return self
+
+    def quadro(self, segundos: float) -> np.ndarray:
+        self.pagina.evaluate(_IR_PARA, segundos * 1000)
+        png = self.pagina.screenshot(type="png", omit_background=True, animations="allow")
+        quadro = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_UNCHANGED)
+        if quadro is None or quadro.shape[2] != 4:
+            raise ErroDefinitivo("O navegador não devolveu o quadro com transparência.")
+        return quadro
+
+    def __exit__(self, *_):
+        navegador = None if self._emprestado else self.navegador
+        for coisa, fechar in ((self.pagina, "close"), (navegador, "close"), (self._playwright, "stop"),
+                              (self.servidor, "fechar")):
+            if coisa is not None:
+                try:
+                    getattr(coisa, fechar)()
+                except Exception:  # noqa: BLE001 (fechar o que abriu, mesmo que algo já tenha caído)
+                    logging.debug("Falha ao fechar o estúdio da animação", exc_info=True)
 
 
 def marcar_animacao_com_erro(db, job: dict, mensagem: str):
@@ -71,10 +192,8 @@ def _escritor(largura: int, altura: int, pix_fmt: str, destino: Path, extras: li
 
 def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float, cor: Path, mascara: Path,
                     reportar: Callable[[int, str], None] = lambda *_: None) -> int:
-    """Grava a página nos dois vídeos e devolve quantos quadros saíram. A página não sai para a rede (só
-    arquivos locais, as fontes), e animação que não mostra nada é recusada."""
-    from playwright.sync_api import sync_playwright
-
+    """Grava a página (montada com as bases /fontes e /animacoes) nos dois vídeos e devolve quantos
+    quadros saíram. Animação que não mostra nada é recusada."""
     total = quadros_da_animacao(duracao)
     escritor_cor = _escritor(largura, altura, "rgb24", cor,
                              ["-vf", "scale=out_color_matrix=bt709:out_range=tv", *MARCAS_BT709])
@@ -82,31 +201,15 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
     feitos = 0
     visivel = False
     try:
-        with tempfile.TemporaryDirectory() as pasta, sync_playwright() as playwright:
-            arquivo = Path(pasta) / "animacao.html"
-            arquivo.write_text(pagina_html, encoding="utf-8")
-            navegador = playwright.chromium.launch(args=["--disable-gpu", "--font-render-hinting=none"])
-            try:
-                pagina = navegador.new_page(viewport={"width": largura, "height": altura}, device_scale_factor=1)
-                pagina.route("**/*", lambda rota: rota.continue_() if rota.request.url.startswith("file:")
-                             else rota.abort())
-                pagina.goto(arquivo.as_uri(), wait_until="load")
-                pagina.evaluate("document.fonts.ready.then(() => true)")
-                for indice in range(total):
-                    pagina.evaluate(_IR_PARA, indice * 1000 / FPS)
-                    png = pagina.screenshot(type="png", omit_background=True, animations="allow")
-                    quadro = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_UNCHANGED)
-                    if quadro is None or quadro.shape[2] != 4:
-                        raise ErroDefinitivo("O navegador não devolveu o quadro com transparência.")
-                    rgb, alfa = espalhar_cor(quadro)
-                    visivel = visivel or bool(alfa.any())
-                    escritor_cor.stdin.write(rgb.tobytes())
-                    escritor_alfa.stdin.write(alfa.tobytes())
-                    feitos += 1
-                    if feitos % 15 == 0:
-                        reportar(min(95, 2 + int(93 * feitos / total)), "Gravando a animação")
-            finally:
-                navegador.close()
+        with Estudio(pagina_html, largura, altura) as estudio:
+            for indice in range(total):
+                rgb, alfa = espalhar_cor(estudio.quadro(indice / FPS))
+                visivel = visivel or bool(alfa.any())
+                escritor_cor.stdin.write(rgb.tobytes())
+                escritor_alfa.stdin.write(alfa.tobytes())
+                feitos += 1
+                if feitos % 15 == 0:
+                    reportar(min(95, 2 + int(93 * feitos / total)), "Gravando a animação")
     finally:
         for escritor in (escritor_cor, escritor_alfa):
             escritor.stdin.close()
@@ -131,7 +234,7 @@ def executar_animacao_html(db, job: dict, reportar: Callable[[int, str], None]) 
     original.parent.mkdir(parents=True, exist_ok=True)
     parciais = [original.with_name("animacao.parcial.mp4"), mascara.with_name("mascara.parcial.mp4")]
     pagina = montar_html(entrada["modelo"], entrada["campos"], entrada["duracao"], entrada["proporcao"],
-                         PASTA_FONTES.as_uri())
+                         "/fontes", "/animacoes")
     reportar(1, "Abrindo a animação")
     try:
         feitos = gravar_animacao(pagina, largura, altura, entrada["duracao"], *parciais, reportar=reportar)

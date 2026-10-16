@@ -8,7 +8,7 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import type { Midia } from "@/lib/tipos";
 
 type Campo = { id: string; rotulo: string; tipo: "texto" | "linhas" | "cor" | "numero"; padrao: string; maximo: number };
-type Modelo = { id: string; nome: string; descricao: string; duracao: number; campos: Campo[] };
+type Modelo = { id: string; nome: string; descricao: string; duracao: number; categoria: string; nome_da_categoria: string; campos: Campo[] };
 
 // O quadro de cada proporção, como em core/modelos/animacao_html.py (lado menor 1080)
 const QUADROS: Record<string, [number, number]> = {
@@ -131,6 +131,8 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState("");
   const [endereco, setEndereco] = useState("");
+  const [categoria, setCategoria] = useState("todas");
+  const [busca, setBusca] = useState("");
 
   useEffect(() => {
     chamarApi<Modelo[]>("/animacoes/modelos")
@@ -173,28 +175,57 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   }
 
   if (!escolhido) {
+    const categorias = [...new Map((modelos ?? []).map((m) => [m.categoria, m.nome_da_categoria])).entries()];
+    const termo = busca.trim().toLowerCase();
+    const visiveis = (modelos ?? []).filter(
+      (m) => (categoria === "todas" || m.categoria === categoria) && (!termo || `${m.nome} ${m.descricao}`.toLowerCase().includes(termo)),
+    );
     return (
       <div className="flex flex-col gap-3">
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
         <DescreverAnimacao proporcao={proporcao} aoPedir={aoPedir} />
-        <p className="text-xs font-medium text-suave">Animações · tarjas, títulos e chamadas com transparência</p>
-        <div className="grid grid-cols-1 gap-2">
-          {(modelos ?? []).map((modelo) => (
+        <p className="text-xs font-medium text-suave">
+          Biblioteca de animações{modelos ? ` · ${modelos.length} modelos` : ""} · com fundo transparente
+        </p>
+        <input
+          type="search"
+          value={busca}
+          onChange={(evento) => setBusca(evento.target.value)}
+          placeholder="Procurar (tarja, contador, 3D…)"
+          aria-label="Procurar animação"
+          className="rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+        />
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Categorias">
+          {[["todas", "Todas"], ...categorias].map(([id, nome]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setCategoria(id)}
+              aria-pressed={categoria === id}
+              className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                categoria === id ? "border-destaque bg-destaque/15 text-texto" : "border-borda text-suave hover:text-texto"
+              }`}
+            >
+              {nome}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {visiveis.map((modelo) => (
             <button
               key={modelo.id}
               type="button"
               onClick={() => escolher(modelo)}
-              className="flex items-start gap-3 rounded-lg border border-borda bg-painel-2 p-3 text-left transition hover:border-destaque"
+              title={modelo.descricao}
+              className="group overflow-hidden rounded-lg border border-borda bg-painel-2 text-left transition hover:border-destaque"
             >
-              <Clapperboard className="mt-0.5 size-4 shrink-0 text-destaque" aria-hidden />
-              <span>
-                <span className="block text-sm font-semibold">{modelo.nome}</span>
-                <span className="block text-xs text-suave">{modelo.descricao}</span>
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- miniaturas fixas, geradas pelo worker */}
+              <img src={`/animacoes/${modelo.id}.webp`} alt="" loading="lazy" className="aspect-video w-full object-cover" />
+              <span className="block truncate px-2 py-1.5 text-[11px] font-semibold">{modelo.nome}</span>
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-suave">Figuras, adesivos e formas chegam na fase 6.</p>
+        {modelos && !visiveis.length ? <p className="text-center text-xs text-suave">Nenhuma animação com esse nome.</p> : null}
       </div>
     );
   }
@@ -205,6 +236,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
         <ArrowLeft className="size-3.5" aria-hidden /> Todas as animações
       </button>
       <h3 className="text-sm font-semibold">{escolhido.nome}</h3>
+      <p className="-mt-2 text-[11px] text-suave">{escolhido.descricao}</p>
       {endereco ? <Previa endereco={endereco} proporcao={proporcao} /> : null}
       {escolhido.campos.map((campo) => (
         <label key={campo.id} className="flex flex-col gap-1 text-[11px] text-suave">

@@ -65,11 +65,10 @@ def _quadro(caminho, segundos: float, largura: int, altura: int) -> np.ndarray:
 
 @pytest.mark.skipif(not PODE_GRAVAR, reason="FFmpeg ou o Chromium do Playwright não instalados")
 def test_tarja_gravada_tem_transparencia_no_lugar_e_cor_sem_borda_preta(tmp_path):
-    from core.modelos.animacao_html import PASTA_FONTES
     from worker.tarefas.animacao_html import gravar_animacao
 
     largura, altura = QUADROS["16:9"]
-    pagina = montar_html("tarja", {"nome": "Ana Souza", "cor_texto": "#ffffff"}, 2, "16:9", PASTA_FONTES.as_uri())
+    pagina = montar_html("tarja", {"nome": "Ana Souza", "cor_texto": "#ffffff"}, 2, "16:9", "/fontes", "/animacoes")
     cor, mascara = tmp_path / "cor.mp4", tmp_path / "mascara.mp4"
     assert gravar_animacao(pagina, largura, altura, 2, cor, mascara) == 60
     sonda = json.loads(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",

@@ -1,3 +1,46 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja com nome",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "Nome e função na parte de baixo, entrando pela esquerda.",
+ "campos": [
+  {
+   "id": "nome",
+   "rotulo": "Nome",
+   "tipo": "texto",
+   "padrao": "Ana Souza",
+   "maximo": 40
+  },
+  {
+   "id": "funcao",
+   "rotulo": "Função",
+   "tipo": "texto",
+   "padrao": "Fundadora",
+   "maximo": 60
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Cor da barra (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor da barra (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do texto",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Tarja com nome: a barra cresce, o nome e a função sobem por trás de uma máscara e tudo sai pela esquerda -->
 <style>
 .tarja{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*9);display:flex;gap:calc(var(--u)*1.8);

@@ -1,3 +1,60 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Número que conta",
+ "categoria": "numeros",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um número que sobe de zero até o valor, com uma legenda.",
+ "campos": [
+  {
+   "id": "valor",
+   "rotulo": "Valor final",
+   "tipo": "numero",
+   "padrao": "250",
+   "maximo": 0
+  },
+  {
+   "id": "prefixo",
+   "rotulo": "Antes do número",
+   "tipo": "texto",
+   "padrao": "+",
+   "maximo": 6
+  },
+  {
+   "id": "sufixo",
+   "rotulo": "Depois do número",
+   "tipo": "texto",
+   "padrao": "mil",
+   "maximo": 10
+  },
+  {
+   "id": "legenda",
+   "rotulo": "Legenda",
+   "tipo": "texto",
+   "padrao": "pessoas alcançadas",
+   "maximo": 50
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Cor (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor da legenda",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Número que conta: a propriedade --n (inteira) anima de 0 até o valor e o contador do CSS mostra o número -->
 <style>
 @property --n{syntax:'<integer>';inherits:false;initial-value:0}

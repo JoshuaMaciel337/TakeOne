@@ -11,7 +11,7 @@ import re
 from html import escape
 from html.parser import HTMLParser
 
-from core.modelos.animacao_html import PASTA_MODELOS, ErroAnimacao
+from core.modelos.animacao_html import ErroAnimacao
 
 DESCRICAO_MINIMA = 5
 DESCRICAO_MAXIMA = 400
@@ -34,8 +34,9 @@ _PROIBIDO_NO_CSS = re.compile(r"url\s*\(|@import|expression\s*\(|javascript:|beh
 
 
 def _instrucoes() -> str:
-    exemplos = "\n\n".join((PASTA_MODELOS / f"{nome}.html").read_text(encoding="utf-8")
-                           for nome in ("tarja", "contador"))
+    from core.modelos.animacao_html import MODELOS
+
+    exemplos = "\n\n".join(MODELOS[nome]["corpo"] for nome in ("tarja", "contador"))
     return f"""Você cria animações curtas em HTML e CSS para pôr por cima de vídeos (motion graphics), \
 como tarjas, títulos, números e chamadas. Responda só com o JSON {{"css": "...", "html": "..."}}.
 

@@ -1,12 +1,19 @@
 # -----------------------------------------------
-# TakeOne — animações em HTML (tarjas, títulos, CTA, contador...), gravadas em vídeo pelo worker
+# TakeOne — animações em HTML (a biblioteca de efeitos), gravadas em vídeo pelo worker
 # Funções puras: os modelos, a conferência dos campos e a página de cada animação.
 #
-# Cada modelo é um HTML com CSS (core/animacoes/<id>.html) animado só por CSS, sem GSAP (a licença dele
-# proíbe editores visuais de animação). O tempo é o das animações CSS: o worker pausa todas e avança
-# document.getAnimations() quadro a quadro, então a mesma página dá sempre os mesmos quadros.
+# Cada modelo é um arquivo core/animacoes/<id>.html que traz os próprios dados num bloco
+# <script type="application/json" id="modelo"> (nome, categoria, descrição, duração, motor e campos).
+# Há dois motores, os dois sem relógio: "css" (animações CSS, que o worker pausa e avança quadro a quadro
+# por document.getAnimations) e "canvas" (o modelo define window.renderAt(t), uma função pura do tempo,
+# em Canvas 2D, SVG ou Three.js). Nada de GSAP: a licença dele proíbe editores visuais de animação.
+#
+# No HTML do modelo: {{campo}} é o texto escapado; {{campo:palavras}}, {{campo:linhas}} e {{campo:letras}}
+# viram spans com --i (para entrar em sequência); {{base}} é a pasta dos arquivos comuns (comum.js, vendor/).
+# A página ganha window.CAMPOS, window.QUADRO ({largura, altura, u}) e window.DURACAO.
 # -----------------------------------------------
 import html
+import json
 import re
 from pathlib import Path
 
@@ -31,96 +38,72 @@ COR_1 = "#ff624a"
 COR_2 = "#ff3478"
 BRANCO = "#ffffff"
 
-# Campo: (id, rótulo, tipo, padrão, tamanho máximo). Tipos: texto, linhas (aceita quebra), cor, numero.
-MODELOS = {
-    "tarja": {
-        "nome": "Tarja com nome",
-        "descricao": "Nome e função na parte de baixo, entrando pela esquerda.",
-        "duracao": 4.0,
-        "campos": [
-            ("nome", "Nome", "texto", "Ana Souza", 40),
-            ("funcao", "Função", "texto", "Fundadora", 60),
-            ("cor_1", "Cor da barra (início)", "cor", COR_1, 0),
-            ("cor_2", "Cor da barra (fim)", "cor", COR_2, 0),
-            ("cor_texto", "Cor do texto", "cor", BRANCO, 0),
-        ],
-    },
-    "titulo": {
-        "nome": "Título cinético",
-        "descricao": "As palavras entram uma a uma, no centro; a última em destaque.",
-        "duracao": 3.0,
-        "campos": [
-            ("texto", "Título", "texto", "Edite melhor. Conte mais.", 60),
-            ("cor_texto", "Cor do texto", "cor", BRANCO, 0),
-            ("cor_1", "Destaque (início)", "cor", COR_1, 0),
-            ("cor_2", "Destaque (fim)", "cor", COR_2, 0),
-        ],
-    },
-    "revelacao": {
-        "nome": "Revelação de nome",
-        "descricao": "Um bloco de cor atravessa e revela o nome, com uma linha embaixo.",
-        "duracao": 3.5,
-        "campos": [
-            ("texto", "Nome", "texto", "TakeOne", 30),
-            ("subtitulo", "Linha de baixo", "texto", "Edite melhor. Conte mais.", 60),
-            ("cor_1", "Cor do bloco (início)", "cor", COR_1, 0),
-            ("cor_2", "Cor do bloco (fim)", "cor", COR_2, 0),
-            ("cor_texto", "Cor do texto", "cor", BRANCO, 0),
-        ],
-    },
-    "cta": {
-        "nome": "Chamada (CTA)",
-        "descricao": "Um botão com seta que salta, embaixo no centro.",
-        "duracao": 4.0,
-        "campos": [
-            ("texto", "Texto", "texto", "Compre pelo link na bio", 40),
-            ("cor_1", "Cor (início)", "cor", COR_1, 0),
-            ("cor_2", "Cor (fim)", "cor", COR_2, 0),
-            ("cor_texto", "Cor do texto", "cor", BRANCO, 0),
-        ],
-    },
-    "contador": {
-        "nome": "Número que conta",
-        "descricao": "Um número que sobe de zero até o valor, com uma legenda.",
-        "duracao": 3.0,
-        "campos": [
-            ("valor", "Valor final", "numero", "250", 0),
-            ("prefixo", "Antes do número", "texto", "+", 6),
-            ("sufixo", "Depois do número", "texto", "mil", 10),
-            ("legenda", "Legenda", "texto", "pessoas alcançadas", 50),
-            ("cor_1", "Cor (início)", "cor", COR_1, 0),
-            ("cor_2", "Cor (fim)", "cor", COR_2, 0),
-            ("cor_texto", "Cor da legenda", "cor", BRANCO, 0),
-        ],
-    },
-    "citacao": {
-        "nome": "Citação",
-        "descricao": "Aspas grandes e o texto linha a linha, com o autor.",
-        "duracao": 5.0,
-        "campos": [
-            ("texto", "Citação (uma linha por quebra)", "linhas",
-             "A melhor parte da conversa\ncabe em 30 segundos.", 160),
-            ("autor", "Autor", "texto", "Ana Souza", 40),
-            ("cor_1", "Cor das aspas (início)", "cor", COR_1, 0),
-            ("cor_2", "Cor das aspas (fim)", "cor", COR_2, 0),
-            ("cor_texto", "Cor do texto", "cor", BRANCO, 0),
-        ],
-    },
+CATEGORIAS = {
+    "titulos": "Títulos",
+    "tarjas": "Tarjas e nomes",
+    "chamadas": "Chamadas",
+    "numeros": "Números e gráficos",
+    "listas": "Listas e passos",
+    "citacoes": "Citações",
+    "redes": "Redes sociais",
+    "logos": "Logos e marca",
+    "transicoes": "Vinhetas e transições",
+    "fundos": "Fundos e partículas",
 }
+MOTORES = {"css", "canvas"}
+TIPOS = {"texto", "linhas", "cor", "numero"}
+ARQUIVOS_COMUNS = re.compile(r"(comum\.js|vendor/[\w.-]+\.js)")
 
 _COR = re.compile(r"#[0-9a-fA-F]{6}")
-_CAMPO = re.compile(r"\{\{(\w+)\}\}")
+_CAMPO = re.compile(r"\{\{(\w+)(?::(palavras|linhas|letras))?\}\}")
+_DADOS = re.compile(r'<script type="application/json" id="modelo">(.*?)</script>\s*', re.S)
 
 
 class ErroAnimacao(ValueError):
     """Campo inválido: a mensagem vai para a pessoa."""
 
 
+def _carregar() -> dict:
+    """Lê todos os modelos de core/animacoes. Um arquivo mal formado é erro de programação: falha alto."""
+    modelos = {}
+    for arquivo in sorted(PASTA_MODELOS.glob("*.html")):
+        texto = arquivo.read_text(encoding="utf-8")
+        achado = _DADOS.search(texto)
+        if not achado:
+            raise ValueError(f"{arquivo.name}: falta o bloco de dados do modelo")
+        dados = json.loads(achado.group(1))
+        for chave in ("nome", "categoria", "descricao", "duracao", "motor", "campos"):
+            if chave not in dados:
+                raise ValueError(f"{arquivo.name}: falta {chave}")
+        if dados["categoria"] not in CATEGORIAS or dados["motor"] not in MOTORES:
+            raise ValueError(f"{arquivo.name}: categoria ou motor desconhecido")
+        campos = []
+        for campo in dados["campos"]:
+            if campo["tipo"] not in TIPOS:
+                raise ValueError(f"{arquivo.name}: tipo de campo desconhecido em {campo['id']}")
+            campos.append((campo["id"], campo["rotulo"], campo["tipo"], str(campo["padrao"]),
+                           int(campo.get("maximo", 0))))
+        modelos[arquivo.stem] = {
+            "nome": dados["nome"], "categoria": dados["categoria"], "descricao": dados["descricao"],
+            "duracao": float(dados["duracao"]), "motor": dados["motor"], "campos": campos,
+            # Modelos que cobrem o quadro todo (fundos, vinhetas): a conferência das bordas não vale para eles
+            "tela_cheia": bool(dados.get("tela_cheia", False)),
+            "corpo": _DADOS.sub("", texto, count=1),
+        }
+    return modelos
+
+
+# id → modelo, lido dos arquivos uma vez, na importação
+MODELOS = _carregar()
+
+
 def lista_de_modelos() -> list[dict]:
-    """Os modelos para o painel do editor, com os campos e os valores de partida."""
+    """Os modelos para o painel do editor, com os campos e os valores de partida, por categoria."""
+    ordem = list(CATEGORIAS)
     return [{"id": chave, "nome": m["nome"], "descricao": m["descricao"], "duracao": m["duracao"],
+             "categoria": m["categoria"], "nome_da_categoria": CATEGORIAS[m["categoria"]],
              "campos": [{"id": c, "rotulo": r, "tipo": t, "padrao": p, "maximo": x} for c, r, t, p, x in m["campos"]]}
-            for chave, m in MODELOS.items()]
+            for chave, m in sorted(MODELOS.items(), key=lambda par: (ordem.index(par[1]["categoria"]), par[1]["nome"]))]
 
 
 # A animação que o LLM escreveu ("Descreva a animação"): o CSS e o HTML já limpos, mais as cores
@@ -168,48 +151,65 @@ def conferir_campos(modelo: str, campos: dict) -> dict:
     return saida
 
 
-def _spans(texto: str, separador: str, classe: str) -> str:
-    """Cada palavra (ou linha) num span com o índice --i, para as animações em sequência."""
-    partes = [p for p in (texto.split(separador) if separador else texto.split()) if p.strip()]
-    return "".join(f'<span class="{classe}" style="--i:{i}">{html.escape(p.strip())}</span>'
+def _spans(partes: list[str], classe: str) -> str:
+    """Cada parte num span com o índice --i, para as animações em sequência."""
+    return "".join(f'<span class="{classe}" style="--i:{i}">{html.escape(p) if p != " " else "&nbsp;"}</span>'
                    for i, p in enumerate(partes))
 
 
-def _valores(modelo: str, campos: dict) -> dict:
-    valores = {chave: html.escape(valor) for chave, valor in campos.items()}
-    if modelo == "titulo":
-        valores["palavras"] = _spans(campos["texto"], "", "palavra")
-    if modelo == "citacao":
-        valores["linhas"] = _spans(campos["texto"], "\n", "linha")
-    return valores
+def _substituir(corpo: str, campos: dict, base: str) -> str:
+    def valor(achado: re.Match) -> str:
+        chave, forma = achado.group(1), achado.group(2)
+        if chave == "base":
+            return base
+        texto = campos.get(chave, "")
+        if forma == "palavras":
+            return _spans(texto.split(), "palavra")
+        if forma == "linhas":
+            return _spans([linha.strip() for linha in texto.split("\n") if linha.strip()], "linha")
+        if forma == "letras":
+            return _spans(list(texto), "letra")
+        return html.escape(texto)
+
+    return _CAMPO.sub(valor, corpo)
 
 
-def montar_html(modelo: str, campos: dict, duracao: float, proporcao: str, base_das_fontes: str) -> str:
-    """A página da animação. base_das_fontes: onde estão os arquivos de core/fontes (file:// no worker,
-    a rota da API na prévia do navegador)."""
+def _json_no_script(dados) -> str:
+    """JSON que pode ir dentro de <script> sem fechar a tag."""
+    return json.dumps(dados, ensure_ascii=False).replace("<", "\\u003c")
+
+
+def montar_html(modelo: str, campos: dict, duracao: float, proporcao: str, base_das_fontes: str,
+                base_dos_arquivos: str = "") -> str:
+    """A página da animação. base_das_fontes e base_dos_arquivos: onde estão core/fontes e os arquivos
+    comuns de core/animacoes (o servidor local do worker, ou as rotas da API na prévia do navegador)."""
     campos = conferir_campos(modelo, campos)
     largura, altura = QUADROS[proporcao]
     if modelo == LIVRE:
         corpo = f"<style>\n{campos['css']}\n</style>\n{campos['html']}"
     else:
-        corpo = (PASTA_MODELOS / f"{modelo}.html").read_text(encoding="utf-8")
-        valores = _valores(modelo, campos)
-        corpo = _CAMPO.sub(lambda m: valores.get(m[1], ""), corpo)
+        corpo = _substituir(MODELOS[modelo]["corpo"], campos, base_dos_arquivos)
+    u = min(largura, altura) / 100
     fontes = "\n".join(
         f"@font-face{{font-family:{familia};src:url('{base_das_fontes}/{arquivo}');font-weight:100 900}}"
         for familia, arquivo in (("Inter", "Inter%5Bopsz,wght%5D.ttf"), ("Montserrat", "Montserrat%5Bwght%5D.ttf"),
                                  ("Caveat", "Caveat%5Bwght%5D.ttf")))
+    globais = (f"window.CAMPOS={_json_no_script(campos)};"
+               f"window.QUADRO={{largura:{largura},altura:{altura},u:{u:.3f}}};window.DURACAO={duracao:.3f};")
     return f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <style>
 {fontes}
 html,body{{margin:0;padding:0;background:transparent;overflow:hidden}}
 body{{width:{largura}px;height:{altura}px;position:relative;font-family:Inter,sans-serif;
-  --dur:{duracao:.3f}s;--u:{min(largura, altura) / 100:.3f}px;
+  --dur:{duracao:.3f}s;--u:{u:.3f}px;
   --cor-1:{campos.get('cor_1', COR_1)};--cor-2:{campos.get('cor_2', COR_2)};
   --cor-texto:{campos.get('cor_texto', BRANCO)}}}
 *{{box-sizing:border-box}}
 </style>
+<script>{globais}</script>
+<script src="{base_dos_arquivos}/comum.js"></script>
+<script type="importmap">{{"imports":{{"three":"{base_dos_arquivos}/vendor/three.module.js"}}}}</script>
 </head><body>
 {corpo}
 </body></html>"""

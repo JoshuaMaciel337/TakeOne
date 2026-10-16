@@ -1,3 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chamada com seta",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "Um botão com seta que salta, embaixo no centro.",
+ "campos": [
+  {
+   "id": "texto",
+   "rotulo": "Texto",
+   "tipo": "texto",
+   "padrao": "Compre pelo link na bio",
+   "maximo": 40
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Cor (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do texto",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Chamada: o botão aparece com um salto, a seta empurra para a direita sem parar, e tudo some no fim -->
 <style>
 .cta{position:absolute;left:50%;bottom:calc(var(--u)*12);transform:translateX(-50%);display:flex;align-items:center;

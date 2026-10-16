@@ -1,3 +1,46 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Citação",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Aspas grandes e o texto linha a linha, com o autor.",
+ "campos": [
+  {
+   "id": "texto",
+   "rotulo": "Citação (uma linha por quebra)",
+   "tipo": "linhas",
+   "padrao": "A melhor parte da conversa\ncabe em 30 segundos.",
+   "maximo": 160
+  },
+  {
+   "id": "autor",
+   "rotulo": "Autor",
+   "tipo": "texto",
+   "padrao": "Ana Souza",
+   "maximo": 40
+  },
+  {
+   "id": "cor_1",
+   "rotulo": "Cor das aspas (início)",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor das aspas (fim)",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do texto",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
 <!-- Citação: as aspas entram girando, cada linha sobe em seguida e o autor aparece por último -->
 <style>
 .citacao{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
@@ -16,4 +59,4 @@
 @keyframes autor{to{opacity:.85}}
 @keyframes sair{to{opacity:0}}
 </style>
-<div class="citacao"><div class="aspas">“</div><div>{{linhas}}</div><div class="autor">{{autor}}</div></div>
+<div class="citacao"><div class="aspas">“</div><div>{{texto:linhas}}</div><div class="autor">{{autor}}</div></div>

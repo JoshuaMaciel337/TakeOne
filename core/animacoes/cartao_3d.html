@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cartão 3D girando",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um cartão com o nome gira em 3D, vira de frente com brilho e se afasta no fim.",
+ "campos": [
+  {"id": "texto", "rotulo": "Nome", "tipo": "texto", "padrao": "TakeOne", "maximo": 24},
+  {"id": "subtitulo", "rotulo": "Linha de baixo", "tipo": "texto", "padrao": "Edite melhor. Conte mais.", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Cor (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Cor (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Cartão 3D: Three.js com o cartão em degradê e o nome numa textura desenhada em Canvas. A rotação, a
+     distância e o reflexo dependem só de t. preserveDrawingBuffer deixa o quadro pronto para a captura. -->
+<script type="module">
+import * as THREE from "three";
+
+const { largura: W, altura: H } = window.QUADRO;
+const C = window.CAMPOS;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+document.body.appendChild(renderer.domElement);
+
+const cena = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 100);
+
+// A face do cartão: degradê da marca e o texto, desenhados num canvas
+const face = document.createElement("canvas");
+face.width = 1600;
+face.height = 1000;
+const fx = face.getContext("2d");
+const textura = new THREE.CanvasTexture(face);
+// O texto só é desenhado depois que as fontes carregam; a gravação e a prévia esperam esta promessa
+window.prontoParaGravar = TO.carregado.then(() => {
+const g = fx.createLinearGradient(0, 0, 1600, 1000);
+g.addColorStop(0, C.cor_1);
+g.addColorStop(1, C.cor_2);
+fx.fillStyle = g;
+fx.fillRect(0, 0, 1600, 1000);
+fx.fillStyle = C.cor_texto;
+fx.textAlign = "center";
+fx.textBaseline = "middle";
+let tam = 240;
+fx.font = `800 ${tam}px Inter, sans-serif`;
+while (fx.measureText(C.texto).width > 1350 && tam > 40) {
+  tam -= 8;
+  fx.font = `800 ${tam}px Inter, sans-serif`;
+}
+fx.fillText(C.texto, 800, 460);
+fx.globalAlpha = 0.85;
+fx.font = "500 64px Inter, sans-serif";
+fx.fillText(C.subtitulo, 800, 700);
+textura.needsUpdate = true;
+});
+textura.colorSpace = THREE.SRGBColorSpace;
+textura.anisotropy = 4;
+
+const verso = new THREE.MeshStandardMaterial({ color: new THREE.Color(C.cor_2).multiplyScalar(0.55), roughness: 0.4, metalness: 0.3 });
+const frente = new THREE.MeshStandardMaterial({ map: textura, roughness: 0.35, metalness: 0.15 });
+const borda = new THREE.MeshStandardMaterial({ color: new THREE.Color(C.cor_1), roughness: 0.3, metalness: 0.5 });
+const cartao = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2, 0.08), [borda, borda, borda, borda, frente, verso]);
+cena.add(cartao);
+
+cena.add(new THREE.AmbientLight(0xffffff, 1.4));
+const luz = new THREE.DirectionalLight(0xffffff, 2.2);
+luz.position.set(2, 3, 4);
+cena.add(luz);
+const brilho = new THREE.PointLight(new THREE.Color(C.cor_2), 30, 10);
+cena.add(brilho);
+
+// Afasta a câmera até o cartão caber na largura e na altura do quadro, em qualquer proporção
+const ajustarCamera = (escala) => {
+  const vfov = THREE.MathUtils.degToRad(camera.fov);
+  const altura = 2 / (2 * Math.tan(vfov / 2));
+  const largura = 3.2 / (2 * Math.tan(vfov / 2) * camera.aspect);
+  camera.position.set(0, 0, Math.max(altura, largura) * 1.45 * escala);
+  camera.lookAt(0, 0, 0);
+};
+
+window.renderAt = (t) => {
+  const dur = window.DURACAO;
+  const entra = TO.ease.outBack(TO.prog(t, 0, 1.4), 1.2);
+  const sai = TO.ease.inCubic(TO.prog(t, dur - 0.6, dur));
+  cartao.rotation.y = (1 - entra) * Math.PI * 1.5 + Math.sin(t * 1.2) * 0.12 * entra + sai * 0.6;
+  cartao.rotation.x = (1 - entra) * -0.5 + Math.sin(t * 0.9) * 0.06;
+  cartao.scale.setScalar(0.4 + 0.6 * entra);
+  cartao.position.z = -sai * 3;
+  brilho.position.set(Math.sin(t * 1.6) * 3, Math.cos(t * 1.1) * 1.5, 2.5);
+  ajustarCamera(1);
+  renderer.domElement.style.opacity = String(TO.prog(t, 0, 0.25) * (1 - sai));
+  renderer.render(cena, camera);
+};
+</script>
