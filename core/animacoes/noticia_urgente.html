@@ -1,0 +1,95 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Barra de notícia",
+ "categoria": "tarjas",
+ "motor": "canvas",
+ "duracao": 7,
+ "descricao": "Barra de telejornal no terço de baixo: selo que pisca, a manchete e uma faixa de notícias correndo embaixo.",
+ "campos": [
+  {"id": "selo", "rotulo": "Selo", "tipo": "texto", "padrao": "URGENTE", "maximo": 14},
+  {"id": "manchete", "rotulo": "Manchete", "tipo": "texto", "padrao": "Chuva forte deixa 12 bairros sem luz", "maximo": 60},
+  {"id": "faixa", "rotulo": "Faixa que corre", "tipo": "texto", "padrao": "Defesa Civil pede que moradores evitem áreas alagadas • Escolas suspendem aulas amanhã", "maximo": 160},
+  {"id": "cor_1", "rotulo": "Selo", "tipo": "cor", "padrao": "#e63946"},
+  {"id": "cor_2", "rotulo": "Faixa", "tipo": "cor", "padrao": "#1d4ed8"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Notícia: a barra branca da manchete abre da esquerda, o selo entra por cima dela e pisca devagar, e a
+     faixa colorida embaixo traz o texto correndo da direita para a esquerda sem parar (deslocamento
+     proporcional ao tempo, repetido). A manchete encolhe até caber. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const abre = TO.ease.inOutCubic(TO.prog(t, 0.2, 0.8));
+    const x = 4 * u;
+    const w = W - 8 * u;
+    const y = H - 26 * u;
+    const hm = 11 * u;
+    const hf = 6 * u;
+    ctx.globalAlpha = 1 - sai;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, 0, w * abre, H);
+    ctx.clip();
+    ctx.fillStyle = "rgba(255,255,255,.96)";
+    ctx.fillRect(x, y, w, hm);
+    ctx.fillStyle = C.cor_2;
+    ctx.fillRect(x, y + hm, w, hf);
+    // Faixa correndo
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y + hm, w, hf);
+    ctx.clip();
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(600, 3.2);
+    ctx.textBaseline = "middle";
+    const item = `${C.faixa}     •     `;
+    const iw = ctx.measureText(item).width;
+    let fx = x + w - ((t * 14 * u) % iw) - iw;
+    while (fx < x + w) {
+      ctx.fillText(item, fx, y + hm + hf / 2 + 0.2 * u);
+      fx += iw;
+    }
+    ctx.restore();
+    // Manchete
+    const m = TO.ease.outCubic(TO.prog(t, 0.7, 1.2));
+    ctx.globalAlpha = (1 - sai) * m;
+    ctx.fillStyle = "#111319";
+    const sx = x + 2.4 * u;
+    ctx.font = TO.fonte(900, 3.4);
+    const sw = ctx.measureText(C.selo).width + 4 * u;
+    const tx = sx + sw + 2.4 * u;
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.manchete, 800, 5, x + w - tx - 2 * u));
+    ctx.fillText(C.manchete, tx + (1 - m) * 2 * u, y + hm / 2 + 0.3 * u);
+    ctx.restore();
+    // Selo
+    const selo = TO.spring(t - 0.4, 0.5, 2.6);
+    if (selo > 0) {
+      const pisca = 0.75 + 0.25 * Math.cos(t * 5);
+      ctx.save();
+      ctx.globalAlpha = 1 - sai;
+      ctx.translate(sx + sw / 2, y + hm / 2);
+      ctx.scale(selo, selo);
+      ctx.fillStyle = C.cor_1;
+      ctx.globalAlpha = (1 - sai) * (t > 1.2 ? pisca : 1);
+      TO.retangulo(ctx, -sw / 2, -3.4 * u, sw, 6.8 * u, 0.8 * u);
+      ctx.fill();
+      ctx.globalAlpha = 1 - sai;
+      ctx.fillStyle = "#fff";
+      ctx.font = TO.fonte(900, 3.4);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(C.selo, 0, 0.3 * u);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

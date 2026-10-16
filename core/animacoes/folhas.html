@@ -1,0 +1,73 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Folhas caindo",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Folhas caem girando e balançando pela tela inteira, com um título no centro. Bom para campo, outono e natureza.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Colheita 2026", "maximo": 28},
+  {"id": "cor_1", "rotulo": "Folhas 1", "tipo": "cor", "padrao": "#5fa83b"},
+  {"id": "cor_2", "rotulo": "Folhas 2", "tipo": "cor", "padrao": "#e0a030"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Folhas: 46 folhas (duas curvas com o talo no meio) caem em ciclo, cada uma com velocidade, giro, balanço
+     e cor sorteados por índice; o "virar" da folha é a escala horizontal pelo cosseno. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 46;
+  const folhas = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(1500 + i);
+    return { x: r(), y: r(), tam: 1.6 + r() * 2, vel: 0.07 + r() * 0.07, giro: (r() - 0.5) * 3, fase: r() * 6.28, cor: TO.mix(C.cor_1, C.cor_2, r()) };
+  });
+  const folha = (s) => {
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.quadraticCurveTo(s * 0.8, 0, 0, s);
+    ctx.quadraticCurveTo(-s * 0.8, 0, 0, -s);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.lineWidth = s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.9);
+    ctx.lineTo(0, s * 1.15);
+    ctx.stroke();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.5, 0.6, dur);
+    for (const f of folhas) {
+      const y = ((f.y + t * f.vel) % 1.12) - 0.06;
+      const x = f.x * W + Math.sin(t * 1.3 + f.fase) * 5 * u;
+      ctx.globalAlpha = env;
+      ctx.fillStyle = f.cor;
+      ctx.save();
+      ctx.translate(x, y * H);
+      ctx.rotate(f.fase + t * f.giro);
+      ctx.scale(Math.cos(t * 2 + f.fase), 1);
+      folha(f.tam * u);
+      ctx.restore();
+    }
+    if (C.titulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 0.5, 1.4));
+      ctx.globalAlpha = env * k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.55)";
+      ctx.shadowBlur = 2.5 * u;
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84, "Montserrat"), "Montserrat");
+      ctx.fillText(C.titulo, W / 2, H / 2 + (1 - k) * 3 * u);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

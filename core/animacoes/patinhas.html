@@ -1,0 +1,86 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Pegadas de patinhas",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Pegadas de patinha atravessam a tela em zigue-zague, aparecendo e sumindo, e um título entra no meio.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Banho e tosa", "maximo": 28},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "agende pelo WhatsApp", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Pegadas", "tipo": "cor", "padrao": "#ffb547"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Patinhas: duas trilhas cruzam a tela na diagonal; cada pegada (almofada e quatro dedos) aparece com
+     um estalo na sua vez, alternando esquerda e direita da trilha, e some devagar depois de 1,6 s. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const pata = (x, y, s, a) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.35, s * 0.55, s * 0.45, 0, 0, 6.2832);
+    ctx.fill();
+    [[-0.6, -0.3], [-0.22, -0.62], [0.22, -0.62], [0.6, -0.3]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.ellipse(dx * s, dy * s, s * 0.2, s * 0.26, dx * 0.5, 0, 6.2832);
+      ctx.fill();
+    });
+    ctx.restore();
+  };
+  const trilhas = [
+    { a: [-0.05, 0.85], b: [1.05, 0.15], inicio: 0 },
+    { a: [1.05, 0.95], b: [-0.05, 0.35], inicio: 0.9 },
+  ];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    ctx.fillStyle = C.cor_1;
+    const passos = 14;
+    trilhas.forEach((tr) => {
+      const ang = Math.atan2((tr.b[1] - tr.a[1]) * H, (tr.b[0] - tr.a[0]) * W) + Math.PI / 2;
+      for (let i = 0; i < passos; i++) {
+        const quando = tr.inicio + i * 0.22;
+        const idade = t - quando;
+        if (idade < 0) continue;
+        const q = i / (passos - 1);
+        const lado = i % 2 ? 1 : -1;
+        const x = TO.lerp(tr.a[0], tr.b[0], q) * W + Math.cos(ang) * lado * 3.2 * u;
+        const y = TO.lerp(tr.a[1], tr.b[1], q) * H + Math.sin(ang) * lado * 3.2 * u;
+        ctx.globalAlpha = fim * TO.clamp(1 - (idade - 1.6) / 0.8) * 0.85;
+        pata(x, y, 3.6 * u * TO.ease.outBack(TO.clamp(idade / 0.2)), ang);
+      }
+    });
+    const k = TO.spring(t - 0.6, 0.5, 2);
+    ctx.globalAlpha = fim * TO.clamp(k);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(k, k);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,.5)";
+    ctx.shadowBlur = 2.5 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84));
+    ctx.fillText(C.titulo, 0, 0);
+    ctx.restore();
+    const d = TO.ease.outCubic(TO.prog(t, 1.2, 1.8));
+    ctx.globalAlpha = fim * d;
+    ctx.fillStyle = C.cor_2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(700, Math.min(4, TO.caber(ctx, C.detalhe, 700, 4, W * 0.8)));
+    ctx.fillText(C.detalhe, W / 2, H / 2 + 9 * u + (1 - d) * 2 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

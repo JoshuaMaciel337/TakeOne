@@ -116,6 +116,68 @@
     "texto": "Nova Rota",
     "subtitulo": "Vender mais, com método."
    }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_empresa",
+   "nome": "Avaliação da empresa",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "Equipe séria, prazo cumprido e resultado acima do combinado.",
+    "nome": "Grupo Lima, cliente"
+   }
+  },
+  {
+   "modelo": "tarja_dupla",
+   "id": "socios",
+   "nome": "Sócios",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nome_1": "Fernanda Lima",
+    "funcao_1": "CEO",
+    "nome_2": "Rodrigo Alves",
+    "funcao_2": "Diretor comercial"
+   }
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "garantia_resultado",
+   "nome": "Garantia de resultado",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "numero": "30",
+    "texto": "DIAS",
+    "fita": "SATISFAÇÃO"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "meta_vendas",
+   "nome": "Meta de vendas",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Meta de vendas do mês",
+    "valor": "412000",
+    "meta": "500000"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_negocios",
+   "nome": "Enquete de negócios",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "pergunta": "Você vende pelas redes sociais?",
+    "opcao_1": "Sim",
+    "pct_1": "71",
+    "opcao_2": "Ainda não",
+    "pct_2": "29"
+   }
   }
  ]
 }

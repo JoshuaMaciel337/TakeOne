@@ -115,6 +115,58 @@
     "valor": "78",
     "legenda": "de aproveitamento na temporada"
    }
+  },
+  {
+   "modelo": "velocimetro",
+   "id": "velocidade_chute",
+   "nome": "Velocidade do chute",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "112",
+    "maximo": "150",
+    "unidade": "km/h",
+    "legenda": "velocidade do chute"
+   }
+  },
+  {
+   "modelo": "batimento",
+   "id": "batimento_atleta",
+   "nome": "Batimento do atleta",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "168",
+    "unidade": "bpm",
+    "legenda": "no último sprint"
+   }
+  },
+  {
+   "modelo": "tarja_dupla",
+   "id": "comentaristas",
+   "nome": "Comentaristas",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "nome_1": "Paulo Cesar",
+    "funcao_1": "Narrador",
+    "nome_2": "Rita Alves",
+    "funcao_2": "Comentarista"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_jogo",
+   "nome": "Quem vence",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "pergunta": "Quem vence a final?",
+    "opcao_1": "Azul",
+    "pct_1": "53",
+    "opcao_2": "Verde",
+    "pct_2": "47"
+   }
   }
  ]
 }

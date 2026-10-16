@@ -101,6 +101,54 @@
     "titulo": "Carga no supino (kg)",
     "dados": "Sem 1: 40\nSem 2: 45\nSem 3: 45\nSem 4: 50\nSem 5: 55\nSem 6: 60"
    }
+  },
+  {
+   "modelo": "batimento",
+   "id": "batimento_treino",
+   "nome": "Batimento no treino",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "valor": "152",
+    "unidade": "bpm",
+    "legenda": "zona de queima de gordura"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_aula",
+   "nome": "Horário da aula",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "hora": "6",
+    "minuto": "30",
+    "texto": "Aula de funcional às 6h30"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "desafio_km",
+   "nome": "Desafio de quilômetros",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "titulo": "Desafio de 100 km",
+    "valor": "72",
+    "meta": "100",
+    "prefixo": ""
+   }
+  },
+  {
+   "modelo": "bateria",
+   "id": "energia_treino",
+   "nome": "Energia para o treino",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "valor": "100",
+    "legenda": "energia para o treino"
+   }
   }
  ]
 }

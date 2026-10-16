@@ -1,0 +1,52 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Enquete",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Cartão de enquete: a pergunta, as opções com barras que enchem até a porcentagem e a vencedora em destaque.",
+ "campos": [
+  {"id": "pergunta", "rotulo": "Pergunta", "tipo": "texto", "padrao": "Qual vídeo você quer ver amanhã?", "maximo": 60},
+  {"id": "opcao_1", "rotulo": "Opção 1", "tipo": "texto", "padrao": "Bastidores", "maximo": 24},
+  {"id": "pct_1", "rotulo": "Opção 1 (%)", "tipo": "numero", "padrao": "64", "maximo": 0},
+  {"id": "opcao_2", "rotulo": "Opção 2", "tipo": "texto", "padrao": "Tutorial", "maximo": 24},
+  {"id": "pct_2", "rotulo": "Opção 2 (%)", "tipo": "numero", "padrao": "36", "maximo": 0},
+  {"id": "cor_1", "rotulo": "Vencedora (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Vencedora (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Enquete: um script curto lê as porcentagens (limitadas a 100) para a largura de cada barra e marca a
+     maior como vencedora; as barras enchem em sequência e a vencedora ganha o degradê e um check. -->
+<style>
+.enquete{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*84),88%);padding:calc(var(--u)*4);
+  border-radius:calc(var(--u)*3.2);background:rgba(18,19,25,.92);color:var(--cor-texto);
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.pergunta{font-weight:800;font-size:calc(var(--u)*5);line-height:1.15;margin-bottom:calc(var(--u)*3)}
+.opcao{position:relative;display:flex;justify-content:space-between;align-items:center;margin-top:calc(var(--u)*1.8);padding:calc(var(--u)*2.2) calc(var(--u)*2.6);
+  border-radius:calc(var(--u)*1.8);overflow:hidden;background:rgba(255,255,255,.08);font-weight:700;font-size:calc(var(--u)*3.8)}
+.opcao i{position:absolute;left:0;top:0;bottom:0;width:var(--pct);background:rgba(255,255,255,.16);transform-origin:0 50%;
+  animation:encher 1s cubic-bezier(.2,.8,.2,1) calc(.7s + var(--n) * .25s) both}
+.opcao.vence i{background:linear-gradient(90deg,var(--cor-1),var(--cor-2))}
+.opcao span{position:relative}
+.opcao b{position:relative;animation:aparecer .4s ease-out calc(1.3s + var(--n) * .25s) both}
+.opcao.vence span::after{content:" ✓";animation:aparecer .3s ease-out 2s both}
+@keyframes subir{from{opacity:0;transform:translate(-50%,-44%)}}
+@keyframes encher{from{transform:scaleX(0)}}
+@keyframes aparecer{from{opacity:0}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-55%)}}
+</style>
+<div class="enquete">
+ <div class="pergunta">{{pergunta}}</div>
+ <div class="opcao" style="--n:0" data-pct="{{pct_1}}"><i></i><span>{{opcao_1}}</span><b>{{pct_1}}%</b></div>
+ <div class="opcao" style="--n:1" data-pct="{{pct_2}}"><i></i><span>{{opcao_2}}</span><b>{{pct_2}}%</b></div>
+</div>
+<script>
+const opcoes = [...document.querySelectorAll(".opcao")];
+const pcts = opcoes.map((o) => Math.min(100, parseInt(o.dataset.pct, 10) || 0));
+opcoes.forEach((o, i) => {
+  o.style.setProperty("--pct", `${pcts[i]}%`);
+  if (pcts[i] === Math.max(...pcts)) o.classList.add("vence");
+});
+</script>

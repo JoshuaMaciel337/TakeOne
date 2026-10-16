@@ -107,6 +107,53 @@
     "cor_1": "#ffb547",
     "cor_2": "#ff624a"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_almoco",
+   "nome": "Horário do almoço",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "hora": "11",
+    "minuto": "30",
+    "texto": "Almoço a partir das 11h30"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_restaurante",
+   "nome": "Avaliação do restaurante",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "texto": "A melhor feijoada da cidade, sem exagero.",
+    "nome": "Marcos, cliente fiel"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_prato",
+   "nome": "Prato da semana",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "pergunta": "Qual prato volta ao cardápio?",
+    "opcao_1": "Lasanha",
+    "pct_1": "59",
+    "opcao_2": "Strogonoff",
+    "pct_2": "41"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "pedido_conversa",
+   "nome": "Pedido por mensagem",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "texto": "Boa noite! Ainda dá para pedir?\nDá sim! O que vai ser?\nUma pizza grande de calabresa\nChega em 40 minutos!"
+   }
   }
  ]
 }

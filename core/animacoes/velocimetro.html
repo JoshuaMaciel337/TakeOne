@@ -1,0 +1,99 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Velocímetro",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Um mostrador de velocímetro: o ponteiro sobe até o valor com um tranco, o arco acende e o número conta.",
+ "campos": [
+  {"id": "valor", "rotulo": "Valor", "tipo": "numero", "padrao": "240", "maximo": 0},
+  {"id": "maximo", "rotulo": "Fim da escala", "tipo": "numero", "padrao": "300", "maximo": 0},
+  {"id": "unidade", "rotulo": "Unidade", "tipo": "texto", "padrao": "km/h", "maximo": 8},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "velocidade máxima", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Arco (início)", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Arco (fim)", "tipo": "cor", "padrao": "#e63946"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Velocímetro: arco de 240°, com marcas a cada décimo da escala; o ponteiro vai até o valor com uma mola
+     pouco amortecida (o tranco do motor) e o arco aceso segue o ponteiro. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const maximo = Math.max(1, parseInt(C.maximo, 10) || 1);
+  const alvo = Math.min(1, (parseInt(C.valor, 10) || 0) / maximo);
+  const A0 = Math.PI * (150 / 180);
+  const VARRE = Math.PI * (240 / 180);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const e = TO.ease.outBack(TO.prog(t, 0, 0.5));
+    const cx = W / 2;
+    const cy = H / 2;
+    const r = 20 * u;
+    ctx.globalAlpha = (1 - sai) * TO.clamp(t / 0.3);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(e, e);
+    ctx.fillStyle = "rgba(14,15,20,.86)";
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 4 * u, 0, 6.2832);
+    ctx.fill();
+    ctx.lineCap = "round";
+    ctx.lineWidth = 2 * u;
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.beginPath();
+    ctx.arc(0, 0, r, A0, A0 + VARRE);
+    ctx.stroke();
+    const k = TO.clamp(TO.spring(t - 0.5, 0.55, 1.3) * alvo, 0, 1);
+    ctx.strokeStyle = TO.degrade(ctx, -r, 0, r, 0);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, A0, A0 + VARRE * Math.max(0.001, k));
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.6)";
+    ctx.lineWidth = 0.35 * u;
+    ctx.fillStyle = "rgba(255,255,255,.55)";
+    ctx.font = TO.fonte(600, 1.8);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i <= 10; i++) {
+      const a = A0 + (VARRE * i) / 10;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (r - 3 * u), Math.sin(a) * (r - 3 * u));
+      ctx.lineTo(Math.cos(a) * (r - 4.6 * u), Math.sin(a) * (r - 4.6 * u));
+      ctx.stroke();
+      if (i % 2 === 0) ctx.fillText(String(Math.round((maximo * i) / 10)), Math.cos(a) * (r - 7 * u), Math.sin(a) * (r - 7 * u));
+    }
+    const a = A0 + VARRE * k;
+    ctx.strokeStyle = C.cor_2;
+    ctx.lineWidth = 0.8 * u;
+    ctx.beginPath();
+    ctx.moveTo(-Math.cos(a) * 2 * u, -Math.sin(a) * 2 * u);
+    ctx.lineTo(Math.cos(a) * (r - 5 * u), Math.sin(a) * (r - 5 * u));
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.4 * u, 0, 6.2832);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(900, 6.4);
+    ctx.fillText(String(Math.round(maximo * k)), 0, r * 0.52);
+    ctx.font = TO.fonte(600, 2.4);
+    ctx.globalAlpha = (1 - sai) * 0.7;
+    ctx.fillText(C.unidade, 0, r * 0.52 + 5 * u);
+    ctx.restore();
+    const l = TO.ease.outCubic(TO.prog(t, 1.2, 1.8));
+    ctx.globalAlpha = (1 - sai) * l;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = TO.fonte(700, Math.min(3.8, TO.caber(ctx, C.legenda, 700, 3.8, W * 0.84)));
+    ctx.fillText(C.legenda, cx, cy + r + 7 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

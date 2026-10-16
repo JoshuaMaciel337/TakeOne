@@ -224,6 +224,80 @@
     "sufixo": "",
     "legenda": "vidas alcançadas este ano"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_culto",
+   "nome": "Horário do culto",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "hora": "19",
+    "minuto": "0",
+    "texto": "Culto hoje às 19h"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "meta_templo",
+   "nome": "Meta do templo",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Construção do templo",
+    "valor": "320000",
+    "meta": "500000"
+   }
+  },
+  {
+   "modelo": "chave_pix",
+   "id": "ofertas_igreja",
+   "nome": "Ofertas",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Contribua com a obra",
+    "chave": "00.000.000/0001-00",
+    "obrigado": "Deus abençoe a sua vida."
+   }
+  },
+  {
+   "modelo": "tarja_dupla",
+   "id": "entrevista_igreja",
+   "nome": "Entrevista na igreja",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "nome_1": "Pr. João",
+    "funcao_1": "Pastor presidente",
+    "nome_2": "Ir. Marta",
+    "funcao_2": "Ministério infantil"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_igreja",
+   "nome": "Enquete da igreja",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "pergunta": "Qual tema para o próximo retiro?",
+    "opcao_1": "Família",
+    "pct_1": "55",
+    "opcao_2": "Propósito",
+    "pct_2": "45"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "testemunho",
+   "nome": "Testemunho",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Cheguei sem esperança e encontrei uma família.",
+    "nome": "Irmã Lúcia"
+   }
   }
  ]
 }

@@ -1,0 +1,83 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Bolhas de sabão",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Bolhas de sabão com reflexo colorido sobem flutuando pela tela inteira, com um título divertido no centro.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Hora da brincadeira", "maximo": 28},
+  {"id": "cor_1", "rotulo": "Reflexo 1", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_2", "rotulo": "Reflexo 2", "tipo": "cor", "padrao": "#ff8fab"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Bolhas: 30 bolhas transparentes (borda em degradê das duas cores e um reflexo branco) sobem em ciclo,
+     balançando e mudando um pouco de forma. O título pula letra a letra, como num desenho animado. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 30;
+  const bolhas = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(5100 + i);
+    return { x: r(), y: r(), raio: 2 + r() * 5, vel: 0.05 + r() * 0.06, fase: r() * 6.28 };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.5, 0.6, dur);
+    for (const b of bolhas) {
+      const y = 1.08 - ((b.y + t * b.vel) % 1.16);
+      const x = b.x * W + Math.sin(t * 1.4 + b.fase) * 3 * u;
+      const r = b.raio * u;
+      ctx.globalAlpha = env;
+      ctx.save();
+      ctx.translate(x, y * H);
+      ctx.scale(1 + 0.05 * Math.sin(t * 3 + b.fase), 1 - 0.05 * Math.sin(t * 3 + b.fase));
+      const g = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r);
+      g.addColorStop(0, "rgba(255,255,255,0.02)");
+      g.addColorStop(0.8, TO.rgba(C.cor_1, 0.25));
+      g.addColorStop(1, TO.rgba(C.cor_2, 0.55));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.7)";
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.4, -r * 0.4, r * 0.18, r * 0.1, -0.7, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (C.titulo) {
+      ctx.textBaseline = "middle";
+      const tam = TO.caber(ctx, C.titulo, 900, 10, W * 0.84, "Montserrat");
+      ctx.font = TO.fonte(900, tam, "Montserrat");
+      const letras = [...C.titulo];
+      const total = ctx.measureText(C.titulo).width;
+      let x = W / 2 - total / 2;
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 2 * u;
+      letras.forEach((l, i) => {
+        const k = TO.spring(t - 0.5 - i * 0.05, 0.4, 2.6);
+        const pulo = Math.sin(t * 4 - i * 0.5) * 0.6 * u;
+        ctx.globalAlpha = env * TO.clamp(k);
+        ctx.fillStyle = i % 2 ? TO.mix(C.cor_texto, C.cor_2, 0.15) : C.cor_texto;
+        const lw = ctx.measureText(l).width;
+        ctx.save();
+        ctx.translate(x + lw / 2, H / 2 + pulo);
+        ctx.scale(k, k);
+        ctx.textAlign = "center";
+        ctx.fillText(l, 0, 0);
+        ctx.restore();
+        x += lw;
+      });
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

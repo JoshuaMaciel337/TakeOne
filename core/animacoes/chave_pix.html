@@ -1,0 +1,52 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chave para doação",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Cartão de doação: o motivo, a chave em destaque com o ícone de copiar e um agradecimento embaixo.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Ajude a reforma da creche", "maximo": 40},
+  {"id": "rotulo", "rotulo": "Rótulo da chave", "tipo": "texto", "padrao": "CHAVE PIX", "maximo": 20},
+  {"id": "chave", "rotulo": "Chave", "tipo": "texto", "padrao": "00.000.000/0001-00", "maximo": 40},
+  {"id": "obrigado", "rotulo": "Agradecimento", "tipo": "texto", "padrao": "Qualquer valor faz diferença. Obrigado!", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#2a9d8f"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Doação: o cartão sobe, o coração com a mão (SVG) pulsa, a caixa da chave abre de dentro para fora e o
+     ícone de copiar vira um check depois de um instante, como se a chave tivesse sido copiada. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*86),88%);padding:calc(var(--u)*4.4);text-align:center;
+  border-radius:calc(var(--u)*3.2);background:rgba(16,20,20,.9);color:var(--cor-texto);
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.icone{width:calc(var(--u)*10);height:calc(var(--u)*10);margin:0 auto calc(var(--u)*1.6);fill:var(--cor-1);animation:pulsar 1.2s ease-in-out .6s infinite}
+.titulo{font-weight:800;font-size:calc(var(--u)*5);line-height:1.15}
+.caixa{display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u)*2);margin:calc(var(--u)*3) 0 calc(var(--u)*2.4);padding:calc(var(--u)*2.2) calc(var(--u)*2.8);
+  border-radius:calc(var(--u)*2);border:calc(var(--u)*.35) solid var(--cor-1);background:color-mix(in srgb,var(--cor-1) 12%,transparent);text-align:left;
+  animation:abrir .6s cubic-bezier(.2,1.2,.4,1) .7s both}
+.rotulo{font-weight:800;font-size:calc(var(--u)*2.4);letter-spacing:.14em;color:var(--cor-1)}
+.chave{font-weight:700;font-size:calc(var(--u)*3.8);word-break:break-all}
+.copiar{position:relative;flex:none;width:calc(var(--u)*6);height:calc(var(--u)*6)}
+.copiar svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--cor-texto);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.copiar .doc{animation:sumir .2s ease-out 2.2s forwards}
+.copiar .ok{stroke:var(--cor-1);stroke-width:3;opacity:0;animation:aparecer .3s cubic-bezier(.2,1.6,.4,1) 2.3s forwards}
+.obrigado{font-weight:500;font-size:calc(var(--u)*3);opacity:.75;animation:aparecer .5s ease-out 1.4s both}
+@keyframes subir{from{opacity:0;transform:translate(-50%,-44%)}}
+@keyframes pulsar{50%{transform:scale(1.1)}}
+@keyframes abrir{from{opacity:0;transform:scaleX(.6)}}
+@keyframes sumir{to{opacity:0;transform:scale(.5)}}
+@keyframes aparecer{from{opacity:0;transform:scale(.6)}to{opacity:1}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-55%)}}
+</style>
+<div class="cartao">
+ <svg class="icone" viewBox="0 0 24 24"><path d="M12 10.6S8.4 8.3 8.4 5.9A2.1 2.1 0 0 1 12 4.6a2.1 2.1 0 0 1 3.6 1.3c0 2.4-3.6 4.7-3.6 4.7zM2 14h3.2l3.3 1.2h4.3a1.5 1.5 0 0 1 0 3H9.5l3.5.6 5.6-2.6a1.5 1.5 0 0 1 1.6 2.4L14 21.5H2z"/></svg>
+ <div class="titulo">{{titulo}}</div>
+ <div class="caixa">
+  <div><div class="rotulo">{{rotulo}}</div><div class="chave">{{chave}}</div></div>
+  <div class="copiar"><svg class="doc" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg><svg class="ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+ </div>
+ <div class="obrigado">{{obrigado}}</div>
+</div>

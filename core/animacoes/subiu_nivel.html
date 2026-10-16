@@ -1,0 +1,115 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Subiu de nível",
+ "categoria": "redes",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "A barra de experiência enche, transborda num clarão e o novo nível estala no centro, com estrelinhas em volta.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "SUBIU DE NÍVEL!", "maximo": 22},
+  {"id": "nivel", "rotulo": "Novo nível", "tipo": "texto", "padrao": "NÍVEL 25", "maximo": 14},
+  {"id": "cor_1", "rotulo": "Barra (início)", "tipo": "cor", "padrao": "#9b8cff"},
+  {"id": "cor_2", "rotulo": "Barra (fim)", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Nível: a barra de XP enche de 60% até cheia, pisca branca, e a partir daí o clarão abre, o título
+     sobe com mola e o nível aparece num selo; doze estrelinhas de quatro pontas saem do centro e giram. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const estrela = (x, y, s, giro) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(giro);
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const r = i % 2 ? s * 0.32 : s;
+      const a = (i / 8) * 6.2832;
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const cx = W / 2;
+    const cy = H / 2;
+    const cheio = 1.4;
+    ctx.globalAlpha = 1 - sai;
+    // Barra
+    const bw = Math.min(W * 0.7, 70 * u);
+    const bh = 3.2 * u;
+    const by = cy + 13 * u;
+    const k = 0.6 + 0.4 * TO.ease.inOutCubic(TO.prog(t, 0.3, cheio));
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.3));
+    ctx.globalAlpha = (1 - sai) * entra;
+    ctx.fillStyle = "rgba(14,15,20,.85)";
+    TO.retangulo(ctx, cx - bw / 2 - 0.8 * u, by - 0.8 * u, bw + 1.6 * u, bh + 1.6 * u, bh);
+    ctx.fill();
+    const pisca = t > cheio && t < cheio + 0.3;
+    ctx.fillStyle = pisca ? "#fff" : TO.degrade(ctx, cx - bw / 2, 0, cx + bw / 2, 0);
+    TO.retangulo(ctx, cx - bw / 2, by, bw * k, bh, bh / 2);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(800, 2.4);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`XP ${Math.round(k * 1000)} / 1000`, cx + bw / 2, by - 1.4 * u);
+    // Clarão e estrelas
+    const c = TO.prog(t, cheio, cheio + 0.8);
+    if (c > 0 && c < 1) {
+      ctx.globalAlpha = (1 - sai) * (1 - c);
+      const r = 40 * u * TO.ease.outCubic(c);
+      ctx.drawImage(TO.brilho(C.cor_2), cx - r, cy - r, r * 2, r * 2);
+    }
+    const e = TO.prog(t, cheio, cheio + 2);
+    if (e > 0 && e < 1) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * 6.2832 + TO.hash(i, 2) * 0.4;
+        const d = (12 + TO.hash(i, 4) * 14) * u * TO.ease.outCubic(e);
+        ctx.globalAlpha = (1 - sai) * (1 - e);
+        ctx.fillStyle = i % 2 ? C.cor_1 : "#ffd166";
+        estrela(cx + Math.cos(a) * d * 1.5, cy - 3 * u + Math.sin(a) * d, (1 + TO.hash(i, 6)) * u, e * 4);
+      }
+    }
+    // Título e nível
+    const s = TO.spring(t - cheio, 0.45, 2.4);
+    if (s > 0) {
+      ctx.globalAlpha = (1 - sai) * TO.clamp(s);
+      ctx.save();
+      ctx.translate(cx, cy - 6 * u);
+      ctx.scale(s, s);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = C.cor_texto;
+      ctx.shadowColor = TO.rgba(C.cor_1, 0.9);
+      ctx.shadowBlur = 2.5 * u;
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 9, W * 0.86));
+      ctx.fillText(C.titulo, 0, 0);
+      ctx.restore();
+      const n = TO.ease.outBack(TO.prog(t, cheio + 0.3, cheio + 0.8));
+      ctx.save();
+      ctx.translate(cx, cy + 3 * u);
+      ctx.scale(n, n);
+      ctx.font = TO.fonte(800, 3.6);
+      const nw = ctx.measureText(C.nivel).width + 5 * u;
+      ctx.fillStyle = TO.degrade(ctx, -nw / 2, 0, nw / 2, 0);
+      TO.retangulo(ctx, -nw / 2, -2.8 * u, nw, 5.6 * u, 2.8 * u);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(C.nivel, 0, 0.2 * u);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

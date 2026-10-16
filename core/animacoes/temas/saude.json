@@ -1,0 +1,152 @@
+{
+ "nome": "Saúde e clínicas",
+ "ordem": 19,
+ "versoes": [
+  {
+   "modelo": "batimento",
+   "id": "batimento_coracao",
+   "nome": "Batimento do coração",
+   "padroes": {}
+  },
+  {
+   "modelo": "batimento",
+   "id": "batimento_clinica",
+   "nome": "Batimento da clínica",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "valor": "12",
+    "unidade": "anos",
+    "legenda": "cuidando da sua saúde"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_medica",
+   "nome": "Dica de saúde",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "rotulo": "SAÚDE EM DIA",
+    "texto": "Faça o check-up uma vez por ano, mesmo sem sintomas."
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "campanha_vacina",
+   "nome": "Campanha de vacinação",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "dia": "05",
+    "mes": "NOV",
+    "titulo": "Vacinação da gripe",
+    "hora": "8h às 17h",
+    "local": "UBS Centro"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_medico",
+   "nome": "Tarja de médico",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "nome": "Dra. Paula Reis",
+    "funcao": "Cardiologista · CRM 123456"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_nutricionista",
+   "nome": "Tarja de nutricionista",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "etiqueta": "Nutrição",
+    "nome": "Marina Teles",
+    "funcao": "Nutricionista esportiva"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "sinais_alerta",
+   "nome": "Sinais de alerta",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "titulo": "Procure um médico se",
+    "texto": "Febre por mais de 3 dias\nFalta de ar\nDor no peito\nTontura forte"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "lavar_maos",
+   "nome": "Como lavar as mãos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "titulo": "Lave as mãos assim",
+    "texto": "Molhe e passe sabão\nEsfregue palmas e dorso\nEntre os dedos e unhas\nEnxágue e seque bem"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_consulta",
+   "nome": "Horário da consulta",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "hora": "8",
+    "minuto": "0",
+    "texto": "Atendemos a partir das 8h"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_pacientes",
+   "nome": "Pacientes atendidos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "valor": "20",
+    "prefixo": "+",
+    "sufixo": "mil",
+    "legenda": "pacientes atendidos"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_clinica",
+   "nome": "Avaliação de paciente",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "texto": "Fui muito bem atendida, sem fila e com toda a atenção.",
+    "nome": "Cláudia, paciente"
+   }
+  },
+  {
+   "modelo": "chamada_link_bio",
+   "id": "agende_consulta",
+   "nome": "Agende sua consulta",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "texto": "Agende sua consulta",
+    "subtitulo": "link na bio"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "anel_hidratacao",
+   "nome": "Meta de água",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "valor": "80",
+    "legenda": "da meta de água de hoje"
+   }
+  }
+ ]
+}

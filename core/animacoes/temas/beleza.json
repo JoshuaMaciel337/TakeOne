@@ -95,6 +95,43 @@
     "texto": "Carolina Reis",
     "cargo": "estilista"
    }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_salao",
+   "nome": "Avaliação do salão",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Saí de lá me sentindo outra pessoa. Amei o corte!",
+    "nome": "Patrícia, cliente"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_salao",
+   "nome": "Horário do salão",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "hora": "9",
+    "minuto": "0",
+    "texto": "Abrimos às 9h, de terça a sábado"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_beleza",
+   "nome": "Qual cor de cabelo",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "pergunta": "Qual cor para o verão?",
+    "opcao_1": "Loiro mel",
+    "pct_1": "63",
+    "opcao_2": "Ruivo",
+    "pct_2": "37"
+   }
   }
  ]
 }

@@ -97,6 +97,41 @@
     "mensagem": "Mais uma família de casa nova",
     "iniciais": "L"
    }
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "distancia_imovel",
+   "nome": "Distância do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "origem": "Residencial",
+    "destino": "Shopping",
+    "detalhe": "5 minutos de carro"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "plantao",
+   "nome": "Plantão de vendas",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "hora": "9",
+    "minuto": "0",
+    "texto": "Plantão de vendas a partir das 9h"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_imobiliaria",
+   "nome": "Avaliação da imobiliária",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "texto": "Encontraram o apartamento ideal em duas semanas.",
+    "nome": "Família Souza"
+   }
   }
  ]
 }

@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Capelos para o alto",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Capelos de formatura são jogados para o alto, giram e caem, enquanto o título da turma aparece.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Formandos 2026", "maximo": 28},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "Engenharia Civil", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Borla", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#c79a4b"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Capelos: 16 capelos (losango em perspectiva achatada, com o topo e a borla) saem de baixo em
+     lançamento com gravidade, giram e caem de novo; tempos e alturas sorteados por índice. O título sobe
+     com mola e o curso aparece em dourado. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 16;
+  const capelos = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(2600 + i);
+    return { x: 0.06 + r() * 0.88, sobe: 0.55 + r() * 0.35, quando: r() * 0.6, giro: (r() - 0.5) * 6, tam: 4.6 + r() * 2.6, deriva: (r() - 0.5) * 0.12 };
+  });
+  const capelo = (s, borla) => {
+    ctx.fillStyle = "#14151b";
+    ctx.beginPath();
+    ctx.moveTo(-s, 0);
+    ctx.lineTo(0, -s * 0.45);
+    ctx.lineTo(s, 0);
+    ctx.lineTo(0, s * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    // Borda clara: o capelo é preto e some em vídeo escuro sem ela
+    ctx.strokeStyle = "rgba(255,255,255,.55)";
+    ctx.lineWidth = s * 0.05;
+    ctx.stroke();
+    ctx.fillStyle = "#23252e";
+    ctx.fillRect(-s * 0.45, s * 0.15, s * 0.9, s * 0.45);
+    ctx.strokeStyle = borla;
+    ctx.lineWidth = s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(s * 0.6, s * 0.1, s * 0.7, s * 0.7);
+    ctx.stroke();
+    ctx.fillStyle = borla;
+    ctx.fillRect(s * 0.62, s * 0.65, s * 0.16, s * 0.35);
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    for (const c of capelos) {
+      const s = t - c.quando;
+      if (s <= 0) continue;
+      const T = 3.2;
+      const v = (4 * c.sobe * H) / T;
+      const g = (2 * v) / T;
+      const y = H + 6 * u - (v * s - 0.5 * g * s * s);
+      if (y > H + 10 * u) continue;
+      const x = (c.x + c.deriva * s) * W;
+      ctx.globalAlpha = fim;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(s * c.giro) * 0.6);
+      ctx.scale(1, 0.7 + 0.3 * Math.cos(s * c.giro));
+      capelo(c.tam * u, C.cor_1);
+      ctx.restore();
+    }
+    const k = TO.spring(t - 0.8, 0.5, 2);
+    ctx.globalAlpha = fim * TO.clamp(k);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.42);
+    ctx.scale(k, k);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 2.5 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84, "Montserrat"), "Montserrat");
+    ctx.fillText(C.titulo, 0, 0);
+    ctx.restore();
+    const d = TO.ease.outCubic(TO.prog(t, 1.4, 2));
+    ctx.globalAlpha = fim * d;
+    ctx.fillStyle = C.cor_2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(700, Math.min(4.2, TO.caber(ctx, C.detalhe, 700, 4.2, W * 0.8)));
+    ctx.letterSpacing = `${0.3 * u}px`;
+    ctx.fillText(C.detalhe.toUpperCase(), W / 2, H * 0.42 + 9 * u);
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

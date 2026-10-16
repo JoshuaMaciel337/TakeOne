@@ -127,6 +127,40 @@
     "titulo": "Na festa vai ter",
     "texto": "Bolo de chocolate\nPula-pula\nMúsica ao vivo\nLembrancinhas"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_festa",
+   "nome": "Horário da festa",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "hora": "15",
+    "minuto": "0",
+    "texto": "A festa começa às 15h"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "convite_conversa",
+   "nome": "Convite por mensagem",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "texto": "Sábado tem festa!\nOnde vai ser?\nSalão Estrela, às 15h\nEstarei lá!"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "vaquinha_presente",
+   "nome": "Vaquinha do presente",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Vaquinha do presente",
+    "valor": "840",
+    "meta": "1200"
+   }
   }
  ]
 }

@@ -129,6 +129,52 @@
     "valor": "92",
     "legenda": "do primeiro lote já foi vendido"
    }
+  },
+  {
+   "modelo": "bateria",
+   "id": "bateria_lancamento",
+   "nome": "Bateria do produto",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "valor": "100",
+    "legenda": "2 dias de bateria"
+   }
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "garantia_produto",
+   "nome": "Garantia",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "numero": "1",
+    "texto": "ANO",
+    "fita": "GARANTIA"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_produto",
+   "nome": "Avaliação do produto",
+   "padroes": {
+    "texto": "Superou tudo o que eu esperava. Recomendo!",
+    "nome": "Lucas, comprador verificado"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_cor",
+   "nome": "Qual cor lançar",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "pergunta": "Qual cor você quer?",
+    "opcao_1": "Azul-noite",
+    "pct_1": "57",
+    "opcao_2": "Areia",
+    "pct_2": "43"
+   }
   }
  ]
 }

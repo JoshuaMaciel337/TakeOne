@@ -1,0 +1,50 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Avaliação com estrelas",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 5.5,
+ "descricao": "Cinco estrelas acendem uma a uma, o depoimento entra palavra por palavra e o nome de quem avaliou aparece embaixo.",
+ "campos": [
+  {"id": "estrelas", "rotulo": "Estrelas (1 a 5)", "tipo": "numero", "padrao": "5", "maximo": 0},
+  {"id": "texto", "rotulo": "Depoimento", "tipo": "texto", "padrao": "Atendimento impecável e entrega antes do prazo. Já virei cliente.", "maximo": 140},
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Renata, de Belo Horizonte", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Estrelas", "tipo": "cor", "padrao": "#ffc83d"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Avaliação: as cinco estrelas (SVG) entram apagadas; as acesas (quantas o campo pedir) estalam com cor e
+     brilho, uma depois da outra. O depoimento entra palavra por palavra, entre aspas grandes. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*84),88%);padding:calc(var(--u)*4.4);
+  border-radius:calc(var(--u)*3);background:rgba(18,19,25,.9);color:var(--cor-texto);text-align:center;
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.estrelas{display:flex;justify-content:center;gap:calc(var(--u)*1.4)}
+.estrelas svg{width:calc(var(--u)*7);height:calc(var(--u)*7);fill:rgba(255,255,255,.16)}
+.estrelas svg.acesa{animation:acender .45s cubic-bezier(.2,1.8,.4,1) calc(.5s + var(--n) * .16s) both;filter:drop-shadow(0 0 calc(var(--u)*1.2) color-mix(in srgb,var(--cor-1) 70%,transparent))}
+.texto{margin:calc(var(--u)*3) 0 calc(var(--u)*2);font-weight:600;font-size:calc(var(--u)*4.2);line-height:1.35}
+.texto::before{content:"“";font-family:Montserrat,sans-serif;font-weight:900;color:var(--cor-2);margin-right:.08em}
+.palavra{display:inline-block;margin-right:.26em;animation:aparecer .35s ease-out calc(1.4s + var(--i) * .06s) both}
+.nome{font-weight:500;font-size:calc(var(--u)*3);opacity:.7;animation:aparecer .5s ease-out 2.6s both}
+.nome::before{content:"— "}
+@keyframes subir{from{opacity:0;transform:translate(-50%,-44%)}}
+@keyframes acender{from{fill:rgba(255,255,255,.16);transform:scale(.4)}to{fill:var(--cor-1);transform:scale(1)}}
+@keyframes aparecer{from{opacity:0;transform:translateY(calc(var(--u)*.8))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-55%)}}
+</style>
+<div class="cartao" data-estrelas="{{estrelas}}">
+ <div class="estrelas"></div>
+ <div class="texto">{{texto:palavras}}</div>
+ <div class="nome">{{nome}}</div>
+</div>
+<script>
+{
+  const n = Math.max(1, Math.min(5, parseInt(document.querySelector(".cartao").dataset.estrelas, 10) || 5));
+  const caixa = document.querySelector(".estrelas");
+  for (let i = 0; i < 5; i++) {
+    caixa.insertAdjacentHTML("beforeend", `<svg viewBox="0 0 24 24" class="${i < n ? "acesa" : ""}" style="--n:${i}"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`);
+  }
+}
+</script>

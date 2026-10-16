@@ -1,0 +1,116 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Selo de garantia",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Um escudo com fita estala no centro, o número grande aparece dentro e um brilho passa pela borda.",
+ "campos": [
+  {"id": "numero", "rotulo": "No meio", "tipo": "texto", "padrao": "7", "maximo": 4},
+  {"id": "texto", "rotulo": "Embaixo do número", "tipo": "texto", "padrao": "DIAS", "maximo": 10},
+  {"id": "fita", "rotulo": "Fita", "tipo": "texto", "padrao": "GARANTIA", "maximo": 16},
+  {"id": "cor_1", "rotulo": "Escudo (início)", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Escudo (fim)", "tipo": "cor", "padrao": "#c79a4b"},
+  {"id": "cor_texto", "rotulo": "Fita", "tipo": "cor", "padrao": "#e63946"}
+ ]
+}
+</script>
+<!-- Selo: o escudo (caminho com curvas) cresce com mola e uma leve rotação, a borda de dentro é desenhada,
+     a fita atravessa por baixo com as pontas dobradas e um brilho diagonal passa por cima (source-atop). -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const camada = document.createElement("canvas");
+  camada.width = W;
+  camada.height = H;
+  const c2 = camada.getContext("2d");
+  const escudo = (c, s) => {
+    c.beginPath();
+    c.moveTo(0, -s);
+    c.bezierCurveTo(s * 0.55, -s * 0.78, s * 0.82, -s * 0.82, s * 0.82, -s * 0.82);
+    c.lineTo(s * 0.82, -s * 0.1);
+    c.bezierCurveTo(s * 0.82, s * 0.5, s * 0.4, s * 0.85, 0, s);
+    c.bezierCurveTo(-s * 0.4, s * 0.85, -s * 0.82, s * 0.5, -s * 0.82, -s * 0.1);
+    c.lineTo(-s * 0.82, -s * 0.82);
+    c.bezierCurveTo(-s * 0.82, -s * 0.82, -s * 0.55, -s * 0.78, 0, -s);
+    c.closePath();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    c2.clearRect(0, 0, W, H);
+    const sai = TO.ease.inBack(TO.prog(t, dur - 0.5, dur));
+    const k = TO.spring(t, 0.45, 2) * (1 - sai);
+    const s = 20 * u;
+    const cx = W / 2;
+    const cy = H / 2 - 2 * u;
+    c2.save();
+    c2.translate(cx, cy);
+    c2.rotate((1 - TO.clamp(k)) * -0.4);
+    c2.scale(k, k);
+    c2.fillStyle = TO.degrade(c2, -s, -s, s, s);
+    escudo(c2, s);
+    c2.fill();
+    const borda = TO.ease.inOutCubic(TO.prog(t, 0.4, 1.2));
+    c2.strokeStyle = "rgba(255,255,255,.75)";
+    c2.lineWidth = 0.5 * u;
+    c2.setLineDash([s * 6 * borda, s * 6]);
+    escudo(c2, s * 0.86);
+    c2.stroke();
+    c2.setLineDash([]);
+    c2.fillStyle = "#3a2a0e";
+    c2.textAlign = "center";
+    c2.textBaseline = "middle";
+    const n = TO.ease.outBack(TO.prog(t, 0.7, 1.2));
+    c2.globalAlpha = TO.clamp(n);
+    c2.font = TO.fonte(900, TO.caber(c2, C.numero, 900, 15, s * 1.2));
+    c2.fillText(C.numero, 0, -s * 0.18);
+    c2.font = TO.fonte(800, 3.4);
+    c2.fillText(C.texto, 0, s * 0.38);
+    c2.globalAlpha = 1;
+    // Brilho passando
+    const b = TO.prog(t, 1.6, 2.4);
+    if (b > 0 && b < 1) {
+      c2.globalCompositeOperation = "source-atop";
+      const bx = TO.lerp(-s * 1.5, s * 1.5, b);
+      const g = c2.createLinearGradient(bx - 5 * u, -s, bx + 5 * u, s);
+      g.addColorStop(0, "rgba(255,255,255,0)");
+      g.addColorStop(0.5, "rgba(255,255,255,.7)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      c2.fillStyle = g;
+      c2.fillRect(-s * 2, -s * 2, s * 4, s * 4);
+      c2.globalCompositeOperation = "source-over";
+    }
+    // Fita
+    const f = TO.ease.outCubic(TO.prog(t, 0.9, 1.4));
+    if (f > 0) {
+      const fw = s * 2.1 * f;
+      const fy = s * 0.68;
+      c2.fillStyle = TO.mix(C.cor_texto, "#000000", 0.35);
+      c2.beginPath();
+      c2.moveTo(-fw / 2, fy - 1 * u);
+      c2.lineTo(-fw / 2 - 3 * u, fy + 2.4 * u);
+      c2.lineTo(-fw / 2 + 1 * u, fy + 2.4 * u);
+      c2.fill();
+      c2.beginPath();
+      c2.moveTo(fw / 2, fy - 1 * u);
+      c2.lineTo(fw / 2 + 3 * u, fy + 2.4 * u);
+      c2.lineTo(fw / 2 - 1 * u, fy + 2.4 * u);
+      c2.fill();
+      c2.fillStyle = C.cor_texto;
+      c2.fillRect(-fw / 2, fy - 3.2 * u, fw, 5.6 * u);
+      c2.globalAlpha = TO.clamp((f - 0.6) / 0.4);
+      c2.fillStyle = "#fff";
+      c2.font = TO.fonte(900, Math.min(3.4, TO.caber(c2, C.fita, 900, 3.4, fw * 0.86)));
+      c2.letterSpacing = `${0.3 * u}px`;
+      c2.fillText(C.fita, 0, fy - 0.3 * u);
+      c2.letterSpacing = "0px";
+      c2.globalAlpha = 1;
+    }
+    c2.restore();
+    ctx.drawImage(camada, 0, 0);
+  };
+})();
+</script>

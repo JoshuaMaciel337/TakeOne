@@ -152,6 +152,51 @@
     "cor_2": "#ff7a00",
     "texto": "Compre agora pelo site"
    }
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "garantia_7_dias",
+   "nome": "Garantia de 7 dias",
+   "padroes": {}
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "frete_gratis_selo",
+   "nome": "Selo de frete grátis",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "numero": "0",
+    "texto": "FRETE",
+    "fita": "GRÁTIS"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_cliente",
+   "nome": "Avaliação de cliente",
+   "padroes": {}
+  },
+  {
+   "modelo": "relogio",
+   "id": "oferta_acaba",
+   "nome": "Oferta acaba à meia-noite",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "hora": "0",
+    "minuto": "0",
+    "texto": "A oferta acaba à meia-noite"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_venda",
+   "nome": "Conversa de venda",
+   "padroes": {
+    "cor_1": "#22c55e",
+    "cor_2": "#16a34a"
+   }
   }
  ]
 }

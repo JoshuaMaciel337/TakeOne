@@ -92,6 +92,58 @@
     "cor_2": "#ffd166",
     "titulo": "Diário de viagem"
    }
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "rota_viagem",
+   "nome": "Rota da viagem",
+   "padroes": {}
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "rota_nordeste",
+   "nome": "Rota no Nordeste",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "origem": "Recife",
+    "destino": "Porto de Galinhas",
+    "detalhe": "1 h de estrada"
+   }
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "rota_europa",
+   "nome": "Rota na Europa",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "origem": "Paris",
+    "destino": "Roma",
+    "detalhe": "2 h de voo"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_embarque",
+   "nome": "Horário de embarque",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "hora": "7",
+    "minuto": "40",
+    "texto": "Embarque às 7h40"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_viagem",
+   "nome": "Planejando a viagem",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "texto": "Bora para a praia em janeiro?\nBora! Quantos dias?\nUma semana inteira\nJá tô fazendo a mala"
+   }
   }
  ]
 }

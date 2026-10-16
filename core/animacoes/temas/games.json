@@ -1,0 +1,144 @@
+{
+ "nome": "Games",
+ "ordem": 21,
+ "versoes": [
+  {
+   "modelo": "pixel_titulo",
+   "id": "game_over",
+   "nome": "Game over",
+   "padroes": {}
+  },
+  {
+   "modelo": "pixel_titulo",
+   "id": "press_start",
+   "nome": "Aperte para começar",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "texto": "PRESS START",
+    "subtitulo": "nova live hoje às 20h"
+   }
+  },
+  {
+   "modelo": "pixel_titulo",
+   "id": "voce_venceu",
+   "nome": "Você venceu",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "texto": "VITÓRIA!",
+    "subtitulo": "partida perfeita"
+   }
+  },
+  {
+   "modelo": "subiu_nivel",
+   "id": "level_up",
+   "nome": "Subiu de nível",
+   "padroes": {}
+  },
+  {
+   "modelo": "subiu_nivel",
+   "id": "conquista",
+   "nome": "Conquista desbloqueada",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "titulo": "CONQUISTA!",
+    "nivel": "100% COMPLETO"
+   }
+  },
+  {
+   "modelo": "subiu_nivel",
+   "id": "meta_seguidores",
+   "nome": "Meta de seguidores",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "titulo": "10 MIL SEGUIDORES!",
+    "nivel": "OBRIGADO!"
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "live_game",
+   "nome": "Live de jogo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#6bd8f2",
+    "titulo": "Campanha completa",
+    "detalhe": "Parte 3 · sem cortes"
+   }
+  },
+  {
+   "modelo": "titulo_glitch",
+   "id": "glitch_game",
+   "nome": "Glitch gamer",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "texto": "BOSS FINAL"
+   }
+  },
+  {
+   "modelo": "placar",
+   "id": "placar_esports",
+   "nome": "Placar de e-sports",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#6bd8f2",
+    "time_1": "LOU",
+    "placar_1": "13",
+    "time_2": "FUR",
+    "placar_2": "11",
+    "tempo": "MAPA 2"
+   }
+  },
+  {
+   "modelo": "grade_retro",
+   "id": "retro_game",
+   "nome": "Arcade retrô",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "titulo": "ARCADE NIGHT"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_streamer",
+   "nome": "Tarja de streamer",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#6bd8f2",
+    "etiqueta": "Streamer",
+    "nome": "Leo Games",
+    "funcao": "ao vivo de segunda a sexta"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_game",
+   "nome": "Enquete de jogo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#6bd8f2",
+    "pergunta": "Qual jogo na próxima live?",
+    "opcao_1": "Terror",
+    "pct_1": "58",
+    "opcao_2": "Corrida",
+    "pct_2": "42"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_partida",
+   "nome": "Contagem da partida",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "de": "3",
+    "final": "LUTE!"
+   }
+  }
+ ]
+}

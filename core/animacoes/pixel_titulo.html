@@ -1,0 +1,78 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título em pixels",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "As letras se montam com blocos de pixel que caem do alto, no estilo dos jogos antigos, com uma sombra em degraus.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "GAME OVER", "maximo": 16},
+  {"id": "subtitulo", "rotulo": "Embaixo", "tipo": "texto", "padrao": "aperte para continuar", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Letras (cima)", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Letras (baixo)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Sombra e embaixo", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Pixels: o texto é desenhado pequeno num canvas escondido; cada pixel aceso vira um bloco no quadro.
+     Os blocos caem de alturas sorteadas (por índice) e param no lugar, coluna da esquerda primeiro. A cor vai
+     da de cima à de baixo por linha, com sombra deslocada em diagonal. O subtítulo pisca como "insira a ficha". -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const pequeno = document.createElement("canvas");
+  const p = pequeno.getContext("2d", { willReadFrequently: true });
+  let blocos = [];
+  let cols = 0;
+  let rows = 0;
+  const montar = () => {
+    p.font = "900 14px Inter, sans-serif";
+    const tw = Math.ceil(p.measureText(C.texto).width) + 2;
+    pequeno.width = tw;
+    pequeno.height = 16;
+    p.font = "900 14px Inter, sans-serif";
+    p.textBaseline = "top";
+    p.fillStyle = "#fff";
+    p.fillText(C.texto, 1, 1);
+    const d = p.getImageData(0, 0, tw, 16).data;
+    cols = tw;
+    rows = 16;
+    blocos = [];
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (d[(y * cols + x) * 4 + 3] > 110) blocos.push([x, y]);
+  };
+  window.prontoParaGravar = TO.carregado.then(montar);
+  window.renderAt = (t) => {
+    if (!blocos.length) montar();
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.4, dur));
+    const b = Math.min((W * 0.86) / cols, 1.6 * u);
+    const ox = (W - cols * b) / 2;
+    const oy = H / 2 - rows * b * 0.6;
+    ctx.globalAlpha = 1 - sai;
+    for (const [i, [x, y]] of blocos.entries()) {
+      const inicio = 0.1 + (x / cols) * 1.1 + TO.hash(i, 3) * 0.2;
+      const k = TO.ease.outQuad(TO.clamp((t - inicio) / 0.35));
+      if (k <= 0) continue;
+      const queda = (1 - k) * (20 + TO.hash(i, 5) * 30) * u;
+      const px = Math.round(ox + x * b);
+      const py = Math.round(oy + y * b - queda);
+      ctx.fillStyle = TO.rgba(C.cor_texto, 0.35);
+      ctx.fillRect(px + b * 0.6, py + b * 0.6, Math.ceil(b), Math.ceil(b));
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, y / rows);
+      ctx.fillRect(px, py, Math.ceil(b), Math.ceil(b));
+    }
+    const s = TO.prog(t, 1.6, 1.8);
+    if (s > 0 && Math.floor(t * 2.5) % 2 === 0) {
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = `700 ${Math.min(3.6, TO.caber(ctx, C.subtitulo.toUpperCase(), 700, 3.6, W * 0.84)) * u}px ui-monospace, "DejaVu Sans Mono", monospace`;
+      ctx.fillText(C.subtitulo.toUpperCase(), W / 2, oy + rows * b + 4 * u);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

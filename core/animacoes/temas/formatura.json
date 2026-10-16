@@ -1,0 +1,101 @@
+{
+ "nome": "Formatura",
+ "ordem": 26,
+ "versoes": [
+  {
+   "modelo": "capelos",
+   "id": "formandos",
+   "nome": "Formandos",
+   "padroes": {}
+  },
+  {
+   "modelo": "capelos",
+   "id": "formatura_medicina",
+   "nome": "Formatura de medicina",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Medicina 2026",
+    "detalhe": "Turma Dr. Carlos Chagas"
+   }
+  },
+  {
+   "modelo": "capelos",
+   "id": "formatura_escola",
+   "nome": "Formatura do ensino médio",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "titulo": "3º ano 2026",
+    "detalhe": "Colégio Horizonte"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "convite_formatura",
+   "nome": "Convite de formatura",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Baile de Formatura",
+    "data": "18 DEZ · 21H",
+    "local": "Espaço Villa",
+    "canhoto": "MESA 7"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_formando",
+   "nome": "Tarja de formando",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "etiqueta": "Formando",
+    "nome": "Gabriel Souza",
+    "funcao": "Engenharia Civil · 2026"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_formatura",
+   "nome": "Contagem da formatura",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "de": "3",
+    "final": "FORMADOS!"
+   }
+  },
+  {
+   "modelo": "linha_do_tempo",
+   "id": "jornada_faculdade",
+   "nome": "Jornada da faculdade",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dados": "2021: Primeiro dia\n2023: Estágio\n2025: TCC\n2026: Diploma"
+   }
+  },
+  {
+   "modelo": "fogos",
+   "id": "fogos_formatura",
+   "nome": "Fogos de formatura",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Parabéns, formandos!"
+   }
+  },
+  {
+   "modelo": "citacao",
+   "id": "juramento",
+   "nome": "Juramento",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Hoje não é o fim,\né o começo de tudo.",
+    "autor": "Turma de 2026"
+   }
+  }
+ ]
+}

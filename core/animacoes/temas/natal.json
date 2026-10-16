@@ -114,6 +114,42 @@
     "cor_2": "#c79a4b",
     "titulo": "2027 chegou!"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "meia_noite",
+   "nome": "Meia-noite",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "hora": "0",
+    "minuto": "0",
+    "texto": "Feliz Natal à meia-noite"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "natal_solidario",
+   "nome": "Natal solidário",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "titulo": "Brinquedos arrecadados",
+    "valor": "780",
+    "meta": "1000",
+    "prefixo": ""
+   }
+  },
+  {
+   "modelo": "selo_giratorio",
+   "id": "selo_natal",
+   "nome": "Selo de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "circular": "FELIZ NATAL • BOAS FESTAS •",
+    "centro": "2026"
+   }
   }
  ]
 }

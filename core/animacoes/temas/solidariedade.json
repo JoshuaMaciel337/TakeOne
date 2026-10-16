@@ -1,0 +1,116 @@
+{
+ "nome": "Solidariedade e ONGs",
+ "ordem": 28,
+ "versoes": [
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "campanha_agasalho",
+   "nome": "Campanha do agasalho",
+   "padroes": {}
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "construcao",
+   "nome": "Meta da construção",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Construção do novo salão",
+    "valor": "182000",
+    "meta": "250000"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "cestas",
+   "nome": "Cestas básicas",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Cestas básicas arrecadadas",
+    "valor": "640",
+    "meta": "1000",
+    "prefixo": ""
+   }
+  },
+  {
+   "modelo": "chave_pix",
+   "id": "doacao_creche",
+   "nome": "Doação para a creche",
+   "padroes": {}
+  },
+  {
+   "modelo": "chave_pix",
+   "id": "dizimo",
+   "nome": "Dízimos e ofertas",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Dízimos e ofertas",
+    "chave": "00.000.000/0001-00",
+    "obrigado": "Deus abençoe a sua generosidade."
+   }
+  },
+  {
+   "modelo": "chave_pix",
+   "id": "vaquinha",
+   "nome": "Vaquinha",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Ajude o tratamento da Bia",
+    "chave": "(11) 90000-0000",
+    "obrigado": "Cada ajuda conta. Obrigado de coração!"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_doacoes",
+   "nome": "Famílias ajudadas",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "350",
+    "prefixo": "+",
+    "sufixo": "",
+    "legenda": "famílias ajudadas este mês"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "como_ajudar",
+   "nome": "Como ajudar",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "Como ajudar",
+    "texto": "Doe alimentos\nSeja voluntário\nCompartilhe a campanha\nContribua todo mês"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "mutirao",
+   "nome": "Mutirão",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "dia": "09",
+    "mes": "NOV",
+    "titulo": "Mutirão de limpeza",
+    "hora": "Sábado, 8h",
+    "local": "Praia do Forte"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "depoimento_voluntario",
+   "nome": "Depoimento de voluntário",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "texto": "Ser voluntário mudou a minha forma de ver o mundo.",
+    "nome": "Rafael, voluntário há 3 anos"
+   }
+  }
+ ]
+}

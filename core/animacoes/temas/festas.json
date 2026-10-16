@@ -146,6 +146,42 @@
     "titulo": "Festival de Verão",
     "detalhe": "Palco principal"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_portoes",
+   "nome": "Abertura dos portões",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "hora": "19",
+    "minuto": "0",
+    "texto": "Portões abrem às 19h"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_show",
+   "nome": "Enquete de música",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "pergunta": "Qual música no bis?",
+    "opcao_1": "Noite de Verão",
+    "pct_1": "70",
+    "opcao_2": "Luzes",
+    "pct_2": "30"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_festa",
+   "nome": "Combinando a festa",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Bora pro show?\nJá comprei o ingresso!\nPassa aqui às 20h\nCombinado"
+   }
   }
  ]
 }

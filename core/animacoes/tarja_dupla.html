@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja de dois nomes",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Duas tarjas no terço de baixo, uma de cada lado, para entrevistas e conversas com duas pessoas.",
+ "campos": [
+  {"id": "nome_1", "rotulo": "Nome da esquerda", "tipo": "texto", "padrao": "Ana Souza", "maximo": 28},
+  {"id": "funcao_1", "rotulo": "Função da esquerda", "tipo": "texto", "padrao": "Apresentadora", "maximo": 36},
+  {"id": "nome_2", "rotulo": "Nome da direita", "tipo": "texto", "padrao": "Carlos Lima", "maximo": 28},
+  {"id": "funcao_2", "rotulo": "Função da direita", "tipo": "texto", "padrao": "Economista", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Barra (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Barra (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Duas tarjas: cada uma tem uma barra de cor que cresce de baixo e o bloco escuro que abre a partir dela
+     (clip-path), a da esquerda primeiro; a da direita espelhada, com o texto alinhado à direita. Em pé, as
+     duas ficam uma sobre a outra. -->
+<style>
+.duas{position:absolute;left:calc(var(--u)*5);right:calc(var(--u)*5);bottom:calc(var(--u)*9);display:flex;justify-content:space-between;align-items:flex-end;
+  gap:calc(var(--u)*3);color:var(--cor-texto);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+@media (max-aspect-ratio:1/1){.duas{flex-direction:column;align-items:stretch;bottom:calc(var(--u)*16)}.tarja.dir{align-self:flex-end}}
+.tarja{display:flex;align-items:stretch;max-width:48%}
+@media (max-aspect-ratio:1/1){.tarja{max-width:100%}}
+.tarja i{flex:none;width:calc(var(--u)*1.1);background:linear-gradient(var(--cor-1),var(--cor-2));transform-origin:50% 100%;animation:crescer .4s ease-out var(--a) both}
+.bloco{padding:calc(var(--u)*1.6) calc(var(--u)*2.8);background:rgba(14,15,20,.88);clip-path:inset(0 100% 0 0);animation:abrir .6s cubic-bezier(.65,0,.35,1) calc(var(--a) + .3s) forwards}
+.dir{flex-direction:row-reverse;text-align:right}
+.dir .bloco{clip-path:inset(0 0 0 100%)}
+.nome{font-weight:800;font-size:calc(var(--u)*4.4);white-space:nowrap}
+.funcao{font-weight:500;font-size:calc(var(--u)*2.8);opacity:.72;white-space:nowrap}
+@keyframes crescer{from{transform:scaleY(0)}}
+@keyframes abrir{to{clip-path:inset(0 0 0 0)}}
+@keyframes sair{to{opacity:0;transform:translateY(calc(var(--u)*2))}}
+</style>
+<div class="duas">
+ <div class="tarja esq" style="--a:.2s"><i></i><div class="bloco"><div class="nome">{{nome_1}}</div><div class="funcao">{{funcao_1}}</div></div></div>
+ <div class="tarja dir" style="--a:.7s"><i></i><div class="bloco"><div class="nome">{{nome_2}}</div><div class="funcao">{{funcao_2}}</div></div></div>
+</div>

@@ -114,6 +114,54 @@
     "titulo": "Média da turma",
     "dados": "1º bim: 6\n2º bim: 7\n3º bim: 7\n4º bim: 9"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_aula_ao_vivo",
+   "nome": "Horário da aula",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "hora": "20",
+    "minuto": "0",
+    "texto": "Aula ao vivo às 20h"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_aula",
+   "nome": "Pergunta para a turma",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "pergunta": "Quanto é 7 × 8?",
+    "opcao_1": "56",
+    "pct_1": "82",
+    "opcao_2": "54",
+    "pct_2": "18"
+   }
+  },
+  {
+   "modelo": "subiu_nivel",
+   "id": "nivel_aluno",
+   "nome": "Aluno subiu de nível",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "MÓDULO CONCLUÍDO!",
+    "nivel": "NÍVEL 2"
+   }
+  },
+  {
+   "modelo": "terminal",
+   "id": "aula_programacao",
+   "nome": "Aula de programação",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "aula-01",
+    "texto": "$ python ola.py\nOlá, mundo!\n✓ Primeiro programa feito"
+   }
   }
  ]
 }

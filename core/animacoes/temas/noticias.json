@@ -1,0 +1,120 @@
+{
+ "nome": "Notícias e jornalismo",
+ "ordem": 27,
+ "versoes": [
+  {
+   "modelo": "noticia_urgente",
+   "id": "urgente",
+   "nome": "Notícia urgente",
+   "padroes": {}
+  },
+  {
+   "modelo": "noticia_urgente",
+   "id": "ao_vivo_jornal",
+   "nome": "Jornal ao vivo",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#14151b",
+    "selo": "AO VIVO",
+    "manchete": "Prefeitura anuncia novo hospital na zona norte",
+    "faixa": "Obras começam em março • Investimento de R$ 80 milhões • 200 leitos"
+   }
+  },
+  {
+   "modelo": "noticia_urgente",
+   "id": "esportes_jornal",
+   "nome": "Jornal de esportes",
+   "padroes": {
+    "cor_1": "#22c55e",
+    "cor_2": "#14532d",
+    "selo": "ESPORTES",
+    "manchete": "Time da cidade vence e sobe para a Série B",
+    "faixa": "Gol nos acréscimos • Torcida lota o estádio • Próximo jogo no domingo"
+   }
+  },
+  {
+   "modelo": "noticia_urgente",
+   "id": "clima",
+   "nome": "Previsão do tempo",
+   "padroes": {
+    "cor_1": "#3b82f6",
+    "cor_2": "#0e7490",
+    "selo": "CLIMA",
+    "manchete": "Frente fria derruba temperatura no fim de semana",
+    "faixa": "Mínima de 8 °C no sábado • Chance de geada nas serras • Leve agasalho"
+   }
+  },
+  {
+   "modelo": "tarja_dupla",
+   "id": "entrevista_jornal",
+   "nome": "Entrevista",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "nome_1": "Ana Souza",
+    "funcao_1": "Repórter",
+    "nome_2": "Carlos Lima",
+    "funcao_2": "Economista"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_reporter",
+   "nome": "Tarja de repórter",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "nome": "Juliana Prado",
+    "funcao": "Repórter · direto de Brasília"
+   }
+  },
+  {
+   "modelo": "grafico_barras",
+   "id": "dados_noticia",
+   "nome": "Dados da notícia",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "titulo": "Casos por mês",
+    "dados": "Jul: 320\nAgo: 410\nSet: 290\nOut: 180"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_jornal",
+   "nome": "Enquete do jornal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "pergunta": "Você é a favor da nova ciclovia?",
+    "opcao_1": "Sim",
+    "pct_1": "61",
+    "opcao_2": "Não",
+    "pct_2": "39"
+   }
+  },
+  {
+   "modelo": "citacao",
+   "id": "declaracao",
+   "nome": "Declaração",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "texto": "Vamos entregar a obra\naté o fim do ano.",
+    "autor": "Prefeito, em entrevista"
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "boletim",
+   "nome": "Boletim ao vivo",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "selo": "AGORA",
+    "titulo": "Boletim do trânsito",
+    "detalhe": "atualizado às 18h"
+   }
+  }
+ ]
+}

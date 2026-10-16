@@ -1,0 +1,92 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Terminal digitando",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 6,
+ "descricao": "Uma janela de terminal escura em que os comandos são digitados linha a linha, com o cursor piscando.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título da janela", "tipo": "texto", "padrao": "~/projeto", "maximo": 30},
+  {"id": "texto", "rotulo": "Linhas (as que começam com $ são comandos)", "tipo": "linhas", "padrao": "$ npm create app\nCriando o projeto...\n✓ Pronto em 2,3 s\n$ npm run dev", "maximo": 220},
+  {"id": "cor_1", "rotulo": "Comandos", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Destaque", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#e6e6e6"}
+ ]
+}
+</script>
+<!-- Terminal: a janela (com os três botões) abre de baixo; cada linha é digitada letra a letra (as de
+     comando mais devagar, as de saída aparecem quase de uma vez), em fonte monoespaçada do sistema. O
+     cursor em bloco pisca no fim da última linha. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const linhas = C.texto.split("\n").filter((l) => l.trim()).slice(0, 8);
+  // Quando cada linha começa e termina
+  let tempo = 0.7;
+  const tempos = linhas.map((l) => {
+    const comando = l.startsWith("$");
+    const inicio = tempo;
+    const fim = inicio + (comando ? l.length * 0.06 : 0.25);
+    tempo = fim + (comando ? 0.35 : 0.2);
+    return { inicio, fim, comando };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const abre = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const jw = Math.min(W * 0.88, 100 * u);
+    const lh = 5.4 * u;
+    const jh = 9 * u + linhas.length * lh + 4 * u;
+    const jx = (W - jw) / 2;
+    const jy = (H - jh) / 2 + (1 - abre) * 4 * u;
+    ctx.globalAlpha = abre * (1 - sai);
+    ctx.fillStyle = "rgba(12,13,17,.94)";
+    TO.retangulo(ctx, jx, jy, jw, jh, 2 * u);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.fillRect(jx, jy + 6 * u, jw, 0.15 * u);
+    ["#ff5f57", "#febc2e", "#28c840"].forEach((cor, i) => {
+      ctx.fillStyle = cor;
+      ctx.beginPath();
+      ctx.arc(jx + 3.4 * u + i * 3 * u, jy + 3 * u, 0.9 * u, 0, 6.2832);
+      ctx.fill();
+    });
+    ctx.fillStyle = "rgba(255,255,255,.5)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(500, 2.4);
+    ctx.fillText(C.titulo, jx + jw / 2, jy + 3.1 * u);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const tam = Math.min(3.4, ((jw - 8 * u) / u) / (Math.max(...linhas.map((l) => l.length)) * 0.62));
+    ctx.font = `500 ${tam * u}px ui-monospace, "DejaVu Sans Mono", monospace`;
+    let ultimo = null;
+    linhas.forEach((linha, i) => {
+      const { inicio, fim, comando } = tempos[i];
+      if (t < inicio) return;
+      const n = Math.floor(linha.length * TO.clamp((t - inicio) / Math.max(0.01, fim - inicio)));
+      const x = jx + 4 * u;
+      const y = jy + 9 * u + i * lh;
+      const visivel = linha.slice(0, n);
+      if (comando) {
+        ctx.fillStyle = C.cor_1;
+        ctx.fillText(visivel.slice(0, 1), x, y);
+        ctx.fillStyle = C.cor_texto;
+        ctx.fillText(visivel.slice(1), x + ctx.measureText("$").width, y);
+      } else {
+        ctx.fillStyle = visivel.startsWith("✓") ? C.cor_2 : TO.rgba(C.cor_texto, 0.7);
+        ctx.fillText(visivel, x, y);
+      }
+      ultimo = [x + ctx.measureText(visivel).width, y];
+    });
+    if (ultimo && Math.floor(t * 2.4) % 2 === 0) {
+      ctx.fillStyle = C.cor_1;
+      ctx.fillRect(ultimo[0] + 0.4 * u, ultimo[1], tam * 0.55 * u, tam * 1.1 * u);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

@@ -1,0 +1,132 @@
+{
+ "nome": "Tecnologia",
+ "ordem": 22,
+ "versoes": [
+  {
+   "modelo": "terminal",
+   "id": "terminal_dev",
+   "nome": "Terminal de programação",
+   "padroes": {}
+  },
+  {
+   "modelo": "terminal",
+   "id": "terminal_deploy",
+   "nome": "Deploy no terminal",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "servidor",
+    "texto": "$ git push\nEnviando 12 arquivos...\n$ ./publicar.sh\n✓ Site no ar"
+   }
+  },
+  {
+   "modelo": "terminal",
+   "id": "terminal_python",
+   "nome": "Python no terminal",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "titulo": "~/dados",
+    "texto": "$ python analise.py\nLendo 10 mil linhas...\n✓ Relatório pronto"
+   }
+  },
+  {
+   "modelo": "bateria",
+   "id": "bateria_cheia",
+   "nome": "Bateria cheia",
+   "padroes": {}
+  },
+  {
+   "modelo": "bateria",
+   "id": "bateria_fraca",
+   "nome": "Bateria fraca",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "valor": "15",
+    "legenda": "hora de carregar"
+   }
+  },
+  {
+   "modelo": "produto_revelacao",
+   "id": "revelacao_gadget",
+   "nome": "Revelação de aparelho",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "selo": "NOVO",
+    "titulo": "Fone Pulse 2",
+    "detalhe": "40 horas de bateria"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "especificacoes",
+   "nome": "Especificações",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Ficha técnica",
+    "texto": "Tela de 6,7 polegadas\n256 GB de memória\nCâmera de 50 MP\n5G"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_velocidade",
+   "nome": "Antes e depois de velocidade",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "antes": "8 s",
+    "depois": "0,9 s",
+    "rotulo_antes": "site antigo",
+    "rotulo_depois": "site novo"
+   }
+  },
+  {
+   "modelo": "titulo_glitch",
+   "id": "glitch_tech",
+   "nome": "Glitch de tecnologia",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "SISTEMA ONLINE"
+   }
+  },
+  {
+   "modelo": "grafico_linha",
+   "id": "usuarios_app",
+   "nome": "Usuários do app",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Usuários ativos",
+    "dados": "Jan: 800\nFev: 1500\nMar: 2900\nAbr: 4200\nMai: 7800\nJun: 12000"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_tech",
+   "nome": "Dica de tecnologia",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "rotulo": "DICA TECH",
+    "texto": "Ative a verificação em duas etapas em todas as suas contas."
+   }
+  },
+  {
+   "modelo": "chamada_notificacao",
+   "id": "notificacao_app",
+   "nome": "Notificação de app",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "app": "Agenda Fácil",
+    "titulo": "Lembrete: reunião às 15h",
+    "mensagem": "Toque para abrir a pauta",
+    "iniciais": "A"
+   }
+  }
+ ]
+}

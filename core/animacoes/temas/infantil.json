@@ -1,0 +1,110 @@
+{
+ "nome": "Infantil",
+ "ordem": 25,
+ "versoes": [
+  {
+   "modelo": "bolhas",
+   "id": "brincadeira",
+   "nome": "Hora da brincadeira",
+   "padroes": {}
+  },
+  {
+   "modelo": "bolhas",
+   "id": "festa_infantil",
+   "nome": "Festa infantil",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "titulo": "Festa da Alice"
+   }
+  },
+  {
+   "modelo": "bolhas",
+   "id": "colonia_ferias",
+   "nome": "Colônia de férias",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Colônia de férias"
+   }
+  },
+  {
+   "modelo": "baloes",
+   "id": "baloes_turminha",
+   "nome": "Balões da turminha",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "titulo": "Bem-vindos à turminha",
+    "nome": "Escola Arco-Íris"
+   }
+  },
+  {
+   "modelo": "pixel_titulo",
+   "id": "titulo_infantil",
+   "nome": "Título de bloquinhos",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "texto": "RECREIO",
+    "subtitulo": "as 10h no pátio"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "lista_material",
+   "nome": "Lista de material",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "titulo": "Lista de material",
+    "texto": "Caderno de desenho\nGiz de cera\nTesoura sem ponta\nCola branca"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "reuniao_pais",
+   "nome": "Reunião de pais",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "dia": "30",
+    "mes": "OUT",
+    "titulo": "Reunião de pais",
+    "hora": "Quinta, 18h30",
+    "local": "Escola Arco-Íris"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_ferias",
+   "nome": "Contagem para as férias",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "de": "5",
+    "final": "FÉRIAS!"
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "impacto_infantil",
+   "nome": "Hora da história",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "texto": "Hora da história"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "confete_infantil",
+   "nome": "Confete infantil",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "titulo": "Muito bem!"
+   }
+  }
+ ]
+}

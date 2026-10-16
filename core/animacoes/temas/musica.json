@@ -95,6 +95,32 @@
     "sufixo": "milhão",
     "legenda": "de reproduções"
    }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_musica",
+   "nome": "Qual música",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "pergunta": "Qual música no próximo vídeo?",
+    "opcao_1": "Acústico",
+    "pct_1": "66",
+    "opcao_2": "Eletrônico",
+    "pct_2": "34"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_show",
+   "nome": "Horário do show",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "hora": "22",
+    "minuto": "0",
+    "texto": "Show começa às 22h"
+   }
   }
  ]
 }

@@ -155,6 +155,53 @@
     "texto": "Prometo escolher você\ntodos os dias.",
     "autor": "Pedro, nos votos"
    }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_cerimonia",
+   "nome": "Horário da cerimônia",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "hora": "16",
+    "minuto": "30",
+    "texto": "Cerimônia às 16h30"
+   }
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "lua_de_mel",
+   "nome": "Lua de mel",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "origem": "São Paulo",
+    "destino": "Maceió",
+    "detalhe": "lua de mel"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_noivos",
+   "nome": "Conversa dos noivos",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Vamos marcar a data?\nSó se for em setembro!\nFechado. 12 de setembro?\nSim!"
+   }
+  },
+  {
+   "modelo": "chave_pix",
+   "id": "lista_presentes",
+   "nome": "Lista de presentes",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Presente para os noivos",
+    "rotulo": "CHAVE PIX",
+    "chave": "(19) 90000-0000",
+    "obrigado": "Obrigado pelo carinho!"
+   }
   }
  ]
 }

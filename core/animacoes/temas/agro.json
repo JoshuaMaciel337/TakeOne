@@ -1,0 +1,116 @@
+{
+ "nome": "Agro e campo",
+ "ordem": 23,
+ "versoes": [
+  {
+   "modelo": "folhas",
+   "id": "colheita",
+   "nome": "Colheita",
+   "padroes": {}
+  },
+  {
+   "modelo": "folhas",
+   "id": "dia_de_campo",
+   "nome": "Dia de campo",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "titulo": "Dia de campo"
+   }
+  },
+  {
+   "modelo": "folhas",
+   "id": "outono",
+   "nome": "Outono",
+   "padroes": {
+    "cor_1": "#e0a030",
+    "cor_2": "#c0502a",
+    "titulo": "Chegou o outono"
+   }
+  },
+  {
+   "modelo": "grafico_barras",
+   "id": "safra",
+   "nome": "Produção da safra",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "titulo": "Sacas por hectare",
+    "dados": "2022: 52\n2023: 58\n2024: 61\n2025: 67"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_hectares",
+   "nome": "Hectares plantados",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "valor": "1200",
+    "prefixo": "",
+    "sufixo": "ha",
+    "legenda": "de área plantada"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "feira_agro",
+   "nome": "Feira agropecuária",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "dia": "18",
+    "mes": "MAI",
+    "titulo": "Feira Agro 2027",
+    "hora": "8h às 18h",
+    "local": "Parque de exposições"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_produtor",
+   "nome": "Tarja de produtor",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "nome": "Seu Antônio Silva",
+    "funcao": "Produtor de café · Sul de Minas"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "plantio",
+   "nome": "Etapas do plantio",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "titulo": "Do plantio à colheita",
+    "texto": "Preparo do solo\nPlantio\nManejo e irrigação\nColheita"
+   }
+  },
+  {
+   "modelo": "local_pin",
+   "id": "fazenda",
+   "nome": "Localização da fazenda",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "titulo": "Fazenda Boa Vista",
+    "endereco": "Estrada do Café, km 12 · Minas Gerais"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "preco_saca",
+   "nome": "Preço da saca",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "produto": "Café arábica (saca)",
+    "de": "R$ 1.480",
+    "por": "R$ 1.620",
+    "selo": "+9%"
+   }
+  }
+ ]
+}

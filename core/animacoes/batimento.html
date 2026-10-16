@@ -1,0 +1,99 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Batimento cardíaco",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Uma linha de eletrocardiograma corre pela faixa, o coração pulsa a cada batida e o número fica ao lado.",
+ "campos": [
+  {"id": "valor", "rotulo": "Número", "tipo": "texto", "padrao": "72", "maximo": 6},
+  {"id": "unidade", "rotulo": "Unidade", "tipo": "texto", "padrao": "bpm", "maximo": 8},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "Cuide do seu coração", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Linha", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Coração", "tipo": "cor", "padrao": "#ff3b5c"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Batimento: a forma de um batimento (P, QRS e T, por trechos) se repete a cada 0,85 s; a linha é
+     desenhada até a ponta, que corre da esquerda para a direita e recomeça, com a parte de trás se apagando.
+     O coração pulsa quando o pico passa. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const PERIODO = 0.85;
+  const onda = (f) => {
+    const g = (c, l, a) => a * Math.exp(-((f - c) ** 2) / (2 * l * l));
+    return g(0.18, 0.03, 0.12) - g(0.37, 0.012, 0.15) + g(0.4, 0.014, 1) - g(0.44, 0.014, 0.3) + g(0.66, 0.05, 0.22);
+  };
+  const coracao = (x, y, s) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.35);
+    ctx.bezierCurveTo(x - s * 1.1, y - s * 0.35, x - s * 0.45, y - s * 1.05, x, y - s * 0.45);
+    ctx.bezierCurveTo(x + s * 0.45, y - s * 1.05, x + s * 1.1, y - s * 0.35, x, y + s * 0.35);
+    ctx.fill();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const pw = Math.min(W * 0.86, 100 * u);
+    const ph = 26 * u;
+    const px = (W - pw) / 2;
+    const py = (H - ph) / 2;
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.fillStyle = "rgba(10,14,14,.88)";
+    TO.retangulo(ctx, px, py, pw, ph, 3 * u);
+    ctx.fill();
+    // Linha
+    const lx = px + 4 * u;
+    const lw = pw * 0.6;
+    const base = py + ph * 0.62;
+    const amp = ph * 0.45;
+    const janela = 2.4;
+    const ponta = (t % janela) / janela;
+    ctx.lineWidth = 0.6 * u;
+    ctx.lineJoin = "round";
+    for (let i = 1; i <= 160; i++) {
+      const q0 = (i - 1) / 160;
+      const q1 = i / 160;
+      const atras = (ponta - q1 + 1) % 1;
+      if (atras > 0.75) continue;
+      const tv0 = t - ((ponta - q0 + 1) % 1) * janela;
+      const tv1 = t - atras * janela;
+      if (tv1 < 0.3) continue;
+      ctx.globalAlpha = entra * (1 - sai) * (1 - atras / 0.75);
+      ctx.strokeStyle = C.cor_1;
+      ctx.beginPath();
+      ctx.moveTo(lx + q0 * lw, base - onda(((tv0 % PERIODO) + PERIODO) % PERIODO / PERIODO) * amp);
+      ctx.lineTo(lx + q1 * lw, base - onda(((tv1 % PERIODO) + PERIODO) % PERIODO / PERIODO) * amp);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.drawImage(TO.brilho(C.cor_1), lx + ponta * lw - 2.5 * u, base - onda((t % PERIODO) / PERIODO) * amp - 2.5 * u, 5 * u, 5 * u);
+    // Coração e número
+    const f = (t % PERIODO) / PERIODO;
+    const pulso = 1 + 0.18 * Math.exp(-((f - 0.42) ** 2) / 0.003);
+    const hx = px + pw * 0.66 + 6 * u;
+    ctx.fillStyle = C.cor_2;
+    coracao(hx, py + ph * 0.42, 3.6 * u * pulso);
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(900, 7.6);
+    const nx = hx + 5.4 * u;
+    ctx.fillText(C.valor, nx, py + ph * 0.42);
+    ctx.font = TO.fonte(600, 2.6);
+    ctx.globalAlpha = entra * (1 - sai) * 0.7;
+    ctx.fillText(C.unidade, nx, py + ph * 0.42 + 6 * u);
+    ctx.globalAlpha = entra * (1 - sai) * 0.9;
+    ctx.textAlign = "center";
+    ctx.font = TO.fonte(600, Math.min(3, TO.caber(ctx, C.legenda, 600, 3, pw - 8 * u)));
+    ctx.fillText(C.legenda, px + pw / 2, py + 4 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

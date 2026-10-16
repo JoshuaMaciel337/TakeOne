@@ -128,6 +128,39 @@
     "texto": "DIA DO CLIENTE",
     "texto_2": "OFERTAS ESPECIAIS"
    }
+  },
+  {
+   "modelo": "selo_giratorio",
+   "id": "selo_black_friday",
+   "nome": "Selo de Black Friday",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "circular": "BLACK FRIDAY • SÓ HOJE •",
+    "centro": "-70%"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_mae",
+   "nome": "Mensagem para a mãe",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Mãe, já almoçou?\nJá, filho! E você?\nTô chegando aí com um presente\nAi, que amor!"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_almoco_maes",
+   "nome": "Almoço do Dia das Mães",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "hora": "12",
+    "minuto": "30",
+    "texto": "Almoço às 12h30"
+   }
   }
  ]
 }

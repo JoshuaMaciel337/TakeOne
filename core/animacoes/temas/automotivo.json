@@ -1,0 +1,123 @@
+{
+ "nome": "Automotivo",
+ "ordem": 24,
+ "versoes": [
+  {
+   "modelo": "velocimetro",
+   "id": "velocidade_maxima",
+   "nome": "Velocidade máxima",
+   "padroes": {}
+  },
+  {
+   "modelo": "velocimetro",
+   "id": "potencia",
+   "nome": "Potência",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "valor": "180",
+    "maximo": "250",
+    "unidade": "cv",
+    "legenda": "de potência"
+   }
+  },
+  {
+   "modelo": "velocimetro",
+   "id": "economia",
+   "nome": "Consumo",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "16",
+    "maximo": "20",
+    "unidade": "km/l",
+    "legenda": "na estrada"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "carro_oferta",
+   "nome": "Carro em oferta",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "produto": "Hatch 1.0 2024",
+    "de": "R$ 79.900",
+    "por": "R$ 72.900",
+    "selo": "-9%"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "itens_carro",
+   "nome": "Itens do carro",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "titulo": "Completo",
+    "texto": "Ar-condicionado\nCâmbio automático\nCentral multimídia\nCâmera de ré"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_mecanico",
+   "nome": "Tarja de mecânico",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "nome": "Oficina do Zé",
+    "funcao": "Mecânica e funilaria desde 1998"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "largada",
+   "nome": "Largada",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "de": "3",
+    "final": "ACELERA!"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_polimento",
+   "nome": "Antes e depois do polimento",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "pintura opaca",
+    "rotulo_depois": "polimento técnico"
+   }
+  },
+  {
+   "modelo": "rota_mapa",
+   "id": "rota_viagem_carro",
+   "nome": "Rota de carro",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "origem": "Curitiba",
+    "destino": "Florianópolis",
+    "detalhe": "300 km de estrada"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "revisao",
+   "nome": "Revisão agendada",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "dia": "14",
+    "mes": "NOV",
+    "titulo": "Revisão dos 10 mil km",
+    "hora": "Quinta, 9h",
+    "local": "Oficina do Zé"
+   }
+  }
+ ]
+}

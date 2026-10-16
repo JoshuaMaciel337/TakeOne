@@ -1,0 +1,90 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Meta com barra",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Uma barra enche até a parte já alcançada da meta, com o valor contando, a meta no fim e a porcentagem.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Campanha do agasalho", "maximo": 36},
+  {"id": "valor", "rotulo": "Já alcançado", "tipo": "numero", "padrao": "7350", "maximo": 0},
+  {"id": "meta", "rotulo": "Meta", "tipo": "numero", "padrao": "10000", "maximo": 0},
+  {"id": "prefixo", "rotulo": "Antes do número", "tipo": "texto", "padrao": "R$", "maximo": 4},
+  {"id": "cor_1", "rotulo": "Barra (início)", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Barra (fim)", "tipo": "cor", "padrao": "#22c55e"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Meta: o painel sobe, a barra enche com desaceleração longa até valor/meta (no máximo cheia), o valor
+     conta junto, um brilho corre por dentro da parte cheia e a porcentagem acompanha a ponta da barra. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const valor = parseInt(C.valor, 10) || 0;
+  const meta = Math.max(1, parseInt(C.meta, 10) || 1);
+  const alvo = Math.min(1, valor / meta);
+  const num = (v) => `${C.prefixo ? C.prefixo + " " : ""}${Math.round(v).toLocaleString("pt-BR")}`;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const pw = Math.min(W * 0.86, 100 * u);
+    const ph = 30 * u;
+    const px = (W - pw) / 2;
+    const py = (H - ph) / 2 + (1 - entra) * 3 * u;
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.fillStyle = "rgba(14,15,20,.86)";
+    TO.retangulo(ctx, px, py, pw, ph, 3 * u);
+    ctx.fill();
+    const k = TO.ease.outQuart(TO.prog(t, 0.5, 2.8)) * alvo;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "top";
+    ctx.font = TO.fonte(700, TO.caber(ctx, C.titulo, 700, 3.6, pw - 8 * u));
+    ctx.fillText(C.titulo, px + 4 * u, py + 3.4 * u);
+    ctx.font = TO.fonte(900, 7.4);
+    ctx.fillText(num(meta * k), px + 4 * u, py + 8.4 * u);
+    // Barra
+    const bx = px + 4 * u;
+    const bw = pw - 8 * u;
+    const by = py + ph - 9.6 * u;
+    const bh = 3.4 * u;
+    ctx.fillStyle = "rgba(255,255,255,.12)";
+    TO.retangulo(ctx, bx, by, bw, bh, bh / 2);
+    ctx.fill();
+    if (k > 0.002) {
+      ctx.save();
+      TO.retangulo(ctx, bx, by, bw * k, bh, bh / 2);
+      ctx.clip();
+      ctx.fillStyle = TO.degrade(ctx, bx, 0, bx + bw, 0);
+      ctx.fillRect(bx, by, bw * k, bh);
+      const g = (t * 0.6) % 1.4 - 0.2;
+      const gx = bx + bw * k * g;
+      const brilho = ctx.createLinearGradient(gx - 6 * u, 0, gx + 6 * u, 0);
+      brilho.addColorStop(0, "rgba(255,255,255,0)");
+      brilho.addColorStop(0.5, "rgba(255,255,255,.45)");
+      brilho.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = brilho;
+      ctx.fillRect(bx, by, bw * k, bh);
+      ctx.restore();
+    }
+    ctx.font = TO.fonte(800, 3);
+    ctx.textBaseline = "top";
+    const pct = `${Math.round(k * 100)}%`;
+    const pctW = ctx.measureText(pct).width;
+    ctx.fillStyle = C.cor_1;
+    ctx.fillText(pct, Math.min(bx + bw - pctW, Math.max(bx, bx + bw * k - pctW / 2)), by + bh + 1.2 * u);
+    ctx.globalAlpha = entra * (1 - sai) * 0.6;
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(500, 2.6);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`meta: ${num(meta)}`, bx + bw, by - 1 * u);
+    ctx.textAlign = "left";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

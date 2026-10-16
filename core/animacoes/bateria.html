@@ -1,0 +1,87 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Bateria carregando",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Uma bateria se enche em blocos até a porcentagem, com um raio piscando e a legenda embaixo.",
+ "campos": [
+  {"id": "valor", "rotulo": "Porcentagem", "tipo": "numero", "padrao": "100", "maximo": 0},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "energia para a semana", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Carga (início)", "tipo": "cor", "padrao": "#c6ff3d"},
+  {"id": "cor_2", "rotulo": "Carga (fim)", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Bateria: o contorno estala; cinco blocos acendem um por vez até a fração pedida (o último pode ficar pela
+     metade), o número conta junto e o raio no meio pisca enquanto carrega. Abaixo de 20% a carga fica vermelha. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const alvo = Math.min(100, parseInt(C.valor, 10) || 0) / 100;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const s = TO.spring(t, 0.5, 2.2);
+    const bw = 44 * u;
+    const bh = 22 * u;
+    const cx = W / 2;
+    const cy = H / 2 - 4 * u;
+    ctx.globalAlpha = 1 - sai;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(s, s);
+    ctx.fillStyle = "rgba(14,15,20,.85)";
+    TO.retangulo(ctx, -bw / 2, -bh / 2, bw, bh, 3 * u);
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1 * u;
+    TO.retangulo(ctx, -bw / 2, -bh / 2, bw, bh, 3 * u);
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    TO.retangulo(ctx, bw / 2 + 0.8 * u, -4 * u, 2.4 * u, 8 * u, 1 * u);
+    ctx.fill();
+    const k = TO.ease.inOutSine(TO.prog(t, 0.5, 2.6)) * alvo;
+    const pad = 2 * u;
+    const gap = 1.2 * u;
+    const cw = (bw - pad * 2 - gap * 4) / 5;
+    ctx.fillStyle = k < 0.2 ? "#ff3b3b" : TO.degrade(ctx, -bw / 2, 0, bw / 2, 0);
+    for (let i = 0; i < 5; i++) {
+      const f = TO.clamp(k * 5 - i);
+      if (f <= 0) continue;
+      TO.retangulo(ctx, -bw / 2 + pad + i * (cw + gap), -bh / 2 + pad, cw * f, bh - pad * 2, 1 * u);
+      ctx.fill();
+    }
+    if (k < alvo - 0.001 || Math.sin(t * 10) > 0) {
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = "rgba(0,0,0,.5)";
+      ctx.lineWidth = 0.4 * u;
+      ctx.beginPath();
+      ctx.moveTo(1 * u, -7 * u);
+      ctx.lineTo(-4 * u, 1 * u);
+      ctx.lineTo(0, 1 * u);
+      ctx.lineTo(-1 * u, 7 * u);
+      ctx.lineTo(4 * u, -1 * u);
+      ctx.lineTo(0, -1 * u);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = TO.fonte(900, 7);
+    ctx.fillText(`${Math.round(k * 100)}%`, cx, cy + bh / 2 + 3 * u);
+    const l = TO.ease.outCubic(TO.prog(t, 1, 1.6));
+    ctx.globalAlpha = (1 - sai) * l * 0.85;
+    ctx.font = TO.fonte(500, Math.min(3.6, TO.caber(ctx, C.legenda, 500, 3.6, W * 0.84)));
+    ctx.fillText(C.legenda, cx, cy + bh / 2 + 12 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

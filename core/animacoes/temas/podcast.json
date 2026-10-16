@@ -129,6 +129,55 @@
     "titulo": "Neste episódio",
     "texto": "Como tudo começou\nO primeiro grande erro\nO que aprendemos\nPerguntas do público"
    }
+  },
+  {
+   "modelo": "tarja_dupla",
+   "id": "dupla_podcast",
+   "nome": "Apresentador e convidado",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "nome_1": "Lucas Martins",
+    "funcao_1": "Apresentador",
+    "nome_2": "Helena Costa",
+    "funcao_2": "Psicóloga"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_podcast",
+   "nome": "Enquete do podcast",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "pergunta": "Qual o tema do próximo episódio?",
+    "opcao_1": "Carreira",
+    "pct_1": "62",
+    "opcao_2": "Finanças",
+    "pct_2": "38"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "pergunta_ouvinte",
+   "nome": "Pergunta do ouvinte",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Como vocês começaram o podcast?\nCom um celular e muita vontade!\nE o microfone?\nVeio só no episódio 20"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_episodio",
+   "nome": "Horário do episódio",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "hora": "20",
+    "minuto": "0",
+    "texto": "Episódio novo às 20h"
+   }
   }
  ]
 }

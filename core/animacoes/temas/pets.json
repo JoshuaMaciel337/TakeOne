@@ -1,0 +1,118 @@
+{
+ "nome": "Pets",
+ "ordem": 20,
+ "versoes": [
+  {
+   "modelo": "patinhas",
+   "id": "banho_tosa",
+   "nome": "Banho e tosa",
+   "padroes": {}
+  },
+  {
+   "modelo": "patinhas",
+   "id": "adocao",
+   "nome": "Feira de adoção",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Adote um amigo",
+    "detalhe": "feira de adoção no sábado"
+   }
+  },
+  {
+   "modelo": "patinhas",
+   "id": "petshop_aberto",
+   "nome": "Pet shop aberto",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "Pet shop aberto",
+    "detalhe": "das 8h às 20h"
+   }
+  },
+  {
+   "modelo": "tarja_perfil",
+   "id": "pet_do_dia",
+   "nome": "Pet do dia",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "nome": "Thor",
+    "perfil": "golden de 3 anos",
+    "iniciais": "T"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "cuidados_pet",
+   "nome": "Cuidados com o pet",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Cuidados de verão",
+    "texto": "Água fresca o dia todo\nPasseio fora do sol forte\nTosa higiênica\nAntipulgas em dia"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "vacinacao_pet",
+   "nome": "Vacinação de pets",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "dia": "12",
+    "mes": "NOV",
+    "titulo": "Vacinação antirrábica",
+    "hora": "Sábado, 9h",
+    "local": "Praça central"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "racao_oferta",
+   "nome": "Ração em oferta",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "produto": "Ração premium 15 kg",
+    "de": "R$ 289",
+    "por": "R$ 219",
+    "selo": "-24%"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_tosa",
+   "nome": "Antes e depois da tosa",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "pelo embolado",
+    "rotulo_depois": "tosa na tesoura"
+   }
+  },
+  {
+   "modelo": "coracoes",
+   "id": "amor_pet",
+   "nome": "Amor de pet",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Amor de quatro patas"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_veterinario",
+   "nome": "Tarja de veterinário",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "nome": "Dr. Felipe Rocha",
+    "funcao": "Médico-veterinário · CRMV 12345"
+   }
+  }
+ ]
+}
