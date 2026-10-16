@@ -75,6 +75,8 @@ export type Midia = {
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
   gerada?: { descricao: string; formato: string; duracao: number } | null;
+  /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */
+  animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;

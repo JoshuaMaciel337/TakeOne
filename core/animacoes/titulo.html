@@ -1,0 +1,15 @@
+<!-- Título cinético: cada palavra entra crescendo e saindo do desfoque; a última leva o degradê -->
+<style>
+.titulo{position:absolute;inset:0;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;
+  gap:0 calc(var(--u)*2.4);padding:0 calc(var(--u)*8);text-align:center;
+  animation:sair .5s cubic-bezier(.6,0,.8,.4) calc(var(--dur) - .5s) forwards}
+.palavra{display:inline-block;color:var(--cor-texto);font-weight:800;font-size:calc(var(--u)*10);line-height:1.08;
+  letter-spacing:-.04em;text-shadow:0 calc(var(--u)*.4) calc(var(--u)*2) rgba(0,0,0,.4);
+  animation:entrar .55s cubic-bezier(.2,.9,.25,1.25) calc(var(--i) * .12s) both}
+.palavra:last-child{background:linear-gradient(110deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;
+  background-clip:text;color:transparent;text-shadow:none;
+  filter:drop-shadow(0 calc(var(--u)*.4) calc(var(--u)*1.6) rgba(0,0,0,.35))}
+@keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*3)) scale(.7);filter:blur(calc(var(--u)*1))}}
+@keyframes sair{to{opacity:0;transform:scale(1.08)}}
+</style>
+<div class="titulo">{{palavras}}</div>

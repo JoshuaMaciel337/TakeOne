@@ -13,6 +13,7 @@ import type { Texto } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelAnimacoes } from "./PainelAnimacoes";
 import { PainelEfeitos } from "./PainelEfeitos";
 import { PainelFiltros } from "./PainelFiltros";
 import { PainelTransicoes } from "./PainelTransicoes";
@@ -34,6 +35,8 @@ type Props = {
   aoSelecionarMidia: (midiaId: string | null) => void;
   aoAdicionarMidia: (midiaId: string) => void;
   aoAdicionarTexto: (texto: Texto) => void;
+  /** Uma animação foi pedida: entra no cursor quando ficar pronta. */
+  aoPedirAnimacao: (midia: Midia) => void;
   legendas: PropsLegendas;
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
@@ -107,6 +110,7 @@ export function PainelConteudo({
   aoSelecionarMidia,
   aoAdicionarMidia,
   aoAdicionarTexto,
+  aoPedirAnimacao,
   legendas,
   selecionado,
   aoPrever,
@@ -135,6 +139,8 @@ export function PainelConteudo({
             aoAdicionarMidia={aoAdicionarMidia}
             proporcao={legendas.projeto.proporcao}
           />
+        ) : ferramenta.id === "elementos" ? (
+          <PainelAnimacoes proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} />
         ) : ferramenta.id === "texto" ? (
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : ferramenta.id === "legendas" ? (

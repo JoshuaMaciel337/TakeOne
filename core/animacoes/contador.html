@@ -1,0 +1,19 @@
+<!-- Número que conta: a propriedade --n (inteira) anima de 0 até o valor e o contador do CSS mostra o número -->
+<style>
+@property --n{syntax:'<integer>';inherits:false;initial-value:0}
+.contador{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:calc(var(--u)*1.2);animation:entrar .5s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.numero{display:flex;align-items:baseline;gap:calc(var(--u)*1);font-weight:800;font-size:calc(var(--u)*18);line-height:1;
+  letter-spacing:-.05em;font-variant-numeric:tabular-nums;padding:0 calc(var(--u)*1)}
+.numero span{background:linear-gradient(110deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.valor{counter-reset:n var(--n);animation:contar 1.6s cubic-bezier(.15,.7,.2,1) .15s both}
+.valor::after{content:counter(n)}
+.pequeno{font-size:.45em;letter-spacing:-.02em}
+.legenda{color:var(--cor-texto);font-weight:600;font-size:calc(var(--u)*4);opacity:.9;
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.4) rgba(0,0,0,.45)}
+@keyframes contar{from{--n:0}to{--n:{{valor}}}}
+@keyframes entrar{from{opacity:0;transform:scale(.85)}}
+@keyframes sair{to{opacity:0;transform:translateY(calc(var(--u)*-3))}}
+</style>
+<div class="contador"><div class="numero"><span class="pequeno">{{prefixo}}</span><span class="valor"></span><span class="pequeno">{{sufixo}}</span></div>
+<div class="legenda">{{legenda}}</div></div>

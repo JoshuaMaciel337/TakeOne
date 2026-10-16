@@ -1,0 +1,15 @@
+<!-- Chamada: o botão aparece com um salto, a seta empurra para a direita sem parar, e tudo some no fim -->
+<style>
+.cta{position:absolute;left:50%;bottom:calc(var(--u)*12);transform:translateX(-50%);display:flex;align-items:center;
+  gap:calc(var(--u)*2);padding:calc(var(--u)*2.4) calc(var(--u)*4.2);border-radius:999px;white-space:nowrap;
+  background:linear-gradient(110deg,var(--cor-1),var(--cor-2));color:var(--cor-texto);
+  box-shadow:0 calc(var(--u)*1.4) calc(var(--u)*4) rgba(0,0,0,.35);
+  font-weight:800;font-size:calc(var(--u)*4.4);letter-spacing:-.01em;
+  animation:entrar .6s cubic-bezier(.2,.9,.3,1.35) both,sair .4s ease-in calc(var(--dur) - .4s) forwards}
+.seta{width:calc(var(--u)*4.4);height:calc(var(--u)*4.4);animation:empurrar .9s ease-in-out .6s infinite}
+@keyframes entrar{from{opacity:0;transform:translateX(-50%) translateY(calc(var(--u)*4)) scale(.6)}}
+@keyframes sair{to{opacity:0;transform:translateX(-50%) scale(.85)}}
+@keyframes empurrar{50%{transform:translateX(calc(var(--u)*1.2))}}
+</style>
+<div class="cta"><span>{{texto}}</span>
+<svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M13 5l7 7-7 7"/></svg></div>

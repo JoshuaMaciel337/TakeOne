@@ -257,12 +257,14 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     fade_saida: 0,
     transformacao: TRANSFORMACAO_PADRAO,
     recorte: RECORTE_PADRAO,
+    // A animação já vem com a transparência: o clipe usa a máscara dela, como no recorte do fundo
+    ...(info.transparente ? { remover_fundo: true } : {}),
   };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
   if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixaDeTexto(faixa.tipo) ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
 
   let resultado: Projeto;
-  if (faixa?.tipo === "principal" || (!faixa && !destino.novaFaixa && info.video)) {
+  if (faixa?.tipo === "principal" || (!faixa && !destino.novaFaixa && info.video && !info.transparente)) {
     resultado = inserirNaPrincipal(projeto, clipe, destino.inicio);
   } else {
     clipe.inicio = Math.max(0, quadroMaisProximo(projeto.taxa, destino.inicio ?? 0));

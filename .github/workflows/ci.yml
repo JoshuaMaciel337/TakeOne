@@ -37,6 +37,8 @@ jobs:
           echo "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9  $RUNNER_TEMP/modnet.onnx" | sha256sum -c -
           echo "MODELO_RECORTE=$RUNNER_TEMP/modnet.onnx" >> "$GITHUB_ENV"
       - run: pip install -r requirements-dev.txt
+      - name: Instalar o Chromium (testes das animações em HTML)
+        run: playwright install --with-deps chromium-headless-shell
       - run: ruff check .
       - run: pytest -q
         env:

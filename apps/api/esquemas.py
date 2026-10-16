@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
+from core.modelos.animacao_html import DURACAO_MAXIMA as DURACAO_MAXIMA_ANIMACAO
+from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
@@ -110,6 +112,8 @@ class MidiaSaida(BaseModel):
     tons: dict = Field(default_factory=dict)
     # Vídeo gerado com IA: {descricao, formato, duracao}
     gerada: dict | None = None
+    # Animação em HTML: {modelo, campos, proporcao, duracao}
+    animacao: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
@@ -377,6 +381,13 @@ class FaixaEntrada(BaseModel):
     muda: bool = False
     travada: bool = False
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
+
+
+class AnimacaoEntrada(BaseModel):
+    modelo: str = Field(min_length=1, max_length=40)
+    campos: dict[str, str | int | float] = Field(default_factory=dict)
+    proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] = "16:9"
+    duracao: float = Field(default=4, ge=DURACAO_MINIMA_ANIMACAO, le=DURACAO_MAXIMA_ANIMACAO)
 
 
 class GerarVideoEntrada(BaseModel):

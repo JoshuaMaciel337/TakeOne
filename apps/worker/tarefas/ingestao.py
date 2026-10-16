@@ -206,6 +206,8 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
                          str(caminho(ARQUIVO_CAPA))])
         arquivos.append(ARQUIVO_CAPA)
 
+    # O que já foi gerado antes da ingestão (a transparência de uma animação, por exemplo) continua na mídia
+    arquivos += [nome for nome in midia.get("arquivos", []) if nome not in arquivos]
     momento = agora()
     db.midias.update_one({"_id": midia_id}, {"$set": {
         "status": STATUS_PRONTA,

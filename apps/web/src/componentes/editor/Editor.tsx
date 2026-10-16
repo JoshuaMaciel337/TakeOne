@@ -102,7 +102,12 @@ export function Editor({ projetoId }: { projetoId: string }) {
       midia: (id) => {
         const midia = midias.get(id);
         if (!midia || midia.status !== "pronta" || !midia.duracao) return null;
-        return { duracao: segundosParaTicks(midia.duracao), video: Boolean(midia.video), audio: Boolean(midia.audio) };
+        return {
+          duracao: segundosParaTicks(midia.duracao),
+          video: Boolean(midia.video),
+          audio: Boolean(midia.audio),
+          transparente: Boolean(midia.animacao) && midia.arquivos.includes("mascara.mp4"),
+        };
       },
     }),
     [midias],
@@ -169,6 +174,28 @@ export function Editor({ projetoId }: { projetoId: string }) {
     const novo = resultado?.selecao?.[0] && acharClipe(resultado.projeto, resultado.selecao[0]);
     if (novo && novo.faixa.tipo === "principal") buscar(fimDoClipe(novo.clipe));
   }
+
+  // Animações pedidas no painel: cada uma entra no instante em que o cursor estava, quando ficar pronta
+  const animacoesPedidas = useRef(new Map<string, Tick>());
+  function pedirAnimacao(midia: { id: string }) {
+    animacoesPedidas.current.set(midia.id, tempo);
+    void biblioteca.recarregar();
+  }
+  const colocarAnimacoes = useEffectEvent(() => {
+    for (const [id, inicio] of animacoesPedidas.current) {
+      const midia = midias.get(id);
+      if (!midia || midia.status === "erro") {
+        animacoesPedidas.current.delete(id);
+        if (midia) mostrarAviso(`A animação não foi gravada: ${midia.erro ?? "erro desconhecido"}`);
+      } else if (midia.status === "pronta") {
+        animacoesPedidas.current.delete(id);
+        executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio } });
+      }
+    }
+  });
+  useEffect(() => {
+    if (animacoesPedidas.current.size) colocarAnimacoes();
+  }, [midias]);
 
   const bibliotecaDoEditor = useMemo(
     () => ({
@@ -274,6 +301,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
           }}
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
+          aoPedirAnimacao={pedirAnimacao}
           selecionado={selecionado}
           aoPrever={preverDoPainel}
           legendas={{

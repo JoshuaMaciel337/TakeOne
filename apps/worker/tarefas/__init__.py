@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from worker.tarefas.animacao_html import executar_animacao_html, marcar_animacao_com_erro
 from worker.tarefas.geracao_video import executar_geracao_video, marcar_geracao_com_erro
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
@@ -32,5 +33,6 @@ REGISTRO = {
     "recorte_fundo": Tarefa(executar_recorte_fundo, ao_falhar=marcar_recorte_com_erro),
     "limpeza_imagem": Tarefa(executar_limpeza_imagem, ao_falhar=marcar_imagem_com_erro),
     "rosto": Tarefa(executar_rosto, ao_falhar=marcar_rosto_com_erro),
+    "animacao_html": Tarefa(executar_animacao_html, ao_falhar=marcar_animacao_com_erro),
     "geracao_video": Tarefa(executar_geracao_video, ao_falhar=marcar_geracao_com_erro),
 }

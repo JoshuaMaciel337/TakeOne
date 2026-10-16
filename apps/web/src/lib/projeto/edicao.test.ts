@@ -42,10 +42,11 @@ const QUADRO = duracaoDoQuadro(TAXA);
 
 function contexto(): Contexto {
   let n = 0;
-  const midias: Record<string, { duracao: number; video: boolean; audio: boolean }> = {
+  const midias: Record<string, { duracao: number; video: boolean; audio: boolean; transparente?: boolean }> = {
     video10: { duracao: 10 * S, video: true, audio: true },
     video4: { duracao: 4 * S, video: true, audio: true },
     musica: { duracao: 30 * S, video: false, audio: true },
+    animacao: { duracao: 3 * S, video: true, audio: false, transparente: true },
   };
   return { novoId: () => `n${++n}`, midia: (id) => midias[id] ?? null };
 }
@@ -98,6 +99,17 @@ test("vídeo entra na principal, encostado; áudio vai para uma faixa de áudio"
 
   assert.throws(() => adicionarClipe(projeto, ctx, "musica", { faixaId: "principal" }), ErroEdicao);
   assert.throws(() => adicionarClipe(projeto, ctx, "nao-existe"), ErroEdicao);
+});
+
+test("animação entra por cima, no cursor e com a transparência ligada", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "animacao", { inicio: 2 * S }));
+  const sobreposicao = projeto.faixas.find((f) => f.tipo === "video")!;
+  assert.equal(sobreposicao.clipes[0].inicio, 2 * S);
+  assert.equal(sobreposicao.clipes[0].remover_fundo, true);
+  assert.equal(principal(projeto).length, 1);
+  conferir(projeto);
 });
 
 test("dividir no cursor e apagar fechando o espaço na principal", () => {

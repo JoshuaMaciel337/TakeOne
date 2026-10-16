@@ -142,7 +142,8 @@ export type Projeto = {
 };
 
 /** O que a edição precisa saber de uma mídia. */
-export type InfoMidia = { duracao: Tick; video: boolean; audio: boolean };
+/** transparente: a mídia traz a própria transparência (animação em HTML), então entra por cima, recortada. */
+export type InfoMidia = { duracao: Tick; video: boolean; audio: boolean; transparente?: boolean };
 
 export function fimDoClipe(clipe: Clipe): Tick {
   return clipe.inicio + clipe.duracao;

@@ -587,6 +587,8 @@ function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
 function RemoverFundo({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   const recorte = midia.recorte_fundo;
+  // A animação já nasce com a transparência: a mesma opção, com outro nome
+  const animacao = Boolean(midia.animacao);
   function mudar(ligar: boolean) {
     aoExecutar({ comando: "clipe.removerFundo", parametros: { clipeIds: [clipe.id], ligar } });
     if (!ligar || recorte?.status === "pronta" || recorte?.status === "processando") return;
@@ -599,12 +601,14 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; mid
     <div className="mt-2 border-t border-borda/60 pt-2">
       <label className="flex items-center gap-2 text-xs">
         <input type="checkbox" checked={Boolean(clipe.remover_fundo)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
-        <span className="flex-1">Remover o fundo (fica a pessoa)</span>
+        <span className="flex-1">{animacao ? "Fundo transparente (só a animação aparece)" : "Remover o fundo (fica a pessoa)"}</span>
       </label>
       {clipe.remover_fundo ? (
         <p className="mt-1 text-[11px] text-suave" role="status">
           {recorte?.status === "pronta"
-            ? "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
+            ? animacao
+              ? "A animação aparece por cima do vídeo, sem fundo."
+              : "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
             : recorte?.status === "erro" || erroDoPedido
               ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
               : `Achando a pessoa em cada quadro${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}. Até terminar, a prévia mostra o clipe inteiro.`}

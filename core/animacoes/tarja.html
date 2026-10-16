@@ -1,0 +1,20 @@
+<!-- Tarja com nome: a barra cresce, o nome e a função sobem por trás de uma máscara e tudo sai pela esquerda -->
+<style>
+.tarja{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*9);display:flex;gap:calc(var(--u)*1.8);
+  animation:sair .45s cubic-bezier(.6,0,.8,.4) calc(var(--dur) - .45s) forwards}
+.barra{width:calc(var(--u)*1);border-radius:calc(var(--u)*1);background:linear-gradient(var(--cor-1),var(--cor-2));
+  transform-origin:50% 100%;animation:crescer .5s cubic-bezier(.2,.8,.2,1) both}
+.linhas{display:flex;flex-direction:column;gap:calc(var(--u)*.6)}
+.mascara{overflow:hidden;padding-right:calc(var(--u)*1)}
+.nome,.funcao{display:block;color:var(--cor-texto);text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.4) rgba(0,0,0,.45);
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) both}
+.nome{font-weight:800;font-size:calc(var(--u)*6);line-height:1.05;letter-spacing:-.02em;animation-delay:.15s}
+.funcao{font-weight:500;font-size:calc(var(--u)*3.4);line-height:1.3;opacity:.88;animation-delay:.3s}
+@keyframes crescer{from{transform:scaleY(0)}}
+@keyframes subir{from{transform:translateY(110%)}}
+@keyframes sair{to{opacity:0;transform:translateX(calc(var(--u)*-5))}}
+</style>
+<div class="tarja"><div class="barra"></div><div class="linhas">
+  <div class="mascara"><span class="nome">{{nome}}</span></div>
+  <div class="mascara"><span class="funcao">{{funcao}}</span></div>
+</div></div>

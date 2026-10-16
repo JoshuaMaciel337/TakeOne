@@ -1,0 +1,19 @@
+<!-- Citação: as aspas entram girando, cada linha sobe em seguida e o autor aparece por último -->
+<style>
+.citacao{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+  padding:0 calc(var(--u)*10);gap:calc(var(--u)*1.2);animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.aspas{font-family:Montserrat,Inter,sans-serif;font-weight:900;font-size:calc(var(--u)*22);line-height:.7;height:calc(var(--u)*11);
+  align-self:flex-start;background:linear-gradient(110deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;
+  background-clip:text;color:transparent;animation:aspas .7s cubic-bezier(.2,.9,.3,1.3) both}
+.linha{display:block;color:var(--cor-texto);font-weight:700;font-size:calc(var(--u)*6);line-height:1.2;letter-spacing:-.02em;
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.45);
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) calc(.35s + var(--i) * .22s) both}
+.autor{margin-top:calc(var(--u)*2);color:var(--cor-texto);font-weight:500;font-size:calc(var(--u)*3.4);opacity:0;
+  animation:autor .5s ease-out 1.1s forwards}
+.autor::before{content:"— "}
+@keyframes aspas{from{opacity:0;transform:rotate(-20deg) scale(.4)}}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*3))}}
+@keyframes autor{to{opacity:.85}}
+@keyframes sair{to{opacity:0}}
+</style>
+<div class="citacao"><div class="aspas">“</div><div>{{linhas}}</div><div class="autor">{{autor}}</div></div>

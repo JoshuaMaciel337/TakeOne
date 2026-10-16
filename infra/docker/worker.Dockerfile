@@ -30,6 +30,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY apps/worker/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+# O Chromium das animações em HTML, com as bibliotecas do sistema que ele pede, numa pasta que todos leem
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium-headless-shell && chmod -R a+rX /ms-playwright
 
 COPY core /app/core
 COPY apps/worker /app/worker

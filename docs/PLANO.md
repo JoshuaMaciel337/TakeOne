@@ -520,6 +520,6 @@ Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames
 - **"Descreva a animação":** o LLM escreve o HTML a partir de um esqueleto com o relógio já ligado; a animação só entra se abrir sem erro e gerar quadros. Experimental.
 - **Fora do produto:** como o dono já assina o Claude Code, o servidor MCP da fase 7 deixaria pedir edições em português direto do terminal, sem custo por uso. É uso pessoal, não uma peça do TakeOne.
 - **Ordem:** (1) clipe de animação com modelos prontos; (2) Ollama + "Criar automaticamente" e destaque de palavras; (3) "Descreva a animação".
-- [ ] Clipe de animação com modelos prontos
+- [x] Clipe de animação com modelos prontos (ferramenta Elementos: tarja, título, revelação, CTA, contador e citação)
 - [ ] LLM local e "Criar automaticamente"
 - [ ] "Descreva a animação" (experimental)

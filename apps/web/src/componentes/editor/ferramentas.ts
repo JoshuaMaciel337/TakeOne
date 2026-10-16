@@ -49,7 +49,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "elementos",
     nome: "Elementos",
     icone: Shapes,
-    emBreve: { fase: "Fase 6", descricao: "Figuras, adesivos animados, formas e imagens do banco gratuito." },
   },
   {
     id: "audio",
