@@ -436,15 +436,19 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] limpar a voz (DeepFilterNet3 no worker de CPU, opção na aba Áudio)
   - [x] reenquadrar seguindo o rosto (YuNet no worker de CPU, botão na aba Básico)
   - [x] redução de ruído na imagem (hqdn3d no worker de CPU; a mesma imagem limpa na prévia e no render)
-  - "Criar automaticamente"
+  - "Criar automaticamente" (diretor de edição com o LLM local; seção 10)
 - Novos:
+  - **animações em HTML (motion graphics):** clipe de animação a partir de modelos prontos (tarja, título cinético, logo, CTA, contador, citação), com as cores do kit de marca. Seção 10.
+  - LLM local (Ollama com o Qwen3 8B) para o "Criar automaticamente" e o destaque de palavras. Seção 10.
+  - "Descreva a animação": o LLM escreve a animação a partir de um esqueleto (experimental). Seção 10.
   - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
-  - **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto ou de uma imagem, com o Wan 2.2 TI2V-5B. Detalhes na seção 9.
+  - [x] **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto, com o Wan 2.2 TI2V-5B (painel Mídia, 2 a 5 s em 480p). Detalhes na seção 9.
+  - gerar vídeo a partir de uma imagem (o Wan 2.2 TI2V também aceita; falta a biblioteca aceitar imagens)
   - batida automática: cortar e animar no ritmo da música (detecção de batidas do SoundCraft)
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
   - texto em fala (TTS com modelo aberto)
   - edição automática a partir de vários clipes
-  - destacar a palavra-chave da legenda com o LLM
+  - destacar a palavra-chave da legenda com o LLM (seção 10)
 - Fica fora do escopo, pelas regras do dono no HolyCut: avatar de IA, dublagem, clonagem de voz e lip-sync.
 
 ### Fase 6: modelos, elementos e marca (2 semanas)
@@ -495,4 +499,27 @@ Escolhido entre Wan 2.2, LTX-Video, HunyuanVideo, LTX Desktop e ComfyUI, pelo qu
 - **Memória:** 16 GB de RAM no Nitro 5 é o limite com o offload ligado. A tarefa roda sozinha na GPU e libera a memória ao terminar.
 - **Ficaram de fora:** LTX-Video (a licença só é grátis para empresas com menos de US$ 10 milhões de faturamento, e na prática pede mais de 8 GB), HunyuanVideo (licença própria com exclusão de países e uns 14 GB no mínimo) e LTX Desktop (é um editor separado e pede 32 GB).
 - **Antes de começar:** conferir a licença na página do modelo no Hugging Face e medir no Nitro 5 o tempo e a memória de um clipe de 5 s.
+- **Medido de novo pelo serviço `comfyui` (15/10/2026):** 3 s em pé em 5 min 14 s e 5 s deitado em 9 min 1 s, com o HolyCut parado; a RAM livre do WSL desceu a 1,6 GB e a placa chegou a 87 °C. A geração entra pela tarefa `geracao_video` no painel Mídia.
 - **Medido no Nitro 5 (14/10/2026):** licença Apache 2.0. Um clipe de 5 s em 480p levou 12 min 43 s, com pico de 9,7 GB de RAM e 7,8 GB de VRAM. Roda só com 12 GB de RAM no WSL e com a GPU livre (HolyCut parado ou sem modelo carregado); a tarefa precisa esperar a placa ficar livre e avisar que leva uns 13 minutos por clipe.
+
+## 10. Animações e edição automática sem custo por uso
+
+Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames" (documento do dono). Lá, o Claude lê a transcrição, decide os cortes e escreve as animações em HTML; o Video-Use corta e legenda; o HyperFrames grava as animações em vídeo. O TakeOne faz o mesmo sem nada pago:
+
+| Peça do fluxo | Lá | No TakeOne |
+| --- | --- | --- |
+| Transcrição palavra a palavra | ElevenLabs Scribe (API paga) | faster-whisper no worker de GPU (já existe) |
+| Cortar silêncios, vícios, falsos começos e retakes | Video-Use (MIT) | Limpeza de fala da ferramenta Transcrição (já existe) |
+| Legendas, cor e fades nos cortes | Video-Use | Já existem, com legendas animadas |
+| Animações em HTML gravadas em vídeo | HyperFrames (Apache 2.0, HeyGen) | Clipe de animação (a fazer) |
+| O "diretor" que planeja a edição | Claude (assinatura) | LLM aberto local pelo Ollama (a fazer) |
+
+- **Clipe de animação:** a animação é uma página HTML com o tempo controlado (CSS, Web Animations ou Anime.js, MIT). O worker abre num Chrome sem tela, avança quadro a quadro e grava um vídeo da cor e outro da transparência, o mesmo par que o recorte do fundo usa; a prévia e o render tocam os mesmos arquivos. Os modelos são nossos, com campos (texto, cores, tempos) e as cores do kit de marca.
+- **Sem GSAP:** a licença do GSAP é gratuita mas não é aberta e proíbe, sem autorização, ferramentas visuais que deixam o usuário montar animações. O HyperFrames aceita CSS, Web Animations e Anime.js, que bastam. O catálogo de blocos do HyperFrames não declara licença: não copiar de lá.
+- **LLM local:** Qwen3 8B (Apache 2.0) pelo Ollama (MIT), uns 5 GB de VRAM em 4 bits, revezando a placa com o Whisper e o Wan pela fila de GPU (o modelo sai da memória no fim de cada job). Modelos de 8B erram ao escrever código do zero, então o diretor **escolhe e preenche**: lê a transcrição e devolve um plano em JSON com esquema fixo (cortes, título, tarjas, zooms, palavras em destaque) que vira comandos do editor. O resultado fica editável na linha do tempo, em vez de um MP4 fechado.
+- **"Descreva a animação":** o LLM escreve o HTML a partir de um esqueleto com o relógio já ligado; a animação só entra se abrir sem erro e gerar quadros. Experimental.
+- **Fora do produto:** como o dono já assina o Claude Code, o servidor MCP da fase 7 deixaria pedir edições em português direto do terminal, sem custo por uso. É uso pessoal, não uma peça do TakeOne.
+- **Ordem:** (1) clipe de animação com modelos prontos; (2) Ollama + "Criar automaticamente" e destaque de palavras; (3) "Descreva a animação".
+- [ ] Clipe de animação com modelos prontos
+- [ ] LLM local e "Criar automaticamente"
+- [ ] "Descreva a animação" (experimental)

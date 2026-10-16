@@ -2,6 +2,7 @@
 # TakeOne API — mídias (a biblioteca de vídeos e áudios enviados)
 # -----------------------------------------------
 import logging
+import secrets
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -11,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
+    GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
     RostoSaida,
@@ -21,6 +23,7 @@ from api.esquemas import (
     rosto_para_saida,
     transcricao_para_saida,
 )
+from core.modelos.geracao import nome_da_midia
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
@@ -33,6 +36,7 @@ from core.modelos.midia import (
     arquivo_publico,
     chave_arquivo,
     chave_do_tom,
+    montar_midia,
     pasta_da_midia,
 )
 from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
@@ -92,6 +96,26 @@ async def listar_midias(limite: int = Query(default=30, ge=1, le=100),
                         usuario=Depends(usuario_atual), db=Depends(obter_db)):
     cursor = db.midias.find({"organizacao_id": usuario["organizacao_id"]}).sort("criado_em", -1).limit(limite)
     return await para_saida(db, [m async for m in cursor])
+
+
+@router.post("/gerar-video", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def gerar_video(dados: GerarVideoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila um clipe gerado com o Wan 2.2. A mídia já entra na biblioteca, processando; o vídeo
+    vira o original dela quando ficar pronto e passa pela ingestão como um envio comum."""
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome_da_midia(dados.descricao)}.mp4", 0,
+                         "video/mp4")
+    midia["nome_original"] = midia["nome"]
+    midia["status"] = STATUS_PROCESSANDO
+    midia["gerada"] = {"descricao": dados.descricao, "formato": dados.formato, "duracao": dados.duracao}
+    midia_id = (await db.midias.insert_one(midia)).inserted_id
+    job = montar_job("geracao_video", usuario["organizacao_id"],
+                     {"midia_id": str(midia_id), **midia["gerada"], "semente": secrets.randbelow(2**31)},
+                     criado_por=usuario["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    # O progresso da geração aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
+    await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
+    logging.info(f"[{usuario['organizacao_id']}] Vídeo com IA pedido: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
 
 
 @router.get("/{midia_id}", response_model=MidiaSaida)

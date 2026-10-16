@@ -35,7 +35,7 @@ def test_espera_entre_tentativas_cresce_e_para_em_30_min():
 def test_tipos_por_recursos():
     assert set(tipos_por_recursos(["cpu"])) == {"teste", "ingestao", "renderizacao", "limpeza_voz", "rosto", "tom",
                                                 "recorte_fundo", "limpeza_imagem"}
-    assert tipos_por_recursos(["gpu"]) == ["transcricao"]
+    assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video"]
 
 
 def test_extensao_e_nome_da_midia():
@@ -124,3 +124,30 @@ def test_ticks_exatos_nas_taxas_comuns():
     assert quadro_em(0, 0, TICKS_POR_SEGUNDO) == 30   # taxa danificada vira a padrão
     assert taxa_de_fps(29.97) == (30000, 1001)
     assert taxa_de_fps(12.5) == (25, 2)
+
+
+def test_geracao_de_video_formatos_tempo_e_fluxo():
+    from core.modelos.geracao import (
+        FORMATOS,
+        arquivo_gerado,
+        montar_fluxo,
+        nome_da_midia,
+        quadros_para,
+        segundos_estimados,
+    )
+
+    assert [quadros_para(s) for s in (2, 5)] == [49, 121]
+    assert all(lado % 32 == 0 for formato in FORMATOS.values() for lado in formato)
+    # O que foi medido no Nitro 5: 5 s em 832×480 em 541 s
+    assert segundos_estimados(5, "16:9") == 541
+    assert segundos_estimados(2, "16:9") < segundos_estimados(5, "16:9")
+    assert nome_da_midia("Ondas do mar, câmera lenta") == "IA · Ondas do mar"
+    assert len(nome_da_midia("palavra " * 30)) <= 66
+    fluxo = montar_fluxo("Ondas", "9:16", 3, 7, "takeone_x")
+    latente = fluxo["7"]["inputs"]
+    assert (latente["width"], latente["height"], latente["length"]) == (480, 832, 73)
+    assert fluxo["8"]["inputs"]["seed"] == 7 and fluxo["5"]["inputs"]["text"] == "Ondas"
+    historico = {"outputs": {"11": {"images": [{"filename": "takeone_x_00001_.mp4", "subfolder": "video",
+                                                "type": "output"}], "animated": [True]}}}
+    assert arquivo_gerado(historico)["filename"] == "takeone_x_00001_.mp4"
+    assert arquivo_gerado({"outputs": {}}) is None

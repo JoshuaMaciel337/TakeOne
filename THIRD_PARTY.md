@@ -39,7 +39,7 @@ O sistema de comandos (`lib/projeto/comandos.ts`) segue a ideia do `crates/engin
 
 ## Bibliotecas
 
-As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e as fontes Inter e Sora (OFL) vêm do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.
+As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e a fonte Inter (OFL) vem do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.
 
 ## Programas e modelos usados pelos workers
 
@@ -48,4 +48,6 @@ Não fazem parte do código do repositório: são baixados quando a imagem do Do
 - **DeepFilterNet 0.5.6** ([Rikorose/DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)), MIT ou Apache-2.0: o binário `deep-filter`, com o modelo DeepFilterNet3 dentro, tira o ruído da voz no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
 - **MODNet** ([ZHKKKe/MODNet](https://github.com/ZHKKKe/MODNet)), Apache-2.0: o recorte de retrato que recorta o fundo do vídeo, em ONNX (a cópia do [Xenova/modnet](https://huggingface.co/Xenova/modnet), Apache-2.0, numa revisão fixa), rodado pelo onnxruntime (MIT) no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
 - **YuNet 2023mar** ([opencv/opencv_zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)), MIT, Copyright (c) 2020 Shiqi Yu: o detector de rostos do reenquadramento, rodado pelo OpenCV (Apache-2.0) no worker de CPU. Baixado no `worker.Dockerfile`, conferido pelo SHA-256.
+- **Wan 2.2 TI2V-5B** ([Wan-Video/Wan2.2](https://github.com/Wan-Video/Wan2.2)), Apache-2.0, com o codificador de texto umT5 e o VAE do mesmo pacote: gera vídeo a partir de texto. Os pesos são o pacote do [Comfy-Org/Wan_2.2_ComfyUI_Repackaged](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) (Apache-2.0) numa revisão fixa, baixados pelo `infra/comfyui/iniciar.sh` na primeira subida, conferidos pelo SHA-256, e guardados no volume `comfyui_modelos`.
+- **ComfyUI v0.38.0** ([comfyanonymous/ComfyUI](https://github.com/comfyanonymous/ComfyUI)), GPL-3.0, com o PyTorch (BSD): roda o Wan 2.2 no serviço `comfyui` (perfil `video`). Fica num container próprio, montado pelo `comfyui.Dockerfile`, e o worker de GPU só conversa com ele pela API HTTP; nenhum código do ComfyUI entra no repositório.
 - **faster-whisper** (MIT) e o modelo **large-v3-turbo** do Whisper (MIT): transcrição no worker de GPU. O modelo vem do Hugging Face na primeira transcrição e fica no volume `modelos_ia`.

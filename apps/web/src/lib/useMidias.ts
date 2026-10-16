@@ -48,7 +48,8 @@ export function useMidias() {
       );
       return;
     }
-    if (job.tipo !== "ingestao") return;
+    // A geração com IA mostra o progresso na própria mídia, como a ingestão que vem depois dela
+    if (job.tipo !== "ingestao" && job.tipo !== "geracao_video") return;
     if (job.status === "concluido" || job.status === "erro") {
       void recarregar();
       return;

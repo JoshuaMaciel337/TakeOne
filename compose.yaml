@@ -2,6 +2,7 @@
 # TakeOne — todos os serviços
 #
 # Subir tudo:                 docker compose up --build -d
+# Gerar vídeo com IA (Wan 2.2):  docker compose --profile gpu --profile video up --build -d
 # Túnel rápido para testes:   docker compose --profile tunel-rapido up -d
 # Túnel fixo (produção):      docker compose --profile tunel up -d
 #
@@ -81,6 +82,7 @@ services:
     environment:
       <<: *ambiente-python
       MODO_IA: real
+      COMFYUI_URL: http://comfyui:8188
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - "${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"
@@ -91,6 +93,23 @@ services:
           devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
     depends_on:
       mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  # Geração de vídeo com o Wan 2.2 (perfil video). O ComfyUI é GPL-3.0 e fica neste container, só
+  # acessível pela rede interna; o worker de GPU conversa com ele por HTTP. Na primeira subida baixa uns
+  # 17 GB de pesos. Gerar pede a placa livre e uns 9 GB de RAM: com o HolyCut usando a GPU, o pedido espera.
+  comfyui:
+    profiles: [video]
+    build: {context: ., dockerfile: infra/docker/comfyui.Dockerfile}
+    image: takeone/comfyui:local
+    # A interface do ComfyUI, só neste computador (http://localhost:8188). O que se gera por ela não passa
+    # pela checagem de memória do worker nem entra na biblioteca.
+    ports: ["127.0.0.1:${COMFYUI_PORTA:-8188}:8188"]
+    volumes: [comfyui_modelos:/modelos]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
     restart: unless-stopped
 
   backup:
@@ -130,3 +149,5 @@ volumes:
   mongo_dados:
   # Pesos baixados do Hugging Face (o modelo de transcrição, uns 1,6 GB)
   modelos_ia:
+  # Pesos do Wan 2.2 para o ComfyUI (uns 17 GB). Ler da pasta do Windows dava errno=12, por isso um volume
+  comfyui_modelos:

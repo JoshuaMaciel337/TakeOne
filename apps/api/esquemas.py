@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
+from core.modelos.geracao import DESCRICAO_MAXIMA, DESCRICAO_MINIMA, DURACOES
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import STATUS_ERRO, STATUS_PROCESSANDO, arquivo_publico
 from core.utils.tempo import TICKS_POR_SEGUNDO
@@ -107,6 +108,8 @@ class MidiaSaida(BaseModel):
     imagem_limpa: dict | None = None
     # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
     tons: dict = Field(default_factory=dict)
+    # Vídeo gerado com IA: {descricao, formato, duracao}
+    gerada: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
@@ -376,6 +379,17 @@ class FaixaEntrada(BaseModel):
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
 
 
+class GerarVideoEntrada(BaseModel):
+    descricao: str = Field(min_length=DESCRICAO_MINIMA, max_length=DESCRICAO_MAXIMA)
+    formato: Literal["16:9", "9:16", "1:1"] = "16:9"
+    duracao: int = Field(default=5, ge=min(DURACOES), le=max(DURACOES))
+
+    @field_validator("descricao", mode="before")
+    @classmethod
+    def limpar_descricao(cls, valor):
+        return valor.strip() if isinstance(valor, str) else valor
+
+
 class TomEntrada(BaseModel):
     semitons: int = Field(ge=-12, le=12)
     limpa: bool = False
@@ -559,6 +573,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                           if (recorte := doc.get("recorte_fundo")) else None),
         "imagem_limpa": ({"status": limpa["status"], "erro": limpa.get("erro")}
                          if (limpa := doc.get("imagem_limpa")) else None),
+        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada["duracao"]}
+                   if (gerada := doc.get("gerada")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
                  for chave, tom in (doc.get("tons") or {}).items()},
     })

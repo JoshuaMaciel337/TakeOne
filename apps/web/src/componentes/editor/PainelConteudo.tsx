@@ -4,6 +4,7 @@ import { Clock, X } from "lucide-react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
+import { GerarVideo } from "@/componentes/midia/GerarVideo";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import type { Comando } from "@/lib/projeto/comandos";
@@ -23,6 +24,7 @@ type Biblioteca = {
   midias: Midia[] | null;
   erro: string;
   excluir: (midiaId: string) => Promise<void>;
+  recarregar: () => Promise<void>;
 };
 
 type Props = {
@@ -43,15 +45,17 @@ type Props = {
 };
 
 function PainelMidia({
-  biblioteca: { midias, erro, excluir },
+  biblioteca: { midias, erro, excluir, recarregar },
   midiaSelecionadaId,
   aoSelecionarMidia,
   aoAdicionarMidia,
-}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia">) {
+  proporcao,
+}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia"> & { proporcao: string }) {
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
       <ListaEnvios />
+      <GerarVideo proporcao={proporcao} aoPedir={() => void recarregar()} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {midias && midias.length > 0 ? (
         <>
@@ -129,6 +133,7 @@ export function PainelConteudo({
             midiaSelecionadaId={midiaSelecionadaId}
             aoSelecionarMidia={aoSelecionarMidia}
             aoAdicionarMidia={aoAdicionarMidia}
+            proporcao={legendas.projeto.proporcao}
           />
         ) : ferramenta.id === "texto" ? (
           <PainelTexto aoAdicionar={aoAdicionarTexto} />

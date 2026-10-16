@@ -21,6 +21,7 @@ TAREFAS = {
     "ingestao": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
+    "geracao_video": RECURSO_GPU,
     "limpeza_voz": RECURSO_CPU,
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,
