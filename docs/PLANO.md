@@ -440,7 +440,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Novos:
   - **animações em HTML (motion graphics):** clipe de animação a partir de modelos prontos (tarja, título cinético, logo, CTA, contador, citação), com as cores do kit de marca. Seção 10.
   - [x] LLM local (Ollama com o Qwen3 8B) para o "Criar automaticamente". Seção 10.
-  - "Descreva a animação": o LLM escreve a animação a partir de um esqueleto (experimental). Seção 10.
+  - [x] "Descreva a animação": o LLM encaixa o pedido num modelo pronto ou escreve a animação a partir de um esqueleto (experimental). Seção 10.
   - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
   - [x] **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto, com o Wan 2.2 TI2V-5B (painel Mídia, 2 a 5 s em 480p). Detalhes na seção 9.
   - gerar vídeo a partir de uma imagem (o Wan 2.2 TI2V também aceita; falta a biblioteca aceitar imagens)
@@ -522,4 +522,4 @@ Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames
 - **Ordem:** (1) clipe de animação com modelos prontos; (2) Ollama + "Criar automaticamente" e destaque de palavras; (3) "Descreva a animação".
 - [x] Clipe de animação com modelos prontos (ferramenta Elementos: tarja, título, revelação, CTA, contador e citação)
 - [x] LLM local e "Criar automaticamente" (título, tarja, zooms e chamada a partir da fala; testado num vídeo de 47 s)
-- [ ] "Descreva a animação" (experimental)
+- [x] "Descreva a animação" (experimental: o LLM tenta primeiro os modelos prontos; escrevendo do zero, o modelo de 8B acerta pouco)

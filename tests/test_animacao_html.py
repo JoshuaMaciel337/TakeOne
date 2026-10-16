@@ -105,3 +105,40 @@ def test_espalhar_cor_leva_a_cor_para_fora_da_forma():
     assert alfa[20, 31] == 0
     vazio = np.zeros((10, 10, 4), np.uint8)
     assert espalhar_cor(vazio)[0].max() == 0
+
+
+def test_animacao_descrita_so_passa_html_e_css_de_animacao():
+    from core.modelos.animacao_descrita import limpar_css, limpar_html, separar_resposta
+
+    html = limpar_html('<div class="a" onclick="x()" style="color:red">Oi <script>alert(1)</script><img src=x>'
+                       '<svg viewBox="0 0 10 10"><path d="M0 0L10 10"/></svg></div><iframe src="//x"></iframe>')
+    assert "script" not in html and "onclick" not in html and "<img" not in html and "iframe" not in html
+    assert html.startswith('<div class="a" style="color:red">Oi ') and "<path" in html
+    css = limpar_css("@import url(x.css); .a{color:red;background:url(http://x/y.png);width:1px}"
+                     "@font-face{font-family:X;src:url(x)} </style><script>")
+    assert "url" not in css and "@import" not in css and "font-face" not in css and "<" not in css
+    assert "color:red" in css and "width:1px" in css
+    # O <style> dentro do html vai para o CSS; sem @keyframes não é animação
+    css, html = separar_resposta({"css": "", "html": "<style>@keyframes a{to{opacity:0}}</style><p>x</p>"})
+    assert "@keyframes a" in css and html == "<p>x</p>"
+    with pytest.raises(ErroAnimacao):
+        separar_resposta({"css": ".a{color:red}", "html": "<p>x</p>"})
+
+
+def test_modelo_livre_monta_a_pagina_limpa():
+    pagina = montar_html("livre", {"css": "@keyframes a{to{opacity:0}} .x{animation:a 1s}",
+                                   "html": '<div class="x">Oi</div><script>alert(1)</script>'}, 3, "9:16", "/f")
+    assert '<div class="x">Oi</div>' in pagina and "alert" not in pagina and "@keyframes a" in pagina
+
+
+def test_classes_sem_ponto_ganham_o_ponto():
+    from core.modelos.animacao_descrita import corrigir_seletores, separar_resposta
+
+    css = ("body{position:absolute}contador{left:1px;animation:a 1s}barra{width:2px} .num, num:hover{color:red}"
+           "@keyframes a{from{opacity:0}to{opacity:1}} span{color:blue}")
+    html = '<div class="contador"><div class="barra"></div><span class="num">0</span></div>'
+    corrigido = corrigir_seletores(css, html)
+    assert "body" not in corrigido and ".contador{" in corrigido and ".barra{" in corrigido
+    assert ".num, .num:hover{" in corrigido and " span{" in corrigido and "@keyframes a{from{" in corrigido
+    with pytest.raises(ErroAnimacao, match="sem preencher"):
+        separar_resposta({"css": "@keyframes a{}", "html": "<div>{{titulo}}</div>"})

@@ -71,7 +71,8 @@ def _escritor(largura: int, altura: int, pix_fmt: str, destino: Path, extras: li
 
 def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float, cor: Path, mascara: Path,
                     reportar: Callable[[int, str], None] = lambda *_: None) -> int:
-    """Grava a página nos dois vídeos e devolve quantos quadros saíram."""
+    """Grava a página nos dois vídeos e devolve quantos quadros saíram. A página não sai para a rede (só
+    arquivos locais, as fontes), e animação que não mostra nada é recusada."""
     from playwright.sync_api import sync_playwright
 
     total = quadros_da_animacao(duracao)
@@ -79,6 +80,7 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
                              ["-vf", "scale=out_color_matrix=bt709:out_range=tv", *MARCAS_BT709])
     escritor_alfa = _escritor(largura, altura, "gray", mascara, ["-color_range", "tv"])
     feitos = 0
+    visivel = False
     try:
         with tempfile.TemporaryDirectory() as pasta, sync_playwright() as playwright:
             arquivo = Path(pasta) / "animacao.html"
@@ -86,6 +88,8 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
             navegador = playwright.chromium.launch(args=["--disable-gpu", "--font-render-hinting=none"])
             try:
                 pagina = navegador.new_page(viewport={"width": largura, "height": altura}, device_scale_factor=1)
+                pagina.route("**/*", lambda rota: rota.continue_() if rota.request.url.startswith("file:")
+                             else rota.abort())
                 pagina.goto(arquivo.as_uri(), wait_until="load")
                 pagina.evaluate("document.fonts.ready.then(() => true)")
                 for indice in range(total):
@@ -95,6 +99,7 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
                     if quadro is None or quadro.shape[2] != 4:
                         raise ErroDefinitivo("O navegador não devolveu o quadro com transparência.")
                     rgb, alfa = espalhar_cor(quadro)
+                    visivel = visivel or bool(alfa.any())
                     escritor_cor.stdin.write(rgb.tobytes())
                     escritor_alfa.stdin.write(alfa.tobytes())
                     feitos += 1
@@ -108,6 +113,8 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
         codigos = [escritor_cor.wait(timeout=600), escritor_alfa.wait(timeout=600)]
     if any(codigos) or feitos < total:
         raise RuntimeError("O vídeo da animação não foi gravado.")
+    if not visivel:
+        raise ErroDefinitivo("A animação saiu vazia: nada apareceu no quadro. Tente descrever de outro jeito.")
     return feitos
 
 

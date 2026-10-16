@@ -12,11 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse, HTMLResponse
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import AnimacaoHtmlEntrada, MidiaSaida
+from api.esquemas import AnimacaoDescritaEntrada, AnimacaoHtmlEntrada, MidiaSaida
 from api.rotas.midias import para_saida
 from core.modelos.animacao_html import (
     DURACAO_MAXIMA,
     DURACAO_MINIMA,
+    LIVRE,
     MODELOS,
     PASTA_FONTES,
     QUADROS,
@@ -80,9 +81,35 @@ async def fonte(nome: str):
                         headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"})
 
 
+async def _criar_midia(db, usuario, nome: str, animacao: dict, tipo_do_job: str, entrada_do_job: dict) -> MidiaSaida:
+    """A mídia já entra na biblioteca, processando; o progresso do job aparece nela como o da ingestão."""
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], "animacao.mp4", 0, "video/mp4")
+    midia.update({"nome": nome, "nome_original": nome, "status": STATUS_PROCESSANDO, "animacao": animacao})
+    midia_id = (await db.midias.insert_one(midia)).inserted_id
+    job = montar_job(tipo_do_job, usuario["organizacao_id"], {"midia_id": str(midia_id), **entrada_do_job},
+                     criado_por=usuario["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
+    logging.info(f"[{usuario['organizacao_id']}] Animação pedida: {nome}")
+    return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
+
+
+@router.post("/descrita", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def descrever(dados: AnimacaoDescritaEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Experimental: o LLM local escreve a animação a partir do pedido (worker de GPU) e ela é gravada
+    como as outras (worker de CPU)."""
+    nome = f"Animação · {dados.descricao}"[:110]
+    animacao = {"modelo": LIVRE, "descricao": dados.descricao, "campos": {}, "proporcao": dados.proporcao,
+                "duracao": dados.duracao}
+    entrada = {"descricao": dados.descricao, "proporcao": dados.proporcao, "duracao": dados.duracao}
+    return await _criar_midia(db, usuario, nome, animacao, "animacao_descrita", entrada)
+
+
 @router.post("", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
 async def gravar(dados: AnimacaoHtmlEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Põe na fila a gravação da animação. A mídia já entra na biblioteca, processando."""
+    if dados.modelo not in MODELOS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Modelo de animação desconhecido.")
     try:
         campos = conferir_campos(dados.modelo, dados.campos)
     except ErroAnimacao as e:
@@ -90,15 +117,5 @@ async def gravar(dados: AnimacaoHtmlEntrada, usuario=Depends(usuario_atual), db=
     modelo = MODELOS[dados.modelo]
     destaque = next((campos[c[0]] for c in modelo["campos"] if c[2] in ("texto", "linhas", "numero")), "")
     nome = f"Animação · {modelo['nome']}: {' '.join(destaque.split())}"[:110]
-    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome}.mp4", 0, "video/mp4")
-    midia.update({"nome": nome, "nome_original": nome, "status": STATUS_PROCESSANDO,
-                  "animacao": {"modelo": dados.modelo, "campos": campos, "proporcao": dados.proporcao,
-                               "duracao": dados.duracao}})
-    midia_id = (await db.midias.insert_one(midia)).inserted_id
-    job = montar_job("animacao_html", usuario["organizacao_id"], {"midia_id": str(midia_id), **midia["animacao"]},
-                     criado_por=usuario["_id"])
-    job_id = (await db.jobs.insert_one(job)).inserted_id
-    # O progresso da gravação aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
-    await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
-    logging.info(f"[{usuario['organizacao_id']}] Animação pedida: {nome}")
-    return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
+    animacao = {"modelo": dados.modelo, "campos": campos, "proporcao": dados.proporcao, "duracao": dados.duracao}
+    return await _criar_midia(db, usuario, nome, animacao, "animacao_html", animacao)

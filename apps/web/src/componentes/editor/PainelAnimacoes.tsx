@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Clapperboard } from "lucide-react";
+import { ArrowLeft, Clapperboard, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
@@ -64,6 +64,63 @@ function Previa({ endereco, proporcao }: { endereco: string; proporcao: string }
   );
 }
 
+/** Experimental: o LLM local escreve a animação a partir de um pedido em texto. */
+function DescreverAnimacao({ proporcao, aoPedir }: Props) {
+  const [descricao, setDescricao] = useState("");
+  const [duracao, setDuracao] = useState(4);
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [erro, setErro] = useState("");
+
+  function pedir(evento: React.FormEvent) {
+    evento.preventDefault();
+    setEnviando(true);
+    setErro("");
+    chamarApi<Midia>("/animacoes/descrita", { metodo: "POST", corpo: { descricao, proporcao, duracao } })
+      .then((midia) => {
+        setAviso("O modelo está escrevendo a animação. Ela entra no cursor, por cima, quando ficar pronta.");
+        aoPedir(midia);
+      })
+      .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não foi possível pedir a animação."))
+      .finally(() => setEnviando(false));
+  }
+
+  return (
+    <form onSubmit={pedir} className="flex flex-col gap-2 rounded-lg border border-destaque/40 bg-destaque/5 p-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold">
+        <WandSparkles className="size-4 text-destaque" aria-hidden /> Descreva a animação
+        <span className="rounded-full border border-borda px-1.5 text-[10px] font-medium text-suave">experimental</span>
+      </p>
+      <textarea
+        value={descricao}
+        onChange={(evento) => setDescricao(evento.target.value)}
+        rows={3}
+        minLength={5}
+        maxLength={400}
+        required
+        aria-label="Descrição da animação"
+        placeholder="Um contador de 0 a 100% com uma barra enchendo embaixo"
+        className="resize-y rounded-md border border-borda bg-painel px-2 py-1.5 text-xs outline-none focus:border-destaque"
+      />
+      <label className="flex flex-col gap-1 text-[11px] text-suave">
+        Duração · {duracao.toLocaleString("pt-BR")} s
+        <input type="range" min={1.5} max={10} step={0.5} value={duracao} onChange={(evento) => setDuracao(Number(evento.target.value))} />
+      </label>
+      <p className="text-[11px] text-suave">Um modelo de IA no servidor escreve a animação. Nem sempre acerta: se não gostar, apague e descreva de outro jeito.</p>
+      {erro ? <AvisoErro>{erro}</AvisoErro> : null}
+      {aviso ? (
+        <p className="text-[11px] text-suave" role="status">
+          {aviso}
+        </p>
+      ) : null}
+      <button type="submit" className="botao-principal px-3 py-1.5" disabled={enviando || descricao.trim().length < 5}>
+        <WandSparkles className="size-4" aria-hidden />
+        {enviando ? "Pedindo…" : "Criar a animação"}
+      </button>
+    </form>
+  );
+}
+
 /** Tarjas, títulos, CTA, contador e citação: modelos prontos que viram um clipe com transparência. */
 export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   const [modelos, setModelos] = useState<Modelo[] | null>(null);
@@ -119,6 +176,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
     return (
       <div className="flex flex-col gap-3">
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
+        <DescreverAnimacao proporcao={proporcao} aoPedir={aoPedir} />
         <p className="text-xs font-medium text-suave">Animações · tarjas, títulos e chamadas com transparência</p>
         <div className="grid grid-cols-1 gap-2">
           {(modelos ?? []).map((modelo) => (

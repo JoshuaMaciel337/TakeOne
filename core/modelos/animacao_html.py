@@ -123,8 +123,28 @@ def lista_de_modelos() -> list[dict]:
             for chave, m in MODELOS.items()]
 
 
+# A animação que o LLM escreveu ("Descreva a animação"): o CSS e o HTML já limpos, mais as cores
+LIVRE = "livre"
+
+
+def _conferir_livre(campos: dict) -> dict:
+    from core.modelos.animacao_descrita import separar_resposta
+
+    saida = {}
+    for chave, padrao in (("cor_1", COR_1), ("cor_2", COR_2), ("cor_texto", BRANCO)):
+        valor = str(campos.get(chave, padrao))
+        if not _COR.fullmatch(valor):
+            raise ErroAnimacao("Use cores no formato #rrggbb.")
+        saida[chave] = valor.lower()
+    # Limpa de novo: o que chega aqui pode ter vindo da API, não só do worker
+    saida["css"], saida["html"] = separar_resposta({"css": campos.get("css"), "html": campos.get("html")})
+    return saida
+
+
 def conferir_campos(modelo: str, campos: dict) -> dict:
     """Os campos do modelo, com o padrão no que faltar. Recusa cor, número ou texto fora do esperado."""
+    if modelo == LIVRE:
+        return _conferir_livre(campos)
     if modelo not in MODELOS:
         raise ErroAnimacao("Modelo de animação desconhecido.")
     saida = {}
@@ -169,9 +189,12 @@ def montar_html(modelo: str, campos: dict, duracao: float, proporcao: str, base_
     a rota da API na prévia do navegador)."""
     campos = conferir_campos(modelo, campos)
     largura, altura = QUADROS[proporcao]
-    corpo = (PASTA_MODELOS / f"{modelo}.html").read_text(encoding="utf-8")
-    valores = _valores(modelo, campos)
-    corpo = _CAMPO.sub(lambda m: valores.get(m[1], ""), corpo)
+    if modelo == LIVRE:
+        corpo = f"<style>\n{campos['css']}\n</style>\n{campos['html']}"
+    else:
+        corpo = (PASTA_MODELOS / f"{modelo}.html").read_text(encoding="utf-8")
+        valores = _valores(modelo, campos)
+        corpo = _CAMPO.sub(lambda m: valores.get(m[1], ""), corpo)
     fontes = "\n".join(
         f"@font-face{{font-family:{familia};src:url('{base_das_fontes}/{arquivo}');font-weight:100 900}}"
         for familia, arquivo in (("Inter", "Inter%5Bopsz,wght%5D.ttf"), ("Montserrat", "Montserrat%5Bwght%5D.ttf"),
