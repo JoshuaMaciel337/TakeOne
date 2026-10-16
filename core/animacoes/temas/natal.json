@@ -1,0 +1,119 @@
+{
+ "nome": "Natal e Ano Novo",
+ "ordem": 8,
+ "versoes": [
+  {
+   "modelo": "neve",
+   "id": "neve_natal",
+   "nome": "Feliz Natal com neve",
+   "padroes": {}
+  },
+  {
+   "modelo": "neve",
+   "id": "neve_boas_festas",
+   "nome": "Boas festas",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Boas festas",
+    "subtitulo": "obrigado por estar com a gente"
+   }
+  },
+  {
+   "modelo": "fogos",
+   "id": "fogos_ano_novo",
+   "nome": "Fogos de Ano Novo",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
+   "modelo": "fogos",
+   "id": "fogos_reveillon",
+   "nome": "Réveillon",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Feliz Ano Novo!"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_virada",
+   "nome": "Contagem da virada",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "de": "10",
+    "final": "FELIZ 2027!"
+   }
+  },
+  {
+   "modelo": "particulas_brilho",
+   "id": "brilho_natal",
+   "nome": "Brilho de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "texto": "Feliz Natal"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_natal",
+   "nome": "Natal em neon",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "texto": "Feliz Natal"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "ceia_natal",
+   "nome": "Ceia de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "dia": "24",
+    "mes": "DEZ",
+    "titulo": "Ceia de Natal",
+    "hora": "Terça, 20h",
+    "local": "Casa da vó"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_natal",
+   "nome": "Cupom de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "desconto": "20% OFF",
+    "texto": "presentes de Natal",
+    "codigo": "NATAL20"
+   }
+  },
+  {
+   "modelo": "linha_do_tempo",
+   "id": "retrospectiva",
+   "nome": "Retrospectiva do ano",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dados": "Jan: Loja nova\nMar: 10 mil clientes\nJul: App lançado\nDez: Recorde de vendas"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "confete_ano_novo",
+   "nome": "Confete de Ano Novo",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "2027 chegou!"
+   }
+  }
+ ]
+}

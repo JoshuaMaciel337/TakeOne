@@ -1,0 +1,102 @@
+{
+ "nome": "Imóveis",
+ "ordem": 16,
+ "versoes": [
+  {
+   "modelo": "preco_oferta",
+   "id": "imovel_preco",
+   "nome": "Preço do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "produto": "Apartamento 2 quartos",
+    "de": "R$ 480 mil",
+    "por": "R$ 429 mil",
+    "selo": "-10%"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "imovel_itens",
+   "nome": "Itens do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "titulo": "O que tem",
+    "texto": "2 quartos com suíte\nVaranda gourmet\n2 vagas de garagem\nLazer completo"
+   }
+  },
+  {
+   "modelo": "local_pin",
+   "id": "imovel_endereco",
+   "nome": "Endereço do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "titulo": "Residencial Jardins",
+    "endereco": "Rua das Palmeiras, 300 · Jardim Europa"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_corretor",
+   "nome": "Tarja de corretor",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "nome": "André Moraes",
+    "funcao": "Corretor · CRECI 123456"
+   }
+  },
+  {
+   "modelo": "titulo_mascara",
+   "id": "titulo_imovel",
+   "nome": "Título do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "texto": "Seu novo lar\nchegou"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "visita",
+   "nome": "Visita ao decorado",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "dia": "26",
+    "mes": "OUT",
+    "titulo": "Visita ao decorado",
+    "hora": "Sábado, 10h às 16h",
+    "local": "Residencial Jardins"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_metros",
+   "nome": "Metros quadrados",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "valor": "86",
+    "prefixo": "",
+    "sufixo": "m²",
+    "legenda": "de área privativa"
+   }
+  },
+  {
+   "modelo": "chamada_notificacao",
+   "id": "imovel_vendido",
+   "nome": "Vendido",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "app": "Imobiliária Lar",
+    "titulo": "Imóvel vendido!",
+    "mensagem": "Mais uma família de casa nova",
+    "iniciais": "L"
+   }
+  }
+ ]
+}

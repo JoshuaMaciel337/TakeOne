@@ -1,0 +1,47 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Anúncio de evento",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Cartão de evento: o dia num bloco de calendário, o nome do evento, o horário e o local.",
+ "campos": [
+  {"id": "dia", "rotulo": "Dia", "tipo": "texto", "padrao": "24", "maximo": 3},
+  {"id": "mes", "rotulo": "Mês", "tipo": "texto", "padrao": "OUT", "maximo": 4},
+  {"id": "titulo", "rotulo": "Evento", "tipo": "texto", "padrao": "Noite de louvor", "maximo": 34},
+  {"id": "hora", "rotulo": "Horário", "tipo": "texto", "padrao": "Sábado, 19h30", "maximo": 30},
+  {"id": "local", "rotulo": "Local", "tipo": "texto", "padrao": "Templo central", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Evento: o bloco do calendário vira para a frente (rotateX), o cartão abre ao lado dele e as linhas
+     de horário e local entram com um ícone cada (relógio e alfinete em SVG). Em pé, o bloco fica em cima. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:calc(var(--u)*4.42);
+  width:max-content;max-width:88%;padding:calc(var(--u)*3.9);border-radius:calc(var(--u)*3.9);background:rgba(14,15,20,.88);color:var(--cor-texto);
+  animation:abrir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+@media (max-aspect-ratio:1/1){.cartao{flex-direction:column;text-align:center}.linha{justify-content:center}}
+.calendario{flex:none;width:calc(var(--u)*22.1);border-radius:calc(var(--u)*2.6);overflow:hidden;background:#fff;text-align:center;
+  transform-origin:50% 0;animation:virar .8s cubic-bezier(.2,1.3,.4,1) .2s both}
+.mes{padding:calc(var(--u)*1.04) 0;background:linear-gradient(120deg,var(--cor-1),var(--cor-2));color:#fff;font-weight:800;font-size:calc(var(--u)*3.64);letter-spacing:.14em}
+.dia{padding:calc(var(--u)*0.78) 0 calc(var(--u)*1.56);color:#14151b;font-weight:900;font-size:calc(var(--u)*11.7);line-height:1}
+.titulo{font-weight:900;font-size:calc(var(--u)*7.28);letter-spacing:-.02em;line-height:1.05;animation:entrar .5s ease-out .6s both}
+.linha{display:flex;align-items:center;gap:calc(var(--u)*1.56);margin-top:calc(var(--u)*1.82);font-weight:500;font-size:calc(var(--u)*3.9);opacity:.85;
+  animation:entrar .5s ease-out calc(.9s + var(--n) * .2s) both}
+.linha svg{width:calc(var(--u)*4.16);height:calc(var(--u)*4.16);flex:none;fill:none;stroke:var(--cor-1);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+@keyframes abrir{from{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
+@keyframes virar{from{transform:perspective(600px) rotateX(-90deg)}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*2.6))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="cartao">
+ <div class="calendario"><div class="mes">{{mes}}</div><div class="dia">{{dia}}</div></div>
+ <div>
+  <div class="titulo">{{titulo}}</div>
+  <div class="linha" style="--n:0"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{hora}}</div>
+  <div class="linha" style="--n:1"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>{{local}}</div>
+ </div>
+</div>

@@ -1,0 +1,97 @@
+{
+ "nome": "Viagem e turismo",
+ "ordem": 18,
+ "versoes": [
+  {
+   "modelo": "local_pin",
+   "id": "destino",
+   "nome": "Destino",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Jericoacoara",
+    "endereco": "Ceará · Brasil"
+   }
+  },
+  {
+   "modelo": "linha_do_tempo",
+   "id": "roteiro",
+   "nome": "Roteiro da viagem",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "dados": "Dia 1: Chegada e praia\nDia 2: Lagoa Azul\nDia 3: Pôr do sol na duna\nDia 4: Volta"
+   }
+  },
+  {
+   "modelo": "titulo_mascara",
+   "id": "titulo_viagem",
+   "nome": "Título de viagem",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "texto": "Partiu\nlitoral"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "pacote_viagem",
+   "nome": "Pacote em oferta",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "produto": "Pacote 5 noites",
+    "de": "R$ 3.900",
+    "por": "R$ 2.790",
+    "selo": "-28%"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "mala",
+   "nome": "Checklist da mala",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Na mala",
+    "texto": "Protetor solar\nDocumentos\nCarregador\nRoupa de banho"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "passagem",
+   "nome": "Cartão de embarque",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "São Paulo → Recife",
+    "data": "12 JAN · 07H40",
+    "local": "Portão 15",
+    "canhoto": "14C"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_km",
+   "nome": "Quilômetros rodados",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "valor": "3200",
+    "prefixo": "",
+    "sufixo": "km",
+    "legenda": "de estrada nesta viagem"
+   }
+  },
+  {
+   "modelo": "fundo_ondas",
+   "id": "ondas_praia",
+   "nome": "Ondas de praia",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Diário de viagem"
+   }
+  }
+ ]
+}

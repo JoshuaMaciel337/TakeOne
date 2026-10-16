@@ -1,0 +1,103 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Episódio com onda sonora",
+ "categoria": "tarjas",
+ "motor": "canvas",
+ "duracao": 6,
+ "descricao": "Microfone num círculo, número e nome do episódio, e uma onda sonora de barras que mexe o tempo todo.",
+ "campos": [
+  {"id": "episodio", "rotulo": "Número ou selo", "tipo": "texto", "padrao": "EP. 42", "maximo": 12},
+  {"id": "titulo", "rotulo": "Título do episódio", "tipo": "texto", "padrao": "Como começar a investir", "maximo": 40},
+  {"id": "convidado", "rotulo": "Convidado", "tipo": "texto", "padrao": "com Marina Lopes", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Onda (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Onda (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Podcast: a caixa abre no terço de baixo a partir do círculo do microfone; embaixo dos textos, 40 barras
+     arredondadas sobem e descem pela soma de senos de frequências sorteadas por índice (sem estado), como
+     um medidor de áudio. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 40;
+  const microfone = (x, y, s) => {
+    ctx.strokeStyle = "#fff";
+    ctx.fillStyle = "#fff";
+    ctx.lineWidth = s * 0.12;
+    ctx.lineCap = "round";
+    TO.retangulo(ctx, x - s * 0.22, y - s * 0.6, s * 0.44, s * 0.8, s * 0.22);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y - s * 0.05, s * 0.4, 0.15, Math.PI - 0.15);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.35);
+    ctx.lineTo(x, y + s * 0.6);
+    ctx.stroke();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const abre = TO.ease.inOutCubic(TO.prog(t, 0.3, 1));
+    const vertical = H > W;
+    const pw = vertical ? W * 0.86 : Math.min(W * 0.62, 110 * u);
+    const ph = 21 * u;
+    const px = (W - pw) / 2;
+    const py = H * (vertical ? 0.7 : 0.66);
+    ctx.globalAlpha = 1 - sai;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py - ph, (pw) * abre + 22 * u, ph * 2);
+    ctx.clip();
+    ctx.fillStyle = "rgba(14,15,20,.88)";
+    TO.retangulo(ctx, px, py, pw, ph, 3 * u);
+    ctx.fill();
+    const tx = px + 22 * u;
+    const tw = pw - 25 * u;
+    ctx.fillStyle = TO.degrade(ctx, 0, 0, 30 * u, 0);
+    ctx.font = TO.fonte(800, 2.6);
+    ctx.letterSpacing = `${0.25 * u}px`;
+    ctx.textBaseline = "top";
+    ctx.fillStyle = C.cor_1;
+    ctx.fillText(C.episodio, tx, py + 2.4 * u);
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 4.2, tw));
+    ctx.fillText(C.titulo, tx, py + 5.6 * u);
+    ctx.globalAlpha = (1 - sai) * 0.7;
+    ctx.font = TO.fonte(500, Math.min(2.8, TO.caber(ctx, C.convidado, 500, 2.8, tw)));
+    ctx.fillText(C.convidado, tx, py + 10.8 * u);
+    ctx.globalAlpha = 1 - sai;
+    // Onda sonora
+    const bw = tw / N;
+    const base = py + ph - 3 * u;
+    for (let i = 0; i < N; i++) {
+      const f1 = 3 + TO.hash(i, 21) * 6;
+      const f2 = 7 + TO.hash(i, 23) * 9;
+      const a = 0.25 + 0.75 * Math.abs(Math.sin(t * f1 + i * 0.7) * 0.6 + Math.sin(t * f2 + i) * 0.4);
+      const h = (0.6 + a * 3.4) * u * TO.clamp((t - 0.9 - i * 0.01) * 4);
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, i / (N - 1));
+      TO.retangulo(ctx, tx + i * bw, base - h, bw * 0.55, h, bw * 0.27);
+      ctx.fill();
+    }
+    ctx.restore();
+    // Círculo do microfone (estala antes da caixa abrir)
+    const k = TO.spring(t, 0.5, 2.2) * (1 - sai);
+    ctx.save();
+    ctx.translate(px + 11 * u, py + ph / 2);
+    ctx.scale(k, k);
+    ctx.fillStyle = TO.degrade(ctx, -8 * u, -8 * u, 8 * u, 8 * u);
+    ctx.beginPath();
+    ctx.arc(0, 0, 7.6 * u, 0, 6.2832);
+    ctx.fill();
+    microfone(0, 0, 7 * u);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

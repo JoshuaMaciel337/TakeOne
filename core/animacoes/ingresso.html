@@ -1,0 +1,45 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Ingresso",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um ingresso entra girando, com o nome do evento, data, local e um canhoto que se destaca no fim.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Evento", "tipo": "texto", "padrao": "Show de Verão", "maximo": 28},
+  {"id": "data", "rotulo": "Data e hora", "tipo": "texto", "padrao": "15 NOV · 21H", "maximo": 22},
+  {"id": "local", "rotulo": "Local", "tipo": "texto", "padrao": "Arena Central", "maximo": 30},
+  {"id": "canhoto", "rotulo": "Canhoto", "tipo": "texto", "padrao": "VIP", "maximo": 8},
+  {"id": "cor_1", "rotulo": "Ingresso (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Ingresso (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Ingresso: o bilhete (com bordas recortadas em semicírculos por máscara) entra girando em 3D; um brilho
+     passa por cima como num papel laminado, e no fim o canhoto se separa um pouco pela linha do picote. -->
+<style>
+.ingresso{position:absolute;left:50%;top:50%;display:flex;transform:translate(-50%,-50%);color:var(--cor-texto);
+  filter:drop-shadow(0 calc(var(--u)*1) calc(var(--u)*3) rgba(0,0,0,.5));
+  animation:entrar .9s cubic-bezier(.2,1.1,.3,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.corpo,.canhoto{position:relative;overflow:hidden;background:linear-gradient(120deg,var(--cor-1),var(--cor-2))}
+.corpo{padding:calc(var(--u)*3.6) calc(var(--u)*5) calc(var(--u)*3.6) calc(var(--u)*4.4);border-radius:calc(var(--u)*2) 0 0 calc(var(--u)*2);
+  -webkit-mask:radial-gradient(circle calc(var(--u)*1.6) at 100% 50%,transparent 98%,#000);mask:radial-gradient(circle calc(var(--u)*1.6) at 100% 50%,transparent 98%,#000)}
+.corpo::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.45) 50%,transparent 65%);
+  transform:translateX(-100%);animation:brilho 1s ease-in-out 1s forwards}
+.canhoto{display:grid;place-items:center;padding:0 calc(var(--u)*3.4);border-radius:0 calc(var(--u)*2) calc(var(--u)*2) 0;border-left:calc(var(--u)*.35) dashed rgba(255,255,255,.6);
+  -webkit-mask:radial-gradient(circle calc(var(--u)*1.6) at 0 50%,transparent 98%,#000);mask:radial-gradient(circle calc(var(--u)*1.6) at 0 50%,transparent 98%,#000);
+  animation:destacar .6s cubic-bezier(.2,1.4,.4,1) 2.2s forwards}
+.canhoto b{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:900;font-size:calc(var(--u)*4.2);letter-spacing:.12em}
+.rotulo{font-weight:700;font-size:calc(var(--u)*2.2);letter-spacing:.2em;opacity:.8}
+.titulo{font-weight:900;font-size:calc(var(--u)*6.4);line-height:1.05;letter-spacing:-.02em;white-space:nowrap}
+.info{display:flex;gap:calc(var(--u)*3);margin-top:calc(var(--u)*1.6);font-weight:700;font-size:calc(var(--u)*2.9);white-space:nowrap}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,-50%) perspective(900px) rotateY(-70deg) rotateZ(-6deg)}}
+@keyframes brilho{to{transform:translateX(100%)}}
+@keyframes destacar{to{transform:translateX(calc(var(--u)*2)) rotate(6deg)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
+</style>
+<div class="ingresso">
+ <div class="corpo"><div class="rotulo">INGRESSO</div><div class="titulo">{{titulo}}</div><div class="info"><span>{{data}}</span><span>{{local}}</span></div></div>
+ <div class="canhoto"><b>{{canhoto}}</b></div>
+</div>

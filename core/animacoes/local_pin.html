@@ -1,0 +1,107 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Alfinete no mapa",
+ "categoria": "tarjas",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Um alfinete de mapa cai quicando sobre uma grade de ruas, solta ondas no chão e mostra o endereço ao lado.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Lugar", "tipo": "texto", "padrao": "Café Aurora", "maximo": 30},
+  {"id": "endereco", "rotulo": "Endereço", "tipo": "texto", "padrao": "Rua das Flores, 120 · Centro", "maximo": 44},
+  {"id": "cor_1", "rotulo": "Alfinete (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Alfinete (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Local: um pedaço de mapa (círculo com ruas em perspectiva achatada) aparece; o alfinete cai de cima com
+     quique (mola pouco amortecida) e, ao tocar o chão, solta três ondas. O cartão com o nome e o endereço abre
+     à direita (embaixo, nas telas em pé). -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const pino = (x, y, s) => {
+    ctx.fillStyle = TO.degrade(ctx, x - s, y - s * 2.4, x + s, y);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.bezierCurveTo(x - s * 0.3, y - s * 0.8, x - s, y - s * 1.3, x - s, y - s * 1.9);
+    ctx.arc(x, y - s * 1.9, s, Math.PI, 0);
+    ctx.bezierCurveTo(x + s, y - s * 1.3, x + s * 0.3, y - s * 0.8, x, y);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(x, y - s * 1.9, s * 0.38, 0, 6.2832);
+    ctx.fill();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const vertical = H > W;
+    const mx = vertical ? W / 2 : W * 0.32;
+    const my = vertical ? H * 0.42 : H * 0.55;
+    const mr = 16 * u;
+    const mapa = TO.ease.outBack(TO.prog(t, 0, 0.5));
+    ctx.globalAlpha = 1 - sai;
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.scale(mapa, mapa * 0.45);
+    ctx.fillStyle = "rgba(14,15,20,.85)";
+    ctx.beginPath();
+    ctx.arc(0, 0, mr, 0, 6.2832);
+    ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 0.7 * u;
+    for (let k = -3; k <= 3; k++) {
+      ctx.beginPath();
+      ctx.moveTo(k * 5 * u, -mr);
+      ctx.lineTo(k * 5 * u + 3 * u, mr);
+      ctx.moveTo(-mr, k * 5 * u);
+      ctx.lineTo(mr, k * 5 * u - 2 * u);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Ondas no chão
+    const toque = 0.75;
+    for (let k = 0; k < 3; k++) {
+      const q = TO.prog(t, toque + k * 0.25, toque + k * 0.25 + 1.2);
+      if (q <= 0 || q >= 1) continue;
+      ctx.strokeStyle = TO.rgba(C.cor_2, 1 - q);
+      ctx.lineWidth = 0.4 * u;
+      ctx.beginPath();
+      ctx.ellipse(mx, my, mr * q, mr * q * 0.45, 0, 0, 6.2832);
+      ctx.stroke();
+    }
+    // Alfinete caindo com quique
+    // Cai acelerando até o chão (em toque) e quica para cima, cada vez mais baixo
+    const s = t - toque;
+    const y = s < 0
+      ? my - 40 * u * (1 - TO.ease.inQuad(TO.prog(t, 0.3, toque)))
+      : my - 6 * u * Math.exp(-4 * s) * Math.abs(Math.sin(9 * s));
+    pino(mx, y, 3.4 * u);
+    // Cartão
+    const c = TO.ease.outCubic(TO.prog(t, 1.1, 1.7));
+    if (c > 0) {
+      ctx.globalAlpha = (1 - sai) * c;
+      ctx.textBaseline = "top";
+      ctx.textAlign = vertical ? "center" : "left";
+      const tx = vertical ? W / 2 : mx + mr + 4 * u + (1 - c) * 3 * u;
+      const ty = vertical ? my + mr * 0.6 + 4 * u : my - 9 * u;
+      const larg = vertical ? W * 0.84 : W - tx - 6 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.font = TO.fonte(900, Math.min(6, TO.caber(ctx, C.titulo, 900, 6, larg)));
+      ctx.shadowColor = "rgba(0,0,0,.5)";
+      ctx.shadowBlur = 2 * u;
+      ctx.fillText(C.titulo, tx, ty);
+      ctx.font = TO.fonte(500, Math.min(3.2, TO.caber(ctx, C.endereco, 500, 3.2, larg)));
+      ctx.globalAlpha = (1 - sai) * c * 0.85;
+      ctx.fillText(C.endereco, tx, ty + 8 * u);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

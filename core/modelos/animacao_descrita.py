@@ -62,11 +62,11 @@ Dois exemplos (o CSS fica dentro de <style> e o resto é o HTML):
 
 
 def esquema_da_escolha() -> dict:
-    from core.modelos.animacao_html import MODELOS
+    from core.modelos.animacao_html import DESENHOS
 
     return {
         "type": "object",
-        "properties": {"modelo": {"type": "string", "enum": [*MODELOS, "livre"]},
+        "properties": {"modelo": {"type": "string", "enum": [*DESENHOS, "livre"]},
                        "campos": {"type": "object", "additionalProperties": {"type": "string"}}},
         "required": ["modelo", "campos"],
     }
@@ -74,12 +74,12 @@ def esquema_da_escolha() -> dict:
 
 def mensagens_da_escolha(descricao: str) -> list[dict]:
     """Primeiro passo: encaixar o pedido num modelo pronto (o que um modelo pequeno faz bem)."""
-    from core.modelos.animacao_html import MODELOS
+    from core.modelos.animacao_html import DESENHOS
 
     lista = "\n".join(
         f"- {chave}: {m['descricao']} Campos: "
         + ", ".join(f"{c} ({r.lower()})" for c, r, tipo, _p, _x in m["campos"] if tipo != "cor")
-        for chave, m in MODELOS.items())
+        for chave, m in DESENHOS.items())
     instrucoes = f"""Você escolhe a animação pronta que atende ao pedido e preenche os campos dela, em português \
 do Brasil. Responda só com o JSON {{"modelo": "...", "campos": {{...}}}}.
 

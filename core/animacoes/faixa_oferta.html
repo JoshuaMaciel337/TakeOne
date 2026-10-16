@@ -1,0 +1,56 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Fitas de oferta",
+ "categoria": "chamadas",
+ "motor": "canvas",
+ "duracao": 4,
+ "tela_cheia": true,
+ "descricao": "Duas fitas inclinadas atravessam a tela em X, com o texto correndo nelas em sentidos opostos.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto da fita", "tipo": "texto", "padrao": "BLACK FRIDAY", "maximo": 24},
+  {"id": "texto_2", "rotulo": "Texto da outra fita", "tipo": "texto", "padrao": "ATÉ 70% OFF", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Fita da frente", "tipo": "cor", "padrao": "#ffd400"},
+  {"id": "cor_2", "rotulo": "Fita de trás", "tipo": "cor", "padrao": "#14151b"},
+  {"id": "cor_texto", "rotulo": "Texto da fita de trás", "tipo": "cor", "padrao": "#ffd400"}
+ ]
+}
+</script>
+<!-- Fitas: duas faixas giradas (+8° e -8°) entram deslizando dos lados e se cruzam no centro; o texto se
+     repete ao longo de cada uma, separado por um losango, e corre sem parar (deslocamento proporcional a t).
+     A fita da frente tem texto escuro; a de trás usa a cor do texto. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const fita = (t, texto, fundo, cor, angulo, sentido, k) => {
+    const L = Math.hypot(W, H) * 1.3;
+    const h = 11 * u;
+    ctx.save();
+    ctx.translate(W / 2 + sentido * (1 - k) * L, H / 2);
+    ctx.rotate(angulo);
+    ctx.fillStyle = fundo;
+    ctx.fillRect(-L / 2, -h / 2, L, h);
+    ctx.fillStyle = cor;
+    ctx.font = TO.fonte(900, 6);
+    ctx.textBaseline = "middle";
+    const item = `${texto}   ◆   `;
+    const iw = ctx.measureText(item).width;
+    let x = -L / 2 - iw + ((t * 12 * u * sentido) % iw + iw) % iw;
+    while (x < L / 2) {
+      ctx.fillText(item, x, 0.4 * u);
+      x += iw;
+    }
+    ctx.restore();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const entra1 = TO.ease.outCubic(TO.prog(t, 0, 0.6));
+    const entra2 = TO.ease.outCubic(TO.prog(t, 0.15, 0.75));
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    fita(t, C.texto_2, C.cor_2, C.cor_texto, -0.14, -1, entra2 * (1 - sai));
+    fita(t, C.texto, C.cor_1, "#14151b", 0.14, 1, entra1 * (1 - sai));
+  };
+})();
+</script>

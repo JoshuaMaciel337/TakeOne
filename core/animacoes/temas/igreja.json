@@ -1,0 +1,229 @@
+{
+ "nome": "Igreja",
+ "ordem": 1,
+ "versoes": [
+  {
+   "modelo": "versiculo",
+   "id": "versiculo_salmo",
+   "nome": "Versículo do dia",
+   "padroes": {
+    "texto": "O Senhor é o meu pastor; nada me faltará.",
+    "referencia": "Salmos 23:1"
+   }
+  },
+  {
+   "modelo": "versiculo",
+   "id": "versiculo_joao",
+   "nome": "Versículo de amor",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "texto": "Porque Deus amou o mundo de tal maneira que deu o seu Filho unigênito.",
+    "referencia": "João 3:16"
+   }
+  },
+  {
+   "modelo": "versiculo",
+   "id": "versiculo_filipenses",
+   "nome": "Versículo de força",
+   "padroes": {
+    "texto": "Tudo posso naquele que me fortalece.",
+    "referencia": "Filipenses 4:13"
+   }
+  },
+  {
+   "modelo": "versiculo",
+   "id": "versiculo_isaias",
+   "nome": "Versículo de esperança",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "texto": "Os que esperam no Senhor renovam as suas forças.",
+    "referencia": "Isaías 40:31"
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "culto_ao_vivo",
+   "nome": "Culto ao vivo",
+   "padroes": {
+    "titulo": "Culto de celebração",
+    "detalhe": "Domingo · 19h"
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "oracao_ao_vivo",
+   "nome": "Oração ao vivo",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "titulo": "Madrugada de oração",
+    "detalhe": "Toda sexta · 5h"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "evento_conferencia",
+   "nome": "Conferência",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dia": "08",
+    "mes": "NOV",
+    "titulo": "Conferência de jovens",
+    "hora": "Sábado, 18h",
+    "local": "Templo sede"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "evento_batismo",
+   "nome": "Batismo",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "dia": "15",
+    "mes": "DEZ",
+    "titulo": "Culto de batismo",
+    "hora": "Domingo, 10h",
+    "local": "Igreja central"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "evento_ceia",
+   "nome": "Santa ceia",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dia": "03",
+    "mes": "NOV",
+    "titulo": "Santa ceia",
+    "hora": "Domingo, 19h",
+    "local": "Templo central"
+   }
+  },
+  {
+   "modelo": "tarja",
+   "id": "tarja_pastor",
+   "nome": "Tarja do pastor",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "nome": "Pr. João Almeida",
+    "funcao": "Pastor presidente"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_ministerio",
+   "nome": "Tarja de ministério",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "nome": "Ministério de louvor",
+    "funcao": "Igreja Vida Nova"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_pregador",
+   "nome": "Pregador convidado",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "etiqueta": "Pregador",
+    "nome": "Pr. Marcos Vieira",
+    "funcao": "Igreja Esperança · São Paulo"
+   }
+  },
+  {
+   "modelo": "titulo_mascara",
+   "id": "titulo_mensagem",
+   "nome": "Título da mensagem",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Fé que move\nmontanhas"
+   }
+  },
+  {
+   "modelo": "vinheta_intro",
+   "id": "vinheta_culto",
+   "nome": "Abertura do culto",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "CULTO DE DOMINGO",
+    "subtitulo": "Seja bem-vindo à casa do Pai"
+   }
+  },
+  {
+   "modelo": "particulas_brilho",
+   "id": "bem_vindo_igreja",
+   "nome": "Seja bem-vindo",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Seja bem-vindo"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "agenda_semana",
+   "nome": "Agenda da semana",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "titulo": "Nossa semana",
+    "texto": "Terça · Estudo bíblico\nQuinta · Culto de oração\nSábado · Culto de jovens\nDomingo · Celebração"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "reflexao_do_dia",
+   "nome": "Reflexão do dia",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "rotulo": "REFLEXÃO",
+    "texto": "Gratidão transforma o que temos em suficiente."
+   }
+  },
+  {
+   "modelo": "citacao",
+   "id": "citacao_pregacao",
+   "nome": "Frase da pregação",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Deus não chama os capacitados,\nele capacita os chamados.",
+    "autor": "Pr. João Almeida"
+   }
+  },
+  {
+   "modelo": "chamada_seguir",
+   "id": "seguir_igreja",
+   "nome": "Siga a igreja",
+   "padroes": {
+    "cor_1": "#8ec5ff",
+    "cor_2": "#9b8cff",
+    "chamada": "Acompanhe os cultos ao vivo"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_vidas",
+   "nome": "Vidas alcançadas",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "valor": "1200",
+    "prefixo": "+",
+    "sufixo": "",
+    "legenda": "vidas alcançadas este ano"
+   }
+  }
+ ]
+}

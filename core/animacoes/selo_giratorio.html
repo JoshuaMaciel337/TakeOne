@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Selo giratório",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Um texto corre em círculo em volta de uma palavra no centro, como um carimbo girando.",
+ "campos": [
+  {"id": "circular", "rotulo": "Texto em volta", "tipo": "texto", "padrao": "LANÇAMENTO • EDIÇÃO LIMITADA •", "maximo": 44},
+  {"id": "centro", "rotulo": "No centro", "tipo": "texto", "padrao": "2026", "maximo": 8},
+  {"id": "cor_1", "rotulo": "Selo (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Selo (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Selo: um disco em degradê estala, as letras do texto circular aparecem uma a uma ao longo do círculo e
+     o anel inteiro gira devagar; a palavra do centro fica parada. Cada letra é desenhada girada no seu ângulo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const letras = [...(C.circular.trim() + " ")];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inBack(TO.prog(t, dur - 0.5, dur));
+    const entra = TO.spring(t, 0.5, 1.8);
+    const cx = W / 2;
+    const cy = H / 2;
+    const R = 20 * u;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(entra * (1 - sai), entra * (1 - sai));
+    ctx.fillStyle = TO.degrade(ctx, -R, -R, R, R);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, 6.2832);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.55)";
+    ctx.lineWidth = 0.3 * u;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.62, 0, 6.2832);
+    ctx.stroke();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tam = Math.min(3.4, (6.2832 * R * 0.8) / (letras.length * 0.68 * u));
+    ctx.font = TO.fonte(800, tam);
+    const giro = t * 0.6;
+    letras.forEach((l, i) => {
+      const k = TO.clamp((t - 0.3 - i * 0.025) / 0.2);
+      if (k <= 0) return;
+      const a = giro + (i / letras.length) * 6.2832 - Math.PI / 2;
+      ctx.save();
+      ctx.globalAlpha = k;
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillText(l, 0, -R * 0.81);
+      ctx.restore();
+    });
+    const centro = TO.spring(t - 0.6, 0.45, 2.4);
+    ctx.scale(centro, centro);
+    ctx.font = TO.fonte(900, Math.min(8, TO.caber(ctx, C.centro, 900, 8, R * 1.05)));
+    ctx.fillText(C.centro, 0, 0.4 * u);
+    ctx.restore();
+  };
+})();
+</script>

@@ -1,0 +1,95 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Contagem regressiva",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Números grandes caem de um em um até zero, com um anel que esvazia, e a frase final explode no fim.",
+ "campos": [
+  {"id": "de", "rotulo": "Começa em (até 10)", "tipo": "numero", "padrao": "3", "maximo": 0},
+  {"id": "final", "rotulo": "Frase final", "tipo": "texto", "padrao": "É HOJE!", "maximo": 20},
+  {"id": "cor_1", "rotulo": "Anel (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Anel (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Contagem: o tempo antes do último segundo é dividido igualmente entre os números; cada número entra
+     grande e encolhe com mola enquanto o anel em volta esvazia. A frase final estala com raios em volta. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const n = Math.max(1, Math.min(10, parseInt(C.de, 10) || 3));
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fimDosNumeros = Math.max(0.6, dur - 1.6);
+    const passo = fimDosNumeros / n;
+    const cx = W / 2;
+    const cy = H / 2;
+    const r = 18 * u;
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.4, dur));
+    ctx.globalAlpha = 1 - sai;
+    if (t < fimDosNumeros) {
+      const i = Math.floor(t / passo);
+      const local = (t - i * passo) / passo;
+      ctx.fillStyle = "rgba(14,15,20,.78)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 3 * u, 0, 6.2832);
+      ctx.fill();
+      ctx.lineWidth = 1.6 * u;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(255,255,255,.14)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, 6.2832);
+      ctx.stroke();
+      ctx.strokeStyle = TO.degrade(ctx, cx - r, cy - r, cx + r, cy + r);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 6.2832 * (1 - local));
+      ctx.stroke();
+      const s = 1 + 0.6 * (1 - TO.spring(local * passo, 0.5, 2.6));
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(s, s);
+      ctx.globalAlpha = (1 - sai) * TO.clamp(local * 6) * (1 - TO.prog(local, 0.85, 1));
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, 20);
+      ctx.fillText(String(n - i), 0, 1.5 * u);
+      ctx.restore();
+    } else {
+      const k = TO.spring(t - fimDosNumeros, 0.45, 2.2);
+      const raios = TO.ease.outCubic(TO.prog(t, fimDosNumeros, fimDosNumeros + 0.7));
+      ctx.strokeStyle = TO.degrade(ctx, cx - r, cy, cx + r, cy);
+      ctx.lineWidth = 0.8 * u;
+      ctx.lineCap = "round";
+      for (let j = 0; j < 14; j++) {
+        const a = (j / 14) * 6.2832;
+        const r0 = 12 * u + raios * 14 * u;
+        const r1 = r0 + 5 * u * (1 - raios);
+        ctx.globalAlpha = (1 - sai) * (1 - raios);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+        ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = (1 - sai) * TO.clamp(k);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(k, k);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = TO.rgba(C.cor_2, 0.8);
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.final, 900, 13, W * 0.84));
+      ctx.fillText(C.final, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

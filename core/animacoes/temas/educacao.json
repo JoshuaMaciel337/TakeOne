@@ -1,0 +1,119 @@
+{
+ "nome": "Educação e cursos",
+ "ordem": 14,
+ "versoes": [
+  {
+   "modelo": "dica",
+   "id": "dica_de_estudo",
+   "nome": "Dica de estudo",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "rotulo": "DICA DE ESTUDO",
+    "texto": "Estude em blocos de 25 minutos com 5 de pausa."
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "aula_passos",
+   "nome": "Passos da aula",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Na aula de hoje",
+    "texto": "Revisão da semana\nConceito novo\nExercício prático\nDesafio para casa"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "o_que_voce_leva",
+   "nome": "O que o curso inclui",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_professor",
+   "nome": "Tarja de professor",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nome": "Prof. Ricardo Dias",
+    "funcao": "Matemática · 15 anos de sala"
+   }
+  },
+  {
+   "modelo": "frase_marcador",
+   "id": "conceito_chave",
+   "nome": "Conceito-chave",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "antes": "Aprender é",
+    "destaque": "repetir com atenção",
+    "depois": ""
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_alunos",
+   "nome": "Alunos formados",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "valor": "12",
+    "prefixo": "+",
+    "sufixo": "mil",
+    "legenda": "alunos formados"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "anel_aprovacao",
+   "nome": "Taxa de aprovação",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "valor": "94",
+    "legenda": "de aprovação no último vestibular"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "aula_ao_vivo",
+   "nome": "Aula ao vivo",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "dia": "28",
+    "mes": "OUT",
+    "titulo": "Aulão de revisão",
+    "hora": "Terça, 20h",
+    "local": "Ao vivo no canal"
+   }
+  },
+  {
+   "modelo": "titulo_maquina",
+   "id": "pergunta",
+   "nome": "Pergunta para a turma",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "Você sabe a resposta?"
+   }
+  },
+  {
+   "modelo": "grafico_barras",
+   "id": "notas",
+   "nome": "Gráfico de notas",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Média da turma",
+    "dados": "1º bim: 6\n2º bim: 7\n3º bim: 7\n4º bim: 9"
+   }
+  }
+ ]
+}

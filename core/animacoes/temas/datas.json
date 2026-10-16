@@ -1,0 +1,133 @@
+{
+ "nome": "Datas comemorativas",
+ "ordem": 9,
+ "versoes": [
+  {
+   "modelo": "coracoes",
+   "id": "dia_das_maes",
+   "nome": "Dia das Mães",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Feliz Dia das Mães"
+   }
+  },
+  {
+   "modelo": "coracoes",
+   "id": "dia_dos_namorados",
+   "nome": "Dia dos Namorados",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#ff8fab",
+    "titulo": "Feliz Dia dos Namorados"
+   }
+  },
+  {
+   "modelo": "coracoes",
+   "id": "dia_dos_pais",
+   "nome": "Dia dos Pais",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Feliz Dia dos Pais"
+   }
+  },
+  {
+   "modelo": "bandeirinhas",
+   "id": "festa_junina",
+   "nome": "Festa junina",
+   "padroes": {}
+  },
+  {
+   "modelo": "bandeirinhas",
+   "id": "arraia_escola",
+   "nome": "Arraiá da escola",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Arraiá da Escola",
+    "detalhe": "sábado, 14h, no pátio"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "carnaval",
+   "nome": "Carnaval",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#9b8cff",
+    "titulo": "É Carnaval!"
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "pascoa",
+   "nome": "Feliz Páscoa",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#9b8cff",
+    "texto": "Feliz Páscoa"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "dia_das_criancas",
+   "nome": "Dia das Crianças",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "texto": "Dia das Crianças"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "dia_das_maes_evento",
+   "nome": "Homenagem às mães",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "dia": "10",
+    "mes": "MAI",
+    "titulo": "Café das mães",
+    "hora": "Domingo, 9h",
+    "local": "Salão da igreja"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_maes",
+   "nome": "Cupom do Dia das Mães",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "desconto": "15% OFF",
+    "texto": "presente para a mãe",
+    "codigo": "MAE15"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_namorados",
+   "nome": "Cupom do Dia dos Namorados",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#ff8fab",
+    "desconto": "2 POR 1",
+    "texto": "só dia 12 de junho",
+    "codigo": "AMOR"
+   }
+  },
+  {
+   "modelo": "faixa_oferta",
+   "id": "fitas_dia_do_cliente",
+   "nome": "Dia do Cliente",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#14151b",
+    "cor_texto": "#35d3a1",
+    "texto": "DIA DO CLIENTE",
+    "texto_2": "OFERTAS ESPECIAIS"
+   }
+  }
+ ]
+}

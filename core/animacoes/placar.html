@@ -1,0 +1,50 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Placar",
+ "categoria": "numeros",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Placar de jogo no alto da tela: os dois times, os gols que viram e o tempo de jogo.",
+ "campos": [
+  {"id": "time_1", "rotulo": "Time da casa", "tipo": "texto", "padrao": "AZU", "maximo": 4},
+  {"id": "placar_1", "rotulo": "Gols da casa", "tipo": "texto", "padrao": "2", "maximo": 3},
+  {"id": "time_2", "rotulo": "Visitante", "tipo": "texto", "padrao": "VER", "maximo": 4},
+  {"id": "placar_2", "rotulo": "Gols do visitante", "tipo": "texto", "padrao": "1", "maximo": 3},
+  {"id": "tempo", "rotulo": "Tempo", "tipo": "texto", "padrao": "2º T · 38'", "maximo": 12},
+  {"id": "cor_1", "rotulo": "Cor da casa", "tipo": "cor", "padrao": "#3b82f6"},
+  {"id": "cor_2", "rotulo": "Cor do visitante", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Placar: a barra desce do topo, as faixas coloridas dos times crescem dos lados e os números viram
+     (rotateX, como placa de placar) um depois do outro. O tempo fica numa etiqueta embaixo, piscando o ponto. -->
+<style>
+.placar{position:absolute;left:50%;top:calc(var(--u)*8.7);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
+  color:var(--cor-texto);animation:descer .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.barra{display:flex;align-items:stretch;border-radius:calc(var(--u)*2.03);overflow:hidden;background:rgba(14,15,20,.92);font-weight:900}
+.time{display:flex;align-items:center;gap:calc(var(--u)*2.03);padding:calc(var(--u)*1.74) calc(var(--u)*3.48);font-size:calc(var(--u)*5.22);letter-spacing:.06em}
+.time i{width:calc(var(--u)*1.3);align-self:stretch;border-radius:9px;transform-origin:50% 100%;animation:crescer .5s ease-out .4s both}
+.casa i{background:var(--cor-1)}.fora i{background:var(--cor-2)}
+.gols{display:flex;align-items:center;gap:calc(var(--u)*1.74);padding:0 calc(var(--u)*2.9);background:rgba(255,255,255,.08);font-size:calc(var(--u)*6.67)}
+.gols b{display:inline-block;min-width:calc(var(--u)*4.93);text-align:center;animation:virar .6s cubic-bezier(.2,1.4,.4,1) both}
+.gols b:first-child{animation-delay:.7s}.gols b:last-child{animation-delay:.9s}
+.gols span{opacity:.4;font-size:calc(var(--u)*4.35)}
+.tempo{margin-top:calc(var(--u)*-0.29);padding:calc(var(--u)*0.72) calc(var(--u)*2.61);border-radius:0 0 calc(var(--u)*1.45) calc(var(--u)*1.45);
+  background:rgba(255,255,255,.92);color:#14151b;font-weight:800;font-size:calc(var(--u)*3.33);animation:abrir .4s ease-out 1.1s both}
+.tempo::before{content:"●";margin-right:calc(var(--u)*1.16);color:#ff3b3b;animation:piscar 1s steps(2) infinite}
+@keyframes descer{from{opacity:0;transform:translate(-50%,calc(var(--u)*-8.7))}}
+@keyframes crescer{from{transform:scaleY(0)}}
+@keyframes virar{from{opacity:0;transform:perspective(200px) rotateX(90deg)}}
+@keyframes abrir{from{opacity:0;transform:translateY(calc(var(--u)*-2.9))}}
+@keyframes piscar{50%{opacity:0}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,calc(var(--u)*-5.8))}}
+</style>
+<div class="placar">
+ <div class="barra">
+  <div class="time casa"><i></i>{{time_1}}</div>
+  <div class="gols"><b>{{placar_1}}</b><span>×</span><b>{{placar_2}}</b></div>
+  <div class="time fora">{{time_2}}<i></i></div>
+ </div>
+ <div class="tempo">{{tempo}}</div>
+</div>

@@ -1,0 +1,111 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Revelação de produto",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Um feixe de luz atravessa o escuro e revela o nome do produto com um brilho que passa, o selo de novidade e o detalhe.",
+ "campos": [
+  {"id": "selo", "rotulo": "Selo", "tipo": "texto", "padrao": "NOVO", "maximo": 14},
+  {"id": "titulo", "rotulo": "Produto", "tipo": "texto", "padrao": "Linha Aurora", "maximo": 26},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "chega dia 10 nas lojas", "maximo": 44},
+  {"id": "cor_1", "rotulo": "Luz (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Luz (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Revelação: um feixe diagonal (degradê largo) cruza da esquerda para a direita e o nome aparece no
+     rastro dele (recorte que acompanha o feixe); depois uma faixa de brilho corre por dentro das letras
+     (source-atop), o selo estala acima e o detalhe sobe embaixo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const camada = document.createElement("canvas");
+  camada.width = W;
+  camada.height = H;
+  const c2 = camada.getContext("2d");
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const cx = W / 2;
+    const cy = H / 2;
+    const tam = TO.caber(ctx, C.titulo, 900, 12, W * 0.8);
+    ctx.font = TO.fonte(900, tam);
+    const lw = ctx.measureText(C.titulo).width;
+    const feixe = TO.ease.inOutCubic(TO.prog(t, 0.1, 1.4));
+    const fx = TO.lerp(cx - lw * 0.8, cx + lw * 0.8, feixe);
+    // Feixe
+    if (feixe > 0 && feixe < 1) {
+      ctx.save();
+      ctx.globalAlpha = (1 - sai) * Math.sin(feixe * Math.PI) * 0.8;
+      ctx.translate(fx, cy);
+      ctx.rotate(0.35);
+      const g = ctx.createLinearGradient(-8 * u, 0, 8 * u, 0);
+      g.addColorStop(0, TO.rgba(C.cor_1, 0));
+      g.addColorStop(0.5, TO.rgba(C.cor_2, 0.9));
+      g.addColorStop(1, TO.rgba(C.cor_1, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(-8 * u, -tam * u * 1.1, 16 * u, tam * u * 2.2);
+      ctx.restore();
+    }
+    // Nome, revelado até o feixe, com o brilho passando dentro das letras
+    c2.clearRect(0, 0, W, H);
+    c2.font = TO.fonte(900, tam);
+    c2.textAlign = "center";
+    c2.textBaseline = "middle";
+    c2.letterSpacing = `${0.02 * tam * u}px`;
+    c2.fillStyle = C.cor_texto;
+    c2.fillText(C.titulo, cx, cy);
+    const brilho = TO.prog(t, 1.6, 2.6);
+    if (brilho > 0 && brilho < 1) {
+      c2.globalCompositeOperation = "source-atop";
+      const bx = TO.lerp(cx - lw, cx + lw, brilho);
+      const g = c2.createLinearGradient(bx - 6 * u, 0, bx + 6 * u, 0);
+      g.addColorStop(0, "rgba(255,255,255,0)");
+      g.addColorStop(0.5, TO.rgba(C.cor_1, 1));
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      c2.fillStyle = g;
+      c2.fillRect(0, 0, W, H);
+      c2.globalCompositeOperation = "source-over";
+    }
+    ctx.save();
+    ctx.globalAlpha = 1 - sai;
+    ctx.beginPath();
+    ctx.rect(0, 0, fx + (feixe >= 1 ? W : 0), H);
+    ctx.clip();
+    ctx.drawImage(camada, 0, 0);
+    ctx.restore();
+    // Selo e detalhe
+    const selo = TO.spring(t - 1.3, 0.45, 2.6);
+    if (selo > 0) {
+      ctx.save();
+      ctx.globalAlpha = (1 - sai) * TO.clamp(selo);
+      ctx.font = TO.fonte(800, 2.8);
+      ctx.letterSpacing = `${0.4 * u}px`;
+      const sw = ctx.measureText(C.selo).width + 4 * u;
+      ctx.translate(cx, cy - tam * u * 0.85);
+      ctx.scale(selo, selo);
+      ctx.fillStyle = TO.degrade(ctx, -sw / 2, 0, sw / 2, 0);
+      TO.retangulo(ctx, -sw / 2, -2.4 * u, sw, 4.8 * u, 2.4 * u);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(C.selo, 0.2 * u, 0.2 * u);
+      ctx.restore();
+    }
+    const det = TO.ease.outCubic(TO.prog(t, 1.8, 2.4));
+    ctx.globalAlpha = (1 - sai) * det * 0.85;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = TO.fonte(500, Math.min(3.6, TO.caber(ctx, C.detalhe, 500, 3.6, W * 0.8)));
+    ctx.fillText(C.detalhe, cx, cy + tam * u * 0.7 + (1 - det) * 2 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

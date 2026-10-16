@@ -1,0 +1,94 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Balões de festa",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Balões coloridos sobem balançando pela tela inteira enquanto o título e o nome aparecem no centro.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Feliz aniversário", "maximo": 30},
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Laura", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Balão 1", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Balão 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Balões: 26 balões com coluna, tamanho, velocidade e cor sorteados por índice sobem de baixo e saem por
+     cima, balançando de lado; cada um tem brilho, nó e fio ondulado. O título entra com mola e o nome, em
+     letra cursiva, logo depois. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const cores = [C.cor_1, C.cor_2, "#ffd166", "#6bd8f2", "#9b8cff", "#35d3a1"];
+  const N = 26;
+  const baloes = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(300 + i);
+    return { x: 0.04 + r() * 0.92, r: 3.2 + r() * 3, vel: 0.22 + r() * 0.16, atraso: r() * 1.6, fase: r() * 6.28, cor: cores[Math.floor(r() * cores.length)] };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    baloes.sort((a, b) => a.r - b.r);
+    for (const b of baloes) {
+      const s = t - b.atraso;
+      if (s <= 0) continue;
+      const R = b.r * u;
+      const x = b.x * W + Math.sin(s * 1.6 + b.fase) * 2 * u;
+      const y = H + R * 2 - s * b.vel * H;
+      if (y < -R * 5) continue;
+      ctx.globalAlpha = fim;
+      // Fio
+      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.lineWidth = Math.max(1, 0.15 * u);
+      ctx.beginPath();
+      ctx.moveTo(x, y + R * 1.2);
+      for (let k = 1; k <= 8; k++) ctx.lineTo(x + Math.sin(k * 0.9 + s * 3) * 0.6 * u, y + R * 1.2 + k * R * 0.4);
+      ctx.stroke();
+      // Balão, nó e brilho
+      ctx.fillStyle = b.cor;
+      ctx.beginPath();
+      ctx.ellipse(x, y, R * 0.86, R, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x, y + R * 0.95);
+      ctx.lineTo(x - R * 0.14, y + R * 1.2);
+      ctx.lineTo(x + R * 0.14, y + R * 1.2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.35)";
+      ctx.beginPath();
+      ctx.ellipse(x - R * 0.3, y - R * 0.38, R * 0.16, R * 0.28, -0.5, 0, 6.2832);
+      ctx.fill();
+    }
+    const k = TO.spring(t - 0.5, 0.5, 2);
+    ctx.globalAlpha = fim * TO.clamp(k);
+    ctx.save();
+    ctx.translate(W / 2, H / 2 - 4 * u);
+    ctx.scale(k, k);
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowBlur = 2.5 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 9, W * 0.84));
+    ctx.fillText(C.titulo, 0, 0);
+    ctx.restore();
+    const nome = TO.ease.outBack(TO.prog(t, 1, 1.6));
+    ctx.globalAlpha = fim * TO.clamp(nome);
+    ctx.save();
+    ctx.translate(W / 2, H / 2 + 9 * u);
+    ctx.scale(nome, nome);
+    ctx.fillStyle = TO.degrade(ctx, -20 * u, 0, 20 * u, 0, "#ffd166", C.cor_2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(600, TO.caber(ctx, C.nome, 600, 13, W * 0.8, "Caveat"), "Caveat");
+    ctx.fillText(C.nome, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

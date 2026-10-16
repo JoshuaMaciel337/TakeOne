@@ -1,0 +1,106 @@
+{
+ "nome": "Academia e saúde",
+ "ordem": 11,
+ "versoes": [
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_treino",
+   "nome": "Antes e depois do treino",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "antes": "92 kg",
+    "depois": "78 kg",
+    "rotulo_antes": "em janeiro",
+    "rotulo_depois": "em junho"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "treino_do_dia",
+   "nome": "Treino do dia",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "titulo": "Treino do dia",
+    "texto": "Aquecimento · 10 min\nAgachamento · 4x12\nFlexão · 4x15\nPrancha · 3x1 min"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_serie",
+   "nome": "Contagem da série",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "de": "3",
+    "final": "VAI!"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "anel_meta",
+   "nome": "Meta do mês",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "valor": "75",
+    "legenda": "da meta de treinos do mês"
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "impacto_treino",
+   "nome": "Sem desculpas",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "texto": "Sem desculpas"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_saude",
+   "nome": "Dica de saúde",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "rotulo": "DICA DE SAÚDE",
+    "texto": "Beba um copo de água assim que acordar."
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "habitos",
+   "nome": "Hábitos do dia",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "Hábitos de hoje",
+    "texto": "2 litros de água\n8 horas de sono\n30 minutos de treino\nSem açúcar"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_personal",
+   "nome": "Tarja de personal",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "nome": "Bruna Alves",
+    "funcao": "Personal trainer · CREF 012345"
+   }
+  },
+  {
+   "modelo": "grafico_linha",
+   "id": "evolucao_carga",
+   "nome": "Evolução da carga",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "titulo": "Carga no supino (kg)",
+    "dados": "Sem 1: 40\nSem 2: 45\nSem 3: 45\nSem 4: 50\nSem 5: 55\nSem 6: 60"
+   }
+  }
+ ]
+}

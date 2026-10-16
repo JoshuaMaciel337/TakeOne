@@ -1,0 +1,120 @@
+{
+ "nome": "Esportes",
+ "ordem": 10,
+ "versoes": [
+  {
+   "modelo": "placar",
+   "id": "placar_futebol",
+   "nome": "Placar de futebol",
+   "padroes": {}
+  },
+  {
+   "modelo": "placar",
+   "id": "placar_basquete",
+   "nome": "Placar de basquete",
+   "padroes": {
+    "cor_1": "#ff7a00",
+    "cor_2": "#9b8cff",
+    "time_1": "LEO",
+    "placar_1": "88",
+    "time_2": "TIG",
+    "placar_2": "84",
+    "tempo": "4º Q · 2:10"
+   }
+  },
+  {
+   "modelo": "placar",
+   "id": "placar_volei",
+   "nome": "Placar de vôlei",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#3b82f6",
+    "time_1": "BRA",
+    "placar_1": "2",
+    "time_2": "ITA",
+    "placar_2": "1",
+    "tempo": "4º SET"
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "gol",
+   "nome": "Gol!",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "texto": "GOOOL!"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_atleta",
+   "nome": "Tarja de atleta",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "nome": "Carlos Souza",
+    "funcao": "Camisa 10 · Meio-campo"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "jogo",
+   "nome": "Dia de jogo",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "dia": "20",
+    "mes": "OUT",
+    "titulo": "Final do campeonato",
+    "hora": "Domingo, 16h",
+    "local": "Estádio Municipal"
+   }
+  },
+  {
+   "modelo": "grafico_barras",
+   "id": "estatisticas_jogo",
+   "nome": "Estatísticas do jogo",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "Estatísticas",
+    "dados": "Chutes: 14\nEscanteios: 7\nFaltas: 11\nPosse (%): 58"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_jogo",
+   "nome": "Contagem para o jogo",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "de": "3",
+    "final": "BOLA ROLANDO!"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_tecnico",
+   "nome": "Técnico",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "etiqueta": "Técnico",
+    "nome": "Roberto Lima",
+    "funcao": "Esporte Clube Azul"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "anel_aproveitamento",
+   "nome": "Aproveitamento",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "78",
+    "legenda": "de aproveitamento na temporada"
+   }
+  }
+ ]
+}

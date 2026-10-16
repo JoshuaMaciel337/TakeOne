@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Ao vivo",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Selo de transmissão ao vivo com o ponto piscando, o nome do programa e o horário ao lado.",
+ "campos": [
+  {"id": "selo", "rotulo": "Selo", "tipo": "texto", "padrao": "AO VIVO", "maximo": 14},
+  {"id": "titulo", "rotulo": "Programa", "tipo": "texto", "padrao": "Culto de domingo", "maximo": 36},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "19h · todo domingo", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Selo (início)", "tipo": "cor", "padrao": "#ff3b3b"},
+  {"id": "cor_2", "rotulo": "Selo (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Ao vivo: o selo estala no canto de cima, com o ponto pulsando e uma onda que sai dele em laço; a caixa
+     com o programa abre da esquerda para a direita a partir do selo. Fica no terço de cima, à esquerda. -->
+<style>
+.grupo{position:absolute;left:calc(var(--u)*7.8);top:calc(var(--u)*7.8);display:flex;align-items:stretch;color:var(--cor-texto);
+  animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.selo{position:relative;z-index:1;display:flex;align-items:center;gap:calc(var(--u)*1.82);padding:0 calc(var(--u)*3.12);border-radius:calc(var(--u)*1.82);
+  background:linear-gradient(120deg,var(--cor-1),var(--cor-2));font-weight:900;font-size:calc(var(--u)*4.16);letter-spacing:.08em;
+  animation:estalo .5s cubic-bezier(.2,1.6,.4,1) both}
+.ponto{position:relative;width:calc(var(--u)*2.34);height:calc(var(--u)*2.34);border-radius:50%;background:#fff;animation:piscar 1s ease-in-out infinite}
+.ponto::after{content:"";position:absolute;inset:0;border-radius:50%;border:calc(var(--u)*0.39) solid #fff;animation:onda 1.2s ease-out infinite}
+.caixa{margin-left:calc(var(--u)*-1.82);padding:calc(var(--u)*2.08) calc(var(--u)*3.9) calc(var(--u)*2.08) calc(var(--u)*4.68);border-radius:0 calc(var(--u)*1.82) calc(var(--u)*1.82) 0;
+  background:rgba(14,15,20,.86);clip-path:inset(0 100% 0 0);animation:abrir .7s cubic-bezier(.65,0,.35,1) .45s forwards}
+.titulo{font-weight:800;font-size:calc(var(--u)*4.68);white-space:nowrap}
+.detalhe{font-weight:500;font-size:calc(var(--u)*3.25);opacity:.7;white-space:nowrap}
+@keyframes estalo{from{transform:scale(0)}}
+@keyframes piscar{50%{opacity:.35}}
+@keyframes onda{from{transform:scale(1);opacity:.9}to{transform:scale(2.6);opacity:0}}
+@keyframes abrir{to{clip-path:inset(0 0 0 0)}}
+@keyframes sair{to{opacity:0;transform:translateY(calc(var(--u)*-2.6))}}
+</style>
+<div class="grupo">
+ <div class="selo"><span class="ponto"></span>{{selo}}</div>
+ <div class="caixa"><div class="titulo">{{titulo}}</div><div class="detalhe">{{detalhe}}</div></div>
+</div>

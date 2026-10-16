@@ -1,0 +1,95 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Fogos de artifício",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Fogos sobem e explodem em várias cores pela tela, com faíscas que caem, e um título grande no meio.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Feliz 2027", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Fogos 1", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Fogos 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Fogos: 9 foguetes com lugar, hora e cor sorteados; cada um sobe com rastro e, no topo, solta 46 faíscas
+     em círculo, que perdem força (arrasto), caem com a gravidade e piscam ao apagar. Tudo é função de t:
+     a posição de cada faísca sai da conta fechada do lançamento. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const cores = [C.cor_1, C.cor_2, "#6bd8f2", "#ffffff", "#9b8cff"];
+  const N = 9;
+  const fogos = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(70 + i);
+    return { x: 0.1 + r() * 0.8, topo: 0.15 + r() * 0.3, nasce: 0.1 + (i / N) * 3.6 + r() * 0.3, cor: cores[i % cores.length], forca: 0.7 + r() * 0.5 };
+  });
+  const SUBIDA = 0.7;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    ctx.globalCompositeOperation = "lighter";
+    for (const [i, f] of fogos.entries()) {
+      const s = t - f.nasce;
+      if (s < 0) continue;
+      const x0 = f.x * W;
+      const y0 = f.topo * H;
+      if (s < SUBIDA) {
+        const k = TO.ease.outQuad(s / SUBIDA);
+        const y = TO.lerp(H, y0, k);
+        ctx.globalAlpha = fim;
+        ctx.drawImage(TO.brilho(f.cor), x0 - 1.5 * u, y - 1.5 * u, 3 * u, 3 * u);
+        ctx.strokeStyle = TO.rgba(f.cor, 0.5);
+        ctx.lineWidth = 0.25 * u;
+        ctx.beginPath();
+        ctx.moveTo(x0, y);
+        ctx.lineTo(x0, y + 8 * u);
+        ctx.stroke();
+        continue;
+      }
+      const e = s - SUBIDA;
+      if (e > 2.2) continue;
+      const vida = 1 - e / 2.2;
+      if (e < 0.25) {
+        ctx.globalAlpha = fim * (1 - e / 0.25);
+        const r = 26 * u * f.forca;
+        ctx.drawImage(TO.brilho(f.cor), x0 - r, y0 - r, r * 2, r * 2);
+      }
+      const arrasto = 2.6;
+      const desl = (1 - Math.exp(-arrasto * e)) / arrasto;
+      for (let j = 0; j < 46; j++) {
+        const a = (j / 46) * 6.2832 + TO.hash(j + i * 50, 4) * 0.12;
+        const v = (30 + TO.hash(j + i * 50, 6) * 12) * u * f.forca;
+        const x = x0 + Math.cos(a) * v * desl;
+        const y = y0 + Math.sin(a) * v * desl + 9 * u * e * e;
+        const pisca = vida < 0.35 ? (Math.sin(t * 40 + j) > 0 ? 1 : 0.3) : 1;
+        ctx.globalAlpha = fim * vida * pisca;
+        const sz = (1.4 + 1.2 * vida) * u;
+        ctx.drawImage(TO.brilho(f.cor), x - sz, y - sz, sz * 2, sz * 2);
+      }
+    }
+    ctx.globalCompositeOperation = "source-over";
+    if (C.titulo) {
+      const k = TO.spring(t - 0.9, 0.5, 2);
+      ctx.globalAlpha = fim * TO.clamp(k);
+      ctx.save();
+      ctx.translate(W / 2, H * 0.6);
+      ctx.scale(k, k);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = TO.rgba(C.cor_1, 0.9);
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 13, W * 0.84));
+      ctx.fillText(C.titulo, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

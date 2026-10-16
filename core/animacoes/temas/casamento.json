@@ -1,0 +1,160 @@
+{
+ "nome": "Casamento",
+ "ordem": 2,
+ "versoes": [
+  {
+   "modelo": "casamento_nomes",
+   "id": "nomes_dourado",
+   "nome": "Nomes do casal",
+   "padroes": {
+    "nome_1": "Ana",
+    "nome_2": "Pedro",
+    "data": "12 · 09 · 2026"
+   }
+  },
+  {
+   "modelo": "casamento_nomes",
+   "id": "nomes_rose",
+   "nome": "Nomes do casal, rosé",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "nome_1": "Júlia",
+    "nome_2": "Rafael",
+    "data": "20 · 03 · 2027"
+   }
+  },
+  {
+   "modelo": "reserve_data",
+   "id": "reserve_dourado",
+   "nome": "Reserve a data",
+   "padroes": {}
+  },
+  {
+   "modelo": "reserve_data",
+   "id": "reserve_rose",
+   "nome": "Reserve a data, rosé",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "data": "20.03.27",
+    "detalhe": "Júlia & Rafael · Curitiba"
+   }
+  },
+  {
+   "modelo": "reserve_data",
+   "id": "bodas",
+   "nome": "Bodas",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "chamada": "Bodas de prata",
+    "data": "25 anos",
+    "detalhe": "Maria & José · 1999 a 2024"
+   }
+  },
+  {
+   "modelo": "assinatura",
+   "id": "assinatura_noivos",
+   "nome": "Assinatura dos noivos",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Ana & Pedro",
+    "cargo": "para sempre"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "cerimonia",
+   "nome": "Cerimônia",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dia": "12",
+    "mes": "SET",
+    "titulo": "Cerimônia",
+    "hora": "Sábado, 16h30",
+    "local": "Capela São José"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "recepcao",
+   "nome": "Recepção",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "dia": "12",
+    "mes": "SET",
+    "titulo": "Recepção",
+    "hora": "A partir das 19h",
+    "local": "Espaço Jardim"
+   }
+  },
+  {
+   "modelo": "linha_do_tempo",
+   "id": "nossa_historia",
+   "nome": "Nossa história",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "dados": "2018: Nos conhecemos\n2020: Primeira viagem\n2024: O pedido\n2026: O sim"
+   }
+  },
+  {
+   "modelo": "coracoes",
+   "id": "coracoes_casamento",
+   "nome": "Corações do casal",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Ana & Pedro"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_casamento",
+   "nome": "Contagem para o sim",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "de": "3",
+    "final": "SIM!"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_just_married",
+   "nome": "Recém-casados",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Recém-casados"
+   }
+  },
+  {
+   "modelo": "tarja_perfil",
+   "id": "padrinhos",
+   "nome": "Padrinhos",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "nome": "Carla & Bruno",
+    "perfil": "padrinhos do noivo",
+    "iniciais": "CB"
+   }
+  },
+  {
+   "modelo": "citacao",
+   "id": "votos",
+   "nome": "Trecho dos votos",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Prometo escolher você\ntodos os dias.",
+    "autor": "Pedro, nos votos"
+   }
+  }
+ ]
+}

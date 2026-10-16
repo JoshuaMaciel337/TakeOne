@@ -1,0 +1,48 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Preço em oferta",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "O preço antigo é riscado, o novo salta grande e um selo de desconto gira no canto.",
+ "campos": [
+  {"id": "produto", "rotulo": "Produto", "tipo": "texto", "padrao": "Tênis Corrida Pro", "maximo": 32},
+  {"id": "de", "rotulo": "Preço antigo", "tipo": "texto", "padrao": "R$ 399", "maximo": 14},
+  {"id": "por", "rotulo": "Preço novo", "tipo": "texto", "padrao": "R$ 239", "maximo": 14},
+  {"id": "selo", "rotulo": "Selo", "tipo": "texto", "padrao": "-40%", "maximo": 6},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Oferta: o cartão sobe, o preço antigo aparece e é riscado na diagonal, o novo entra com salto e brilho
+     em degradê, e o selo redondo estala no canto girando de leve em laço. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:calc(var(--u)*3.6) calc(var(--u)*5);border-radius:calc(var(--u)*3);
+  background:rgba(14,15,20,.88);color:var(--cor-texto);text-align:center;min-width:calc(var(--u)*46);
+  animation:subir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.produto{font-weight:700;font-size:calc(var(--u)*3.6);opacity:.9;white-space:nowrap}
+.de{position:relative;display:inline-block;margin-top:calc(var(--u)*1.4);font-weight:600;font-size:calc(var(--u)*4);opacity:.55;animation:aparecer .4s ease-out .4s both}
+.de::after{content:"";position:absolute;left:-8%;right:-8%;top:50%;height:calc(var(--u)*.5);border-radius:9px;background:var(--cor-1);
+  transform:rotate(-12deg) scaleX(0);transform-origin:0 50%;animation:riscar .35s ease-out .9s forwards}
+.por{font-weight:900;font-size:calc(var(--u)*12);line-height:1;letter-spacing:-.04em;white-space:nowrap;
+  background:linear-gradient(110deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:saltar .7s cubic-bezier(.2,1.6,.4,1) 1.2s both}
+.selo{position:absolute;right:calc(var(--u)*-4);top:calc(var(--u)*-4);width:calc(var(--u)*12);height:calc(var(--u)*12);border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));color:#fff;font-weight:900;font-size:calc(var(--u)*3.6);
+  box-shadow:0 calc(var(--u)*.6) calc(var(--u)*2.4) rgba(0,0,0,.4);animation:estalo .55s cubic-bezier(.2,1.7,.4,1) 1.6s both,balanco 1.6s ease-in-out 2.2s infinite alternate}
+@keyframes subir{from{opacity:0;transform:translate(-50%,-40%)}}
+@keyframes aparecer{from{opacity:0}}
+@keyframes riscar{to{transform:rotate(-12deg) scaleX(1)}}
+@keyframes saltar{from{opacity:0;transform:scale(.4)}}
+@keyframes estalo{from{transform:scale(0) rotate(-90deg)}}
+@keyframes balanco{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-56%)}}
+</style>
+<div class="cartao">
+ <div class="produto">{{produto}}</div>
+ <div class="de">{{de}}</div>
+ <div class="por">{{por}}</div>
+ <div class="selo">{{selo}}</div>
+</div>

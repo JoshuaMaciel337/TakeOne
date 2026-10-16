@@ -1,0 +1,96 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Nomes do casal",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 6,
+ "descricao": "Dois nomes em letra cursiva com um & entre eles, um ornamento que se desenha dos dois lados e a data embaixo.",
+ "campos": [
+  {"id": "nome_1", "rotulo": "Primeiro nome", "tipo": "texto", "padrao": "Ana", "maximo": 18},
+  {"id": "nome_2", "rotulo": "Segundo nome", "tipo": "texto", "padrao": "Pedro", "maximo": 18},
+  {"id": "data", "rotulo": "Data", "tipo": "texto", "padrao": "12 · 09 · 2026", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Ornamento", "tipo": "cor", "padrao": "#e8c98f"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#c79a4b"},
+  {"id": "cor_texto", "rotulo": "Cor dos nomes", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Casal: o "&" grande aparece primeiro, dourado e transparente; os nomes entram dos lados com desfoque
+     que some; duas volutas (curvas de Bézier espelhadas) se desenham a partir do centro, embaixo, e a data
+     aparece com espaçamento largo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const voluta = (lado, k, x0, y0, s) => {
+    ctx.beginPath();
+    const pts = [];
+    for (let i = 0; i <= 60 * k; i++) {
+      const q = i / 60;
+      const x = x0 + lado * q * s;
+      const y = y0 + Math.sin(q * Math.PI * 2) * s * 0.06 * (1 - q * 0.4);
+      pts.push([x, y]);
+    }
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.stroke();
+    if (k >= 1) {
+      ctx.beginPath();
+      ctx.arc(x0 + lado * s, y0, s * 0.025, 0, 6.2832);
+      ctx.fill();
+    }
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.6, dur));
+    const cx = W / 2;
+    const cy = H / 2 - 3 * u;
+    ctx.globalAlpha = 1 - sai;
+    const amp = TO.ease.outCubic(TO.prog(t, 0, 1));
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(600, 26 * (0.8 + 0.2 * amp), "Caveat");
+    ctx.fillStyle = TO.rgba(C.cor_1, 0.35 * amp);
+    ctx.fillText("&", cx, cy);
+    const largura = Math.min(W * 0.4, 50 * u);
+    const tam = Math.min(TO.caber(ctx, C.nome_1, 600, 13, largura, "Caveat"), TO.caber(ctx, C.nome_2, 600, 13, largura, "Caveat"));
+    const vertical = H > W;
+    [[C.nome_1, -1, 0.4], [C.nome_2, 1, 0.7]].forEach(([nome, lado, atraso]) => {
+      const k = TO.ease.outCubic(TO.prog(t, atraso, atraso + 1));
+      ctx.save();
+      ctx.globalAlpha = (1 - sai) * k;
+      ctx.filter = k < 1 ? `blur(${(1 - k) * 1.2 * u}px)` : "none";
+      ctx.fillStyle = C.cor_texto;
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 2 * u;
+      ctx.font = TO.fonte(600, tam, "Caveat");
+      const x = vertical ? cx : cx + lado * (largura / 2 + 6 * u) + lado * (1 - k) * 4 * u;
+      const y = vertical ? cy + lado * 12 * u : cy;
+      ctx.fillText(nome, x, y);
+      ctx.restore();
+    });
+    const orn = TO.ease.inOutCubic(TO.prog(t, 1.4, 2.6));
+    if (orn > 0) {
+      ctx.strokeStyle = C.cor_1;
+      ctx.fillStyle = C.cor_1;
+      ctx.lineWidth = 0.3 * u;
+      const oy = cy + (vertical ? 22 * u : 12 * u);
+      const s = Math.min(W * 0.36, 36 * u);
+      ctx.beginPath();
+      ctx.arc(cx, oy, 0.7 * u * orn, 0, 6.2832);
+      ctx.fill();
+      voluta(-1, orn, cx - 2 * u, oy, s);
+      voluta(1, orn, cx + 2 * u, oy, s);
+    }
+    const data = TO.ease.outCubic(TO.prog(t, 2.2, 3));
+    ctx.globalAlpha = (1 - sai) * data;
+    ctx.fillStyle = C.cor_2;
+    ctx.font = TO.fonte(500, 3.2);
+    ctx.letterSpacing = `${0.6 * u * (1 + (1 - data))}px`;
+    ctx.fillText(C.data, cx, cy + (vertical ? 29 * u : 19 * u));
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

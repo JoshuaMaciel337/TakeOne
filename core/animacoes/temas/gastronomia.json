@@ -1,0 +1,112 @@
+{
+ "nome": "Gastronomia",
+ "ordem": 13,
+ "versoes": [
+  {
+   "modelo": "cardapio",
+   "id": "menu_do_dia",
+   "nome": "Menu do dia",
+   "padroes": {}
+  },
+  {
+   "modelo": "cardapio",
+   "id": "cardapio_cafe",
+   "nome": "Cardápio do café",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#a0673a",
+    "titulo": "Cafeteria",
+    "texto": "Espresso: R$ 7\nCappuccino: R$ 12\nPão de queijo: R$ 8\nBolo do dia: R$ 10"
+   }
+  },
+  {
+   "modelo": "cardapio",
+   "id": "cardapio_pizza",
+   "nome": "Cardápio de pizzaria",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "titulo": "Pizzas",
+    "texto": "Margherita: R$ 49\nCalabresa: R$ 52\nQuatro queijos: R$ 58\nPortuguesa: R$ 56"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "prato_promocao",
+   "nome": "Prato em promoção",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "produto": "Hambúrguer artesanal",
+    "de": "R$ 42",
+    "por": "R$ 29",
+    "selo": "-30%"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "receita",
+   "nome": "Receita passo a passo",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Modo de preparo",
+    "texto": "Bata os ovos com o açúcar\nJunte a farinha aos poucos\nLeve ao forno a 180 °C\nEspere esfriar e desenforme"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "ingredientes",
+   "nome": "Ingredientes",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Ingredientes",
+    "texto": "3 ovos\n2 xícaras de farinha\n1 xícara de açúcar\n1 colher de fermento"
+   }
+  },
+  {
+   "modelo": "local_pin",
+   "id": "restaurante",
+   "nome": "Endereço do restaurante",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Cantina da Nona",
+    "endereco": "Rua Itália, 45 · Bela Vista"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_aberto",
+   "nome": "Aberto agora",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "texto": "Aberto agora"
+   }
+  },
+  {
+   "modelo": "chamada_notificacao",
+   "id": "pedido_saiu",
+   "nome": "Pedido saiu",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "app": "Cantina da Nona",
+    "titulo": "Seu pedido saiu para entrega",
+    "mensagem": "Chega em 30 minutos",
+    "iniciais": "C"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_chef",
+   "nome": "Tarja de chef",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  }
+ ]
+}

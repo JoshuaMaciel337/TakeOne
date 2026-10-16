@@ -1,0 +1,132 @@
+{
+ "nome": "Aniversário",
+ "ordem": 3,
+ "versoes": [
+  {
+   "modelo": "baloes",
+   "id": "baloes_classico",
+   "nome": "Balões de aniversário",
+   "padroes": {}
+  },
+  {
+   "modelo": "baloes",
+   "id": "baloes_15_anos",
+   "nome": "Balões de 15 anos",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Meus 15 anos",
+    "nome": "Sofia"
+   }
+  },
+  {
+   "modelo": "baloes",
+   "id": "baloes_infantil",
+   "nome": "Balões infantil",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Parabéns!",
+    "nome": "Theo, 5 anos"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "confete_parabens",
+   "nome": "Confete de parabéns",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Parabéns!"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "confete_idade",
+   "nome": "Confete com a idade",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "30 anos!"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_festa",
+   "nome": "Contagem para a festa",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "de": "5",
+    "final": "PARABÉNS!"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "convite_aniversario",
+   "nome": "Convite de aniversário",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "dia": "09",
+    "mes": "NOV",
+    "titulo": "Aniversário da Laura",
+    "hora": "Sábado, 15h",
+    "local": "Salão Estrela"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_aniversario",
+   "nome": "Feliz aniversário em neon",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "texto": "Feliz aniversário"
+   }
+  },
+  {
+   "modelo": "fogos",
+   "id": "fogos_aniversario",
+   "nome": "Fogos de aniversário",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Parabéns, Laura!"
+   }
+  },
+  {
+   "modelo": "tarja_perfil",
+   "id": "aniversariante",
+   "nome": "Aniversariante",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "nome": "Laura Mendes",
+    "perfil": "aniversariante do dia",
+    "iniciais": "LM"
+   }
+  },
+  {
+   "modelo": "coracoes",
+   "id": "coracoes_aniversario",
+   "nome": "Corações de aniversário",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Feliz aniversário, vó"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "lista_festa",
+   "nome": "O que tem na festa",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Na festa vai ter",
+    "texto": "Bolo de chocolate\nPula-pula\nMúsica ao vivo\nLembrancinhas"
+   }
+  }
+ ]
+}

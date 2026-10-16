@@ -11,6 +11,10 @@
 # No HTML do modelo: {{campo}} é o texto escapado; {{campo:palavras}}, {{campo:linhas}} e {{campo:letras}}
 # viram spans com --i (para entrar em sequência); {{base}} é a pasta dos arquivos comuns (comum.js, vendor/).
 # A página ganha window.CAMPOS, window.QUADRO ({largura, altura, u}) e window.DURACAO.
+#
+# Temas (core/animacoes/temas/<tema>.json: igreja, casamento, podcast...) são versões prontas de um desenho:
+# o mesmo HTML com outros textos, cores e duração. Cada versão vira um modelo "<tema>-<id>" na biblioteca,
+# com a miniatura própria; o desenho continua um só.
 # -----------------------------------------------
 import html
 import json
@@ -56,6 +60,7 @@ ARQUIVOS_COMUNS = re.compile(r"(comum\.js|vendor/[\w.-]+\.js)")
 
 _COR = re.compile(r"#[0-9a-fA-F]{6}")
 _CAMPO = re.compile(r"\{\{(\w+)(?::(palavras|linhas|letras))?\}\}")
+_ID = re.compile(r"[a-z0-9_]+")
 _DADOS = re.compile(r'<script type="application/json" id="modelo">(.*?)</script>\s*', re.S)
 
 
@@ -63,8 +68,8 @@ class ErroAnimacao(ValueError):
     """Campo inválido: a mensagem vai para a pessoa."""
 
 
-def _carregar() -> dict:
-    """Lê todos os modelos de core/animacoes. Um arquivo mal formado é erro de programação: falha alto."""
+def _carregar_desenhos() -> dict:
+    """Lê os desenhos de core/animacoes. Um arquivo mal formado é erro de programação: falha alto."""
     modelos = {}
     for arquivo in sorted(PASTA_MODELOS.glob("*.html")):
         texto = arquivo.read_text(encoding="utf-8")
@@ -89,12 +94,51 @@ def _carregar() -> dict:
             # Modelos que cobrem o quadro todo (fundos, vinhetas): a conferência das bordas não vale para eles
             "tela_cheia": bool(dados.get("tela_cheia", False)),
             "corpo": _DADOS.sub("", texto, count=1),
+            "desenho": arquivo.stem, "temas": [],
         }
     return modelos
 
 
-# id → modelo, lido dos arquivos uma vez, na importação
-MODELOS = _carregar()
+def _carregar_temas(desenhos: dict) -> tuple[dict, dict]:
+    """Os temas e as versões de cada um. Devolve (id do tema → nome, id da versão → modelo)."""
+    temas, versoes = {}, {}
+    arquivos = sorted((PASTA_MODELOS / "temas").glob("*.json"),
+                      key=lambda a: (json.loads(a.read_text(encoding="utf-8")).get("ordem", 99), a.stem))
+    for arquivo in arquivos:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        tema = arquivo.stem
+        if not _ID.fullmatch(tema) or "nome" not in dados:
+            raise ValueError(f"temas/{arquivo.name}: id ou nome do tema inválido")
+        temas[tema] = dados["nome"]
+        for versao in dados.get("versoes", []):
+            desenho = desenhos.get(versao.get("modelo"))
+            chave = f"{tema}-{versao.get('id', '')}"
+            if desenho is None or not _ID.fullmatch(versao.get("id", "")) or "nome" not in versao:
+                raise ValueError(f"temas/{arquivo.name}: versão {chave} sem nome ou com modelo desconhecido")
+            if chave in versoes:
+                raise ValueError(f"temas/{arquivo.name}: versão {chave} repetida")
+            padroes = versao.get("padroes", {})
+            ids = {c[0] for c in desenho["campos"]}
+            if sobra := set(padroes) - ids:
+                raise ValueError(f"temas/{arquivo.name}: {chave} muda campos que o modelo não tem: {sobra}")
+            versoes[chave] = {
+                **desenho, "nome": versao["nome"], "descricao": versao.get("descricao", desenho["descricao"]),
+                "duracao": float(versao.get("duracao", desenho["duracao"])), "temas": [tema],
+                "campos": [(c, r, t, str(padroes.get(c, p)), x) for c, r, t, p, x in desenho["campos"]],
+            }
+    return temas, versoes
+
+
+def _carregar() -> tuple[dict, dict]:
+    desenhos = _carregar_desenhos()
+    temas, versoes = _carregar_temas(desenhos)
+    return {**desenhos, **versoes}, temas
+
+
+# id → modelo (os desenhos e as versões dos temas) e id → nome do tema, lidos uma vez, na importação
+MODELOS, TEMAS = _carregar()
+# Só os desenhos: o que o LLM escolhe no "Descreva a animação" (as versões mudam só os valores de partida)
+DESENHOS = {chave: m for chave, m in MODELOS.items() if chave == m["desenho"]}
 
 
 def lista_de_modelos() -> list[dict]:
@@ -102,6 +146,7 @@ def lista_de_modelos() -> list[dict]:
     ordem = list(CATEGORIAS)
     return [{"id": chave, "nome": m["nome"], "descricao": m["descricao"], "duracao": m["duracao"],
              "categoria": m["categoria"], "nome_da_categoria": CATEGORIAS[m["categoria"]],
+             "temas": [{"id": t, "nome": TEMAS[t]} for t in m["temas"]],
              "campos": [{"id": c, "rotulo": r, "tipo": t, "padrao": p, "maximo": x} for c, r, t, p, x in m["campos"]]}
             for chave, m in sorted(MODELOS.items(), key=lambda par: (ordem.index(par[1]["categoria"]), par[1]["nome"]))]
 

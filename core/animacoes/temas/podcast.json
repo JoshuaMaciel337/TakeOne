@@ -1,0 +1,134 @@
+{
+ "nome": "Podcast e entrevista",
+ "ordem": 7,
+ "versoes": [
+  {
+   "modelo": "podcast_onda",
+   "id": "episodio_onda",
+   "nome": "Episódio com onda",
+   "padroes": {}
+  },
+  {
+   "modelo": "podcast_onda",
+   "id": "episodio_onda_roxo",
+   "nome": "Episódio com onda, roxo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "episodio": "EP. 108",
+    "titulo": "Saúde mental no trabalho",
+    "convidado": "com Dra. Helena Costa"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "convidado",
+   "nome": "Convidado",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "apresentador",
+   "nome": "Apresentador",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "etiqueta": "Apresentador",
+    "nome": "Lucas Martins",
+    "funcao": "Podcast Conversa Boa"
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_entrevistado",
+   "nome": "Entrevistado",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "nome": "Dra. Helena Costa",
+    "funcao": "Psicóloga e autora"
+   }
+  },
+  {
+   "modelo": "titulo_glitch",
+   "id": "glitch_episodio",
+   "nome": "Novo episódio",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "vinheta_intro",
+   "id": "vinheta_podcast",
+   "nome": "Abertura do podcast",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "EPISÓDIO 12",
+    "subtitulo": "Como começar do zero"
+   }
+  },
+  {
+   "modelo": "citacao_post",
+   "id": "frase_do_episodio",
+   "nome": "Frase do episódio",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "nome": "Conversa Boa",
+    "usuario": "@conversaboa",
+    "texto": "Ninguém fica pronto antes de começar. A gente fica pronto começando.",
+    "curtidas": "3,2 mil"
+   }
+  },
+  {
+   "modelo": "frase_marcador",
+   "id": "marca_texto_podcast",
+   "nome": "Frase com destaque",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "antes": "O que muda o jogo é",
+    "destaque": "a consistência",
+    "depois": ""
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "podcast_ao_vivo",
+   "nome": "Podcast ao vivo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Conversa Boa",
+    "detalhe": "Episódio 109 · ao vivo"
+   }
+  },
+  {
+   "modelo": "chamada_seguir",
+   "id": "seguir_podcast",
+   "nome": "Siga o podcast",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Seguir",
+    "chamada": "Novo episódio toda terça"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "pauta_episodio",
+   "nome": "Pauta do episódio",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Neste episódio",
+    "texto": "Como tudo começou\nO primeiro grande erro\nO que aprendemos\nPerguntas do público"
+   }
+  }
+ ]
+}

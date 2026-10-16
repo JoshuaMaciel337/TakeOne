@@ -1,0 +1,151 @@
+{
+ "nome": "Festas e eventos",
+ "ordem": 4,
+ "versoes": [
+  {
+   "modelo": "ingresso",
+   "id": "ingresso_show",
+   "nome": "Ingresso de show",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "ingresso_festa",
+   "nome": "Ingresso de festa",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "Festa do Branco",
+    "data": "31 DEZ · 22H",
+    "local": "Clube Náutico",
+    "canhoto": "PISTA"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "ingresso_formatura",
+   "nome": "Ingresso de formatura",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Formatura 2026",
+    "data": "18 DEZ · 20H",
+    "local": "Espaço Villa",
+    "canhoto": "MESA 12"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "evento_show",
+   "nome": "Show",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "dia": "15",
+    "mes": "NOV",
+    "titulo": "Show de Verão",
+    "hora": "Sábado, 21h",
+    "local": "Arena Central"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "evento_workshop",
+   "nome": "Workshop",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "dia": "22",
+    "mes": "OUT",
+    "titulo": "Workshop de fotografia",
+    "hora": "Quarta, 19h",
+    "local": "Online e gratuito"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_evento",
+   "nome": "Contagem para o evento",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "de": "10",
+    "final": "COMEÇOU!"
+   }
+  },
+  {
+   "modelo": "grade_retro",
+   "id": "festa_anos_80",
+   "nome": "Festa anos 80",
+   "padroes": {
+    "titulo": "FESTA ANOS 80"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_open_bar",
+   "nome": "Neon da festa",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Hoje tem festa"
+   }
+  },
+  {
+   "modelo": "fogos",
+   "id": "fogos_evento",
+   "nome": "Fogos de abertura",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Começou!"
+   }
+  },
+  {
+   "modelo": "confete",
+   "id": "confete_evento",
+   "nome": "Confete de comemoração",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Bem-vindos!"
+   }
+  },
+  {
+   "modelo": "local_pin",
+   "id": "local_evento",
+   "nome": "Local do evento",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Arena Central",
+    "endereco": "Av. das Nações, 1500 · Centro"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "programacao",
+   "nome": "Programação",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Programação",
+    "texto": "19h · Abertura dos portões\n20h · Banda de abertura\n21h30 · Show principal\n23h · Pista com DJ"
+   }
+  },
+  {
+   "modelo": "ao_vivo",
+   "id": "evento_ao_vivo",
+   "nome": "Evento ao vivo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Festival de Verão",
+    "detalhe": "Palco principal"
+   }
+  }
+ ]
+}

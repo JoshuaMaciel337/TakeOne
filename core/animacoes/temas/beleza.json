@@ -1,0 +1,100 @@
+{
+ "nome": "Beleza e moda",
+ "ordem": 17,
+ "versoes": [
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_beleza",
+   "nome": "Antes e depois",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "cabelo ressecado",
+    "rotulo_depois": "após 1 sessão"
+   }
+  },
+  {
+   "modelo": "tarja_perfil",
+   "id": "tarja_maquiadora",
+   "nome": "Maquiadora",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "nome": "Bia Santos",
+    "perfil": "@biamakeup",
+    "iniciais": "BS"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "rotina_skincare",
+   "nome": "Rotina de cuidados",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Rotina da noite",
+    "texto": "Limpeza suave\nTônico\nSérum\nHidratante"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "preco_beleza",
+   "nome": "Preço do procedimento",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "produto": "Design de sobrancelha",
+    "de": "R$ 80",
+    "por": "R$ 55",
+    "selo": "-30%"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_beleza",
+   "nome": "Neon do salão",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Agenda aberta"
+   }
+  },
+  {
+   "modelo": "produto_revelacao",
+   "id": "colecao_moda",
+   "nome": "Nova coleção de moda",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "selo": "COLEÇÃO",
+    "titulo": "Verão Rosa",
+    "detalhe": "já disponível na loja"
+   }
+  },
+  {
+   "modelo": "chamada_comente",
+   "id": "comente_agendar",
+   "nome": "Comente para agendar",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Comente",
+    "palavra": "AGENDA",
+    "subtitulo": "que eu te chamo no direct"
+   }
+  },
+  {
+   "modelo": "assinatura",
+   "id": "assinatura_estilista",
+   "nome": "Assinatura da estilista",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Carolina Reis",
+    "cargo": "estilista"
+   }
+  }
+ ]
+}

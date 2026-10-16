@@ -1,0 +1,157 @@
+{
+ "nome": "Promoções e ofertas",
+ "ordem": 6,
+ "versoes": [
+  {
+   "modelo": "faixa_oferta",
+   "id": "fitas_black_friday",
+   "nome": "Black Friday",
+   "padroes": {}
+  },
+  {
+   "modelo": "faixa_oferta",
+   "id": "fitas_queima",
+   "nome": "Queima de estoque",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#14151b",
+    "cor_texto": "#ff3b3b",
+    "texto": "QUEIMA DE ESTOQUE",
+    "texto_2": "TUDO COM DESCONTO"
+   }
+  },
+  {
+   "modelo": "faixa_oferta",
+   "id": "fitas_liquidacao",
+   "nome": "Liquidação",
+   "padroes": {
+    "cor_1": "#ffffff",
+    "cor_2": "#ff3478",
+    "cor_texto": "#ffffff",
+    "texto": "LIQUIDAÇÃO",
+    "texto_2": "SÓ ESTA SEMANA"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "preco_tenis",
+   "nome": "Preço em oferta",
+   "padroes": {}
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "preco_black",
+   "nome": "Preço de Black Friday",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "produto": "Fone sem fio",
+    "de": "R$ 299",
+    "por": "R$ 149",
+    "selo": "-50%"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_primeira",
+   "nome": "Cupom de primeira compra",
+   "padroes": {}
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_frete",
+   "nome": "Cupom de frete grátis",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "desconto": "FRETE",
+    "texto": "grátis em todo o site",
+    "codigo": "FRETE0"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_black",
+   "nome": "Cupom de Black Friday",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "desconto": "30% OFF",
+    "texto": "só na Black Friday",
+    "codigo": "BLACK30"
+   }
+  },
+  {
+   "modelo": "titulo_contorno",
+   "id": "contorno_promocao",
+   "nome": "Promoção",
+   "padroes": {}
+  },
+  {
+   "modelo": "titulo_contorno",
+   "id": "contorno_ultimo_dia",
+   "nome": "Último dia",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "texto": "ÚLTIMO DIA",
+    "subtitulo": "a oferta acaba hoje"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_desconto",
+   "nome": "Desconto que sobe",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "valor": "70",
+    "prefixo": "até",
+    "sufixo": "%",
+    "legenda": "de desconto"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_oferta",
+   "nome": "Oferta relâmpago",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "de": "3",
+    "final": "CORRE!"
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "impacto_oferta",
+   "nome": "Oferta imperdível",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "texto": "Oferta imperdível"
+   }
+  },
+  {
+   "modelo": "chamada_comente",
+   "id": "comente_eu_quero",
+   "nome": "Comente e ganhe",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "palavra": "EU QUERO",
+    "subtitulo": "que eu te mando o cupom"
+   }
+  },
+  {
+   "modelo": "cta",
+   "id": "cta_compre_agora",
+   "nome": "Compre agora",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "texto": "Compre agora pelo site"
+   }
+  }
+ ]
+}

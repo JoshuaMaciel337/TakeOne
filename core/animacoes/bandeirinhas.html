@@ -1,0 +1,91 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Bandeirinhas",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Varais de bandeirinhas coloridas descem no alto da tela e balançam com o vento, com um título embaixo.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Arraiá do Bairro", "maximo": 28},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "sábado, a partir das 18h", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Bandeira 1", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Bandeira 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Bandeirinhas: dois varais em catenária (parábola) atravessam o topo; as bandeiras (com o recorte em V
+     embaixo) penduram nos pontos do fio, entram caindo uma a uma e giram de leve com um vento senoidal que
+     passa da esquerda para a direita. O título entra com mola. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const cores = [C.cor_1, "#ffd166", "#35d3a1", "#6bd8f2", C.cor_2, "#9b8cff"];
+  const varais = [{ y: 0.06, flecha: 0.09, n: 16 }, { y: 0.02, flecha: 0.17, n: 18 }];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    varais.forEach((v, vi) => {
+      const fio = (q) => H * v.y + 4 * H * v.flecha * q * (1 - q);
+      ctx.globalAlpha = fim;
+      ctx.strokeStyle = "rgba(255,255,255,.7)";
+      ctx.lineWidth = 0.2 * u;
+      ctx.beginPath();
+      for (let k = 0; k <= 40; k++) {
+        const q = k / 40;
+        const x = -2 * u + q * (W + 4 * u);
+        if (k) ctx.lineTo(x, fio(q));
+        else ctx.moveTo(x, fio(q));
+      }
+      ctx.stroke();
+      const bw = Math.min(7 * u, (W / v.n) * 0.8);
+      for (let i = 0; i < v.n; i++) {
+        const q = (i + 0.5) / v.n;
+        const x = -2 * u + q * (W + 4 * u);
+        const y = fio(q);
+        const queda = TO.spring(t - 0.1 - i * 0.05 - vi * 0.25, 0.45, 2.4);
+        if (queda <= 0) continue;
+        const vento = Math.sin(t * 2.4 - q * 6 + vi) * 0.18;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(vento);
+        ctx.scale(1, queda);
+        ctx.fillStyle = cores[(i + vi * 2) % cores.length];
+        ctx.beginPath();
+        ctx.moveTo(-bw / 2, 0);
+        ctx.lineTo(bw / 2, 0);
+        ctx.lineTo(bw / 2, bw * 1.3);
+        ctx.lineTo(0, bw * 0.95);
+        ctx.lineTo(-bw / 2, bw * 1.3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+    const k = TO.spring(t - 0.8, 0.5, 2);
+    ctx.globalAlpha = fim * TO.clamp(k);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.56);
+    ctx.scale(k, k);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,.5)";
+    ctx.shadowBlur = 2.5 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84, "Montserrat"), "Montserrat");
+    ctx.fillText(C.titulo, 0, 0);
+    ctx.restore();
+    const d = TO.ease.outCubic(TO.prog(t, 1.4, 2));
+    ctx.globalAlpha = fim * d;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.font = TO.fonte(600, Math.min(3.8, TO.caber(ctx, C.detalhe, 600, 3.8, W * 0.8)));
+    ctx.fillText(C.detalhe, W / 2, H * 0.56 + 10 * u + (1 - d) * 2 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

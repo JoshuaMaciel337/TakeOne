@@ -1,0 +1,100 @@
+{
+ "nome": "Música",
+ "ordem": 12,
+ "versoes": [
+  {
+   "modelo": "tocando_agora",
+   "id": "tocando_agora",
+   "nome": "Tocando agora",
+   "padroes": {}
+  },
+  {
+   "modelo": "tocando_agora",
+   "id": "tocando_louvor",
+   "nome": "Louvor tocando",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "faixa": "Grande é o Senhor",
+    "artista": "Ministério Vida Nova"
+   }
+  },
+  {
+   "modelo": "tocando_agora",
+   "id": "tocando_roxo",
+   "nome": "Tocando agora, roxo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "faixa": "Luzes da Cidade",
+    "artista": "DJ Nova"
+   }
+  },
+  {
+   "modelo": "grade_retro",
+   "id": "retro_synth",
+   "nome": "Noite synth",
+   "padroes": {
+    "titulo": "SYNTH NIGHT"
+   }
+  },
+  {
+   "modelo": "titulo_neon",
+   "id": "neon_ao_vivo",
+   "nome": "Música ao vivo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Música ao vivo"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "ingresso_turne",
+   "nome": "Ingresso da turnê",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Turnê Horizonte",
+    "data": "02 DEZ · 22H",
+    "local": "Casa de Shows Lume",
+    "canhoto": "PISTA"
+   }
+  },
+  {
+   "modelo": "tarja_moderna",
+   "id": "tarja_musico",
+   "nome": "Tarja de músico",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "etiqueta": "No violão",
+    "nome": "Daniel Rocha",
+    "funcao": "Banda Horizonte"
+   }
+  },
+  {
+   "modelo": "fundo_ondas",
+   "id": "ondas_lancamento_musica",
+   "nome": "Lançamento de música",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Single novo"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "contador_streams",
+   "nome": "Reproduções",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "valor": "1",
+    "prefixo": "+",
+    "sufixo": "milhão",
+    "legenda": "de reproduções"
+   }
+  }
+ ]
+}

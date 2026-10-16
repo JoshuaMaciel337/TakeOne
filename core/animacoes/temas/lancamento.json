@@ -1,0 +1,134 @@
+{
+ "nome": "Lançamento de produto",
+ "ordem": 5,
+ "versoes": [
+  {
+   "modelo": "produto_revelacao",
+   "id": "revelacao_produto",
+   "nome": "Revelação do produto",
+   "padroes": {}
+  },
+  {
+   "modelo": "produto_revelacao",
+   "id": "revelacao_app",
+   "nome": "Revelação do app",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "selo": "NOVO APP",
+    "titulo": "Agenda Fácil",
+    "detalhe": "disponível para Android e iPhone"
+   }
+  },
+  {
+   "modelo": "produto_revelacao",
+   "id": "revelacao_colecao",
+   "nome": "Nova coleção",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "selo": "COLEÇÃO",
+    "titulo": "Outono 2027",
+    "detalhe": "nas lojas a partir de 10 de março"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_lancamento",
+   "nome": "Contagem do lançamento",
+   "padroes": {
+    "de": "5",
+    "final": "DISPONÍVEL!"
+   }
+  },
+  {
+   "modelo": "selo_giratorio",
+   "id": "selo_novidade",
+   "nome": "Selo de novidade",
+   "padroes": {}
+  },
+  {
+   "modelo": "selo_giratorio",
+   "id": "selo_edicao_limitada",
+   "nome": "Selo de edição limitada",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "circular": "EDIÇÃO LIMITADA • SÓ 100 UNIDADES •",
+    "centro": "100"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "recursos_produto",
+   "nome": "Recursos do produto",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "O que tem de novo",
+    "texto": "Bateria para 2 dias\nTela 30% maior\nCarregamento rápido\nResistente à água"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_produto",
+   "nome": "Antes e depois do produto",
+   "padroes": {
+    "antes": "2 horas",
+    "depois": "10 min",
+    "rotulo_antes": "do jeito antigo",
+    "rotulo_depois": "com o novo app"
+   }
+  },
+  {
+   "modelo": "vinheta_intro",
+   "id": "vinheta_lancamento",
+   "nome": "Abertura do lançamento",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "LANÇAMENTO",
+    "subtitulo": "Conheça o que preparamos para você"
+   }
+  },
+  {
+   "modelo": "cartao_3d",
+   "id": "cartao_produto",
+   "nome": "Cartão 3D do produto",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "Aurora X",
+    "subtitulo": "O próximo passo chegou"
+   }
+  },
+  {
+   "modelo": "chamada_link_bio",
+   "id": "pre_venda",
+   "nome": "Pré-venda",
+   "padroes": {
+    "texto": "Pré-venda aberta",
+    "subtitulo": "link na bio"
+   }
+  },
+  {
+   "modelo": "titulo_glitch",
+   "id": "glitch_lancamento",
+   "nome": "Chegou",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "CHEGOU"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "anel_pre_venda",
+   "nome": "Pré-venda esgotando",
+   "padroes": {
+    "valor": "92",
+    "legenda": "do primeiro lote já foi vendido"
+   }
+  }
+ ]
+}

@@ -1,0 +1,43 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Reserve a data",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Um convite elegante: moldura dupla que se desenha, a chamada em letra cursiva, a data grande e o local.",
+ "campos": [
+  {"id": "chamada", "rotulo": "Chamada", "tipo": "texto", "padrao": "Reserve a data", "maximo": 26},
+  {"id": "data", "rotulo": "Data", "tipo": "texto", "padrao": "12.09.26", "maximo": 16},
+  {"id": "detalhe", "rotulo": "Detalhe", "tipo": "texto", "padrao": "Ana & Pedro · Campinas", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Moldura", "tipo": "cor", "padrao": "#e8c98f"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#c79a4b"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Convite: as duas molduras são SVG com pathLength=100 e se desenham (dashoffset) em sentidos opostos;
+     a chamada em Caveat aparece com desfoque, a data em Montserrat com espaçamento que fecha, e o detalhe por
+     último. O fundo é escuro e translúcido, para ler sobre qualquer vídeo. -->
+<style>
+.convite{position:absolute;left:50%;top:50%;width:calc(var(--u)*70);height:calc(var(--u)*52);transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.4);color:var(--cor-texto);text-align:center;
+  background:rgba(12,12,16,.72);border-radius:calc(var(--u)*1);animation:aparecer .8s ease-out both,sair .6s ease-in calc(var(--dur) - .6s) forwards}
+.convite svg{position:absolute;inset:0;width:100%;height:100%;fill:none;overflow:visible}
+.convite rect{stroke:var(--cor-1);stroke-dasharray:100;stroke-dashoffset:100;animation:desenhar 1.6s cubic-bezier(.65,0,.35,1) .2s forwards}
+.convite .dentro{stroke-width:.25;animation-delay:.5s;animation-direction:reverse;stroke-dashoffset:0;animation-name:desenhar-inverso}
+.chamada{font-family:Caveat,cursive;font-weight:600;font-size:calc(var(--u)*7.4);color:var(--cor-1);animation:foco 1s ease-out 1s both}
+.data{font-family:Montserrat,sans-serif;font-weight:900;font-size:calc(var(--u)*10);line-height:1;animation:fechar 1.2s cubic-bezier(.2,.8,.2,1) 1.4s both}
+.detalhe{font-weight:500;font-size:calc(var(--u)*2.8);letter-spacing:.16em;text-transform:uppercase;color:var(--cor-2);animation:aparecer .8s ease-out 2.2s both}
+@keyframes aparecer{from{opacity:0}}
+@keyframes desenhar{to{stroke-dashoffset:0}}
+@keyframes desenhar-inverso{from{stroke-dashoffset:-100}to{stroke-dashoffset:0}}
+@keyframes foco{from{opacity:0;filter:blur(calc(var(--u)*1))}}
+@keyframes fechar{from{opacity:0;letter-spacing:.4em}to{letter-spacing:.04em}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.97)}}
+</style>
+<div class="convite">
+ <svg viewBox="0 0 70 52" preserveAspectRatio="none"><rect x="1.5" y="1.5" width="67" height="49" stroke-width=".4" pathLength="100"/><rect class="dentro" x="3.2" y="3.2" width="63.6" height="45.6" pathLength="100"/></svg>
+ <div class="chamada">{{chamada}}</div>
+ <div class="data">{{data}}</div>
+ <div class="detalhe">{{detalhe}}</div>
+</div>

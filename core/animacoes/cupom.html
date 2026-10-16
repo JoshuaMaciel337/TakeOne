@@ -1,0 +1,55 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cupom de desconto",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um cupom com picote: o desconto grande de um lado e o código para copiar do outro, com uma tesoura passando.",
+ "campos": [
+  {"id": "desconto", "rotulo": "Desconto", "tipo": "texto", "padrao": "15% OFF", "maximo": 10},
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "na primeira compra", "maximo": 30},
+  {"id": "codigo", "rotulo": "Código", "tipo": "texto", "padrao": "BEMVINDO15", "maximo": 16},
+  {"id": "cor_1", "rotulo": "Cupom (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Cupom (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Cupom: o ticket (com os dois recortes redondos feitos por máscara radial) entra girando de leve; o
+     picote se desenha de cima para baixo com uma tesoura descendo junto, e o código pisca uma vez como
+     se fosse copiado. -->
+<style>
+.tela{position:absolute;inset:0;display:grid;place-items:center}
+/* Em pé o cupom deitado não cabe no tamanho cheio: encolhe tudo junto */
+@media (max-aspect-ratio:1/1){.cupom{zoom:.74}}
+.cupom{display:flex;align-items:stretch;color:#fff;
+  filter:drop-shadow(0 calc(var(--u)*1.04) calc(var(--u)*3.12) rgba(0,0,0,.45));
+  animation:entrar .7s cubic-bezier(.2,1.3,.4,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.lado{background:linear-gradient(120deg,var(--cor-1),var(--cor-2));padding:calc(var(--u)*4.42) calc(var(--u)*5.2)}
+.esq{border-radius:calc(var(--u)*3.12) 0 0 calc(var(--u)*3.12);
+  -webkit-mask:radial-gradient(circle calc(var(--u)*2.6) at 100% 0,transparent 98%,#000) top/100% 51% no-repeat,radial-gradient(circle calc(var(--u)*2.6) at 100% 100%,transparent 98%,#000) bottom/100% 51% no-repeat;
+  mask:radial-gradient(circle calc(var(--u)*2.6) at 100% 0,transparent 98%,#000) top/100% 51% no-repeat,radial-gradient(circle calc(var(--u)*2.6) at 100% 100%,transparent 98%,#000) bottom/100% 51% no-repeat}
+.dir{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:calc(var(--u)*1.04);border-radius:0 calc(var(--u)*3.12) calc(var(--u)*3.12) 0;
+  background:rgba(18,19,25,.94);color:var(--cor-texto);
+  -webkit-mask:radial-gradient(circle calc(var(--u)*2.6) at 0 0,transparent 98%,#000) top/100% 51% no-repeat,radial-gradient(circle calc(var(--u)*2.6) at 0 100%,transparent 98%,#000) bottom/100% 51% no-repeat;
+  mask:radial-gradient(circle calc(var(--u)*2.6) at 0 0,transparent 98%,#000) top/100% 51% no-repeat,radial-gradient(circle calc(var(--u)*2.6) at 0 100%,transparent 98%,#000) bottom/100% 51% no-repeat}
+.dir::before{content:"";position:absolute;left:0;top:calc(var(--u)*3.38);bottom:calc(var(--u)*3.38);border-left:calc(var(--u)*0.45) dashed rgba(255,255,255,.4);
+  transform-origin:50% 0;animation:picote .8s linear .6s both}
+.desconto{font-weight:900;font-size:calc(var(--u)*10.92);line-height:1;letter-spacing:-.03em;white-space:nowrap}
+.texto{margin-top:calc(var(--u)*1.04);font-weight:600;font-size:calc(var(--u)*3.64);opacity:.92;white-space:nowrap}
+.rotulo{font-weight:600;font-size:calc(var(--u)*2.86);letter-spacing:.14em;opacity:.6}
+.codigo{padding:calc(var(--u)*1.3) calc(var(--u)*2.6);border:calc(var(--u)*0.39) dashed var(--cor-1);border-radius:calc(var(--u)*1.56);font-weight:800;
+  font-size:calc(var(--u)*4.68);letter-spacing:.08em;white-space:nowrap;animation:copiar .5s ease-out 1.8s both}
+.tesoura{position:absolute;left:calc(var(--u)*-2.6);top:calc(var(--u)*1.3);width:calc(var(--u)*5.2);height:calc(var(--u)*5.2);fill:none;stroke:#fff;stroke-width:2;
+  animation:descer .8s linear .6s both}
+@keyframes entrar{from{opacity:0;transform:rotate(-6deg) scale(.7)}}
+@keyframes picote{from{transform:scaleY(0)}}
+@keyframes descer{from{transform:translateY(0);opacity:1}90%{opacity:1}to{transform:translateY(calc(var(--u)*18.2));opacity:0}}
+@keyframes copiar{0%{background:transparent}40%{background:color-mix(in srgb,var(--cor-1) 40%,transparent)}100%{background:transparent}}
+@keyframes sair{to{opacity:0;transform:scale(.9)}}
+</style>
+<div class="tela"><div class="cupom">
+ <div class="lado esq"><div class="desconto">{{desconto}}</div><div class="texto">{{texto}}</div></div>
+ <div class="lado dir"><div class="rotulo">USE O CÓDIGO</div><div class="codigo">{{codigo}}</div>
+  <svg class="tesoura" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 20 20M8.1 15.9 20 4"/></svg></div>
+</div></div>

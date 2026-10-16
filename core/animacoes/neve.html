@@ -1,0 +1,67 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Neve caindo",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Flocos de neve em três camadas de profundidade caem devagar sobre o vídeo, com um título que brilha no centro.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Feliz Natal", "maximo": 30},
+  {"id": "subtitulo", "rotulo": "Subtítulo (opcional)", "tipo": "texto", "padrao": "e um próspero Ano Novo", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Brilho do título", "tipo": "cor", "padrao": "#ffd79a"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#e63946"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Neve: 240 flocos em três camadas (os de trás menores, mais lentos e apagados); a posição volta ao topo
+     pelo resto da divisão, então a neve não acaba. Cada floco balança de lado. O título acende com brilho
+     e o subtítulo sobe. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 240;
+  const flocos = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(900 + i);
+    const camada = i % 3;
+    return { x: r(), y: r(), camada, tam: (0.25 + r() * 0.3) * (1 + camada * 0.8), vel: (0.05 + r() * 0.04) * (1 + camada * 0.7), fase: r() * 6.28 };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.6, 0.6, dur);
+    ctx.fillStyle = "#fff";
+    for (const f of flocos) {
+      const y = ((f.y + t * f.vel) % 1.08) - 0.04;
+      const x = f.x * W + Math.sin(t * 0.9 + f.fase) * 1.4 * u * (1 + f.camada);
+      ctx.globalAlpha = env * (0.35 + f.camada * 0.25);
+      ctx.beginPath();
+      ctx.arc(x, y * H, f.tam * u, 0, 6.2832);
+      ctx.fill();
+    }
+    if (C.titulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 0.5, 1.5));
+      ctx.globalAlpha = env * k;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = C.cor_texto;
+      ctx.shadowColor = C.cor_1;
+      ctx.shadowBlur = (2 + 1.5 * Math.sin(t * 2)) * u;
+      ctx.font = TO.fonte(600, TO.caber(ctx, C.titulo, 600, 15, W * 0.84, "Caveat"), "Caveat");
+      ctx.fillText(C.titulo, W / 2, H / 2 - 2 * u + (1 - k) * 2 * u);
+      ctx.shadowBlur = 0;
+    }
+    if (C.subtitulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 1.2, 2));
+      ctx.globalAlpha = env * k * 0.9;
+      ctx.fillStyle = C.cor_texto;
+      ctx.font = TO.fonte(500, Math.min(3.8, TO.caber(ctx, C.subtitulo, 500, 3.8, W * 0.8)));
+      ctx.fillText(C.subtitulo, W / 2, H / 2 + 9 * u + (1 - k) * 2 * u);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>
