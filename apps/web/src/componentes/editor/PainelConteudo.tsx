@@ -10,6 +10,7 @@ import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
+import type { Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
@@ -35,8 +36,8 @@ type Props = {
   aoSelecionarMidia: (midiaId: string | null) => void;
   aoAdicionarMidia: (midiaId: string) => void;
   aoAdicionarTexto: (texto: Texto) => void;
-  /** Uma animação foi pedida: entra no cursor quando ficar pronta. */
-  aoPedirAnimacao: (midia: Midia) => void;
+  /** Uma animação foi pedida: entra no cursor (ou no instante dado) quando ficar pronta. */
+  aoPedirAnimacao: (midia: Midia, inicio?: Tick) => void;
   legendas: PropsLegendas;
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
@@ -146,7 +147,14 @@ export function PainelConteudo({
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
         ) : ferramenta.id === "transcricao" ? (
-          <PainelTranscricao projeto={legendas.projeto} tempo={legendas.tempo} aoExecutar={legendas.aoExecutar} aoBuscar={legendas.aoBuscar} aoAvisar={legendas.aoAvisar} />
+          <PainelTranscricao
+            projeto={legendas.projeto}
+            tempo={legendas.tempo}
+            aoExecutar={legendas.aoExecutar}
+            aoBuscar={legendas.aoBuscar}
+            aoAvisar={legendas.aoAvisar}
+            aoPedirAnimacao={aoPedirAnimacao}
+          />
         ) : ferramenta.id === "transicoes" ? (
           <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "efeitos" ? (

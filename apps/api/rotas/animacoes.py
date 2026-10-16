@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse, HTMLResponse
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import AnimacaoEntrada, MidiaSaida
+from api.esquemas import AnimacaoHtmlEntrada, MidiaSaida
 from api.rotas.midias import para_saida
 from core.modelos.animacao_html import (
     DURACAO_MAXIMA,
@@ -81,7 +81,7 @@ async def fonte(nome: str):
 
 
 @router.post("", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
-async def gravar(dados: AnimacaoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def gravar(dados: AnimacaoHtmlEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Põe na fila a gravação da animação. A mídia já entra na biblioteca, processando."""
     try:
         campos = conferir_campos(dados.modelo, dados.campos)

@@ -27,6 +27,7 @@ import {
   type MudancaDeAudio,
   mudarKeyframe,
   reenquadrarClipe,
+  zoomNosTrechos,
   abaixarClipe,
   mesclarClipes,
   aplicarEfeito,
@@ -63,6 +64,7 @@ export type Comando =
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
   | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
+  | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
@@ -97,6 +99,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
   "linha.removerIntervalos": "remover trechos",
+  "linha.zoomNosTrechos": "dar zoom nos destaques",
   "clipe.duplicar": "duplicar",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
@@ -143,6 +146,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = dividirClipes(projeto, ctx, parametros.tempo, parametros.clipeIds);
       return { projeto: resultado.projeto, selecao: resultado.novos };
     }
+    case "linha.zoomNosTrechos":
+      return { projeto: zoomNosTrechos(projeto, parametros.trechos) };
     case "linha.removerIntervalos":
       return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
     case "clipe.apagar":

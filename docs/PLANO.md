@@ -436,10 +436,10 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] limpar a voz (DeepFilterNet3 no worker de CPU, opção na aba Áudio)
   - [x] reenquadrar seguindo o rosto (YuNet no worker de CPU, botão na aba Básico)
   - [x] redução de ruído na imagem (hqdn3d no worker de CPU; a mesma imagem limpa na prévia e no render)
-  - "Criar automaticamente" (diretor de edição com o LLM local; seção 10)
+  - [x] "Criar automaticamente" (diretor de edição com o LLM local; seção 10)
 - Novos:
   - **animações em HTML (motion graphics):** clipe de animação a partir de modelos prontos (tarja, título cinético, logo, CTA, contador, citação), com as cores do kit de marca. Seção 10.
-  - LLM local (Ollama com o Qwen3 8B) para o "Criar automaticamente" e o destaque de palavras. Seção 10.
+  - [x] LLM local (Ollama com o Qwen3 8B) para o "Criar automaticamente". Seção 10.
   - "Descreva a animação": o LLM escreve a animação a partir de um esqueleto (experimental). Seção 10.
   - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
   - [x] **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto, com o Wan 2.2 TI2V-5B (painel Mídia, 2 a 5 s em 480p). Detalhes na seção 9.
@@ -521,5 +521,5 @@ Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames
 - **Fora do produto:** como o dono já assina o Claude Code, o servidor MCP da fase 7 deixaria pedir edições em português direto do terminal, sem custo por uso. É uso pessoal, não uma peça do TakeOne.
 - **Ordem:** (1) clipe de animação com modelos prontos; (2) Ollama + "Criar automaticamente" e destaque de palavras; (3) "Descreva a animação".
 - [x] Clipe de animação com modelos prontos (ferramenta Elementos: tarja, título, revelação, CTA, contador e citação)
-- [ ] LLM local e "Criar automaticamente"
+- [x] LLM local e "Criar automaticamente" (título, tarja, zooms e chamada a partir da fala; testado num vídeo de 47 s)
 - [ ] "Descreva a animação" (experimental)

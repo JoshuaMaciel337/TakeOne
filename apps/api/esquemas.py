@@ -383,7 +383,18 @@ class FaixaEntrada(BaseModel):
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
 
 
-class AnimacaoEntrada(BaseModel):
+class PalavraDaDirecao(BaseModel):
+    texto: str = Field(max_length=60)
+    inicio: float = Field(ge=0)
+    fim: float = Field(ge=0)
+
+
+class DirecaoEntrada(BaseModel):
+    palavras: list[PalavraDaDirecao] = Field(min_length=1, max_length=6000)
+    duracao: float = Field(gt=0, le=6 * 3600)
+
+
+class AnimacaoHtmlEntrada(BaseModel):
     modelo: str = Field(min_length=1, max_length=40)
     campos: dict[str, str | int | float] = Field(default_factory=dict)
     proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] = "16:9"

@@ -74,3 +74,6 @@ INTERVALO_LIMPEZA_SEGUNDOS = 60   # frequência da recuperação de jobs com pos
 MODO_IA = os.environ.get("MODO_IA", "simulado")  # "simulado" ou "real"
 # O ComfyUI que gera vídeo com o Wan 2.2 (serviço comfyui do Compose, perfil video)
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://comfyui:8188")
+# O LLM local do "Criar automaticamente" (serviço ollama do Compose, perfil gpu)
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+MODELO_LLM = os.environ.get("MODELO_LLM", "qwen3:8b")

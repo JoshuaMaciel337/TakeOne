@@ -18,6 +18,7 @@ import {
   ErroEdicao,
   estiloDasLegendas,
   importarLegendas,
+  zoomNosTrechos,
   moverClipe,
   mudarCor,
   mudarKeyframe,
@@ -109,6 +110,23 @@ test("animação entra por cima, no cursor e com a transparência ligada", () =>
   assert.equal(sobreposicao.clipes[0].inicio, 2 * S);
   assert.equal(sobreposicao.clipes[0].remover_fundo, true);
   assert.equal(principal(projeto).length, 1);
+  conferir(projeto);
+});
+
+test("zoom nos destaques: a escala sobe antes do trecho, fica e volta depois", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  projeto = zoomNosTrechos(projeto, [{ inicio: 2 * S, fim: 4 * S }, { inicio: 3 * S, fim: 5 * S }, { inicio: 7 * S, fim: 8 * S }]);
+  const pontos = principal(projeto)[0].keyframes!.escala!;
+  // O segundo trecho começa dentro do primeiro e fica de fora
+  assert.equal(pontos.length, 8);
+  assert.deepEqual(
+    pontos.slice(0, 4).map((p) => [Math.round((p.t / S) * 100) / 100, Math.round(p.valor * 100) / 100]),
+    [[1.73, 1], [2.23, 1.12], [3.98, 1.12], [4.33, 1]],
+  );
+  assert.ok(pontos.every((p) => p.curva === "suave"));
+  // Quem já tem keyframes de escala fica como está
+  assert.deepEqual(zoomNosTrechos(projeto, [{ inicio: 0, fim: 2 * S }]), projeto);
   conferir(projeto);
 });
 

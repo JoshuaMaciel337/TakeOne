@@ -17,7 +17,7 @@ from core.modelos.midia import ARQUIVO_IMAGEM_LIMPA, ARQUIVO_IMAGEM_LIMPA_PROXY,
 from core.utils import storage
 from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709
 from core.utils.mongo import agora
-from worker.tarefas.ingestao import FILTRO_PROXY, FPS_MAXIMO_PROXY
+from worker.tarefas.ingestao import FILTRO_PROXY, FPS_MAXIMO_PROXY, reduzir_quadros
 
 # Luma espacial, croma espacial, luma no tempo, croma no tempo. Medido num vídeo com ruído acrescentado:
 # o ruído caiu pela metade (de 7,1 para 3,5 níveis em 255) e o mesmo vídeo sem ruído perdeu 2,3 de detalhe
@@ -58,7 +58,8 @@ def executar_limpeza_imagem(db, job: dict, reportar: Callable[[int, str], None])
                          "-movflags", "+faststart", str(parciais[0])],
                         duracao, lambda f: reportar(2 + int(f * 78), "Tirando o ruído da imagem"))
         # A cópia leve dela, como a da ingestão (para a prévia)
-        executar_ffmpeg(["-i", str(parciais[0]), "-an", "-vf", FILTRO_PROXY, "-fpsmax", str(FPS_MAXIMO_PROXY),
+        filtro_proxy = ",".join([FILTRO_PROXY, *reduzir_quadros(video.get("fps"))])
+        executar_ffmpeg(["-i", str(parciais[0]), "-an", "-vf", filtro_proxy, "-fpsmax", str(FPS_MAXIMO_PROXY),
                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", *MARCAS_BT709,
                          "-g", str(FPS_MAXIMO_PROXY * 2), "-movflags", "+faststart", str(parciais[1])],
                         duracao, lambda f: reportar(80 + int(f * 18), "Preparando a prévia"))

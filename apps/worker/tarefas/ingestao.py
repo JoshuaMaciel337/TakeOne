@@ -58,6 +58,13 @@ FILTRO_PROXY = (
 )
 
 
+def reduzir_quadros(fps: float | None) -> list[str]:
+    """Vídeo com mais de 30 quadros por segundo perde quadros na cópia leve. Ela guarda, em cada instante, o
+    último quadro que já chegou, a mesma regra do render (fps com round=up): com o padrão (o mais próximo),
+    um vídeo de 46 fps mostrava na prévia um quadro diferente do vídeo exportado."""
+    return [f"fps={FPS_MAXIMO_PROXY}:round=up"] if fps and fps > FPS_MAXIMO_PROXY + 0.01 else []
+
+
 # -----------------------------------------------
 # FUNÇÕES AUXILIARES
 # -----------------------------------------------
@@ -153,7 +160,8 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     arquivos = []
     argumentos = ["-i", str(original)]
     if tem_video:
-        filtro = ",".join([*ler_como_bt709(resumo["video"]["matriz"]), FILTRO_PROXY])
+        filtro = ",".join([*ler_como_bt709(resumo["video"]["matriz"]), FILTRO_PROXY,
+                           *reduzir_quadros(resumo["video"].get("fps"))])
         argumentos += ["-map", "0:v:0", "-map", "0:a:0?", "-vf", filtro, "-fpsmax", str(FPS_MAXIMO_PROXY),
                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", *MARCAS_BT709,
                        "-g", str(FPS_MAXIMO_PROXY * 2), "-c:a", "aac", "-b:a", "128k", "-ac", "2",

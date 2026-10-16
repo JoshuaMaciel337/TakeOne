@@ -718,6 +718,45 @@ export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: Pr
   });
 }
 
+/** Quanto o zoom do "Criar automaticamente" aproxima, e quanto tempo leva para entrar e sair. */
+export const ZOOM_DO_DESTAQUE = { escala: 1.12, entrada: 0.25, saida: 0.35 } as const;
+
+/**
+ * Um zoom suave em cada trecho, nos clipes da faixa principal: a escala sobe um pouco antes do trecho,
+ * fica durante ele e volta depois, com keyframes de curva suave. Clipe que já tem keyframes de escala
+ * fica como está, para não desmanchar o que a pessoa fez.
+ */
+export function zoomNosTrechos(projeto: Projeto, trechos: Intervalo[], escala: number = ZOOM_DO_DESTAQUE.escala): Projeto {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");
+  exigirDestravada(principal);
+  const entrada = Math.round(ZOOM_DO_DESTAQUE.entrada * TICKS_POR_SEGUNDO);
+  const saida = Math.round(ZOOM_DO_DESTAQUE.saida * TICKS_POR_SEGUNDO);
+  const ordenados = [...trechos].sort((a, b) => a.inicio - b.inicio);
+  const clipes = principal.clipes.map((clipe) => {
+    if (clipe.texto || clipe.keyframes?.escala?.length) return clipe;
+    const base = clipe.transformacao.escala;
+    const pontos: Keyframe[] = [];
+    for (const trecho of ordenados) {
+      const de = quadroDoClipe(projeto, clipe, trecho.inicio - entrada);
+      const ate = quadroDoClipe(projeto, clipe, trecho.fim + saida);
+      if (ate - de < 2 * entrada || (pontos.length && de <= pontos[pontos.length - 1].t)) continue;
+      const cheio = Math.min(de + entrada * 2, ate - saida);
+      const fimCheio = Math.max(cheio, ate - saida);
+      pontos.push(
+        { t: de, valor: base, curva: "suave" },
+        { t: cheio, valor: base * escala, curva: "suave" },
+        { t: fimCheio, valor: base * escala, curva: "suave" },
+        { t: ate, valor: base, curva: "suave" },
+      );
+    }
+    if (!pontos.length) return clipe;
+    if (pontos.length > KEYFRAMES_POR_PROPRIEDADE) pontos.length = KEYFRAMES_POR_PROPRIEDADE - (KEYFRAMES_POR_PROPRIEDADE % 4);
+    return { ...clipe, keyframes: { ...clipe.keyframes, escala: pontos } };
+  });
+  return finalizar(trocarFaixa(projeto, { ...principal, clipes }));
+}
+
 /** Volta posição, escala, giro, opacidade e recorte ao padrão, sem keyframes. */
 export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null }));

@@ -83,6 +83,7 @@ services:
       <<: *ambiente-python
       MODO_IA: real
       COMFYUI_URL: http://comfyui:8188
+      OLLAMA_URL: http://ollama:11434
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - "${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"
@@ -93,6 +94,21 @@ services:
           devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
     depends_on:
       mongo: {condition: service_healthy}
+    restart: unless-stopped
+
+  # LLM local do "Criar automaticamente" (Qwen3 8B, Apache-2.0), só na rede interna. O modelo é baixado
+  # pelo worker no primeiro pedido (uns 5 GB) e sai da placa no fim de cada um (keep_alive 0).
+  ollama:
+    profiles: [gpu]
+    image: ollama/ollama:0.34.4
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "0"
+    volumes: [ollama_modelos:/root/.ollama]
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
     restart: unless-stopped
 
   # Geração de vídeo com o Wan 2.2 (perfil video). O ComfyUI é GPL-3.0 e fica neste container, só
@@ -151,3 +167,5 @@ volumes:
   modelos_ia:
   # Pesos do Wan 2.2 para o ComfyUI (uns 17 GB). Ler da pasta do Windows dava errno=12, por isso um volume
   comfyui_modelos:
+  # Pesos do LLM local (Qwen3 8B, uns 5 GB)
+  ollama_modelos:

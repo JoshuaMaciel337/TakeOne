@@ -177,8 +177,8 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
   // Animações pedidas no painel: cada uma entra no instante em que o cursor estava, quando ficar pronta
   const animacoesPedidas = useRef(new Map<string, Tick>());
-  function pedirAnimacao(midia: { id: string }) {
-    animacoesPedidas.current.set(midia.id, tempo);
+  function pedirAnimacao(midia: { id: string }, inicio: Tick = tempo) {
+    animacoesPedidas.current.set(midia.id, inicio);
     void biblioteca.recarregar();
   }
   const colocarAnimacoes = useEffectEvent(() => {

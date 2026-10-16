@@ -173,11 +173,19 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
     return () => window.removeEventListener("beforeunload", avisarAoSair);
   }, [pendente]);
 
+  // O projeto mais novo, já com os comandos que ainda não renderizaram: dois comandos seguidos (o
+  // "Criar automaticamente" manda vários) partem um do outro, e não os dois do projeto da tela
+  const maisNovo = useRef<Projeto | null>(null);
+  useEffect(() => {
+    maisNovo.current = estado?.historico.presente ?? null;
+  }, [estado]);
+
   const executar = useCallback(
     (comando: Comando): { projeto: Projeto; selecao?: string[] } | null => {
       if (!estado) return null;
       try {
-        const resultado = executarComando(estado.historico.presente, comando, ctx);
+        const resultado = executarComando(maisNovo.current ?? estado.historico.presente, comando, ctx);
+        maisNovo.current = resultado.projeto;
         despachar({ tipo: "executar", projeto: resultado.projeto, nome: NOMES_DOS_COMANDOS[comando.comando] });
         setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
         return resultado;
