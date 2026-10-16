@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 
-// O movimento da página inicial, portado do script da home do kit da marca: menu, entradas ao rolar,
-// legendas karaokê, cursor da linha do tempo, demonstrações dos cartões e preço mensal ou anual.
-// A página é desenhada no servidor; aqui só se trocam classes, estilos e textos dela.
+import { ligarMovimento } from "./movimentoDaInicio";
+
+// O movimento da página inicial, portado do script da home do dono: menu, entradas ao rolar, legendas
+// karaokê, cursor da linha do tempo, demonstrações dos cartões e preço mensal ou anual. A abertura, a
+// galeria horizontal, os títulos e a rolagem suave ficam em movimentoDaInicio.ts. A página é desenhada no
+// servidor; aqui só se trocam classes, estilos e textos dela.
 
 export function AnimacoesDaInicio() {
   useEffect(() => {
@@ -70,8 +73,18 @@ export function AnimacoesDaInicio() {
       entradas.disconnect();
       vistas.disconnect();
     });
-    const quadro = requestAnimationFrame(() => depois(() => um(".hero")?.classList.add("loaded"), 120));
-    desfazer.push(() => cancelAnimationFrame(quadro));
+    // O editor desenhado entra quando a seção dele aparece
+    const secaoDoEditor = um(".hero");
+    if (secaoDoEditor) {
+      const aparecer = new IntersectionObserver((itens) => {
+        if (!itens[0].isIntersecting) return;
+        secaoDoEditor.classList.add("loaded");
+        aparecer.disconnect();
+      }, { threshold: 0.2 });
+      aparecer.observe(secaoDoEditor);
+      desfazer.push(() => aparecer.disconnect());
+    }
+    desfazer.push(ligarMovimento(raiz, reduzir));
 
     // Legendas karaokê: a palavra destacada anda
     for (const legenda of todos(".kara")) {

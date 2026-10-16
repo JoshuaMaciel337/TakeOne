@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Fragment } from "react";
 
@@ -9,7 +8,7 @@ import { Simbolo } from "@/componentes/Logo";
 
 import "@/componentes/inicio/inicio.css";
 
-// Página inicial, portada da home do kit da marca (docs/marca). O movimento fica em AnimacoesDaInicio.
+// Página inicial, portada da home v2 do dono (docs/marca). O movimento fica em AnimacoesDaInicio.
 
 /** Sorteio fixo (o mesmo do protótipo), para as ondas saírem iguais no servidor e no navegador. */
 function criarSorteio() {
@@ -51,6 +50,23 @@ function EmBreve() {
   return <span className="em-breve">Em breve</span>;
 }
 
+/** Texto de botão que rola letra a letra ao passar o mouse: a segunda cópia sobe no lugar da primeira. */
+function Rotulo({ texto }: { texto: string }) {
+  const letras = [...texto].map((letra, i) => (
+    <span key={i} style={{ "--i": i } as React.CSSProperties}>
+      {letra === " " ? "\u00a0" : letra}
+    </span>
+  ));
+  return (
+    <span className="bl">
+      <span className="t">{letras}</span>
+      <span className="t c" aria-hidden>
+        {letras}
+      </span>
+    </span>
+  );
+}
+
 function Marca({ tamanho = 30 }: { tamanho?: number }) {
   return (
     <span className="wordmark">
@@ -64,14 +80,17 @@ function Marca({ tamanho = 30 }: { tamanho?: number }) {
 
 const FORMATOS = ["Vídeos curtos", "YouTube", "Reels", "Podcasts", "Conteúdo de marca", "Vlogs de viagem", "Aulas online", "Eventos ao vivo"];
 
+/** A galeria horizontal dos criadores: fotos e frases, cada uma numa altura e numa velocidade. */
 const GALERIA = [
-  { foto: "produto", tamanho: "g5", atraso: "", icone: "filme", marca: "Produto", titulo: "Conteúdo para redes sociais", texto: "Crie vídeos que engajam.", alt: "Criador filmando um relógio em estúdio" },
-  { foto: "viagem", tamanho: "g4", atraso: "d1", icone: "monitor", marca: "Vlog", titulo: "Viagens e lifestyle", texto: "Reviva seus melhores momentos.", alt: "Criadora gravando a cidade ao entardecer" },
-  { foto: "gastronomia", tamanho: "g3", atraso: "d2", icone: "recorte", marca: "4:5", titulo: "Gastronomia e produtos", texto: "Destaque o que torna seu conteúdo único.", alt: "Chef finalizando um prato" },
-  { foto: "podcast", tamanho: "g3", atraso: "", icone: "audio", marca: "Podcast", titulo: "Podcasts e entrevistas", texto: "Transforme conversas em grandes vídeos.", alt: "Podcaster gravando em estúdio" },
-  { foto: "show", tamanho: "g4", atraso: "d1", icone: "onda", marca: "Ao vivo", titulo: "Música e eventos", texto: "Capture a energia do momento.", alt: "Show com luzes rosa e público" },
-  { foto: "edicao", tamanho: "g5", atraso: "d2", icone: "camadas", marca: "Multipista", titulo: "Projetos profissionais", texto: "Mais faixas, mais controle, no seu ritmo.", alt: "Editor trabalhando em dois monitores" },
-] as const;
+  { foto: "produto", forma: "s-tall", y: "-6vh", vel: 1.05, etiqueta: "Produto · Redes sociais", titulo: "Crie vídeos que engajam.", alt: "Criador filmando um relógio em estúdio" },
+  { foto: "viagem", forma: "s-wide", y: "10vh", vel: 0.92, etiqueta: "Viagens · Lifestyle", titulo: "Reviva seus melhores momentos.", alt: "Criadora gravando a cidade ao entardecer" },
+  { frase: "Corte o que não importa.", destaque: "Mantenha o que emociona.", y: "-14vh", vel: 1.12 },
+  { foto: "gastronomia", forma: "s-sq", y: "4vh", vel: 1, etiqueta: "Gastronomia · 4:5", titulo: "Valorize cada textura.", alt: "Chef finalizando um prato" },
+  { foto: "podcast", forma: "s-tall", y: "-8vh", vel: 1.08, etiqueta: "Podcasts · Entrevistas", titulo: "Conversas que viram cortes.", alt: "Podcaster gravando em estúdio" },
+  { foto: "show", forma: "s-wide", y: "12vh", vel: 0.94, etiqueta: "Música · Ao vivo", titulo: "Capture a energia do momento.", alt: "Show com luzes rosa e público" },
+  { frase: "Rápido quando precisa.", destaque: "Completo quando quiser.", y: "-10vh", vel: 1.1 },
+  { foto: "edicao", forma: "s-sq", y: "6vh", vel: 1.02, etiqueta: "Pro · Multipista", titulo: "Mais faixas, mais controle.", alt: "Editor trabalhando em dois monitores" },
+];
 
 const STORIES = [
   { fundo: "ph-product", atraso: "", rotulo: "Template com filmagem de produto", barras: ["done", "run", ""], texto: "Bastidores que ", destaque: "viram conteúdo." },
@@ -135,7 +154,7 @@ export default function PaginaInicial() {
       <AnimacoesDaInicio />
       <header className="nav">
         <div className="wrap">
-          <a className="brand" href="#top" aria-label="TakeOne — início">
+          <a className="brand" href="#top-reel" aria-label="TakeOne — início">
             <Marca />
           </a>
           <nav className="nav-links" aria-label="Principal">
@@ -151,7 +170,7 @@ export default function PaginaInicial() {
               Entrar
             </Link>
             <Link className="btn btn-primary btn-sm" href="/cadastro">
-              Começar agora
+              <Rotulo texto="Começar agora" />
             </Link>
             <button className="menu-btn" type="button" aria-label="Abrir menu" aria-expanded="false">
               <span />
@@ -167,30 +186,136 @@ export default function PaginaInicial() {
         ))}
         <Link href="/entrar">Entrar</Link>
         <Link className="btn btn-primary" href="/cadastro">
-          Começar a editar <Icone nome="seta" seta />
+          <Rotulo texto="Começar a editar" /> <Icone nome="seta" seta />
         </Link>
       </div>
 
       <main>
-        <section className="hero">
-          <div className="hero-glow" aria-hidden />
-          <div className="wrap hero-grid">
-            <div className="hero-copy">
-              <div className="eyebrow reveal">
+        <section className="reel" id="top-reel" data-reel>
+          <div className="reel-stage" data-reel-stage>
+            <div className="reel-marquee" aria-hidden>
+              <div className="reel-row r1" data-reel-row="1">
+                <div className="reel-row-inner">
+                  <span>Edite · Corte · Legende · Publique ·</span>
+                  <span>Edite · Corte · Legende · Publique ·</span>
+                </div>
+              </div>
+              <div className="reel-row r2" data-reel-row="2">
+                <div className="reel-row-inner">
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="grad-text">
+                      Sem complicação ·
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="reel-media" data-reel-media>
+              <canvas
+                className="reel-canvas"
+                data-reel-canvas
+                data-raw="/marca/fotos/viagem-bruto.jpg"
+                role="img"
+                aria-label="Criadora gravando a cidade ao entardecer. Passe o mouse para ver a versão com correção de cor feita pela IA."
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element -- o canvas lê a mesma imagem; ela também aparece sem script */}
+              <img className="reel-fallback" src="/marca/fotos/viagem-corrigido.jpg" alt="" />
+              <div className="reel-grain" aria-hidden />
+              <div className="reel-shade" aria-hidden />
+              <div className="reel-tl" data-reel-tl aria-hidden>
+                <span className="reel-tl-play">
+                  <Icone nome="reproduzir" />
+                </span>
+                <span className="reel-tl-time" data-reel-time>
+                  00:00 / 01:12
+                </span>
+                <span className="reel-tl-bar">
+                  <i data-reel-bar />
+                </span>
+                <span className="reel-tl-tag">
+                  <Icone nome="brilho" /> Correção de cor · IA
+                </span>
+              </div>
+            </div>
+
+            <div className="reel-cursor" data-reel-cursor aria-hidden>
+              <span>Arraste para editar</span>
+            </div>
+
+            <div className="reel-copy wrap" data-reel-copy>
+              <div className="eyebrow">
                 <span className="dot" />
                 Edição de vídeos com IA
               </div>
-              <h1 className="reveal d1">
+              <h1>
                 <span className="line">Edite vídeos.</span>
                 <span className="line grad-text">Sem complicação.</span>
               </h1>
-              <p className="lead reveal d2">Do corte rápido à edição avançada, tudo no navegador com IA ao seu lado.</p>
+              <div className="reel-copy-row">
+                <p className="lead">Do corte rápido à edição avançada, tudo no navegador com IA ao seu lado.</p>
+                <div className="hero-actions">
+                  <Link className="btn btn-primary" href="/cadastro">
+                    <Rotulo texto="Começar a editar" /> <Icone nome="seta" seta />
+                  </Link>
+                  <a className="btn btn-ghost" href="#editor">
+                    <Icone nome="reproduzir" /> <Rotulo texto="Ver o editor" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="reel-ui" data-reel-ui>
+              <div className="reel-card">
+                <small>Projeto</small>
+                <b>Chicago ao entardecer</b>
+                <span className="reel-card-meta">
+                  <i className="ld" />
+                  Bruto · LOG <em>→</em> <i className="lg" />
+                  Corrigido
+                </span>
+              </div>
+              <button className="reel-lock" type="button" data-reel-lock aria-pressed="false">
+                <span className="reel-lock-label">
+                  <span className="aplicar">
+                    <Rotulo texto="Aplicar correção" />
+                  </span>
+                  <span className="feito">
+                    <Rotulo texto="Correção aplicada" />
+                  </span>
+                </span>
+                <span className="reel-lock-ic">
+                  <Icone nome="varinha" />
+                </span>
+              </button>
+            </div>
+
+            <a className="reel-scroll" href="#editor" data-reel-hint aria-label="Rolar para o editor">
+              <span />
+              Role
+            </a>
+          </div>
+        </section>
+
+        <section className="hero" id="editor">
+          <div className="hero-glow" aria-hidden />
+          <div className="wrap hero-grid">
+            <div className="hero-copy">
+              <div className="eyebrow reveal">O editor</div>
+              <h2 className="h2 split">
+                Do corte rápido
+                <br />
+                <span className="grad-text">à edição avançada.</span>
+              </h2>
+              <p className="lead reveal d2">
+                A IA adianta o trabalho repetitivo. Você mantém o controle na timeline — tudo no navegador, sem instalar nada.
+              </p>
               <div className="hero-actions reveal d3">
                 <Link className="btn btn-primary" href="/cadastro">
-                  Começar a editar <Icone nome="seta" seta />
+                  <Rotulo texto="Começar a editar" /> <Icone nome="seta" seta />
                 </Link>
                 <a className="btn btn-ghost" href="#recursos">
-                  <Icone nome="reproduzir" /> Explorar recursos
+                  <Icone nome="camadas" /> <Rotulo texto="Explorar recursos" />
                 </a>
               </div>
               <div className="trust reveal d4">
@@ -385,7 +510,7 @@ export default function PaginaInicial() {
             <div className="head">
               <div>
                 <div className="eyebrow reveal">Principais recursos</div>
-                <h2 className="reveal d1">
+                <h2 className="split">
                   Rápido quando precisa.
                   <br />
                   <span className="grad-text">Completo quando quiser.</span>
@@ -625,34 +750,65 @@ export default function PaginaInicial() {
           </div>
         </section>
 
-        <section className="section creators" id="criadores">
-          <div className="wrap">
-            <div className="head">
-              <div>
-                <div className="eyebrow reveal">Para todos os criadores</div>
-                <h2 className="reveal d1">
+        <section className="hgal" id="criadores" data-hgal>
+          <div className="hgal-pin">
+            <div className="hgal-glow" aria-hidden data-hgal-glow />
+            <div className="hgal-track" data-hgal-track>
+              <div className="hgal-intro">
+                <div className="eyebrow">Para todos os criadores</div>
+                <h2 className="h2 split">
                   Seu conteúdo.
                   <br />
                   <span className="grad-text">Seu jeito de criar.</span>
                 </h2>
+                <p>De vídeos para redes sociais a podcasts, viagens, música e produtos — o TakeOne acompanha o seu fluxo criativo.</p>
+                <span className="hgal-hint">
+                  <Icone nome="seta" /> Role para ver
+                </span>
               </div>
-              <p className="reveal d2">
-                De vídeos para redes sociais a podcasts, viagens, música e produtos — o TakeOne acompanha o seu fluxo criativo.
-              </p>
+              {GALERIA.map((item, i) =>
+                "foto" in item ? (
+                  <figure key={i} className={`hcard ${item.forma}`} style={{ "--y": item.y } as React.CSSProperties} data-speed={item.vel}>
+                    <div className="hcard-img">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- o script move a foto dentro da moldura */}
+                      <img src={`/marca/fotos/${item.foto}.jpg`} alt={item.alt} loading="lazy" />
+                    </div>
+                    <figcaption>
+                      <span className="etiqueta">{item.etiqueta}</span>
+                      <h3>{item.titulo}</h3>
+                    </figcaption>
+                  </figure>
+                ) : (
+                  <blockquote key={i} className="hquote" style={{ "--y": item.y } as React.CSSProperties} data-speed={item.vel}>
+                    <p>
+                      “{item.frase} <span className="grad-text">{item.destaque}</span>”
+                    </p>
+                    <cite>
+                      <Simbolo tamanho={18} />
+                      TakeOne
+                    </cite>
+                  </blockquote>
+                ),
+              )}
+              <Link className="hend" href="/cadastro">
+                <span className="hend-ic">
+                  <Icone nome="seta" />
+                </span>
+                <b>
+                  Seu próximo vídeo
+                  <br />
+                  começa aqui.
+                </b>
+                <small>Começar a editar</small>
+              </Link>
             </div>
-            <div className="gallery">
-              {GALERIA.map((item) => (
-                <figure key={item.foto} className={`shot ${item.tamanho} reveal ${item.atraso}`}>
-                  <Image src={`/marca/fotos/${item.foto}.jpg`} alt={item.alt} fill sizes="(max-width: 860px) 100vw, 42vw" unoptimized />
-                  <span className="tag">
-                    <Icone nome={item.icone} /> {item.marca}
-                  </span>
-                  <figcaption>
-                    <h3>{item.titulo}</h3>
-                    <p>{item.texto}</p>
-                  </figcaption>
-                </figure>
-              ))}
+            <div className="hgal-progress" aria-hidden>
+              <span className="hgal-count" data-hgal-count>
+                01 / 06
+              </span>
+              <span className="hgal-bar">
+                <i data-hgal-bar />
+              </span>
             </div>
           </div>
         </section>
@@ -664,7 +820,7 @@ export default function PaginaInicial() {
                 <div className="eyebrow reveal">
                   Templates para Stories · 9:16 <EmBreve />
                 </div>
-                <h2 className="reveal d1">
+                <h2 className="split">
                   Comece com um template.
                   <br />
                   <span className="grad-text">Termine com a sua cara.</span>
@@ -672,7 +828,7 @@ export default function PaginaInicial() {
               </div>
               <p className="reveal d2">Layouts verticais prontos para Reels, Shorts e Stories. Troque a mídia, ajuste o texto e publique.</p>
             </div>
-            <div className="stories watch">
+            <div className="stories watch" id="stories" data-lenis-prevent-touch>
               {STORIES.map((story) => (
                 <div key={story.fundo} className={`story ${story.fundo} reveal ${story.atraso}`} role="img" aria-label={story.rotulo}>
                   <div className="bars">
@@ -701,14 +857,14 @@ export default function PaginaInicial() {
           <div className="wrap flow">
             <div className="flow-intro">
               <div className="eyebrow reveal">Como funciona</div>
-              <h2 className="h2 reveal d1">
+              <h2 className="h2 split">
                 Da ideia ao vídeo final.
                 <br />
                 <span className="grad-text">Sem trocar de ferramenta.</span>
               </h2>
               <p className="reveal d2">Importe seus arquivos, use a IA para adiantar o trabalho e refine tudo na mesma linha do tempo.</p>
               <Link className="btn btn-primary reveal d3" href="/cadastro">
-                Criar meu primeiro vídeo <Icone nome="seta" seta />
+                <Rotulo texto="Criar meu primeiro vídeo" /> <Icone nome="seta" seta />
               </Link>
             </div>
             <div className="steps" id="steps">
@@ -776,7 +932,7 @@ export default function PaginaInicial() {
               <div className="eyebrow reveal">
                 Planos <EmBreve />
               </div>
-              <h2 className="reveal d1">
+              <h2 className="split">
                 Comece grátis.
                 <br />
                 <span className="grad-text">Evolua quando quiser.</span>
@@ -810,7 +966,7 @@ export default function PaginaInicial() {
                     ))}
                   </ul>
                   <Link className={`btn ${plano.destaque ? "btn-primary" : "btn-ghost"}`} href="/cadastro">
-                    {plano.botao}
+                    <Rotulo texto={plano.botao} />
                     {plano.destaque ? <Icone nome="seta" seta /> : null}
                   </Link>
                 </article>
@@ -823,7 +979,7 @@ export default function PaginaInicial() {
           <div className="wrap faq-grid">
             <div>
               <div className="eyebrow reveal">Perguntas frequentes</div>
-              <h2 className="h2 reveal d1">Tudo o que você precisa saber.</h2>
+              <h2 className="h2 split">Tudo o que você precisa saber.</h2>
               <p className="reveal d2">
                 Ainda com dúvidas? <a href="#comece">Fale com a gente</a>.
               </p>
@@ -855,10 +1011,10 @@ export default function PaginaInicial() {
               <p>Comece simples. Evolua quando quiser. Seu primeiro vídeo está a poucos cliques.</p>
               <div className="hero-actions">
                 <Link className="btn btn-primary" href="/cadastro">
-                  Começar a editar <Icone nome="seta" seta />
+                  <Rotulo texto="Começar a editar" /> <Icone nome="seta" seta />
                 </Link>
                 <a className="btn btn-ghost" href="#recursos">
-                  Ver demonstração
+                  <Rotulo texto="Ver demonstração" />
                 </a>
               </div>
             </div>

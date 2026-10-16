@@ -39,7 +39,7 @@ O sistema de comandos (`lib/projeto/comandos.ts`) segue a ideia do `crates/engin
 
 ## Bibliotecas
 
-As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). Os ícones são do [Lucide](https://lucide.dev) (ISC), e a fonte Inter (OFL) vem do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.
+As dependências estão em `apps/api/requirements.txt`, `apps/worker/requirements.txt` e `apps/web/package.json`. Só entram bibliotecas com licença permissiva (MIT, BSD, Apache-2.0, ISC). A página inicial usa o [GSAP](https://gsap.com) 3.13 com ScrollTrigger e SplitText (licença padrão gratuita da GreenSock/Webflow, que permite sites; não é usado no editor nem nas animações do vídeo, que a licença restringe) e o [Lenis](https://github.com/darkroomengineering/lenis) (MIT). Os ícones são do [Lucide](https://lucide.dev) (ISC), e a fonte Inter (OFL) vem do Google Fonts pelo `next/font`. As fontes que vão para dentro do vídeo (Montserrat, Inter e Caveat, OFL) ficam em `core/fontes`, com o texto da licença de cada uma ao lado.
 
 ## Programas e modelos usados pelos workers
 

@@ -1,9 +1,11 @@
-/* Página inicial, portada da home do kit da marca (docs/marca). Tudo fica dentro de .inicio, para nada
-   daqui valer nas outras páginas; as cores vêm dos tokens do site, então a home segue o tema escolhido. */
+/* Página inicial, portada da home v2 do dono (docs/marca). Tudo fica dentro de .inicio, para nada daqui
+   valer nas outras páginas; as cores vêm dos tokens do site, então a home segue o tema escolhido. A abertura
+   é uma foto escura: os textos dela e o menu enquanto está por cima dela ficam com as cores do tema escuro. */
 
-html:has(.inicio) {
-  scroll-behavior: smooth;
-}
+/* O Lenis (rolagem suave) marca o <html>; só a home liga o Lenis */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-stopped{overflow:hidden}
 
 .inicio {
   --bg: var(--to-fundo);
@@ -32,6 +34,7 @@ html:has(.inicio) {
   --sombra-funda: rgba(0, 0, 0, 0.9);
   --sombra-chip: rgba(0, 0, 0, 0.7);
 
+  /* TakeOne — homepage. Colors, radii and spacing come from the design-system tokens (var(--…)). */
   &{min-height:100dvh;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:clip}
   img{display:block;max-width:100%}
   section[id]{scroll-margin-top:72px}
@@ -420,7 +423,7 @@ html:has(.inicio) {
     .bento .span-4{grid-column:span 6}
     .assist{grid-template-columns:1fr}
     .assist .viz{margin:0 28px 28px}
-    .stories{grid-template-columns:repeat(5,minmax(200px,1fr));overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:40px;margin-inline:-32px;padding-inline:32px;scrollbar-width:none}
+    .stories{grid-template-columns:repeat(5,minmax(180px,1fr));overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:40px;margin-inline:-32px;padding-inline:32px;scrollbar-width:none}
     .stories::-webkit-scrollbar{display:none}
     .story{scroll-snap-align:start}
     .flow,.faq-grid{grid-template-columns:minmax(0,1fr);gap:48px}
@@ -475,7 +478,13 @@ html:has(.inicio) {
     .assist .viz{margin:0 16px 16px;padding:16px}
     .gallery .g5,.gallery .g4,.gallery .g3{grid-column:span 12}
     .shot{height:260px}
-    .stories{margin-inline:-16px;padding-inline:16px;grid-template-columns:repeat(5,72%)}
+    .stories{margin-inline:-16px;padding-inline:16px;grid-template-columns:repeat(5,42vw);gap:12px;padding-bottom:28px}
+    .story{border-radius:14px}
+    .story .bars{top:9px;left:9px;right:9px;gap:3px}
+    .story .txt{left:11px;right:11px;bottom:32px;font-size:14.5px}
+    .story .sig{left:11px;bottom:11px;font-size:9px}
+    .story .sig svg{width:12px;height:12px}
+    .story .use{right:8px;bottom:8px;padding:5px 8px;font-size:10px;opacity:1;transform:none}
     .story:nth-child(even){transform:none}
     .story:nth-child(even):hover{transform:translateY(-6px)}
     .steps{padding-left:40px}
@@ -491,6 +500,163 @@ html:has(.inicio) {
     .marquee-track{animation:none}
   }
 
+  /* =====================================================================
+     v2 — técnicas inspiradas no landonorris.com (Lenis + GSAP/ScrollTrigger)
+     ===================================================================== */
+
+
+
+  .nav{position:fixed;left:0;right:0}
+
+  /* ---------- reel: hero que encolhe + cursor revela ---------- */
+  .reel{position:relative;background:var(--bg)}
+  .reel-stage{position:relative;height:100vh;height:100svh;min-height:560px;overflow:hidden;background:var(--bg);isolation:isolate}
+  .reel-marquee{position:absolute;inset:0;z-index:0;display:flex;flex-direction:column;justify-content:center;gap:1vh;pointer-events:none}
+  .reel-row{white-space:nowrap;font-size:clamp(64px,12.5vw,210px);font-weight:800;line-height:.92;letter-spacing:-.055em;text-transform:uppercase;will-change:transform}
+  .reel-row-inner{display:inline-flex;gap:.28em;padding-right:.28em;animation:inicio-marquee 46s linear infinite}
+  .r2 .reel-row-inner{animation-direction:reverse;animation-duration:38s}
+  .r1 span{color:transparent;-webkit-text-stroke:1.5px rgba(176,181,192,.42)}
+  .reel-media{position:absolute;inset:0;z-index:1;clip-path:inset(0% 0% 0% 0% round 0px);transform-origin:50% 50%;will-change:clip-path,transform;cursor:crosshair}
+  .reel-canvas,.reel-fallback{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .reel-fallback{object-fit:cover;object-position:50% 45%;display:none}
+  @media (max-aspect-ratio:1/1){.reel-fallback{object-position:17% 45%}}
+  @media (min-aspect-ratio:1/1) and (max-aspect-ratio:7/5){.reel-fallback{object-position:35% 45%}}
+  :root.no-reveal & .reel-fallback{display:block}
+  :root.no-reveal & .reel-canvas{display:none}
+  .reel-grain{position:absolute;inset:-60%;pointer-events:none;opacity:.13;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:inicio-grain 1.2s steps(6) infinite}
+
+  .reel-shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(8,9,11,.7),rgba(8,9,11,0) 24%),linear-gradient(to top,rgba(8,9,11,.94),rgba(8,9,11,.45) 38%,rgba(8,9,11,0) 66%)}
+  .reel-tl{position:absolute;left:19%;right:19%;bottom:15.5%;display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:12px;background:rgba(17,19,25,.74);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);font-size:12px;opacity:0}
+  .reel-tl-play{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--raised);flex:none}
+  .reel-tl-play .i{width:14px;height:14px}
+  .reel-tl-time{font:600 11px/1 var(--font-mono,ui-monospace,Menlo,monospace);color:var(--secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .reel-tl-bar{flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}
+  .reel-tl-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--pink));transform-origin:left;transform:scaleX(0)}
+  .reel-tl-tag{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;color:var(--secondary)}
+  .reel-tl-tag .i{width:13px;height:13px;color:var(--pink)}
+  .reel-copy{position:absolute;z-index:3;left:0;right:0;bottom:clamp(36px,7vh,76px);pointer-events:none}
+  .reel-copy a,.reel-copy button{pointer-events:auto}
+  .reel-copy h1{margin:20px 0 26px;font-size:clamp(46px,7.6vw,124px);line-height:.94;letter-spacing:-.058em;font-weight:800}
+  .reel-copy h1 .line{display:block;white-space:nowrap}
+  .reel-copy-row{display:flex;align-items:flex-end;justify-content:space-between;gap:32px}
+  .reel-copy .lead{max-width:430px;color:#d3d6de}
+  .reel-copy .hero-actions{margin:0}
+  .reel-ui{position:absolute;z-index:3;top:104px;right:max(32px,calc((100vw - 1240px) / 2));display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+  .reel-card{width:232px;padding:14px 16px;border-radius:14px;background:rgba(17,19,25,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);font-size:12px}
+  .reel-card small{display:block;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .reel-card b{display:block;margin:4px 0 10px;font-size:14px;letter-spacing:-.01em}
+  .reel-card-meta{display:flex;align-items:center;gap:6px;color:var(--secondary)}
+  .reel-card-meta i{width:8px;height:8px;border-radius:50%}
+  .reel-card-meta .ld{background:#8a8f88}.reel-card-meta .lg{background:linear-gradient(120deg,var(--coral),var(--pink))}
+  .reel-card-meta em{font-style:normal;color:var(--muted)}
+  .reel-lock{display:inline-flex;align-items:center;gap:12px;height:48px;padding:0 6px 0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(17,19,25,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-size:13px;font-weight:700;transition:background-color .3s,border-color .3s}
+  .reel-lock:hover{background:rgba(23,26,34,.85)}
+  .reel-lock-ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(120deg,var(--coral),var(--pink));color:#fff;transition:transform .5s cubic-bezier(.2,.8,.2,1),background .3s}
+  .reel-lock-ic .i{width:17px;height:17px}
+  .reel-lock:hover .reel-lock-ic{transform:rotate(-20deg) scale(1.06)}
+  .reel-lock[aria-pressed="true"]{border-color:rgba(53,211,161,.45)}
+  .reel-lock[aria-pressed="true"] .reel-lock-ic{background:var(--success);color:var(--bg)}
+  .reel-cursor{position:absolute;z-index:4;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .3s}
+  .reel-cursor span{display:inline-block;transform:translate(18px,18px);padding:6px 11px;border-radius:999px;background:#fff;color:#08090b;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .reel-stage.is-hover .reel-cursor{opacity:1}
+  .reel-scroll{position:absolute;z-index:3;left:50%;bottom:28px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .reel-scroll span{width:1px;height:38px;background:linear-gradient(var(--coral),transparent);animation:inicio-drip 1.8s cubic-bezier(.6,0,.4,1) infinite;transform-origin:top}
+
+
+  /* editor section (antigo hero) */
+  #editor{padding-top:120px}
+  #editor .h2{margin:18px 0 22px}
+
+  /* ---------- títulos linha a linha (SplitText) ---------- */
+  .split .sl-mask{padding-bottom:.12em;margin-bottom:-.12em}
+  :root.js & .split{visibility:hidden}
+  :root.js & .split.is-split,:root.no-motion & .split{visibility:visible}
+
+  /* ---------- texto do botão rolando ---------- */
+  .bl{position:relative;display:inline-block;overflow:hidden;vertical-align:top;line-height:1.25}
+  .bl .t{display:block;white-space:pre}
+  .bl .t.c{position:absolute;left:0;top:100%}
+  .bl .t>span{display:inline-block;transition:transform .5s cubic-bezier(.75,0,.2,1);transition-delay:calc(var(--i) * 14ms)}
+  .btn:hover .bl .t>span,.reel-lock:hover .bl .t>span{transform:translateY(-100%)}
+
+  /* ---------- galeria horizontal ---------- */
+  .hgal{position:relative;background:var(--faixa);border-block:1px solid var(--border)}
+  .hgal-pin{position:relative;height:100vh;height:100svh;min-height:620px;overflow:hidden;display:flex;align-items:center}
+  .hgal-glow{position:absolute;left:-10%;top:15%;width:60vw;height:70vh;border-radius:50%;background:radial-gradient(closest-side,rgba(255,52,120,.15),rgba(255,98,74,.06) 60%,transparent);filter:blur(40px);pointer-events:none}
+  .hgal-track{position:relative;display:flex;align-items:center;gap:clamp(56px,6vw,112px);padding:0 max(32px,calc((100vw - 1240px) / 2));width:max-content;will-change:transform}
+  .hgal-intro{flex:none;width:min(440px,82vw)}
+  .hgal-intro p{margin:20px 0 0;color:var(--secondary);font-size:16px;max-width:400px}
+  .hgal-hint{display:inline-flex;align-items:center;gap:8px;margin-top:28px;font-size:13px;font-weight:600;color:var(--muted)}
+  .hgal-hint .i{width:15px;height:15px;color:var(--coral);animation:inicio-nudge 1.6s ease-in-out infinite}
+
+  .hcard{position:relative;top:var(--y,0);flex:none;margin:0}
+  .hcard-img{overflow:hidden;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--surface)}
+  .hcard img{width:100%;height:100%;object-fit:cover;transform:scale(1.18);filter:brightness(.9) saturate(.96);will-change:transform;transition:filter .6s}
+  .hcard:hover img{filter:brightness(1) saturate(1.05)}
+  .s-tall .hcard-img{width:clamp(230px,21vw,330px);aspect-ratio:3/4}
+  .s-wide .hcard-img{width:clamp(300px,32vw,500px);aspect-ratio:4/3}
+  .s-sq .hcard-img{width:clamp(230px,23vw,350px);aspect-ratio:1}
+  .hcard figcaption{margin-top:16px;max-width:320px}
+  .etiqueta{display:inline;padding:3px 7px;border-radius:3px;background:var(--coral);color:var(--bg);font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;line-height:1.9;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .hcard h3{margin:10px 0 0;font-size:19px;letter-spacing:-.025em;line-height:1.2}
+  .hquote{position:relative;top:var(--y,0);flex:none;width:clamp(260px,23vw,340px);margin:0}
+  .hquote p{margin:0;font-size:clamp(24px,2.3vw,34px);line-height:1.1;font-weight:800;letter-spacing:-.04em}
+  .hquote cite{display:flex;align-items:center;gap:8px;margin-top:18px;font-style:normal;font-size:12px;font-weight:700;color:var(--muted)}
+  .hquote cite svg{width:18px;height:18px}
+  .hend{position:relative;flex:none;width:clamp(240px,21vw,320px);aspect-ratio:3/4;padding:28px;border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;color:#fff;background:linear-gradient(150deg,var(--coral),var(--pink));box-shadow:0 30px 80px -30px rgba(255,52,120,.6)}
+  .hend b{font-size:clamp(24px,2.2vw,32px);line-height:1.05;letter-spacing:-.04em}
+  .hend small{font-size:13px;font-weight:700;opacity:.9}
+  .hend-ic{position:absolute;top:22px;right:22px;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--pink);transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+  .hend-ic .i{width:20px;height:20px}
+  .hend:hover .hend-ic{transform:rotate(-45deg) scale(1.06)}
+  .hgal-progress{position:absolute;left:max(32px,calc((100vw - 1240px) / 2));right:max(32px,calc((100vw - 1240px) / 2));bottom:34px;display:flex;align-items:center;gap:18px;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+  .hgal-bar{flex:1;height:2px;border-radius:2px;background:var(--border);overflow:hidden}
+  .hgal-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--pink));transform-origin:left;transform:scaleX(0)}
+
+  @media (max-width:860px){
+    .reel-ui{top:84px;right:16px}
+    .reel-card{width:200px;padding:12px 14px}
+    .reel-copy-row{flex-direction:column;align-items:flex-start;gap:22px}
+    .reel-scroll{display:none}
+    /* galeria horizontal no mobile: mesma lógica do desktop (rolagem vertical → movimento lateral) */
+    .hgal-pin{min-height:560px}
+    .hgal-track{gap:44px;padding:0 20px}
+    .hgal-intro{width:78vw}
+    .hgal-intro p{font-size:15px}
+    .hcard,.hquote{top:calc(var(--y,0) * .45)}
+    .s-tall .hcard-img{width:56vw;max-width:280px}
+    .s-wide .hcard-img{width:74vw;max-width:380px}
+    .s-sq .hcard-img{width:60vw;max-width:300px}
+    .hcard h3{font-size:16px}
+    .hquote{width:66vw}
+    .hquote p{font-size:23px}
+    .hend{width:58vw;padding:22px}
+    .hgal-progress{left:20px;right:20px;bottom:22px}
+    :root.no-motion & .hgal-pin,:root.reduce-motion & .hgal-pin{height:auto;display:block;padding:88px 0 40px}
+    :root.no-motion & .hgal-track,:root.reduce-motion & .hgal-track{width:auto;overflow-x:auto;scroll-snap-type:x mandatory}
+  }
+  @media (max-width:640px){
+    .reel-copy h1{font-size:clamp(40px,11.4vw,56px)}
+    .reel-copy .hero-actions{width:100%}
+    .reel-card{display:none}
+    .reel-ui{top:76px}
+    .reel-lock{height:42px;font-size:12px}
+    .reel-lock-ic{width:30px;height:30px}
+    #editor{padding-top:72px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .reel-row-inner,.reel-grain{animation:none}
+  }
+
+  /* toque e segure para revelar (mobile) */
+  .reel-media,.reel-stage{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  .reel-stage.is-touch .reel-cursor{left:50%;top:31%;opacity:1;transform:translate(-50%,-50%)}
+  .reel-stage.is-touch .reel-cursor span{transform:none;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;font-size:12px;animation:inicio-hintPulse 2.2s ease-in-out infinite}
+  .reel-stage.is-touch .reel-cursor span::before{content:"";width:8px;height:8px;border-radius:50%;background:linear-gradient(120deg,var(--coral),var(--pink))}
+  .reel-stage.is-touch.hint-off .reel-cursor{opacity:0}
+  .reel-stage.is-painting .reel-media{cursor:none}
+
+
   .ph-travel{background-image:url(/marca/fotos/viagem.jpg);background-size:cover;background-position:center}
   .ph-product{background-image:url(/marca/fotos/produto.jpg);background-size:cover;background-position:center}
   .ph-food{background-image:url(/marca/fotos/gastronomia.jpg);background-size:cover;background-position:center}
@@ -499,14 +665,21 @@ html:has(.inicio) {
   .ph-editor{background-image:url(/marca/fotos/edicao.jpg);background-size:cover;background-position:center}
 
   /* Por cima das fotos o texto é sempre branco, nos dois temas */
-  .kara,.tc,.shot figcaption,.shot .tag,.story{color:#fff}
+  .kara,.tc,.story{color:#fff}
   .faq details[open] summary .pm::before,.faq details[open] summary .pm::after{background:#fff}
   /* O botão "Aplicar" do editor desenhado troca de rótulo */
   .ai-apply .feito,.ai-apply.done .aplicar{display:none}
   .ai-apply.done .feito{display:inline}
-  .em-breve{display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px;padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--coral) 45%,transparent);background:color-mix(in srgb,var(--coral) 12%,transparent);color:var(--coral);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.4;white-space:nowrap;-webkit-text-fill-color:currentColor}
+  .reel-lock .feito,.reel-lock[aria-pressed="true"] .aplicar{display:none}
+  .reel-lock[aria-pressed="true"] .feito{display:inline-block}
   .nav-actions .botao-tema{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:var(--secondary);transition:color .2s,background-color .2s}
   .nav-actions .botao-tema:hover{color:var(--text);background:var(--surface)}
+  .em-breve{display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px;padding:3px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--coral) 45%,transparent);background:color-mix(in srgb,var(--coral) 12%,transparent);color:var(--coral);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.4;white-space:nowrap;-webkit-text-fill-color:currentColor}
+  /* A abertura é escura nos dois temas */
+  .reel-copy,.reel-ui,.reel-tl,.reel-cursor,.reel-scroll{--bg:#08090b;--surface:#111319;--raised:#171a22;--text:#f5f6fa;--secondary:#b0b5c0;--muted:#858b98;--border-strong:#353843;color:var(--text)}
+  .nav:not(.scrolled):not(.open){--text:#f5f6fa;--secondary:#b0b5c0;--surface:rgba(255,255,255,.08);--border:rgba(255,255,255,.14);color:var(--text)}
+  /* Numa tela de 390 px, "Sem complicação." passava da borda */
+  @media (max-width:640px){.reel-copy h1{font-size:clamp(34px,10.2vw,56px)}}
 }
 
 :root[data-tema="claro"] .inicio {
@@ -524,3 +697,7 @@ html:has(.inicio) {
 @keyframes inicio-scan{0%{left:20px}50%{left:calc(100% - 22px)}100%{left:20px}}
 @keyframes inicio-blink{50%{opacity:0}}
 @keyframes inicio-fill{to{transform:scaleX(1)}}
+@keyframes inicio-grain{0%{transform:translate(0,0)}20%{transform:translate(-4%,3%)}40%{transform:translate(3%,-5%)}60%{transform:translate(-6%,-2%)}80%{transform:translate(5%,4%)}100%{transform:translate(0,0)}}
+@keyframes inicio-drip{0%{transform:scaleY(0)}50%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+@keyframes inicio-nudge{50%{transform:translateX(5px)}}
+@keyframes inicio-hintPulse{50%{transform:scale(1.05)}}
