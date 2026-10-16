@@ -1,0 +1,79 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Confete",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 4,
+ "tela_cheia": true,
+ "descricao": "Dois jatos de confete saem dos cantos de baixo, caem girando e um título comemora no meio.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Parabéns!", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Confete 1", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Confete 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Confete: 220 papéis com velocidade inicial, giro e cor sorteados por índice; a posição sai da conta do
+     lançamento com gravidade e arrasto (fechada no tempo, sem estado), mais um balanço de lado ao cair.
+     As cores misturam as duas escolhidas com amarelo, branco e azul. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 220;
+  const extras = ["#ffd166", "#ffffff", "#6bd8f2"];
+  const papeis = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(500 + i);
+    const lado = i % 2 ? 1 : -1;
+    const ang = (-Math.PI / 2) + lado * -(0.25 + r() * 0.45);
+    const v = (0.9 + r() * 0.7) * Math.max(W, H);
+    return {
+      lado, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, giro: (r() - 0.5) * 18, fase: r() * 6.28,
+      w: (0.8 + r() * 0.8), h: (1.4 + r() * 1.2), atraso: r() * 0.25,
+      cor: r() < 0.6 ? (r() < 0.5 ? C.cor_1 : C.cor_2) : extras[Math.floor(r() * 3)],
+    };
+  });
+  const arrasto = 2.2;
+  const g = 0.9;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.6, dur);
+    for (const p of papeis) {
+      const s = t - 0.15 - p.atraso;
+      if (s <= 0) continue;
+      const e = (1 - Math.exp(-arrasto * s)) / arrasto;
+      const gv = (g * H) / arrasto;
+      const x = (p.lado < 0 ? -2 * u : W + 2 * u) + p.vx * e + Math.sin(s * 3 + p.fase) * 2 * u * TO.clamp(s - 0.6);
+      const y = H + 2 * u + p.vy * e + gv * (s - e);
+      if (y > H + 6 * u && s > 1) continue;
+      ctx.globalAlpha = fim;
+      ctx.fillStyle = p.cor;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(p.fase + s * p.giro);
+      ctx.scale(1, Math.cos(s * p.giro * 0.7 + p.fase));
+      ctx.fillRect((-p.w / 2) * u, (-p.h / 2) * u, p.w * u, p.h * u);
+      ctx.restore();
+    }
+    if (C.titulo) {
+      const k = TO.spring(t - 0.4, 0.45, 2.4);
+      ctx.globalAlpha = TO.clamp(k) * fim;
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.scale(k, k);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 12, W * 0.8));
+      ctx.fillText(C.titulo, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

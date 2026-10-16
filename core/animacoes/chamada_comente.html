@@ -1,0 +1,46 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Comente a palavra",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Um balão de comentário com três pontinhos digitando e, em seguida, a palavra para comentar.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "Comente", "maximo": 20},
+  {"id": "palavra", "rotulo": "Palavra", "tipo": "texto", "padrao": "QUERO", "maximo": 16},
+  {"id": "subtitulo", "rotulo": "Linha de baixo", "tipo": "texto", "padrao": "que eu te mando o link", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Balão (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Balão (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Comente: o balão estala com mola, os três pontos pulsam como quem digita e dão lugar à frase com a
+     palavra em destaque, que pulsa duas vezes; a linha de baixo aparece por último. -->
+<style>
+.caixa{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;
+  gap:calc(var(--u)*2);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.balao{position:relative;padding:calc(var(--u)*2.6) calc(var(--u)*4.4);border-radius:calc(var(--u)*4);
+  background:linear-gradient(120deg,var(--cor-1),var(--cor-2));box-shadow:0 calc(var(--u)*1.4) calc(var(--u)*4) rgba(0,0,0,.35);
+  display:grid;place-items:center;transform-origin:20% 100%;animation:pop .6s cubic-bezier(.2,1.5,.4,1) both}
+.balao::after{content:"";position:absolute;left:calc(var(--u)*5);bottom:calc(var(--u)*-1.8);width:calc(var(--u)*3.6);height:calc(var(--u)*3.6);
+  background:var(--cor-1);clip-path:polygon(0 0,100% 0,0 100%)}
+.pontos,.frase{grid-area:1/1}
+.pontos{display:flex;gap:calc(var(--u)*1.2);animation:esconder .01s linear 1.5s forwards}
+.pontos i{width:calc(var(--u)*1.8);height:calc(var(--u)*1.8);border-radius:50%;background:#fff;animation:digitar .9s ease-in-out calc(var(--i) * .15s) infinite}
+.frase{color:var(--cor-texto);font-weight:800;font-size:calc(var(--u)*6);letter-spacing:-.02em;white-space:nowrap;opacity:0;
+  animation:mostrar .45s cubic-bezier(.2,.8,.2,1) 1.5s forwards}
+.palavra{display:inline-block;padding:0 calc(var(--u)*1.4);margin-left:calc(var(--u)*.8);border-radius:calc(var(--u)*1.2);background:#fff;color:#111319;
+  animation:pulsa .5s ease-in-out 2s 2}
+.sub{color:var(--cor-texto);opacity:0;font-weight:600;font-size:calc(var(--u)*3);white-space:nowrap;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.45);
+  animation:sub .5s ease-out 2.1s forwards}
+@keyframes pop{from{transform:scale(0)}}
+@keyframes digitar{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(-40%);opacity:1}}
+@keyframes esconder{to{opacity:0}}
+@keyframes mostrar{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes pulsa{50%{transform:scale(1.12)}}
+@keyframes sub{from{opacity:0;transform:translateY(calc(var(--u)*1))}to{opacity:.9;transform:none}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+</style>
+<div class="caixa"><div class="balao"><div class="pontos"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i></div>
+<div class="frase">{{texto}}<span class="palavra">{{palavra}}</span></div></div><div class="sub">{{subtitulo}}</div></div>

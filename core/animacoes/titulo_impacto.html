@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Impacto palavra a palavra",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "descricao": "Uma palavra por vez bate na tela com força, a imagem treme e a frase inteira aparece no fim.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "Isso muda tudo", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Impacto: cada palavra cai de 2,4x para o tamanho normal com uma mola dura, sozinha no centro; depois a
+     frase inteira assenta empilhada, com a última palavra no degradê. O tremor é uma mola amortecida
+     disparada em cada batida. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const palavras = C.texto.split(/\s+/).filter(Boolean);
+  const passo = 0.38;
+  const fimBatidas = 0.15 + passo * palavras.length;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.45, dur));
+    if (t < fimBatidas) {
+      const i = Math.min(palavras.length - 1, Math.floor((t - 0.15) / passo));
+      if (i < 0) return;
+      const local = t - 0.15 - i * passo;
+      const k = TO.spring(local, 0.5, 4);
+      const escala = 2.4 - 1.4 * k;
+      const tremor = Math.exp(-local * 9) * Math.sin(local * 70) * 1.2 * u;
+      const tam = TO.caber(ctx, palavras[i], 900, 16, W * 0.82);
+      ctx.save();
+      ctx.translate(W / 2 + tremor, H / 2 + tremor * 0.6);
+      ctx.scale(escala, escala);
+      ctx.globalAlpha = TO.clamp(local / 0.06);
+      ctx.font = TO.fonte(900, tam);
+      ctx.fillStyle = i === palavras.length - 1 ? TO.degrade(ctx, -W * 0.3, 0, W * 0.3, 0) : C.cor_texto;
+      ctx.fillText(palavras[i].toUpperCase(), 0, 0);
+      ctx.restore();
+      return;
+    }
+    // A frase inteira, uma palavra por linha
+    const k = TO.ease.outBack(TO.prog(t, fimBatidas, fimBatidas + 0.5));
+    let tam = 11;
+    ctx.font = TO.fonte(900, tam);
+    for (const p of palavras) tam = Math.min(tam, TO.caber(ctx, p.toUpperCase(), 900, tam, W * 0.82));
+    const alt = tam * u * 1.02;
+    const total = alt * palavras.length;
+    ctx.globalAlpha = 1 - sai;
+    palavras.forEach((p, i) => {
+      const y = H / 2 - total / 2 + alt * (i + 0.5) + (1 - k) * 3 * u * (i % 2 ? 1 : -1) - sai * 4 * u;
+      ctx.font = TO.fonte(900, tam);
+      ctx.fillStyle = i === palavras.length - 1 ? TO.degrade(ctx, W * 0.2, 0, W * 0.8, 0) : C.cor_texto;
+      ctx.fillText(p.toUpperCase(), W / 2, y);
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

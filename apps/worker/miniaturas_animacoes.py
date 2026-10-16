@@ -33,8 +33,10 @@ def gerar(modelo: str, navegador) -> np.ndarray:
     largura, altura = QUADROS["16:9"]
     dur = MODELOS[modelo]["duracao"]
     with Estudio(montar_html(modelo, {}, dur, "16:9", "/fontes", "/animacoes"), largura, altura, navegador) as estudio:
-        # O quadro com mais coisa aparecendo, entre 35% e 75% da animação
-        quadros = [estudio.quadro(dur * frac) for frac in (0.35, 0.5, 0.62, 0.75)]
+        # O quadro com mais coisa aparecendo, entre 35% e 75% da animação. Transição cobre a tela toda no
+        # meio (a miniatura viraria uma cor só), então ela mostra a entrada, ainda pela metade
+        fracoes = (0.25,) if MODELOS[modelo]["categoria"] == "transicoes" else (0.35, 0.5, 0.62, 0.75)
+        quadros = [estudio.quadro(dur * frac) for frac in fracoes]
     quadro = max(quadros, key=lambda q: int(q[:, :, 3].astype(np.int64).sum()))
     a = quadro[:, :, 3:4].astype(np.float32) / 255
     imagem = quadro[:, :, :3].astype(np.float32) * a + fundo(largura, altura) * (1 - a)

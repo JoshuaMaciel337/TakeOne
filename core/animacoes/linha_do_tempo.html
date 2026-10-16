@@ -1,0 +1,99 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Linha do tempo",
+ "categoria": "listas",
+ "motor": "canvas",
+ "duracao": 6,
+ "descricao": "Uma linha atravessa a tela e acende os marcos um a um, com o ano e o que aconteceu.",
+ "campos": [
+  {"id": "dados", "rotulo": "Marcos (Ano: o que aconteceu, um por linha)", "tipo": "linhas", "padrao": "2019: Primeiro vídeo\n2021: 10 mil seguidores\n2023: Loja própria\n2025: 1 milhão", "maximo": 240},
+  {"id": "cor_1", "rotulo": "Linha (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Linha (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Linha do tempo: na tela deitada a linha é horizontal e os textos alternam em cima e embaixo; em pé,
+     a linha é vertical e os textos ficam à direita. Um ponto brilhante corre na frente da linha e cada
+     marco acende (círculo com mola) quando ele passa. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const marcos = C.dados.split("\n").map((l) => {
+    const i = l.indexOf(":");
+    return i < 0 ? null : { ano: l.slice(0, i).trim(), texto: l.slice(i + 1).trim() };
+  }).filter(Boolean).slice(0, 6);
+  const n = marcos.length;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const vertical = H > W * 1.05;
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const k = TO.ease.inOutSine(TO.prog(t, 0.3, dur - 1.4));
+    const a = vertical ? [W * 0.2, H * 0.18] : [W * 0.1, H * 0.5];
+    const b = vertical ? [W * 0.2, H * 0.82] : [W * 0.9, H * 0.5];
+    const ponto = (f) => [TO.lerp(a[0], b[0], f), TO.lerp(a[1], b[1], f)];
+    ctx.globalAlpha = 1 - sai;
+    // Trilho e linha percorrida
+    ctx.lineCap = "round";
+    ctx.lineWidth = 0.5 * u;
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.beginPath();
+    ctx.moveTo(...a);
+    ctx.lineTo(...b);
+    ctx.stroke();
+    const p = ponto(k);
+    ctx.strokeStyle = TO.degrade(ctx, a[0], a[1], b[0], b[1]);
+    ctx.lineWidth = 0.8 * u;
+    ctx.beginPath();
+    ctx.moveTo(...a);
+    ctx.lineTo(...p);
+    ctx.stroke();
+    ctx.drawImage(TO.brilho(C.cor_2), p[0] - 4 * u, p[1] - 4 * u, 8 * u, 8 * u);
+    marcos.forEach((m, i) => {
+      const f = n === 1 ? 0.5 : 0.06 + (0.88 * i) / (n - 1);
+      const [x, y] = ponto(f);
+      const desde = 0.3 + f * (dur - 1.7);
+      const acende = TO.spring(t - desde, 0.5, 2.6);
+      if (t < desde) {
+        ctx.fillStyle = "rgba(255,255,255,.25)";
+        ctx.beginPath();
+        ctx.arc(x, y, 1 * u, 0, 6.28);
+        ctx.fill();
+        return;
+      }
+      ctx.fillStyle = "#111319";
+      ctx.beginPath();
+      ctx.arc(x, y, 2 * u * acende, 0, 6.28);
+      ctx.fill();
+      ctx.lineWidth = 0.6 * u;
+      ctx.strokeStyle = C.cor_1;
+      ctx.stroke();
+      // Textos: ano grande, o que aconteceu embaixo
+      const texto = TO.clamp((t - desde) / 0.4);
+      ctx.globalAlpha = texto * (1 - sai);
+      ctx.fillStyle = C.cor_texto;
+      const largura = vertical ? W * 0.62 : (W * 0.8) / Math.max(1, n) - 2 * u;
+      let tx = x, ty = y;
+      if (vertical) {
+        ctx.textAlign = "left";
+        tx = x + 5 * u;
+        ty = y - 1.5 * u;
+      } else {
+        ctx.textAlign = "center";
+        ty = i % 2 ? y + 6 * u : y - 10 * u;
+      }
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(800, Math.min(5, TO.caber(ctx, m.ano, 800, 5, largura)));
+      ctx.fillText(m.ano, tx, ty + (1 - texto) * u);
+      ctx.font = TO.fonte(500, Math.min(2.8, TO.caber(ctx, m.texto, 500, 2.8, largura)));
+      ctx.globalAlpha = texto * (1 - sai) * 0.85;
+      ctx.fillText(m.texto, tx, ty + 4.2 * u + (1 - texto) * u);
+      ctx.globalAlpha = 1 - sai;
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

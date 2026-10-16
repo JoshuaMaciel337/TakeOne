@@ -1,0 +1,79 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Máquina de escrever",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "O texto é digitado letra a letra, com o cursor piscando, e apagado no fim.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "O segredo é começar.", "maximo": 70},
+  {"id": "cor_1", "rotulo": "Cor do cursor", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Cor da caixa", "tipo": "cor", "padrao": "#111319"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Máquina de escrever: uma caixa escura com o texto em fonte larga, digitado num ritmo com pequenas
+     variações (sorteadas por letra, sempre iguais); o cursor pisca parado e some no fim, quando o texto é apagado. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const letras = [...C.texto];
+  // Instante em que cada letra aparece: 55 ms em média, mais devagar depois de pontuação
+  const tempos = [];
+  let t0 = 0.35;
+  letras.forEach((letra, i) => {
+    tempos.push(t0);
+    t0 += 0.04 + TO.hash(i, 11) * 0.035 + (/[.,!?]/.test(letra) ? 0.18 : 0);
+  });
+  const fimDigitar = t0;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    // Apaga de trás para a frente no último 0,8 s
+    const apagar = TO.prog(t, dur - 0.9, dur - 0.25);
+    let n = letras.filter((_, i) => t >= tempos[i]).length;
+    n = Math.round(n * (1 - apagar));
+    const tam = TO.caber(ctx, C.texto, 600, 6.4, W * 0.72, "Montserrat");
+    ctx.font = TO.fonte(600, tam, "Montserrat");
+    const linhas = TO.quebrar(ctx, C.texto, W * 0.72);
+    const altLinha = tam * u * 1.3;
+    const larguraMax = Math.max(...linhas.map((l) => ctx.measureText(l).width));
+    const caixaW = larguraMax + 8 * u;
+    const caixaH = linhas.length * altLinha + 6 * u;
+    const x0 = (W - caixaW) / 2;
+    const y0 = (H - caixaH) / 2;
+    const aparece = TO.ease.outCubic(TO.prog(t, 0, 0.35)) * (1 - TO.ease.inCubic(TO.prog(t, dur - 0.25, dur)));
+    ctx.globalAlpha = aparece;
+    ctx.fillStyle = TO.rgba(C.cor_2, 0.82);
+    TO.retangulo(ctx, x0, y0 + (1 - aparece) * 2 * u, caixaW, caixaH, 1.6 * u);
+    ctx.fill();
+    // O texto: as n primeiras letras, linha a linha
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "middle";
+    let resto = n;
+    let cx = x0 + 4 * u;
+    let cy = y0 + 3 * u + altLinha / 2;
+    linhas.forEach((linha, i) => {
+      const parte = linha.slice(0, Math.max(0, resto));
+      const y = y0 + 3 * u + altLinha * (i + 0.5);
+      ctx.fillText(parte, x0 + 4 * u, y);
+      if (resto > 0) {
+        cx = x0 + 4 * u + ctx.measureText(parte).width;
+        cy = y;
+      }
+      resto -= linha.length + 1;
+    });
+    // O cursor pisca quando está parado e fica aceso enquanto digita
+    const digitando = t > 0.35 && t < fimDigitar + 0.1;
+    const piscar = digitando || Math.floor(t * 2.2) % 2 === 0;
+    if (piscar && apagar < 1) {
+      ctx.fillStyle = C.cor_1;
+      ctx.fillRect(cx + 0.5 * u, cy - tam * u * 0.5, 0.55 * u, tam * u);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

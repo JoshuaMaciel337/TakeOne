@@ -1,0 +1,35 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Frase com marca-texto",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Uma frase entra palavra por palavra e um marca-texto passa por baixo do trecho em destaque.",
+ "campos": [
+  {"id": "antes", "rotulo": "Começo da frase", "tipo": "texto", "padrao": "O segredo é", "maximo": 50},
+  {"id": "destaque", "rotulo": "Trecho em destaque", "tipo": "texto", "padrao": "constância", "maximo": 30},
+  {"id": "depois", "rotulo": "Fim da frase", "tipo": "texto", "padrao": "todo dia", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Marca-texto (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Marca-texto (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Marca-texto: as palavras entram em sequência; o destaque fica num span próprio (z-index 0) e o traço
+     inclinado atrás dele cresce da esquerda para a direita depois que a frase toda chegou. -->
+<style>
+.frase{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:86%;text-align:center;color:var(--cor-texto);
+  font-weight:900;font-size:calc(var(--u)*8);line-height:1.25;letter-spacing:-.03em;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*2.5) rgba(0,0,0,.4);
+  animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.palavra{display:inline-block;margin:0 .12em;animation:entrar .45s cubic-bezier(.2,.9,.3,1.2) calc(var(--atraso, 0s) + var(--i) * .1s) both}
+.a{--atraso:.1s}
+.marca{position:relative;z-index:0;display:inline-block;margin:0 .12em;padding:0 .14em;text-shadow:none;animation:entrar .45s cubic-bezier(.2,.9,.3,1.2) .6s both}
+.marca::before{content:"";position:absolute;z-index:-1;left:0;right:0;top:.18em;bottom:.06em;border-radius:.12em;
+  background:linear-gradient(90deg,var(--cor-1),var(--cor-2));transform-origin:0 50%;transform:skewX(-10deg) scaleX(0);
+  animation:marcar .6s cubic-bezier(.65,0,.35,1) 1.3s forwards}
+.d{--atraso:.8s}
+@keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*2.5)) scale(.9)}}
+@keyframes marcar{to{transform:skewX(-10deg) scaleX(1)}}
+@keyframes sair{to{opacity:0}}
+</style>
+<div class="frase"><span class="a">{{antes:palavras}}</span><span class="marca">{{destaque}}</span><span class="d">{{depois:palavras}}</span></div>

@@ -1,0 +1,43 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título com sublinhado",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 3.5,
+ "descricao": "Cada linha sobe por trás de uma máscara e um traço de cor sublinha a última.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título (uma linha por quebra)", "tipo": "linhas", "padrao": "Ideias grandes\ncabem em vídeos curtos", "maximo": 80},
+  {"id": "cor_1", "rotulo": "Sublinhado (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Sublinhado (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Título com sublinhado: cada linha numa máscara própria, subindo em sequência; a última ganha um
+     traço em degradê que se desenha da esquerda para a direita. Sai subindo de novo pela máscara. -->
+<style>
+.bloco{position:absolute;left:calc(var(--u)*8);right:calc(var(--u)*8);top:50%;transform:translateY(-50%)}
+.linha{display:block;overflow:hidden;padding-bottom:calc(var(--u)*.6)}
+.linha>span{display:inline-block;color:var(--cor-texto);font-weight:800;font-size:calc(var(--u)*8.5);line-height:1.04;
+  letter-spacing:-.045em;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*2) rgba(0,0,0,.35);
+  animation:subir .8s cubic-bezier(.16,1,.3,1) calc(.1s + var(--i) * .14s) both,
+            sair .5s cubic-bezier(.7,0,.84,0) calc(var(--dur) - .55s + var(--i) * .05s) forwards}
+.linha:last-child>span{position:relative}
+.linha:last-child>span::after{content:"";position:absolute;left:0;right:0;bottom:calc(var(--u)*-.2);height:calc(var(--u)*1.1);
+  border-radius:calc(var(--u)*1);background:linear-gradient(90deg,var(--cor-1),var(--cor-2));transform-origin:0 50%;
+  animation:traco .7s cubic-bezier(.65,0,.35,1) .75s both}
+@keyframes subir{from{transform:translateY(110%)}}
+@keyframes sair{to{transform:translateY(-115%)}}
+@keyframes traco{from{transform:scaleX(0)}}
+</style>
+<div class="bloco">{{texto:linhas}}</div>
+<script>
+// Cada linha numa máscara: o span de cada linha fica dentro de outro, que corta o que sai dele
+document.querySelectorAll(".bloco > .linha").forEach((linha) => {
+  const dentro = document.createElement("span");
+  dentro.textContent = linha.textContent;
+  linha.textContent = "";
+  linha.style.setProperty("--i", getComputedStyle(linha).getPropertyValue("--i"));
+  linha.appendChild(dentro);
+});
+</script>

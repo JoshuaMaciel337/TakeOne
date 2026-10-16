@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Grade retrô",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Fundo em tela cheia no estilo anos 80: um sol listrado no horizonte, uma grade correndo para a frente e o título em cima.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "NOITE RETRÔ", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Sol (cima)", "tipo": "cor", "padrao": "#ffb547"},
+  {"id": "cor_2", "rotulo": "Sol (baixo) e grade", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Grade retrô: perspectiva feita à mão no Canvas 2D (mais leve que WebGL no render por software). As
+     linhas de profundidade ficam em z = 1/(k + deslocamento), e o deslocamento cresce com o tempo, então
+     a grade anda para a frente sem fim. O sol tem listras que se abrem embaixo; tudo some no fim. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = TO.envelope(t, 0.4, 0.5, dur);
+    const hz = H * 0.58;
+    const ceu = ctx.createLinearGradient(0, 0, 0, hz);
+    ceu.addColorStop(0, "#07060f");
+    ceu.addColorStop(1, "#2a0c2e");
+    ctx.fillStyle = ceu;
+    ctx.fillRect(0, 0, W, hz);
+    // Sol listrado
+    const r = Math.min(W, H) * 0.24;
+    const sy = hz - r * 0.15 - TO.ease.outCubic(TO.prog(t, 0, 1.6)) * r * 0.25;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, hz);
+    ctx.clip();
+    ctx.drawImage(TO.brilho(C.cor_2), W / 2 - r * 2, sy - r * 2, r * 4, r * 4);
+    ctx.beginPath();
+    ctx.arc(W / 2, sy, r, 0, 6.2832);
+    ctx.fillStyle = TO.degrade(ctx, 0, sy - r, 0, sy + r);
+    ctx.fill();
+    ctx.fillStyle = "#2a0c2e";
+    for (let i = 0; i < 7; i++) {
+      const f = i / 7;
+      const y = sy + r * (0.05 + f * 0.95) - ((t * 0.1 * r) % (r * 0.14));
+      ctx.fillRect(W / 2 - r, y, r * 2, r * (0.015 + f * 0.07));
+    }
+    ctx.restore();
+    // Chão e grade
+    const chao = ctx.createLinearGradient(0, hz, 0, H);
+    chao.addColorStop(0, "#1a0620");
+    chao.addColorStop(1, "#05040a");
+    ctx.fillStyle = chao;
+    ctx.fillRect(0, hz, W, H - hz);
+    ctx.strokeStyle = C.cor_2;
+    ctx.lineWidth = Math.max(1, 0.25 * u);
+    ctx.shadowColor = C.cor_2;
+    ctx.shadowBlur = 1.2 * u;
+    const fundoY = H - hz;
+    const desl = (t * 1.2) % 1;
+    for (let i = 0; i < 18; i++) {
+      const z = 1 / (i + 1 - desl);
+      if (z > 1.2) continue;
+      const y = hz + fundoY * Math.min(1, z);
+      ctx.globalAlpha = TO.envelope(t, 0.4, 0.5, dur) * TO.clamp(z * 3);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = TO.envelope(t, 0.4, 0.5, dur);
+    for (let i = -14; i <= 14; i++) {
+      ctx.beginPath();
+      ctx.moveTo(W / 2 + i * W * 0.012, hz);
+      ctx.lineTo(W / 2 + i * W * 0.16, H);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    // Título
+    const k = TO.ease.outExpo(TO.prog(t, 0.6, 1.6));
+    ctx.globalAlpha *= TO.clamp(k * 1.5);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tam = TO.caber(ctx, C.titulo, 900, 11, W * 0.84, "Montserrat");
+    ctx.font = `italic ${TO.fonte(900, tam, "Montserrat")}`;
+    ctx.letterSpacing = `${(1 - k) * 3 * u}px`;
+    const ty = H * 0.22;
+    ctx.fillStyle = C.cor_2;
+    ctx.fillText(C.titulo, W / 2 + 0.6 * u, ty + 0.6 * u);
+    ctx.fillStyle = C.cor_texto;
+    ctx.fillText(C.titulo, W / 2, ty);
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

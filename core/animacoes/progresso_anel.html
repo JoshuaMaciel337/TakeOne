@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Anel de progresso",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um anel se enche até a porcentagem, com o número contando no centro e a legenda embaixo.",
+ "campos": [
+  {"id": "valor", "rotulo": "Porcentagem", "tipo": "numero", "padrao": "87", "maximo": 0},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "dos clientes voltam a comprar", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Anel (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Anel (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Anel: o trilho apagado aparece, o arco em degradê se enche até o valor (no máximo 100%) com uma
+     desaceleração longa, o número conta junto e a ponta do arco brilha. A legenda sobe por último. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const alvo = Math.min(100, parseInt(C.valor, 10) || 0) / 100;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const entra = TO.ease.outBack(TO.prog(t, 0, 0.6));
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const cx = W / 2;
+    const cy = H / 2 - 4 * u;
+    const r = 17 * u * entra;
+    const k = TO.ease.outQuart(TO.prog(t, 0.4, 2.4)) * alvo;
+    ctx.globalAlpha = (1 - sai) * TO.clamp(t / 0.3);
+    // Fundo do anel, para ler sobre o vídeo
+    ctx.fillStyle = "rgba(14,15,20,.72)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4.2 * u * entra, 0, 6.2832);
+    ctx.fill();
+    ctx.lineWidth = 3.2 * u * entra;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 6.2832);
+    ctx.stroke();
+    if (k > 0.001) {
+      ctx.strokeStyle = TO.degrade(ctx, cx - r, cy - r, cx + r, cy + r);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + k * 6.2832);
+      ctx.stroke();
+      const a = -Math.PI / 2 + k * 6.2832;
+      ctx.drawImage(TO.brilho(C.cor_2), cx + Math.cos(a) * r - 5 * u, cy + Math.sin(a) * r - 5 * u, 10 * u, 10 * u);
+    }
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(800, 10 * entra);
+    ctx.fillText(`${Math.round(k * 100)}%`, cx, cy + 0.5 * u);
+    // Legenda
+    const leg = TO.ease.outCubic(TO.prog(t, 1.2, 1.8));
+    ctx.globalAlpha = leg * (1 - sai) * 0.92;
+    const tam = TO.caber(ctx, C.legenda, 600, 3.8, W * 0.86);
+    ctx.font = TO.fonte(600, tam);
+    ctx.fillText(C.legenda, cx, cy + 25 * u + (1 - leg) * 2 * u);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

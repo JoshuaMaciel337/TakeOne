@@ -1,0 +1,130 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Gráfico de linha",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Uma linha se desenha entre os pontos, com a área embaixo e o último valor em destaque.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Seguidores", "maximo": 40},
+  {"id": "dados", "rotulo": "Dados (Rótulo: valor, um por linha)", "tipo": "linhas", "padrao": "Jan: 1200\nFev: 1800\nMar: 1650\nAbr: 2900\nMai: 4100\nJun: 6300", "maximo": 240},
+  {"id": "cor_1", "rotulo": "Linha (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Linha (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Linha: a curva passa pelos pontos (spline de Catmull-Rom) e é desenhada até a fração k do caminho;
+     a área embaixo segue a mesma fração. Um ponto brilhante corre na ponta da linha e, no fim, o último
+     valor aparece numa etiqueta. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const dados = C.dados.split("\n").map((l) => l.split(":")).filter((p) => p.length >= 2)
+    .map(([r, v]) => ({ rotulo: r.trim(), valor: parseFloat(v.replace(",", ".")) || 0 })).slice(0, 12);
+  const max = Math.max(...dados.map((d) => d.valor));
+  const min = Math.min(0, ...dados.map((d) => d.valor));
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const vertical = H > W;
+    const pw = vertical ? W * 0.86 : Math.min(W * 0.64, H * 1.3);
+    const ph = vertical ? H * 0.42 : H * 0.7;
+    const px = (W - pw) / 2;
+    const py = (H - ph) / 2;
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    ctx.save();
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.fillStyle = "rgba(14,15,20,.82)";
+    TO.retangulo(ctx, px, py, pw, ph, 2.4 * u);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "top";
+    const tamTitulo = TO.caber(ctx, C.titulo, 800, 4.4, pw - 8 * u);
+    ctx.font = TO.fonte(800, tamTitulo);
+    ctx.fillText(C.titulo, px + 4 * u, py + 3.6 * u);
+    const ax = px + 5 * u;
+    const aw = pw - 10 * u;
+    const topo = py + 3.6 * u + tamTitulo * u * 1.4 + 6 * u;
+    const base = py + ph - 7 * u;
+    const ah = base - topo;
+    const pontos = dados.map((d, i) => [ax + (aw * i) / Math.max(1, dados.length - 1), base - ((d.valor - min) / (max - min || 1)) * ah]);
+    // Curva amostrada (Catmull-Rom) para desenhar só até a fração k
+    const curva = [];
+    for (let i = 0; i < pontos.length - 1; i++) {
+      const p0 = pontos[Math.max(0, i - 1)], p1 = pontos[i], p2 = pontos[i + 1], p3 = pontos[Math.min(pontos.length - 1, i + 2)];
+      for (let s = 0; s < 24; s++) {
+        const q = s / 24, q2 = q * q, q3 = q2 * q;
+        curva.push([0, 1].map((c) => 0.5 * (2 * p1[c] + (-p0[c] + p2[c]) * q + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * q2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * q3)));
+      }
+    }
+    curva.push(pontos[pontos.length - 1]);
+    const k = TO.ease.inOutCubic(TO.prog(t, 0.5, 3));
+    const ate = Math.max(1, Math.floor(k * (curva.length - 1)));
+    // Área
+    const area = ctx.createLinearGradient(0, topo, 0, base);
+    area.addColorStop(0, TO.rgba(C.cor_2, 0.35));
+    area.addColorStop(1, TO.rgba(C.cor_2, 0));
+    ctx.fillStyle = area;
+    ctx.beginPath();
+    ctx.moveTo(curva[0][0], base);
+    for (let i = 0; i <= ate; i++) ctx.lineTo(curva[i][0], curva[i][1]);
+    ctx.lineTo(curva[ate][0], base);
+    ctx.closePath();
+    ctx.fill();
+    // Linha
+    ctx.strokeStyle = TO.degrade(ctx, ax, 0, ax + aw, 0);
+    ctx.lineWidth = 0.7 * u;
+    ctx.lineJoin = ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(curva[0][0], curva[0][1]);
+    for (let i = 1; i <= ate; i++) ctx.lineTo(curva[i][0], curva[i][1]);
+    ctx.stroke();
+    // Pontos já alcançados e os rótulos
+    ctx.textAlign = "center";
+    pontos.forEach((p, i) => {
+      const alcancado = (i / Math.max(1, pontos.length - 1)) <= k + 1e-6;
+      ctx.globalAlpha = entra * (1 - sai) * 0.7;
+      ctx.fillStyle = C.cor_texto;
+      ctx.font = TO.fonte(500, 2.4);
+      ctx.textBaseline = "top";
+      ctx.fillText(dados[i].rotulo, p[0], base + 1.6 * u);
+      if (!alcancado) return;
+      ctx.globalAlpha = entra * (1 - sai);
+      ctx.fillStyle = "#111319";
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], 1 * u, 0, 6.28);
+      ctx.fill();
+      ctx.lineWidth = 0.45 * u;
+      ctx.strokeStyle = C.cor_1;
+      ctx.stroke();
+    });
+    // Ponta brilhando e a etiqueta do último valor
+    const ponta = curva[ate];
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.drawImage(TO.brilho(C.cor_2), ponta[0] - 4 * u, ponta[1] - 4 * u, 8 * u, 8 * u);
+    const etiqueta = TO.ease.outBack(TO.prog(t, 3, 3.5));
+    if (etiqueta > 0) {
+      const ultimo = dados[dados.length - 1].valor.toLocaleString("pt-BR");
+      ctx.font = TO.fonte(800, 3);
+      const lw = ctx.measureText(ultimo).width + 3 * u;
+      const ex = Math.min(px + pw - lw - 2 * u, ponta[0] - lw / 2);
+      const ey = ponta[1] - 7 * u;
+      ctx.save();
+      ctx.translate(ex + lw / 2, ey + 2.2 * u);
+      ctx.scale(etiqueta, etiqueta);
+      ctx.fillStyle = TO.degrade(ctx, -lw / 2, 0, lw / 2, 0);
+      TO.retangulo(ctx, -lw / 2, -2.2 * u, lw, 4.4 * u, 2.2 * u);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(ultimo, 0, 0.1 * u);
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+})();
+</script>

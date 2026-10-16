@@ -1,0 +1,50 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Antes e depois",
+ "categoria": "numeros",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Dois cartões lado a lado: o número de antes, uma seta e o número de depois em destaque.",
+ "campos": [
+  {"id": "antes", "rotulo": "Antes", "tipo": "texto", "padrao": "3 horas", "maximo": 14},
+  {"id": "depois", "rotulo": "Depois", "tipo": "texto", "padrao": "15 min", "maximo": 14},
+  {"id": "rotulo_antes", "rotulo": "Legenda de antes", "tipo": "texto", "padrao": "editando sozinho", "maximo": 30},
+  {"id": "rotulo_depois", "rotulo": "Legenda de depois", "tipo": "texto", "padrao": "com o TakeOne", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Antes e depois: o cartão de antes entra apagado, riscado no meio; a seta corre; o de depois entra com
+     salto e brilho. Em telas em pé os cartões ficam um sobre o outro (a seta aponta para baixo). -->
+<style>
+.par{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*4);
+  animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+@media (max-aspect-ratio:1/1){.par{flex-direction:column}.seta{transform:rotate(90deg)}}
+.cartao{min-width:calc(var(--u)*30);padding:calc(var(--u)*3.4) calc(var(--u)*4);border-radius:calc(var(--u)*2.6);text-align:center;
+  background:rgba(14,15,20,.84);color:var(--cor-texto)}
+.valor{font-weight:900;font-size:calc(var(--u)*9);letter-spacing:-.04em;line-height:1;white-space:nowrap}
+.rotulo{margin-top:calc(var(--u)*1);font-weight:500;font-size:calc(var(--u)*2.9);opacity:.75;white-space:nowrap}
+.antes{animation:entrar .6s cubic-bezier(.2,.8,.2,1) .1s both}
+.antes .valor{position:relative;opacity:.6}
+.antes .valor::after{content:"";position:absolute;left:-4%;right:-4%;top:52%;height:calc(var(--u)*.7);border-radius:9px;background:var(--cor-1);
+  transform-origin:0 50%;animation:riscar .45s cubic-bezier(.65,0,.35,1) .9s both}
+.seta{width:calc(var(--u)*10);height:calc(var(--u)*6);flex:none}
+.seta path{fill:none;stroke:var(--cor-texto);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;
+  stroke-dashoffset:60;animation:desenhar .5s ease-out 1.3s forwards}
+.depois{position:relative;border:calc(var(--u)*.35) solid transparent;
+  background:linear-gradient(rgba(14,15,20,.9),rgba(14,15,20,.9)) padding-box,linear-gradient(120deg,var(--cor-1),var(--cor-2)) border-box;
+  box-shadow:0 0 calc(var(--u)*6) color-mix(in srgb,var(--cor-2) 45%,transparent);animation:salto .7s cubic-bezier(.2,1.5,.4,1) 1.7s both}
+.depois .valor{background:linear-gradient(110deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+@keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*3))}}
+@keyframes riscar{from{transform:scaleX(0)}}
+@keyframes desenhar{to{stroke-dashoffset:0}}
+@keyframes salto{from{opacity:0;transform:scale(.6)}}
+@keyframes sair{to{opacity:0;transform:scale(.95)}}
+</style>
+<div class="par">
+<div class="cartao antes"><div class="valor">{{antes}}</div><div class="rotulo">{{rotulo_antes}}</div></div>
+<svg class="seta" viewBox="0 0 50 30"><path d="M4 15h40M32 5l12 10-12 10"/></svg>
+<div class="cartao depois"><div class="valor">{{depois}}</div><div class="rotulo">{{rotulo_depois}}</div></div>
+</div>

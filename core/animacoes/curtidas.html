@@ -1,0 +1,111 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chuva de curtidas",
+ "categoria": "redes",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Um botão de coração é tocado, corações sobem flutuando e o contador de curtidas dispara.",
+ "campos": [
+  {"id": "valor", "rotulo": "Curtidas no fim", "tipo": "numero", "padrao": "25000", "maximo": 0},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "curtidas", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Corações (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Corações (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Curtidas: a pílula entra, o coração é tocado (encolhe e estala) e, a partir daí, 40 corações sobem
+     em ondas, com deriva de lado, giro e tamanho sorteados por índice. O número conta com desaceleração. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const alvo = parseInt(C.valor, 10) || 0;
+  const N = 40;
+  const coracao = (x, y, s) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.35);
+    ctx.bezierCurveTo(x - s * 1.1, y - s * 0.35, x - s * 0.45, y - s * 1.05, x, y - s * 0.45);
+    ctx.bezierCurveTo(x + s * 0.45, y - s * 1.05, x + s * 1.1, y - s * 0.35, x, y + s * 0.35);
+    ctx.closePath();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const entra = TO.ease.outBack(TO.prog(t, 0, 0.5));
+    const toque = 0.8;
+    const cx = W / 2;
+    const cy = H / 2 + 6 * u;
+    // Corações subindo (atrás da pílula)
+    for (let i = 0; i < N; i++) {
+      const nasce = toque + 0.05 + TO.hash(i, 3) * (dur - toque - 1.4);
+      const vida = 1.4 + TO.hash(i, 5) * 0.8;
+      const k = (t - nasce) / vida;
+      if (k <= 0 || k >= 1) continue;
+      const deriva = (TO.hash(i, 9) - 0.5) * 24 * u;
+      const x = cx - 10 * u + deriva * TO.ease.outQuad(k) + Math.sin(k * 6 + i) * 1.5 * u;
+      const y = cy - 4 * u - k * 34 * u;
+      const s = (1.4 + TO.hash(i, 11) * 1.6) * u * TO.ease.outBack(TO.clamp(k * 4));
+      ctx.globalAlpha = (1 - sai) * (1 - TO.ease.inQuad(k));
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, TO.hash(i, 13));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((TO.hash(i, 17) - 0.5) * 0.8);
+      coracao(0, 0, s);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Pílula com o botão e o número
+    ctx.globalAlpha = TO.clamp(entra) * (1 - sai);
+    const k = TO.ease.outExpo(TO.prog(t, toque, dur - 1));
+    const numero = Math.round(alvo * k).toLocaleString("pt-BR");
+    ctx.font = TO.fonte(800, 5.4);
+    const largNum = Math.max(ctx.measureText(alvo.toLocaleString("pt-BR")).width, ctx.measureText(numero).width);
+    ctx.font = TO.fonte(500, 3);
+    const largLeg = ctx.measureText(C.legenda).width;
+    const pw = 12 * u + Math.max(largNum, largLeg) + 4 * u;
+    const ph = 13 * u;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(entra, entra);
+    ctx.fillStyle = "rgba(18,19,25,.9)";
+    TO.retangulo(ctx, -pw / 2, -ph / 2, pw, ph, ph / 2);
+    ctx.fill();
+    // Botão: encolhe no toque e estala de volta
+    const aperto = t < toque ? 1 - 0.25 * TO.prog(t, toque - 0.15, toque) : 0.75 + 0.25 * TO.spring(t - toque, 0.35, 3);
+    const bx = -pw / 2 + 6.5 * u;
+    ctx.save();
+    ctx.translate(bx, 0);
+    ctx.scale(aperto, aperto);
+    const cheio = t >= toque;
+    ctx.fillStyle = cheio ? TO.degrade(ctx, -4 * u, -4 * u, 4 * u, 4 * u) : "rgba(255,255,255,.18)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.6 * u, 0, 6.2832);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    coracao(0, 0.4 * u, 2.3 * u);
+    ctx.fill();
+    ctx.restore();
+    if (cheio && t < toque + 0.5) {
+      const r = TO.ease.outCubic(TO.prog(t, toque, toque + 0.5));
+      ctx.strokeStyle = TO.rgba(C.cor_2, 1 - r);
+      ctx.lineWidth = 0.6 * u;
+      ctx.beginPath();
+      ctx.arc(bx, 0, 4.6 * u + r * 4 * u, 0, 6.2832);
+      ctx.stroke();
+    }
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.font = TO.fonte(800, 5.4);
+    ctx.fillText(numero, bx + 6.5 * u, 0.9 * u);
+    ctx.globalAlpha *= 0.6;
+    ctx.font = TO.fonte(500, 3);
+    ctx.fillText(C.legenda, bx + 6.5 * u, 4.4 * u);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

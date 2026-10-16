@@ -1,0 +1,38 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja em caixa",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Uma caixa escura com uma faixa de cor abre da esquerda e mostra o nome e a função.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Marina Costa", "maximo": 36},
+  {"id": "funcao", "rotulo": "Função", "tipo": "texto", "padrao": "Diretora de criação", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Faixa (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Faixa (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Tarja em caixa: a faixa de cor cresce primeiro, a caixa escura abre atrás dela e os textos entram com
+     um pequeno atraso; na saída a caixa fecha de volta para a faixa e a faixa some. -->
+<style>
+.tarja{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*10);display:flex;align-items:stretch;
+  filter:drop-shadow(0 calc(var(--u)*1) calc(var(--u)*3) rgba(0,0,0,.35))}
+.faixa{width:calc(var(--u)*1.2);background:linear-gradient(var(--cor-1),var(--cor-2));transform-origin:50% 0;
+  animation:descer .45s cubic-bezier(.2,.8,.2,1) both,sumir .3s ease-in calc(var(--dur) - .3s) forwards}
+.caixa{background:rgba(12,13,17,.86);padding:calc(var(--u)*2.2) calc(var(--u)*3.6) calc(var(--u)*2.4) calc(var(--u)*2.6);
+  clip-path:inset(0 100% 0 0);animation:abrir .6s cubic-bezier(.65,0,.35,1) .3s forwards,
+  fechar .45s cubic-bezier(.65,0,.35,1) calc(var(--dur) - .7s) forwards}
+.nome{color:var(--cor-texto);font-weight:800;font-size:calc(var(--u)*5);line-height:1.1;letter-spacing:-.02em;white-space:nowrap;
+  opacity:0;animation:entrar .5s cubic-bezier(.2,.8,.2,1) .6s forwards}
+.funcao{color:var(--cor-texto);opacity:0;font-weight:500;font-size:calc(var(--u)*2.9);margin-top:calc(var(--u)*.6);white-space:nowrap;
+  letter-spacing:.06em;text-transform:uppercase;animation:entrar2 .5s cubic-bezier(.2,.8,.2,1) .75s forwards}
+@keyframes descer{from{transform:scaleY(0)}}
+@keyframes sumir{to{transform:scaleY(0);transform-origin:50% 100%}}
+@keyframes abrir{to{clip-path:inset(0 0 0 0)}}
+@keyframes fechar{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(0 100% 0 0)}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-2))}to{opacity:1;transform:none}}
+@keyframes entrar2{from{opacity:0;transform:translateX(calc(var(--u)*-2))}to{opacity:.8;transform:none}}
+</style>
+<div class="tarja"><div class="faixa"></div><div class="caixa"><div class="nome">{{nome}}</div><div class="funcao">{{funcao}}</div></div></div>

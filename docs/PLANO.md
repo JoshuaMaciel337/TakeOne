@@ -523,3 +523,4 @@ Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames
 - [x] Clipe de animação com modelos prontos (ferramenta Elementos: tarja, título, revelação, CTA, contador e citação)
 - [x] LLM local e "Criar automaticamente" (título, tarja, zooms e chamada a partir da fala; testado num vídeo de 47 s)
 - [x] "Descreva a animação" (experimental: o LLM tenta primeiro os modelos prontos; escrevendo do zero, o modelo de 8B acerta pouco)
+- [x] Biblioteca com 39 modelos em 10 categorias (CSS, Canvas 2D e Three.js), com miniaturas e teste em três proporções; a meta é chegar a uns 100, em lotes

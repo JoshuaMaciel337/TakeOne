@@ -1,0 +1,42 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja de perfil",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Um círculo com as iniciais, o nome e o @ do perfil, numa pílula de vidro escuro.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Júlia Prado", "maximo": 30},
+  {"id": "perfil", "rotulo": "Perfil (com @)", "tipo": "texto", "padrao": "@juliaprado", "maximo": 30},
+  {"id": "iniciais", "rotulo": "Iniciais", "tipo": "texto", "padrao": "JP", "maximo": 3},
+  {"id": "cor_1", "rotulo": "Círculo (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Círculo (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Tarja de perfil: o círculo das iniciais cresce com mola e gira um pouco, a pílula abre para a direita
+     e o nome e o @ sobem em sequência. Um anel gira em volta do círculo enquanto a tarja está na tela. -->
+<style>
+.perfil{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*10);display:flex;align-items:center;
+  animation:sair .45s cubic-bezier(.7,0,.84,0) calc(var(--dur) - .45s) forwards}
+.avatar{position:relative;z-index:1;width:calc(var(--u)*11);height:calc(var(--u)*11);border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));color:#fff;font-weight:800;font-size:calc(var(--u)*4);letter-spacing:-.02em;
+  box-shadow:0 0 0 calc(var(--u)*.6) rgba(12,13,17,.86);animation:pop .7s cubic-bezier(.2,1.5,.4,1) both}
+.anel{position:absolute;inset:calc(var(--u)*-1.3);border-radius:50%;border:calc(var(--u)*.35) solid transparent;
+  border-top-color:var(--cor-1);border-right-color:var(--cor-2);animation:girar 2.4s linear infinite,surge .4s ease-out .5s both}
+.pilula{margin-left:calc(var(--u)*-5.5);padding:calc(var(--u)*1.6) calc(var(--u)*3.6) calc(var(--u)*1.6) calc(var(--u)*7);
+  border-radius:999px;background:rgba(12,13,17,.82);clip-path:inset(0 100% 0 0 round 999px);
+  animation:abrir .65s cubic-bezier(.65,0,.35,1) .35s forwards}
+.nome{color:var(--cor-texto);font-weight:800;font-size:calc(var(--u)*4.4);line-height:1.1;white-space:nowrap;animation:subir .5s cubic-bezier(.2,.8,.2,1) .7s both}
+.arroba{color:var(--cor-texto);opacity:.7;font-weight:500;font-size:calc(var(--u)*2.9);white-space:nowrap;animation:subir2 .5s cubic-bezier(.2,.8,.2,1) .82s both}
+@keyframes pop{from{transform:scale(0) rotate(-40deg)}}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes surge{from{opacity:0}}
+@keyframes abrir{to{clip-path:inset(0 0 0 0 round 999px)}}
+@keyframes subir{from{opacity:0;transform:translateY(60%)}}
+@keyframes subir2{from{opacity:0;transform:translateY(60%)}to{opacity:.7}}
+@keyframes sair{to{opacity:0;transform:scale(.9) translateY(calc(var(--u)*2))}}
+</style>
+<div class="perfil"><div class="avatar">{{iniciais}}<span class="anel"></span></div>
+<div class="pilula"><div class="nome">{{nome}}</div><div class="arroba">{{perfil}}</div></div></div>

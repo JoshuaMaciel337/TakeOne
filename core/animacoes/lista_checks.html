@@ -1,0 +1,35 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Lista com checks",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Itens que aparecem um a um e ganham um check desenhado, como uma lista de tarefas.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "O que você leva", "maximo": 36},
+  {"id": "texto", "rotulo": "Itens (um por linha)", "tipo": "linhas", "padrao": "Aulas gravadas\nComunidade exclusiva\nCertificado\nSuporte por 1 ano", "maximo": 200},
+  {"id": "cor_1", "rotulo": "Checks (início)", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Checks (fim)", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Lista com checks: cada item entra deslizando com a caixinha vazia, e em seguida a caixinha se enche e
+     o check se desenha (um traço SVG com dashoffset feito pelo CSS, como máscara). -->
+<style>
+.lista{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:calc(var(--u)*1.8);
+  width:min(calc(var(--u)*80),88%);color:var(--cor-texto);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.titulo{font-weight:800;font-size:calc(var(--u)*6);letter-spacing:-.03em;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*2) rgba(0,0,0,.45);
+  animation:entrar .55s cubic-bezier(.2,.8,.2,1) both}
+.linha{display:flex;align-items:center;gap:calc(var(--u)*2.2);padding:calc(var(--u)*1.6) calc(var(--u)*2.2);border-radius:calc(var(--u)*2);
+  background:rgba(14,15,20,.8);font-weight:600;font-size:calc(var(--u)*3.6);animation:entrar .5s cubic-bezier(.2,.8,.2,1) calc(.45s + var(--i) * .5s) both}
+.linha::before{content:"";flex:none;width:calc(var(--u)*4.2);height:calc(var(--u)*4.2);border-radius:calc(var(--u)*1.2);
+  border:calc(var(--u)*.4) solid rgba(255,255,255,.35);
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2)) center/0 0 no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/0 0 no-repeat;
+  animation:marcar .4s cubic-bezier(.2,1.4,.4,1) calc(.85s + var(--i) * .5s) forwards}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-3))}}
+@keyframes marcar{to{border-color:transparent;background-size:100% 100%,72% 72%}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="lista"><div class="titulo">{{titulo}}</div>{{texto:linhas}}</div>

@@ -1,0 +1,38 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Notificação no topo",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Uma notificação de celular desce do topo com ícone, título e mensagem, e sobe de volta.",
+ "campos": [
+  {"id": "app", "rotulo": "Nome do app", "tipo": "texto", "padrao": "Minha loja", "maximo": 24},
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Seu pedido saiu para entrega", "maximo": 40},
+  {"id": "mensagem", "rotulo": "Mensagem", "tipo": "texto", "padrao": "Chega hoje até as 18h", "maximo": 50},
+  {"id": "iniciais", "rotulo": "Letra do ícone", "tipo": "texto", "padrao": "M", "maximo": 2},
+  {"id": "cor_1", "rotulo": "Ícone (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Ícone (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Notificação: o cartão desce do topo com mola, o ícone dá um pulinho quando ele assenta e o horário
+     "agora" aparece; sobe de volta no fim. Sem marca de nenhum sistema: só o desenho de um aviso. -->
+<style>
+.aviso{position:absolute;left:50%;top:calc(var(--u)*6);width:min(calc(var(--u)*86),88%);transform:translateX(-50%);display:flex;
+  gap:calc(var(--u)*2.2);align-items:center;padding:calc(var(--u)*2.2) calc(var(--u)*2.6);border-radius:calc(var(--u)*3.6);
+  background:rgba(30,32,40,.88);box-shadow:0 calc(var(--u)*1.6) calc(var(--u)*5) rgba(0,0,0,.45);
+  animation:descer .8s cubic-bezier(.2,1.25,.4,1) .15s both,subir .45s cubic-bezier(.7,0,.84,0) calc(var(--dur) - .45s) forwards}
+.icone{flex:none;width:calc(var(--u)*9);height:calc(var(--u)*9);border-radius:calc(var(--u)*2.4);display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));color:#fff;font-weight:800;font-size:calc(var(--u)*4.4);
+  animation:pulo .4s ease-out .85s}
+.textos{min-width:0;flex:1;color:var(--cor-texto)}
+.topo{display:flex;justify-content:space-between;gap:calc(var(--u)*1);font-size:calc(var(--u)*2.5);opacity:.7;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+.titulo{font-weight:700;font-size:calc(var(--u)*3.5);margin-top:calc(var(--u)*.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mensagem{font-size:calc(var(--u)*3.1);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes descer{from{transform:translateX(-50%) translateY(calc(var(--u)*-30))}}
+@keyframes subir{to{transform:translateX(-50%) translateY(calc(var(--u)*-30));opacity:.4}}
+@keyframes pulo{50%{transform:scale(1.15)}}
+</style>
+<div class="aviso"><div class="icone">{{iniciais}}</div><div class="textos"><div class="topo"><span>{{app}}</span><span>agora</span></div>
+<div class="titulo">{{titulo}}</div><div class="mensagem">{{mensagem}}</div></div></div>

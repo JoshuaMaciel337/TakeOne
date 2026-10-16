@@ -1,0 +1,64 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título glitch",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "O título treme em canais de cor separados e em faixas deslocadas, e assenta nítido.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "NOVO EPISÓDIO", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Canal 1", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_2", "rotulo": "Canal 2", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Glitch: o título é desenhado três vezes (dois canais de cor deslocados e o branco por cima). A força do
+     glitch é alta na entrada e na saída e quase nula no meio; os saltos mudam a cada 2 quadros, sorteados pelo
+     número do bloco (sem estado). Faixas horizontais são recortadas e empurradas para os lados. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const tela = document.createElement("canvas");
+  tela.width = W;
+  tela.height = H;
+  const tx = tela.getContext("2d");
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const bloco = Math.floor(t * 15);
+    const forca = Math.max(1 - TO.prog(t, 0.15, 0.9), TO.prog(t, dur - 0.6, dur - 0.05)) + (TO.hash(bloco, 3) > 0.92 ? 0.35 : 0);
+    const visivel = TO.prog(t, 0, 0.12) * (1 - TO.prog(t, dur - 0.08, dur));
+    const tam = TO.caber(tx, C.texto, 900, 11, W * 0.82);
+    tx.clearRect(0, 0, W, H);
+    tx.font = TO.fonte(900, tam);
+    tx.textAlign = "center";
+    tx.textBaseline = "middle";
+    const dx = (TO.hash(bloco, 5) - 0.5) * 2.4 * u * forca;
+    const dy = (TO.hash(bloco, 6) - 0.5) * 1.2 * u * forca;
+    tx.globalCompositeOperation = "lighter";
+    tx.fillStyle = TO.rgba(C.cor_1, 0.9);
+    tx.fillText(C.texto, W / 2 - 0.9 * u * forca + dx, H / 2 + dy);
+    tx.fillStyle = TO.rgba(C.cor_2, 0.9);
+    tx.fillText(C.texto, W / 2 + 0.9 * u * forca - dx, H / 2 - dy);
+    tx.globalCompositeOperation = "source-over";
+    tx.fillStyle = C.cor_texto;
+    tx.fillText(C.texto, W / 2, H / 2);
+    // Faixas deslocadas: copia a tela por fatias, cada uma empurrada um pouco
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = visivel;
+    const faixas = 14;
+    const altura = tam * u * 1.6;
+    const topo = H / 2 - altura / 2;
+    ctx.drawImage(tela, 0, 0, W, topo, 0, 0, W, topo);
+    ctx.drawImage(tela, 0, topo + altura, W, H - topo - altura, 0, topo + altura, W, H - topo - altura);
+    for (let i = 0; i < faixas; i++) {
+      const y = topo + (altura / faixas) * i;
+      const empurra = TO.hash(bloco * 31 + i, 9) > 0.7 ? (TO.hash(bloco * 17 + i, 4) - 0.5) * 7 * u * forca : 0;
+      ctx.drawImage(tela, 0, y, W, altura / faixas + 1, empurra, y, W, altura / faixas + 1);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

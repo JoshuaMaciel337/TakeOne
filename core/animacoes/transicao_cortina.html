@@ -1,0 +1,60 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cortina em faixas",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.6,
+ "tela_cheia": true,
+ "descricao": "Faixas inclinadas cobrem a tela uma depois da outra e saem pelo outro lado. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Faixas (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Faixas (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Cortina: cinco faixas inclinadas, cada uma com a sua cor entre as duas do degradê, atravessam a tela
+     com atraso crescente. No meio da duração todas se sobrepõem e a tela fica coberta (é ali que o corte
+     deve cair); depois elas continuam e saem pela direita. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 5;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const inclina = H * 0.35;
+    const larg = W + inclina * 2;
+    for (let i = 0; i < N; i++) {
+      const atraso = i * 0.06;
+      const entra = TO.ease.inOutCubic(TO.prog(t, atraso, dur / 2 - 0.12 + atraso * 0.5));
+      const sai = TO.ease.inOutCubic(TO.prog(t, dur / 2 + 0.05 + atraso, dur - 0.24 + atraso));
+      // Em x = -inclina a faixa cobre a largura toda, em qualquer altura
+      const x = -inclina - larg + larg * entra + larg * sai;
+      const y0 = (H * i) / N - 1;
+      const y1 = (H * (i + 1)) / N + 1;
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, i / (N - 1));
+      ctx.beginPath();
+      ctx.moveTo(x + inclina * (1 - y0 / H), y0);
+      ctx.lineTo(x + larg + inclina * (1 - y0 / H), y0);
+      ctx.lineTo(x + larg + inclina * (1 - y1 / H), y1);
+      ctx.lineTo(x + inclina * (1 - y1 / H), y1);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, dur * 0.3, dur * 0.42), 1 - TO.prog(t, dur * 0.58, dur * 0.7));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2 + (1 - k) * 2 * u);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

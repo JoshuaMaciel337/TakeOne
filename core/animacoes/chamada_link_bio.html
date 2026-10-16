@@ -1,0 +1,42 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Seta para o link",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "Uma frase grande e três setas que descem em onda apontando para baixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "Link na bio", "maximo": 30},
+  {"id": "subtitulo", "rotulo": "Linha de baixo", "tipo": "texto", "padrao": "garanta o seu", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Setas (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Setas (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Seta para o link: a frase sobe e as três setas (chevrons) acendem uma depois da outra, em laço,
+     descendo um pouco cada vez; tudo some no fim. -->
+<style>
+.chamada{position:absolute;left:50%;bottom:calc(var(--u)*8);transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:calc(var(--u)*.6);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.frase{color:var(--cor-texto);font-weight:900;font-size:calc(var(--u)*8);letter-spacing:-.04em;line-height:1;white-space:nowrap;
+  text-shadow:0 calc(var(--u)*.4) calc(var(--u)*2.4) rgba(0,0,0,.45);animation:subir .7s cubic-bezier(.2,.9,.3,1.25) both}
+.sub{color:var(--cor-texto);opacity:.85;font-weight:600;font-size:calc(var(--u)*3.2);letter-spacing:.2em;text-transform:uppercase;
+  white-space:nowrap;animation:surge .5s ease-out .35s both}
+.setas{display:flex;flex-direction:column;align-items:center;margin-top:calc(var(--u)*1.2)}
+.seta{width:calc(var(--u)*7);height:calc(var(--u)*3.6);margin-top:calc(var(--u)*-1);opacity:.15;
+  animation:onda 1.1s ease-in-out calc(.5s + var(--i) * .16s) infinite}
+.seta path{fill:none;stroke:url(#degrade);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*4)) scale(.9)}}
+@keyframes surge{from{opacity:0}}
+@keyframes onda{0%,100%{opacity:.15;transform:none}40%{opacity:1;transform:translateY(calc(var(--u)*.8))}}
+@keyframes sair{to{opacity:0;transform:translateX(-50%) translateY(calc(var(--u)*3))}}
+</style>
+<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="degrade" x1="0" x2="1">
+<stop offset="0" stop-color="var(--cor-1)" style="stop-color:var(--cor-1)"/><stop offset="1" style="stop-color:var(--cor-2)"/></linearGradient></defs></svg>
+<div class="chamada"><div class="frase">{{texto}}</div><div class="sub">{{subtitulo}}</div>
+<div class="setas">
+<svg class="seta" style="--i:0" viewBox="0 0 28 14"><path d="M3 3l11 8 11-8"/></svg>
+<svg class="seta" style="--i:1" viewBox="0 0 28 14"><path d="M3 3l11 8 11-8"/></svg>
+<svg class="seta" style="--i:2" viewBox="0 0 28 14"><path d="M3 3l11 8 11-8"/></svg>
+</div></div>

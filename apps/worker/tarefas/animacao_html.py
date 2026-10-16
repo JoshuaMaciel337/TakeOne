@@ -136,7 +136,10 @@ class Estudio:
         self.pagina.evaluate(_IR_PARA, segundos * 1000)
         png = self.pagina.screenshot(type="png", omit_background=True, animations="allow")
         quadro = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_UNCHANGED)
-        if quadro is None or quadro.shape[2] != 4:
+        # Quadro todo coberto (meio de uma transição): o Chrome manda o PNG sem o canal alfa
+        if quadro is not None and quadro.ndim == 3 and quadro.shape[2] == 3:
+            quadro = cv2.cvtColor(quadro, cv2.COLOR_BGR2BGRA)
+        if quadro is None or quadro.ndim != 3 or quadro.shape[2] != 4:
             raise ErroDefinitivo("O navegador não devolveu o quadro com transparência.")
         return quadro
 

@@ -1,0 +1,122 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Botão Seguir clicado",
+ "categoria": "chamadas",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um cursor entra, clica num botão Seguir e ele vira Seguindo, com um estalo de partículas.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto do botão", "tipo": "texto", "padrao": "Seguir", "maximo": 16},
+  {"id": "feito", "rotulo": "Depois do clique", "tipo": "texto", "padrao": "Seguindo", "maximo": 16},
+  {"id": "chamada", "rotulo": "Frase em cima", "tipo": "texto", "padrao": "Gostou? Segue para mais", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Botão (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Botão (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Botão Seguir: o botão entra com mola, o cursor vem de baixo em curva até ele, aperta (o botão afunda),
+     o botão troca para o estado "feito" (fundo escuro com check) e solta faíscas; no fim tudo desce e some. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const clique = 1.75;
+  const centroY = H * 0.7;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const entra = TO.spring(t - 0.1, 0.55, 2.4);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.45, dur));
+    ctx.save();
+    ctx.globalAlpha = TO.clamp(t / 0.15) * (1 - sai);
+    ctx.translate(0, sai * 6 * u);
+    // A frase em cima
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tamFrase = TO.caber(ctx, C.chamada, 700, 4.2, W * 0.8);
+    ctx.font = TO.fonte(700, tamFrase);
+    ctx.fillStyle = C.cor_texto;
+    ctx.globalAlpha *= TO.prog(t, 0.3, 0.7);
+    ctx.fillText(C.chamada, W / 2, centroY - 10 * u);
+    ctx.globalAlpha = TO.clamp(t / 0.15) * (1 - sai);
+    // O botão
+    const feito = t >= clique;
+    const texto = feito ? C.feito : C.texto;
+    ctx.font = TO.fonte(800, 4.6);
+    const largura = ctx.measureText(texto).width + (feito ? 13 : 9) * u;
+    const altura = 10 * u;
+    const aperto = t > clique - 0.08 && t < clique + 0.12 ? 0.92 : 1;
+    const escala = entra * aperto;
+    ctx.save();
+    ctx.translate(W / 2, centroY);
+    ctx.scale(escala, escala);
+    ctx.shadowColor = "rgba(0,0,0,.35)";
+    ctx.shadowBlur = 3 * u;
+    ctx.shadowOffsetY = 1 * u;
+    ctx.fillStyle = feito ? "rgba(17,19,25,.92)" : TO.degrade(ctx, -largura / 2, 0, largura / 2, 0);
+    TO.retangulo(ctx, -largura / 2, -altura / 2, largura, altura, altura / 2);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    if (feito) {
+      ctx.strokeStyle = TO.degrade(ctx, -largura / 2, 0, largura / 2, 0);
+      ctx.lineWidth = 0.5 * u;
+      ctx.stroke();
+      // O check, que se desenha
+      const k = TO.ease.outCubic(TO.prog(t, clique, clique + 0.3));
+      ctx.strokeStyle = C.cor_1;
+      ctx.lineWidth = 0.8 * u;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      const cx = -largura / 2 + 5.2 * u;
+      ctx.moveTo(cx - 1.5 * u, 0);
+      ctx.lineTo(cx - 1.5 * u + 1.2 * u * Math.min(1, k * 2), 1.2 * u * Math.min(1, k * 2));
+      if (k > 0.5) ctx.lineTo(cx - 0.3 * u + 2.4 * u * (k - 0.5) * 2, 1.2 * u - 2.6 * u * (k - 0.5) * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = C.cor_texto;
+    ctx.fillText(texto, feito ? 2.2 * u : 0, 0);
+    ctx.restore();
+    // Faíscas do clique
+    if (t > clique && t < clique + 0.8) {
+      const k = TO.prog(t, clique, clique + 0.8);
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2 + TO.hash(i, 3);
+        const d = (largura / 2 + 2 * u) * (0.7 + TO.ease.outCubic(k) * 0.8);
+        ctx.globalAlpha = (1 - k) * (1 - sai);
+        ctx.fillStyle = i % 2 ? C.cor_1 : C.cor_2;
+        ctx.beginPath();
+        ctx.arc(W / 2 + Math.cos(a) * d, centroY + Math.sin(a) * d * 0.55, 0.7 * u * (1 - k), 0, 6.28);
+        ctx.fill();
+      }
+    }
+    // O cursor: vem de baixo à direita, para no botão e vai embora depois do clique
+    const chega = TO.ease.inOutCubic(TO.prog(t, 0.6, clique - 0.1));
+    const vai = TO.ease.inCubic(TO.prog(t, clique + 0.5, clique + 1.2));
+    const px = TO.lerp(W / 2 + 22 * u, W / 2 + 2 * u, chega) + vai * 10 * u;
+    const py = TO.lerp(centroY + 22 * u, centroY + 1.5 * u, chega) + vai * 14 * u + Math.sin(chega * Math.PI) * -4 * u;
+    ctx.globalAlpha = TO.prog(t, 0.6, 0.8) * (1 - vai) * (1 - sai);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(aperto, aperto);
+    ctx.beginPath();
+    const s = u * 0.9;
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 7 * s);
+    ctx.lineTo(1.8 * s, 5.3 * s);
+    ctx.lineTo(3 * s, 8 * s);
+    ctx.lineTo(4.3 * s, 7.4 * s);
+    ctx.lineTo(3.1 * s, 4.8 * s);
+    ctx.lineTo(5.4 * s, 4.8 * s);
+    ctx.closePath();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#111319";
+    ctx.lineWidth = 0.35 * u;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  };
+})();
+</script>

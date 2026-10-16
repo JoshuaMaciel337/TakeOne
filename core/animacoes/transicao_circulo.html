@@ -1,0 +1,42 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Círculo que cobre",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Círculos em camadas crescem do centro até cobrir a tela e depois abrem um buraco no meio. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "cor_1", "rotulo": "Primeira camada", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Última camada", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Camada do meio", "tipo": "cor", "padrao": "#14151b"}
+ ]
+}
+</script>
+<!-- Círculo: três discos (as duas cores e o escuro) crescem do centro, um atrás do outro, até passar da
+     diagonal. Na segunda metade, um buraco cresce do centro em cada disco, na ordem contrária, e o vídeo
+     de baixo volta a aparecer. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const R = Math.hypot(W, H) / 2 + 2;
+    const cores = [C.cor_1, C.cor_texto, C.cor_2];
+    const meio = dur / 2;
+    cores.forEach((cor, i) => {
+      const r = R * TO.ease.inOutCubic(TO.prog(t, i * 0.08, meio - 0.1 + i * 0.05));
+      const buraco = R * TO.ease.inOutCubic(TO.prog(t, meio + 0.05 + (2 - i) * 0.08, dur - 0.04 - i * 0.03));
+      if (r <= buraco) return;
+      ctx.fillStyle = cor;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, r, 0, 6.2832);
+      if (buraco > 0) ctx.arc(W / 2, H / 2, buraco, 0, 6.2832, true);
+      ctx.fill();
+    });
+  };
+})();
+</script>

@@ -1,0 +1,94 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Gráfico de barras",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Barras que crescem uma a uma com o valor contando em cima, e um título.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Vendas por mês", "maximo": 40},
+  {"id": "dados", "rotulo": "Dados (Rótulo: valor, um por linha)", "tipo": "linhas", "padrao": "Jan: 120\nFev: 180\nMar: 150\nAbr: 260\nMai: 340", "maximo": 200},
+  {"id": "sufixo", "rotulo": "Depois do valor", "tipo": "texto", "padrao": "", "maximo": 6},
+  {"id": "cor_1", "rotulo": "Barras (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Barras (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Barras: os dados vêm como "Rótulo: valor" (até 8 linhas). Cada barra cresce com mola, uma depois da
+     outra, e o número em cima conta junto; a maior barra ganha o degradê cheio e as outras ficam mais
+     apagadas. Um painel escuro arredondado segura tudo, para ler em cima de qualquer vídeo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const dados = C.dados.split("\n").map((l) => l.split(":")).filter((p) => p.length >= 2)
+    .map(([r, v]) => ({ rotulo: r.trim(), valor: parseFloat(v.replace(",", ".")) || 0 })).slice(0, 8);
+  const maximo = Math.max(1, ...dados.map((d) => d.valor));
+  const formatar = (v) => Math.round(v).toLocaleString("pt-BR") + C.sufixo;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const vertical = H > W;
+    const pw = vertical ? W * 0.86 : Math.min(W * 0.62, H * 1.25);
+    const ph = vertical ? H * 0.42 : H * 0.7;
+    const px = (W - pw) / 2;
+    const py = (H - ph) / 2;
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    ctx.save();
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.translate(0, (1 - entra) * 3 * u + sai * 3 * u);
+    ctx.fillStyle = "rgba(14,15,20,.82)";
+    TO.retangulo(ctx, px, py, pw, ph, 2.4 * u);
+    ctx.fill();
+    // Título
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    const tamTitulo = TO.caber(ctx, C.titulo, 800, 4.4, pw - 8 * u);
+    ctx.font = TO.fonte(800, tamTitulo);
+    ctx.fillText(C.titulo, px + 4 * u, py + 3.6 * u);
+    // Área das barras
+    const ax = px + 4 * u;
+    const aw = pw - 8 * u;
+    const topo = py + 3.6 * u + tamTitulo * u * 1.4 + 5 * u;
+    const base = py + ph - 7 * u;
+    const ah = base - topo;
+    const n = dados.length;
+    const passo = aw / Math.max(1, n);
+    const largura = passo * 0.62;
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.lineWidth = Math.max(1, 0.15 * u);
+    for (let i = 0; i <= 3; i++) {
+      const y = base - (ah * i) / 3;
+      ctx.beginPath();
+      ctx.moveTo(ax, y);
+      ctx.lineTo(ax + aw, y);
+      ctx.stroke();
+    }
+    dados.forEach((d, i) => {
+      const k = TO.clamp(TO.spring(t - 0.5 - i * 0.18, 0.62, 1.6), 0, 1.06);
+      const h = (ah * d.valor) / maximo * k;
+      const x = ax + passo * i + (passo - largura) / 2;
+      const maior = d.valor === maximo;
+      ctx.globalAlpha = entra * (1 - sai) * (maior ? 1 : 0.62);
+      ctx.fillStyle = TO.degrade(ctx, 0, base, 0, base - ah);
+      TO.retangulo(ctx, x, base - h, largura, h, Math.min(1.2 * u, largura / 2));
+      ctx.fill();
+      ctx.globalAlpha = entra * (1 - sai) * TO.clamp(k * 1.5);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = TO.fonte(800, Math.min(3.2, (largura / u) * 0.42));
+      ctx.fillText(formatar(d.valor * TO.clamp(k)), x + largura / 2, base - h - 0.8 * u);
+      ctx.globalAlpha = entra * (1 - sai) * 0.75;
+      ctx.textBaseline = "top";
+      ctx.font = TO.fonte(500, Math.min(2.6, (largura / u) * 0.36));
+      ctx.fillText(d.rotulo, x + largura / 2, base + 1.4 * u);
+    });
+    ctx.restore();
+  };
+})();
+</script>

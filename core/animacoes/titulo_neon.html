@@ -1,0 +1,60 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Letreiro neon",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um letreiro de neon que acende piscando, zune aceso e apaga no fim.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "Aberto agora", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Cor do neon", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_2", "rotulo": "Cor do brilho", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Miolo do tubo", "tipo": "cor", "padrao": "#ffe4ee"}
+ ]
+}
+</script>
+<!-- Neon: o texto em traço (o tubo) com várias camadas de brilho. Acende com tremidas sorteadas por
+     bloco de quadros, fica com um leve zumbido de intensidade e apaga com duas piscadas. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const bloco = Math.floor(t * 20);
+    // Acende entre 0,2 e 1,1 s piscando, apaga no último 0,6 s
+    let luz = 0;
+    if (t > 0.2 && t < 1.1) luz = TO.hash(bloco, 2) > 0.45 - TO.prog(t, 0.2, 1.1) * 0.45 ? 1 : 0.15;
+    else if (t >= 1.1 && t < dur - 0.6) luz = 0.92 + 0.08 * Math.sin(t * 37) * Math.sin(t * 11);
+    else if (t >= dur - 0.6) luz = TO.hash(bloco, 8) > TO.prog(t, dur - 0.6, dur - 0.1) ? 0.9 : 0.1;
+    if (t >= dur - 0.1) luz = 0;
+    ctx.clearRect(0, 0, W, H);
+    const tam = TO.caber(ctx, C.texto, 600, 17, W * 0.82, "Caveat");
+    ctx.font = TO.fonte(600, tam, "Caveat");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    const y = H / 2;
+    // O tubo apagado (vidro escuro), sempre visível depois de aparecer
+    const presente = TO.prog(t, 0, 0.2) * (1 - TO.prog(t, dur - 0.1, dur));
+    ctx.globalAlpha = presente;
+    ctx.lineWidth = 0.7 * u;
+    ctx.strokeStyle = TO.rgba(C.cor_1, 0.25);
+    ctx.strokeText(C.texto, W / 2, y);
+    // Brilho em camadas: largo e fraco, depois estreito e forte
+    for (const [blur, alpha, largura] of [[6, 0.35, 1.6], [3, 0.6, 1.1], [1.2, 0.9, 0.75]]) {
+      ctx.shadowColor = TO.rgba(C.cor_2, alpha * luz);
+      ctx.shadowBlur = blur * u;
+      ctx.lineWidth = largura * u;
+      ctx.strokeStyle = TO.rgba(C.cor_1, alpha * luz);
+      ctx.strokeText(C.texto, W / 2, y);
+    }
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 0.28 * u;
+    ctx.strokeStyle = TO.rgba(C.cor_texto, luz);
+    ctx.strokeText(C.texto, W / 2, y);
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

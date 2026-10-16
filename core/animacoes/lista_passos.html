@@ -1,0 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Passo a passo",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Os passos entram um por um, cada um com o número num círculo e uma linha ligando todos.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Como fazer", "maximo": 36},
+  {"id": "texto", "rotulo": "Passos (um por linha)", "tipo": "linhas", "padrao": "Grave o vídeo no celular\nSuba para o TakeOne\nClique em Criar automaticamente\nExporte e publique", "maximo": 220},
+  {"id": "cor_1", "rotulo": "Números (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Números (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Passo a passo: o painel abre, o título desce e cada passo entra com o círculo numerado estalando; a
+     linha vertical cresce ligando os círculos à medida que os passos chegam. O número vem do contador do CSS. -->
+<style>
+.painel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*92),90%);
+  padding:calc(var(--u)*4) calc(var(--u)*4.4);border-radius:calc(var(--u)*3);background:rgba(14,15,20,.84);color:var(--cor-texto);
+  animation:abrir .55s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.titulo{font-weight:800;font-size:calc(var(--u)*5);letter-spacing:-.02em;margin-bottom:calc(var(--u)*2.6)}
+.passos{position:relative;counter-reset:passo}
+.passos::before{content:"";position:absolute;left:calc(var(--u)*2.6);top:calc(var(--u)*2.6);bottom:calc(var(--u)*2.6);width:calc(var(--u)*.4);
+  background:linear-gradient(var(--cor-1),var(--cor-2));transform-origin:50% 0;animation:linha 2.6s linear .6s both}
+.linha{position:relative;display:flex;align-items:center;gap:calc(var(--u)*2.4);min-height:calc(var(--u)*5.2);margin:calc(var(--u)*1.4) 0;
+  font-weight:600;font-size:calc(var(--u)*3.6);line-height:1.2;counter-increment:passo;
+  animation:entrar .5s cubic-bezier(.2,.8,.2,1) calc(.6s + var(--i) * .65s) both}
+.linha::before{content:counter(passo);flex:none;width:calc(var(--u)*5.2);height:calc(var(--u)*5.2);border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));color:#fff;font-weight:800;font-size:calc(var(--u)*2.8);
+  box-shadow:0 0 0 calc(var(--u)*.7) rgba(14,15,20,.95);animation:estalo .45s cubic-bezier(.2,1.6,.4,1) calc(.6s + var(--i) * .65s) both}
+@keyframes abrir{from{opacity:0;transform:translate(-50%,-46%)}}
+@keyframes linha{from{transform:scaleY(0)}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*3))}}
+@keyframes estalo{from{transform:scale(0)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-54%)}}
+</style>
+<div class="painel"><div class="titulo">{{titulo}}</div><div class="passos">{{texto:linhas}}</div></div>

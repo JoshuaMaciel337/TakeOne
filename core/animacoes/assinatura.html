@@ -1,0 +1,86 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Assinatura",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "O nome é escrito à mão da esquerda para a direita, com a ponta da caneta e um traço embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Nome", "tipo": "texto", "padrao": "Joana Mendes", "maximo": 26},
+  {"id": "cargo", "rotulo": "Embaixo", "tipo": "texto", "padrao": "fotógrafa", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Traço (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Traço (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor da assinatura", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Assinatura: o nome em letra cursiva (Caveat) é revelado por um recorte que anda da esquerda para a
+     direita numa linha levemente ondulada; uma ponta brilhante marca onde a caneta está. Depois um traço
+     curvo sublinha o nome e o texto de baixo aparece. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.45, dur));
+    const cx = W / 2;
+    const cy = H / 2 - 2 * u;
+    const tam = TO.caber(ctx, C.texto, 600, 16, W * 0.8, "Caveat");
+    ctx.font = TO.fonte(600, tam, "Caveat");
+    const lw = ctx.measureText(C.texto).width;
+    const x0 = cx - lw / 2;
+    const k = TO.ease.inOutSine(TO.prog(t, 0.2, 2));
+    const xc = x0 - 2 * u + (lw + 4 * u) * k;
+    ctx.globalAlpha = 1 - sai;
+    // Nome revelado até a caneta
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, xc, H);
+    ctx.clip();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowBlur = 2 * u;
+    ctx.fillText(C.texto, cx, cy);
+    ctx.restore();
+    if (k > 0 && k < 1) {
+      const yc = cy + Math.sin(k * 40) * tam * u * 0.18;
+      ctx.drawImage(TO.brilho(C.cor_2), xc - 3 * u, yc - 3 * u, 6 * u, 6 * u);
+    }
+    // Sublinhado curvo
+    const traco = TO.ease.outCubic(TO.prog(t, 1.9, 2.6));
+    if (traco > 0) {
+      const y = cy + tam * u * 0.42;
+      ctx.strokeStyle = TO.degrade(ctx, x0, 0, x0 + lw, 0);
+      ctx.lineWidth = 0.7 * u;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      const passos = 40;
+      for (let i = 0; i <= passos * traco; i++) {
+        const q = i / passos;
+        const x = x0 + lw * 0.05 + lw * 0.95 * q;
+        const yy = y + Math.sin(q * Math.PI) * -1.4 * u + q * 1.2 * u;
+        if (i === 0) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    const cargo = TO.ease.outCubic(TO.prog(t, 2.4, 3));
+    if (cargo > 0) {
+      ctx.globalAlpha = cargo * (1 - sai) * 0.85;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = TO.fonte(500, Math.min(3.4, TO.caber(ctx, C.cargo, 500, 3.4, W * 0.8)));
+      ctx.letterSpacing = `${0.35 * u}px`;
+      ctx.fillText(C.cargo.toUpperCase(), cx, cy + tam * u * 0.62 + (1 - cargo) * 1.5 * u);
+      ctx.letterSpacing = "0px";
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

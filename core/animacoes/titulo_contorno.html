@@ -1,0 +1,35 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Contorno que se preenche",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 3.5,
+ "descricao": "O título aparece só no contorno e uma onda de cor o preenche da esquerda para a direita.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "PROMOÇÃO", "maximo": 20},
+  {"id": "subtitulo", "rotulo": "Linha de baixo", "tipo": "texto", "padrao": "só até domingo", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Preenchimento (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Preenchimento (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Contorno e linha de baixo", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Contorno: duas cópias do título no mesmo lugar. A de baixo é só o traço; a de cima é o degradê, e um
+     recorte (clip-path) anda da esquerda para a direita revelando o preenchimento. -->
+<style>
+.caixa{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:calc(var(--u)*1.5);animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.palco{position:relative;animation:entrar .7s cubic-bezier(.2,.8,.2,1) both}
+.palco span{display:block;font-weight:900;font-size:calc(var(--u)*13.5);line-height:1;letter-spacing:-.03em;white-space:nowrap}
+.traco{color:transparent;-webkit-text-stroke:calc(var(--u)*.25) var(--cor-texto)}
+.cheio{position:absolute;inset:0;background:linear-gradient(100deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;
+  background-clip:text;color:transparent;clip-path:inset(0 100% 0 0);animation:encher 1.1s cubic-bezier(.65,0,.35,1) .6s forwards}
+.sub{color:var(--cor-texto);font-weight:600;font-size:calc(var(--u)*3.6);letter-spacing:.32em;text-transform:uppercase;
+  opacity:0;animation:aparecer .6s ease-out 1.4s forwards}
+@keyframes entrar{from{opacity:0;transform:scale(.92);letter-spacing:.1em}}
+@keyframes encher{to{clip-path:inset(0 0 0 0)}}
+@keyframes aparecer{from{opacity:0;transform:translateY(calc(var(--u)*1))}to{opacity:.9;transform:none}}
+@keyframes sair{to{opacity:0;transform:scale(1.04)}}
+</style>
+<div class="caixa"><div class="palco"><span class="traco">{{texto}}</span><span class="cheio">{{texto}}</span></div>
+<div class="sub">{{subtitulo}}</div></div>

@@ -1,0 +1,86 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Marca com círculos",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Anéis se abrem do centro, se fecham num ponto e a marca aparece com o slogan embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Marca", "tipo": "texto", "padrao": "TAKEONE", "maximo": 18},
+  {"id": "slogan", "rotulo": "Slogan", "tipo": "texto", "padrao": "edite sem medo", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Anéis (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Anéis (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Marca: quatro anéis nascem do centro em sequência e crescem girando (arcos incompletos); depois
+     encolhem num ponto que explode num clarão, e a marca abre o espaçamento entre as letras até o normal.
+     O raio máximo fica dentro do quadro, para não encostar na borda. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.45, dur));
+    const cx = W / 2;
+    const cy = H / 2;
+    const rMax = Math.min(W, H) * 0.36;
+    ctx.globalAlpha = 1 - sai;
+    ctx.lineCap = "round";
+    const fecha = TO.ease.inBack(TO.prog(t, 1.05, 1.45));
+    for (let i = 0; i < 4; i++) {
+      const abre = TO.ease.outCubic(TO.prog(t, i * 0.12, 0.8 + i * 0.12));
+      const r = rMax * (0.35 + i * 0.2) * abre * (1 - fecha);
+      if (r < 1) continue;
+      const giro = t * (i % 2 ? -2.2 : 1.8) + i;
+      ctx.strokeStyle = TO.degrade(ctx, cx - r, cy - r, cx + r, cy + r);
+      ctx.lineWidth = (1.2 - i * 0.2) * u;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, giro, giro + 6.2832 * (0.55 + 0.1 * i) * abre);
+      ctx.stroke();
+    }
+    // Clarão quando os anéis se fecham
+    const clarao = TO.prog(t, 1.4, 2);
+    if (clarao > 0 && clarao < 1) {
+      ctx.globalAlpha = (1 - clarao) * (1 - sai);
+      const s = rMax * 1.4 * TO.ease.outCubic(clarao);
+      ctx.drawImage(TO.brilho(C.cor_2), cx - s, cy - s, s * 2, s * 2);
+      ctx.strokeStyle = TO.rgba(C.cor_1, 1 - clarao);
+      ctx.lineWidth = 0.5 * u;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rMax * TO.ease.outCubic(clarao), 0, 6.2832);
+      ctx.stroke();
+    }
+    // Marca: o espaçamento fecha até o normal
+    const marca = TO.ease.outExpo(TO.prog(t, 1.4, 2.4));
+    if (marca > 0) {
+      ctx.globalAlpha = TO.clamp(marca * 1.6) * (1 - sai);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const espaco = (1 - marca) * 4 * u;
+      const tam = TO.caber(ctx, C.texto, 900, 11, W * 0.8 - espaco * C.texto.length, "Montserrat");
+      ctx.font = TO.fonte(900, tam, "Montserrat");
+      ctx.letterSpacing = `${espaco + 0.04 * tam * u}px`;
+      ctx.fillText(C.texto, cx, cy);
+      ctx.letterSpacing = "0px";
+      const slogan = TO.ease.outCubic(TO.prog(t, 2, 2.6));
+      ctx.globalAlpha = slogan * (1 - sai) * 0.8;
+      ctx.font = TO.fonte(500, Math.min(3.6, TO.caber(ctx, C.slogan, 500, 3.6, W * 0.8)));
+      ctx.letterSpacing = `${0.3 * u}px`;
+      ctx.fillText(C.slogan.toUpperCase(), cx, cy + tam * u * 0.75 + (1 - slogan) * 2 * u);
+      ctx.letterSpacing = "0px";
+      // Traço em degradê entre a marca e o slogan
+      ctx.globalAlpha = 1 - sai;
+      const lw = 14 * u * slogan;
+      ctx.fillStyle = TO.degrade(ctx, cx - lw, 0, cx + lw, 0);
+      ctx.fillRect(cx - lw / 2, cy + tam * u * 0.5, lw, 0.4 * u);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

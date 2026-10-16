@@ -1,0 +1,49 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Post em destaque",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um cartão de post com foto, nome, usuário e o texto, que sobe e ganha as curtidas.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Ana Ribeiro", "maximo": 30},
+  {"id": "usuario", "rotulo": "Usuário", "tipo": "texto", "padrao": "@anaribeiro", "maximo": 30},
+  {"id": "texto", "rotulo": "Texto do post", "tipo": "texto", "padrao": "Editei o vídeo inteiro em 15 minutos e ainda sobrou tempo para o café.", "maximo": 160},
+  {"id": "curtidas", "rotulo": "Curtidas", "tipo": "texto", "padrao": "12,4 mil", "maximo": 12},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Post: o cartão sobe com uma leve inclinação que se endireita, as palavras do texto aparecem em sequência
+     e, no fim, o coração estala e a contagem de curtidas entra. Sem marca de rede nenhuma. -->
+<style>
+.post{position:absolute;left:50%;top:50%;width:min(calc(var(--u)*86),88%);transform:translate(-50%,-50%);
+  padding:calc(var(--u)*3.6) calc(var(--u)*4);border-radius:calc(var(--u)*3);background:rgba(18,19,25,.92);color:var(--cor-texto);
+  box-shadow:0 calc(var(--u)*2) calc(var(--u)*6) rgba(0,0,0,.45);
+  animation:subir .7s cubic-bezier(.2,.9,.25,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.topo{display:flex;align-items:center;gap:calc(var(--u)*2)}
+.foto{flex:none;width:calc(var(--u)*7);height:calc(var(--u)*7);border-radius:50%;background:linear-gradient(135deg,var(--cor-1),var(--cor-2));
+  display:grid;place-items:center}
+.foto svg{width:55%;height:55%;fill:rgba(255,255,255,.92)}
+.nome{font-weight:800;font-size:calc(var(--u)*3.4)}
+.usuario{font-weight:500;font-size:calc(var(--u)*2.7);opacity:.55}
+.texto{margin:calc(var(--u)*2.6) 0;font-weight:500;font-size:calc(var(--u)*3.7);line-height:1.35}
+.palavra{display:inline-block;margin-right:.26em;animation:aparecer .35s ease-out calc(.5s + var(--i) * .06s) both}
+.rodape{display:flex;align-items:center;gap:calc(var(--u)*1.2);font-weight:700;font-size:calc(var(--u)*3);
+  animation:aparecer .4s ease-out 2.2s both}
+.rodape svg{width:calc(var(--u)*4);height:calc(var(--u)*4);fill:var(--cor-2);animation:estalo .5s cubic-bezier(.2,1.8,.4,1) 2.4s both}
+@keyframes subir{from{opacity:0;transform:translate(-50%,-38%) rotate(-3deg)}}
+@keyframes aparecer{from{opacity:0;transform:translateY(calc(var(--u)*.8))}}
+@keyframes estalo{0%{transform:scale(0)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-56%)}}
+</style>
+<div class="post">
+ <div class="topo">
+  <div class="foto"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.8-4.6 4.3-7 8.5-7s7.7 2.4 8.5 7z"/></svg></div>
+  <div><div class="nome">{{nome}}</div><div class="usuario">{{usuario}}</div></div>
+ </div>
+ <div class="texto">{{texto:palavras}}</div>
+ <div class="rodape"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.3 2.5h2c.7-1.4 2.2-2.5 4.3-2.5 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>{{curtidas}}</div>
+</div>
