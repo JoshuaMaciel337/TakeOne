@@ -5,11 +5,12 @@
 # worker grava, com as mesmas fontes) e pede a gravação. A animação vira uma mídia da biblioteca,
 # com a transparência pronta, e passa pela ingestão como um envio comum.
 # -----------------------------------------------
+import gzip
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, HTMLResponse, Response
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import AnimacaoDescritaEntrada, AnimacaoHtmlEntrada, MidiaSaida
@@ -53,9 +54,18 @@ _LACO_DA_PREVIA = """<script>
 </script>"""
 
 
+# A lista só muda quando a biblioteca muda (no deploy): montada uma vez, já comprimida. Com os temas ela passa
+# de centenas de modelos, e o gzip leva a uns 10% do tamanho.
+_LISTA = json.dumps(lista_de_modelos(), ensure_ascii=False).encode()
+_LISTA_GZIP = gzip.compress(_LISTA, 9)
+
+
 @router.get("/modelos")
-async def modelos(_usuario=Depends(usuario_atual)):
-    return lista_de_modelos()
+async def modelos(request: Request, _usuario=Depends(usuario_atual)):
+    if "gzip" in request.headers.get("accept-encoding", ""):
+        return Response(_LISTA_GZIP, media_type="application/json",
+                        headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
+    return Response(_LISTA, media_type="application/json", headers={"Vary": "Accept-Encoding"})
 
 
 @router.get("/previa", response_class=HTMLResponse)
