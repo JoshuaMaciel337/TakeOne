@@ -8,7 +8,17 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import type { Midia } from "@/lib/tipos";
 
 type Campo = { id: string; rotulo: string; tipo: "texto" | "linhas" | "cor" | "numero"; padrao: string; maximo: number };
-type Modelo = { id: string; nome: string; descricao: string; duracao: number; categoria: string; nome_da_categoria: string; campos: Campo[] };
+type Tema = { id: string; nome: string };
+type Modelo = {
+  id: string;
+  nome: string;
+  descricao: string;
+  duracao: number;
+  categoria: string;
+  nome_da_categoria: string;
+  temas: Tema[];
+  campos: Campo[];
+};
 
 // O quadro de cada proporção, como em core/modelos/animacao_html.py (lado menor 1080)
 const QUADROS: Record<string, [number, number]> = {
@@ -132,6 +142,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   const [aviso, setAviso] = useState("");
   const [endereco, setEndereco] = useState("");
   const [categoria, setCategoria] = useState("todas");
+  const [tema, setTema] = useState("todos");
   const [busca, setBusca] = useState("");
 
   useEffect(() => {
@@ -176,9 +187,15 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
 
   if (!escolhido) {
     const categorias = [...new Map((modelos ?? []).map((m) => [m.categoria, m.nome_da_categoria])).entries()];
+    const temas = [...new Map((modelos ?? []).flatMap((m) => m.temas.map((t) => [t.id, t.nome] as const))).entries()].sort((a, b) =>
+      a[1].localeCompare(b[1], "pt-BR"),
+    );
     const termo = busca.trim().toLowerCase();
     const visiveis = (modelos ?? []).filter(
-      (m) => (categoria === "todas" || m.categoria === categoria) && (!termo || `${m.nome} ${m.descricao}`.toLowerCase().includes(termo)),
+      (m) =>
+        (categoria === "todas" || m.categoria === categoria) &&
+        (tema === "todos" || m.temas.some((t) => t.id === tema)) &&
+        (!termo || `${m.nome} ${m.descricao} ${m.temas.map((t) => t.nome).join(" ")}`.toLowerCase().includes(termo)),
     );
     return (
       <div className="flex flex-col gap-3">
@@ -187,14 +204,29 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
         <p className="text-xs font-medium text-suave">
           Biblioteca de animações{modelos ? ` · ${modelos.length} modelos` : ""} · com fundo transparente
         </p>
-        <input
-          type="search"
-          value={busca}
-          onChange={(evento) => setBusca(evento.target.value)}
-          placeholder="Procurar (tarja, contador, 3D…)"
-          aria-label="Procurar animação"
-          className="rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
-        />
+        <div className="flex gap-2">
+          <input
+            type="search"
+            value={busca}
+            onChange={(evento) => setBusca(evento.target.value)}
+            placeholder="Procurar (tarja, casamento, 3D…)"
+            aria-label="Procurar animação"
+            className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+          />
+          <select
+            value={tema}
+            onChange={(evento) => setTema(evento.target.value)}
+            aria-label="Tema"
+            className="w-32 rounded-md border border-borda bg-painel-2 px-1.5 py-1.5 text-xs outline-none focus:border-destaque"
+          >
+            <option value="todos">Todos os temas</option>
+            {temas.map(([id, nome]) => (
+              <option key={id} value={id}>
+                {nome}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex flex-wrap gap-1" role="group" aria-label="Categorias">
           {[["todas", "Todas"], ...categorias].map(([id, nome]) => (
             <button
@@ -225,7 +257,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
             </button>
           ))}
         </div>
-        {modelos && !visiveis.length ? <p className="text-center text-xs text-suave">Nenhuma animação com esse nome.</p> : null}
+        {modelos && !visiveis.length ? <p className="text-center text-xs text-suave">Nenhuma animação com esse filtro.</p> : null}
       </div>
     );
   }
