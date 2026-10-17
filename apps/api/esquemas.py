@@ -2,7 +2,7 @@
 # TakeOne API — formatos de entrada e saída
 # -----------------------------------------------
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -246,6 +246,9 @@ class TextoEntrada(BaseModel):
     brilho_cor: str = Field(default="#ffffff", pattern=COR)
     destaque: DestaqueEntrada | None = None
     tempos: list[int] | None = Field(default=None, max_length=500, description="Começo de cada palavra, em ticks")
+    # Palavras pintadas na cor_chave (números contados como em core/modelos/palavras_chave.py)
+    palavras_chave: list[Annotated[int, Field(ge=0, le=500)]] | None = Field(default=None, max_length=60)
+    cor_chave: str = Field(default="#ffd400", pattern=COR)
 
 
 class AnimacaoEntrada(BaseModel):
@@ -392,6 +395,15 @@ class PalavraDaDirecao(BaseModel):
 class DirecaoEntrada(BaseModel):
     palavras: list[PalavraDaDirecao] = Field(min_length=1, max_length=6000)
     duracao: float = Field(gt=0, le=6 * 3600)
+
+
+class LegendaParaDestacar(BaseModel):
+    id: str = Field(min_length=1, max_length=64)
+    texto: str = Field(max_length=500)
+
+
+class PalavrasChaveEntrada(BaseModel):
+    legendas: list[LegendaParaDestacar] = Field(min_length=1, max_length=2000)
 
 
 class AnimacaoDescritaEntrada(BaseModel):

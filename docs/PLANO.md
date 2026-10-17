@@ -448,7 +448,7 @@ Cada fase termina com algo que dá para usar e testar.
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
   - texto em fala (TTS com modelo aberto)
   - edição automática a partir de vários clipes
-  - destacar a palavra-chave da legenda com o LLM (seção 10)
+  - [x] destacar a palavra-chave da legenda com o LLM (seção 10): botão na ferramenta Legendas e opção do "Criar automaticamente"
 - Fica fora do escopo, pelas regras do dono no HolyCut: avatar de IA, dublagem, clonagem de voz e lip-sync.
 
 ### Fase 6: modelos, elementos e marca (2 semanas)

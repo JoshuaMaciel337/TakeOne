@@ -53,6 +53,8 @@ TEXTO_PADRAO = {
     "fundo_opacidade": 0.0,
     "brilho": 0.0,
     "brilho_cor": "#ffffff",
+    "palavras_chave": None,
+    "cor_chave": "#ffd400",
 }
 
 
@@ -106,6 +108,31 @@ def _medidas(texto: dict, lado_menor: int) -> dict:
             "folga": folga, "largura": int(largura_texto) + 2 * folga, "altura": altura_texto + 2 * folga}
 
 
+def _mascara_das_chaves(texto: dict, medidas: dict) -> Image.Image | None:
+    """Onde ficam as palavras-chave: uma faixa por palavra, da altura da linha, que vai até o meio dos espaços
+    vizinhos (para levar junto o contorno das letras). None se não há palavra-chave."""
+    chaves = set(texto.get("palavras_chave") or [])
+    if not chaves:
+        return None
+    mascara = Image.new("L", (medidas["largura"], medidas["altura"]), 0)
+    desenho = ImageDraw.Draw(mascara)
+    fonte, numero = medidas["fonte"], 0
+    for indice, (linha, (x, y)) in enumerate(zip(medidas["linhas"], medidas["posicoes"], strict=True)):
+        y0 = 0 if indice == 0 else y
+        y1 = medidas["altura"] if indice == len(medidas["linhas"]) - 1 else medidas["posicoes"][indice + 1][1]
+        palavras = palavras_das_letras(linha)
+        # Onde cada letra começa na imagem (e o fim da última)
+        xs = [x + fonte.getlength(linha[:i]) for i in range(len(linha) + 1)]
+        for k, (de, ate) in enumerate(palavras):
+            if numero + k not in chaves:
+                continue
+            esquerda = (xs[palavras[k - 1][1]] + xs[de]) / 2 if k > 0 else 0
+            direita = (xs[ate] + xs[palavras[k + 1][0]]) / 2 if k + 1 < len(palavras) else medidas["largura"]
+            desenho.rectangle((esquerda, y0, direita, y1), fill=255)
+        numero += len(palavras)
+    return mascara
+
+
 def layout_do_texto(texto: dict, lado_menor: int) -> dict:
     """
     Onde fica cada letra no PNG de desenhar_texto, em frações da imagem (core/utils/letras.py):
@@ -146,6 +173,16 @@ def desenhar_texto(texto: dict, lado_menor: int) -> Image.Image:
     for linha, posicao in zip(medidas["linhas"], medidas["posicoes"], strict=True):
         desenho.text(posicao, linha, font=fonte, fill=(*_rgb(texto["cor"]), 255),
                      stroke_width=contorno, stroke_fill=(*_rgb(texto["contorno_cor"]), 255))
+    # Palavras-chave: o mesmo texto desenhado de novo na cor delas, colado só nas faixas das palavras. As
+    # letras ficam exatamente no mesmo lugar, e o contorno, a sombra e o brilho continuam iguais.
+    mascara = _mascara_das_chaves(texto, medidas)
+    if mascara is not None:
+        chave = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+        desenho_chave = ImageDraw.Draw(chave)
+        for linha, posicao in zip(medidas["linhas"], medidas["posicoes"], strict=True):
+            desenho_chave.text(posicao, linha, font=fonte, fill=(*_rgb(texto["cor_chave"]), 255),
+                               stroke_width=contorno, stroke_fill=(*_rgb(texto["contorno_cor"]), 255))
+        camada.paste(chave, (0, 0), mascara)
 
     resultado = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
     if texto["fundo_opacidade"] > 0:
