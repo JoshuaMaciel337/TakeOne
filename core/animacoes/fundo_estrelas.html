@@ -1,0 +1,90 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Viagem nas estrelas",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Estrelas vêm do centro em direção à câmera, cada vez mais rápido, como um salto no espaço, e o título aparece.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "PRÓXIMA PARADA", "maximo": 26},
+  {"id": "subtitulo", "rotulo": "Subtítulo (opcional)", "tipo": "texto", "padrao": "o futuro", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Estrelas", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Brilho do centro", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Estrelas: 320 estrelas com direção e profundidade sorteadas; a profundidade cai com a integral da
+     velocidade (que acelera), e cada uma vira um risco do ponto anterior até o atual, mais longo quanto mais
+     perto. A profundidade volta ao fundo pelo resto da divisão. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 320;
+  const estrelas = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(7700 + i);
+    return { a: r() * 6.2832, d: 0.15 + r() * 1.1, z: r() };
+  });
+  // Distância percorrida até t: velocidade 0,15 + 0,2·t²
+  const andou = (t) => 0.15 * t + (0.2 * t * t * t) / 3;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.4, 0.6, dur);
+    ctx.globalAlpha = env;
+    ctx.fillStyle = "#04050a";
+    ctx.fillRect(0, 0, W, H);
+    const g = Math.max(W, H) * (0.4 + 0.1 * Math.sin(t * 2));
+    ctx.globalAlpha = env * 0.35;
+    ctx.drawImage(TO.brilho(C.cor_2), W / 2 - g / 2, H / 2 - g / 2, g, g);
+    const foco = Math.max(W, H) * 0.5;
+    ctx.strokeStyle = C.cor_1;
+    ctx.lineCap = "round";
+    for (const e of estrelas) {
+      const z1 = 1 - ((e.z + andou(t)) % 1);
+      const z0 = Math.min(1, z1 + (andou(t) - andou(Math.max(0, t - 0.06))));
+      const p1 = foco / (z1 * 6 + 0.3);
+      const p0 = foco / (z0 * 6 + 0.3);
+      const x1 = W / 2 + Math.cos(e.a) * e.d * p1 * 0.6;
+      const y1 = H / 2 + Math.sin(e.a) * e.d * p1 * 0.6;
+      const x0 = W / 2 + Math.cos(e.a) * e.d * p0 * 0.6;
+      const y0 = H / 2 + Math.sin(e.a) * e.d * p0 * 0.6;
+      ctx.globalAlpha = env * TO.clamp((1 - z1) * 1.4);
+      ctx.lineWidth = (0.1 + (1 - z1) * 0.5) * u;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    const k = TO.spring(t - 1, 0.55, 1.8);
+    // Uma sombra larga atrás do título, para os riscos não atrapalharem a leitura
+    const sombra = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) * 0.42);
+    sombra.addColorStop(0, "rgba(4,5,10,.85)");
+    sombra.addColorStop(1, "rgba(4,5,10,0)");
+    ctx.globalAlpha = env * TO.clamp(k);
+    ctx.fillStyle = sombra;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(0.6 + 0.4 * k, 0.6 + 0.4 * k);
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = TO.rgba(C.cor_2, 0.9);
+    ctx.shadowBlur = 3 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84, "Montserrat"), "Montserrat");
+    ctx.fillText(C.titulo, 0, C.subtitulo ? -3 * u : 0);
+    if (C.subtitulo) {
+      ctx.font = TO.fonte(500, Math.min(4, TO.caber(ctx, C.subtitulo.toUpperCase(), 500, 4, W * 0.8)));
+      ctx.letterSpacing = `${0.8 * u}px`;
+      ctx.fillText(C.subtitulo.toUpperCase(), 0, 7 * u);
+      ctx.letterSpacing = "0px";
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

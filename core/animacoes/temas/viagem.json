@@ -144,6 +144,48 @@
     "cor_2": "#ffd166",
     "texto": "Bora para a praia em janeiro?\nBora! Quantos dias?\nUma semana inteira\nJá tô fazendo a mala"
    }
+  },
+  {
+   "modelo": "fundo_aurora",
+   "id": "aurora_viagem",
+   "nome": "Fundo de viagem",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Diário de bordo",
+    "subtitulo": "dia 1"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_destinos",
+   "nome": "Destinos favoritos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "titulo": "Top 5 praias do Brasil",
+    "texto": "Baía do Sancho\nJericoacoara\nLopes Mendes\nPraia do Espelho\nCarneiros"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_viagem",
+   "nome": "Palavras de viagem",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "texto": "Sol\nMar\nLiberdade\nPartiu!"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166",
+    "cor_texto": "#6bd8f2"
+   }
   }
  ]
 }

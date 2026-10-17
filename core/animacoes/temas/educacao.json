@@ -162,6 +162,49 @@
     "titulo": "aula-01",
     "texto": "$ python ola.py\nOlá, mundo!\n✓ Primeiro programa feito"
    }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_aula",
+   "nome": "Pergunta da aula",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "pergunta": "Por que o céu é azul?",
+    "resposta": "A luz azul se espalha mais no ar do que as outras cores."
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_curso",
+   "nome": "Comparativo de curso",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nosso": "Nosso curso",
+    "deles": "Outros",
+    "texto": "Aulas ao vivo\nMaterial em PDF\nCorreção de redação\nCertificado"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_turma",
+   "nome": "Ranking da turma",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "Destaques do mês",
+    "texto": "Ana\nBruno\nCarla\nDiego\nElisa"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
   }
  ]
 }

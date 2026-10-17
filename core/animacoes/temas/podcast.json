@@ -178,6 +178,60 @@
     "minuto": "0",
     "texto": "Episódio novo às 20h"
    }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_convidado",
+   "nome": "Convidado discreto",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "nome": "Helena Costa",
+    "funcao": "Psicóloga e autora"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_episodio",
+   "nome": "Pergunta do episódio",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "pergunta": "Como lidar com a ansiedade no trabalho?",
+    "resposta": "Começando pelo básico: sono, pausas e conversas sinceras."
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_podcast",
+   "nome": "Abertura do podcast",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Ideias\nConversas\nHistórias\nConversa Boa"
+   }
+  },
+  {
+   "modelo": "botao_inscrever",
+   "id": "inscreva_podcast",
+   "nome": "Inscreva-se no podcast",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "SEGUIR",
+    "feito": "SEGUINDO",
+    "chamada": "novo episódio toda terça"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

@@ -127,6 +127,50 @@
     "mensagem": "Toque para abrir a pauta",
     "iniciais": "A"
    }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_tech",
+   "nome": "Pergunta de tecnologia",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "pergunta": "Preciso desligar o celular toda noite?",
+    "resposta": "Não precisa, mas reiniciar uma vez por semana ajuda."
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_tech",
+   "nome": "Comparativo de aparelhos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nosso": "Modelo novo",
+    "deles": "Antigo",
+    "texto": "Carregamento rápido\nTela 120 Hz\nResistente à água\n5G"
+   }
+  },
+  {
+   "modelo": "fundo_estrelas",
+   "id": "estrelas_tech",
+   "nome": "Salto tecnológico",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "titulo": "O FUTURO CHEGOU",
+    "subtitulo": "conheça a nova versão"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

@@ -1,0 +1,76 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Toque aqui",
+ "categoria": "chamadas",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um dedo toca a tela várias vezes, soltando ondas a cada toque, com a chamada ao lado.",
+ "campos": [
+  {"id": "texto", "rotulo": "Chamada", "tipo": "texto", "padrao": "Toque para saber mais", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Ondas", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Toque: a mão (círculo do dedo e palma em formas simples) desce e sobe a cada 0,9 s; cada toque solta
+     dois anéis que crescem e somem. A chamada fica numa pílula embaixo, entrando com mola. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const P = 0.9;
+  const mao = (x, y, s) => {
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "rgba(0,0,0,.35)";
+    ctx.lineWidth = s * 0.06;
+    TO.retangulo(ctx, x - s * 0.22, y - s * 0.1, s * 0.44, s * 1.2, s * 0.22);
+    ctx.fill();
+    ctx.stroke();
+    TO.retangulo(ctx, x - s * 0.22, y + s * 0.65, s * 1.15, s * 1.05, s * 0.4);
+    ctx.fill();
+    ctx.stroke();
+  };
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.4, dur));
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.4));
+    const cx = W / 2;
+    const cy = H / 2 - 6 * u;
+    ctx.globalAlpha = entra * (1 - sai);
+    const n = Math.floor((t - 0.4) / P);
+    for (let j = 0; j <= n; j++) {
+      const desde = t - 0.4 - j * P - 0.25;
+      for (const atraso of [0, 0.15]) {
+        const q = (desde - atraso) / 0.9;
+        if (q <= 0 || q >= 1) continue;
+        ctx.strokeStyle = TO.rgba(C.cor_1, (1 - q) * 0.9);
+        ctx.lineWidth = 0.6 * u;
+        ctx.beginPath();
+        ctx.arc(cx, cy, (2 + q * 10) * u, 0, 6.2832);
+        ctx.stroke();
+      }
+    }
+    const fase = ((t - 0.4) % P + P) % P / P;
+    const desce = t < 0.4 ? 0 : Math.sin(Math.min(1, fase / 0.55) * Math.PI);
+    mao(cx, cy - 1 * u - (1 - desce) * 3 * u, 7 * u);
+    const k = TO.spring(t - 0.6, 0.5, 2.4);
+    ctx.save();
+    ctx.translate(cx, cy + 22 * u);
+    ctx.scale(k, k);
+    ctx.font = TO.fonte(800, Math.min(4.2, TO.caber(ctx, C.texto, 800, 4.2, W * 0.76)));
+    const tw = ctx.measureText(C.texto).width + 6 * u;
+    ctx.fillStyle = TO.degrade(ctx, -tw / 2, 0, tw / 2, 0, C.cor_2, C.cor_2);
+    TO.retangulo(ctx, -tw / 2, -3.6 * u, tw, 7.2 * u, 3.6 * u);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(C.texto, 0, 0.3 * u);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

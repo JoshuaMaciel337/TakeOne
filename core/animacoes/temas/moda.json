@@ -1,0 +1,119 @@
+{
+ "nome": "Moda e estilo",
+ "ordem": 34,
+ "versoes": [
+  {
+   "modelo": "titulo_degrade",
+   "id": "nova_colecao",
+   "nome": "Nova coleção",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "texto": "Nova coleção",
+    "subtitulo": "primavera e verão"
+   }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_estilista",
+   "nome": "Tarja de estilista",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "nome": "Carolina Reis",
+    "funcao": "Estilista"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "look_oferta",
+   "nome": "Look em oferta",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "produto": "Vestido midi linho",
+    "de": "R$ 289",
+    "por": "R$ 189",
+    "selo": "-35%"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "look_do_dia",
+   "nome": "Look do dia",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "titulo": "Look do dia",
+    "texto": "Camisa de linho\nCalça de alfaiataria\nMocassim caramelo\nBolsa de palha"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "tendencias",
+   "nome": "Tendências",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "titulo": "5 tendências do verão",
+    "texto": "Linho\nTons terrosos\nAlfaiataria leve\nCrochê\nSandália flat"
+   }
+  },
+  {
+   "modelo": "logo_linhas",
+   "id": "logo_marca_moda",
+   "nome": "Logo da marca",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "texto": "ATELIÊ LUNA",
+    "slogan": "moda feita à mão"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_look",
+   "nome": "Qual look",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "pergunta": "Qual look para o fim de semana?",
+    "opcao_1": "Vestido",
+    "pct_1": "58",
+    "opcao_2": "Conjunto",
+    "pct_2": "42"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_moda",
+   "nome": "Palavras de moda",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "texto": "Leve\nAtemporal\nSeu\nAteliê Luna"
+   }
+  },
+  {
+   "modelo": "cupom",
+   "id": "cupom_moda",
+   "nome": "Cupom de moda",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0",
+    "desconto": "10% OFF",
+    "texto": "na primeira peça",
+    "codigo": "LUNA10"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0"
+   }
+  }
+ ]
+}

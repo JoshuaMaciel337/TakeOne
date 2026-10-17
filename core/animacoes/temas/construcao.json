@@ -1,0 +1,132 @@
+{
+ "nome": "Construção e reformas",
+ "ordem": 31,
+ "versoes": [
+  {
+   "modelo": "antes_depois",
+   "id": "antes_depois_reforma",
+   "nome": "Antes e depois da reforma",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "cozinha antiga",
+    "rotulo_depois": "em 15 dias"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "etapas_obra",
+   "nome": "Etapas da obra",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "titulo": "Etapas da obra",
+    "texto": "Fundação\nEstrutura e alvenaria\nInstalações\nAcabamento"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "andamento_obra",
+   "nome": "Andamento da obra",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "titulo": "Andamento da obra",
+    "valor": "68",
+    "meta": "100",
+    "prefixo": ""
+   }
+  },
+  {
+   "modelo": "tarja_caixa",
+   "id": "tarja_engenheiro",
+   "nome": "Tarja de engenheiro",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "nome": "Eng. Paulo Mendes",
+    "funcao": "Engenheiro civil · CREA 123456"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "materiais",
+   "nome": "Materiais",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "titulo": "Lista de materiais",
+    "texto": "Cimento e areia\nTijolo baiano\nFerragem\nRevestimento"
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_obra",
+   "nome": "Comparativo de obra",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "nosso": "Empreitada",
+    "deles": "Por conta",
+    "texto": "Prazo garantido\nCompra de material\nEquipe fixa\nNota fiscal"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "preco_m2",
+   "nome": "Preço por m²",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "produto": "Porcelanato 60x60",
+    "de": "R$ 89/m²",
+    "por": "R$ 64/m²",
+    "selo": "-28%"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_obra",
+   "nome": "Dica de obra",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "rotulo": "DICA DE OBRA",
+    "texto": "Compre 10% a mais de piso para cortes e perdas."
+   }
+  },
+  {
+   "modelo": "titulo_impacto",
+   "id": "obra_entregue",
+   "nome": "Obra entregue",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "texto": "Obra entregue!"
+   }
+  },
+  {
+   "modelo": "logo_linhas",
+   "id": "logo_construtora",
+   "nome": "Logo da construtora",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "texto": "CONSTRUTORA ALFA",
+    "slogan": "construindo desde 1995"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00",
+    "cor_texto": "#14151b"
+   }
+  }
+ ]
+}

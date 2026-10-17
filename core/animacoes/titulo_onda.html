@@ -1,0 +1,51 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título em onda",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "As letras entram pulando uma a uma e depois ondulam sem parar, como uma bandeira ao vento.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "Bem-vindos ao canal", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Letras (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Letras (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Contorno", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Onda: cada letra tem a sua cor no degradê, entra com mola de baixo para cima em sequência e, depois,
+     sobe e desce num seno que anda da esquerda para a direita. O contorno claro ajuda a ler em qualquer fundo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const letras = [...C.texto];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inBack(TO.prog(t, dur - 0.5, dur));
+    const tam = TO.caber(ctx, C.texto, 900, 11, W * 0.84, "Montserrat");
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    const total = ctx.measureText(C.texto).width;
+    let x = W / 2 - total / 2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    letras.forEach((l, i) => {
+      const lw = ctx.measureText(l).width;
+      const k = TO.spring(t - 0.1 - i * 0.04, 0.45, 2.4);
+      const onda = Math.sin(t * 5 - i * 0.55) * 1.4 * u * TO.clamp(t - 0.8);
+      const y = H / 2 + (1 - k) * 8 * u + onda + sai * 10 * u;
+      ctx.globalAlpha = TO.clamp(k) * (1 - sai);
+      ctx.lineWidth = tam * u * 0.12;
+      ctx.strokeStyle = C.cor_texto;
+      ctx.strokeText(l, x + lw / 2, y);
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, letras.length > 1 ? i / (letras.length - 1) : 0);
+      ctx.fillText(l, x + lw / 2, y);
+      x += lw;
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

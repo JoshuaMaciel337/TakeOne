@@ -1,0 +1,63 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título dividido",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "descricao": "A metade de cima e a de baixo do título entram de lados opostos e se encaixam, com uma linha cortando no meio.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "SEM LIMITES", "maximo": 22},
+  {"id": "subtitulo", "rotulo": "Embaixo", "tipo": "texto", "padrao": "temporada 2", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Linha (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Linha (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Dividido: o texto é desenhado duas vezes, cada vez recortado numa metade (acima e abaixo da linha do
+     meio); a de cima vem da esquerda e a de baixo da direita, com desaceleração forte. Na saída elas se
+     separam de novo pelo caminho contrário. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const entra = TO.ease.outExpo(TO.prog(t, 0.1, 1));
+    const sai = TO.ease.inExpo(TO.prog(t, dur - 0.6, dur));
+    const desl = (1 - entra + sai) * W * 0.6;
+    const cy = H / 2 - 2 * u;
+    const tam = TO.caber(ctx, C.texto, 900, 14, W * 0.86, "Montserrat");
+    const meia = tam * u * 0.5;
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.globalAlpha = 1 - sai * 0.5;
+    [[-1, cy - meia, cy], [1, cy, cy + meia]].forEach(([lado, y0, y1]) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, y0 - 2, W, y1 - y0 + 2);
+      ctx.clip();
+      ctx.fillText(C.texto, W / 2 + lado * desl, cy);
+      ctx.restore();
+    });
+    const linha = TO.ease.inOutCubic(TO.prog(t, 0.5, 1.1)) * (1 - TO.prog(t, dur - 0.8, dur - 0.4));
+    if (linha > 0) {
+      const lw = W * 0.86 * linha;
+      ctx.fillStyle = TO.degrade(ctx, W / 2 - lw / 2, 0, W / 2 + lw / 2, 0);
+      ctx.fillRect(W / 2 - lw / 2, cy - 0.25 * u, lw, 0.5 * u);
+    }
+    const s = TO.ease.outCubic(TO.prog(t, 0.9, 1.5));
+    ctx.globalAlpha = s * (1 - TO.prog(t, dur - 0.7, dur - 0.4));
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(600, Math.min(4, TO.caber(ctx, C.subtitulo.toUpperCase(), 600, 4, W * 0.8)));
+    ctx.letterSpacing = `${0.6 * u}px`;
+    ctx.fillText(C.subtitulo.toUpperCase(), W / 2, cy + meia + 5 * u);
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

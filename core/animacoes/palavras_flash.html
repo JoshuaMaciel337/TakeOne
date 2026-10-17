@@ -1,0 +1,52 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Palavras em sequência",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Uma palavra (ou frase curta) por vez, grande no centro, trocando no ritmo com um soco de zoom.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavras (uma por linha)", "tipo": "linhas", "padrao": "Rápido\nSimples\nSem custo\nTakeOne", "maximo": 120},
+  {"id": "cor_1", "rotulo": "Última (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Última (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Sequência: a duração é dividida igualmente entre as linhas; cada uma entra grande (escala 1,35) e
+     assenta em 0,15 s, com um tremor curto, e a última fica até o fim, no degradê. Bom para cortes no
+     ritmo da música. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const palavras = C.texto.split("\n").map((p) => p.trim()).filter(Boolean).slice(0, 8);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    if (!palavras.length) return;
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.35, dur));
+    const passo = (dur - 0.35) / palavras.length;
+    const i = Math.min(palavras.length - 1, Math.floor(t / passo));
+    const local = t - i * passo;
+    const p = palavras[i];
+    const ultima = i === palavras.length - 1;
+    const s = 1 + 0.35 * (1 - TO.ease.outCubic(TO.clamp(local / 0.15)));
+    const tremor = local < 0.12 ? Math.sin(local * 120) * 0.6 * u : 0;
+    ctx.save();
+    ctx.translate(W / 2 + tremor, H / 2);
+    ctx.scale(s, s);
+    ctx.globalAlpha = TO.clamp(local / 0.05) * (1 - sai);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(900, TO.caber(ctx, p, 900, 16, (W * 0.84) / 1.35));
+    ctx.shadowColor = "rgba(0,0,0,.5)";
+    ctx.shadowBlur = 3 * u;
+    const lw = ctx.measureText(p).width;
+    ctx.fillStyle = ultima ? TO.degrade(ctx, -lw / 2, 0, lw / 2, 0) : C.cor_texto;
+    ctx.fillText(p, 0, 0);
+    ctx.restore();
+  };
+})();
+</script>

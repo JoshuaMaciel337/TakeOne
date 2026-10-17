@@ -111,6 +111,47 @@
     "por": "R$ 1.620",
     "selo": "+9%"
    }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_safra",
+   "nome": "Números da safra",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "dados": "hectares: 1200\nsacas por hectare: 67\nde aumento (%): 12"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_agro",
+   "nome": "Pergunta do campo",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "pergunta": "Qual a melhor época para plantar milho?",
+    "resposta": "No Centro-Sul, de setembro a novembro, com as chuvas."
+   }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_agro",
+   "nome": "Título do campo",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "texto": "Bom dia, campo!"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#5fa83b",
+    "cor_2": "#e0a030",
+    "cor_texto": "#5fa83b"
+   }
   }
  ]
 }

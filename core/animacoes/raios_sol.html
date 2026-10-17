@@ -1,0 +1,79 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Raios girando",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Fundo em tela cheia de raios em duas cores girando a partir do centro, com um selo de destaque pulsando no meio.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "SUPER OFERTA", "maximo": 22},
+  {"id": "subtitulo", "rotulo": "Subtítulo (opcional)", "tipo": "texto", "padrao": "só neste fim de semana", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Raio 1", "tipo": "cor", "padrao": "#ffd400"},
+  {"id": "cor_2", "rotulo": "Raio 2", "tipo": "cor", "padrao": "#ff7a00"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Raios: 24 fatias alternando as duas cores giram devagar em volta do centro, com um escurecimento radial
+     nas bordas; no meio, um círculo escuro pulsa no ritmo e segura o título, que entra com mola e gira um pouco. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 24;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.4, 0.5, dur);
+    const cx = W / 2;
+    const cy = H / 2;
+    const R = Math.hypot(W, H);
+    ctx.globalAlpha = env;
+    ctx.fillStyle = C.cor_2;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = C.cor_1;
+    const giro = t * 0.35;
+    for (let i = 0; i < N; i += 2) {
+      const a0 = giro + (i / N) * 6.2832;
+      const a1 = giro + ((i + 1) / N) * 6.2832;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a0) * R, cy + Math.sin(a0) * R);
+      ctx.lineTo(cx + Math.cos(a1) * R, cy + Math.sin(a1) * R);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const v = ctx.createRadialGradient(cx, cy, Math.min(W, H) * 0.2, cx, cy, R * 0.6);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(1, "rgba(0,0,0,.55)");
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+    const k = TO.spring(t - 0.3, 0.45, 2);
+    const pulso = 1 + 0.04 * Math.sin(t * 6);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((1 - TO.clamp(k)) * -0.3 - 0.06);
+    ctx.scale(k * pulso, k * pulso);
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 11, Math.min(W * 0.8, 90 * u), "Montserrat"), "Montserrat");
+    const tw = ctx.measureText(C.titulo).width;
+    const r = Math.max(tw * 0.62, 22 * u);
+    ctx.fillStyle = "rgba(14,15,20,.92)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, Math.min(r * 0.6, 26 * u), 0, 0, 6.2832);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(C.titulo, 0, C.subtitulo ? -2.6 * u : 0);
+    if (C.subtitulo) {
+      ctx.fillStyle = C.cor_1;
+      ctx.font = TO.fonte(700, Math.min(3.4, TO.caber(ctx, C.subtitulo, 700, 3.4, r * 1.5)));
+      ctx.fillText(C.subtitulo, 0, 7 * u);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

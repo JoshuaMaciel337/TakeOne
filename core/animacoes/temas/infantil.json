@@ -105,6 +105,47 @@
     "cor_2": "#ff8fab",
     "titulo": "Muito bem!"
    }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_infantil",
+   "nome": "Título infantil",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "texto": "Bem-vindos, crianças!"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "adivinha",
+   "nome": "Adivinha",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "pergunta": "O que é, o que é: tem dentes mas não morde?",
+    "resposta": "O pente!"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_infantil",
+   "nome": "Palavras divertidas",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "texto": "Pular\nCorrer\nBrincar\nSorrir!"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

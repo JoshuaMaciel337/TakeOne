@@ -132,6 +132,49 @@
     "texto": "Encontraram o apartamento ideal em duas semanas.",
     "nome": "Família Souza"
    }
+  },
+  {
+   "modelo": "logo_linhas",
+   "id": "logo_imobiliaria",
+   "nome": "Logo da imobiliária",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "texto": "IMOBILIÁRIA LAR",
+    "slogan": "o seu próximo endereço"
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_imovel",
+   "nome": "Comprar ou alugar",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "nosso": "Comprar",
+    "deles": "Alugar",
+    "texto": "Patrimônio próprio\nReforma do seu jeito\nParcela que vira bem\nValorização"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_imovel",
+   "nome": "Números do imóvel",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "dados": "m² privativos: 86\nvagas: 2\nvendido (%): 70"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

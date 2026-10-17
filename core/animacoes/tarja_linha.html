@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja minimalista",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Uma linha fina se desenha e o nome sobe de dentro dela, com a função logo abaixo. Elegante e discreta.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Helena Duarte", "maximo": 32},
+  {"id": "funcao", "rotulo": "Função", "tipo": "texto", "padrao": "Arquiteta", "maximo": 44},
+  {"id": "cor_1", "rotulo": "Linha (início)", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Linha (fim)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Minimalista: a linha cresce da esquerda; o nome sobe de baixo dela, escondido por uma máscara
+     (overflow), e a função desce de cima. Na saída a linha encolhe para a direita e os textos voltam para
+     dentro. Sem caixa de fundo: só uma sombra suave. -->
+<style>
+.tarja{position:absolute;left:calc(var(--u)*7);bottom:calc(var(--u)*12);color:var(--cor-texto);text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1.4) rgba(0,0,0,.6)}
+.cima,.baixo{overflow:hidden}
+.nome{font-weight:700;font-size:calc(var(--u)*7);letter-spacing:.01em;white-space:nowrap;padding-bottom:calc(var(--u)*.6);
+  animation:subir .7s cubic-bezier(.2,.8,.2,1) .5s both,descer .5s cubic-bezier(.6,0,.8,.2) calc(var(--dur) - .7s) forwards}
+.linha{height:calc(var(--u)*.3);background:linear-gradient(90deg,var(--cor-1),var(--cor-2));transform-origin:0 50%;
+  animation:crescer .6s cubic-bezier(.65,0,.35,1) .1s both,encolher .5s cubic-bezier(.65,0,.35,1) calc(var(--dur) - .5s) forwards}
+.funcao{font-weight:400;font-size:calc(var(--u)*3.6);letter-spacing:.18em;text-transform:uppercase;opacity:.85;white-space:nowrap;padding-top:calc(var(--u)*.8);
+  animation:baixar .7s cubic-bezier(.2,.8,.2,1) .65s both,voltar .5s cubic-bezier(.6,0,.8,.2) calc(var(--dur) - .75s) forwards}
+@keyframes crescer{from{transform:scaleX(0)}}
+@keyframes encolher{to{transform:scaleX(0);transform-origin:100% 50%}}
+@keyframes subir{from{transform:translateY(110%)}}
+@keyframes descer{to{transform:translateY(110%)}}
+@keyframes baixar{from{transform:translateY(-110%)}}
+@keyframes voltar{to{transform:translateY(-110%)}}
+</style>
+<div class="tarja"><div class="cima"><div class="nome">{{nome}}</div></div><div class="linha"></div><div class="baixo"><div class="funcao">{{funcao}}</div></div></div>

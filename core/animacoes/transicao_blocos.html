@@ -1,0 +1,45 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Blocos que cobrem",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Quadrados aparecem em ordem sorteada até cobrir a tela e depois somem do mesmo jeito. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "cor_1", "rotulo": "Blocos (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Blocos (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#14151b"}
+ ]
+}
+</script>
+<!-- Blocos: a tela vira uma grade de quadrados (12 no lado menor); cada um tem a sua vez sorteada e
+     cresce do centro dele até cobrir a célula; na segunda metade, encolhe na ordem sorteada de novo. A cor
+     vai da 1 à 2 na diagonal. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const lado = Math.min(W, H) / 12;
+  const cols = Math.ceil(W / lado);
+  const rows = Math.ceil(H / lado);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const meio = dur / 2;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const i = y * cols + x;
+        const vez = TO.hash(i, 9) * (meio - 0.25);
+        const sai = TO.hash(i, 11) * (meio - 0.25);
+        const k = TO.ease.outCubic(TO.prog(t, vez, vez + 0.22)) * (1 - TO.ease.inCubic(TO.prog(t, meio + 0.03 + sai, meio + 0.25 + sai)));
+        if (k <= 0) continue;
+        const s = lado * k + 1;
+        ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, (x / cols + y / rows) / 2);
+        ctx.fillRect(x * lado + (lado - s) / 2, y * lado + (lado - s) / 2, s, s);
+      }
+    }
+  };
+})();
+</script>

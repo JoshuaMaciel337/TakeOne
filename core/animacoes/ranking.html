@@ -1,0 +1,45 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Ranking",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Um top 5 que entra de baixo para cima, do último ao primeiro, com medalhas de ouro, prata e bronze.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Top 5 da semana", "maximo": 30},
+  {"id": "texto", "rotulo": "Posições (do 1º ao último, uma por linha)", "tipo": "linhas", "padrao": "Bolo de cenoura\nPão de queijo\nCoxinha\nBrigadeiro\nPastel de feira", "maximo": 200},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Ranking: um script conta as linhas para que a última posição entre primeiro e o 1º lugar por último
+     (suspense); o número vem do contador do CSS. As três primeiras ganham medalha (cores fixas de ouro,
+     prata e bronze), e o 1º lugar ganha a borda em degradê. -->
+<style>
+.ranking{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*84),88%);color:var(--cor-texto);counter-reset:pos;
+  animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.titulo{font-weight:900;font-size:calc(var(--u)*6);letter-spacing:-.02em;margin-bottom:calc(var(--u)*2);text-shadow:0 calc(var(--u)*.3) calc(var(--u)*2) rgba(0,0,0,.5);
+  animation:entrar .5s ease-out both}
+.linha{display:flex;align-items:center;gap:calc(var(--u)*2.2);margin-top:calc(var(--u)*1.4);padding:calc(var(--u)*1.6) calc(var(--u)*2.4);border-radius:calc(var(--u)*2);
+  background:rgba(16,17,22,.88);font-weight:700;font-size:calc(var(--u)*3.8);counter-increment:pos;
+  animation:subir .5s cubic-bezier(.2,1.2,.4,1) calc(.5s + (var(--n) - 1 - var(--i)) * .55s) both}
+.linha::before{content:counter(pos);flex:none;width:calc(var(--u)*6);height:calc(var(--u)*6);border-radius:50%;display:grid;place-items:center;
+  background:rgba(255,255,255,.12);font-weight:900;font-size:calc(var(--u)*3.2)}
+.linha:nth-child(2)::before{background:linear-gradient(135deg,#ffe08a,#d4a017);color:#3a2a00}
+.linha:nth-child(3)::before{background:linear-gradient(135deg,#f0f0f0,#a8adb5);color:#222}
+.linha:nth-child(4)::before{background:linear-gradient(135deg,#f0b37e,#a0612c);color:#2a1300}
+.linha:nth-child(2){border:calc(var(--u)*.35) solid transparent;
+  background:linear-gradient(rgba(16,17,22,.92),rgba(16,17,22,.92)) padding-box,linear-gradient(120deg,var(--cor-1),var(--cor-2)) border-box}
+@keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*-2))}}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*4)) scale(.95)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="ranking"><div class="titulo">{{titulo}}</div>{{texto:linhas}}</div>
+<script>
+{
+  const linhas = document.querySelectorAll(".ranking .linha");
+  document.querySelector(".ranking").style.setProperty("--n", linhas.length);
+}
+</script>

@@ -1,0 +1,134 @@
+{
+ "nome": "Lojas e varejo",
+ "ordem": 36,
+ "versoes": [
+  {
+   "modelo": "raios_sol",
+   "id": "super_oferta",
+   "nome": "Super oferta",
+   "padroes": {}
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "inauguracao",
+   "nome": "Inauguração",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "titulo": "INAUGURAÇÃO",
+    "subtitulo": "sábado, a partir das 9h"
+   }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "queima_total",
+   "nome": "Queima total",
+   "padroes": {
+    "cor_1": "#ff3b3b",
+    "cor_2": "#ff7a00",
+    "titulo": "QUEIMA TOTAL",
+    "subtitulo": "tudo pela metade do preço"
+   }
+  },
+  {
+   "modelo": "titulo_degrade",
+   "id": "liquidacao_degrade",
+   "nome": "Liquidação",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "texto": "Liquidação",
+    "subtitulo": "até 60% de desconto"
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "por_que_nos",
+   "nome": "Por que comprar aqui",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "troca_facil",
+   "nome": "Troca fácil",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "numero": "30",
+    "texto": "DIAS",
+    "fita": "TROCA FÁCIL"
+   }
+  },
+  {
+   "modelo": "chamada_notificacao",
+   "id": "pedido_confirmado",
+   "nome": "Pedido confirmado",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "app": "Loja Central",
+    "titulo": "Pedido confirmado!",
+    "mensagem": "Chega em até 2 dias úteis",
+    "iniciais": "L"
+   }
+  },
+  {
+   "modelo": "local_pin",
+   "id": "endereco_loja",
+   "nome": "Endereço da loja",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "titulo": "Loja Central",
+    "endereco": "Av. Brasil, 1200 · Centro"
+   }
+  },
+  {
+   "modelo": "relogio",
+   "id": "horario_loja",
+   "nome": "Horário da loja",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "hora": "9",
+    "minuto": "0",
+    "texto": "Abrimos às 9h, de segunda a sábado"
+   }
+  },
+  {
+   "modelo": "toque_aqui",
+   "id": "toque_comprar",
+   "nome": "Toque para comprar",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "texto": "Toque para comprar",
+    "cor_texto": "#14151b"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "avaliacao_loja",
+   "nome": "Avaliação da loja",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "texto": "Preço bom, atendimento rápido e entrega no mesmo dia.",
+    "nome": "Júlio, cliente"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166",
+    "cor_texto": "#14151b"
+   }
+  }
+ ]
+}

@@ -147,6 +147,47 @@
     "valor": "80",
     "legenda": "da meta de água de hoje"
    }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_saude",
+   "nome": "Pergunta de saúde",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "pergunta": "Quantos litros de água por dia?",
+    "resposta": "Em média, 35 ml por quilo de peso. Converse com o seu médico."
+   }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_medica",
+   "nome": "Tarja discreta de médica",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "nome": "Dra. Paula Reis",
+    "funcao": "Cardiologista"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_clinica",
+   "nome": "Números da clínica",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1",
+    "dados": "especialidades: 18\nmédicos: 45\nde satisfação (%): 97"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1"
+   }
   }
  ]
 }

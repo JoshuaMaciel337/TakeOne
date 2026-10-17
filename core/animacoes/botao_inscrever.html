@@ -1,0 +1,56 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Botão de inscrição com sino",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Um botão grande é clicado e vira 'inscrito', e o sino ao lado balança e ganha o ponto de aviso.",
+ "campos": [
+  {"id": "texto", "rotulo": "Botão", "tipo": "texto", "padrao": "INSCREVA-SE", "maximo": 18},
+  {"id": "feito", "rotulo": "Depois do clique", "tipo": "texto", "padrao": "INSCRITO", "maximo": 18},
+  {"id": "chamada", "rotulo": "Chamada", "tipo": "texto", "padrao": "e ative o sininho", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Botão (início)", "tipo": "cor", "padrao": "#ff3b3b"},
+  {"id": "cor_2", "rotulo": "Botão (fim)", "tipo": "cor", "padrao": "#e11d48"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Inscrição: o grupo estala; um cursor (SVG) desliza até o botão e clica (o botão afunda); o botão
+     troca para o cinza com o texto de feito (dois spans trocados por opacidade); o sino balança em laço e
+     ganha um ponto vermelho. -->
+<style>
+.grupo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*2);
+  color:var(--cor-texto);animation:estalo .5s cubic-bezier(.2,1.5,.4,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.linha{display:flex;align-items:center;gap:calc(var(--u)*2.4)}
+.botao{position:relative;display:grid;padding:calc(var(--u)*2.4) calc(var(--u)*5);border-radius:calc(var(--u)*1.6);font-weight:900;font-size:calc(var(--u)*4.6);letter-spacing:.04em;
+  background:linear-gradient(120deg,var(--cor-1),var(--cor-2));box-shadow:0 calc(var(--u)*.8) calc(var(--u)*2.4) rgba(0,0,0,.4);
+  animation:clique .3s ease-in-out 1.3s,cinza .01s linear 1.45s forwards}
+.botao span{grid-area:1/1;text-align:center;white-space:nowrap}
+.botao .depois{opacity:0;animation:aparecer .01s linear 1.45s forwards}
+.botao .antes{animation:sumir .01s linear 1.45s forwards}
+.sino{position:relative;width:calc(var(--u)*9);height:calc(var(--u)*9);display:grid;place-items:center;border-radius:50%;background:rgba(18,19,25,.9)}
+.sino svg{width:60%;height:60%;fill:#fff;transform-origin:50% 10%;animation:balancar .5s ease-in-out 1.8s 4 alternate}
+.sino i{position:absolute;right:calc(var(--u)*1.6);top:calc(var(--u)*1.4);width:calc(var(--u)*2);height:calc(var(--u)*2);border-radius:50%;background:#ff3b3b;
+  border:calc(var(--u)*.35) solid rgba(18,19,25,.9);animation:estalo .4s cubic-bezier(.2,1.8,.4,1) 1.9s both}
+.chamada{font-weight:700;font-size:calc(var(--u)*3.6);text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.55);animation:aparecer .5s ease-out 2s both}
+.cursor{position:absolute;left:55%;top:60%;width:calc(var(--u)*6);height:calc(var(--u)*6);fill:#fff;stroke:#111;stroke-width:1.2;
+  animation:mover .9s cubic-bezier(.2,.8,.2,1) .4s both,apertar .3s ease-in-out 1.3s,some .3s ease-in 2.2s forwards}
+@keyframes estalo{from{transform:scale(0)}}
+@keyframes clique{50%{transform:scale(.92)}}
+@keyframes cinza{to{background:rgba(70,72,82,.95)}}
+@keyframes aparecer{from{opacity:0}to{opacity:1}}
+@keyframes sumir{to{opacity:0}}
+@keyframes balancar{from{transform:rotate(-16deg)}to{transform:rotate(16deg)}}
+@keyframes mover{from{opacity:0;transform:translate(calc(var(--u)*14),calc(var(--u)*12))}}
+@keyframes apertar{50%{transform:scale(.8)}}
+@keyframes some{to{opacity:0}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+</style>
+<div class="grupo">
+ <div class="linha">
+  <div class="botao"><span class="antes">{{texto}}</span><span class="depois">{{feito}}</span></div>
+  <div class="sino"><svg viewBox="0 0 24 24"><path d="M12 2a1.5 1.5 0 0 1 1.5 1.5v.6A6 6 0 0 1 18 10v4.5l2 2.5H4l2-2.5V10a6 6 0 0 1 4.5-5.9v-.6A1.5 1.5 0 0 1 12 2zM9.5 19h5a2.5 2.5 0 0 1-5 0z"/></svg><i></i></div>
+ </div>
+ <div class="chamada">{{chamada}}</div>
+ <svg class="cursor" viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.5L10 19z"/></svg>
+</div>

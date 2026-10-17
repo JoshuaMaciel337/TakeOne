@@ -1,0 +1,119 @@
+{
+ "nome": "Criadores de conteúdo",
+ "ordem": 30,
+ "versoes": [
+  {
+   "modelo": "botao_inscrever",
+   "id": "inscreva_se",
+   "nome": "Inscreva-se",
+   "padroes": {}
+  },
+  {
+   "modelo": "botao_inscrever",
+   "id": "siga_perfil",
+   "nome": "Siga o perfil",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "SEGUIR",
+    "feito": "SEGUINDO",
+    "chamada": "e ative as notificações"
+   }
+  },
+  {
+   "modelo": "odometro",
+   "id": "marca_inscritos",
+   "nome": "Marca de inscritos",
+   "padroes": {}
+  },
+  {
+   "modelo": "odometro",
+   "id": "marca_seguidores",
+   "nome": "Marca de seguidores",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "valor": "1000000",
+    "legenda": "seguidores! Obrigado!"
+   }
+  },
+  {
+   "modelo": "seta_desenhada",
+   "id": "olha_isso",
+   "nome": "Olha isso",
+   "padroes": {}
+  },
+  {
+   "modelo": "seta_desenhada",
+   "id": "link_aqui",
+   "nome": "Link aqui",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "link aqui!"
+   }
+  },
+  {
+   "modelo": "toque_aqui",
+   "id": "toque_saber_mais",
+   "nome": "Toque para saber mais",
+   "padroes": {}
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "intro_canal",
+   "nome": "Abertura do canal",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Dicas\nBastidores\nHistórias\nToda semana"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_seguidores",
+   "nome": "Enquete para seguidores",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "boas_vindas_canal",
+   "nome": "Boas-vindas ao canal",
+   "padroes": {}
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "comentario_seguidor",
+   "nome": "Mensagem de seguidor",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Seu vídeo me ajudou muito!\nQue bom, obrigado!\nFaz um sobre edição?\nJá está na lista!"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_seguidor",
+   "nome": "Pergunta de seguidor",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "pergunta": "Qual câmera você usa?",
+    "resposta": "O celular mesmo! Luz boa importa mais que a câmera."
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "cor_texto": "#14151b"
+   }
+  }
+ ]
+}

@@ -1,0 +1,88 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chuva de moedas",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Moedas douradas caem girando pela tela inteira, brilhando, com um valor ou título grande no centro.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Você ganhou R$ 50", "maximo": 28},
+  {"id": "subtitulo", "rotulo": "Subtítulo (opcional)", "tipo": "texto", "padrao": "de cashback na primeira compra", "maximo": 44},
+  {"id": "cor_1", "rotulo": "Moeda (claro)", "tipo": "cor", "padrao": "#ffe08a"},
+  {"id": "cor_2", "rotulo": "Moeda (escuro)", "tipo": "cor", "padrao": "#d4a017"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Moedas: 50 moedas caem com gravidade a partir de alturas e tempos sorteados; o giro é a escala
+     horizontal pelo cosseno (de frente, de lado), com a borda mais escura e um cifrão no centro quando
+     ela está de frente. Um brilho em estrela pisca de vez em quando. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 50;
+  const moedas = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(8800 + i);
+    return { x: r(), quando: r() * 2.4, raio: 2.4 + r() * 2.2, giro: 4 + r() * 6, fase: r() * 6.28, vel: 0.2 + r() * 0.25 };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.5, dur);
+    for (const m of moedas) {
+      const s = t - m.quando;
+      if (s <= 0) continue;
+      const y = -6 * u + (m.vel * s + 0.35 * s * s) * H;
+      if (y > H + 6 * u) continue;
+      const x = m.x * W + Math.sin(s * 2 + m.fase) * 1.5 * u;
+      const r = m.raio * u;
+      const lado = Math.cos(s * m.giro + m.fase);
+      ctx.globalAlpha = fim;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(Math.max(0.12, Math.abs(lado)), 1);
+      ctx.fillStyle = C.cor_2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = C.cor_1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.8, 0, 6.2832);
+      ctx.fill();
+      if (Math.abs(lado) > 0.5) {
+        ctx.fillStyle = C.cor_2;
+        ctx.font = TO.fonte(900, (r / u) * 1.1);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("$", 0, r * 0.06);
+      }
+      ctx.restore();
+      if (Math.sin(s * 3 + m.fase * 2) > 0.92) {
+        ctx.drawImage(TO.brilho("#ffffff"), x - r, y - r, r * 2, r * 2);
+      }
+    }
+    const k = TO.spring(t - 0.6, 0.45, 2.2);
+    ctx.globalAlpha = fim * TO.clamp(k);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(k, k);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,.6)";
+    ctx.shadowBlur = 3 * u;
+    ctx.font = TO.fonte(900, TO.caber(ctx, C.titulo, 900, 10, W * 0.84));
+    ctx.fillText(C.titulo, 0, C.subtitulo ? -3 * u : 0);
+    if (C.subtitulo) {
+      ctx.fillStyle = C.cor_1;
+      ctx.font = TO.fonte(700, Math.min(4, TO.caber(ctx, C.subtitulo, 700, 4, W * 0.8)));
+      ctx.fillText(C.subtitulo, 0, 7 * u);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

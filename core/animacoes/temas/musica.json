@@ -121,6 +121,47 @@
     "minuto": "0",
     "texto": "Show começa às 22h"
    }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_musica",
+   "nome": "Título musical",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Música ao vivo"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_musica",
+   "nome": "Palavras no ritmo",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Um\nDois\nTrês\nJá!"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_musicas",
+   "nome": "Top músicas",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Mais tocadas da semana",
+    "texto": "Noite de Verão\nLuzes da Cidade\nMar Aberto\nSaudade\nHorizonte"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

@@ -1,0 +1,51 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Círculos espalhados",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.6,
+ "tela_cheia": true,
+ "descricao": "Círculos nascem em pontos espalhados e crescem até se juntar e cobrir a tela, depois encolhem. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "cor_1", "rotulo": "Cor 1", "tipo": "cor", "padrao": "#9b8cff"},
+  {"id": "cor_2", "rotulo": "Cor 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor de fundo", "tipo": "cor", "padrao": "#ff624a"}
+ ]
+}
+</script>
+<!-- Círculos: 14 centros sorteados, cada um com a sua cor e atraso, crescem até um raio maior que a
+     diagonal do quadro (então a tela fica coberta no meio da duração); na volta encolhem na ordem contrária.
+     Uma camada da cor de fundo cobre os vãos que sobram no meio. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 14;
+  const R = Math.hypot(W, H);
+  const bolhas = Array.from({ length: N }, (_, i) => {
+    const r = TO.rng(9100 + i);
+    return { x: r() * W, y: r() * H, atraso: r() * 0.25, cor: [C.cor_1, C.cor_2, C.cor_texto][i % 3] };
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const meio = dur / 2;
+    const cheio = TO.prog(t, meio - 0.12, meio - 0.02) * (1 - TO.prog(t, meio + 0.02, meio + 0.12));
+    if (cheio > 0) {
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillRect(0, 0, W, H);
+    }
+    for (const b of bolhas) {
+      const entra = TO.ease.inCubic(TO.prog(t, b.atraso, meio - 0.02));
+      const sai = TO.ease.outCubic(TO.prog(t, meio + 0.02, dur - 0.25 + b.atraso));
+      const r = R * 0.75 * entra * (1 - sai);
+      if (r < 1) continue;
+      ctx.fillStyle = b.cor;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, r, 0, 6.2832);
+      ctx.fill();
+    }
+  };
+})();
+</script>

@@ -1,0 +1,133 @@
+{
+ "nome": "Finanças e investimentos",
+ "ordem": 29,
+ "versoes": [
+  {
+   "modelo": "chuva_moedas",
+   "id": "cashback",
+   "nome": "Cashback",
+   "padroes": {}
+  },
+  {
+   "modelo": "chuva_moedas",
+   "id": "primeiro_milhao",
+   "nome": "Primeiro milhão",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "titulo": "Rumo ao 1º milhão",
+    "subtitulo": "série de investimentos"
+   }
+  },
+  {
+   "modelo": "grafico_linha",
+   "id": "rendimento",
+   "nome": "Rendimento",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "titulo": "Rendimento acumulado (R$)",
+    "dados": "Ano 1: 1200\nAno 2: 2600\nAno 3: 4300\nAno 4: 6400\nAno 5: 9100"
+   }
+  },
+  {
+   "modelo": "grafico_pizza",
+   "id": "carteira",
+   "nome": "Divisão da carteira",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "titulo": "Minha carteira",
+    "dados": "Renda fixa: 50\nAções: 25\nFundos imobiliários: 15\nReserva: 10"
+   }
+  },
+  {
+   "modelo": "meta_arrecadacao",
+   "id": "reserva_emergencia",
+   "nome": "Reserva de emergência",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "titulo": "Reserva de emergência",
+    "valor": "14500",
+    "meta": "20000"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "juros",
+   "nome": "Antes e depois dos juros",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "antes": "R$ 10 mil",
+    "depois": "R$ 17,9 mil",
+    "rotulo_antes": "investido em 2020",
+    "rotulo_depois": "em 2026"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_financeira",
+   "nome": "Dica financeira",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "rotulo": "DICA DE DINHEIRO",
+    "texto": "Pague a você primeiro: separe 10% do salário assim que ele cair."
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "sair_dividas",
+   "nome": "Sair das dívidas",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "titulo": "Como sair das dívidas",
+    "texto": "Liste tudo o que deve\nCorte gastos pequenos\nNegocie os juros mais altos\nGuarde uma reserva"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_investidor",
+   "nome": "Números do investidor",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "dados": "investidores: 4200\nanos de mercado: 8\nde retorno no ano (%): 14"
+   }
+  },
+  {
+   "modelo": "odometro",
+   "id": "patrimonio",
+   "nome": "Patrimônio",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "valor": "250000",
+    "legenda": "de patrimônio sob gestão"
+   }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_consultor",
+   "nome": "Tarja de consultor",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166",
+    "nome": "Ricardo Alves",
+    "funcao": "Planejador financeiro CFP"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166"
+   }
+  }
+ ]
+}

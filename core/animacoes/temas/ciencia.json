@@ -1,0 +1,107 @@
+{
+ "nome": "Ciência e curiosidades",
+ "ordem": 35,
+ "versoes": [
+  {
+   "modelo": "fundo_estrelas",
+   "id": "universo",
+   "nome": "Universo",
+   "padroes": {}
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "voce_sabia",
+   "nome": "Você sabia",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "pergunta": "Você sabia que o polvo tem três corações?",
+    "resposta": "Dois levam sangue às brânquias e um ao resto do corpo."
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_ciencia",
+   "nome": "Números da ciência",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "dados": "planetas no Sistema Solar: 8\nluas de Júpiter: 95\nda Terra é água (%): 71"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "curiosidade",
+   "nome": "Curiosidade",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "rotulo": "CURIOSIDADE",
+    "texto": "A luz do Sol leva cerca de 8 minutos para chegar à Terra."
+   }
+  },
+  {
+   "modelo": "terminal",
+   "id": "experimento",
+   "nome": "Experimento",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "titulo": "laboratório",
+    "texto": "$ medir temperatura\n22,4 °C\n$ aquecer até 100 °C\n✓ Água fervendo"
+   }
+  },
+  {
+   "modelo": "grafico_barras",
+   "id": "dados_ciencia",
+   "nome": "Dados do experimento",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "titulo": "Crescimento da planta (cm)",
+    "dados": "Sem 1: 2\nSem 2: 5\nSem 3: 9\nSem 4: 14"
+   }
+  },
+  {
+   "modelo": "titulo_glitch",
+   "id": "glitch_ciencia",
+   "nome": "Mistério",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "texto": "MISTÉRIO RESOLVIDO"
+   }
+  },
+  {
+   "modelo": "fundo_aurora",
+   "id": "aurora_ciencia",
+   "nome": "Aurora boreal",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "titulo": "Aurora boreal",
+    "subtitulo": "como ela acontece"
+   }
+  },
+  {
+   "modelo": "linha_do_tempo",
+   "id": "historia_ciencia",
+   "nome": "Linha do tempo da ciência",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "dados": "1687: Leis de Newton\n1905: Relatividade\n1953: DNA\n1969: Lua"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff",
+    "cor_texto": "#14151b"
+   }
+  }
+ ]
+}

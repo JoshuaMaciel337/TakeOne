@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Comparativo lado a lado",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Duas colunas, a nossa e a dos outros: cada linha entra com um check verde de um lado e um X do outro.",
+ "campos": [
+  {"id": "nosso", "rotulo": "Coluna do bem", "tipo": "texto", "padrao": "Com a gente", "maximo": 20},
+  {"id": "deles", "rotulo": "Coluna do mal", "tipo": "texto", "padrao": "Os outros", "maximo": 20},
+  {"id": "texto", "rotulo": "Itens (um por linha)", "tipo": "linhas", "padrao": "Entrega em 24 h\nSuporte humano\nSem taxa escondida\nTroca grátis", "maximo": 200},
+  {"id": "cor_1", "rotulo": "Lado bom", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Lado ruim", "tipo": "cor", "padrao": "#ff3b5c"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Comparativo: uma tabela de três colunas (item, nós, eles). O cabeçalho do nosso lado tem a cor boa;
+     cada linha entra deslizando e os dois sinais (check e X, por CSS) estalam em seguida. -->
+<style>
+.tabela{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*92),90%);padding:calc(var(--u)*3);border-radius:calc(var(--u)*3);
+  background:rgba(16,17,22,.9);color:var(--cor-texto);animation:abrir .6s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.cab,.linha{display:grid;grid-template-columns:1fr calc(var(--u)*18) calc(var(--u)*18);align-items:center;gap:calc(var(--u)*1.2)}
+.cab{font-weight:800;font-size:calc(var(--u)*3);text-align:center;margin-bottom:calc(var(--u)*1)}
+.cab b{padding:calc(var(--u)*1) 0;border-radius:calc(var(--u)*1.2);background:var(--cor-1);color:#0c1a14}
+.cab span{opacity:.6}
+.linha{padding:calc(var(--u)*1.5) 0;border-top:calc(var(--u)*.15) solid rgba(255,255,255,.08);font-weight:600;font-size:calc(var(--u)*3.4);
+  animation:entrar .45s ease-out calc(.5s + var(--i) * .45s) both}
+.linha::before,.linha::after{grid-row:1;justify-self:center;width:calc(var(--u)*5);height:calc(var(--u)*5);border-radius:50%;display:grid;place-items:center;
+  font-weight:900;font-size:calc(var(--u)*3);animation:estalo .4s cubic-bezier(.2,1.7,.4,1) calc(.75s + var(--i) * .45s) both}
+.linha::before{content:"✓";grid-column:2;background:color-mix(in srgb,var(--cor-1) 25%,transparent);color:var(--cor-1)}
+.linha::after{content:"✕";grid-column:3;background:color-mix(in srgb,var(--cor-2) 20%,transparent);color:var(--cor-2)}
+@keyframes abrir{from{opacity:0;transform:translate(-50%,-46%)}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-2))}}
+@keyframes estalo{from{transform:scale(0)}}
+@keyframes sair{to{opacity:0}}
+</style>
+<div class="tabela">
+ <div class="cab"><i></i><b>{{nosso}}</b><span>{{deles}}</span></div>
+ {{texto:linhas}}
+</div>

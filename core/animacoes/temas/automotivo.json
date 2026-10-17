@@ -118,6 +118,48 @@
     "hora": "Quinta, 9h",
     "local": "Oficina do Zé"
    }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_carro",
+   "nome": "Comparativo de carros",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "nosso": "Versão Top",
+    "deles": "Básica",
+    "texto": "Câmbio automático\nCentral multimídia\nBancos de couro\nSensor de ré"
+   }
+  },
+  {
+   "modelo": "titulo_dividido",
+   "id": "dividido_carro",
+   "nome": "Lançamento de carro",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "texto": "NOVO SEDÃ",
+    "subtitulo": "test drive no sábado"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_carro",
+   "nome": "Números do carro",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "dados": "cv de potência: 180\nkm/l na estrada: 16\nanos de garantia: 5"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946"
+   }
   }
  ]
 }

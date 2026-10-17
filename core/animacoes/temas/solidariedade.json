@@ -111,6 +111,47 @@
     "texto": "Ser voluntário mudou a minha forma de ver o mundo.",
     "nome": "Rafael, voluntário há 3 anos"
    }
+  },
+  {
+   "modelo": "odometro",
+   "id": "refeicoes",
+   "nome": "Refeições servidas",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "valor": "25000",
+    "legenda": "refeições servidas este ano"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_solidarias",
+   "nome": "Palavras solidárias",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "texto": "Doe\nAjude\nCompartilhe\nTransforme"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_ong",
+   "nome": "Números da ONG",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "dados": "voluntários: 120\nfamílias: 850\ncidades: 6"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "cor_texto": "#35d3a1"
+   }
   }
  ]
 }

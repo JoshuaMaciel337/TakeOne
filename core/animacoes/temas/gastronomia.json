@@ -154,6 +154,45 @@
     "cor_2": "#ff624a",
     "texto": "Boa noite! Ainda dá para pedir?\nDá sim! O que vai ser?\nUma pizza grande de calabresa\nChega em 40 minutos!"
    }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_pratos",
+   "nome": "Pratos mais pedidos",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_delicia",
+   "nome": "Que delícia",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "texto": "Que delícia!"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_restaurante",
+   "nome": "Números do restaurante",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "dados": "pratos servidos: 52000\nanos de casa: 15\nde avaliações 5 estrelas (%): 94"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "cor_texto": "#ffb547"
+   }
   }
  ]
 }

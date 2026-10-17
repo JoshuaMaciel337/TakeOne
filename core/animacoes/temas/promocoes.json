@@ -197,6 +197,59 @@
     "cor_1": "#22c55e",
     "cor_2": "#16a34a"
    }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "raios_black",
+   "nome": "Raios de Black Friday",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#14151b",
+    "titulo": "BLACK FRIDAY",
+    "subtitulo": "descontos de até 70%"
+   }
+  },
+  {
+   "modelo": "titulo_degrade",
+   "id": "degrade_promocao",
+   "nome": "Promoção em degradê",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "texto": "Promoção",
+    "subtitulo": "só até domingo"
+   }
+  },
+  {
+   "modelo": "chuva_moedas",
+   "id": "moedas_desconto",
+   "nome": "Chuva de descontos",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "titulo": "Descontos de até 50%",
+    "subtitulo": "em toda a loja"
+   }
+  },
+  {
+   "modelo": "toque_aqui",
+   "id": "toque_oferta",
+   "nome": "Toque na oferta",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "texto": "Toque e aproveite"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

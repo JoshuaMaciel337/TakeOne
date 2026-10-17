@@ -1,0 +1,71 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Marca com linhas",
+ "categoria": "logos",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Linhas finas chegam de todos os lados, desenham um quadro em volta e a marca aparece dentro, com o slogan.",
+ "campos": [
+  {"id": "texto", "rotulo": "Marca", "tipo": "texto", "padrao": "ESTÚDIO NORTE", "maximo": 20},
+  {"id": "slogan", "rotulo": "Slogan", "tipo": "texto", "padrao": "arquitetura e interiores", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Linhas (início)", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Linhas (fim)", "tipo": "cor", "padrao": "#c79a4b"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Linhas: quatro traços entram correndo pelos lados do quadro em volta da marca (cada um vindo de fora),
+     fecham o retângulo e passam um pouco dos cantos, como em desenho técnico. A marca aparece com o
+     espaçamento fechando e o slogan embaixo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const tam = TO.caber(ctx, C.texto, 600, 8, W * 0.7, "Montserrat");
+    ctx.font = TO.fonte(600, tam, "Montserrat");
+    const tw = ctx.measureText(C.texto).width;
+    const bw = tw + 14 * u;
+    const bh = tam * u + 12 * u;
+    const x0 = W / 2 - bw / 2;
+    const y0 = H / 2 - bh / 2;
+    const extra = 3 * u;
+    ctx.globalAlpha = 1 - sai;
+    ctx.strokeStyle = TO.degrade(ctx, x0, y0, x0 + bw, y0 + bh);
+    ctx.lineWidth = Math.max(1, 0.22 * u);
+    const lados = [
+      [x0 - extra, y0, x0 + bw + extra, y0],
+      [x0 + bw, y0 - extra, x0 + bw, y0 + bh + extra],
+      [x0 + bw + extra, y0 + bh, x0 - extra, y0 + bh],
+      [x0, y0 + bh + extra, x0, y0 - extra],
+    ];
+    lados.forEach(([ax, ay, bx, by], i) => {
+      const k = TO.ease.outExpo(TO.prog(t, 0.1 + i * 0.12, 0.9 + i * 0.12));
+      if (k <= 0) return;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(TO.lerp(ax, bx, k), TO.lerp(ay, by, k));
+      ctx.stroke();
+    });
+    const m = TO.ease.outCubic(TO.prog(t, 0.9, 1.8));
+    ctx.globalAlpha = (1 - sai) * m;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.letterSpacing = `${(0.3 + (1 - m) * 1.2) * u}px`;
+    ctx.fillText(C.texto, W / 2, H / 2 + 0.4 * u);
+    const s = TO.ease.outCubic(TO.prog(t, 1.5, 2.1));
+    ctx.globalAlpha = (1 - sai) * s * 0.85;
+    ctx.fillStyle = C.cor_2;
+    ctx.font = TO.fonte(500, Math.min(3, TO.caber(ctx, C.slogan.toUpperCase(), 500, 3, W * 0.8)));
+    ctx.letterSpacing = `${0.5 * u}px`;
+    ctx.fillText(C.slogan.toUpperCase(), W / 2, y0 + bh + 5 * u);
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

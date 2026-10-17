@@ -1,0 +1,35 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título com degradê vivo",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "Um título grande com o degradê das cores correndo por dentro das letras e um brilho que passa de tempos em tempos.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "Black Friday", "maximo": 24},
+  {"id": "subtitulo", "rotulo": "Embaixo", "tipo": "texto", "padrao": "ofertas de até 70%", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Degradê 1", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Degradê 2", "tipo": "cor", "padrao": "#9b8cff"},
+  {"id": "cor_texto", "rotulo": "Subtítulo", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Degradê vivo: o fundo das letras é um degradê de 4 paradas com 300% de largura, que anda em laço
+     (background-position), recortado pelo texto (background-clip); um segundo fundo branco estreito passa
+     como brilho na mesma volta. O título entra com desfoque e o subtítulo depois. -->
+<style>
+.bloco{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:88%;text-align:center;animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.titulo{font-family:Montserrat,sans-serif;font-weight:900;font-size:calc(var(--u)*14);line-height:1.05;letter-spacing:-.02em;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.85) 50%,transparent 60%) -200% 0/50% 100% no-repeat,
+    linear-gradient(90deg,var(--cor-1),var(--cor-2),var(--cor-1),var(--cor-2)) 0 0/300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 calc(var(--u)*.4) calc(var(--u)*1.6) rgba(0,0,0,.45));
+  animation:entrar .8s cubic-bezier(.2,.8,.2,1) both,correr 2.5s linear infinite}
+.sub{margin-top:calc(var(--u)*2);font-weight:700;font-size:calc(var(--u)*4.2);color:var(--cor-texto);letter-spacing:.06em;text-transform:uppercase;
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.5);animation:subir .5s ease-out .6s both}
+@keyframes entrar{from{opacity:0;filter:blur(calc(var(--u)*1.5));transform:scale(1.15)}}
+/* As duas camadas andam juntas: o brilho cruza o título e o degradê anda um período inteiro (100%), sem emenda */
+@keyframes correr{from{background-position:-200% 0,0 0}to{background-position:300% 0,100% 0}}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*2))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.95)}}
+</style>
+<div class="bloco"><div class="titulo">{{texto}}</div><div class="sub">{{subtitulo}}</div></div>

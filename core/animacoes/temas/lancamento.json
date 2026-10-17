@@ -175,6 +175,59 @@
     "opcao_2": "Areia",
     "pct_2": "43"
    }
+  },
+  {
+   "modelo": "titulo_dividido",
+   "id": "dividido_lancamento",
+   "nome": "Título dividido",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "LANÇAMENTO",
+    "subtitulo": "dia 10, às 20h"
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "comparativo_produto",
+   "nome": "Comparativo do produto",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nosso": "Aurora X",
+    "deles": "Comuns",
+    "texto": "Bateria de 2 dias\nTela sem bordas\nCarrega em 30 min\nÀ prova d'água"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_lancamento",
+   "nome": "Números do produto",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "dados": "horas de bateria: 48\ngramas: 180\nde desconto na pré-venda (%): 20"
+   }
+  },
+  {
+   "modelo": "toque_aqui",
+   "id": "toque_pre_venda",
+   "nome": "Toque para a pré-venda",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "Toque e garanta o seu"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

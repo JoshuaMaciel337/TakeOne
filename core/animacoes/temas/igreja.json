@@ -298,6 +298,58 @@
     "texto": "Cheguei sem esperança e encontrei uma família.",
     "nome": "Irmã Lúcia"
    }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_culto",
+   "nome": "Palavras do culto",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Fé\nEsperança\nAmor\nVida Nova"
+   }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_louvor",
+   "nome": "Noite de louvor",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Noite de louvor"
+   }
+  },
+  {
+   "modelo": "fundo_aurora",
+   "id": "aurora_adoracao",
+   "nome": "Fundo de adoração",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "titulo": "Momento de adoração",
+    "subtitulo": "entregue tudo a Ele"
+   }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_pastor",
+   "nome": "Tarja discreta do pastor",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "nome": "Pr. João Almeida",
+    "funcao": "Pastor presidente"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

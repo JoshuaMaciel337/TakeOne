@@ -161,6 +161,47 @@
     "valor": "840",
     "meta": "1200"
    }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_parabens",
+   "nome": "Parabéns em onda",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "texto": "Feliz aniversário!"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_aniversario",
+   "nome": "Palavras de aniversário",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "texto": "Saúde\nAmor\nAlegria\nParabéns!"
+   }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "raios_aniversario",
+   "nome": "Raios de aniversário",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "titulo": "PARABÉNS!",
+    "subtitulo": "hoje é dia de festa"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166",
+    "cor_texto": "#ff8fab"
+   }
   }
  ]
 }

@@ -178,6 +178,56 @@
     "opcao_2": "Ainda não",
     "pct_2": "29"
    }
+  },
+  {
+   "modelo": "grafico_pizza",
+   "id": "receita_canais",
+   "nome": "Receita por canal",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_empresa",
+   "nome": "Números da empresa",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_ceo",
+   "nome": "Tarja discreta de diretor",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "nome": "Fernanda Lima",
+    "funcao": "CEO da Nova Rota"
+   }
+  },
+  {
+   "modelo": "logo_linhas",
+   "id": "logo_consultoria",
+   "nome": "Logo da consultoria",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "NOVA ROTA",
+    "slogan": "consultoria em vendas"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

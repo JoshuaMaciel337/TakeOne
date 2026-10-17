@@ -150,6 +150,47 @@
     "circular": "FELIZ NATAL • BOAS FESTAS •",
     "centro": "2026"
    }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_natal",
+   "nome": "Natal em onda",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "texto": "Feliz Natal!"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_natal",
+   "nome": "Palavras de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "texto": "Paz\nAmor\nFamília\nFeliz Natal"
+   }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "raios_natal",
+   "nome": "Oferta de Natal",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "titulo": "OFERTA DE NATAL",
+    "subtitulo": "presentes com até 40% off"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f",
+    "cor_texto": "#e63946"
+   }
   }
  ]
 }

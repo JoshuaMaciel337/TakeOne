@@ -1,0 +1,102 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Gráfico de rosca",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Um gráfico de rosca se desenha fatia por fatia, com a legenda de cada parte e a maior em destaque no centro.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "De onde vêm as vendas", "maximo": 36},
+  {"id": "dados", "rotulo": "Partes (Rótulo: valor, uma por linha)", "tipo": "linhas", "padrao": "Instagram: 45\nSite: 30\nLoja física: 15\nIndicação: 10", "maximo": 200},
+  {"id": "cor_1", "rotulo": "Maior parte", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Segunda parte", "tipo": "cor", "padrao": "#9b8cff"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Rosca: as partes viram fatias proporcionais; o arco total se desenha de 0 a 360° e cada fatia aparece
+     quando o arco passa por ela. A maior fica com a cor 1 e sai um pouco para fora; o centro mostra a
+     porcentagem dela. A legenda fica ao lado (embaixo, em telas em pé). -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const partes = C.dados.split("\n").map((l) => l.split(":")).filter((p) => p.length >= 2)
+    .map(([r, v]) => ({ rotulo: r.trim(), valor: Math.max(0, parseFloat(v.replace(",", ".")) || 0) })).slice(0, 6);
+  const total = partes.reduce((s, p) => s + p.valor, 0) || 1;
+  const ordem = [...partes].sort((a, b) => b.valor - a.valor);
+  const cores = [C.cor_1, C.cor_2, "#6bd8f2", "#ffd166", "#35d3a1", "#ff8fab"];
+  partes.forEach((p) => (p.cor = cores[ordem.indexOf(p)]));
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.5));
+    const vertical = H > W;
+    const pw = vertical ? W * 0.86 : Math.min(W * 0.7, 120 * u);
+    const ph = vertical ? 84 * u : 50 * u;
+    const px = (W - pw) / 2;
+    const py = (H - ph) / 2;
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.fillStyle = "rgba(14,15,20,.86)";
+    TO.retangulo(ctx, px, py, pw, ph, 3 * u);
+    ctx.fill();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 4.4, pw - 8 * u));
+    ctx.fillText(C.titulo, px + 4 * u, py + 3.6 * u);
+    const r = vertical ? 17 * u : 15 * u;
+    const cx = vertical ? W / 2 : px + 6 * u + r;
+    const cy = vertical ? py + 15 * u + r : py + ph / 2 + 4 * u;
+    const k = TO.ease.inOutCubic(TO.prog(t, 0.4, 2.2));
+    let a = -Math.PI / 2;
+    ctx.lineWidth = r * 0.42;
+    for (const p of partes) {
+      const fatia = (p.valor / total) * 6.2832;
+      const fim = Math.min(a + fatia, -Math.PI / 2 + 6.2832 * k);
+      if (fim > a) {
+        const maior = p === ordem[0];
+        const fora = maior ? TO.ease.outBack(TO.prog(t, 2.2, 2.6)) * 1.4 * u : 0;
+        const meio = (a + a + fatia) / 2;
+        ctx.strokeStyle = p.cor;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(meio) * fora, cy + Math.sin(meio) * fora, r, a + 0.02, fim - 0.02);
+        ctx.stroke();
+      }
+      a += fatia;
+    }
+    const c = TO.ease.outBack(TO.prog(t, 2.2, 2.7));
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(c, c);
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(900, 6);
+    ctx.fillText(`${Math.round((ordem[0]?.valor / total) * 100)}%`, 0, 0);
+    ctx.restore();
+    // Legenda
+    const lx = vertical ? px + 6 * u : cx + r + 9 * u;
+    let ly = vertical ? cy + r + 8 * u : cy - partes.length * 3.2 * u;
+    partes.forEach((p, i) => {
+      const l = TO.ease.outCubic(TO.prog(t, 0.6 + i * 0.25, 1 + i * 0.25));
+      ctx.globalAlpha = entra * (1 - sai) * l;
+      ctx.fillStyle = p.cor;
+      TO.retangulo(ctx, lx, ly + 0.6 * u, 3 * u, 3 * u, 0.8 * u);
+      ctx.fill();
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.font = TO.fonte(600, 3.2);
+      ctx.fillText(p.rotulo, lx + 4.6 * u, ly);
+      ctx.textAlign = "right";
+      ctx.font = TO.fonte(800, 3.2);
+      ctx.fillText(`${Math.round((p.valor / total) * 100)}%`, px + pw - 4 * u, ly);
+      ly += 6.4 * u;
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

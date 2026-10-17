@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Pergunta e resposta",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Um cartão de dúvida frequente: a pergunta com um P grande, depois a resposta abre embaixo com um R.",
+ "campos": [
+  {"id": "pergunta", "rotulo": "Pergunta", "tipo": "texto", "padrao": "Preciso de computador potente?", "maximo": 80},
+  {"id": "resposta", "rotulo": "Resposta", "tipo": "texto", "padrao": "Não. Dá para editar até no celular, direto do navegador.", "maximo": 140},
+  {"id": "cor_1", "rotulo": "Pergunta", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Resposta", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Pergunta e resposta: o bloco da pergunta entra; a resposta abre de cima para baixo (grid-template-rows
+     de 0fr a 1fr, que anima a altura sem medir) e as palavras dela aparecem em sequência. -->
+<style>
+.faq{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*86),88%);color:var(--cor-texto);
+  animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.bloco{display:flex;gap:calc(var(--u)*2.4);align-items:flex-start;padding:calc(var(--u)*3) calc(var(--u)*3.4);border-radius:calc(var(--u)*2.6);background:rgba(16,17,22,.9)}
+.bloco b{flex:none;width:calc(var(--u)*7);height:calc(var(--u)*7);border-radius:calc(var(--u)*1.8);display:grid;place-items:center;font-weight:900;font-size:calc(var(--u)*4);color:#111}
+.p{animation:entrar .5s cubic-bezier(.2,.8,.2,1) both}
+.p b{background:var(--cor-1)}
+.p div{font-weight:800;font-size:calc(var(--u)*4.4);line-height:1.25;padding-top:calc(var(--u)*.6)}
+.abre{display:grid;grid-template-rows:0fr;animation:abrir .6s cubic-bezier(.65,0,.35,1) 1.4s forwards}
+.abre>div{overflow:hidden}
+.r{margin-top:calc(var(--u)*1.4)}
+.r b{background:var(--cor-2)}
+.r div{font-weight:500;font-size:calc(var(--u)*3.8);line-height:1.35;padding-top:calc(var(--u)*.8)}
+.palavra{display:inline-block;margin-right:.26em;animation:aparecer .3s ease-out calc(1.8s + var(--i) * .07s) both}
+@keyframes entrar{from{opacity:0;transform:translateY(calc(var(--u)*2))}}
+@keyframes abrir{to{grid-template-rows:1fr}}
+@keyframes aparecer{from{opacity:0}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="faq">
+ <div class="bloco p"><b>P</b><div>{{pergunta}}</div></div>
+ <div class="abre"><div><div class="bloco r"><b>R</b><div>{{resposta:palavras}}</div></div></div></div>
+</div>

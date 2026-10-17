@@ -139,6 +139,47 @@
     "de": "3",
     "final": "LUTE!"
    }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_game",
+   "nome": "Palavras de jogo",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "texto": "Pronto?\nMira\nFogo!\nVITÓRIA"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_jogadores",
+   "nome": "Ranking de jogadores",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#6bd8f2",
+    "titulo": "Top 5 da semana",
+    "texto": "Leo Games\nNina_XP\nRafaPro\nZeta\nMaxi"
+   }
+  },
+  {
+   "modelo": "botao_inscrever",
+   "id": "inscreva_games",
+   "nome": "Inscreva-se no canal de jogos",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "chamada": "live todo dia às 20h"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

@@ -1,0 +1,84 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Seta desenhada à mão",
+ "categoria": "chamadas",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma seta curva, como feita à caneta, se desenha apontando para baixo à direita, com o texto escrito à mão.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto", "tipo": "texto", "padrao": "olha isso!", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Seta", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Detalhe", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffd166"}
+ ]
+}
+</script>
+<!-- Seta: um caminho em curva com um laço no meio (amostrado em pontos) é desenhado até a fração k, com
+     um tremido leve e fixo para parecer feito à mão; a ponta (dois traços) aparece no fim. O texto em
+     Caveat é revelado da esquerda para a direita antes da seta. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 90;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.4, dur));
+    const s = Math.min(W, H) * 0.32;
+    const ox = W / 2 - s * 0.55;
+    const oy = H / 2 - s * 0.45;
+    // Caminho: sai do texto, faz um laço e desce para a direita
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const q = i / N;
+      const x = ox + s * (0.15 + q * 0.95) + Math.sin(q * Math.PI * 2) * s * 0.18 * Math.sin(q * Math.PI);
+      const y = oy + s * (0.25 + q * q * 0.75) - Math.cos(q * Math.PI * 2) * s * 0.12 * Math.sin(q * Math.PI) + TO.noise(i * 0.4, 3) * 0.25 * u;
+      pts.push([x, y]);
+    }
+    const txt = TO.ease.outCubic(TO.prog(t, 0.1, 0.7));
+    ctx.globalAlpha = 1 - sai;
+    ctx.save();
+    ctx.font = TO.fonte(700, TO.caber(ctx, C.texto, 700, 9, s * 1.4, "Caveat"), "Caveat");
+    const tw = ctx.measureText(C.texto).width;
+    ctx.beginPath();
+    ctx.rect(ox - tw * 0.5 - 2 * u, 0, (tw + 4 * u) * txt, H);
+    ctx.clip();
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.shadowColor = "rgba(0,0,0,.6)";
+    ctx.shadowBlur = 1.5 * u;
+    ctx.fillText(C.texto, ox, oy + s * 0.2);
+    ctx.restore();
+    const k = TO.ease.inOutSine(TO.prog(t, 0.6, 1.6));
+    const ate = Math.floor(k * N);
+    ctx.strokeStyle = C.cor_1;
+    ctx.lineWidth = 0.9 * u;
+    ctx.lineCap = ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(0,0,0,.5)";
+    ctx.shadowBlur = 1.2 * u;
+    if (ate > 0) {
+      ctx.beginPath();
+      ctx.moveTo(...pts[0]);
+      for (let i = 1; i <= ate; i++) ctx.lineTo(...pts[i]);
+      ctx.stroke();
+    }
+    const ponta = TO.ease.outBack(TO.prog(t, 1.6, 1.9));
+    if (ponta > 0) {
+      const [x, y] = pts[N];
+      const [xa, ya] = pts[N - 4];
+      const a = Math.atan2(y - ya, x - xa);
+      const L = 4 * u * ponta;
+      ctx.beginPath();
+      ctx.moveTo(x - Math.cos(a - 0.5) * L, y - Math.sin(a - 0.5) * L);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x - Math.cos(a + 0.5) * L, y - Math.sin(a + 0.5) * L);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

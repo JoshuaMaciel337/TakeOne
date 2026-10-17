@@ -167,6 +167,48 @@
     "opcao_2": "Verde",
     "pct_2": "47"
    }
+  },
+  {
+   "modelo": "ranking",
+   "id": "classificacao",
+   "nome": "Classificação",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "Classificação",
+    "texto": "Azul FC\nVerde EC\nUnião\nPorto\nAtlético"
+   }
+  },
+  {
+   "modelo": "titulo_dividido",
+   "id": "dividido_final",
+   "nome": "A grande final",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "texto": "A GRANDE FINAL",
+    "subtitulo": "domingo, 16h"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_temporada",
+   "nome": "Números da temporada",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "dados": "gols: 42\njogos: 30\nde aproveitamento (%): 78"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

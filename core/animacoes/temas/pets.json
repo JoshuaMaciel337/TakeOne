@@ -113,6 +113,48 @@
     "nome": "Dr. Felipe Rocha",
     "funcao": "Médico-veterinário · CRMV 12345"
    }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_pet",
+   "nome": "Pergunta sobre pets",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "pergunta": "Cachorro pode comer chocolate?",
+    "resposta": "Não. O chocolate tem teobromina, que é tóxica para eles."
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_racas",
+   "nome": "Raças mais amadas",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "titulo": "Raças mais amadas",
+    "texto": "Vira-lata caramelo\nShih-tzu\nGolden\nPinscher\nBuldogue francês"
+   }
+  },
+  {
+   "modelo": "titulo_onda",
+   "id": "onda_pet",
+   "nome": "Título de pet",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "texto": "Dia de banho!"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

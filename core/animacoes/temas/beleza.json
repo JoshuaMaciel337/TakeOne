@@ -132,6 +132,49 @@
     "opcao_2": "Ruivo",
     "pct_2": "37"
    }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_beleza",
+   "nome": "Tarja discreta de beleza",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "nome": "Bia Santos",
+    "funcao": "Maquiadora profissional"
+   }
+  },
+  {
+   "modelo": "titulo_degrade",
+   "id": "degrade_beleza",
+   "nome": "Título de beleza",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Autoestima",
+    "subtitulo": "agenda aberta"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_produtos",
+   "nome": "Produtos favoritos",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Meus 5 favoritos",
+    "texto": "Protetor solar\nSérum de vitamina C\nHidratante\nMáscara de cílios\nBatom nude"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

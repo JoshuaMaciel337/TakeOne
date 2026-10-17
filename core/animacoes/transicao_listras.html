@@ -1,0 +1,42 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Listras que varrem",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Listras verticais descem e sobem alternadas, fecham a tela e depois abrem pelo outro lado. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "cor_1", "rotulo": "Listra 1", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Listra 2", "tipo": "cor", "padrao": "#14151b"},
+  {"id": "cor_texto", "rotulo": "Listra 3", "tipo": "cor", "padrao": "#ff3478"}
+ ]
+}
+</script>
+<!-- Listras: 8 colunas; as pares descem de cima e as ímpares sobem de baixo, com atraso pela posição.
+     No meio da duração todas cobrem a tela (é onde o corte deve cair); depois continuam e saem pelo lado
+     oposto ao que entraram. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 8;
+  const cores = [C.cor_1, C.cor_2, C.cor_texto];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const meio = dur / 2;
+    const lw = W / N;
+    for (let i = 0; i < N; i++) {
+      const atraso = (i / N) * 0.22;
+      const entra = TO.ease.inOutCubic(TO.prog(t, atraso, meio - 0.22 + atraso));
+      const sai = TO.ease.inOutCubic(TO.prog(t, meio + 0.04 + atraso, dur - 0.22 + atraso));
+      const desce = i % 2 === 0;
+      const y = desce ? -H + H * entra + H * sai : H - H * entra - H * sai;
+      ctx.fillStyle = cores[i % 3];
+      ctx.fillRect(Math.floor(i * lw), y, Math.ceil(lw) + 1, H);
+    }
+  };
+})();
+</script>

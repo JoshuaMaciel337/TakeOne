@@ -1,0 +1,112 @@
+{
+ "nome": "Cinema e séries",
+ "ordem": 33,
+ "versoes": [
+  {
+   "modelo": "titulo_dividido",
+   "id": "trailer",
+   "nome": "Título de trailer",
+   "padroes": {}
+  },
+  {
+   "modelo": "titulo_dividido",
+   "id": "estreia",
+   "nome": "Estreia",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "texto": "ESTREIA",
+    "subtitulo": "sexta-feira nos cinemas"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "trailer_palavras",
+   "nome": "Palavras de trailer",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "texto": "Neste verão\nUma escolha\nMuda tudo"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "top_filmes",
+   "nome": "Top filmes",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "titulo": "Top 5 filmes do ano",
+    "texto": "Horizonte\nA Última Estação\nMar Aberto\nSombras\nO Retorno"
+   }
+  },
+  {
+   "modelo": "depoimento_estrelas",
+   "id": "critica",
+   "nome": "Crítica",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "estrelas": "4",
+    "texto": "Uma história simples contada com coragem. Saí do cinema pensando nela.",
+    "nome": "Revista Tela"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "contagem_estreia",
+   "nome": "Contagem da estreia",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "de": "3",
+    "final": "AÇÃO!"
+   }
+  },
+  {
+   "modelo": "fundo_estrelas",
+   "id": "espaco",
+   "nome": "Viagem no espaço",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "titulo": "EPISÓDIO FINAL",
+    "subtitulo": "a jornada termina"
+   }
+  },
+  {
+   "modelo": "ingresso",
+   "id": "ingresso_cinema",
+   "nome": "Ingresso de cinema",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "titulo": "Sessão de estreia",
+    "data": "12 DEZ · 20H",
+    "local": "Sala 3",
+    "canhoto": "F12"
+   }
+  },
+  {
+   "modelo": "vinheta_intro",
+   "id": "vinheta_serie",
+   "nome": "Abertura de série",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "titulo": "TEMPORADA 2",
+    "subtitulo": "Episódio 1: O começo"
+   }
+  },
+  {
+   "modelo": "transicao_bolhas",
+   "id": "transicao",
+   "nome": "Transição: círculos",
+   "padroes": {
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946",
+    "cor_texto": "#ffd166"
+   }
+  }
+ ]
+}

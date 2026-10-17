@@ -182,6 +182,47 @@
     "cor_2": "#ff3478",
     "texto": "Bora pro show?\nJá comprei o ingresso!\nPassa aqui às 20h\nCombinado"
    }
+  },
+  {
+   "modelo": "titulo_degrade",
+   "id": "degrade_festa",
+   "nome": "Festa em degradê",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Hoje tem festa",
+    "subtitulo": "sábado a partir das 22h"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_festa",
+   "nome": "Palavras da festa",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "texto": "Música\nDança\nAmigos\nSábado"
+   }
+  },
+  {
+   "modelo": "fundo_aurora",
+   "id": "aurora_festa",
+   "nome": "Fundo de festa",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478",
+    "titulo": "Noite Neon",
+    "subtitulo": "festa à fantasia"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
   }
  ]
 }

@@ -149,6 +149,48 @@
     "valor": "100",
     "legenda": "energia para o treino"
    }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_treino",
+   "nome": "Palavras do treino",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "texto": "Foco\nForça\nFé\nVai!"
+   }
+  },
+  {
+   "modelo": "titulo_dividido",
+   "id": "dividido_treino",
+   "nome": "Treino pesado",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "texto": "TREINO PESADO",
+    "subtitulo": "hoje é dia de perna"
+   }
+  },
+  {
+   "modelo": "ranking",
+   "id": "ranking_exercicios",
+   "nome": "Melhores exercícios",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "titulo": "Top 5 para glúteos",
+    "texto": "Agachamento\nElevação pélvica\nAfundo\nStiff\nAbdução"
+   }
+  },
+  {
+   "modelo": "transicao_listras",
+   "id": "transicao",
+   "nome": "Transição: listras",
+   "padroes": {
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

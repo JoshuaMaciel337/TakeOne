@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Três números",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Três números grandes lado a lado, contando ao mesmo tempo, cada um com a sua legenda e um traço de cor.",
+ "campos": [
+  {"id": "dados", "rotulo": "Números (legenda: número, um por linha)", "tipo": "linhas", "padrao": "anos de mercado: 12\nclientes: 3500\nde satisfação (%): 98", "maximo": 160},
+  {"id": "cor_1", "rotulo": "Números (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Números (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Três números: cada linha "legenda: número" vira uma coluna (até 3); os números contam com
+     desaceleração longa, em sequência curta, e a legenda sobe por baixo de um traço em degradê. Em pé, as
+     colunas viram linhas. "(%)" na legenda vira o sinal depois do número. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const itens = C.dados.split("\n").map((l) => {
+    const i = l.lastIndexOf(":");
+    if (i < 0) return null;
+    let legenda = l.slice(0, i).trim();
+    const pct = legenda.includes("(%)");
+    legenda = legenda.replace("(%)", "").trim();
+    return { legenda, valor: parseFloat(l.slice(i + 1).replace(/\./g, "").replace(",", ".")) || 0, pct };
+  }).filter(Boolean).slice(0, 3);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const vertical = H > W;
+    const n = Math.max(1, itens.length);
+    itens.forEach((it, i) => {
+      const k = TO.ease.outExpo(TO.prog(t, 0.3 + i * 0.15, 2.4 + i * 0.15));
+      const e = TO.ease.outCubic(TO.prog(t, 0.1 + i * 0.15, 0.6 + i * 0.15));
+      const cx = vertical ? W / 2 : W * (0.5 + (i - (n - 1) / 2) * 0.28);
+      const cy = vertical ? H * (0.5 + (i - (n - 1) / 2) * 0.22) : H / 2;
+      ctx.globalAlpha = e * (1 - sai);
+      const texto = `${Math.round(it.valor * k).toLocaleString("pt-BR")}${it.pct ? "%" : ""}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.font = TO.fonte(900, TO.caber(ctx, texto, 900, 12, vertical ? W * 0.8 : W * 0.25));
+      const tw = ctx.measureText(texto).width;
+      ctx.fillStyle = TO.degrade(ctx, cx - tw / 2, 0, cx + tw / 2, 0);
+      ctx.shadowColor = "rgba(0,0,0,.5)";
+      ctx.shadowBlur = 2 * u;
+      ctx.fillText(texto, cx, cy + (1 - e) * 3 * u);
+      ctx.shadowBlur = 0;
+      const lw = 10 * u * e;
+      ctx.fillStyle = TO.degrade(ctx, cx - lw / 2, 0, cx + lw / 2, 0);
+      ctx.fillRect(cx - lw / 2, cy + 2 * u, lw, 0.5 * u);
+      ctx.fillStyle = C.cor_texto;
+      ctx.textBaseline = "top";
+      ctx.font = TO.fonte(600, Math.min(3.4, TO.caber(ctx, it.legenda, 600, 3.4, vertical ? W * 0.8 : W * 0.26)));
+      ctx.shadowColor = "rgba(0,0,0,.6)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillText(it.legenda, cx, cy + 4 * u);
+      ctx.shadowBlur = 0;
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

@@ -202,6 +202,48 @@
     "chave": "(19) 90000-0000",
     "obrigado": "Obrigado pelo carinho!"
    }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_cerimonialista",
+   "nome": "Cerimonialista",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "nome": "Beatriz Lemos",
+    "funcao": "Cerimonialista"
+   }
+  },
+  {
+   "modelo": "fundo_aurora",
+   "id": "aurora_casamento",
+   "nome": "Fundo romântico",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "titulo": "Ana & Pedro",
+    "subtitulo": "para sempre"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_casamento",
+   "nome": "Palavras do casal",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b",
+    "texto": "Amor\nParceria\nFé\nPara sempre"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

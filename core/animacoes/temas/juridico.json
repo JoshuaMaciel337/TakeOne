@@ -1,0 +1,115 @@
+{
+ "nome": "Jurídico e advocacia",
+ "ordem": 32,
+ "versoes": [
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_advogada",
+   "nome": "Tarja de advogada",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "nome": "Dra. Camila Rocha",
+    "funcao": "Advogada · OAB/SP 123.456"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "duvida_juridica",
+   "nome": "Dúvida jurídica",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "pergunta": "Posso ser demitido nas férias?",
+    "resposta": "Não. A demissão só pode ser comunicada depois do fim das férias."
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "direito_consumidor",
+   "nome": "Direito do consumidor",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "pergunta": "Tenho direito de devolver compra on-line?",
+    "resposta": "Sim. São 7 dias para desistir, sem precisar explicar o motivo."
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "documentos",
+   "nome": "Documentos necessários",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "titulo": "Leve no atendimento",
+    "texto": "RG e CPF\nComprovante de residência\nCarteira de trabalho\nContrato assinado"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_juridica",
+   "nome": "Dica jurídica",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "rotulo": "SEU DIREITO",
+    "texto": "Guarde sempre o comprovante de pagamento por 5 anos."
+   }
+  },
+  {
+   "modelo": "citacao",
+   "id": "citacao_lei",
+   "nome": "Trecho da lei",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "texto": "Todos são iguais perante a lei,\nsem distinção de qualquer natureza.",
+    "autor": "Constituição Federal, art. 5º"
+   }
+  },
+  {
+   "modelo": "logo_linhas",
+   "id": "logo_escritorio",
+   "nome": "Logo do escritório",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "texto": "ROCHA ADVOGADOS",
+    "slogan": "direito trabalhista e do consumidor"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_escritorio",
+   "nome": "Números do escritório",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "dados": "anos de atuação: 18\nprocessos: 2400\nde êxito (%): 87"
+   }
+  },
+  {
+   "modelo": "selo_garantia",
+   "id": "selo_oab",
+   "nome": "Selo de atendimento",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "numero": "24",
+    "texto": "HORAS",
+    "fita": "ATENDIMENTO"
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f",
+    "cor_texto": "#14151b"
+   }
+  }
+ ]
+}

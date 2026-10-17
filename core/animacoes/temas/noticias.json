@@ -115,6 +115,48 @@
     "titulo": "Boletim do trânsito",
     "detalhe": "atualizado às 18h"
    }
+  },
+  {
+   "modelo": "tarja_linha",
+   "id": "tarja_linha_reporter",
+   "nome": "Repórter discreta",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "nome": "Juliana Prado",
+    "funcao": "Repórter"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_noticia",
+   "nome": "Números da notícia",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "dados": "bairros atingidos: 12\nfamílias: 340\nde chuva em 24 h (mm): 98"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "entenda",
+   "nome": "Entenda o caso",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "pergunta": "O que muda com a nova lei?",
+    "resposta": "As compras on-line de até US$ 50 passam a pagar imposto federal."
+   }
+  },
+  {
+   "modelo": "transicao_blocos",
+   "id": "transicao",
+   "nome": "Transição: blocos",
+   "padroes": {
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8",
+    "cor_texto": "#14151b"
+   }
   }
  ]
 }

@@ -1,0 +1,86 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Contador de rolo",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Os algarismos rolam para cima como num contador mecânico até o número final, cada coluna no seu ritmo.",
+ "campos": [
+  {"id": "valor", "rotulo": "Número final", "tipo": "numero", "padrao": "100000", "maximo": 0},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "inscritos. Obrigado!", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor dos números", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Rolo: cada algarismo do número final é uma coluna com a faixa 0..9 repetida; a coluna roda voltas
+     inteiras e para no algarismo dela (as da direita rodam mais e param depois). Cada coluna é recortada na
+     janela do seu dígito, com as bordas esmaecendo, e os pontos de milhar ficam parados. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const texto = (parseInt(C.valor, 10) || 0).toLocaleString("pt-BR");
+  const chars = [...texto];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const sai = TO.ease.inCubic(TO.prog(t, dur - 0.5, dur));
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.4));
+    const tam = TO.caber(ctx, texto, 900, 16, W * 0.84);
+    ctx.font = TO.fonte(900, tam);
+    const altura = tam * u * 1.05;
+    const total = ctx.measureText(texto).width;
+    const cy = H / 2 - 3 * u;
+    const pw = total + 8 * u;
+    ctx.globalAlpha = entra * (1 - sai);
+    ctx.fillStyle = "rgba(14,15,20,.85)";
+    TO.retangulo(ctx, W / 2 - pw / 2, cy - altura * 0.7, pw, altura * 1.4, 2.4 * u);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    let x = W / 2 - total / 2;
+    let d = 0;
+    for (const c of chars) {
+      const cw = ctx.measureText(c).width;
+      if (!/\d/.test(c)) {
+        ctx.fillStyle = C.cor_texto;
+        ctx.fillText(c, x + cw / 2, cy);
+        x += cw;
+        continue;
+      }
+      const alvo = parseInt(c, 10);
+      const voltas = 2 + d;
+      const fim = 1.2 + d * 0.22;
+      const k = TO.ease.outCubic(TO.prog(t, 0.3, fim + 0.6));
+      const pos = (voltas * 10 + alvo) * k;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x - 2, cy - altura * 0.55, cw + 4, altura * 1.1);
+      ctx.clip();
+      for (let j = Math.floor(pos) - 1; j <= Math.floor(pos) + 1; j++) {
+        const y = cy + (j - pos) * altura;
+        const dist = Math.abs(j - pos);
+        ctx.globalAlpha = entra * (1 - sai) * TO.clamp(1 - dist * 0.9);
+        ctx.fillStyle = k >= 1 ? TO.degrade(ctx, W / 2 - total / 2, 0, W / 2 + total / 2, 0) : C.cor_texto;
+        ctx.fillText(String(((j % 10) + 10) % 10), x + cw / 2, y);
+      }
+      ctx.restore();
+      x += cw;
+      d++;
+    }
+    const l = TO.ease.outCubic(TO.prog(t, 1.8, 2.4));
+    ctx.globalAlpha = (1 - sai) * l;
+    ctx.fillStyle = C.cor_texto;
+    ctx.textBaseline = "top";
+    ctx.shadowColor = "rgba(0,0,0,.6)";
+    ctx.shadowBlur = 1.5 * u;
+    ctx.font = TO.fonte(700, Math.min(4.4, TO.caber(ctx, C.legenda, 700, 4.4, W * 0.84)));
+    ctx.fillText(C.legenda, W / 2, cy + altura * 0.75 + 3 * u + (1 - l) * 2 * u);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

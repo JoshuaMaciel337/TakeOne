@@ -161,6 +161,47 @@
     "minuto": "30",
     "texto": "Almoço às 12h30"
    }
+  },
+  {
+   "modelo": "titulo_degrade",
+   "id": "degrade_maes",
+   "nome": "Dia das Mães em degradê",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0",
+    "texto": "Feliz Dia das Mães",
+    "subtitulo": "com todo o amor"
+   }
+  },
+  {
+   "modelo": "palavras_flash",
+   "id": "palavras_pais",
+   "nome": "Palavras do Dia dos Pais",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6",
+    "texto": "Herói\nAmigo\nExemplo\nPai"
+   }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "raios_dia_do_cliente",
+   "nome": "Dia do Cliente",
+   "padroes": {
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e",
+    "titulo": "DIA DO CLIENTE",
+    "subtitulo": "ofertas o dia todo"
+   }
+  },
+  {
+   "modelo": "transicao_cortina",
+   "id": "transicao",
+   "nome": "Transição: cortina",
+   "padroes": {
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
   }
  ]
 }
