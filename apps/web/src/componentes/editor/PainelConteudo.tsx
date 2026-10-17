@@ -14,6 +14,7 @@ import type { Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import { PainelAudio } from "./PainelAudio";
 import { PainelAnimacoes } from "./PainelAnimacoes";
 import { PainelEfeitos } from "./PainelEfeitos";
 import { PainelFiltros } from "./PainelFiltros";
@@ -140,6 +141,8 @@ export function PainelConteudo({
             aoAdicionarMidia={aoAdicionarMidia}
             proporcao={legendas.projeto.proporcao}
           />
+        ) : ferramenta.id === "audio" ? (
+          <PainelAudio aoPedir={aoPedirAnimacao} />
         ) : ferramenta.id === "elementos" ? (
           <PainelAnimacoes proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} />
         ) : ferramenta.id === "texto" ? (

@@ -54,7 +54,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "audio",
     nome: "Áudio",
     icone: Music,
-    emBreve: { fase: "Fase 6", descricao: "Banco de músicas e efeitos sonoros com licença. Volume, fades, abaixar na fala e efeitos de voz já estão na aba Áudio do clipe." },
   },
   {
     id: "texto",

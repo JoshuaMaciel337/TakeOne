@@ -186,7 +186,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
       const midia = midias.get(id);
       if (!midia || midia.status === "erro") {
         animacoesPedidas.current.delete(id);
-        if (midia) mostrarAviso(`A animação não foi gravada: ${midia.erro ?? "erro desconhecido"}`);
+        if (midia) mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
       } else if (midia.status === "pronta") {
         animacoesPedidas.current.delete(id);
         executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio } });
