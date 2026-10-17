@@ -24,6 +24,8 @@ import {
   dividirClipes,
   estiloDasLegendas,
   palavrasChaveDasLegendas,
+  cortarNoRitmo,
+  pulsarNoRitmo,
   importarLegendas,
   type MudancaDeAudio,
   mudarKeyframe,
@@ -90,6 +92,8 @@ export type Comando =
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
+  | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "linha.pulsarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
   | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } };
@@ -126,6 +130,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.importar": "importar legendas",
   "legenda.estilo": "mudar o estilo das legendas",
   "legenda.palavrasChave": "destacar palavras-chave",
+  "linha.cortarNoRitmo": "cortar no ritmo",
+  "linha.pulsarNoRitmo": "pulsar no ritmo",
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
   "clipe.transicao": "mudar a transição",
@@ -207,6 +213,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
     case "legenda.palavrasChave":
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
+    case "linha.cortarNoRitmo":
+      return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
+    case "linha.pulsarNoRitmo":
+      return { projeto: pulsarNoRitmo(projeto, parametros.batidas) };
     case "clipe.transicao":
       return { projeto: definirTransicao(projeto, parametros.clipeId, parametros.transicao) };
     case "clipe.cor":

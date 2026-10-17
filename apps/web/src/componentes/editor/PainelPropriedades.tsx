@@ -31,6 +31,7 @@ import { AbaCor } from "./AbaCor";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
+import { NoRitmo } from "./NoRitmo";
 import { SeguirRosto } from "./SeguirRosto";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
@@ -797,6 +798,9 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
       </Secao>
       <Secao titulo="Abaixar na fala">
         <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+      </Secao>
+      <Secao titulo="Ritmo">
+        <NoRitmo clipe={clipe} faixa={faixas.find((item) => item.tipo === "principal") ?? faixa} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Voz">
         <ControleNumerico

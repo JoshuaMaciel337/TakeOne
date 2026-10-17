@@ -34,6 +34,7 @@ import { resumoDoTexto } from "@/lib/projeto/texto";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { MarcasDoRitmo } from "./NoRitmo";
 import { FormaDeOndaDoClipe, MiniaturasDoClipe } from "./VisualDoClipe";
 
 type Props = {
@@ -526,6 +527,8 @@ export function LinhaDoTempo({
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                     />
                   ))}
+                  {/* Batidas da música, depois de achadas na aba Áudio */}
+                  {faixa.tipo === "audio" ? faixa.clipes.map((clipe) => <MarcasDoRitmo key={`r-${clipe.id}`} clipe={clipe} px={px} />) : null}
                   {/* Keyframes do clipe (de qualquer propriedade): clicar leva o cursor até o ponto */}
                   {faixa.clipes.flatMap((clipe) =>
                     [...new Set(PROPRIEDADES_ANIMAVEIS.flatMap((p) => clipe.keyframes?.[p] ?? []).map((k) => k.t))]

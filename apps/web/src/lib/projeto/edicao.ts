@@ -757,6 +757,73 @@ export function zoomNosTrechos(projeto: Projeto, trechos: Intervalo[], escala: n
   return finalizar(trocarFaixa(projeto, { ...principal, clipes }));
 }
 
+/** O pulso de cada batida: quanto a imagem cresce e em quanto tempo volta. */
+export const PULSO_NO_RITMO = { escala: 1.06, volta: 0.22 } as const;
+/** Clipe mais curto que isso não é cortado na batida (fica do tamanho que estava). */
+export const CORTE_MINIMO_NO_RITMO_S = 0.4;
+
+/**
+ * Cortes da faixa principal nas batidas: cada clipe termina na última batida que cabe nele (sem crescer
+ * além da mídia nem ficar mais curto que CORTE_MINIMO_NO_RITMO_S). Como a principal é magnética, o clipe
+ * seguinte começa na mesma batida. `batidas`: instantes da linha do tempo, já na cadência escolhida.
+ */
+export function cortarNoRitmo(projeto: Projeto, ctx: Contexto, batidas: Tick[]): Projeto {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal?.clipes.length) throw new ErroEdicao("Coloque os vídeos na faixa principal antes de cortar no ritmo.");
+  exigirDestravada(principal);
+  const ordenadas = [...batidas].sort((a, b) => a - b);
+  if (ordenadas.length < 2) throw new ErroEdicao("A música tem poucas batidas para cortar no ritmo.");
+  const minimo = Math.round(CORTE_MINIMO_NO_RITMO_S * TICKS_POR_SEGUNDO);
+  const meioQuadro = duracaoDoQuadro(projeto.taxa) / 2;
+  let resultado = projeto;
+  let cortados = 0;
+  for (const id of principal.clipes.map((clipe) => clipe.id)) {
+    const clipe = resultado.faixas.find((faixa) => faixa.tipo === "principal")!.clipes.find((item) => item.id === id)!;
+    const fim = clipe.inicio + clipe.duracao;
+    const alvo = [...ordenadas].reverse().find((b) => b <= fim + meioQuadro && b - clipe.inicio >= minimo);
+    if (alvo === undefined || Math.abs(alvo - fim) <= meioQuadro) continue;
+    resultado = apararClipe(resultado, ctx, id, "fim", alvo);
+    cortados++;
+  }
+  if (!cortados) throw new ErroEdicao("Os cortes já estão nas batidas.");
+  return resultado;
+}
+
+/**
+ * Um pulso de zoom em cada batida, nos clipes da faixa principal: a imagem cresce de uma vez na batida e
+ * volta em PULSO_NO_RITMO.volta, com keyframes de escala. Clipe que já tem keyframes de escala fica como
+ * está, e cada clipe leva no máximo um terço do limite de keyframes (três pontos por batida).
+ */
+export function pulsarNoRitmo(projeto: Projeto, batidas: Tick[], escala: number = PULSO_NO_RITMO.escala): Projeto {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal?.clipes.length) throw new ErroEdicao("Coloque os vídeos na faixa principal antes de pulsar no ritmo.");
+  exigirDestravada(principal);
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const volta = Math.round(PULSO_NO_RITMO.volta * TICKS_POR_SEGUNDO);
+  const ordenadas = [...batidas].sort((a, b) => a - b);
+  let mudou = false;
+  const clipes = principal.clipes.map((clipe) => {
+    if (clipe.texto || clipe.keyframes?.escala?.length) return clipe;
+    const base = clipe.transformacao.escala;
+    const pontos: Keyframe[] = [];
+    for (const batida of ordenadas) {
+      const t = quadroMaisProximo(projeto.taxa, batida) - clipe.inicio;
+      if (t < quadro || t + volta > clipe.duracao || (pontos.length && t - quadro <= pontos[pontos.length - 1].t)) continue;
+      if (pontos.length + 3 > KEYFRAMES_POR_PROPRIEDADE) break;
+      pontos.push(
+        { t: t - quadro, valor: base, curva: "linear" },
+        { t, valor: base * escala, curva: "suave" },
+        { t: t + volta, valor: base, curva: "linear" },
+      );
+    }
+    if (!pontos.length) return clipe;
+    mudou = true;
+    return { ...clipe, keyframes: { ...clipe.keyframes, escala: pontos } };
+  });
+  if (!mudou) throw new ErroEdicao("Nenhum clipe da principal recebeu pulsos (sem batidas por cima, ou já com zoom).");
+  return finalizar(trocarFaixa(projeto, { ...principal, clipes }));
+}
+
 /** Volta posição, escala, giro, opacidade e recorte ao padrão, sem keyframes. */
 export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null }));

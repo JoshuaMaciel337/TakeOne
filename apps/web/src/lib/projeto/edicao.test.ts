@@ -27,6 +27,9 @@ import {
   mudarVelocidade,
   normalizarRotacao,
   palavrasChaveDasLegendas,
+  cortarNoRitmo,
+  pulsarNoRitmo,
+  PULSO_NO_RITMO,
   recortarClipes,
   removerIntervalos,
   restaurarClipes,
@@ -417,6 +420,35 @@ test("palavras-chave: contadas como no desenho, limpas, importadas com as legend
   assert.equal(projeto.faixas[0].clipes[1].texto!.cor_chave, "#00ff00");
   conferir(projeto);
   assert.throws(() => palavrasChaveDasLegendas(vazio(), {}, null), /não tem legendas/);
+});
+
+test("no ritmo: cada clipe da principal termina na última batida que cabe, e pulsa em cada batida", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video4");
+  ({ projeto } = adicionarClipe(projeto, ctx, "video10"));
+  ({ projeto } = adicionarClipe(projeto, ctx, "video4"));
+  // Batidas a cada 0,75 s, desde 0,1 s
+  const batidas = Array.from({ length: 30 }, (_, i) => Math.round((0.1 + 0.75 * i) * S));
+  const cortado = cortarNoRitmo(projeto, ctx, batidas);
+  const [a, b, c] = principal(cortado);
+  const naBatida = (t: number) => batidas.some((x) => Math.abs(x - t) <= QUADRO / 2);
+  assert.ok(naBatida(a.inicio + a.duracao) && naBatida(b.inicio + b.duracao) && naBatida(c.inicio + c.duracao));
+  assert.ok(a.duracao <= 4 * S && b.duracao <= 10 * S, "nenhum clipe cresce além da mídia");
+  conferir(cortado);
+  assert.throws(() => cortarNoRitmo(cortado, ctx, batidas), /já estão nas batidas/);
+  assert.throws(() => cortarNoRitmo(vazio(), ctx, batidas), /faixa principal/);
+
+  const pulsado = pulsarNoRitmo(cortado, batidas);
+  const pontos = principal(pulsado)[0].keyframes!.escala!;
+  assert.equal(pontos.length % 3, 0);
+  assert.ok(pontos.length <= 100);
+  // O pico cai no quadro da batida e a imagem volta à escala de antes
+  const pico = pontos[1];
+  assert.equal(pico.valor, principal(cortado)[0].transformacao.escala * PULSO_NO_RITMO.escala);
+  assert.ok(naBatida(principal(pulsado)[0].inicio + pico.t));
+  assert.equal(pontos[2].valor, principal(cortado)[0].transformacao.escala);
+  // Clipe que já tem zoom fica como está
+  assert.throws(() => pulsarNoRitmo(pulsado, batidas), /Nenhum clipe/);
 });
 
 test("animações: durações dentro do clipe, e ao dividir a entrada fica à esquerda e a saída à direita", () => {
