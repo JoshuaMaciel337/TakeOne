@@ -880,7 +880,8 @@ export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Lege
     if (fim - inicio < quadro) continue;
     // Os tempos das palavras passam a contar do começo do clipe
     const tempos = legenda.tempos?.map((t) => t - inicio) ?? null;
-    clipes.push(clipeDeTexto(ctx, inicio, fim - inicio, { ...estilo, conteudo: legenda.conteudo, tempos }, POSICAO_LEGENDA));
+    const texto = ajustarTexto(estilo, { conteudo: legenda.conteudo, tempos, palavras_chave: legenda.palavras_chave ?? null });
+    clipes.push(clipeDeTexto(ctx, inicio, fim - inicio, texto, POSICAO_LEGENDA));
     fimAnterior = fim;
   }
   if (!clipes.length) throw new ErroEdicao("O arquivo não tem legendas que deem para usar.");
@@ -920,8 +921,29 @@ export function estiloDasLegendas(projeto: Projeto, faixaId: string, estilo: Par
   const semConteudo = { ...estilo, destaque: estilo.destaque ?? null };
   delete semConteudo.conteudo;
   delete semConteudo.tempos;
+  delete semConteudo.palavras_chave;
   const clipes = faixa.clipes.map((clipe) => (clipe.texto ? { ...clipe, texto: ajustarTexto(clipe.texto, semConteudo) } : clipe));
   return trocarFaixa(projeto, { ...faixa, clipes });
+}
+
+/**
+ * Palavras-chave de todas as legendas: id do clipe → números das palavras (as legendas fora do mapa
+ * ficam sem). `cor` muda a cor delas; null mantém a de cada legenda.
+ */
+export function palavrasChaveDasLegendas(projeto: Projeto, chaves: Record<string, number[]>, cor: string | null): Projeto {
+  const faixas = projeto.faixas.filter((faixa) => faixa.tipo === "legenda");
+  if (!faixas.length) throw new ErroEdicao("Este projeto não tem legendas.");
+  let resultado = projeto;
+  for (const faixa of faixas) {
+    exigirDestravada(faixa);
+    const clipes = faixa.clipes.map((clipe) =>
+      clipe.texto
+        ? { ...clipe, texto: ajustarTexto(clipe.texto, { palavras_chave: chaves[clipe.id] ?? null, ...(cor ? { cor_chave: cor } : {}) }) }
+        : clipe,
+    );
+    resultado = trocarFaixa(resultado, { ...faixa, clipes });
+  }
+  return resultado;
 }
 
 export function mudarTexto(projeto: Projeto, clipeIds: string[], mudanca: Partial<Texto>): Projeto {

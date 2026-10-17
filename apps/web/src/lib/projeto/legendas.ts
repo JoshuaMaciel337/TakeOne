@@ -6,8 +6,11 @@ import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Faixa } from "./modelo.ts";
 import { type Texto, TEXTO_PADRAO } from "./texto.ts";
 
-/** tempos: quando cada palavra começa, na linha do tempo (só nas legendas da fala). */
-export type Legenda = { inicio: Tick; fim: Tick; conteudo: string; tempos?: Tick[] };
+/**
+ * tempos: quando cada palavra começa, na linha do tempo (só nas legendas da fala).
+ * palavras_chave: as palavras para pintar (números de palavrasDoTexto), quando o LLM já escolheu.
+ */
+export type Legenda = { inicio: Tick; fim: Tick; conteudo: string; tempos?: Tick[]; palavras_chave?: number[] | null };
 
 /** Centro das legendas, em fração da altura do quadro a partir do meio: perto da borda de baixo. */
 export const POSICAO_LEGENDA = 0.35;

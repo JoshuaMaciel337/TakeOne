@@ -26,6 +26,7 @@ import {
   mudarTexto,
   mudarVelocidade,
   normalizarRotacao,
+  palavrasChaveDasLegendas,
   recortarClipes,
   removerIntervalos,
   restaurarClipes,
@@ -34,7 +35,7 @@ import {
 } from "./edicao.ts";
 import { transformacaoNoTempo } from "./keyframes.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
-import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "./texto.ts";
+import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
 import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
@@ -379,6 +380,43 @@ test("legendas: importadas numa faixa por cima de tudo, presas aos quadros, e o 
   assert.ok(projeto.faixas[0].clipes.every((c) => c.texto!.cor === "#ffd60a"));
   assert.deepEqual(projeto.faixas[0].clipes.map((c) => c.texto!.conteudo), ["Primeira", "Segunda", "Legenda"]);
   assert.throws(() => importarLegendas(projeto, ctx, [], ESTILO_LEGENDA), /não tem legendas/);
+});
+
+test("palavras-chave: contadas como no desenho, limpas, importadas com as legendas e trocadas em todas", () => {
+  assert.deepEqual(palavrasDoTexto("Hoje vou\r\n  mostrar  três"), ["Hoje", "vou", "mostrar", "três"]);
+  const base = { ...TEXTO_PADRAO, conteudo: "a b c" };
+  assert.deepEqual(alternarPalavraChave({ ...base, palavras_chave: [2] }, 0), [0, 2]);
+  assert.equal(alternarPalavraChave({ ...base, palavras_chave: [2] }, 2), null);
+  const limpo = ajustarTexto(base, { palavras_chave: [3, 1, 1, -2, 1.5, 999], cor_chave: "#FF0000" });
+  assert.deepEqual(limpo.palavras_chave, [1, 3]);
+  assert.equal(limpo.cor_chave, "#ff0000");
+  assert.equal(ajustarTexto(base, { palavras_chave: [] }).palavras_chave, null);
+  assert.equal(ajustarTexto(base, { cor_chave: "vermelho" }).cor_chave, "#ffd400");
+
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  projeto = importarLegendas(
+    projeto,
+    ctx,
+    [
+      { inicio: 0, fim: 2 * S, conteudo: "Economize duas horas", palavras_chave: [2] },
+      { inicio: 2 * S, fim: 4 * S, conteudo: "todo dia" },
+    ],
+    ESTILO_LEGENDA,
+  ).projeto;
+  const [primeira, segunda] = projeto.faixas[0].clipes;
+  assert.deepEqual(primeira.texto!.palavras_chave, [2]);
+  assert.equal(segunda.texto!.palavras_chave, null);
+  // O estilo do painel não apaga as palavras-chave
+  projeto = estiloDasLegendas(projeto, projeto.faixas[0].id, ESTILO_LEGENDA);
+  assert.deepEqual(projeto.faixas[0].clipes[0].texto!.palavras_chave, [2]);
+  // A IA troca todas: quem não está no mapa fica sem
+  projeto = palavrasChaveDasLegendas(projeto, { [segunda.id]: [1] }, "#00ff00");
+  assert.equal(projeto.faixas[0].clipes[0].texto!.palavras_chave, null);
+  assert.deepEqual(projeto.faixas[0].clipes[1].texto!.palavras_chave, [1]);
+  assert.equal(projeto.faixas[0].clipes[1].texto!.cor_chave, "#00ff00");
+  conferir(projeto);
+  assert.throws(() => palavrasChaveDasLegendas(vazio(), {}, null), /não tem legendas/);
 });
 
 test("animações: durações dentro do clipe, e ao dividir a entrada fica à esquerda e a saída à direita", () => {

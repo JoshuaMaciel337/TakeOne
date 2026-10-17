@@ -23,6 +23,7 @@ import {
   removerIntervalos,
   dividirClipes,
   estiloDasLegendas,
+  palavrasChaveDasLegendas,
   importarLegendas,
   type MudancaDeAudio,
   mudarKeyframe,
@@ -88,6 +89,7 @@ export type Comando =
   | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
+  | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
   | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } };
@@ -123,6 +125,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.adicionar": "adicionar legenda",
   "legenda.importar": "importar legendas",
   "legenda.estilo": "mudar o estilo das legendas",
+  "legenda.palavrasChave": "destacar palavras-chave",
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
   "clipe.transicao": "mudar a transição",
@@ -202,6 +205,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "legenda.estilo":
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
+    case "legenda.palavrasChave":
+      return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
     case "clipe.transicao":
       return { projeto: definirTransicao(projeto, parametros.clipeId, parametros.transicao) };
     case "clipe.cor":

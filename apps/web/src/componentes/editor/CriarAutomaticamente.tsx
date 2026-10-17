@@ -4,6 +4,7 @@ import { LoaderCircle, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { chamarApi } from "@/lib/api";
+import { pedirPalavrasChave } from "@/lib/palavrasChave";
 import type { Comando } from "@/lib/projeto/comandos";
 import { animacoesDoPlano, palavrasDepoisDoCorte, type Plano, trechosDosDestaques } from "@/lib/projeto/direcao";
 import { falaDosClipes, type Palavra, palavrasDaLinha, type PalavraDaLinha } from "@/lib/projeto/fala";
@@ -15,11 +16,12 @@ import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia, StatusJob } from "@/lib/tipos";
 import { transcreverMidias } from "@/lib/transcricao";
 
-type Opcoes = { limpar: boolean; legendas: boolean; titulo: boolean; tarja: boolean; zoom: boolean; cta: boolean };
+type Opcoes = { limpar: boolean; legendas: boolean; chaves: boolean; titulo: boolean; tarja: boolean; zoom: boolean; cta: boolean };
 
 const ROTULOS: [keyof Opcoes, string][] = [
   ["limpar", "Tirar pausas, hesitações e retakes"],
   ["legendas", "Legendas da fala"],
+  ["chaves", "Palavras-chave das legendas em destaque"],
   ["titulo", "Título animado na abertura"],
   ["tarja", "Tarja com o nome de quem se apresenta"],
   ["zoom", "Zoom nas frases mais fortes"],
@@ -62,7 +64,7 @@ async function pedirPlano(palavras: PalavraDaLinha[], duracao: Tick, aoAndamento
  */
 export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAnimacao }: Props) {
   const clipes = projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
-  const [opcoes, setOpcoes] = useState<Opcoes>({ limpar: true, legendas: true, titulo: true, tarja: true, zoom: true, cta: true });
+  const [opcoes, setOpcoes] = useState<Opcoes>({ limpar: true, legendas: true, chaves: true, titulo: true, tarja: true, zoom: true, cta: true });
   const [andamento, setAndamento] = useState<string | null>(null);
   const pendente = useRef<Pendente | null>(null);
   const ativo = useRef(true);
@@ -77,7 +79,20 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
     const feitos: string[] = [];
     if (p.opcoes.legendas) {
       const estilo = ESTILOS_DE_LEGENDA[0].texto;
-      const legendas = legendasDaFala(clipesAgora, p.palavras, opcoesParaOQuadro(projeto.proporcao, estilo.tamanho));
+      let legendas = legendasDaFala(clipesAgora, p.palavras, opcoesParaOQuadro(projeto.proporcao, estilo.tamanho));
+      if (legendas.length && p.opcoes.chaves) {
+        // As palavras-chave vêm antes de criar as legendas: elas já nascem pintadas, num passo só
+        try {
+          const chaves = await pedirPalavrasChave(
+            legendas.map((legenda, i) => ({ id: String(i), texto: legenda.conteudo })),
+            setAndamento,
+            () => ativo.current,
+          );
+          if (chaves) legendas = legendas.map((legenda, i) => ({ ...legenda, palavras_chave: chaves[String(i)] ?? null }));
+        } catch (erro) {
+          aoAvisar(erro instanceof Error ? erro.message : "Não foi possível escolher as palavras-chave.");
+        }
+      }
       if (legendas.length) {
         aoExecutar({ comando: "legenda.importar", parametros: { legendas, estilo } });
         feitos.push(`${legendas.length} legendas`);
@@ -166,7 +181,7 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
       </p>
       {ROTULOS.map(([chave, rotulo]) => (
         <label key={chave} className="flex items-center gap-2">
-          <input type="checkbox" checked={opcoes[chave]} disabled={andamento !== null} onChange={(evento) => setOpcoes({ ...opcoes, [chave]: evento.currentTarget.checked })} />
+          <input type="checkbox" checked={opcoes[chave]} disabled={andamento !== null || (chave === "chaves" && !opcoes.legendas)} onChange={(evento) => setOpcoes({ ...opcoes, [chave]: evento.currentTarget.checked })} />
           <span className="flex-1">{rotulo}</span>
         </label>
       ))}

@@ -4,7 +4,17 @@ import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper } from "lucide-reac
 
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
-import { type Alinhamento, type Destaque, FONTES_TEXTO, type FonteTexto, LIMITES_TEXTO, type Texto } from "@/lib/projeto/texto";
+import {
+  type Alinhamento,
+  alternarPalavraChave,
+  COR_CHAVE,
+  type Destaque,
+  FONTES_TEXTO,
+  type FonteTexto,
+  LIMITES_TEXTO,
+  palavrasDoTexto,
+  type Texto,
+} from "@/lib/projeto/texto";
 
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
@@ -153,6 +163,37 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
       <Secao titulo="Brilho">
         <ControleNumerico rotulo="Brilho" minimo={0} maximo={100} sufixo="%" {...controle("brilho", 100)} />
         <CampoCor rotulo="Cor do brilho" {...cor("brilho_cor")} />
+      </Secao>
+      <Secao titulo="Palavras-chave">
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Palavras-chave">
+          {palavrasDoTexto(texto.conteudo).map((palavra, numero) => {
+            const ligada = texto.palavras_chave?.includes(numero) ?? false;
+            return (
+              <button
+                key={`${numero}-${palavra}`}
+                type="button"
+                aria-pressed={ligada}
+                disabled={travada}
+                onClick={() => aoExecutar(mudar({ palavras_chave: alternarPalavraChave(texto, numero) }))}
+                className={`rounded border px-1.5 py-0.5 text-[11px] transition ${ligada ? "border-transparent font-semibold text-black" : "border-borda text-suave hover:text-texto"}`}
+                style={ligada ? { background: texto.cor_chave ?? COR_CHAVE } : undefined}
+              >
+                {palavra}
+              </button>
+            );
+          })}
+        </div>
+        {texto.palavras_chave?.length ? (
+          <CampoCor
+            rotulo="Cor das palavras-chave"
+            cor={texto.cor_chave ?? COR_CHAVE}
+            desativado={travada}
+            aoPrever={(valor) => aoPrever(mudar({ cor_chave: valor }))}
+            aoConfirmar={(valor) => aoExecutar(mudar({ cor_chave: valor }))}
+          />
+        ) : (
+          <p className="mt-1 text-[11px] text-suave">Toque numa palavra para pintá-la de outra cor.</p>
+        )}
       </Secao>
       <Secao titulo="Destaque da fala">
         <select

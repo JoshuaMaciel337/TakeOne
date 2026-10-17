@@ -33,6 +33,9 @@ export type Texto = {
   destaque?: Destaque | null;
   /** Quando cada palavra começa, em ticks desde o começo do clipe (legendas da fala). */
   tempos?: number[] | null;
+  /** Números das palavras pintadas na cor_chave (contadas por palavrasDoTexto), desenhadas no próprio PNG. */
+  palavras_chave?: number[] | null;
+  cor_chave?: string;
 };
 
 export const FONTES_TEXTO: { id: FonteTexto; nome: string }[] = [
@@ -80,6 +83,13 @@ function limitar(valor: number, minimo: number, maximo: number): number {
 }
 
 const COR = /^#[0-9a-f]{6}$/i;
+export const COR_CHAVE = "#ffd400";
+
+/** Números inteiros, sem repetir, em ordem e no máximo 60, como a API aceita; vazio vira null. */
+function limparPalavrasChave(numeros: number[] | null | undefined): number[] | null {
+  const limpos = [...new Set((numeros ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n <= 500))].sort((a, b) => a - b).slice(0, 60);
+  return limpos.length ? limpos : null;
+}
 
 /** Aplica a mudança e mantém tudo dentro dos limites que a API aceita. */
 export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
@@ -98,7 +108,24 @@ export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
     contorno_cor: cor(texto.contorno_cor, atual.contorno_cor),
     fundo_cor: cor(texto.fundo_cor, atual.fundo_cor),
     destaque: texto.destaque ? { ...texto.destaque, cor: cor(texto.destaque.cor, atual.destaque?.cor ?? "#ffd60a") } : null,
+    palavras_chave: limparPalavrasChave(texto.palavras_chave),
+    cor_chave: cor(texto.cor_chave ?? COR_CHAVE, atual.cor_chave ?? COR_CHAVE),
   };
+}
+
+/** As palavras na ordem do desenho: sequências sem espaço, linha a linha (core/modelos/palavras_chave.py). */
+export function palavrasDoTexto(conteudo: string): string[] {
+  return conteudo
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .flatMap((linha) => linha.split(/\s+/).filter(Boolean));
+}
+
+/** Liga ou desliga a palavra `numero` entre as palavras-chave. */
+export function alternarPalavraChave(texto: Texto, numero: number): number[] | null {
+  const atuais = texto.palavras_chave ?? [];
+  const novas = atuais.includes(numero) ? atuais.filter((n) => n !== numero) : [...atuais, numero];
+  return novas.length ? novas.sort((a, b) => a - b) : null;
 }
 
 /** A primeira linha, para o nome do clipe na linha do tempo. */

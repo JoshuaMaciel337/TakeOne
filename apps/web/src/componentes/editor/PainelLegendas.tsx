@@ -9,6 +9,7 @@ import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 
 import { LegendasDaFala } from "./LegendasDaFala";
+import { PalavrasChaveDaIA } from "./PalavrasChaveDaIA";
 
 export type PropsLegendas = {
   projeto: Projeto;
@@ -88,6 +89,7 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
       ) : null}
 
       <LegendasDaFala projeto={projeto} estilo={estilo} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+      <PalavrasChaveDaIA projeto={projeto} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
 
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="botao-secundario px-3 py-2 text-xs" onClick={() => aoExecutar({ comando: "legenda.adicionar", parametros: { inicio: tempo, estilo } })}>
