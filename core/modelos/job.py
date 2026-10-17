@@ -30,6 +30,7 @@ TAREFAS = {
     "recorte_fundo": RECURSO_CPU,
     "limpeza_imagem": RECURSO_CPU,
     "rosto": RECURSO_CPU,
+    "batidas": RECURSO_CPU,
     "animacao_html": RECURSO_CPU,
 }
 

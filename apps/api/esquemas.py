@@ -570,6 +570,23 @@ class RostoSaida(BaseModel):
     processamento: ProcessamentoSaida | None = None
 
 
+class BatidasSaida(BaseModel):
+    midia_id: str
+    status: str
+    bpm: float = 0.0
+    batidas: list[float] = Field(default=[], description="Segundos da mídia")
+    fortes: list[float] = Field(default=[], description="Os tempos fortes (de 4 em 4 batidas), em segundos da mídia")
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+
+
+def batidas_para_saida(doc: dict, job: dict | None = None) -> BatidasSaida:
+    """job: o job da busca, para mostrar o progresso enquanto ela anda (como em rosto_para_saida)."""
+    rosto = rosto_para_saida({**doc, "amostras": []}, job)
+    return BatidasSaida.model_validate({**doc, "midia_id": str(doc["midia_id"]), "status": rosto.status,
+                                        "erro": rosto.erro, "processamento": rosto.processamento})
+
+
 def rosto_para_saida(doc: dict, job: dict | None = None) -> RostoSaida:
     """job: o job da busca do rosto, para mostrar o progresso enquanto ela anda."""
     processamento = None

@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
+    BatidasSaida,
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
@@ -19,10 +20,14 @@ from api.esquemas import (
     TomEntrada,
     TranscricaoPedirEntrada,
     TranscricaoSaida,
+    batidas_para_saida,
     midia_para_saida,
     rosto_para_saida,
     transcricao_para_saida,
 )
+from core.modelos.batidas import STATUS_NENHUMA as BATIDAS_NENHUMA
+from core.modelos.batidas import STATUS_PRONTO as BATIDAS_PRONTAS
+from core.modelos.batidas import montar_batidas
 from core.modelos.geracao import nome_da_midia
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
@@ -153,6 +158,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.midias.delete_one({"_id": midia["_id"]})
     await db.transcricoes.delete_one({"midia_id": midia["_id"]})
     await db.rostos.delete_one({"midia_id": midia["_id"]})
+    await db.batidas.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
 
@@ -325,7 +331,8 @@ async def pedir_tom(midia_id: str, dados: TomEntrada, usuario=Depends(usuario_at
     return (await para_saida(db, [{**midia, "tons": tons}]))[0]
 
 
-async def _job_do_rosto(db, doc: dict) -> dict | None:
+async def _job_da_analise(db, doc: dict) -> dict | None:
+    """O job de uma análise por mídia (rosto, batidas) enquanto ela anda."""
     if doc["status"] != ROSTO_PROCESSANDO or not doc.get("job_id"):
         return None
     return await db.jobs.find_one({"_id": doc["job_id"]}, {"status": 1, "progresso": 1, "mensagem": 1, "erro": 1})
@@ -341,7 +348,7 @@ async def pedir_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(
         raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para seguir o rosto.')
     atual = await db.rostos.find_one({"midia_id": midia["_id"]})
     if atual:
-        job = await _job_do_rosto(db, atual)
+        job = await _job_da_analise(db, atual)
         andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
         if andando or atual["status"] == ROSTO_PRONTO:
             return rosto_para_saida(atual, job)
@@ -359,4 +366,36 @@ async def ver_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(ob
     doc = await db.rostos.find_one({"midia_id": midia["_id"]})
     if doc is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "O rosto desta mídia ainda não foi procurado.")
-    return rosto_para_saida(doc, await _job_do_rosto(db, doc))
+    return rosto_para_saida(doc, await _job_da_analise(db, doc))
+
+
+@router.post("/{midia_id}/batidas", response_model=BatidasSaida)
+async def pedir_batidas(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe a busca das batidas na fila do worker de CPU. Se já está pronta ou andando, só devolve."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("audio"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem som para achar as batidas.')
+    atual = await db.batidas.find_one({"midia_id": midia["_id"]})
+    if atual:
+        job = await _job_da_analise(db, atual)
+        andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
+        if andando or atual["status"] == BATIDAS_PRONTAS:
+            return batidas_para_saida(atual, job)
+    documento = montar_batidas(usuario["organizacao_id"], midia["_id"])
+    job = montar_job("batidas", usuario["organizacao_id"], {"midia_id": str(midia["_id"])}, criado_por=usuario["_id"])
+    documento["job_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.batidas.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
+    logging.info(f"[{usuario['organizacao_id']}] Batidas pedidas: {midia['nome']}")
+    return batidas_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.get("/{midia_id}/batidas", response_model=BatidasSaida)
+async def ver_batidas(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    doc = await db.batidas.find_one({"midia_id": midia["_id"]})
+    # A linha do tempo pergunta por toda música aberta: "nenhuma" em vez de 404, para não sujar o console
+    if doc is None:
+        return BatidasSaida(midia_id=str(midia["_id"]), status=BATIDAS_NENHUMA)
+    return batidas_para_saida(doc, await _job_da_analise(db, doc))

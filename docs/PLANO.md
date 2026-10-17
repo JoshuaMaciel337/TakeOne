@@ -444,7 +444,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] recortar o fundo do vídeo (pessoas, com o MODNet no worker de CPU; a mesma máscara na prévia e no render)
   - [x] **gerar vídeo com IA:** clipes curtos (B-roll, fundo, transição) a partir de um texto, com o Wan 2.2 TI2V-5B (painel Mídia, 2 a 5 s em 480p). Detalhes na seção 9.
   - gerar vídeo a partir de uma imagem (o Wan 2.2 TI2V também aceita; falta a biblioteca aceitar imagens)
-  - batida automática: cortar e animar no ritmo da música (detecção de batidas do SoundCraft)
+  - [x] batida automática: cortar e animar no ritmo da música (detecção própria em numpy, conferida contra o librosa; seção Ritmo na aba Áudio)
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
   - texto em fala (TTS com modelo aberto)
   - edição automática a partir de vários clipes

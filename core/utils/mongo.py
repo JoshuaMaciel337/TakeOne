@@ -42,6 +42,9 @@ INDICES = {
     "rostos": [
         ([("midia_id", 1)], {"unique": True}),
     ],
+    "batidas": [
+        ([("midia_id", 1)], {"unique": True}),
+    ],
     "exportacoes": [
         ([("organizacao_id", 1), ("projeto_id", 1), ("criado_em", -1)], {}),
         # O link do QR code procura pelo hash do token
