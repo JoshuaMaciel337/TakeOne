@@ -424,6 +424,17 @@ class AnimacaoHtmlEntrada(BaseModel):
     duracao: float = Field(default=4, ge=DURACAO_MINIMA_ANIMACAO, le=DURACAO_MAXIMA_ANIMACAO)
 
 
+class FalaEntrada(BaseModel):
+    texto: str = Field(min_length=2, max_length=3000)
+    voz: Literal["pf_dora", "pm_alex", "pm_santa"] = "pf_dora"
+    velocidade: float = Field(default=1.0, ge=0.7, le=1.4)
+
+    @field_validator("texto", mode="before")
+    @classmethod
+    def limpar_texto(cls, valor):
+        return valor.strip() if isinstance(valor, str) else valor
+
+
 class GerarVideoEntrada(BaseModel):
     descricao: str = Field(min_length=DESCRICAO_MINIMA, max_length=DESCRICAO_MAXIMA)
     formato: Literal["16:9", "9:16", "1:1"] = "16:9"

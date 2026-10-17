@@ -19,8 +19,8 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: "**/requirements*.txt"
-      - name: Instalar o FFmpeg (testes de ingestão)
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+      - name: Instalar o FFmpeg e o espeak-ng (testes de ingestão e dos fonemas do texto em fala)
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg espeak-ng
       - name: Instalar o deep-filter (testes da voz limpa)
         run: |
           sudo curl -sSL -o /usr/local/bin/deep-filter https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-unknown-linux-musl

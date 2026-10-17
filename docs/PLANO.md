@@ -446,7 +446,7 @@ Cada fase termina com algo que dá para usar e testar.
   - gerar vídeo a partir de uma imagem (o Wan 2.2 TI2V também aceita; falta a biblioteca aceitar imagens)
   - [x] batida automática: cortar e animar no ritmo da música (detecção própria em numpy, conferida contra o librosa; seção Ritmo na aba Áudio)
   - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
-  - texto em fala (TTS com modelo aberto)
+  - [x] texto em fala (TTS com modelo aberto): Kokoro-82M (Apache-2.0) com três vozes pt-BR, na ferramenta Áudio
   - edição automática a partir de vários clipes
   - [x] destacar a palavra-chave da legenda com o LLM (seção 10): botão na ferramenta Legendas e opção do "Criar automaticamente"
 - Fica fora do escopo, pelas regras do dono no HolyCut: avatar de IA, dublagem, clonagem de voz e lip-sync.

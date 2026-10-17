@@ -43,6 +43,10 @@ DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
 MODELO_ROSTO = Path(os.environ.get("MODELO_ROSTO", "/app/modelos/yunet.onnx"))
 # MODNet (recorte de retrato) para recortar o fundo do vídeo
 MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx"))
+# Kokoro-82M (texto em fala, Apache-2.0): model.onnx, tokenizer.json e uma tabela de estilo por voz
+MODELO_FALA = Path(os.environ.get("MODELO_FALA", "/app/modelos/kokoro"))
+# espeak-ng (GPL-3): só como programa separado, para converter o texto em fonemas
+ESPEAK = os.environ.get("ESPEAK", "espeak-ng")
 
 # -----------------------------------------------
 # SESSÃO

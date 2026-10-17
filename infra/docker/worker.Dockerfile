@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg tzdata \
+ && apt-get install -y --no-install-recommends ffmpeg tzdata espeak-ng \
  && rm -rf /var/lib/apt/lists/*
 
 # DeepFilterNet 0.5.6 (MIT ou Apache-2.0): o binário do próprio projeto, com o modelo dentro, para
@@ -21,6 +21,15 @@ ADD --checksum=sha256:07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66
     https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model.onnx \
     /app/modelos/modnet.onnx
 RUN chmod 644 /app/modelos/modnet.onnx
+# Kokoro-82M v1.0 em ONNX (texto em fala, Apache-2.0; onnx-community numa revisão fixa) e as três vozes pt-BR.
+# O espeak-ng (GPL-3, pelo apt) converte o texto em fonemas, chamado como programa separado.
+ARG KOKORO=https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231
+ADD --checksum=sha256:8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb ${KOKORO}/onnx/model.onnx /app/modelos/kokoro/model.onnx
+ADD --checksum=sha256:77a02c8e164413299b4b4c403b14f8e0e1c1b727db4d46a09d6327b861060a34 ${KOKORO}/tokenizer.json /app/modelos/kokoro/tokenizer.json
+ADD --checksum=sha256:3da7b5b2d91847ebf5646f57631af6ececae3c29a89cd300f06edf9aa6cfe9ee ${KOKORO}/voices/pf_dora.bin /app/modelos/kokoro/pf_dora.bin
+ADD --checksum=sha256:0175c753f59c54e7fd5a995bedef0c5ff2fb67e0043dd3dcb2ae74ec2acbeb2a ${KOKORO}/voices/pm_alex.bin /app/modelos/kokoro/pm_alex.bin
+ADD --checksum=sha256:8b012db3185778afe2e45a62cbad69db73021774fe68dda634bcc748a982eede ${KOKORO}/voices/pm_santa.bin /app/modelos/kokoro/pm_santa.bin
+RUN chmod -R a+rX /app/modelos/kokoro
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

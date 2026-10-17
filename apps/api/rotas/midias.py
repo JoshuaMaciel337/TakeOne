@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     BatidasSaida,
+    FalaEntrada,
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
@@ -120,6 +121,28 @@ async def gerar_video(dados: GerarVideoEntrada, usuario=Depends(usuario_atual), 
     # O progresso da geração aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
     await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
     logging.info(f"[{usuario['organizacao_id']}] Vídeo com IA pedido: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
+
+
+@router.post("/fala", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def gerar_fala(dados: FalaEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila o texto em fala (Kokoro, worker de CPU). A mídia já entra na biblioteca, processando; o
+    áudio vira o original dela quando ficar pronto e passa pela ingestão como um envio comum."""
+    # "Fala · Olá! Hoje tem novidade no…": o começo do texto, cortado numa palavra inteira
+    texto = " ".join(dados.texto.split())
+    trecho = texto if len(texto) <= 40 else texto[:40].rsplit(" ", 1)[0] + "…"
+    nome = f"Fala · {trecho.rstrip('.,;: ')}"
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome}.m4a", 0, "audio/mp4")
+    midia["nome_original"] = midia["nome"]
+    midia["status"] = STATUS_PROCESSANDO
+    midia["fala"] = {"texto": dados.texto, "voz": dados.voz, "velocidade": dados.velocidade}
+    midia_id = (await db.midias.insert_one(midia)).inserted_id
+    job = montar_job("fala", usuario["organizacao_id"], {"midia_id": str(midia_id), **midia["fala"]},
+                     criado_por=usuario["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    # O progresso da fala aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
+    await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
+    logging.info(f"[{usuario['organizacao_id']}] Texto em fala pedido: {len(dados.texto)} letras, voz {dados.voz}")
     return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
 
 
