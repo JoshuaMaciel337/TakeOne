@@ -24,8 +24,9 @@ const ESPERAS_MS = [0, 1_000, 3_000, 5_000, 10_000, 20_000, 30_000, 60_000];
 const EXTENSOES_ACEITAS = [
   ".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts",
   ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac",
+  ".jpg", ".jpeg", ".png", ".webp",
 ];
-export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", ...EXTENSOES_ACEITAS].join(",");
+export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", "image/jpeg", "image/png", "image/webp", ...EXTENSOES_ACEITAS].join(",");
 
 function extensaoAceita(nome: string): boolean {
   const indice = nome.lastIndexOf(".");
@@ -89,7 +90,7 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
         const envio: Envio = { chave, nome: arquivo.name, tamanho: arquivo.size, enviado: 0, estado: "preparando" };
         if (!extensaoAceita(arquivo.name)) {
           envio.estado = "erro";
-          envio.erro = "Formato não aceito. Envie um vídeo (MP4, MOV, MKV...) ou um áudio (MP3, WAV, M4A...).";
+          envio.erro = "Formato não aceito. Envie um vídeo (MP4, MOV, MKV...), um áudio (MP3, WAV, M4A...) ou uma imagem (JPG, PNG, WebP).";
         }
         setEnvios((lista) => [envio, ...lista.filter((item) => item.chave !== chave)]);
         if (envio.estado === "erro") continue;

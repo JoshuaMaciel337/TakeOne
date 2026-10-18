@@ -185,7 +185,7 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
         />
       </section>
       {GRUPOS.filter((grupo) => grupo.id === "efeito").map(secao)}
-      {!clipe.texto && midia?.video ? <TirarRuido clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
+      {!clipe.texto && midia?.video && !midia.imagem ? <TirarRuido clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
     </div>
   );
 }

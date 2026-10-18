@@ -61,7 +61,9 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
           ) : (
             <Loader2 className="size-6 animate-spin text-suave" aria-hidden />
           )}
-          {pronta && midia.duracao ? (
+          {pronta && midia.imagem ? (
+            <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium">Imagem</span>
+          ) : pronta && midia.duracao ? (
             <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
               {formatarTempo(midia.duracao)}
             </span>

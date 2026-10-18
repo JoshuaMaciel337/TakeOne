@@ -58,10 +58,13 @@ export type Midia = {
   tamanho_total: number;
   bytes_recebidos: number;
   duracao: number | null;
-  video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number } | null;
+  /** transparente: só nas imagens paradas (PNG ou WebP com fundo transparente). */
+  video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number; transparente?: boolean } | null;
   /** lufs: loudness medido na ingestão (falta nas mídias enviadas antes da medição). */
   audio: { codec: string; canais: number; taxa: number; lufs?: number | null } | null;
   miniaturas: Miniaturas | null;
+  /** Imagem parada (JPG, PNG, WebP): sem duração e sem som; proxy.webp para a prévia. */
+  imagem?: boolean;
   arquivos: string[];
   erro: string | null;
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;

@@ -14,6 +14,7 @@ import {
   apararClipe,
   type Contexto,
   dividirClipes,
+  DURACAO_IMAGEM_S,
   duplicarClipes,
   ErroEdicao,
   estiloDasLegendas,
@@ -47,11 +48,13 @@ const QUADRO = duracaoDoQuadro(TAXA);
 
 function contexto(): Contexto {
   let n = 0;
-  const midias: Record<string, { duracao: number; video: boolean; audio: boolean; transparente?: boolean }> = {
+  const midias: Record<string, { duracao: number; video: boolean; audio: boolean; transparente?: boolean; imagem?: boolean }> = {
     video10: { duracao: 10 * S, video: true, audio: true },
     video4: { duracao: 4 * S, video: true, audio: true },
     musica: { duracao: 30 * S, video: false, audio: true },
     animacao: { duracao: 3 * S, video: true, audio: false, transparente: true },
+    foto: { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, imagem: true },
+    logo: { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, transparente: true, imagem: true },
   };
   return { novoId: () => `n${++n}`, midia: (id) => midias[id] ?? null };
 }
@@ -113,6 +116,35 @@ test("animação entra por cima, no cursor e com a transparência ligada", () =>
   const sobreposicao = projeto.faixas.find((f) => f.tipo === "video")!;
   assert.equal(sobreposicao.clipes[0].inicio, 2 * S);
   assert.equal(sobreposicao.clipes[0].remover_fundo, true);
+  assert.equal(principal(projeto).length, 1);
+  conferir(projeto);
+});
+
+test("imagem entra com 5 s e estica para os dois lados quanto quiser", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "foto");
+  const foto = principal(projeto)[0];
+  assert.equal(foto.duracao, DURACAO_IMAGEM_S * S);
+  // Pelo fim, sem limite de mídia
+  projeto = apararClipe(projeto, ctx, foto.id, "fim", 60 * S);
+  assert.equal(principal(projeto)[0].duracao, 60 * S);
+  // Dividida, a segunda metade pode voltar pelo começo e fica com a entrada em zero
+  ({ projeto } = dividirClipes(projeto, ctx, 20 * S, []));
+  const segunda = principal(projeto)[1];
+  projeto = apararClipe(projeto, ctx, segunda.id, "inicio", 10 * S);
+  const depois = principal(projeto)[1];
+  assert.equal(depois.entrada, 0);
+  assert.equal(depois.duracao, 50 * S);
+  conferir(projeto);
+});
+
+test("imagem transparente vai por cima sem ligar o recorte do fundo", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "logo", { inicio: 1 * S }));
+  const sobreposicao = projeto.faixas.find((f) => f.tipo === "video")!;
+  assert.equal(sobreposicao.clipes[0].inicio, 1 * S);
+  assert.ok(!sobreposicao.clipes[0].remover_fundo, "a transparência já vem no próprio arquivo");
   assert.equal(principal(projeto).length, 1);
   conferir(projeto);
 });

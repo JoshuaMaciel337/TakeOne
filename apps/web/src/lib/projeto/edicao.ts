@@ -239,10 +239,14 @@ export type DestinoClipe = {
   novaFaixa?: boolean;
 };
 
+/** Quanto uma imagem parada dura ao entrar na linha do tempo. */
+export const DURACAO_IMAGEM_S = 5;
+
 export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string, destino: DestinoClipe = {}): { projeto: Projeto; clipeId: string } {
   const info = ctx.midia(midiaId);
   if (!info) throw new ErroEdicao("Esta mídia ainda não está pronta.");
-  const duracao = ajustarAoQuadro(projeto.taxa, info.duracao);
+  // Imagem parada não tem fim: entra com DURACAO_IMAGEM_S e a pessoa estica o quanto quiser
+  const duracao = ajustarAoQuadro(projeto.taxa, Number.isFinite(info.duracao) ? info.duracao : DURACAO_IMAGEM_S * TICKS_POR_SEGUNDO);
   if (duracao < duracaoDoQuadro(projeto.taxa)) throw new ErroEdicao("A mídia é curta demais para a linha do tempo.");
 
   const clipe: Clipe = {
@@ -257,8 +261,9 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     fade_saida: 0,
     transformacao: TRANSFORMACAO_PADRAO,
     recorte: RECORTE_PADRAO,
-    // A animação já vem com a transparência: o clipe usa a máscara dela, como no recorte do fundo
-    ...(info.transparente ? { remover_fundo: true } : {}),
+    // A animação já vem com a transparência: o clipe usa a máscara dela, como no recorte do fundo (a imagem
+    // transparente traz o alfa no próprio arquivo e não precisa)
+    ...(info.transparente && !info.imagem ? { remover_fundo: true } : {}),
   };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
   if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixaDeTexto(faixa.tipo) ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
@@ -386,7 +391,7 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
   } else {
     // delta > 0 encurta pelo começo; delta < 0 mostra o que vinha antes na mídia (o texto não tem limite)
     const velocidadeNaPonta = clipe.curva_velocidade ? velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, 0) : clipe.velocidade;
-    let minimo = clipe.texto ? Number.NEGATIVE_INFINITY : -ajustarAoQuadro(projeto.taxa, clipe.entrada / velocidadeNaPonta);
+    let minimo = clipe.texto || info.imagem ? Number.NEGATIVE_INFINITY : -ajustarAoQuadro(projeto.taxa, clipe.entrada / velocidadeNaPonta);
     if (livre) {
       const anterior = [...faixa.clipes].reverse().find((item) => fimDoClipe(item) <= clipe.inicio && item.id !== clipe.id);
       minimo = Math.max(minimo, (anterior ? fimDoClipe(anterior) : 0) - clipe.inicio);
@@ -403,6 +408,8 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       texto: deslocarTempos(clipe.texto, delta),
       abaixamento: deslocarAbaixamento(clipe.abaixamento, delta),
     };
+    // A imagem não usa o ponto de entrada (é a mesma em todo instante): fica em zero, que a API aceita
+    if (info.imagem) novo.entrada = 0;
   }
 
   const clipes = [...faixa.clipes];

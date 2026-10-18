@@ -101,7 +101,12 @@ export function Editor({ projetoId }: { projetoId: string }) {
       novoId,
       midia: (id) => {
         const midia = midias.get(id);
-        if (!midia || midia.status !== "pronta" || !midia.duracao) return null;
+        if (!midia || midia.status !== "pronta") return null;
+        if (midia.imagem && midia.video) {
+          // Imagem parada: sem fim, sem som; com transparência, entra numa faixa por cima
+          return { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, transparente: Boolean(midia.video.transparente), imagem: true };
+        }
+        if (!midia.duracao) return null;
         return {
           duracao: segundosParaTicks(midia.duracao),
           video: Boolean(midia.video),

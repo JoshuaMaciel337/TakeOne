@@ -59,6 +59,14 @@ const ABAS_AUDIO = [
   { id: "velocidade", nome: "Velocidade", fase: "" },
 ] as const;
 
+// Imagem parada: não tem som nem velocidade
+const ABAS_IMAGEM = [
+  { id: "info", nome: "Informações", fase: "" },
+  { id: "basico", nome: "Básico", fase: "" },
+  { id: "animacao", nome: "Animação", fase: "" },
+  { id: "cor", nome: "Cor", fase: "" },
+] as const;
+
 type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
@@ -104,7 +112,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
   const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
   const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
   const ehAudio = selecionado?.faixa.tipo === "audio";
-  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : ABAS;
+  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
   // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
   // Num clipe de áudio, a aba que não existe vira a do som
   const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio ? "audio" : abas[0].id;
@@ -175,8 +183,10 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             <dl className="mt-2">
               <Linha rotulo="Arquivo" valor={midia.nome_original} />
               <Linha rotulo="Tamanho" valor={formatarBytes(midia.tamanho_total)} />
-              <Linha rotulo="Duração" valor={formatarTempo(midia.duracao)} />
-              {midia.video ? (
+              {midia.imagem ? <Linha rotulo="Tipo" valor="Imagem" /> : <Linha rotulo="Duração" valor={formatarTempo(midia.duracao)} />}
+              {midia.imagem && midia.video ? (
+                <Linha rotulo="Resolução" valor={`${midia.video.largura} × ${midia.video.altura}${midia.video.transparente ? " · com transparência" : ""}`} />
+              ) : midia.video ? (
                 <>
                   <Linha rotulo="Resolução" valor={`${midia.video.largura} × ${midia.video.altura}`} />
                   <Linha rotulo="Quadros por segundo" valor={midia.video.fps ? String(midia.video.fps) : "-"} />
@@ -423,7 +433,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           </select>
         </label>
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
-        {!clipe.texto && midia?.video ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
+        {!clipe.texto && midia?.video && !midia.imagem ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
         {pontosDoClipe.length ? (
           <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
             <button
@@ -469,7 +479,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             )}
           </div>
         ) : null}
-        {!clipe.texto && midia?.video ? (
+        {!clipe.texto && midia?.video && !midia.imagem ? (
           <SeguirRosto clipe={clipe} faixa={faixa} midia={midia} proporcao={proporcao} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
         ) : null}
       </Secao>

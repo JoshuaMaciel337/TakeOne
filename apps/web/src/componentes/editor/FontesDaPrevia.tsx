@@ -75,12 +75,52 @@ type PropsFonte = {
   aoTerQuadro: () => void;
 };
 
-/** Quadros de um clipe de vídeo: WebCodecs quando dá, `<video>` quando não. */
+/** Quadros de um clipe de vídeo: WebCodecs quando dá, `<video>` quando não. Imagem parada: o bitmap dela. */
 export function FonteDoClipe(props: PropsFonte) {
+  if (props.item.midia.imagem) return <FonteImagem {...props} />;
+  return <FonteDeVideo {...props} />;
+}
+
+function FonteDeVideo(props: PropsFonte) {
   const temProxy = props.item.midia.arquivos.includes("proxy.mp4");
   const [usarVideo, setUsarVideo] = useState(() => !temProxy || !webCodecsDisponivel());
   if (usarVideo) return <FonteVideo {...props} />;
   return <FonteWebCodecs {...props} arquivo={arquivoDaImagem(props.item)} aoFalhar={() => setUsarVideo(true)} />;
+}
+
+/**
+ * Imagem parada: a cópia leve (proxy.webp) vira um ImageBitmap uma vez, e é o mesmo quadro em todo instante.
+ * Sem pré-multiplicar o alfa: o compositor faz isso ao enviar a textura, como no PNG dos textos.
+ */
+function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
+  const url = arquivoDaMidia(item.midia.id, "proxy.webp");
+  const avisos = useRef({ aoRegistrar, aoTerQuadro });
+  useEffect(() => {
+    avisos.current = { aoRegistrar, aoTerQuadro };
+  });
+  useEffect(() => {
+    let bitmap: ImageBitmap | null = null;
+    let vivo = true;
+    avisos.current.aoRegistrar({ quadro: () => bitmap });
+    fetch(url)
+      .then((resposta) => (resposta.ok ? resposta.blob() : Promise.reject(new Error(`proxy.webp: ${resposta.status}`))))
+      .then((blob) => createImageBitmap(blob, { premultiplyAlpha: "none" }))
+      .then((pronto) => {
+        if (!vivo) {
+          pronto.close();
+          return;
+        }
+        bitmap = pronto;
+        avisos.current.aoTerQuadro();
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+      avisos.current.aoRegistrar(null);
+      bitmap?.close();
+    };
+  }, [url]);
+  return null;
 }
 
 /** A cópia leve da imagem sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */

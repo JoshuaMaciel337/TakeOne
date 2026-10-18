@@ -33,9 +33,9 @@ export function ZonaDeEnvio({ compacta = false }: { compacta?: boolean }) {
     >
       <UploadCloud className={`${compacta ? "size-6" : "size-9"} text-destaque`} aria-hidden />
       <div>
-        <p className={`font-semibold ${compacta ? "text-sm" : "text-base"}`}>Arraste vídeos e áudios para cá</p>
+        <p className={`font-semibold ${compacta ? "text-sm" : "text-base"}`}>Arraste vídeos, áudios e imagens para cá</p>
         <p className="mt-1 text-xs text-suave">
-          MP4, MOV, MKV, MP3, WAV e outros. Se a internet cair, o envio continua de onde parou.
+          MP4, MOV, MP3, WAV, JPG, PNG e outros. Se a internet cair, o envio continua de onde parou.
         </p>
       </div>
       <button
