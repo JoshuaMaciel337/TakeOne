@@ -81,6 +81,18 @@ def e_imagem(midia: dict) -> bool:
     return bool(midia.get("imagem")) or midia.get("extensao") in EXTENSOES_IMAGEM
 
 
+def campos_da_imagem(info: dict, arquivos_antigos: list[str]) -> dict:
+    """O que a mídia guarda de uma imagem preparada (core/utils/imagem.preparar_imagem): sem duração nem som,
+    e `video` só com o tamanho, para a caixa do clipe, a prévia e o render usarem a conta dos vídeos."""
+    arquivos = [ARQUIVO_IMAGEM, ARQUIVO_PROXY_IMAGEM, ARQUIVO_CAPA, ARQUIVO_MINIATURAS]
+    arquivos += [nome for nome in arquivos_antigos if nome not in arquivos]
+    video = {"codec": "imagem", "largura": info["largura"], "altura": info["altura"], "fps": None, "rotacao": 0,
+             "matriz": None, "transparente": info["transparente"]}
+    miniaturas = {"total": 1, "colunas": 1, "linhas": 1, "intervalo": 1.0, **info["miniatura"]}
+    return {"status": STATUS_PRONTA, "imagem": True, "duracao": None, "video": video, "audio": None,
+            "arquivos": arquivos, "miniaturas": miniaturas, "erro": None}
+
+
 def nome_para_exibir(nome_arquivo: str) -> str:
     """'C:/Videos/Viagem 29-09.MP4' → 'Viagem 29-09'."""
     nome = PurePosixPath(nome_arquivo.replace("\\", "/")).stem.strip()

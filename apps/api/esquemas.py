@@ -114,6 +114,8 @@ class MidiaSaida(BaseModel):
     estabilizacoes: dict = Field(default_factory=dict)
     # Vídeo gerado com IA: {descricao, formato, duracao}
     gerada: dict | None = None
+    # Forma desenhada (POST /api/elementos/formas): o pedido que a gerou
+    elemento: dict | None = None
     # Animação em HTML: {modelo, campos, proporcao, duracao}
     animacao: dict | None = None
     criado_em: datetime
@@ -252,6 +254,26 @@ class MarcaSaida(BaseModel):
     fonte_titulo: str = "display"
     fonte_texto: str = "texto"
     logo_midia_id: str | None = None
+
+
+class FormaEntrada(BaseModel):
+    """Uma forma desenhada (core/utils/forma.py). Sem `cor`, ela é vazada e precisa de contorno."""
+    tipo: Literal["retangulo", "arredondado", "elipse", "triangulo", "estrela", "seta", "linha", "balao", "coracao"]
+    cor: str | None = Field(default="#ffffff", pattern=COR)
+    contorno_cor: str = Field(default="#000000", pattern=COR)
+    contorno: float = Field(default=0.0, ge=0, le=0.25, description="Espessura, em fração do lado menor da forma")
+    proporcao: float | None = Field(default=None, ge=0.05, le=20, description="Largura sobre altura")
+
+    @field_validator("cor", "contorno_cor")
+    @classmethod
+    def minusculas(cls, valor):
+        return valor.lower() if isinstance(valor, str) else valor
+
+    @model_validator(mode="after")
+    def vazada_com_contorno(self):
+        if self.cor is None and self.contorno <= 0:
+            raise ValueError("Uma forma vazada precisa de contorno.")
+        return self
 
 
 class TextoEntrada(BaseModel):
@@ -736,6 +758,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                           if (recorte := doc.get("recorte_fundo")) else None),
         "imagem_limpa": ({"status": limpa["status"], "erro": limpa.get("erro")}
                          if (limpa := doc.get("imagem_limpa")) else None),
+        "elemento": ({k: v for k, v in elemento.items() if k != "chave"}
+                     if (elemento := doc.get("elemento")) else None),
         "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada["duracao"],
                     "imagem_id": gerada.get("imagem_id")}
                    if (gerada := doc.get("gerada")) else None),

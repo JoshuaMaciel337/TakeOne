@@ -18,6 +18,7 @@ from api.rotas import (
     auth,
     celular,
     direcoes,
+    elementos,
     eventos,
     exportacoes,
     jobs,
@@ -128,3 +129,4 @@ app.include_router(som.router)
 app.include_router(animacoes.router)
 app.include_router(direcoes.router)
 app.include_router(marca.router)
+app.include_router(elementos.router)

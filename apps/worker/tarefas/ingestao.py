@@ -27,12 +27,12 @@ from core.modelos.midia import (
     ARQUIVO_MINIATURAS,
     ARQUIVO_NIVEIS,
     ARQUIVO_PROXY_AUDIO,
-    ARQUIVO_PROXY_IMAGEM,
     ARQUIVO_PROXY_VIDEO,
     NIVEIS_POR_SEGUNDO,
     STATUS_ERRO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
+    campos_da_imagem,
     chave_arquivo,
     e_imagem,
 )
@@ -141,22 +141,13 @@ def ingerir_imagem(db, midia: dict, original: Path, reportar: Callable[[int, str
         info = preparar_imagem(original, pasta)
     except ImagemInvalida as e:
         raise ErroDefinitivo(str(e)) from e
-    arquivos = [ARQUIVO_IMAGEM, ARQUIVO_PROXY_IMAGEM, ARQUIVO_CAPA, ARQUIVO_MINIATURAS]
-    arquivos += [nome for nome in midia.get("arquivos", []) if nome not in arquivos]
+    campos = campos_da_imagem(info, midia.get("arquivos", []))
     momento = agora()
-    # "video" leva só o tamanho: a caixa do clipe, a prévia e o render usam a mesma conta dos vídeos
-    video = {"codec": "imagem", "largura": info["largura"], "altura": info["altura"], "fps": None, "rotacao": 0,
-             "matriz": None, "transparente": info["transparente"]}
-    miniaturas = {"total": 1, "colunas": 1, "linhas": 1, "intervalo": 1.0, **info["miniatura"]}
-    db.midias.update_one({"_id": midia_id}, {"$set": {
-        "status": STATUS_PRONTA, "imagem": True, "duracao": None, "video": video, "audio": None,
-        "arquivos": arquivos, "miniaturas": miniaturas, "erro": None, "processado_em": momento,
-        "atualizado_em": momento,
-    }})
+    db.midias.update_one({"_id": midia_id}, {"$set": {**campos, "processado_em": momento, "atualizado_em": momento}})
     logging.info(f"[{organizacao_id}] [midia {midia_id}] Imagem {info['largura']}×{info['altura']}"
                  f"{' com transparência' if info['transparente'] else ''}.")
     reportar(100, "Pronta para editar")
-    return {"midia_id": str(midia_id), "imagem": True, "arquivos": arquivos}
+    return {"midia_id": str(midia_id), "imagem": True, "arquivos": campos["arquivos"]}
 
 
 def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
