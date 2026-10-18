@@ -25,6 +25,7 @@ import {
 } from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
+import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
   acharClipe,
@@ -1126,6 +1127,34 @@ export function mesclarClipes(projeto: Projeto, clipeIds: string[], mesclagem: M
 export function mudarFundo(projeto: Projeto, cor: string): Projeto {
   if (!/^#[0-9a-f]{6}$/i.test(cor)) throw new ErroEdicao("Cor inválida.");
   return { ...projeto, fundo: { ...projeto.fundo, cor: cor.toLowerCase() } };
+}
+
+/**
+ * Faz o clipe seguir um objeto (lib/projeto/seguirObjeto.ts): o caminho entra nos keyframes de x e y,
+ * no lugar dos que havia; os de escala, giro e opacidade ficam. A posição de base vira o primeiro ponto.
+ */
+export function seguirObjetoClipe(projeto: Projeto, clipeId: string, caminho: CaminhoDoSeguidor): Projeto {
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    const noQuadro = (pontos: Keyframe[], eixo: "x" | "y") => {
+      const { minimo, maximo } = LIMITES_TRANSFORMACAO[eixo];
+      const alinhados: Keyframe[] = [];
+      for (const ponto of pontos) {
+        const t = Math.min(Math.max(quadroMaisProximo(projeto.taxa, ponto.t), 0), clipe.duracao);
+        if (alinhados.length && t - alinhados[alinhados.length - 1].t < quadro) continue;
+        alinhados.push({ t, valor: limitar(ponto.valor, minimo, maximo), curva: "linear" });
+      }
+      return alinhados.slice(0, KEYFRAMES_POR_PROPRIEDADE);
+    };
+    const x = noQuadro(caminho.x, "x");
+    const y = noQuadro(caminho.y, "y");
+    if (!x.length || !y.length) throw new ErroEdicao("O objeto não aparece enquanto este clipe aparece.");
+    return {
+      ...clipe,
+      transformacao: limitarTransformacao({ ...clipe.transformacao, x: x[0].valor, y: y[0].valor }),
+      keyframes: { ...clipe.keyframes, x: x.length > 1 ? x : undefined, y: y.length > 1 ? y : undefined },
+    };
+  });
 }
 
 /**

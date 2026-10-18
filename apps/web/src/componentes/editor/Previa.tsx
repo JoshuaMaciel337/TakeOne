@@ -25,11 +25,13 @@ import {
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
+import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
 import { formatarTimecode, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, type ItemDaPrevia, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
+import { MarcadorDeObjeto, type ObjetoMarcado } from "./SeguirObjeto";
 import { razao } from "./proporcoes";
 
 type Props = {
@@ -44,6 +46,8 @@ type Props = {
   /** Mudança provisória durante um gesto na prévia; `null` quando o gesto termina. */
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
+  /** Marcando o objeto que um clipe vai seguir: a prévia mostra o marcador no lugar das alças. */
+  marcacao?: { seguidorId: string; aoConfirmar: (marcado: ObjetoMarcado) => void; aoCancelar: () => void } | null;
   className?: string;
 };
 
@@ -206,7 +210,7 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, className = "" }: Props) {
+export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, className = "" }: Props) {
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [suportado] = useState(webgl2Disponivel);
@@ -360,6 +364,21 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     desenho.current.sujo = true;
   };
 
+  /** O retângulo marcado em volta do objeto: no vídeo de cima que está embaixo do meio dele (que não seja quem segue). */
+  function marcarObjeto(retangulo: { esquerda: number; topo: number; largura: number; altura: number }): string | null {
+    if (!marcacao) return null;
+    const meio = { x: retangulo.esquerda + retangulo.largura / 2, y: retangulo.topo + retangulo.altura / 2 };
+    const alvo = [...camadas].reverse().find((camada) => {
+      const midia = camada.clipe.midia_id ? midias.get(camada.clipe.midia_id) : undefined;
+      return camada.clipe.id !== marcacao.seguidorId && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
+    });
+    if (!alvo) return "Marque em cima de um vídeo (não do próprio clipe que vai seguir).";
+    const caixa = retanguloNaImagem(alvo.caixa, alvo.recorte, retangulo);
+    if (!caixa) return "O retângulo ficou fora da imagem do vídeo.";
+    marcacao.aoConfirmar({ alvoId: alvo.clipe.id, caixa });
+    return null;
+  }
+
   /** Clique na prévia: seleciona o clipe de cima que está sob o ponteiro. */
   function selecionarNoPonto(evento: React.PointerEvent<HTMLDivElement>) {
     if (evento.button !== 0) return;
@@ -436,7 +455,9 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
               </>
             ) : null}
 
-            {selecionada && !tocando ? (
+            {marcacao ? <MarcadorDeObjeto aoMarcar={marcarObjeto} aoCancelar={marcacao.aoCancelar} /> : null}
+
+            {selecionada && !tocando && !marcacao ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
                 caixa={selecionada.caixaBase}

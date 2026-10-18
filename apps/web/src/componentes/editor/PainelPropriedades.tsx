@@ -33,6 +33,7 @@ import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
 import { NoRitmo } from "./NoRitmo";
 import { Estabilizar } from "./Estabilizar";
+import { BotaoSeguirObjeto } from "./SeguirObjeto";
 import { SeguirRosto } from "./SeguirRosto";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
@@ -83,6 +84,8 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio", texto: "Texto", legenda: "Legendas" };
 
+type EstadoSeguirObjeto = { marcando: string | null; andamento: { seguidorId: string; texto: string } | null; aoIniciar: (clipeId: string) => void };
+
 type Props = {
   midia: Midia | null;
   /** O clipe escolhido na linha do tempo; `midia` é a dele. */
@@ -96,6 +99,8 @@ type Props = {
   /** As faixas do projeto: o "Abaixar na fala" procura a fala nelas. */
   faixas: Faixa[];
   aoAvisar: (mensagem: string) => void;
+  /** O "Seguir um objeto" (o fluxo fica no Editor, porque passa pela prévia). */
+  seguirObjeto: EstadoSeguirObjeto;
   /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
   fundo: string;
   /** Mudança provisória enquanto um controle é arrastado; `null` para desistir dela. */
@@ -105,7 +110,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, seguirObjeto, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -214,6 +219,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             midia={midia}
             proporcao={proporcao}
             aoAvisar={aoAvisar}
+            seguirObjeto={seguirObjeto}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
           />
@@ -284,6 +290,7 @@ type PropsBasico = PropsAba & {
   midia: Midia | null;
   proporcao: string;
   aoAvisar: (mensagem: string) => void;
+  seguirObjeto: EstadoSeguirObjeto;
 };
 
 /** O losango do keyframe: cheio com ponto no instante, vazado com pontos em outros instantes. */
@@ -308,7 +315,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, aoPrever, aoExecutar }: PropsBasico) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoPrever, aoExecutar }: PropsBasico) {
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
@@ -485,6 +492,16 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         ) : null}
         {!clipe.texto && midia?.video && !midia.imagem ? (
           <SeguirRosto clipe={clipe} faixa={faixa} midia={midia} proporcao={proporcao} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+        ) : null}
+        {/* Quem segue fica por cima do vídeo: textos e sobreposições (a legenda tem lugar fixo) */}
+        {faixa.tipo === "texto" || faixa.tipo === "video" ? (
+          <BotaoSeguirObjeto
+            clipe={clipe}
+            travada={travada}
+            marcando={seguirObjeto.marcando === clipe.id}
+            andamento={seguirObjeto.andamento?.seguidorId === clipe.id ? seguirObjeto.andamento.texto : null}
+            aoIniciar={() => seguirObjeto.aoIniciar(clipe.id)}
+          />
         ) : null}
       </Secao>
       {clipe.texto ? null : (

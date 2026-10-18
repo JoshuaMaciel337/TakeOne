@@ -22,6 +22,7 @@ import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
 import { PainelPropriedades } from "./PainelPropriedades";
 import { Previa } from "./Previa";
+import { useSeguirObjeto } from "./SeguirObjeto";
 import { useProjeto } from "./useProjeto";
 
 const CONTEUDO = { padrao: 320, minimo: 240, maximo: 520 };
@@ -134,6 +135,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
   }, [projeto, provisorio, ctx]);
   const reproducao = useReproducao(projeto?.duracao ?? 0, projeto?.taxa ?? { num: 30, den: 1 });
   const { tempo, buscar, alternar } = reproducao;
+  const objeto = useSeguirObjeto({ projeto, midias, tempo, executar: (comando) => executar(comando), aoAvisar: mostrarAviso });
 
   const [larguraConteudo, setLarguraConteudo] = useTamanhoSalvo("largura-conteudo", CONTEUDO.padrao, CONTEUDO.minimo, CONTEUDO.maximo);
   const [larguraPropriedades, setLarguraPropriedades] = useTamanhoSalvo(
@@ -354,6 +356,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
                 setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null)
               }
               aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } })}
+              marcacao={objeto.marcando ? { seguidorId: objeto.marcando, aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null}
               className="flex-1"
             />
             <Divisor
@@ -375,6 +378,14 @@ export function Editor({ projetoId }: { projetoId: string }) {
               proporcao={projeto.proporcao}
               faixas={projeto.faixas}
               aoAvisar={mostrarAviso}
+              seguirObjeto={{
+                marcando: objeto.marcando,
+                andamento: objeto.andamento,
+                aoIniciar: (clipeId) => {
+                  if (reproducao.tocando) alternar();
+                  objeto.iniciar(clipeId);
+                },
+              }}
               fundo={(projetoNaTela ?? projeto).fundo.cor}
               aoPrever={preverDoPainel}
               aoExecutar={(comando) => {

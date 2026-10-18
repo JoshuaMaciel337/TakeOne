@@ -124,10 +124,14 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
 }
 
 /** A cópia leve da imagem estável ou sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
+export function arquivoDaImagemDoClipe(clipe: Clipe, midia: Midia): string {
+  const estavel = `${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`;
+  if (clipe.estabilizar && midia.arquivos.includes(estavel)) return estavel;
+  return clipe.imagem_limpa && midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";
+}
+
 function arquivoDaImagem(item: ItemDaPrevia): string {
-  const estavel = `${chaveDaEstabilizacao(Boolean(item.clipe.imagem_limpa))}_proxy.mp4`;
-  if (item.clipe.estabilizar && item.midia.arquivos.includes(estavel)) return estavel;
-  return item.clipe.imagem_limpa && item.midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";
+  return arquivoDaImagemDoClipe(item.clipe, item.midia);
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   type MudancaDeAudio,
   mudarKeyframe,
   reenquadrarClipe,
+  seguirObjetoClipe,
   zoomNosTrechos,
   abaixarClipe,
   mesclarClipes,
@@ -52,6 +53,7 @@ import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
+import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
 import type { Chroma, Mesclagem } from "./modelo.ts";
@@ -76,6 +78,7 @@ export type Comando =
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
   | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
+  | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
@@ -115,6 +118,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.transformar": "mudar posição e tamanho",
   "clipe.keyframe": "mudar keyframe",
   "clipe.reenquadrar": "seguir o rosto",
+  "clipe.seguirObjeto": "seguir o objeto",
   "clipe.abaixar": "abaixar na fala",
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.efeito": "mudar o efeito",
@@ -196,6 +200,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":
       return { projeto: reenquadrarClipe(projeto, parametros.clipeId, parametros.reenquadramento) };
+    case "clipe.seguirObjeto":
+      return { projeto: seguirObjetoClipe(projeto, parametros.clipeId, parametros.caminho) };
     case "clipe.keyframe":
       return { projeto: mudarKeyframe(projeto, parametros.clipeId, parametros.propriedade, parametros.tempo, parametros.acao) };
     case "clipe.recortar":
