@@ -186,6 +186,12 @@ export class DecodificadorDeVideo {
       if (this.mostrado && this.mostrado !== quadro && !this.quadros.includes(this.mostrado)) this.mostrado.close();
       this.mostrado = quadro;
       this.podar(indice);
+    } else {
+      // Nenhum guardado cobre o instante: os que ficaram antes dele não voltam a servir (o decodificador só
+      // anda para a frente). Segurá-los travava o decodificador num salto para a frente dentro do mesmo
+      // grupo: com eles abertos, nenhum quadro novo saía, e só a saída de um quadro os fechava.
+      const antes = this.quadros.filter((quadro) => quadro.timestamp < this.alvo).length;
+      if (antes) this.podar(antes);
     }
     void this.trabalhar();
     return indice >= 0 ? this.quadros[0] : this.mostrado;
