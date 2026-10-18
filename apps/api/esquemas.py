@@ -629,6 +629,22 @@ class BatidasSaida(BaseModel):
     processamento: ProcessamentoSaida | None = None
 
 
+class QualidadeSaida(BaseModel):
+    midia_id: str
+    status: str
+    t: list[float] = Field(default=[], description="Segundos da mídia, 4 por segundo")
+    nota: list[float] = Field(default=[], description="De 0 a 1: nitidez, luz e câmera firme")
+    corte: list[bool] = Field(default=[], description="Corte de cena na amostra")
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+
+
+def qualidade_para_saida(doc: dict, job: dict | None = None) -> QualidadeSaida:
+    rosto = rosto_para_saida({**doc, "amostras": []}, job)
+    return QualidadeSaida.model_validate({**doc, "midia_id": str(doc["midia_id"]), "status": rosto.status,
+                                          "erro": rosto.erro, "processamento": rosto.processamento})
+
+
 def batidas_para_saida(doc: dict, job: dict | None = None) -> BatidasSaida:
     """job: o job da busca, para mostrar o progresso enquanto ela anda (como em rosto_para_saida)."""
     rosto = rosto_para_saida({**doc, "amostras": []}, job)

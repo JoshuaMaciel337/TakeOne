@@ -18,6 +18,7 @@ from api.esquemas import (
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
+    QualidadeSaida,
     RastreioEntrada,
     RastreioSaida,
     RostoSaida,
@@ -26,6 +27,7 @@ from api.esquemas import (
     TranscricaoSaida,
     batidas_para_saida,
     midia_para_saida,
+    qualidade_para_saida,
     rastreio_para_saida,
     rosto_para_saida,
     transcricao_para_saida,
@@ -52,6 +54,9 @@ from core.modelos.midia import (
     montar_midia,
     pasta_da_midia,
 )
+from core.modelos.qualidade import STATUS_NENHUMA as QUALIDADE_NENHUMA
+from core.modelos.qualidade import STATUS_PRONTO as QUALIDADE_PRONTA
+from core.modelos.qualidade import montar_qualidade
 from core.modelos.rastreio import conferir_pedido, montar_rastreio
 from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
 from core.modelos.rosto import STATUS_PRONTO as ROSTO_PRONTO
@@ -200,6 +205,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.transcricoes.delete_one({"midia_id": midia["_id"]})
     await db.rostos.delete_one({"midia_id": midia["_id"]})
     await db.rastreios.delete_many({"midia_id": midia["_id"]})
+    await db.qualidades.delete_one({"midia_id": midia["_id"]})
     await db.batidas.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
@@ -502,6 +508,37 @@ async def pedir_batidas(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.batidas.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
     logging.info(f"[{usuario['organizacao_id']}] Batidas pedidas: {midia['nome']}")
     return batidas_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.post("/{midia_id}/qualidade", response_model=QualidadeSaida)
+async def pedir_qualidade(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe a avaliação dos trechos na fila do worker de CPU. Se já está pronta ou andando, só devolve."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Só vídeos têm trechos para avaliar ("{midia["nome"]}" não é).')
+    atual = await db.qualidades.find_one({"midia_id": midia["_id"]})
+    if atual:
+        job = await _job_da_analise(db, atual)
+        andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
+        if andando or atual["status"] == QUALIDADE_PRONTA:
+            return qualidade_para_saida(atual, job)
+    documento = montar_qualidade(usuario["organizacao_id"], midia["_id"])
+    job = montar_job("qualidade", usuario["organizacao_id"], {"midia_id": str(midia["_id"])}, criado_por=usuario["_id"])
+    documento["job_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.qualidades.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
+    logging.info(f"[{usuario['organizacao_id']}] Avaliação dos trechos pedida: {midia['nome']}")
+    return qualidade_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.get("/{midia_id}/qualidade", response_model=QualidadeSaida)
+async def ver_qualidade(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    doc = await db.qualidades.find_one({"midia_id": midia["_id"]})
+    if doc is None:
+        return QualidadeSaida(midia_id=str(midia["_id"]), status=QUALIDADE_NENHUMA)
+    return qualidade_para_saida(doc, await _job_da_analise(db, doc))
 
 
 @router.get("/{midia_id}/batidas", response_model=BatidasSaida)
