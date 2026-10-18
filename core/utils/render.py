@@ -96,6 +96,7 @@ class MidiaDoRender:
     mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
     imagem_limpa: str | None = None  # a imagem sem ruído, em resolução cheia e já em BT.709
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
+    imagem: bool = False           # imagem parada (foto, logo): aberta em laço, sem tempo próprio
 
 
 @dataclass(frozen=True)
@@ -630,6 +631,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         raise ErroRender("O projeto está vazio. Coloque alguma mídia na linha do tempo antes de exportar.")
     taxa = f"{projeto['taxa']['num']}/{projeto['taxa']['den']}"
     quadro = (largura, altura)
+    # Imagem parada não tem tempo próprio: velocidade 1 e sem curva, seja o que for que o clipe guardou
+    paradas = {i for i, m in midias.items() if m.imagem}
+    if paradas:
+        projeto = {**projeto, "faixas": [
+            {**f, "clipes": [{**c, "velocidade": 1, "curva_velocidade": None} if c.get("midia_id") in paradas else c
+                             for c in f["clipes"]]} for f in projeto["faixas"]]}
 
     # Imagem: faixas visíveis de baixo para cima (a lista do projeto vai de cima para baixo)
     visuais = [f for f in reversed(projeto["faixas"]) if f["tipo"] != FAIXA_AUDIO and not f.get("oculta")]
@@ -666,8 +673,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         leitura = _leitura_do_clipe(clipe, janelas.get(clipe["id"]), midia)
         leituras[clipe["id"]] = leitura
         velocidade = clipe["velocidade"]
-        ss = segundos(clipe["entrada"]) - leitura.pular_audio
         lido = (leitura.fim - leitura.inicio - leitura.pausa_inicio - leitura.pausa_fim) * velocidade
+        if midia.imagem:
+            # A imagem em laço só na janela do clipe; antes do começo, o tpad repete o mesmo quadro
+            entradas.append(Entrada(midia.caminho, 0, max(lido, 1 / 1000), imagem=True, taxa=taxa))
+            continue
+        ss = segundos(clipe["entrada"]) - leitura.pular_audio
         entradas.append(Entrada(midia.caminho, ss, max(lido, 1 / 1000)))
 
     auxiliares: dict[str, ArquivoAuxiliar] = {}
@@ -709,7 +720,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
             # A vinheta encontra o clipe já na velocidade dele: dura a janela no vídeo final
             entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
-        entrada_de_cor = None if clipe.get("texto") else ler_como_bt709(midias[clipe["midia_id"]].matriz)
+        e_imagem_parada = not clipe.get("texto") and midias[clipe["midia_id"]].imagem
+        # Texto e imagem parada são PNG em RGB: entram como estão, como a prévia desenha
+        entrada_de_cor = None
+        if not clipe.get("texto") and not e_imagem_parada:
+            entrada_de_cor = ler_como_bt709(midias[clipe["midia_id"]].matriz)
         roteiro = None
         if "opacidade" in animadas(clipe):
             # A opacidade por quadro, contando do começo da janela do clipe (com a sobra das transições)
@@ -730,7 +745,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                            max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
             auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
         entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
-        if clipe.get("imagem_limpa") and not clipe.get("texto"):
+        if clipe.get("imagem_limpa") and not clipe.get("texto") and not e_imagem_parada:
             # A imagem sem ruído no lugar da original (o som continua vindo da original)
             midia = midias[clipe["midia_id"]]
             if not midia.imagem_limpa:
@@ -771,7 +786,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             grao = (len(entradas), roteiro_grao, colunas)
             entradas.append(Entrada(imagem_grao, 0, fim_janela - inicio_janela, imagem=True, taxa=taxa))
         mascara_do_fundo = None
-        if clipe.get("remover_fundo") and not clipe.get("texto"):
+        if clipe.get("remover_fundo") and not clipe.get("texto") and not e_imagem_parada:
             midia = midias[clipe["midia_id"]]
             if not midia.mascara:
                 raise ErroRender("O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar "

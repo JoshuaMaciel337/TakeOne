@@ -1,12 +1,12 @@
 # -----------------------------------------------
-# TakeOne — modelo de mídia (um vídeo ou áudio enviado para a biblioteca)
+# TakeOne — modelo de mídia (um vídeo, um áudio ou uma imagem enviada para a biblioteca)
 # Funções puras: montam e calculam, sem acessar o banco.
 # -----------------------------------------------
 import re
 from datetime import datetime
 from pathlib import PurePosixPath
 
-from core.config import EXTENSOES_AUDIO, EXTENSOES_VIDEO, TZ
+from core.config import EXTENSOES_AUDIO, EXTENSOES_IMAGEM, EXTENSOES_VIDEO, TZ
 
 STATUS_ENVIANDO = "enviando"        # upload em andamento
 STATUS_PROCESSANDO = "processando"  # ingestão na fila ou rodando
@@ -34,6 +34,10 @@ ARQUIVO_MASCARA = "mascara.mp4"
 ARQUIVO_IMAGEM_LIMPA = "limpo.mp4"
 ARQUIVO_IMAGEM_LIMPA_PROXY = "limpo_proxy.mp4"
 ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_PROXY}
+# Imagem parada (core/utils/imagem.py): a de resolução cheia é do render; a cópia leve, da prévia
+ARQUIVO_IMAGEM = "imagem.png"
+ARQUIVO_PROXY_IMAGEM = "proxy.webp"
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM}
 # A voz em outro tom (tarefa "tom"), uma por tom pedido: tom_p3.m4a, tom_m2_limpa.m4a (sobre a voz limpa)
 TOM_LIMITE = 12
 _ARQUIVO_DO_TOM = re.compile(r"tom_[mp]\d{1,2}(_limpa)?\.m4a")
@@ -53,9 +57,14 @@ def arquivo_publico(nome: str) -> bool:
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:
-    """Extensão em minúsculas se o arquivo for vídeo ou áudio aceito, senão None."""
+    """Extensão em minúsculas se o arquivo for vídeo, áudio ou imagem aceita, senão None."""
     extensao = PurePosixPath(nome_arquivo.replace("\\", "/")).suffix.lower()
-    return extensao if extensao in EXTENSOES_VIDEO | EXTENSOES_AUDIO else None
+    return extensao if extensao in EXTENSOES_VIDEO | EXTENSOES_AUDIO | EXTENSOES_IMAGEM else None
+
+
+def e_imagem(midia: dict) -> bool:
+    """A mídia é uma imagem parada (foto, logo): clipe de duração livre, sem som e sem velocidade."""
+    return bool(midia.get("imagem")) or midia.get("extensao") in EXTENSOES_IMAGEM
 
 
 def nome_para_exibir(nome_arquivo: str) -> str:
@@ -95,6 +104,7 @@ def montar_midia(organizacao_id, criado_por, nome_arquivo: str, tamanho_total: i
         "video": None,
         "audio": None,
         "miniaturas": None,
+        "imagem": extensao in EXTENSOES_IMAGEM,
         "job_ingestao_id": None,
         "erro": None,
         "criado_em": momento,

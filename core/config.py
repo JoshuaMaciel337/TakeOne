@@ -31,6 +31,8 @@ UPLOAD_MAX_BYTES = int(float(os.environ.get("UPLOAD_MAX_GB", "20")) * 1024**3)
 ESPACO_MINIMO_LIVRE_BYTES = int(float(os.environ.get("ESPACO_MINIMO_LIVRE_GB", "2")) * 1024**3)
 EXTENSOES_VIDEO = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts"}
 EXTENSOES_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
+# Fotos e imagens paradas: viram clipes de duração livre (core/utils/imagem.py)
+EXTENSOES_IMAGEM = {".jpg", ".jpeg", ".png", ".webp"}
 
 # -----------------------------------------------
 # FFMPEG

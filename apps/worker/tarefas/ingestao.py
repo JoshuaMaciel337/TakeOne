@@ -6,6 +6,7 @@
 #      análise (WAV 16 kHz mono, usado depois na transcrição e nos silêncios)
 #   3. forma de onda (picos, 20 por segundo) e níveis em dB a cada 10 ms
 #   4. miniaturas em uma única imagem (sprite) e a capa
+# Imagens paradas (JPG, PNG, WebP) não passam pelo FFmpeg: core/utils/imagem.py
 # -----------------------------------------------
 import json
 import logging
@@ -22,18 +23,22 @@ from core.modelos.midia import (
     ARQUIVO_AUDIO_ANALISE,
     ARQUIVO_CAPA,
     ARQUIVO_FORMA_DE_ONDA,
+    ARQUIVO_IMAGEM,
     ARQUIVO_MINIATURAS,
     ARQUIVO_NIVEIS,
     ARQUIVO_PROXY_AUDIO,
+    ARQUIVO_PROXY_IMAGEM,
     ARQUIVO_PROXY_VIDEO,
     NIVEIS_POR_SEGUNDO,
     STATUS_ERRO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
     chave_arquivo,
+    e_imagem,
 )
 from core.utils import storage
 from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709, resumir_sondagem, sondar
+from core.utils.imagem import ImagemInvalida, preparar_imagem
 from core.utils.mongo import agora
 from core.utils.render import ler_loudness
 from core.utils.som import FILTRO_MEDIR_LOUDNESS
@@ -127,6 +132,33 @@ def marcar_midia_com_erro(db, job: dict, mensagem: str):
 # -----------------------------------------------
 # FUNÇÃO PRINCIPAL
 # -----------------------------------------------
+def ingerir_imagem(db, midia: dict, original: Path, reportar: Callable[[int, str], None]) -> dict:
+    """Imagem parada: as cópias para o render e a prévia, a capa e a miniatura, sem duração nem som."""
+    midia_id, organizacao_id = midia["_id"], midia["organizacao_id"]
+    reportar(10, "Preparando a imagem")
+    pasta = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_IMAGEM)).parent
+    try:
+        info = preparar_imagem(original, pasta)
+    except ImagemInvalida as e:
+        raise ErroDefinitivo(str(e)) from e
+    arquivos = [ARQUIVO_IMAGEM, ARQUIVO_PROXY_IMAGEM, ARQUIVO_CAPA, ARQUIVO_MINIATURAS]
+    arquivos += [nome for nome in midia.get("arquivos", []) if nome not in arquivos]
+    momento = agora()
+    # "video" leva só o tamanho: a caixa do clipe, a prévia e o render usam a mesma conta dos vídeos
+    video = {"codec": "imagem", "largura": info["largura"], "altura": info["altura"], "fps": None, "rotacao": 0,
+             "matriz": None, "transparente": info["transparente"]}
+    miniaturas = {"total": 1, "colunas": 1, "linhas": 1, "intervalo": 1.0, **info["miniatura"]}
+    db.midias.update_one({"_id": midia_id}, {"$set": {
+        "status": STATUS_PRONTA, "imagem": True, "duracao": None, "video": video, "audio": None,
+        "arquivos": arquivos, "miniaturas": miniaturas, "erro": None, "processado_em": momento,
+        "atualizado_em": momento,
+    }})
+    logging.info(f"[{organizacao_id}] [midia {midia_id}] Imagem {info['largura']}×{info['altura']}"
+                 f"{' com transparência' if info['transparente'] else ''}.")
+    reportar(100, "Pronta para editar")
+    return {"midia_id": str(midia_id), "imagem": True, "arquivos": arquivos}
+
+
 def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     midia_id = ObjectId(job["entrada"]["midia_id"])
     midia = db.midias.find_one({"_id": midia_id})
@@ -144,6 +176,8 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
         "status": STATUS_PROCESSANDO, "erro": None, "atualizado_em": agora(),
     }})
     rotulo = f"[{organizacao_id}] [midia {midia_id}]"
+    if e_imagem(midia):
+        return ingerir_imagem(db, midia, original, reportar)
 
     # 1. Leitura
     reportar(2, "Lendo o arquivo")

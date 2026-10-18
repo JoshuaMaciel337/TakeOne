@@ -42,6 +42,7 @@ from core.modelos.midia import (
     arquivo_publico,
     chave_arquivo,
     chave_do_tom,
+    e_imagem,
     montar_midia,
     pasta_da_midia,
 )
@@ -61,6 +62,8 @@ TIPOS_ARQUIVO = {
     ".m4a": "audio/mp4",
     ".json": "application/json",
     ".jpg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
 }
 # Os arquivos de uma mídia não mudam depois de gerados
 CACHE_ARQUIVOS = "private, max-age=86400"
@@ -283,8 +286,8 @@ async def pedir_limpeza_imagem(midia_id: str, usuario=Depends(usuario_atual), db
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA:
         raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
-    if not midia.get("video"):
-        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para limpar.')
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Tirar o ruído é só para vídeos ("{midia["nome"]}" não é).')
     atual = midia.get("imagem_limpa") or {}
     pronta = atual.get("status") == "pronta" and ARQUIVO_IMAGEM_LIMPA_PROXY in midia.get("arquivos", [])
     andando = atual.get("status") == "processando" and await db.jobs.find_one(
@@ -305,8 +308,9 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA:
         raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
-    if not midia.get("video"):
-        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para recortar.')
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f'Por enquanto o fundo só sai de vídeos ("{midia["nome"]}" não é).')
     atual = midia.get("recorte_fundo") or {}
     pronto = atual.get("status") == "pronta" and ARQUIVO_MASCARA in midia.get("arquivos", [])
     andando = atual.get("status") == "processando" and await db.jobs.find_one(
@@ -367,8 +371,8 @@ async def pedir_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA:
         raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
-    if not midia.get("video"):
-        raise HTTPException(status.HTTP_409_CONFLICT, f'"{midia["nome"]}" não tem imagem para seguir o rosto.')
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Seguir o rosto é só para vídeos ("{midia["nome"]}" não é).')
     atual = await db.rostos.find_one({"midia_id": midia["_id"]})
     if atual:
         job = await _job_da_analise(db, atual)

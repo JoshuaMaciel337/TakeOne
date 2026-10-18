@@ -139,8 +139,8 @@ async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depen
     nome = metadados.get("filename", "")
     if not extensao_aceita(nome):
         return resposta_tus(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                            mensagem="Formato não aceito. Envie um vídeo (MP4, MOV, MKV...) "
-                                     "ou um áudio (MP3, WAV, M4A...).")
+                            mensagem="Formato não aceito. Envie um vídeo (MP4, MOV, MKV...), "
+                                     "um áudio (MP3, WAV, M4A...) ou uma imagem (JPG, PNG, WebP).")
     livre = await run_in_threadpool(storage.espaco_livre)
     if livre - total < ESPACO_MINIMO_LIVRE_BYTES:
         logging.warning(f"Envio recusado por falta de espaço: {total / 1024**3:.1f} GB, "

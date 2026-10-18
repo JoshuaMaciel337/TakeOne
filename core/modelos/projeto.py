@@ -143,7 +143,9 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
             if fim_do_clipe(clipe) > TICK_MAXIMO:
                 return "O projeto pode ter no máximo 6 horas."
             fonte_fim = clipe["entrada"] + round(clipe["duracao"] * clipe["velocidade"])
-            if fonte_fim > segundos_para_ticks(midia.get("duracao") or 0) + FOLGA_FIM_DA_MIDIA:
+            # Imagem parada não tem fim: o clipe dura o quanto a pessoa quiser
+            fim_da_midia = segundos_para_ticks(midia.get("duracao") or 0) + FOLGA_FIM_DA_MIDIA
+            if not midia.get("imagem") and fonte_fim > fim_da_midia:
                 return f'Um clipe de "{midia["nome"]}" passa do fim da mídia.'
             if clipe.get("fade_entrada", 0) + clipe.get("fade_saida", 0) > clipe["duracao"]:
                 return "Os fades de um clipe passam da duração dele."

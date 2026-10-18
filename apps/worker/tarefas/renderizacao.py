@@ -22,12 +22,15 @@ from core.modelos.exportacao import (
 )
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import (
+    ARQUIVO_IMAGEM,
     ARQUIVO_IMAGEM_LIMPA,
     ARQUIVO_MASCARA,
     ARQUIVO_PROXY_AUDIO,
+    ARQUIVO_PROXY_IMAGEM,
     ARQUIVO_PROXY_VIDEO,
     ARQUIVO_VOZ_LIMPA,
     chave_arquivo,
+    e_imagem,
 )
 from core.modelos.midia import STATUS_PRONTA as MIDIA_PRONTA
 from core.modelos.projeto import midias_usadas
@@ -57,8 +60,11 @@ ARQUIVO_PARCIAL = "video.parcial.mp4"
 
 
 def arquivo_da_midia(midia: dict) -> Path | None:
-    """O original, que tem a qualidade toda; sem ele (apagado à mão), o proxy."""
-    for nome in (midia.get("original"), ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO):
+    """O original, que tem a qualidade toda; sem ele (apagado à mão), o proxy. Imagem: a imagem.png da
+    ingestão, já girada pelo EXIF (o FFmpeg não gira) e no máximo 4096 px."""
+    nomes = (ARQUIVO_IMAGEM, ARQUIVO_PROXY_IMAGEM) if e_imagem(midia) else (
+        midia.get("original"), ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO)
+    for nome in nomes:
         if not nome:
             continue
         caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], nome))
@@ -77,7 +83,9 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
         video = midia.get("video") or {}
         voz = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_VOZ_LIMPA))
         # Mídias enviadas antes de a ingestão guardar a matriz de cor: lê do arquivo
-        if "matriz" in video:
+        if e_imagem(midia):
+            matriz = None
+        elif "matriz" in video:
             matriz = video["matriz"]
         else:
             matriz = (resumir_sondagem(sondar(caminho))["video"] or {}).get("matriz")
@@ -87,7 +95,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             altura=int(video.get("altura") or 0),
             video=bool(video),
             audio=bool(midia.get("audio")),
-            duracao=float(midia.get("duracao") or 0),
+            duracao=0 if e_imagem(midia) else float(midia.get("duracao") or 0),
             matriz=matriz,
             voz_limpa=str(voz) if voz.is_file() else None,
             imagem_limpa=str(limpa) if (limpa := storage.caminho_local(chave_arquivo(
@@ -99,6 +107,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
                        and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
                                                                            f"{chave}.m4a"))).is_file()),
             lufs=(midia.get("audio") or {}).get("lufs"),
+            imagem=e_imagem(midia),
         )
     return preparadas
 

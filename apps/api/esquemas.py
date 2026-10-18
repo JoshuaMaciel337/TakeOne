@@ -99,6 +99,7 @@ class MidiaSaida(BaseModel):
     video: dict | None = None
     audio: dict | None = None
     miniaturas: dict | None = None
+    imagem: bool = False
     arquivos: list[str] = []
     erro: str | None = None
     processamento: ProcessamentoSaida | None = None
