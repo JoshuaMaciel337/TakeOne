@@ -26,6 +26,8 @@ import {
   palavrasChaveDasLegendas,
   cortarNoRitmo,
   montarNaLinha,
+  colocarLogo,
+  aplicarMarcaAosTextos,
   type TrechoNaLinha,
   pulsarNoRitmo,
   importarLegendas,
@@ -62,7 +64,7 @@ import type { Chroma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
-import type { Texto } from "./texto.ts";
+import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
 export type Comando =
@@ -100,6 +102,8 @@ export type Comando =
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "marca.logo"; parametros: { midiaId: string; transformacao: Transformacao } }
+  | { comando: "marca.textos"; parametros: { fonteTitulo: FonteTexto; fonteTexto: FonteTexto; cor: string | null } }
   | { comando: "linha.montar"; parametros: { trechos: TrechoNaLinha[]; musica: { midiaId: string; entrada: Tick } | null } }
   | { comando: "linha.pulsarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
@@ -142,6 +146,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.palavrasChave": "destacar palavras-chave",
   "linha.cortarNoRitmo": "cortar no ritmo",
   "linha.montar": "montar com vários clipes",
+  "marca.logo": "pôr o logo",
+  "marca.textos": "aplicar a marca aos textos",
   "linha.pulsarNoRitmo": "pulsar no ritmo",
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
@@ -230,6 +236,12 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
+    case "marca.logo": {
+      const resultado = colocarLogo(projeto, ctx, parametros.midiaId, parametros.transformacao);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "marca.textos":
+      return { projeto: aplicarMarcaAosTextos(projeto, parametros.fonteTitulo, parametros.fonteTexto, parametros.cor) };
     case "linha.montar":
       return montarNaLinha(projeto, ctx, parametros.trechos, parametros.musica);
     case "linha.pulsarNoRitmo":

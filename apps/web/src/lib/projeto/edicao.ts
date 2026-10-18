@@ -49,7 +49,7 @@ import type { Abaixamento } from "./abaixar.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
 import { type Efeito, EFEITOS } from "./efeitos.ts";
 import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos, TOM_LIMITE } from "./som.ts";
-import { ajustarTexto, type Texto } from "./texto.ts";
+import { ajustarTexto, type FonteTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
 
@@ -346,6 +346,59 @@ export function montarNaLinha(projeto: Projeto, ctx: Contexto, trechos: TrechoNa
     }
   }
   return { projeto: finalizar(resultado), selecao };
+}
+
+/**
+ * Põe o logo da marca por cima de tudo (logo abaixo dos textos), do começo ao fim do projeto, com a
+ * transformação dada (lib/projeto/marca.ts). Numa faixa de sobreposição só dele.
+ */
+export function colocarLogo(projeto: Projeto, ctx: Contexto, midiaId: string, transformacao: Transformacao): { projeto: Projeto; clipeId: string } {
+  const info = ctx.midia(midiaId);
+  if (!info?.imagem) throw new ErroEdicao("O logo precisa ser uma imagem pronta da biblioteca.");
+  const clipe: Clipe = {
+    id: ctx.novoId(),
+    midia_id: midiaId,
+    inicio: 0,
+    duracao: ajustarAoQuadro(projeto.taxa, Math.max(projeto.duracao, DURACAO_IMAGEM_S * TICKS_POR_SEGUNDO)),
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: limitarTransformacao(transformacao),
+    recorte: RECORTE_PADRAO,
+  };
+  const colocado = colocarLivre(projeto, ctx, "video", clipe, undefined, true);
+  // A faixa nova nasce logo acima da principal: sobe para a primeira das de vídeo, abaixo dos textos
+  const faixa = colocado.faixas.find((item) => item.clipes.some((c) => c.id === clipe.id))!;
+  const outras = colocado.faixas.filter((item) => item.id !== faixa.id);
+  const topo = outras.filter((item) => faixaDeTexto(item.tipo)).length;
+  return { projeto: finalizar({ ...colocado, faixas: [...outras.slice(0, topo), faixa, ...outras.slice(topo)] }), clipeId: clipe.id };
+}
+
+/**
+ * A fonte e a cor da marca nos textos do projeto: os títulos (faixas de texto) ganham a fonte de título e a
+ * primeira cor; as legendas, a fonte de texto e a primeira cor nas palavras-chave e no destaque da fala.
+ */
+export function aplicarMarcaAosTextos(projeto: Projeto, fonteTitulo: FonteTexto, fonteTexto: FonteTexto, cor: string | null): Projeto {
+  let mudou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixaDeTexto(faixa.tipo) || faixa.travada) return faixa;
+    const legenda = faixa.tipo === "legenda";
+    return {
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => {
+        if (!clipe.texto) return clipe;
+        mudou = true;
+        const texto = legenda
+          ? { ...clipe.texto, fonte: fonteTexto, ...(cor ? { cor_chave: cor, destaque: clipe.texto.destaque ? { ...clipe.texto.destaque, cor } : clipe.texto.destaque } : {}) }
+          : { ...clipe.texto, fonte: fonteTitulo, ...(cor ? { cor } : {}) };
+        return { ...clipe, texto };
+      }),
+    };
+  });
+  if (!mudou) throw new ErroEdicao("O projeto não tem textos nem legendas (ou as faixas deles estão travadas).");
+  return { ...projeto, faixas };
 }
 
 export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, destino: DestinoClipe & { inicio: Tick }): Projeto {

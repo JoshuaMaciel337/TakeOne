@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, Clapperboard, WandSparkles } from "lucide-react";
+import { ArrowLeft, Clapperboard, Stamp, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { useMarca } from "@/lib/marca";
 import type { Midia } from "@/lib/tipos";
 
 type Campo = { id: string; rotulo: string; tipo: "texto" | "linhas" | "cor" | "numero"; padrao: string; maximo: number };
@@ -144,6 +145,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   const [categoria, setCategoria] = useState("todas");
   const [tema, setTema] = useState("todos");
   const [busca, setBusca] = useState("");
+  const marca = useMarca();
 
   useEffect(() => {
     chamarApi<Modelo[]>("/animacoes/modelos")
@@ -262,6 +264,7 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
     );
   }
 
+  const camposDeCor = escolhido.campos.filter((campo) => campo.tipo === "cor");
   return (
     <div className="flex flex-col gap-3">
       <button type="button" onClick={() => setEscolhido(null)} className="flex items-center gap-1 self-start text-xs text-suave hover:text-texto">
@@ -270,16 +273,43 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
       <h3 className="text-sm font-semibold">{escolhido.nome}</h3>
       <p className="-mt-2 text-[11px] text-suave">{escolhido.descricao}</p>
       {endereco ? <Previa endereco={endereco} proporcao={proporcao} /> : null}
+      {marca.cores.length && camposDeCor.length ? (
+        <button
+          type="button"
+          className="botao-secundario self-start px-2 py-1 text-xs"
+          // As cores do kit vão para os campos de cor do modelo, na ordem (repetindo se faltar cor)
+          onClick={() => setCampos({ ...campos, ...Object.fromEntries(camposDeCor.map((campo, i) => [campo.id, marca.cores[i % marca.cores.length]])) })}
+        >
+          <Stamp className="size-3.5" aria-hidden /> Usar as cores da marca
+        </button>
+      ) : null}
       {escolhido.campos.map((campo) => (
         <label key={campo.id} className="flex flex-col gap-1 text-[11px] text-suave">
           {campo.rotulo}
           {campo.tipo === "cor" ? (
-            <input
-              type="color"
-              value={campos[campo.id] ?? campo.padrao}
-              onChange={(evento) => setCampos({ ...campos, [campo.id]: evento.target.value })}
-              className="h-8 w-full cursor-pointer rounded-md border border-borda bg-painel"
-            />
+            <>
+              <input
+                type="color"
+                value={campos[campo.id] ?? campo.padrao}
+                onChange={(evento) => setCampos({ ...campos, [campo.id]: evento.target.value })}
+                className="h-8 w-full cursor-pointer rounded-md border border-borda bg-painel"
+              />
+              {marca.cores.length ? (
+                <span className="flex gap-1">
+                  {marca.cores.map((cor) => (
+                    <button
+                      key={cor}
+                      type="button"
+                      onClick={() => setCampos({ ...campos, [campo.id]: cor })}
+                      title={cor}
+                      aria-label={`${campo.rotulo}: usar ${cor}`}
+                      className="size-4 rounded-full border border-borda"
+                      style={{ backgroundColor: cor }}
+                    />
+                  ))}
+                </span>
+              ) : null}
+            </>
           ) : campo.tipo === "linhas" ? (
             <textarea
               value={campos[campo.id] ?? ""}

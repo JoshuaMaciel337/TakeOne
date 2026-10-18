@@ -89,7 +89,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "marca",
     nome: "Kit de marca",
     icone: Stamp,
-    emBreve: { fase: "Fase 6", descricao: "Logo, cores e fontes do seu espaço, prontos para usar em qualquer projeto." },
   },
   {
     id: "plugins",

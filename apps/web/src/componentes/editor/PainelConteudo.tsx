@@ -21,6 +21,7 @@ import { PainelEfeitos } from "./PainelEfeitos";
 import { PainelFiltros } from "./PainelFiltros";
 import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
+import { PainelMarca } from "./PainelMarca";
 import { PainelTranscricao } from "./PainelTranscricao";
 import { PainelTexto } from "./PainelTexto";
 
@@ -178,6 +179,8 @@ export function PainelConteudo({
           <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
+        ) : ferramenta.id === "marca" ? (
+          <PainelMarca midias={biblioteca.midias ?? []} proporcao={legendas.projeto.proporcao} aoExecutar={legendas.aoExecutar} aoAvisar={legendas.aoAvisar} />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}
