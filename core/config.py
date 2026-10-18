@@ -43,6 +43,8 @@ FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
 # YuNet (detector de rostos do OpenCV, MIT): o modelo vem na imagem do worker
 MODELO_ROSTO = Path(os.environ.get("MODELO_ROSTO", "/app/modelos/yunet.onnx"))
+# VitTrack (rastreador do OpenCV Zoo, Apache-2.0): segue o objeto marcado no vídeo
+MODELO_RASTREIO = Path(os.environ.get("MODELO_RASTREIO", "/app/modelos/vittrack.onnx"))
 # MODNet (recorte de retrato) para recortar o fundo do vídeo
 MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx"))
 # Kokoro-82M (texto em fala, Apache-2.0): model.onnx, tokenizer.json e uma tabela de estilo por voz

@@ -31,6 +31,7 @@ TAREFAS = {
     "limpeza_imagem": RECURSO_CPU,
     "estabilizacao": RECURSO_CPU,
     "rosto": RECURSO_CPU,
+    "rastreio": RECURSO_CPU,
     "batidas": RECURSO_CPU,
     "fala": RECURSO_CPU,
     "animacao_html": RECURSO_CPU,

@@ -18,12 +18,15 @@ from api.esquemas import (
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
+    RastreioEntrada,
+    RastreioSaida,
     RostoSaida,
     TomEntrada,
     TranscricaoPedirEntrada,
     TranscricaoSaida,
     batidas_para_saida,
     midia_para_saida,
+    rastreio_para_saida,
     rosto_para_saida,
     transcricao_para_saida,
 )
@@ -49,6 +52,7 @@ from core.modelos.midia import (
     montar_midia,
     pasta_da_midia,
 )
+from core.modelos.rastreio import conferir_pedido, montar_rastreio
 from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
 from core.modelos.rosto import STATUS_PRONTO as ROSTO_PRONTO
 from core.modelos.rosto import montar_rosto
@@ -195,6 +199,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.midias.delete_one({"_id": midia["_id"]})
     await db.transcricoes.delete_one({"midia_id": midia["_id"]})
     await db.rostos.delete_one({"midia_id": midia["_id"]})
+    await db.rastreios.delete_many({"midia_id": midia["_id"]})
     await db.batidas.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
@@ -435,6 +440,46 @@ async def ver_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(ob
     if doc is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "O rosto desta mídia ainda não foi procurado.")
     return rosto_para_saida(doc, await _job_da_analise(db, doc))
+
+
+@router.post("/{midia_id}/rastreios", response_model=RastreioSaida, status_code=status.HTTP_201_CREATED)
+async def pedir_rastreio(midia_id: str, dados: RastreioEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila o caminho do objeto marcado num quadro. Cada pedido é um rastreio novo."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Só dá para seguir objetos em vídeos ("{midia["nome"]}" não é).')
+    # Só as cópias leves de vídeo que a prévia pode mostrar
+    if (not dados.arquivo.endswith(".mp4") or not arquivo_publico(dados.arquivo) or dados.arquivo == ARQUIVO_MASCARA
+            or dados.arquivo not in midia.get("arquivos", [])):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Este arquivo não serve para seguir o objeto.")
+    caixa = dados.caixa.model_dump()
+    problema = conferir_pedido(dados.t, caixa, dados.de, dados.ate, float(midia.get("duracao") or 0))
+    if problema:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problema)
+    documento = montar_rastreio(usuario["organizacao_id"], midia["_id"], dados.arquivo, dados.t, caixa, dados.de,
+                                dados.ate)
+    documento["_id"] = ObjectId()
+    job = montar_job("rastreio", usuario["organizacao_id"],
+                     {"midia_id": str(midia["_id"]), "rastreio_id": str(documento["_id"])}, criado_por=usuario["_id"])
+    documento["job_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.rastreios.insert_one(documento)
+    logging.info(f"[{usuario['organizacao_id']}] Seguir objeto pedido: {midia['nome']}")
+    return rastreio_para_saida(documento, {**job, "_id": documento["job_id"]})
+
+
+@router.get("/{midia_id}/rastreios/{rastreio_id}", response_model=RastreioSaida)
+async def ver_rastreio(midia_id: str, rastreio_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    try:
+        filtro = {"_id": ObjectId(rastreio_id), "midia_id": midia["_id"]}
+    except InvalidId as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pedido não encontrado.") from e
+    doc = await db.rastreios.find_one(filtro)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pedido não encontrado.")
+    return rastreio_para_saida(doc, await _job_da_analise(db, doc))
 
 
 @router.post("/{midia_id}/batidas", response_model=BatidasSaida)

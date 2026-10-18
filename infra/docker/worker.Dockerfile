@@ -16,6 +16,11 @@ ADD --checksum=sha256:8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2
     https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx \
     /app/modelos/yunet.onnx
 RUN chmod 644 /app/modelos/yunet.onnx
+# VitTrack 2023sep (rastreador de objetos do OpenCV Zoo, Apache-2.0), para o texto que segue um objeto
+ADD --checksum=sha256:2990f0b7cd44d92afa48cd97db6de7be113fc1d9594fddb74e2725c10478e91d \
+    https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/object_tracking_vittrack/object_tracking_vittrack_2023sep.onnx \
+    /app/modelos/vittrack.onnx
+RUN chmod 644 /app/modelos/vittrack.onnx
 # MODNet em ONNX (recorte de retrato, Apache-2.0; cópia do Xenova/modnet numa revisão fixa), para recortar o fundo
 ADD --checksum=sha256:07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9 \
     https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model.onnx \

@@ -12,6 +12,7 @@ from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.palavras_chave import executar_palavras_chave
+from worker.tarefas.rastreio import executar_rastreio, marcar_rastreio_com_erro
 from worker.tarefas.recorte_fundo import executar_recorte_fundo, marcar_recorte_com_erro
 from worker.tarefas.renderizacao import executar_renderizacao, marcar_exportacao_com_erro
 from worker.tarefas.rosto import executar_rosto, marcar_rosto_com_erro
@@ -40,6 +41,7 @@ REGISTRO = {
     "limpeza_imagem": Tarefa(executar_limpeza_imagem, ao_falhar=marcar_imagem_com_erro),
     "estabilizacao": Tarefa(executar_estabilizacao, ao_falhar=marcar_estabilizacao_com_erro),
     "rosto": Tarefa(executar_rosto, ao_falhar=marcar_rosto_com_erro),
+    "rastreio": Tarefa(executar_rastreio, ao_falhar=marcar_rastreio_com_erro),
     "batidas": Tarefa(executar_batidas, ao_falhar=marcar_batidas_com_erro),
     "fala": Tarefa(executar_fala, ao_falhar=marcar_geracao_com_erro),
     "animacao_html": Tarefa(executar_animacao_html, ao_falhar=marcar_animacao_com_erro),

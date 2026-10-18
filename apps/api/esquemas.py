@@ -577,6 +577,33 @@ class TranscricaoSaida(BaseModel):
     processamento: ProcessamentoSaida | None = None
 
 
+class CaixaNaImagem(BaseModel):
+    """Retângulo em frações da imagem como ela aparece (o canto de cima à esquerda e o tamanho)."""
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    largura: float = Field(gt=0, le=1)
+    altura: float = Field(gt=0, le=1)
+
+
+class RastreioEntrada(BaseModel):
+    # A cópia leve que a prévia mostra no clipe: a de sempre, a sem ruído ou a estável
+    arquivo: str = "proxy.mp4"
+    t: float = Field(ge=0, description="Segundos da mídia do quadro marcado")
+    caixa: CaixaNaImagem
+    de: float = Field(ge=0, description="Começo do trecho seguido, em segundos da mídia")
+    ate: float = Field(ge=0)
+
+
+class RastreioSaida(BaseModel):
+    id: str
+    midia_id: str
+    status: str
+    # [t, x, y, largura, altura, nota]: centro e tamanho em frações da imagem; nota de 0 a 1
+    pontos: list[list[float]] = []
+    erro: str | None = None
+    processamento: ProcessamentoSaida | None = None
+
+
 class AmostraDeRosto(BaseModel):
     t: float = Field(description="Segundos da mídia")
     x: float = Field(description="Centro do rosto, em frações da largura da imagem")
@@ -607,6 +634,19 @@ def batidas_para_saida(doc: dict, job: dict | None = None) -> BatidasSaida:
     rosto = rosto_para_saida({**doc, "amostras": []}, job)
     return BatidasSaida.model_validate({**doc, "midia_id": str(doc["midia_id"]), "status": rosto.status,
                                         "erro": rosto.erro, "processamento": rosto.processamento})
+
+
+def rastreio_para_saida(doc: dict, job: dict | None = None) -> RastreioSaida:
+    """job: o job do rastreio, para mostrar o progresso enquanto ele anda."""
+    processamento = None
+    status, erro = doc["status"], doc.get("erro")
+    if job is not None and status == "processando":
+        processamento = ProcessamentoSaida(status=job["status"], progresso=job.get("progresso", 0),
+                                           mensagem=job.get("mensagem", ""))
+        if job["status"] == STATUS_JOB_ERRO:
+            status, erro = "erro", erro or job.get("erro")
+    return RastreioSaida(id=str(doc["_id"]), midia_id=str(doc["midia_id"]), status=status, erro=erro,
+                         pontos=doc.get("pontos") or [], processamento=processamento)
 
 
 def rosto_para_saida(doc: dict, job: dict | None = None) -> RostoSaida:
