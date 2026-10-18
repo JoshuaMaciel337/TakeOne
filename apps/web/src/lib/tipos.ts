@@ -74,6 +74,8 @@ export type Midia = {
   imagem_limpa?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   /** A máscara da pessoa em cada quadro (recorte do fundo). */
   recorte_fundo?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
+  /** A imagem estável, por chave (estavel, estavel_limpo sobre a imagem sem ruído). */
+  estabilizacoes?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */

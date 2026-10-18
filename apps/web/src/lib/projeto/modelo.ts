@@ -107,6 +107,8 @@ export type Clipe = {
   imagem_limpa?: boolean;
   /** Recorta o fundo pela máscara da pessoa que o worker gera (só em vídeos). */
   remover_fundo?: boolean;
+  /** Usa a imagem estável que o worker gera (sobre a sem ruído, se ela está ligada); não combina com o recorte do fundo. */
+  estabilizar?: boolean;
   /** Tela verde: a cor que some (só em vídeos e imagens). */
   chroma?: Chroma | null;
   /** Velocidade com curva (lib/projeto/velocidade.ts); sem ela, a velocidade é a mesma o clipe todo. */
@@ -212,4 +214,9 @@ export function completarProjeto(projeto: Projeto): Projeto {
 /** Faixas que mostram imagem, da que fica por cima para a de baixo. */
 export function faixasDeVideo(projeto: Projeto): Faixa[] {
   return projeto.faixas.filter((faixa) => faixa.tipo !== "audio");
+}
+
+/** A versão estável de que o clipe precisa, como `chave_da_estabilizacao` em core/modelos/midia.py. */
+export function chaveDaEstabilizacao(limpa: boolean): string {
+  return limpa ? "estavel_limpo" : "estavel";
 }

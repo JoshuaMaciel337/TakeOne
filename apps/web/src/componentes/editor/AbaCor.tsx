@@ -12,11 +12,14 @@ import type { Midia } from "@/lib/tipos";
 
 import { ControleNumerico } from "./ControleNumerico";
 import { EditorDeCurva } from "./EditorDeCurva";
+import { usePedirImagemEstavel } from "./Estabilizar";
 
 /** Tirar o ruído (o granulado) da imagem: o worker gera a versão limpa e a prévia e o render usam ela. */
 function TirarRuido({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   const limpa = midia.imagem_limpa;
+  // Ligar o ruído num clipe estabilizado pede a versão estável sobre a imagem sem ruído
+  usePedirImagemEstavel(clipe, midia);
   function mudar(ligar: boolean) {
     aoExecutar({ comando: "clipe.limparImagem", parametros: { clipeIds: [clipe.id], ligar } });
     if (!ligar || limpa?.status === "pronta" || limpa?.status === "processando") return;

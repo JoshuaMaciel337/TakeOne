@@ -1083,11 +1083,20 @@ export function limparImagem(projeto: Projeto, clipeIds: string[], ligar: boolea
   });
 }
 
-/** Liga ou desliga o recorte do fundo dos clipes de vídeo. */
+/** Liga ou desliga o recorte do fundo dos clipes de vídeo. A máscara é do vídeo original: liga sem a estabilização. */
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
-    return { ...clipe, remover_fundo: ligar };
+    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false } : {}) };
+  });
+}
+
+/** Liga ou desliga a imagem estável dos clipes de vídeo gravado. Liga sem o recorte do fundo, que é do vídeo original. */
+export function estabilizarClipes(projeto: Projeto, ctx: Contexto, clipeIds: string[], ligar: boolean): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    if (ligar && (clipe.texto || !info?.video || info.imagem || info.transparente)) throw new ErroEdicao("Só vídeos gravados podem ser estabilizados.");
+    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false } : {}) };
   });
 }
 

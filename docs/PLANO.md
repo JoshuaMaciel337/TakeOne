@@ -446,7 +446,8 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] imagens na biblioteca (JPG, PNG e WebP, giradas pelo EXIF, com transparência): clipes de qualquer duração, na prévia e no render
   - [x] gerar vídeo a partir de uma imagem (a imagem da biblioteca é o primeiro quadro do Wan 2.2 TI2V)
   - [x] batida automática: cortar e animar no ritmo da música (detecção própria em numpy, conferida contra o librosa; seção Ritmo na aba Áudio)
-  - texto ou adesivo que segue um objeto, e estabilização (`track` do EffectCraft)
+  - [x] estabilização (vidstab no worker de CPU; a mesma imagem estável na prévia e no render)
+  - texto ou adesivo que segue um objeto (`track` do EffectCraft)
   - [x] texto em fala (TTS com modelo aberto): Kokoro-82M (Apache-2.0) com três vozes pt-BR, na ferramenta Áudio
   - edição automática a partir de vários clipes
   - [x] destacar a palavra-chave da legenda com o LLM (seção 10): botão na ferramenta Legendas e opção do "Criar automaticamente"

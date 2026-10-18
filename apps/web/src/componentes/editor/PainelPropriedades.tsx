@@ -32,6 +32,7 @@ import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
 import { NoRitmo } from "./NoRitmo";
+import { Estabilizar } from "./Estabilizar";
 import { SeguirRosto } from "./SeguirRosto";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
@@ -434,6 +435,9 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         </label>
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {!clipe.texto && midia?.video && !midia.imagem ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
+        {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
+          <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
+        ) : null}
         {pontosDoClipe.length ? (
           <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
             <button

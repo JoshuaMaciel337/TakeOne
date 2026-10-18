@@ -15,6 +15,8 @@ import {
   type Contexto,
   dividirClipes,
   DURACAO_IMAGEM_S,
+  estabilizarClipes,
+  removerFundo,
   duplicarClipes,
   ErroEdicao,
   estiloDasLegendas,
@@ -136,6 +138,29 @@ test("imagem entra com 5 s e estica para os dois lados quanto quiser", () => {
   assert.equal(depois.entrada, 0);
   assert.equal(depois.duracao, 50 * S);
   conferir(projeto);
+});
+
+test("estabilizar e recortar o fundo não andam juntos; imagem e animação não se estabilizam", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const id = principal(projeto)[0].id;
+  projeto = removerFundo(projeto, [id], true);
+  projeto = estabilizarClipes(projeto, ctx, [id], true);
+  assert.deepEqual([principal(projeto)[0].estabilizar, principal(projeto)[0].remover_fundo], [true, false]);
+  projeto = removerFundo(projeto, [id], true);
+  assert.deepEqual([principal(projeto)[0].estabilizar, principal(projeto)[0].remover_fundo], [false, true]);
+  // Desligar não mexe no outro
+  projeto = removerFundo(projeto, [id], false);
+  assert.equal(principal(projeto)[0].estabilizar, false);
+
+  ({ projeto } = adicionarClipe(projeto, ctx, "foto"));
+  ({ projeto } = adicionarClipe(projeto, ctx, "animacao", { inicio: 0 }));
+  const foto = principal(projeto).find((c) => c.midia_id === "foto")!;
+  const animacao = projeto.faixas.find((f) => f.tipo === "video")!.clipes[0];
+  assert.throws(() => estabilizarClipes(projeto, ctx, [foto.id], true), ErroEdicao);
+  assert.throws(() => estabilizarClipes(projeto, ctx, [animacao.id], true), ErroEdicao);
+  // Desligar sempre pode (um projeto antigo não trava)
+  assert.doesNotThrow(() => estabilizarClipes(projeto, ctx, [foto.id], false));
 });
 
 test("imagem transparente vai por cima sem ligar o recorte do fundo", () => {

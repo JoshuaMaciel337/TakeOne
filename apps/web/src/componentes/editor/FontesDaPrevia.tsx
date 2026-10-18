@@ -9,7 +9,7 @@ import { arquivoDaMidia } from "@/lib/api";
 import { aplicarEfeitos, aplicarVolume } from "@/lib/previa/audio";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
-import { type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
+import { chaveDaEstabilizacao, type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import { chaveDoTom, type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
@@ -123,8 +123,10 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
   return null;
 }
 
-/** A cópia leve da imagem sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
+/** A cópia leve da imagem estável ou sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
 function arquivoDaImagem(item: ItemDaPrevia): string {
+  const estavel = `${chaveDaEstabilizacao(Boolean(item.clipe.imagem_limpa))}_proxy.mp4`;
+  if (item.clipe.estabilizar && item.midia.arquivos.includes(estavel)) return estavel;
   return item.clipe.imagem_limpa && item.midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";
 }
 
