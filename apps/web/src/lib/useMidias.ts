@@ -8,10 +8,19 @@ import { useEventosJobs } from "@/lib/eventos";
 import type { Midia } from "@/lib/tipos";
 
 const LIMITE_MIDIAS = 60;
+// Jobs que geram um arquivo a mais para uma mídia pronta, e o campo da mídia que mostra o andamento.
+// null: o andamento fica num dicionário (um por tom ou por versão); só o fim recarrega.
+const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | null> = {
+  limpeza_voz: "voz_limpa",
+  limpeza_imagem: "imagem_limpa",
+  recorte_fundo: "recorte_fundo",
+  tom: null,
+  estabilizacao: null,
+};
 
 /**
- * Biblioteca de mídias do espaço. Recarrega quando um envio começa ou termina
- * e quando a ingestão de alguma mídia acaba; no meio dela, só atualiza o progresso.
+ * Biblioteca de mídias do espaço. Recarrega quando um envio começa ou termina e quando a ingestão
+ * (ou um arquivo gerado para a mídia) acaba; no meio, só atualiza o progresso.
  */
 export function useMidias() {
   const { versao } = useEnvios();
@@ -38,13 +47,16 @@ export function useMidias() {
 
   useEventosJobs((job) => {
     const midiaId = String(job.entrada.midia_id ?? "");
-    if (job.tipo === "limpeza_voz") {
+    // Arquivos que o worker gera para uma mídia pronta: o progresso vai no campo dela; no fim, recarrega
+    const campo = CAMPO_DO_JOB[job.tipo];
+    if (campo !== undefined) {
       if (job.status === "concluido" || job.status === "erro") {
         void recarregar();
         return;
       }
+      if (campo === null) return;
       setMidias((lista) =>
-        lista?.map((midia) => (midia.id === midiaId ? { ...midia, voz_limpa: { status: "processando", erro: null, progresso: job.progresso } } : midia)) ?? lista,
+        lista?.map((midia) => (midia.id === midiaId ? { ...midia, [campo]: { status: "processando", erro: null, progresso: job.progresso } } : midia)) ?? lista,
       );
       return;
     }
