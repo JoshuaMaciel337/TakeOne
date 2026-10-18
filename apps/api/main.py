@@ -21,6 +21,7 @@ from api.rotas import (
     eventos,
     exportacoes,
     jobs,
+    marca,
     midias,
     projetos,
     sistema,
@@ -126,3 +127,4 @@ app.include_router(textos.router)
 app.include_router(som.router)
 app.include_router(animacoes.router)
 app.include_router(direcoes.router)
+app.include_router(marca.router)

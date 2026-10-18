@@ -231,9 +231,32 @@ class DestaqueEntrada(BaseModel):
 
 
 # Os limites são os mesmos de apps/web/src/lib/projeto/texto.ts
+FonteTexto = Literal["display", "texto", "manuscrita"]
+
+
+class MarcaEntrada(BaseModel):
+    """O kit de marca do espaço: até 6 cores, a fonte dos títulos e a dos textos e o logo."""
+    cores: list[Annotated[str, Field(pattern=COR)]] = Field(default=[], max_length=6)
+    fonte_titulo: FonteTexto = "display"
+    fonte_texto: FonteTexto = "texto"
+    logo_midia_id: str | None = None
+
+    @field_validator("cores")
+    @classmethod
+    def cores_minusculas(cls, valor: list[str]) -> list[str]:
+        return [cor.lower() for cor in valor]
+
+
+class MarcaSaida(BaseModel):
+    cores: list[str] = []
+    fonte_titulo: str = "display"
+    fonte_texto: str = "texto"
+    logo_midia_id: str | None = None
+
+
 class TextoEntrada(BaseModel):
     conteudo: str = Field(max_length=500)
-    fonte: Literal["display", "texto", "manuscrita"] = "display"
+    fonte: FonteTexto = "display"
     negrito: bool = True
     caixa_alta: bool = False
     tamanho: float = Field(default=0.07, ge=0.02, le=0.3, description="Fração do lado menor do quadro")
