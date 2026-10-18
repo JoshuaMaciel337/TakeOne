@@ -3,7 +3,15 @@ import pytest
 from PIL import Image
 
 from core.utils import imagem as modulo
-from core.utils.imagem import LADO_MAXIMO_PROXY, LADO_MAXIMO_RENDER, ImagemInvalida, abrir_imagem, preparar_imagem
+from core.utils.imagem import (
+    FUNDO_DA_CAPA,
+    LADO_MAXIMO_PROXY,
+    LADO_MAXIMO_RENDER,
+    ImagemInvalida,
+    abrir_imagem,
+    preparar_imagem,
+    quadro_inicial,
+)
 
 
 def _jpeg_em_pe(caminho):
@@ -67,3 +75,25 @@ def test_o_que_nao_serve_e_recusado(tmp_path, monkeypatch):
     monkeypatch.setattr(modulo, "PIXELS_MAXIMOS", 100 * 100)
     with pytest.raises(ImagemInvalida, match="grande demais"):
         abrir_imagem(tmp_path / "media.png")
+
+
+def test_quadro_inicial_cobre_o_formato_cortando_no_meio(tmp_path):
+    # Faixas verticais: vermelho, verde e azul. Num quadro em pé, só o meio (verde) sobra.
+    faixas = Image.new("RGB", (900, 300), (255, 0, 0))
+    faixas.paste((0, 255, 0), (300, 0, 600, 300))
+    faixas.paste((0, 0, 255), (600, 0, 900, 300))
+    faixas.save(tmp_path / "faixas.png")
+    quadro_inicial(tmp_path / "faixas.png", (480, 832), tmp_path / "quadro.png")
+    with Image.open(tmp_path / "quadro.png") as quadro:
+        assert quadro.size == (480, 832) and quadro.mode == "RGB"
+        assert quadro.getpixel((240, 416)) == (0, 255, 0)
+        assert quadro.getpixel((5, 5))[1] > 200 and quadro.getpixel((474, 826))[1] > 200
+    # Deitado, a imagem cobre a largura e corta em cima e embaixo; o transparente vira o fundo escuro
+    logo = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+    logo.paste((255, 255, 255, 255), (150, 150, 250, 250))
+    logo.save(tmp_path / "logo.png")
+    quadro_inicial(tmp_path / "logo.png", (832, 480), tmp_path / "quadro.png")
+    with Image.open(tmp_path / "quadro.png") as quadro:
+        assert quadro.size == (832, 480) and quadro.mode == "RGB"
+        assert quadro.getpixel((416, 240)) == (255, 255, 255)
+        assert quadro.getpixel((20, 240)) == FUNDO_DA_CAPA

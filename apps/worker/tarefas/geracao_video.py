@@ -1,12 +1,14 @@
 # -----------------------------------------------
 # Tarefa "geracao_video" — um clipe curto gerado a partir de um texto, com o Wan 2.2 TI2V-5B
+# (e, se a pessoa escolheu, de uma imagem da biblioteca, que vira o primeiro quadro)
 #
 # O modelo roda no ComfyUI (serviço comfyui do Compose, GPL-3.0, num container à parte); aqui só se
 # monta o fluxo, se manda pela API HTTP, se acompanha e se baixa o MP4. O vídeo vira o original de uma
 # mídia que já está na biblioteca (criada pela API com status "processando") e segue para a ingestão,
 # como um envio comum. Gerar pede a placa livre e uns 9 GB de RAM: se o HolyCut ou outro programa está
 # usando a GPU, a tarefa espera. No fim o ComfyUI solta o modelo, para a placa voltar para os outros.
-# No modo simulado (MODO_IA=simulado) o vídeo é uma imagem de teste do FFmpeg, para testar o fluxo sem GPU.
+# No modo simulado (MODO_IA=simulado) o vídeo é uma imagem de teste do FFmpeg (ou a imagem escolhida, parada),
+# para testar o fluxo sem GPU.
 # -----------------------------------------------
 import json
 import logging
@@ -23,9 +25,10 @@ from bson import ObjectId
 from core.config import COMFYUI_URL, MODO_IA
 from core.modelos.geracao import FORMATOS, FPS, arquivo_gerado, montar_fluxo, segundos_estimados
 from core.modelos.job import ErroDefinitivo, montar_job
-from core.modelos.midia import PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo
+from core.modelos.midia import ARQUIVO_IMAGEM, PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo, e_imagem
 from core.utils import storage
 from core.utils.ffmpeg import executar_ffmpeg
+from core.utils.imagem import ImagemInvalida, quadro_inicial
 from core.utils.mongo import agora
 
 # Medido no Nitro 5: pico de 7,8 GB de VRAM (com parte do modelo na RAM). A RAM livre conta sem os uns 2,5 GB
@@ -64,6 +67,21 @@ def _ram_livre_gb() -> float:
     return float("inf")
 
 
+def _enviar_imagem(caminho: Path) -> str:
+    """Manda o primeiro quadro para a pasta de entrada do ComfyUI (/upload/image) e devolve o nome dado a ele."""
+    fronteira = uuid.uuid4().hex
+    nome = f"takeone_{uuid.uuid4().hex}.png"
+    corpo = (f'--{fronteira}\r\nContent-Disposition: form-data; name="image"; filename="{nome}"\r\n'
+             "Content-Type: image/png\r\n\r\n").encode() + caminho.read_bytes() + (
+             f'\r\n--{fronteira}\r\nContent-Disposition: form-data; name="overwrite"\r\n\r\ntrue'
+             f"\r\n--{fronteira}--\r\n").encode()
+    pedido = urllib.request.Request(f"{COMFYUI_URL}/upload/image", data=corpo,
+                                    headers={"Content-Type": f"multipart/form-data; boundary={fronteira}"})
+    with urllib.request.urlopen(pedido, timeout=60) as resposta:
+        dados = json.loads(resposta.read())
+    return f"{dados['subfolder']}/{dados['name']}" if dados.get("subfolder") else dados["name"]
+
+
 def _esperar_a_placa(midia_existe: Callable[[], bool], reportar: Callable[[int, str], None]):
     """Espera ter VRAM e RAM para o Wan. O ComfyUI desligado é erro definitivo, com o comando para ligar."""
     inicio = time.monotonic()
@@ -87,11 +105,13 @@ def _esperar_a_placa(midia_existe: Callable[[], bool], reportar: Callable[[int, 
         time.sleep(30)
 
 
-def _gerar_no_comfyui(entrada: dict, destino: Path, midia_existe: Callable[[], bool],
+def _gerar_no_comfyui(entrada: dict, destino: Path, quadro: Path | None, midia_existe: Callable[[], bool],
                       reportar: Callable[[int, str], None]):
     _esperar_a_placa(midia_existe, reportar)
     prefixo = f"takeone_{uuid.uuid4().hex}"
-    fluxo = montar_fluxo(entrada["descricao"], entrada["formato"], entrada["duracao"], entrada["semente"], prefixo)
+    imagem = _enviar_imagem(quadro) if quadro else None
+    fluxo = montar_fluxo(entrada["descricao"], entrada["formato"], entrada["duracao"], entrada["semente"], prefixo,
+                         imagem)
     try:
         pedido_id = _pedir("/prompt", {"prompt": fluxo, "client_id": prefixo})["prompt_id"]
     except urllib.error.HTTPError as e:
@@ -133,10 +153,28 @@ def _gerar_no_comfyui(entrada: dict, destino: Path, midia_existe: Callable[[], b
     logging.info(f"Vídeo gerado em {time.monotonic() - inicio:.0f} s (estimado {estimado} s).")
 
 
-def _gerar_simulado(entrada: dict, destino: Path):
+def _gerar_simulado(entrada: dict, destino: Path, quadro: Path | None):
     largura, altura = FORMATOS[entrada["formato"]]
-    executar_ffmpeg(["-f", "lavfi", "-i", f"testsrc2=size={largura}x{altura}:rate={FPS}:duration={entrada['duracao']}",
-                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(destino)])
+    if quadro:
+        fonte = ["-loop", "1", "-framerate", str(FPS), "-t", str(entrada["duracao"]), "-i", str(quadro)]
+    else:
+        fonte = ["-f", "lavfi", "-i", f"testsrc2=size={largura}x{altura}:rate={FPS}:duration={entrada['duracao']}"]
+    executar_ffmpeg([*fonte, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(destino)])
+
+
+def _preparar_quadro(db, midia: dict, entrada: dict, destino: Path) -> Path:
+    """A imagem escolhida, no tamanho do formato, num PNG ao lado do original."""
+    imagem = db.midias.find_one({"_id": ObjectId(entrada["imagem_id"]), "organizacao_id": midia["organizacao_id"]})
+    if imagem is None or not e_imagem(imagem):
+        raise ErroDefinitivo("A imagem escolhida foi excluída antes de o vídeo ser gerado.")
+    caminho = storage.caminho_local(chave_arquivo(imagem["organizacao_id"], imagem["_id"], ARQUIVO_IMAGEM))
+    if not caminho.is_file():
+        raise ErroDefinitivo("A imagem escolhida não está mais no armazenamento. Envie de novo e peça outra vez.")
+    try:
+        quadro_inicial(caminho, FORMATOS[entrada["formato"]], destino)
+    except ImagemInvalida as e:
+        raise ErroDefinitivo(str(e)) from e
+    return destino
 
 
 def executar_geracao_video(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
@@ -150,15 +188,21 @@ def executar_geracao_video(db, job: dict, reportar: Callable[[int, str], None]) 
     original.parent.mkdir(parents=True, exist_ok=True)
     parcial = original.with_name("gerado.parcial.mp4")
     reportar(1, "Preparando a geração")
+    quadro = None
     try:
+        if entrada.get("imagem_id"):
+            quadro = _preparar_quadro(db, midia, entrada, original.with_name("quadro_inicial.png"))
         if MODO_IA == "real":
-            _gerar_no_comfyui(entrada, parcial, lambda: db.midias.count_documents({"_id": midia_id}, limit=1) > 0,
-                              reportar)
+            _gerar_no_comfyui(entrada, parcial, quadro,
+                              lambda: db.midias.count_documents({"_id": midia_id}, limit=1) > 0, reportar)
         else:
-            _gerar_simulado(entrada, parcial)
+            _gerar_simulado(entrada, parcial, quadro)
     except BaseException:
         parcial.unlink(missing_ok=True)
         raise
+    finally:
+        if quadro:
+            quadro.unlink(missing_ok=True)
     parcial.replace(original)
     # Daqui em diante é uma mídia enviada como outra qualquer: a ingestão faz a cópia leve, a capa e o resto
     ingestao = montar_job("ingestao", organizacao_id, {"midia_id": str(midia_id)},

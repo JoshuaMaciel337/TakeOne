@@ -131,6 +131,7 @@ def test_geracao_de_video_formatos_tempo_e_fluxo():
     from core.modelos.geracao import (
         FORMATOS,
         arquivo_gerado,
+        formato_da_imagem,
         montar_fluxo,
         nome_da_midia,
         quadros_para,
@@ -152,3 +153,12 @@ def test_geracao_de_video_formatos_tempo_e_fluxo():
                                                 "type": "output"}], "animated": [True]}}}
     assert arquivo_gerado(historico)["filename"] == "takeone_x_00001_.mp4"
     assert arquivo_gerado({"outputs": {}}) is None
+    # Sem imagem, o latente começa do ruído; com ela, a imagem enviada é o primeiro quadro
+    assert "start_image" not in latente and "12" not in fluxo
+    com_imagem = montar_fluxo("A câmera se aproxima", "1:1", 2, 7, "takeone_x", "takeone_abc.png")
+    assert com_imagem["12"] == {"class_type": "LoadImage", "inputs": {"image": "takeone_abc.png"}}
+    assert com_imagem["7"]["inputs"]["start_image"] == ["12", 0]
+    # O formato mais perto da proporção da imagem
+    assert formato_da_imagem(1920, 1080) == "16:9" and formato_da_imagem(3000, 1000) == "16:9"
+    assert formato_da_imagem(1080, 1920) == "9:16" and formato_da_imagem(1000, 1100) == "1:1"
+    assert formato_da_imagem(1150, 900) == "1:1" and formato_da_imagem(1200, 900) == "16:9"

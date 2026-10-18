@@ -110,12 +110,20 @@ async def listar_midias(limite: int = Query(default=30, ge=1, le=100),
 @router.post("/gerar-video", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
 async def gerar_video(dados: GerarVideoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Põe na fila um clipe gerado com o Wan 2.2. A mídia já entra na biblioteca, processando; o vídeo
-    vira o original dela quando ficar pronto e passa pela ingestão como um envio comum."""
+    vira o original dela quando ficar pronto e passa pela ingestão como um envio comum. Com `imagem_id`, a
+    imagem da biblioteca é o primeiro quadro."""
+    if dados.imagem_id:
+        imagem = await buscar_midia(db, dados.imagem_id, usuario)
+        if not e_imagem(imagem):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Escolha uma imagem da biblioteca para começar o vídeo.")
+        if imagem["status"] != STATUS_PRONTA:
+            raise HTTPException(status.HTTP_409_CONFLICT, "A imagem ainda está sendo preparada.")
     midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome_da_midia(dados.descricao)}.mp4", 0,
                          "video/mp4")
     midia["nome_original"] = midia["nome"]
     midia["status"] = STATUS_PROCESSANDO
-    midia["gerada"] = {"descricao": dados.descricao, "formato": dados.formato, "duracao": dados.duracao}
+    midia["gerada"] = {"descricao": dados.descricao, "formato": dados.formato, "duracao": dados.duracao,
+                       "imagem_id": dados.imagem_id}
     midia_id = (await db.midias.insert_one(midia)).inserted_id
     job = montar_job("geracao_video", usuario["organizacao_id"],
                      {"midia_id": str(midia_id), **midia["gerada"], "semente": secrets.randbelow(2**31)},

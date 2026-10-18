@@ -1,7 +1,9 @@
 # -----------------------------------------------
 # TakeOne — geração de vídeo com o Wan 2.2 TI2V-5B (pelo ComfyUI)
 # Funções puras: os formatos, o fluxo que vai para o ComfyUI e quanto tempo ele deve levar.
+# Com uma imagem, ela é o primeiro quadro e o texto descreve o movimento (o mesmo modelo faz os dois).
 # -----------------------------------------------
+import math
 import re
 
 # Em 480p, o tamanho medido no Nitro 5 (8 GB de VRAM). Lados múltiplos de 32, como o Wan pede.
@@ -33,6 +35,11 @@ def segundos_estimados(duracao: int, formato: str = "16:9") -> int:
     return round(SEGUNDOS_POR_QUADRO * quadros_para(duracao) * largura * altura / (832 * 480))
 
 
+def formato_da_imagem(largura: int, altura: int) -> str:
+    """O formato mais perto da proporção da imagem (comparando em escala logarítmica: 2:1 fica no 16:9)."""
+    return min(FORMATOS, key=lambda f: abs(math.log((largura / altura) / (FORMATOS[f][0] / FORMATOS[f][1]))))
+
+
 def nome_da_midia(descricao: str) -> str:
     """'Ondas do mar quebrando ao pôr do sol, câmera lenta' → 'IA · Ondas do mar quebrando ao pôr do sol'."""
     texto = re.sub(r"\s+", " ", descricao).strip()
@@ -42,10 +49,13 @@ def nome_da_midia(descricao: str) -> str:
     return f"IA · {trecho}"
 
 
-def montar_fluxo(descricao: str, formato: str, duracao: int, semente: int, prefixo: str) -> dict:
-    """O grafo da API do ComfyUI: texto → latente do Wan 2.2 → amostragem → vídeo MP4 (H.264, 24 fps)."""
+def montar_fluxo(descricao: str, formato: str, duracao: int, semente: int, prefixo: str,
+                 imagem: str | None = None) -> dict:
+    """O grafo da API do ComfyUI: texto → latente do Wan 2.2 → amostragem → vídeo MP4 (H.264, 24 fps).
+    `imagem` é o nome de um arquivo já enviado ao ComfyUI (/upload/image), no tamanho do formato: vira o
+    primeiro quadro."""
     largura, altura = FORMATOS[formato]
-    return {
+    fluxo = {
         "1": {"class_type": "UNETLoader",
               "inputs": {"unet_name": "wan2.2_ti2v_5B_fp16.safetensors", "weight_dtype": "fp8_e4m3fn"}},
         "2": {"class_type": "CLIPLoader",
@@ -66,6 +76,10 @@ def montar_fluxo(descricao: str, formato: str, duracao: int, semente: int, prefi
         "11": {"class_type": "SaveVideo",
                "inputs": {"video": ["10", 0], "filename_prefix": prefixo, "format": "mp4", "codec": "h264"}},
     }
+    if imagem:
+        fluxo["12"] = {"class_type": "LoadImage", "inputs": {"image": imagem}}
+        fluxo["7"]["inputs"]["start_image"] = ["12", 0]
+    return fluxo
 
 
 def arquivo_gerado(historico: dict) -> dict | None:

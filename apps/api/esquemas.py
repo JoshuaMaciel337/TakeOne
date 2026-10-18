@@ -440,6 +440,8 @@ class GerarVideoEntrada(BaseModel):
     descricao: str = Field(min_length=DESCRICAO_MINIMA, max_length=DESCRICAO_MAXIMA)
     formato: Literal["16:9", "9:16", "1:1"] = "16:9"
     duracao: int = Field(default=5, ge=min(DURACOES), le=max(DURACOES))
+    # Imagem da biblioteca que vira o primeiro quadro; o texto descreve o movimento
+    imagem_id: str | None = None
 
     @field_validator("descricao", mode="before")
     @classmethod
@@ -647,7 +649,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                           if (recorte := doc.get("recorte_fundo")) else None),
         "imagem_limpa": ({"status": limpa["status"], "erro": limpa.get("erro")}
                          if (limpa := doc.get("imagem_limpa")) else None),
-        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada["duracao"]}
+        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada["duracao"],
+                    "imagem_id": gerada.get("imagem_id")}
                    if (gerada := doc.get("gerada")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
                  for chave, tom in (doc.get("tons") or {}).items()},

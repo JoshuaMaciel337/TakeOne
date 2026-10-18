@@ -89,3 +89,15 @@ def preparar_imagem(original: Path, pasta: Path) -> dict:
     miniatura.save(pasta / "miniaturas.jpg", quality=85)
     return {"largura": render.width, "altura": render.height, "transparente": transparente,
             "miniatura": {"largura": miniatura.width, "altura": miniatura.height}}
+
+
+def quadro_inicial(caminho: Path, tamanho: tuple[int, int], destino: Path):
+    """A imagem cobrindo `tamanho` (cortada no meio, como o "cobrir" da prévia), em RGB e sem transparência,
+    para ser o primeiro quadro de um vídeo gerado. O transparente vira o fundo escuro da capa."""
+    largura, altura = tamanho
+    imagem = _sobre_fundo(abrir_imagem(caminho))
+    escala = max(largura / imagem.width, altura / imagem.height)
+    medida = (max(largura, round(imagem.width * escala)), max(altura, round(imagem.height * escala)))
+    imagem = imagem.resize(medida, Image.Resampling.LANCZOS)
+    x, y = (medida[0] - largura) // 2, (medida[1] - altura) // 2
+    imagem.crop((x, y, x + largura, y + altura)).save(destino, "PNG")
