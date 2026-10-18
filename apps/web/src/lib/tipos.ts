@@ -77,7 +77,7 @@ export type Midia = {
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
-  gerada?: { descricao: string; formato: string; duracao: number } | null;
+  gerada?: { descricao: string; formato: string; duracao: number; imagem_id?: string | null } | null;
   /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */
   animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
   criado_em: string;

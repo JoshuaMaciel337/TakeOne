@@ -60,7 +60,11 @@ function PainelMidia({
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
       <ListaEnvios />
-      <GerarVideo proporcao={proporcao} aoPedir={() => void recarregar()} />
+      <GerarVideo
+        proporcao={proporcao}
+        imagens={(midias ?? []).filter((midia) => midia.imagem && midia.status === "pronta")}
+        aoPedir={() => void recarregar()}
+      />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {midias && midias.length > 0 ? (
         <>

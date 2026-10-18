@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, ImageOff, Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import { chamarApi, ErroApi } from "@/lib/api";
+import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
 import type { Midia } from "@/lib/tipos";
 
 // Os mesmos formatos e tempos de core/modelos/geracao.py (480p, como o Wan 2.2 cabe na placa do Nitro 5)
@@ -18,27 +18,44 @@ function minutosEstimados(duracao: number, formato: Formato): number {
   return Math.max(1, Math.round(segundos / 60));
 }
 
+/** O formato mais perto da proporção da imagem, como `formato_da_imagem` em core/modelos/geracao.py. */
+function formatoDaImagem(largura: number, altura: number): Formato {
+  const distancia = (f: Formato) => Math.abs(Math.log(largura / altura / (FORMATOS[f][0] / FORMATOS[f][1])));
+  return (Object.keys(FORMATOS) as Formato[]).reduce((melhor, f) => (distancia(f) < distancia(melhor) ? f : melhor));
+}
+
 type Props = {
   /** A proporção do projeto, para começar no mesmo formato. */
   proporcao: string;
+  /** As imagens prontas da biblioteca: qualquer uma pode ser o primeiro quadro. */
+  imagens: Midia[];
   aoPedir: (midia: Midia) => void;
 };
 
-/** Gerar um clipe curto com IA (Wan 2.2) a partir de um texto. Ele entra na biblioteca quando fica pronto. */
-export function GerarVideo({ proporcao, aoPedir }: Props) {
+/** Gerar um clipe curto com IA (Wan 2.2) a partir de um texto, ou de uma imagem e um texto. Ele entra na biblioteca quando fica pronto. */
+export function GerarVideo({ proporcao, imagens, aoPedir }: Props) {
   const [aberto, setAberto] = useState(false);
   const [descricao, setDescricao] = useState("");
   const [formato, setFormato] = useState<Formato>(proporcao in FORMATOS ? (proporcao as Formato) : "16:9");
   const [duracao, setDuracao] = useState<number>(5);
+  const [imagemId, setImagemId] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const minutos = minutosEstimados(duracao, formato);
+  // A imagem escolhida pode ter saído da biblioteca
+  const imagem = imagens.find((item) => item.id === imagemId) ?? null;
+
+  function escolherImagem(alvo: Midia | null) {
+    setImagemId(alvo?.id ?? null);
+    if (alvo?.video) setFormato(formatoDaImagem(alvo.video.largura, alvo.video.altura));
+  }
 
   function pedir(evento: React.FormEvent) {
     evento.preventDefault();
     setEnviando(true);
     setErro("");
-    chamarApi<Midia>("/midias/gerar-video", { metodo: "POST", corpo: { descricao, formato, duracao } })
+    const corpo = { descricao, formato, duracao, imagem_id: imagem?.id ?? null };
+    chamarApi<Midia>("/midias/gerar-video", { metodo: "POST", corpo })
       .then((midia) => {
         setDescricao("");
         aoPedir(midia);
@@ -61,8 +78,44 @@ export function GerarVideo({ proporcao, aoPedir }: Props) {
       </button>
       {aberto ? (
         <form onSubmit={pedir} className="flex flex-col gap-2 border-t border-borda p-3">
+          {imagens.length > 0 ? (
+            <fieldset className="flex flex-col gap-1">
+              <legend className="mb-1 text-[11px] text-suave">Começar de uma imagem (opcional)</legend>
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={() => escolherImagem(null)}
+                  aria-pressed={!imagem}
+                  title="Sem imagem: o vídeo sai só do texto"
+                  className={`flex size-12 shrink-0 items-center justify-center rounded-md border bg-painel ${
+                    !imagem ? "border-destaque ring-1 ring-destaque" : "border-borda"
+                  }`}
+                >
+                  <ImageOff className="size-4 text-suave" aria-hidden />
+                  <span className="sr-only">Sem imagem</span>
+                </button>
+                {imagens.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => escolherImagem(item)}
+                    aria-pressed={item.id === imagem?.id}
+                    title={item.nome}
+                    className={`size-12 shrink-0 overflow-hidden rounded-md border ${
+                      item.id === imagem?.id ? "border-destaque ring-1 ring-destaque" : "border-borda"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- capa da API com a sessão do cookie */}
+                    <img src={arquivoDaMidia(item.id, "capa.jpg")} alt={item.nome} className="size-full object-cover" draggable={false} />
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           <label className="text-xs text-suave" htmlFor="descricao-video">
-            Descreva a cena: o que aparece, a luz e o movimento da câmera
+            {imagem
+              ? `Descreva o que acontece a partir de "${imagem.nome}": o movimento e a câmera`
+              : "Descreva a cena: o que aparece, a luz e o movimento da câmera"}
           </label>
           <textarea
             id="descricao-video"
@@ -72,7 +125,11 @@ export function GerarVideo({ proporcao, aoPedir }: Props) {
             maxLength={800}
             required
             minLength={3}
-            placeholder="Ondas do mar quebrando numa praia ao pôr do sol, câmera lenta, luz dourada"
+            placeholder={
+              imagem
+                ? "A câmera se aproxima devagar, o vento mexe o cabelo e as luzes da cidade piscam"
+                : "Ondas do mar quebrando numa praia ao pôr do sol, câmera lenta, luz dourada"
+            }
             className="resize-y rounded-md border border-borda bg-painel px-2 py-1.5 text-xs outline-none focus:border-destaque"
           />
           <div className="flex gap-2">
@@ -104,7 +161,8 @@ export function GerarVideo({ proporcao, aoPedir }: Props) {
             </label>
           </div>
           <p className="text-[11px] text-suave">
-            Leva uns {minutos} min na placa de vídeo, em 480p e sem som. O clipe aparece na biblioteca e você pode continuar editando.
+            Leva uns {minutos} min na placa de vídeo, em 480p e sem som.
+            {imagem ? " A imagem é cortada no meio para caber no formato." : ""} O clipe aparece na biblioteca e você pode continuar editando.
           </p>
           {erro ? (
             <p className="text-[11px] text-erro" role="alert">
