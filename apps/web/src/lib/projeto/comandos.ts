@@ -27,6 +27,7 @@ import {
   cortarNoRitmo,
   montarNaLinha,
   colocarLogo,
+  trocarMidiaDosClipes,
   aplicarMarcaAosTextos,
   type TrechoNaLinha,
   pulsarNoRitmo,
@@ -102,6 +103,7 @@ export type Comando =
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "clipe.trocarMidia"; parametros: { clipeIds: string[]; midiaId: string } }
   | { comando: "marca.logo"; parametros: { midiaId: string; transformacao: Transformacao } }
   | { comando: "marca.textos"; parametros: { fonteTitulo: FonteTexto; fonteTexto: FonteTexto; cor: string | null } }
   | { comando: "linha.montar"; parametros: { trechos: TrechoNaLinha[]; musica: { midiaId: string; entrada: Tick } | null } }
@@ -147,6 +149,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.cortarNoRitmo": "cortar no ritmo",
   "linha.montar": "montar com vários clipes",
   "marca.logo": "pôr o logo",
+  "clipe.trocarMidia": "mudar a forma",
   "marca.textos": "aplicar a marca aos textos",
   "linha.pulsarNoRitmo": "pulsar no ritmo",
   "clipe.animar": "mudar a animação",
@@ -236,6 +239,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
+    case "clipe.trocarMidia":
+      return { projeto: trocarMidiaDosClipes(projeto, ctx, parametros.clipeIds, parametros.midiaId) };
     case "marca.logo": {
       const resultado = colocarLogo(projeto, ctx, parametros.midiaId, parametros.transformacao);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };

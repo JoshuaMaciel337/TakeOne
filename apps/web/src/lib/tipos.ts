@@ -1,4 +1,5 @@
 // Formatos que a API devolve. Espelham apps/api/esquemas.py.
+import type { PedidoDeForma } from "./elementos";
 
 export type Usuario = {
   id: string;
@@ -78,6 +79,8 @@ export type Midia = {
   estabilizacoes?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
+  /** Forma desenhada (lib/elementos.ts): o pedido que a gerou. Não aparece na biblioteca. */
+  elemento?: PedidoDeForma | null;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
   gerada?: { descricao: string; formato: string; duracao: number; imagem_id?: string | null } | null;
   /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */

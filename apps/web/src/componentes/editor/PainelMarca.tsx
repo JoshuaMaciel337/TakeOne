@@ -33,7 +33,7 @@ export function PainelMarca({ midias, proporcao, aoExecutar, aoAvisar }: Props) 
   const marca = rascunho ?? salva;
   const [salvando, setSalvando] = useState(false);
   const [canto, setCanto] = useState<Canto>("superior-direito");
-  const imagens = midias.filter((midia) => midia.status === "pronta" && midia.imagem && midia.video);
+  const imagens = midias.filter((midia) => midia.status === "pronta" && midia.imagem && midia.video && !midia.elemento);
   const logo = imagens.find((midia) => midia.id === marca.logo_midia_id) ?? null;
   const mudar = (mudanca: Partial<Marca>) => setRascunho({ ...marca, ...mudanca });
 

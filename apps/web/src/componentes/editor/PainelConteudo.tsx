@@ -19,6 +19,7 @@ import { PainelAudio } from "./PainelAudio";
 import { PainelAnimacoes } from "./PainelAnimacoes";
 import { PainelEfeitos } from "./PainelEfeitos";
 import { PainelFiltros } from "./PainelFiltros";
+import { PainelFormas } from "./PainelFormas";
 import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
 import { PainelMarca } from "./PainelMarca";
@@ -64,22 +65,24 @@ function PainelMidia({
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
 }) {
+  // As formas desenhadas (Elementos) não entram na biblioteca: elas são editadas no próprio clipe
+  const biblioteca = (midias ?? []).filter((midia) => !midia.elemento);
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
       <ListaEnvios />
       <GerarVideo
         proporcao={proporcao}
-        imagens={(midias ?? []).filter((midia) => midia.imagem && midia.status === "pronta")}
+        imagens={biblioteca.filter((midia) => midia.imagem && midia.status === "pronta")}
         aoPedir={() => void recarregar()}
       />
-      <MontarClipes midias={midias ?? []} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+      <MontarClipes midias={biblioteca} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-      {midias && midias.length > 0 ? (
+      {biblioteca.length > 0 ? (
         <>
           <p className="text-xs font-medium text-suave">Biblioteca do espaço · arraste para a linha do tempo</p>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
-            {midias.map((midia) => (
+            {biblioteca.map((midia) => (
               <CartaoMidia
                 key={midia.id}
                 midia={midia}
@@ -159,7 +162,10 @@ export function PainelConteudo({
         ) : ferramenta.id === "audio" ? (
           <PainelAudio aoPedir={aoPedirAnimacao} />
         ) : ferramenta.id === "elementos" ? (
-          <PainelAnimacoes proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} />
+          <div className="flex flex-col gap-3">
+            <PainelFormas aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} />
+            <PainelAnimacoes proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} />
+          </div>
         ) : ferramenta.id === "texto" ? (
           <PainelTexto aoAdicionar={aoAdicionarTexto} />
         ) : ferramenta.id === "legendas" ? (

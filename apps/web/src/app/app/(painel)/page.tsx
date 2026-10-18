@@ -49,9 +49,9 @@ export default function PaginaInicio() {
         <ZonaDeEnvio />
         <ListaEnvios />
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-        {midias && midias.length > 0 ? (
+        {midias && midias.some((midia) => !midia.elemento) ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            {midias.map((midia) => (
+            {midias.filter((midia) => !midia.elemento).map((midia) => (
               <CartaoMidia
                 key={midia.id}
                 midia={midia}

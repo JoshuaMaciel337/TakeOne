@@ -401,6 +401,20 @@ export function aplicarMarcaAosTextos(projeto: Projeto, fonteTitulo: FonteTexto,
   return { ...projeto, faixas };
 }
 
+/**
+ * Troca a imagem dos clipes por outra (a mesma forma em outra cor, por exemplo), mantendo o resto do clipe:
+ * posição, tempo, keyframes, animações e efeitos. Só de imagem para imagem, que não têm trecho nem fim.
+ */
+export function trocarMidiaDosClipes(projeto: Projeto, ctx: Contexto, clipeIds: string[], midiaId: string): Projeto {
+  const nova = ctx.midia(midiaId);
+  if (!nova?.imagem) throw new ErroEdicao("A nova mídia precisa ser uma imagem pronta.");
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const atual = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    if (!atual?.imagem) throw new ErroEdicao("Só clipes de imagem trocam de imagem.");
+    return { ...clipe, midia_id: midiaId, entrada: 0 };
+  });
+}
+
 export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, destino: DestinoClipe & { inicio: Tick }): Projeto {
   const { faixa: origem, clipe } = acharOuErro(projeto, clipeId);
   exigirDestravada(origem);

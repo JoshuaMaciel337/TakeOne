@@ -17,6 +17,7 @@ import {
   DURACAO_IMAGEM_S,
   estabilizarClipes,
   montarNaLinha,
+  trocarMidiaDosClipes,
   removerFundo,
   duplicarClipes,
   ErroEdicao,
@@ -189,6 +190,20 @@ test("a montagem entra no fim da principal, com os cortes somados antes de ir pa
   assert.ok(trilha.fade_saida > 0);
   conferir(projeto);
   assert.throws(() => montarNaLinha(projeto, ctx, [], null), ErroEdicao);
+});
+
+test("trocar a imagem de um clipe guarda o resto dele; vídeo não troca", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "logo", { inicio: S }));
+  const faixa = projeto.faixas.find((f) => f.tipo === "video")!;
+  const antes = faixa.clipes[0];
+  projeto = transformarClipes(projeto, [antes.id], { x: 0.3, escala: 0.5 });
+  const trocado = trocarMidiaDosClipes(projeto, ctx, [antes.id], "foto").faixas.find((f) => f.tipo === "video")!.clipes[0];
+  assert.equal(trocado.midia_id, "foto");
+  assert.deepEqual([trocado.id, trocado.inicio, trocado.duracao, trocado.transformacao.x, trocado.transformacao.escala], [antes.id, S, antes.duracao, 0.3, 0.5]);
+  assert.throws(() => trocarMidiaDosClipes(projeto, ctx, [antes.id], "video4"), ErroEdicao);
+  assert.throws(() => trocarMidiaDosClipes(projeto, ctx, [principal(projeto)[0].id], "foto"), ErroEdicao);
 });
 
 test("imagem transparente vai por cima sem ligar o recorte do fundo", () => {

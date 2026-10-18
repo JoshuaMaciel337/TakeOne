@@ -182,26 +182,29 @@ export function Editor({ projetoId }: { projetoId: string }) {
     if (novo && novo.faixa.tipo === "principal") buscar(fimDoClipe(novo.clipe));
   }
 
-  // Animações pedidas no painel: cada uma entra no instante em que o cursor estava, quando ficar pronta
-  const animacoesPedidas = useRef(new Map<string, Tick>());
+  // Mídias pedidas nos painéis (animações, formas): quando ficam prontas, entram no cursor do momento do
+  // pedido ou trocam a imagem dos clipes escolhidos. Só saem da lista quando aparecem prontas ou com erro.
+  const pendentes = useRef(new Map<string, { inicio: Tick } | { clipeIds: string[] }>());
   function pedirAnimacao(midia: { id: string }, inicio: Tick = tempo) {
-    animacoesPedidas.current.set(midia.id, inicio);
+    pendentes.current.set(midia.id, { inicio });
     void biblioteca.recarregar();
   }
-  const colocarAnimacoes = useEffectEvent(() => {
-    for (const [id, inicio] of animacoesPedidas.current) {
+  function trocarMidiaQuandoPronta(clipeIds: string[], midia: { id: string }) {
+    pendentes.current.set(midia.id, { clipeIds });
+    void biblioteca.recarregar();
+  }
+  const resolverPendentes = useEffectEvent(() => {
+    for (const [id, acao] of pendentes.current) {
       const midia = midias.get(id);
-      if (!midia || midia.status === "erro") {
-        animacoesPedidas.current.delete(id);
-        if (midia) mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
-      } else if (midia.status === "pronta") {
-        animacoesPedidas.current.delete(id);
-        executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio } });
-      }
+      if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
+      pendentes.current.delete(id);
+      if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
+      else if ("inicio" in acao) executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio: acao.inicio } });
+      else executar({ comando: "clipe.trocarMidia", parametros: { clipeIds: acao.clipeIds, midiaId: id } });
     }
   });
   useEffect(() => {
-    if (animacoesPedidas.current.size) colocarAnimacoes();
+    if (pendentes.current.size) resolverPendentes();
   }, [midias]);
 
   const bibliotecaDoEditor = useMemo(
@@ -378,6 +381,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
               proporcao={projeto.proporcao}
               faixas={projeto.faixas}
               aoAvisar={mostrarAviso}
+              aoTrocarMidia={trocarMidiaQuandoPronta}
               seguirObjeto={{
                 marcando: objeto.marcando,
                 andamento: objeto.andamento,

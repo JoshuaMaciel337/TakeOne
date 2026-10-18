@@ -455,7 +455,8 @@ Cada fase termina com algo que dá para usar e testar.
 
 ### Fase 6: modelos, elementos e marca (2 semanas)
 - Modelos de projeto (os nossos, criados do zero), guardados no formato do projeto, com animações em Lottie.
-- Elementos: figuras, adesivos animados (Lottie, pelo `lottie` do EffectCraft) e formas (`svg` e `pathops` do VectorCraft). Desenhos próprios ou com licença aberta.
+- [x] Formas: retângulo, arredondado, elipse, triângulo, estrela, seta, linha, balão e coração, com cor, contorno e proporção (imagens desenhadas no servidor).
+- Adesivos animados (Lottie, pelo `lottie` do EffectCraft). Desenhos próprios ou com licença aberta.
 - Banco de imagens e vídeos da Pixabay, já no HolyCut.
 - [x] Kit de marca: logo, cores e fontes do espaço; logo num canto do vídeo, fontes e cor nos textos e as cores nos seletores e nas animações.
 - Levar a edição para DaVinci/Premiere (`interchange` do FilmCraft).
