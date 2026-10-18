@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     BatidasSaida,
+    EstabilizacaoEntrada,
     FalaEntrada,
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
@@ -40,7 +41,9 @@ from core.modelos.midia import (
     STATUS_PRONTA,
     arquivo_do_tom,
     arquivo_publico,
+    arquivos_da_estabilizacao,
     chave_arquivo,
+    chave_da_estabilizacao,
     chave_do_tom,
     e_imagem,
     montar_midia,
@@ -331,6 +334,36 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"recorte_fundo": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Recorte do fundo pedido: {midia['nome']}")
     return (await para_saida(db, [{**midia, "recorte_fundo": atual}]))[0]
+
+
+@router.post("/{midia_id}/estabilizacao", response_model=MidiaSaida)
+async def pedir_estabilizacao(midia_id: str, dados: EstabilizacaoEntrada, usuario=Depends(usuario_atual),
+                              db=Depends(obter_db)):
+    """Põe na fila a imagem estável (sobre a sem ruído, com limpa=true). Se já está pronta ou andando, só
+    devolve a mídia."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia) or midia.get("animacao"):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f'Só vídeos gravados podem ser estabilizados ("{midia["nome"]}" não é).')
+    if dados.limpa and ARQUIVO_IMAGEM_LIMPA_PROXY not in midia.get("arquivos", []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "A imagem sem ruído ainda não está pronta.")
+    chave = chave_da_estabilizacao(dados.limpa)
+    atual = (midia.get("estabilizacoes") or {}).get(chave) or {}
+    pronta = atual.get("status") == "pronta" and arquivos_da_estabilizacao(dados.limpa)[1] in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronta or andando):
+        job = montar_job("estabilizacao", usuario["organizacao_id"],
+                         {"midia_id": str(midia["_id"]), "limpa": dados.limpa}, criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]},
+                                   {"$set": {f"estabilizacoes.{chave}": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Estabilização pedida: {midia['nome']}")
+    estabilizacoes = {**(midia.get("estabilizacoes") or {}), chave: atual}
+    return (await para_saida(db, [{**midia, "estabilizacoes": estabilizacoes}]))[0]
 
 
 @router.post("/{midia_id}/tom", response_model=MidiaSaida)

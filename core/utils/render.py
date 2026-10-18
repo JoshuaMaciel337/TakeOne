@@ -24,7 +24,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
-from core.modelos.midia import chave_do_tom
+from core.modelos.midia import chave_da_estabilizacao, chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
@@ -95,6 +95,8 @@ class MidiaDoRender:
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
     mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
     imagem_limpa: str | None = None  # a imagem sem ruído, em resolução cheia e já em BT.709
+    # As imagens estáveis prontas, (chave, caminho): "estavel" e "estavel_limpo" (sobre a sem ruído)
+    estaveis: tuple[tuple[str, str], ...] = ()
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
     imagem: bool = False           # imagem parada (foto, logo): aberta em laço, sem tempo próprio
 
@@ -745,7 +747,19 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                            max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
             auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
         entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
-        if clipe.get("imagem_limpa") and not clipe.get("texto") and not e_imagem_parada:
+        if clipe.get("estabilizar") and not clipe.get("texto") and not e_imagem_parada:
+            # A imagem estável no lugar da original (sobre a sem ruído, se ela está ligada; o som não muda)
+            midia = midias[clipe["midia_id"]]
+            chave = chave_da_estabilizacao(bool(clipe.get("imagem_limpa")))
+            caminho = dict(midia.estaveis).get(chave)
+            if not caminho:
+                raise ErroRender("A imagem estável de um clipe ainda está sendo preparada. Espere terminar "
+                                 "ou desligue \"Estabilizar\" para exportar.")
+            lida = entradas[entrada]
+            entrada = len(entradas)
+            entradas.append(Entrada(caminho, lida.inicio, lida.duracao))
+            entrada_de_cor = []
+        elif clipe.get("imagem_limpa") and not clipe.get("texto") and not e_imagem_parada:
             # A imagem sem ruído no lugar da original (o som continua vindo da original)
             midia = midias[clipe["midia_id"]]
             if not midia.imagem_limpa:

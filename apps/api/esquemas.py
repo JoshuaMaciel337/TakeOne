@@ -111,6 +111,7 @@ class MidiaSaida(BaseModel):
     imagem_limpa: dict | None = None
     # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
     tons: dict = Field(default_factory=dict)
+    estabilizacoes: dict = Field(default_factory=dict)
     # Vídeo gerado com IA: {descricao, formato, duracao}
     gerada: dict | None = None
     # Animação em HTML: {modelo, campos, proporcao, duracao}
@@ -349,6 +350,8 @@ class ClipeEntrada(BaseModel):
     remover_fundo: bool = False
     # Usa a imagem sem ruído (gerada no worker) no lugar da original
     imagem_limpa: bool = False
+    # Usa a imagem estável (gerada no worker, sobre a sem ruído se ela está ligada) no lugar da original
+    estabilizar: bool = False
     # Tom da voz, em semitons (o som vem do arquivo que o worker gera para o tom)
     tom: int = Field(default=0, ge=-12, le=12)
     efeitos_voz: EfeitosVozEntrada | None = None
@@ -447,6 +450,11 @@ class GerarVideoEntrada(BaseModel):
     @classmethod
     def limpar_descricao(cls, valor):
         return valor.strip() if isinstance(valor, str) else valor
+
+
+class EstabilizacaoEntrada(BaseModel):
+    # Sobre a imagem sem ruído (o clipe com "Tirar o ruído" ligado)
+    limpa: bool = False
 
 
 class TomEntrada(BaseModel):
@@ -654,6 +662,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                    if (gerada := doc.get("gerada")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
                  for chave, tom in (doc.get("tons") or {}).items()},
+        "estabilizacoes": {chave: {"status": item["status"], "erro": item.get("erro")}
+                           for chave, item in (doc.get("estabilizacoes") or {}).items()},
     })
 
 

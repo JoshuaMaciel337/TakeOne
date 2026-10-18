@@ -366,6 +366,22 @@ def test_imagem_sem_ruido_le_o_video_limpo_e_o_som_do_original():
     assert "[0:a]" in plano.filtro_som, "o som continua vindo do original"
 
 
+def test_imagem_estavel_le_o_video_estavel_e_sobre_a_limpa_quando_ela_esta_ligada():
+    estaveis = (("estavel", "/m/estavel.mp4"), ("estavel_limpo", "/m/estavel_limpo.mp4"))
+    midia = MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, matriz=None,
+                          imagem_limpa="/m/limpo.mp4", estaveis=estaveis)
+    for extra, esperado in (({}, "/m/estavel.mp4"), ({"imagem_limpa": True}, "/m/estavel_limpo.mp4")):
+        estavel = clipe("c1", "deitado", 0, 4, estabilizar=True, **extra)
+        plano = planejar_render(projeto([faixa("principal", [estavel])]), {**MIDIAS, "deitado": midia}, 720, 1280)
+        assert [e.caminho for e in plano.entradas] == ["/m/deitado.mp4", esperado]
+        assert "[1:v]setpts=" in plano.filtro, "a imagem vem do estável, já em BT.709 (sem setparams)"
+        assert "[0:a]" in plano.filtro_som, "o som continua vindo do original"
+    so_a_comum = MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, matriz=None, estaveis=estaveis[:1])
+    with pytest.raises(ErroRender, match="estável"):
+        estavel = clipe("c1", "deitado", 0, 4, estabilizar=True, imagem_limpa=True)
+        planejar_render(projeto([faixa("principal", [estavel])]), {**MIDIAS, "deitado": so_a_comum}, 720, 1280)
+
+
 def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     com_cor = clipe("c1", "deitado", 0, 4, cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
     so_vinheta = clipe("c2", "empe", 0, 4, cor={"vinheta": 0.3})

@@ -38,6 +38,9 @@ ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_P
 ARQUIVO_IMAGEM = "imagem.png"
 ARQUIVO_PROXY_IMAGEM = "proxy.webp"
 ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM}
+# A imagem estável (tarefa "estabilizacao"): estavel.mp4 só do render, estavel_proxy.mp4 da prévia;
+# sobre a imagem sem ruído, estavel_limpo.mp4 e estavel_limpo_proxy.mp4
+_ARQUIVO_ESTAVEL_PROXY = re.compile(r"estavel(_limpo)?_proxy\.mp4")
 # A voz em outro tom (tarefa "tom"), uma por tom pedido: tom_p3.m4a, tom_m2_limpa.m4a (sobre a voz limpa)
 TOM_LIMITE = 12
 _ARQUIVO_DO_TOM = re.compile(r"tom_[mp]\d{1,2}(_limpa)?\.m4a")
@@ -51,9 +54,20 @@ def arquivo_do_tom(semitons: int, limpa: bool) -> str:
     return f"{chave_do_tom(semitons, limpa)}.m4a"
 
 
+def chave_da_estabilizacao(limpa: bool) -> str:
+    return "estavel_limpo" if limpa else "estavel"
+
+
+def arquivos_da_estabilizacao(limpa: bool) -> tuple[str, str]:
+    """(o do render, o da prévia)."""
+    chave = chave_da_estabilizacao(limpa)
+    return f"{chave}.mp4", f"{chave}_proxy.mp4"
+
+
 def arquivo_publico(nome: str) -> bool:
-    """Os arquivos da mídia que a API serve: os fixos e as vozes em outro tom."""
-    return nome in ARQUIVOS_PUBLICOS or bool(_ARQUIVO_DO_TOM.fullmatch(nome))
+    """Os arquivos da mídia que a API serve: os fixos, as vozes em outro tom e as cópias leves estáveis."""
+    return (nome in ARQUIVOS_PUBLICOS or bool(_ARQUIVO_DO_TOM.fullmatch(nome))
+            or bool(_ARQUIVO_ESTAVEL_PROXY.fullmatch(nome)))
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:

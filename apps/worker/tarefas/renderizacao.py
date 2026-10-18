@@ -106,6 +106,10 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
                        if tom.get("status") == "pronta"
                        and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
                                                                            f"{chave}.m4a"))).is_file()),
+            estaveis=tuple((chave, str(caminho)) for chave, item in (midia.get("estabilizacoes") or {}).items()
+                           if item.get("status") == "pronta"
+                           and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
+                                                                               f"{chave}.mp4"))).is_file()),
             lufs=(midia.get("audio") or {}).get("lufs"),
             imagem=e_imagem(midia),
         )

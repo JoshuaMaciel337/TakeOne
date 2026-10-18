@@ -149,6 +149,10 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
                 return f'Um clipe de "{midia["nome"]}" passa do fim da mídia.'
             if clipe.get("fade_entrada", 0) + clipe.get("fade_saida", 0) > clipe["duracao"]:
                 return "Os fades de um clipe passam da duração dele."
+            incompativel = clipe.get("remover_fundo") or midia.get("imagem") or midia.get("animacao")
+            if clipe.get("estabilizar") and incompativel:
+                # A máscara do recorte é do vídeo original: num vídeo estável ela ficaria fora do lugar
+                return "Um clipe estabilizado não pode ter o fundo removido, e só vídeos gravados se estabilizam."
             problema = _conferir_posicao(faixa, clipe, anterior_fim)
             if problema:
                 return problema
