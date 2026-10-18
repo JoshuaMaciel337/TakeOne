@@ -41,7 +41,8 @@ async function pedirImagem(chave: string, ladoMenor = LADO_REFERENCIA_TEXTO): Pr
     body: JSON.stringify({ texto: JSON.parse(chave), lado_menor: ladoMenor }),
   });
   if (!resposta.ok) throw new Error(`A imagem do texto respondeu ${resposta.status}.`);
-  const bitmap = await createImageBitmap(await resposta.blob(), { premultiplyAlpha: "none" });
+  // Pré-multiplicado no bitmap: o WebGL ignora o UNPACK_PREMULTIPLY_ALPHA num ImageBitmap
+  const bitmap = await createImageBitmap(await resposta.blob(), { premultiplyAlpha: "premultiply" });
   return { bitmap, largura: bitmap.width, altura: bitmap.height, layout: lerLayout(resposta.headers.get("X-Layout-Texto")) };
 }
 

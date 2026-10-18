@@ -305,6 +305,9 @@ type Recursos = {
   texturas: WebGLTexture[];
 };
 
+/** A partir de quantas vezes de redução a textura é lida do mipmap. */
+const REDUCAO_COM_MIPMAP = 1.5;
+
 export class Compositor {
   private readonly canvas: HTMLCanvasElement;
   private readonly gl: WebGL2RenderingContext;
@@ -546,6 +549,15 @@ export class Compositor {
       gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
       const { largura, altura } = tamanhoDaFonte(camada.fonte);
+      // Imagem ou texto bem maior que o lugar dele na tela: lido do mipmap, senão cada pixel da tela pega
+      // um ponto só da textura e as bordas finas saem em escada (o render reduz com média)
+      const reducao = (largura * recorte.largura) / Math.max(1, (caixa.largura * this.canvas.width) / quadro.largura);
+      if (reducao > REDUCAO_COM_MIPMAP && largura > 0 && altura > 0) {
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      } else {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      }
       if (camada.desfoque && camada.desfoque > 0) {
         // O sigma é uma fração da altura do clipe; na textura, da altura do recorte
         const sigma = camada.desfoque * recorte.altura * altura;

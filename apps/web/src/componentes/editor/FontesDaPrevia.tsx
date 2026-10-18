@@ -90,7 +90,8 @@ function FonteDeVideo(props: PropsFonte) {
 
 /**
  * Imagem parada: a cópia leve (proxy.webp) vira um ImageBitmap uma vez, e é o mesmo quadro em todo instante.
- * Sem pré-multiplicar o alfa: o compositor faz isso ao enviar a textura, como no PNG dos textos.
+ * Com o alfa já pré-multiplicado no bitmap: o WebGL ignora o UNPACK_PREMULTIPLY_ALPHA num ImageBitmap, e o
+ * compositor espera a cor multiplicada pelo alfa (sem isso, a borda de uma forma clara saía em escada).
  */
 function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
   const url = arquivoDaMidia(item.midia.id, "proxy.webp");
@@ -104,7 +105,7 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
     avisos.current.aoRegistrar({ quadro: () => bitmap });
     fetch(url)
       .then((resposta) => (resposta.ok ? resposta.blob() : Promise.reject(new Error(`proxy.webp: ${resposta.status}`))))
-      .then((blob) => createImageBitmap(blob, { premultiplyAlpha: "none" }))
+      .then((blob) => createImageBitmap(blob, { premultiplyAlpha: "premultiply" }))
       .then((pronto) => {
         if (!vivo) {
           pronto.close();
