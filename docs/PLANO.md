@@ -449,7 +449,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] estabilização (vidstab no worker de CPU; a mesma imagem estável na prévia e no render)
   - [x] texto ou adesivo que segue um objeto (VitTrack no worker de CPU; o caminho vira keyframes de posição)
   - [x] texto em fala (TTS com modelo aberto): Kokoro-82M (Apache-2.0) com três vozes pt-BR, na ferramenta Áudio
-  - edição automática a partir de vários clipes
+  - [x] edição automática a partir de vários clipes (nota de cada instante no worker de CPU; trechos escolhidos no editor e cortados nas batidas)
   - [x] destacar a palavra-chave da legenda com o LLM (seção 10): botão na ferramenta Legendas e opção do "Criar automaticamente"
 - Fica fora do escopo, pelas regras do dono no HolyCut: avatar de IA, dublagem, clonagem de voz e lip-sync.
 

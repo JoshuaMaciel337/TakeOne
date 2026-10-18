@@ -279,6 +279,75 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
   return { projeto: finalizar(resultado), clipeId: clipe.id };
 }
 
+/** Um trecho da montagem automática (lib/projeto/montagem.ts), em ticks. */
+export type TrechoNaLinha = { midiaId: string; entrada: Tick; duracao: Tick };
+
+/**
+ * Põe a montagem no fim da faixa principal, um clipe por trecho. Os cortes são somados antes de ir
+ * para o quadro, para não acumular o arredondamento e caírem nas batidas. Com música, ela entra numa
+ * faixa de áudio nova, do começo da montagem até o fim, a partir da primeira batida usada, saindo em
+ * fade; o som dos clipes fica mudo, como numa montagem com trilha.
+ */
+export function montarNaLinha(projeto: Projeto, ctx: Contexto, trechos: TrechoNaLinha[], musica: { midiaId: string; entrada: Tick } | null): { projeto: Projeto; selecao: string[] } {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");
+  exigirDestravada(principal);
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const inicio = principal.clipes.reduce((fim, clipe) => Math.max(fim, fimDoClipe(clipe)), 0);
+  let resultado = projeto;
+  let somado = 0;
+  let cursor = inicio;
+  const selecao: string[] = [];
+  for (const trecho of trechos) {
+    const info = ctx.midia(trecho.midiaId);
+    if (!info?.video) throw new ErroEdicao("Uma das mídias da montagem não está pronta.");
+    somado += trecho.duracao;
+    const fim = quadroMaisProximo(projeto.taxa, inicio + somado);
+    const duracao = fim - cursor;
+    if (duracao < quadro) continue;
+    const entrada = info.imagem ? 0 : Math.max(0, Math.min(trecho.entrada, info.duracao - duracao));
+    const clipe: Clipe = {
+      id: ctx.novoId(),
+      midia_id: trecho.midiaId,
+      inicio: cursor,
+      duracao,
+      entrada,
+      velocidade: 1,
+      volume: musica ? 0 : 1,
+      fade_entrada: 0,
+      fade_saida: 0,
+      transformacao: TRANSFORMACAO_PADRAO,
+      recorte: RECORTE_PADRAO,
+    };
+    resultado = inserirNaPrincipal(resultado, clipe, Number.MAX_SAFE_INTEGER);
+    selecao.push(clipe.id);
+    cursor = fim;
+  }
+  if (!selecao.length) throw new ErroEdicao("Nenhum trecho bom o bastante para a montagem.");
+  if (musica) {
+    const info = ctx.midia(musica.midiaId);
+    if (!info?.audio) throw new ErroEdicao("A música da montagem não está pronta.");
+    const duracao = Math.min(cursor - inicio, ajustarAoQuadro(projeto.taxa, info.duracao - musica.entrada));
+    if (duracao >= quadro) {
+      const trilha: Clipe = {
+        id: ctx.novoId(),
+        midia_id: musica.midiaId,
+        inicio,
+        duracao,
+        entrada: musica.entrada,
+        velocidade: 1,
+        volume: 1,
+        fade_entrada: 0,
+        fade_saida: Math.min(TICKS_POR_SEGUNDO, Math.floor(duracao / 4)),
+        transformacao: TRANSFORMACAO_PADRAO,
+        recorte: RECORTE_PADRAO,
+      };
+      resultado = colocarLivre(resultado, ctx, "audio", trilha, undefined, true);
+    }
+  }
+  return { projeto: finalizar(resultado), selecao };
+}
+
 export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, destino: DestinoClipe & { inicio: Tick }): Projeto {
   const { faixa: origem, clipe } = acharOuErro(projeto, clipeId);
   exigirDestravada(origem);

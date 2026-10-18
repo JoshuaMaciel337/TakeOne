@@ -16,6 +16,7 @@ import {
   dividirClipes,
   DURACAO_IMAGEM_S,
   estabilizarClipes,
+  montarNaLinha,
   removerFundo,
   duplicarClipes,
   ErroEdicao,
@@ -161,6 +162,33 @@ test("estabilizar e recortar o fundo não andam juntos; imagem e animação não
   assert.throws(() => estabilizarClipes(projeto, ctx, [animacao.id], true), ErroEdicao);
   // Desligar sempre pode (um projeto antigo não trava)
   assert.doesNotThrow(() => estabilizarClipes(projeto, ctx, [foto.id], false));
+});
+
+test("a montagem entra no fim da principal, com os cortes somados antes de ir para o quadro e a música por baixo", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video4");
+  // Três trechos de 0,7 s: somados, os cortes ficam em 4,7 / 5,4 / 6,1 s (no quadro mais próximo)
+  const trechos = [
+    { midiaId: "video10", entrada: 2 * S, duracao: 0.7 * S },
+    { midiaId: "foto", entrada: 0, duracao: 0.7 * S },
+    { midiaId: "video10", entrada: 9.8 * S, duracao: 0.7 * S },
+  ];
+  const montado = montarNaLinha(projeto, ctx, trechos, { midiaId: "musica", entrada: S / 2 });
+  projeto = montado.projeto;
+  const selecao = montado.selecao;
+  const clipes = principal(projeto);
+  assert.equal(clipes.length, 4);
+  assert.deepEqual(selecao, clipes.slice(1).map((c) => c.id));
+  assert.deepEqual(clipes.slice(1).map((c) => Math.round((c.inicio / S) * 30)), [120, 141, 162]);
+  assert.equal(clipes[3].entrada + clipes[3].duracao <= 10 * S, true, "o trecho não passa do fim da mídia");
+  assert.ok(clipes.slice(1).every((c) => c.volume === 0), "com música, o som dos clipes fica mudo");
+  const trilha = projeto.faixas.find((f) => f.tipo === "audio")!.clipes[0];
+  assert.equal(trilha.inicio, 4 * S);
+  assert.equal(trilha.entrada, S / 2);
+  assert.equal(trilha.inicio + trilha.duracao, fimDoClipe(clipes[3]));
+  assert.ok(trilha.fade_saida > 0);
+  conferir(projeto);
+  assert.throws(() => montarNaLinha(projeto, ctx, [], null), ErroEdicao);
 });
 
 test("imagem transparente vai por cima sem ligar o recorte do fundo", () => {

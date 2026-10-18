@@ -25,6 +25,8 @@ import {
   estiloDasLegendas,
   palavrasChaveDasLegendas,
   cortarNoRitmo,
+  montarNaLinha,
+  type TrechoNaLinha,
   pulsarNoRitmo,
   importarLegendas,
   type MudancaDeAudio,
@@ -98,6 +100,7 @@ export type Comando =
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "linha.montar"; parametros: { trechos: TrechoNaLinha[]; musica: { midiaId: string; entrada: Tick } | null } }
   | { comando: "linha.pulsarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
@@ -138,6 +141,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.estilo": "mudar o estilo das legendas",
   "legenda.palavrasChave": "destacar palavras-chave",
   "linha.cortarNoRitmo": "cortar no ritmo",
+  "linha.montar": "montar com vários clipes",
   "linha.pulsarNoRitmo": "pulsar no ritmo",
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
@@ -226,6 +230,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
+    case "linha.montar":
+      return montarNaLinha(projeto, ctx, parametros.trechos, parametros.musica);
     case "linha.pulsarNoRitmo":
       return { projeto: pulsarNoRitmo(projeto, parametros.batidas) };
     case "clipe.transicao":

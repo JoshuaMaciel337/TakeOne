@@ -6,6 +6,7 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
 import { GerarVideo } from "@/componentes/midia/GerarVideo";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
+import { MontarClipes } from "@/componentes/midia/MontarClipes";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
@@ -55,7 +56,13 @@ function PainelMidia({
   aoSelecionarMidia,
   aoAdicionarMidia,
   proporcao,
-}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia"> & { proporcao: string }) {
+  aoExecutar,
+  aoAvisar,
+}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia"> & {
+  proporcao: string;
+  aoExecutar: (comando: Comando) => void;
+  aoAvisar: (mensagem: string) => void;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
@@ -65,6 +72,7 @@ function PainelMidia({
         imagens={(midias ?? []).filter((midia) => midia.imagem && midia.status === "pronta")}
         aoPedir={() => void recarregar()}
       />
+      <MontarClipes midias={midias ?? []} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {midias && midias.length > 0 ? (
         <>
@@ -144,6 +152,8 @@ export function PainelConteudo({
             aoSelecionarMidia={aoSelecionarMidia}
             aoAdicionarMidia={aoAdicionarMidia}
             proporcao={legendas.projeto.proporcao}
+            aoExecutar={legendas.aoExecutar}
+            aoAvisar={legendas.aoAvisar}
           />
         ) : ferramenta.id === "audio" ? (
           <PainelAudio aoPedir={aoPedirAnimacao} />
