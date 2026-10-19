@@ -528,7 +528,7 @@ export default function PaginaInicial() {
                     <Icone nome="tesoura" />
                   </div>
                   <h3>
-                    Corte inteligente <EmBreve />
+                    Corte inteligente
                   </h3>
                   <p>A IA analisa seu vídeo e encontra os melhores momentos para corte, com ritmo perfeito.</p>
                 </div>
@@ -818,7 +818,7 @@ export default function PaginaInicial() {
             <div className="head">
               <div>
                 <div className="eyebrow reveal">
-                  Templates para Stories · 9:16 <EmBreve />
+                  Templates para Stories · 9:16
                 </div>
                 <h2 className="split">
                   Comece com um template.
