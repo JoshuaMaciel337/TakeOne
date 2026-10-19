@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, LoaderCircle, QrCode, Trash2, TriangleAlert, X } from "lucide-react";
+import { Download, FileCode, FolderArchive, LoaderCircle, QrCode, Trash2, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
@@ -34,7 +34,7 @@ type Props = {
   aoFechar: () => void;
 };
 
-/** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular). */
+/** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular), ou levar a edição para outro editor. */
 export function JanelaExportar({ projetoId, proporcao, salvamento, aoFechar }: Props) {
   const { exportacoes, erro, exportar, excluir } = useExportacoes(projetoId, true);
   const [resolucao, setResolucao] = useState<Resolucao>("1080p");
@@ -99,6 +99,31 @@ export function JanelaExportar({ projetoId, proporcao, salvamento, aoFechar }: P
             {salvo ? "Exportar" : "Esperando salvar…"}
           </button>
           {aviso ? <p className="text-xs text-erro">{aviso}</p> : null}
+        </div>
+
+        <div className="space-y-2 border-b border-borda p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Levar para outro editor</h3>
+          <p className="text-[11px] text-suave">
+            Um XML que os editores profissionais abrem: os cortes, as faixas, o trecho de cada mídia, a velocidade, o volume e as transições (como fusões); os textos viram marcadores. Posição, cor, efeitos e animações ficam aqui.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { arquivo: "intercambio.xml", nome: "Só o XML", Icone: FileCode, dica: "Para quem tem as mídias originais no computador" },
+              { arquivo: "intercambio.zip", nome: "XML com as mídias", Icone: FolderArchive, dica: "Um ZIP com a pasta midias/: no outro editor, aponte para ela" },
+            ].map(({ arquivo, nome, Icone, dica }) => (
+              <a
+                key={arquivo}
+                href={salvo ? `/api/projetos/${projetoId}/${arquivo}` : undefined}
+                download
+                title={dica}
+                aria-disabled={!salvo}
+                className={`botao-secundario px-3 py-1.5 text-xs ${salvo ? "" : "pointer-events-none opacity-50"}`}
+              >
+                <Icone className="size-4" aria-hidden />
+                {nome}
+              </a>
+            ))}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
