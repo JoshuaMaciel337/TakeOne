@@ -416,6 +416,8 @@ def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     assert "setpts=PTS+3.5/TB" in plano.filtro
     # O som do segundo começa no corte: pula o meio segundo a mais que a imagem leu
     assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro_som
+    # E o do primeiro para no corte: o meio segundo lido depois do fim, para a imagem, não soa
+    assert "[0:a]asetpts=PTS-STARTPTS,atrim=start=0:duration=4,asetpts=PTS-STARTPTS" in plano.filtro_som
     assert "tpad" not in plano.filtro, "havia sobra nos dois lados"
 
 

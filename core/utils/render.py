@@ -550,10 +550,11 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
     """
     atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
-    filtros = ["asetpts=PTS-STARTPTS"]
-    if pular > 0:
-        filtros += [f"atrim=start={_numero(pular)}:duration={_numero(duracao * clipe['velocidade'])}",
-                    "asetpts=PTS-STARTPTS"]
+    # Só o trecho do clipe soa: a sobra lida para a transição (antes, `pular`, e depois do fim, no clipe que
+    # sai) fica de fora. Sem o corte no fim, o som do clipe que sai continuava pela transição.
+    filtros = ["asetpts=PTS-STARTPTS",
+               f"atrim=start={_numero(pular)}:duration={_numero(duracao * clipe['velocidade'])}",
+               "asetpts=PTS-STARTPTS"]
     filtros += [
         f"aresample={TAXA_AUDIO}",
         "aformat=sample_fmts=fltp:channel_layouts=stereo",
