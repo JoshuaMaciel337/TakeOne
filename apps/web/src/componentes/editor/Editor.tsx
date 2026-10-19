@@ -452,7 +452,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
       </div>
 
       {exportando ? (
-        <JanelaExportar projetoId={projetoId} proporcao={projeto.proporcao} salvamento={edicao.salvamento} aoFechar={() => setExportando(false)} />
+        <JanelaExportar projetoId={projetoId} projeto={projeto} midias={midias} proporcao={projeto.proporcao} salvamento={edicao.salvamento} aoFechar={() => setExportando(false)} />
       ) : null}
 
       {edicao.aviso ? (

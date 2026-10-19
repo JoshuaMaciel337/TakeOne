@@ -460,7 +460,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Banco de imagens e vídeos da Pixabay, já no HolyCut.
 - [x] Kit de marca: logo, cores e fontes do espaço; logo num canto do vídeo, fontes e cor nos textos e as cores nos seletores e nas animações.
 - [x] Levar a edição para outros editores: XML de intercâmbio (xmeml 4), sozinho ou num ZIP com as mídias.
-- Exportação rápida no navegador para vídeos curtos.
+- [x] Exportação rápida no navegador para vídeos curtos: 720p, até 3 min, com o desenho e o som da prévia.
 
 ### Fase 7: extras
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).

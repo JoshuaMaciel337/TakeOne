@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
 import { formatarBytes, formatarQuando, formatarTempo } from "@/lib/formatar";
-import type { Proporcao } from "@/lib/projeto/modelo";
-import type { Exportacao } from "@/lib/tipos";
+import type { Projeto, Proporcao } from "@/lib/projeto/modelo";
+import type { Exportacao, Midia } from "@/lib/tipos";
 import { useExportacoes } from "@/lib/useExportacoes";
 
+import { ExportarNoNavegador } from "./ExportarNoNavegador";
 import { PainelQrCelular, useLinkCelular } from "./QrDoCelular";
 import type { EstadoSalvamento } from "./useProjeto";
 
@@ -29,13 +30,16 @@ function tamanhoDeSaida(proporcao: Proporcao, lado: number): string {
 
 type Props = {
   projetoId: string;
+  /** O projeto e as mídias, para a exportação no navegador (o mesmo desenho da prévia). */
+  projeto: Projeto;
+  midias: ReadonlyMap<string, Midia>;
   proporcao: Proporcao;
   salvamento: EstadoSalvamento;
   aoFechar: () => void;
 };
 
 /** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular), ou levar a edição para outro editor. */
-export function JanelaExportar({ projetoId, proporcao, salvamento, aoFechar }: Props) {
+export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, aoFechar }: Props) {
   const { exportacoes, erro, exportar, excluir } = useExportacoes(projetoId, true);
   const [resolucao, setResolucao] = useState<Resolucao>("1080p");
   const [enviando, setEnviando] = useState(false);
@@ -100,6 +104,8 @@ export function JanelaExportar({ projetoId, proporcao, salvamento, aoFechar }: P
           </button>
           {aviso ? <p className="text-xs text-erro">{aviso}</p> : null}
         </div>
+
+        <ExportarNoNavegador projeto={projeto} midias={midias} salvo={salvo} />
 
         <div className="space-y-2 border-b border-borda p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Levar para outro editor</h3>
