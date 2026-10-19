@@ -4,3 +4,6 @@
 ruff==0.16.9
 pytest==9.1.1
 httpx2==2.13.1
+# Só nos testes: leem o XML de intercâmbio de forma independente (Apache-2.0)
+opentimelineio==0.17.0
+otio-fcp-adapter==1.0.0
