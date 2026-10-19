@@ -147,6 +147,26 @@
    }
   },
   {
+   "modelo": "horario",
+   "id": "horario_petshop",
+   "nome": "Horário do pet shop",
+   "padroes": {
+    "titulo": "Banho e tosa",
+    "texto": "Seg a sex · 8h às 19h\nSábado · 8h às 16h\nVeterinário · 24 horas",
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_petshop",
+   "nome": "Avaliação do pet shop",
+   "padroes": {
+    "nota": "5,0",
+    "legenda": "tutores felizes"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

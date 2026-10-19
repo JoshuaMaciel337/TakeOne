@@ -1,0 +1,37 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Citação com aspas grandes",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Aspas enormes em degradê caem no lugar e a frase aparece palavra por palavra, com o autor embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "A simplicidade é o último grau de sofisticação.", "maximo": 140},
+  {"id": "autor", "rotulo": "Autor", "tipo": "texto", "padrao": "Leonardo da Vinci", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Aspas (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Aspas (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Aspas grandes: as aspas (o caractere “, em Montserrat preta) caem girando do alto e ficam atrás do
+     canto do texto; as palavras sobem uma a uma, 0,12 s entre elas; o autor entra com um traço que cresce. -->
+<style>
+.citacao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*82),86%);color:var(--cor-texto);
+  animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.aspas{position:absolute;left:calc(var(--u)*-2);top:calc(var(--u)*-19);font-family:Montserrat;font-weight:900;font-size:calc(var(--u)*28);line-height:1;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:cair .7s cubic-bezier(.3,1.4,.5,1) both}
+.frase{position:relative;font-weight:700;font-size:calc(var(--u)*6.2);line-height:1.22;letter-spacing:-.02em;text-wrap:balance;
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.8) rgba(0,0,0,.5)}
+.palavra{display:inline-block;margin-right:.26em;animation:subir .5s cubic-bezier(.2,.8,.2,1) calc(.45s + var(--i) * .12s) both}
+.autor{display:flex;align-items:center;gap:calc(var(--u)*1.6);margin-top:calc(var(--u)*3);font-weight:600;font-size:calc(var(--u)*3.8);opacity:.9;
+  text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1.2) rgba(0,0,0,.5);animation:subir .5s ease-out 1.6s both}
+.autor::before{content:"";width:calc(var(--u)*6);height:calc(var(--u)*.4);background:linear-gradient(90deg,var(--cor-1),var(--cor-2));
+  transform-origin:0 50%;animation:crescer .5s cubic-bezier(.65,0,.35,1) 1.6s both}
+@keyframes cair{from{opacity:0;transform:translateY(calc(var(--u)*-10)) rotate(-25deg) scale(1.3)}}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*2.4))}}
+@keyframes crescer{from{transform:scaleX(0)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-47%)}}
+</style>
+<div class="citacao"><div class="aspas">“</div><div class="frase">{{texto:palavras}}</div><div class="autor">{{autor}}</div></div>

@@ -121,6 +121,28 @@
    }
   },
   {
+   "modelo": "grafico_pontos",
+   "id": "reserva",
+   "nome": "Reserva de emergência",
+   "padroes": {
+    "valor": "35",
+    "legenda": "dos brasileiros têm reserva de emergência",
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
+   "modelo": "pros_contras",
+   "id": "cartao_credito",
+   "nome": "Cartão de crédito",
+   "padroes": {
+    "titulo_1": "Vantagens",
+    "texto_1": "Prazo para pagar\nPontos e milhas\nCompras seguras",
+    "titulo_2": "Cuidados",
+    "texto_2": "Juros altos no rotativo\nFácil gastar demais"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

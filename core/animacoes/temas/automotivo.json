@@ -153,6 +153,26 @@
    }
   },
   {
+   "modelo": "avaliacao",
+   "id": "avaliacao_oficina",
+   "nome": "Avaliação da oficina",
+   "padroes": {
+    "nota": "4,9",
+    "legenda": "860 clientes atendidos"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_oficina",
+   "nome": "Horário da oficina",
+   "padroes": {
+    "titulo": "Oficina aberta",
+    "texto": "Seg a sex · 8h às 18h\nSábado · 8h às 12h\nGuincho · 24 horas",
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

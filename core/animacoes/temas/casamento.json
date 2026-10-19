@@ -236,6 +236,28 @@
    }
   },
   {
+   "modelo": "agenda",
+   "id": "cronograma_casamento",
+   "nome": "Cronograma do casamento",
+   "padroes": {
+    "titulo": "O grande dia",
+    "texto": "16:00 Cerimônia\n17:00 Fotos\n18:00 Recepção\n20:00 Valsa\n23:00 Bolo",
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
+   "modelo": "citacao_aspas",
+   "id": "frase_amor",
+   "nome": "Frase de amor",
+   "padroes": {
+    "texto": "O amor não se vê com os olhos, mas com o coração.",
+    "autor": "William Shakespeare",
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

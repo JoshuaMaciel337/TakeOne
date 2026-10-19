@@ -1,0 +1,61 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cartão de perfil",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um cartão de perfil com a inicial no avatar, o nome, o @, três números e o botão Seguir sendo apertado.",
+ "campos": [
+  {"id": "inicial", "rotulo": "Letra do avatar", "tipo": "texto", "padrao": "L", "maximo": 2},
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Lume Estúdio", "maximo": 26},
+  {"id": "usuario", "rotulo": "Usuário", "tipo": "texto", "padrao": "@lumeestudio", "maximo": 26},
+  {"id": "numero_1", "rotulo": "Número 1", "tipo": "texto", "padrao": "248", "maximo": 8},
+  {"id": "rotulo_1", "rotulo": "Rótulo 1", "tipo": "texto", "padrao": "posts", "maximo": 12},
+  {"id": "numero_2", "rotulo": "Número 2", "tipo": "texto", "padrao": "12,4 mil", "maximo": 8},
+  {"id": "rotulo_2", "rotulo": "Rótulo 2", "tipo": "texto", "padrao": "seguidores", "maximo": 12},
+  {"id": "numero_3", "rotulo": "Número 3", "tipo": "texto", "padrao": "310", "maximo": 8},
+  {"id": "rotulo_3", "rotulo": "Rótulo 3", "tipo": "texto", "padrao": "seguindo", "maximo": 12},
+  {"id": "botao", "rotulo": "Botão", "tipo": "texto", "padrao": "Seguir", "maximo": 14},
+  {"id": "botao_depois", "rotulo": "Botão depois do toque", "tipo": "texto", "padrao": "Seguindo ✓", "maximo": 16},
+  {"id": "cor_1", "rotulo": "Destaque (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Destaque (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Perfil: o cartão sobe; o anel do avatar se desenha em volta (conic-gradient com o ângulo animado por
+     @property), os números entram em sequência e, aos 2,6 s, o botão afunda como um toque e troca de texto
+     e de cor (os dois rótulos ficam empilhados e um some enquanto o outro aparece). -->
+<style>
+@property --giro{syntax:'<angle>';inherits:false;initial-value:0deg}
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*72),88%);padding:calc(var(--u)*4) calc(var(--u)*3.6);
+  border-radius:calc(var(--u)*3.4);background:rgba(14,15,20,.9);color:var(--cor-texto);display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*1);
+  box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.35);animation:entrar .7s cubic-bezier(.2,.8,.2,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.anel{width:calc(var(--u)*17);height:calc(var(--u)*17);border-radius:50%;padding:calc(var(--u)*.8);
+  background:conic-gradient(var(--cor-1),var(--cor-2) var(--giro),transparent 0);animation:anel 1s cubic-bezier(.65,0,.35,1) .3s both}
+.avatar{width:100%;height:100%;border-radius:50%;border:calc(var(--u)*.6) solid rgb(14,15,20);display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));font-family:Montserrat;font-weight:900;font-size:calc(var(--u)*7);color:#fff}
+.nome{margin-top:calc(var(--u)*1);font-weight:800;font-size:calc(var(--u)*5);letter-spacing:-.02em;text-align:center}
+.usuario{font-weight:500;font-size:calc(var(--u)*3.2);opacity:.65}
+.numeros{display:flex;justify-content:space-around;width:100%;margin:calc(var(--u)*1.6) 0}
+.numeros div{display:flex;flex-direction:column;align-items:center;animation:subir .45s cubic-bezier(.2,.8,.2,1) calc(.8s + var(--k) * .15s) both}
+.numeros b{font-weight:800;font-size:calc(var(--u)*4.4)}
+.numeros span{font-size:calc(var(--u)*2.8);opacity:.65}
+.botao{display:grid;width:100%;border-radius:calc(var(--u)*1.6);font-weight:800;font-size:calc(var(--u)*3.8);text-align:center;
+  background:linear-gradient(110deg,var(--cor-1),var(--cor-2));animation:subir .45s ease-out 1.3s both,tocar .3s ease-in-out 2.6s both,depois .01s linear 2.75s both}
+.botao span{grid-area:1/1;padding:calc(var(--u)*1.6)}
+.antes{animation:some .2s linear 2.7s both}
+.depois{opacity:0;animation:aparece .2s linear 2.75s both}
+@keyframes anel{from{--giro:0deg}to{--giro:360deg}}
+@keyframes tocar{50%{transform:scale(.92)}}
+@keyframes depois{to{background:rgba(255,255,255,.14)}}
+@keyframes some{to{opacity:0}}
+@keyframes aparece{to{opacity:1}}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,-44%) scale(.95)}}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*1.6))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-47%)}}
+</style>
+<div class="cartao"><div class="anel"><div class="avatar">{{inicial}}</div></div><div class="nome">{{nome}}</div><div class="usuario">{{usuario}}</div>
+<div class="numeros"><div style="--k:0"><b>{{numero_1}}</b><span>{{rotulo_1}}</span></div><div style="--k:1"><b>{{numero_2}}</b><span>{{rotulo_2}}</span></div>
+<div style="--k:2"><b>{{numero_3}}</b><span>{{rotulo_3}}</span></div></div>
+<div class="botao"><span class="antes">{{botao}}</span><span class="depois">{{botao_depois}}</span></div></div>

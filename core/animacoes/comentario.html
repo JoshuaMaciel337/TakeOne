@@ -1,0 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Respondendo comentário",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "O cartão de um comentário (quem escreveu e o que escreveu) aparece inclinado no topo do vídeo, como na resposta a um comentário.",
+ "campos": [
+  {"id": "rotulo", "rotulo": "Rótulo", "tipo": "texto", "padrao": "Respondendo a", "maximo": 24},
+  {"id": "usuario", "rotulo": "Usuário", "tipo": "texto", "padrao": "@carol.fotos", "maximo": 26},
+  {"id": "texto", "rotulo": "Comentário", "tipo": "texto", "padrao": "Como você faz essa luz tão bonita no fim da tarde?", "maximo": 110},
+  {"id": "cor_1", "rotulo": "Avatar (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Avatar (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#16171c"}
+ ]
+}
+</script>
+<!-- Comentário: um cartão branco, levemente girado, entra com mola de cima; o avatar é só um círculo com
+     degradê, e o coração do canto pulsa duas vezes. O texto do comentário quebra em até três linhas. -->
+<style>
+.cartao{position:absolute;left:50%;top:calc(var(--u)*14);width:min(calc(var(--u)*76),86%);transform:translateX(-50%) rotate(-2deg);
+  padding:calc(var(--u)*2.6) calc(var(--u)*3);border-radius:calc(var(--u)*2.8);background:#fff;color:var(--cor-texto);
+  box-shadow:0 calc(var(--u)*1.2) calc(var(--u)*4) rgba(0,0,0,.35);animation:entrar .75s cubic-bezier(.3,1.4,.5,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.topo{display:flex;align-items:center;gap:calc(var(--u)*1.6);margin-bottom:calc(var(--u)*1.2)}
+.avatar{flex:none;width:calc(var(--u)*6);height:calc(var(--u)*6);border-radius:50%;background:linear-gradient(135deg,var(--cor-1),var(--cor-2))}
+.quem{display:flex;flex-direction:column;min-width:0;font-size:calc(var(--u)*2.8)}
+.quem span{opacity:.55;font-weight:500}
+.quem b{font-weight:800;font-size:calc(var(--u)*3.4)}
+.coracao{margin-left:auto;width:calc(var(--u)*4.6);height:calc(var(--u)*4.6);animation:pulsar .5s ease-in-out 1.2s 2 both}
+.texto{font-weight:600;font-size:calc(var(--u)*4);line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  animation:aparecer .4s ease-out .5s both}
+@keyframes pulsar{50%{transform:scale(1.3)}}
+@keyframes aparecer{from{opacity:0}}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,calc(var(--u)*-10)) rotate(4deg) scale(.9)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,calc(var(--u)*-6)) rotate(-2deg)}}
+</style>
+<div class="cartao"><div class="topo"><div class="avatar"></div><div class="quem"><span>{{rotulo}}</span><b>{{usuario}}</b></div>
+<svg class="coracao" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C1 8.6 3 5 6.6 5c2.1 0 3.7 1.2 5.4 3.1C13.7 6.2 15.3 5 17.4 5 21 5 23 8.6 21.6 11.8 19.5 16.4 12 21 12 21z" fill="#ff3b5c"/></svg></div>
+<div class="texto">{{texto}}</div></div>

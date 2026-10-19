@@ -1,0 +1,92 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Programação",
+ "categoria": "listas",
+ "motor": "canvas",
+ "duracao": 6,
+ "descricao": "A programação de um evento: horários numa linha vertical que se desenha, com cada atividade entrando ao lado.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Programação", "maximo": 30},
+  {"id": "texto", "rotulo": "Itens (hora e atividade, um por linha)", "tipo": "linhas", "padrao": "08:00 Credenciamento\n09:00 Abertura\n10:30 Palestra principal\n12:00 Almoço\n14:00 Oficinas", "maximo": 260},
+  {"id": "cor_1", "rotulo": "Linha (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Linha (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Programação: cada linha do campo é "hora atividade" (a hora é a primeira palavra). Uma linha vertical
+     em degradê se desenha de cima para baixo; ao passar por cada item, o ponto acende e a hora e a atividade
+     entram da direita. Até 7 itens; o tamanho da letra diminui para a atividade mais longa caber. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const itens = String(C.texto).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 7).map((l) => {
+    const i = l.indexOf(" ");
+    return i < 0 ? { hora: l, nome: "" } : { hora: l.slice(0, i), nome: l.slice(i + 1).trim() };
+  });
+  const n = Math.max(itens.length, 1);
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.35, 0.5, dur);
+    const largura = Math.min(W * 0.84, 80 * u);
+    const passo = Math.min(10 * u, (H * 0.7) / (n + 0.75));
+    const altura = passo * (n + 0.75);
+    const x0 = W / 2 - largura / 2;
+    const y0 = H / 2 - altura / 2;
+    ctx.globalAlpha = env;
+    TO.retangulo(ctx, x0 - 3 * u, y0 - 3 * u, largura + 6 * u, altura + 4.5 * u, 3 * u);
+    ctx.fillStyle = "rgba(14,15,20,.84)";
+    ctx.fill();
+    // Título
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.cor_texto;
+    const kt = TO.ease.outCubic(TO.prog(t, 0.1, 0.6));
+    ctx.globalAlpha = env * kt;
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 6, largura));
+    ctx.fillText(C.titulo, x0, y0 + passo * 0.45 + (1 - kt) * 2 * u);
+    // Linha vertical
+    const lx = x0 + 2 * u;
+    const topo = y0 + passo * 1.3;
+    const fim = topo + passo * (n - 1);
+    const desenho = TO.ease.inOutCubic(TO.prog(t, 0.5, 0.5 + 0.45 * n));
+    ctx.globalAlpha = env;
+    ctx.strokeStyle = TO.degrade(ctx, 0, topo, 0, fim);
+    ctx.lineWidth = 0.6 * u;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(lx, topo);
+    ctx.lineTo(lx, topo + (fim - topo) * desenho);
+    ctx.stroke();
+    // Itens: a hora num tamanho fixo, a atividade cabendo no resto
+    ctx.font = TO.fonte(800, 4.2);
+    const largHora = Math.max(...itens.map((it) => ctx.measureText(it.hora).width), 10 * u);
+    const restoX = lx + 4 * u + largHora + 3 * u;
+    let tamNome = 4.2;
+    for (const it of itens) tamNome = Math.min(tamNome, TO.caber(ctx, it.nome, 500, 4.2, x0 + largura - restoX));
+    itens.forEach((it, i) => {
+      const y = topo + passo * i;
+      const quando = 0.5 + 0.45 * n * (n > 1 ? i / (n - 1) : 0);
+      const k = TO.ease.outCubic(TO.prog(t, quando, quando + 0.45));
+      if (k <= 0) return;
+      ctx.globalAlpha = env;
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, n > 1 ? i / (n - 1) : 0);
+      ctx.beginPath();
+      ctx.arc(lx, y, 1.3 * u * TO.ease.outBack(k), 0, 6.2832);
+      ctx.fill();
+      ctx.globalAlpha = env * k;
+      const dx = (1 - k) * 5 * u;
+      ctx.font = TO.fonte(800, 4.2);
+      ctx.fillText(it.hora, lx + 4 * u + dx, y);
+      ctx.fillStyle = C.cor_texto;
+      ctx.font = TO.fonte(500, tamNome);
+      ctx.fillText(it.nome, restoX + dx, y);
+    });
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

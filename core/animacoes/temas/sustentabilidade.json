@@ -1,0 +1,138 @@
+{
+ "nome": "Sustentabilidade",
+ "ordem": 39,
+ "versoes": [
+  {
+   "modelo": "grafico_pontos",
+   "id": "reciclagem",
+   "nome": "Porcentagem reciclada",
+   "padroes": {
+    "valor": "82",
+    "legenda": "do lixo da fábrica volta como matéria-prima",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "habitos_verdes",
+   "nome": "Hábitos verdes",
+   "padroes": {
+    "titulo": "Pequenas trocas",
+    "texto": "Garrafa reutilizável\nSacola de pano\nLâmpada de LED\nBanho de 5 minutos",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "impacto_ano",
+   "nome": "Impacto do ano",
+   "padroes": {
+    "dados": "árvores plantadas: 4800\ntoneladas recicladas: 120\nfamílias atendidas: 350",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "titulo_rolo",
+   "id": "menos_lixo",
+   "nome": "Menos lixo",
+   "padroes": {
+    "texto": "Menos",
+    "palavras": "plástico\ndesperdício\nlixo",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_verde",
+   "nome": "Dica verde",
+   "padroes": {
+    "rotulo": "Dica verde",
+    "texto": "Separe o lixo em seco e úmido: só isso já dobra o que a coleta consegue reciclar.",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_biologa",
+   "nome": "Tarja de bióloga",
+   "padroes": {
+    "nome": "Paula Rezende",
+    "funcao": "Bióloga e educadora ambiental",
+    "detalhe": "",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "mutirao",
+   "nome": "Mutirão",
+   "padroes": {
+    "dia": "05",
+    "mes": "JUN",
+    "titulo": "Mutirão de limpeza da praia",
+    "hora": "Das 8h às 11h",
+    "local": "Posto 4, leve luvas e água",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "pros_contras",
+   "id": "sacola_comparacao",
+   "nome": "Sacola de pano",
+   "padroes": {
+    "titulo_1": "Sacola de pano",
+    "texto_1": "Dura anos\nAguenta mais peso\nLava fácil",
+    "titulo_2": "Sacola plástica",
+    "texto_2": "Usada uma vez\n400 anos para sumir"
+   }
+  },
+  {
+   "modelo": "folhas",
+   "id": "folhas_outono",
+   "nome": "Folhas caindo",
+   "padroes": {
+    "titulo": "Semana do Meio Ambiente",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "selo_reciclavel",
+   "nome": "Selo reciclável",
+   "padroes": {
+    "texto": "100% RECICLÁVEL",
+    "subtitulo": "embalagem de papel",
+    "cor_1": "#2f9e6e",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salvar_dica_verde",
+   "nome": "Salve a dica",
+   "padroes": {
+    "texto": "Salve e comece hoje",
+    "subtitulo": "o planeta agradece",
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  },
+  {
+   "modelo": "transicao_aneis",
+   "id": "transicao",
+   "nome": "Transição: anéis",
+   "padroes": {
+    "cor_1": "#7bd389",
+    "cor_2": "#2f9e6e"
+   }
+  }
+ ]
+}

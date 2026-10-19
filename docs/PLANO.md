@@ -530,4 +530,5 @@ Analisado em 15/10/2026 a partir do fluxo "Claude Code + Video-Use + HyperFrames
 - [x] Temas na biblioteca: 266 modelos (62 desenhos e 204 versões em 18 temas, de igreja a viagem), com filtro por tema no painel
 - [x] Lote 2: 462 modelos (82 desenhos e 380 versões em 28 temas)
 - [x] Lote 3: 689 modelos (104 desenhos e 585 versões em 36 temas)
+- [x] Lote 4: 882 modelos (127 desenhos e 755 versões em 44 temas)
 - [ ] Biblioteca com 1000 modelos, em lotes (desenhos novos e versões por tema)

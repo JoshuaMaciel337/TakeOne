@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Lista numerada grande",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 5.5,
+ "descricao": "Números grandes em contorno (01, 02, 03...) que se enchem de cor enquanto cada item desliza ao lado.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "Antes de começar", "maximo": 36},
+  {"id": "texto", "rotulo": "Itens (um por linha)", "tipo": "linhas", "padrao": "Defina o objetivo\nConheça o público\nEscolha o formato\nMeça o resultado", "maximo": 200},
+  {"id": "cor_1", "rotulo": "Números (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Números (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Numerada: o número vem do contador do CSS (decimal-leading-zero), primeiro só em contorno; o degradê
+     sobe de baixo para cima por dentro dele (background-clip:text com background-position animado) e o
+     texto do item entra deslizando, um item a cada 0,8 s. -->
+<style>
+.lista{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*86),88%);display:flex;flex-direction:column;
+  gap:calc(var(--u)*1.2);counter-reset:item;color:var(--cor-texto);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.titulo{font-weight:800;font-size:calc(var(--u)*5.4);letter-spacing:-.02em;margin-bottom:calc(var(--u)*1);text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.5);
+  animation:entrar .5s cubic-bezier(.2,.8,.2,1) both}
+.titulo:empty{display:none}
+.linha{counter-increment:item;display:flex;align-items:center;gap:calc(var(--u)*2.4);font-weight:700;font-size:calc(var(--u)*4.2);
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.55);animation:entrar .5s cubic-bezier(.2,.8,.2,1) calc(.5s + var(--i) * .8s) both}
+.linha::before{content:counter(item,decimal-leading-zero);flex:none;width:1.9em;font-family:Montserrat;font-weight:900;font-size:2.2em;line-height:1;
+  letter-spacing:-.04em;color:transparent;-webkit-text-stroke:calc(var(--u)*.25) var(--cor-1);text-shadow:none;
+  background:linear-gradient(0deg,var(--cor-1),var(--cor-2) 50%,transparent 50%) 0 0/100% 200% no-repeat;-webkit-background-clip:text;background-clip:text;
+  animation:encher .7s cubic-bezier(.65,0,.35,1) calc(.75s + var(--i) * .8s) both}
+@keyframes encher{from{background-position:0 0}to{background-position:0 100%}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-4))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="lista"><div class="titulo">{{titulo}}</div>{{texto:linhas}}</div>

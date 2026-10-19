@@ -106,6 +106,47 @@
    }
   },
   {
+   "modelo": "perfil_cartao",
+   "id": "perfil_criador",
+   "nome": "Perfil do criador",
+   "padroes": {
+    "inicial": "M",
+    "nome": "Mari Cria",
+    "usuario": "@maricria",
+    "numero_1": "540",
+    "rotulo_1": "vídeos",
+    "numero_2": "230 mil",
+    "rotulo_2": "seguidores",
+    "numero_3": "180",
+    "rotulo_3": "seguindo",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "comentario",
+   "id": "respondendo_criador",
+   "nome": "Respondendo comentário",
+   "padroes": {
+    "rotulo": "Respondendo a",
+    "usuario": "@pedro.edita",
+    "texto": "Faz um vídeo mostrando seu jeito de editar?",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salvar_criador",
+   "nome": "Salve o vídeo",
+   "padroes": {
+    "texto": "Salve para assistir de novo",
+    "subtitulo": "e mande para um amigo",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

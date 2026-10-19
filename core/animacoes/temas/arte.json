@@ -1,0 +1,143 @@
+{
+ "nome": "Arte e design",
+ "ordem": 38,
+ "versoes": [
+  {
+   "modelo": "titulo_rolo",
+   "id": "feito_a_mao",
+   "nome": "Feito à mão",
+   "padroes": {
+    "texto": "Arte que",
+    "palavras": "inspira\nconta histórias\nfica",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_artista",
+   "nome": "Tarja de artista",
+   "padroes": {
+    "nome": "Rafa Monteiro",
+    "funcao": "Ilustrador e muralista",
+    "detalhe": "@rafamonteiro.art",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "fundo_formas",
+   "id": "fundo_criativo",
+   "nome": "Fundo criativo",
+   "padroes": {
+    "titulo": "Portfólio 2026",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "lista_passos",
+   "id": "processo_criativo",
+   "nome": "Processo criativo",
+   "padroes": {
+    "titulo": "Do rascunho à arte",
+    "texto": "Referências\nRascunho a lápis\nArte-final\nCor e textura",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "exposicao",
+   "nome": "Exposição",
+   "padroes": {
+    "dia": "12",
+    "mes": "ABR",
+    "titulo": "Exposição Cores do Sertão",
+    "hora": "Abertura às 19h",
+    "local": "Galeria Casa Amarela",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "citacao_aspas",
+   "id": "frase_arte",
+   "nome": "Frase sobre arte",
+   "padroes": {
+    "texto": "A criatividade é a inteligência se divertindo.",
+    "autor": "frase popular",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "logo_brilho",
+   "id": "logo_atelie",
+   "nome": "Logo do ateliê",
+   "padroes": {
+    "texto": "ATELIÊ ÍRIS",
+    "slogan": "arte, papel e tinta",
+    "cor_1": "#ffe0ec",
+    "cor_2": "#ff5d8f"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_cor",
+   "nome": "Qual paleta",
+   "padroes": {
+    "pergunta": "Qual paleta vai para o mural?",
+    "opcao_1": "Tons quentes",
+    "pct_1": "64",
+    "opcao_2": "Tons frios",
+    "pct_2": "36",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "chamada_arrastar",
+   "id": "loja_prints",
+   "nome": "Loja de prints",
+   "padroes": {
+    "texto": "Arraste para ver",
+    "subtitulo": "os prints da nova coleção",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "edicao_limitada",
+   "nome": "Edição limitada",
+   "padroes": {
+    "texto": "EDIÇÃO LIMITADA",
+    "subtitulo": "só 50 prints numerados",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "comentario",
+   "id": "comentario_arte",
+   "nome": "Comentário do seguidor",
+   "padroes": {
+    "rotulo": "Respondendo a",
+    "usuario": "@leo.desenha",
+    "texto": "Que pincel você usa para essas texturas?",
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  },
+  {
+   "modelo": "transicao_tinta",
+   "id": "transicao",
+   "nome": "Transição: tinta",
+   "padroes": {
+    "cor_1": "#ff5d8f",
+    "cor_2": "#5b8cff"
+   }
+  }
+ ]
+}

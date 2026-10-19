@@ -1,0 +1,137 @@
+{
+ "nome": "Fotografia",
+ "ordem": 37,
+ "versoes": [
+  {
+   "modelo": "logo_quadrado",
+   "id": "logo_estudio_foto",
+   "nome": "Logo de estúdio",
+   "padroes": {
+    "sigla": "LF",
+    "texto": "Luz & Foco",
+    "slogan": "estúdio de fotografia",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_fotografa",
+   "nome": "Tarja de fotógrafa",
+   "padroes": {
+    "nome": "Bianca Torres",
+    "funcao": "Fotógrafa de casamentos",
+    "detalhe": "@biancatorres.foto",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "titulo_eco",
+   "id": "ensaio_titulo",
+   "nome": "Título de ensaio",
+   "padroes": {
+    "texto": "ENSAIO",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "dicas_retrato",
+   "nome": "Dicas de retrato",
+   "padroes": {
+    "titulo": "Retrato com celular",
+    "texto": "Fique perto da janela\nLimpe a lente\nToque no rosto para focar\nGrave na hora dourada",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "edicao_foto",
+   "nome": "Antes e depois da edição",
+   "padroes": {
+    "antes": "Crua",
+    "depois": "Editada",
+    "rotulo_antes": "direto da câmera",
+    "rotulo_depois": "com cor e luz",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "reserve_data",
+   "id": "agenda_ensaios",
+   "nome": "Agenda de ensaios",
+   "padroes": {
+    "chamada": "Agenda aberta",
+    "data": "Março",
+    "detalhe": "ensaios de família ao ar livre",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_estudio",
+   "nome": "Avaliação do estúdio",
+   "padroes": {
+    "nota": "5,0",
+    "legenda": "312 ensaios entregues"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_estudio",
+   "nome": "Horário do estúdio",
+   "padroes": {
+    "titulo": "Estúdio aberto",
+    "texto": "Ter a sex · 9h às 19h\nSábado · 8h às 14h\nDomingo · só com hora marcada",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_foto",
+   "nome": "Pergunta do seguidor",
+   "padroes": {
+    "pergunta": "Qual lente você usa para retrato?",
+    "resposta": "Uma 50 mm abre bem e desfoca o fundo. Para começar, ela é a mais barata e a que mais ensina.",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "fundo_bokeh",
+   "id": "luzes_ensaio",
+   "nome": "Luzes desfocadas",
+   "padroes": {
+    "titulo": "Ensaio noturno",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salvar_dica_foto",
+   "nome": "Salve a dica",
+   "padroes": {
+    "texto": "Salve para o próximo ensaio",
+    "subtitulo": "e marque quem fotografa com você",
+    "cor_1": "#f4efe6",
+    "cor_2": "#e0a458"
+   }
+  },
+  {
+   "modelo": "transicao_diagonal",
+   "id": "transicao",
+   "nome": "Transição: diagonal",
+   "padroes": {
+    "cor_1": "#f4efe6",
+    "cor_2": "#1b1712"
+   }
+  }
+ ]
+}

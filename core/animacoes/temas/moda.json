@@ -107,6 +107,29 @@
    }
   },
   {
+   "modelo": "tarja_vidro",
+   "id": "tarja_estilista_vidro",
+   "nome": "Tarja de vidro",
+   "padroes": {
+    "nome": "Carolina Reis",
+    "funcao": "Estilista do Ateliê Luna",
+    "detalhe": "@atelieluna",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
+   "modelo": "logo_brilho",
+   "id": "logo_grife",
+   "nome": "Logo da grife",
+   "padroes": {
+    "texto": "LUNA",
+    "slogan": "moda feita à mão",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

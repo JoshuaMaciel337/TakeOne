@@ -1,0 +1,146 @@
+{
+ "nome": "Marketing digital",
+ "ordem": 41,
+ "versoes": [
+  {
+   "modelo": "grafico_linha",
+   "id": "alcance",
+   "nome": "Alcance do mês",
+   "padroes": {
+    "titulo": "Alcance em 6 meses",
+    "dados": "Jan: 8000\nFev: 11000\nMar: 9500\nAbr: 18000\nMai: 26000\nJun: 41000",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "taxa_abertura",
+   "nome": "Taxa de abertura",
+   "padroes": {
+    "valor": "47",
+    "legenda": "de abertura nos e-mails da campanha",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "funil",
+   "nome": "Etapas do funil",
+   "padroes": {
+    "titulo": "O funil em 4 passos",
+    "texto": "Atrair\nEngajar\nConverter\nFidelizar",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "titulo_rolo",
+   "id": "conteudo_que",
+   "nome": "Conteúdo que",
+   "padroes": {
+    "texto": "Conteúdo que",
+    "palavras": "atrai\nengaja\nvende",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "perfil_cartao",
+   "id": "perfil_agencia",
+   "nome": "Perfil da agência",
+   "padroes": {
+    "inicial": "P",
+    "nome": "Pulso Digital",
+    "usuario": "@pulsodigital",
+    "numero_1": "1.204",
+    "rotulo_1": "posts",
+    "numero_2": "58 mil",
+    "rotulo_2": "seguidores",
+    "numero_3": "412",
+    "rotulo_3": "seguindo",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "comparativo",
+   "id": "organico_pago",
+   "nome": "Orgânico ou pago",
+   "padroes": {
+    "nosso": "Estratégia",
+    "deles": "Só anúncio",
+    "texto": "Público fiel\nCusto que cai com o tempo\nConteúdo que dura\nMarca lembrada",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_estrategista",
+   "nome": "Tarja de estrategista",
+   "padroes": {
+    "nome": "Diego Almeida",
+    "funcao": "Estrategista de conteúdo",
+    "detalhe": "@diego.estrategia",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_marketing",
+   "nome": "Pergunta frequente",
+   "padroes": {
+    "pergunta": "Quantas vezes devo postar por semana?",
+    "resposta": "Menos que você imagina: três posts bons por semana rendem mais do que um por dia feito às pressas.",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "chamada_arrastar",
+   "id": "baixe_guia",
+   "nome": "Baixe o guia",
+   "padroes": {
+    "texto": "Arraste para baixar",
+    "subtitulo": "o guia gratuito de conteúdo",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salve_estrategia",
+   "nome": "Salve a estratégia",
+   "padroes": {
+    "texto": "Salve este passo a passo",
+    "subtitulo": "e aplique na próxima campanha",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "logo_quadrado",
+   "id": "logo_agencia",
+   "nome": "Logo da agência",
+   "padroes": {
+    "sigla": "PD",
+    "texto": "Pulso Digital",
+    "slogan": "marketing que dá resultado",
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  },
+  {
+   "modelo": "transicao_diagonal",
+   "id": "transicao",
+   "nome": "Transição: diagonal",
+   "padroes": {
+    "cor_1": "#00d1ff",
+    "cor_2": "#7a5cff"
+   }
+  }
+ ]
+}

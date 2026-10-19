@@ -1,0 +1,89 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Luzes desfocadas",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Círculos de luz desfocada, como luzes de fundo fora de foco, flutuando devagar e piscando de leve por cima do vídeo.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "", "maximo": 26},
+  {"id": "cor_1", "rotulo": "Luzes (uma cor)", "tipo": "cor", "padrao": "#ffc46b"},
+  {"id": "cor_2", "rotulo": "Luzes (outra cor)", "tipo": "cor", "padrao": "#ff6fa8"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Luzes: 34 discos sorteados com semente (posição, tamanho, cor entre as duas, velocidade e fase), em três
+     camadas de profundidade: os maiores são mais apagados e andam mais rápido, como no desfoque de uma lente.
+     Cada disco é o carimbo de brilho do comum.js com a borda mais definida (um anel claro por cima), e a
+     intensidade respira num seno próprio. Tudo depende só de t. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const rnd = TO.rng(31);
+  const luzes = Array.from({ length: 34 }, () => {
+    const camada = Math.floor(rnd() * 3);
+    return {
+      x: rnd(), y: rnd(), camada,
+      r: (3 + camada * 3.5 + rnd() * 3) * u,
+      cor: rnd() < 0.5 ? C.cor_1 : C.cor_2,
+      vx: (rnd() - 0.5) * 0.02 * (1 + camada), vy: -(0.008 + rnd() * 0.015) * (1 + camada * 0.6),
+      fase: rnd() * 6.28, ritmo: 0.6 + rnd() * 0.9,
+    };
+  });
+  // Disco de borda suave, desenhado uma vez por cor
+  const discos = {};
+  function disco(cor) {
+    if (!discos[cor]) {
+      const c = document.createElement("canvas");
+      const R = 128;
+      c.width = c.height = R * 2;
+      const x = c.getContext("2d");
+      const g = x.createRadialGradient(R, R, 0, R, R, R);
+      g.addColorStop(0, TO.rgba(cor, 0.55));
+      g.addColorStop(0.72, TO.rgba(cor, 0.42));
+      g.addColorStop(0.86, TO.rgba(cor, 0.62));
+      g.addColorStop(1, TO.rgba(cor, 0));
+      x.fillStyle = g;
+      x.fillRect(0, 0, R * 2, R * 2);
+      discos[cor] = c;
+    }
+    return discos[cor];
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.8, 0.8, dur);
+    ctx.globalCompositeOperation = "lighter";
+    for (const l of luzes) {
+      const x = (((l.x + l.vx * t) % 1) + 1) % 1;
+      const y = (((l.y + l.vy * t) % 1) + 1) % 1;
+      const brilho = 0.55 + 0.45 * Math.sin(t * l.ritmo * 2 + l.fase);
+      ctx.globalAlpha = env * brilho * (l.camada === 2 ? 0.45 : l.camada === 1 ? 0.7 : 0.95);
+      const r = l.r;
+      // Margem de um raio dos dois lados, para a luz sair inteira por uma borda antes de voltar pela outra
+      const px = -r + x * (W + 2 * r);
+      const py = -r + y * (H + 2 * r);
+      ctx.drawImage(disco(l.cor), px - r, py - r, 2 * r, 2 * r);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    if (C.titulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 0.6, 1.4)) * (1 - TO.prog(t, dur - 0.7, dur - 0.1));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 10, W * 0.84, "Montserrat"), "Montserrat");
+      ctx.fillText(C.titulo, W / 2, H / 2 + (1 - k) * 2 * u);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

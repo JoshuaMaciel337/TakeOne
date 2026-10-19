@@ -181,6 +181,28 @@
    }
   },
   {
+   "modelo": "grafico_pontos",
+   "id": "vacinacao",
+   "nome": "Vacinação",
+   "padroes": {
+    "valor": "88",
+    "legenda": "da cidade já tomou a vacina da gripe",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "marque_consulta",
+   "nome": "Marque sua consulta",
+   "padroes": {
+    "titulo": "Marque sua consulta",
+    "contato": "(11) 90000-0000",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#35d3a1"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

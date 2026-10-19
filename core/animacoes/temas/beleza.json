@@ -167,6 +167,29 @@
    }
   },
   {
+   "modelo": "tarja_vidro",
+   "id": "tarja_maquiadora_vidro",
+   "nome": "Tarja de vidro da maquiadora",
+   "padroes": {
+    "nome": "Júlia Andrade",
+    "funcao": "Maquiadora profissional",
+    "detalhe": "@julia.make",
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salvar_skincare",
+   "nome": "Salve a rotina",
+   "padroes": {
+    "texto": "Salve sua rotina de skincare",
+    "subtitulo": "manhã e noite",
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

@@ -178,6 +178,28 @@
    }
   },
   {
+   "modelo": "agenda",
+   "id": "roteiro_dia",
+   "nome": "Roteiro do dia",
+   "padroes": {
+    "titulo": "Roteiro em Lisboa",
+    "texto": "09:00 Torre de Belém\n11:00 Pastéis de Belém\n14:00 Alfama\n18:00 Pôr do sol no miradouro",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
+   "modelo": "chamada_salvar",
+   "id": "salvar_roteiro",
+   "nome": "Salve o roteiro",
+   "padroes": {
+    "texto": "Salve para a próxima viagem",
+    "subtitulo": "e marque quem vai com você",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

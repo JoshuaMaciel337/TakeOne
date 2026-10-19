@@ -1,0 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título carimbado",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 3.5,
+ "descricao": "O título cai como um carimbo, inclinado e com a tinta falhada, e a tela treme no impacto.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "APROVADO", "maximo": 18},
+  {"id": "subtitulo", "rotulo": "Linha de baixo (opcional)", "tipo": "texto", "padrao": "qualidade garantida", "maximo": 32},
+  {"id": "cor_1", "rotulo": "Tinta", "tipo": "cor", "padrao": "#ff3b3b"},
+  {"id": "cor_2", "rotulo": "Linha de baixo", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Carimbo: a caixa de borda dupla nasce grande e transparente e bate no lugar em 0,22 s (curva de queda),
+     com um tremor curto logo depois. A tinta falhada é um filtro SVG fixo (ruído com semente) que tira o
+     alfa de pedacinhos, igual em todo quadro. Na saída o carimbo desbota. -->
+<svg width="0" height="0" style="position:absolute"><filter id="tinta" x="-5%" y="-5%" width="110%" height="110%">
+<feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="2" seed="7" result="ruido"/>
+<feColorMatrix in="ruido" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.2 2.55" result="mascara"/>
+<feComposite in="SourceGraphic" in2="mascara" operator="in"/></filter></svg>
+<style>
+.palco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  animation:tremer .32s linear .22s both,sumir .5s ease-in calc(var(--dur) - .5s) forwards}
+.carimbo{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*1.2);max-width:88%;
+  padding:calc(var(--u)*2.4) calc(var(--u)*4.5);border:calc(var(--u)*1.1) double var(--cor-1);border-radius:calc(var(--u)*2.2);
+  color:var(--cor-1);filter:url(#tinta) drop-shadow(0 calc(var(--u)*.4) calc(var(--u)*1.2) rgba(0,0,0,.45));
+  transform:rotate(-7deg);animation:bater .22s cubic-bezier(.55,0,1,.45) both}
+.texto{font-family:Montserrat;font-weight:900;font-size:calc(var(--u)*13);line-height:.95;letter-spacing:.04em;text-transform:uppercase;text-align:center;text-wrap:balance}
+.sub{font-weight:800;font-size:calc(var(--u)*3.4);letter-spacing:.32em;text-transform:uppercase;text-align:center;color:var(--cor-2)}
+.sub:empty{display:none}
+@keyframes bater{from{opacity:0;transform:rotate(-16deg) scale(2.6)}60%{opacity:1}}
+@keyframes tremer{0%{transform:translate(0,0)}20%{transform:translate(calc(var(--u)*-.9),calc(var(--u)*.6))}
+  40%{transform:translate(calc(var(--u)*.7),calc(var(--u)*-.5))}60%{transform:translate(calc(var(--u)*-.4),calc(var(--u)*.3))}
+  80%{transform:translate(calc(var(--u)*.2),0)}100%{transform:translate(0,0)}}
+@keyframes sumir{to{opacity:0;transform:scale(.96)}}
+</style>
+<div class="palco"><div class="carimbo"><div class="texto">{{texto}}</div><div class="sub">{{subtitulo}}</div></div></div>

@@ -99,6 +99,26 @@
    }
   },
   {
+   "modelo": "avaliacao",
+   "id": "nota_filme",
+   "nome": "Nota do filme",
+   "padroes": {
+    "nota": "4,5",
+    "legenda": "nota da crítica"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "estreia_hoje",
+   "nome": "Estreia hoje",
+   "padroes": {
+    "texto": "ESTREIA HOJE",
+    "subtitulo": "em todos os cinemas",
+    "cor_1": "#ffd166",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

@@ -185,6 +185,26 @@
    }
   },
   {
+   "modelo": "avaliacao",
+   "id": "estrelas_restaurante",
+   "nome": "Estrelas do restaurante",
+   "padroes": {
+    "nota": "4,8",
+    "legenda": "2.010 avaliações no delivery"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_restaurante",
+   "nome": "Horário do restaurante",
+   "padroes": {
+    "titulo": "Funcionamento",
+    "texto": "Almoço · 11h30 às 15h\nJantar · 18h30 às 23h\nSegunda · fechado",
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

@@ -1,0 +1,139 @@
+{
+ "nome": "Entregas e logística",
+ "ordem": 44,
+ "versoes": [
+  {
+   "modelo": "rota_mapa",
+   "id": "rota_entrega",
+   "nome": "Rota da entrega",
+   "padroes": {
+    "origem": "Centro de distribuição",
+    "destino": "Sua casa",
+    "detalhe": "entrega no mesmo dia",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "como_funciona_entrega",
+   "nome": "Como funciona",
+   "padroes": {
+    "titulo": "Como funciona",
+    "texto": "Você pede pelo site\nA gente separa em 1 hora\nO motoboy sai na hora\nChega em até 2 horas",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "rastreio",
+   "nome": "Rastreio do pedido",
+   "padroes": {
+    "titulo": "Seu pedido",
+    "texto": "09:12 Pedido confirmado\n09:40 Separado no estoque\n10:05 Saiu para entrega\n11:20 Entregue",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "no_prazo",
+   "nome": "Entregas no prazo",
+   "padroes": {
+    "valor": "98",
+    "legenda": "das entregas chegam antes do prazo",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "pedidos_mes",
+   "nome": "Pedidos no mês",
+   "padroes": {
+    "valor": "12400",
+    "prefixo": "+",
+    "sufixo": "",
+    "legenda": "pedidos entregues este mês",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "entregue",
+   "nome": "Entregue",
+   "padroes": {
+    "texto": "ENTREGUE",
+    "subtitulo": "pedido nº 48213",
+    "cor_1": "#2fbf71",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_entregas",
+   "nome": "Horário das entregas",
+   "padroes": {
+    "titulo": "Entregamos",
+    "texto": "Seg a sáb · 8h às 22h\nDomingo · 10h às 18h\nFrete grátis acima de R$ 99",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "faixa_oferta",
+   "id": "frete_gratis",
+   "nome": "Frete grátis",
+   "padroes": {
+    "texto": "FRETE GRÁTIS",
+    "texto_2": "SÓ HOJE",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_logistica",
+   "nome": "Tarja de gerente",
+   "padroes": {
+    "nome": "Marcos Vieira",
+    "funcao": "Gerente de logística",
+    "detalhe": "",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "atendimento_entrega",
+   "nome": "Atendimento",
+   "padroes": {
+    "titulo": "Dúvidas sobre o pedido?",
+    "contato": "(11) 90000-0000",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "titulo_eco",
+   "id": "rapido",
+   "nome": "Rápido",
+   "padroes": {
+    "texto": "RÁPIDO",
+    "cor_1": "#ffc145",
+    "cor_2": "#ff6b35"
+   }
+  },
+  {
+   "modelo": "transicao_diagonal",
+   "id": "transicao",
+   "nome": "Transição: diagonal",
+   "padroes": {
+    "cor_1": "#ffc145",
+    "cor_2": "#1a1a1a"
+   }
+  }
+ ]
+}

@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Prós e contras",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 6,
+ "descricao": "Duas colunas, uma com os pontos a favor e outra com os contra, que se preenchem alternando.",
+ "campos": [
+  {"id": "titulo_1", "rotulo": "Título da coluna boa", "tipo": "texto", "padrao": "Prós", "maximo": 18},
+  {"id": "texto_1", "rotulo": "Itens bons (um por linha)", "tipo": "linhas", "padrao": "Mais barato\nEntrega rápida\nFácil de usar", "maximo": 120},
+  {"id": "titulo_2", "rotulo": "Título da coluna ruim", "tipo": "texto", "padrao": "Contras", "maximo": 18},
+  {"id": "texto_2", "rotulo": "Itens ruins (um por linha)", "tipo": "linhas", "padrao": "Poucas cores\nSem garantia estendida", "maximo": 120},
+  {"id": "cor_1", "rotulo": "Coluna boa", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Coluna ruim", "tipo": "cor", "padrao": "#ff5a5f"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Prós e contras: as duas colunas sobem juntas; os itens entram um de cada lado, alternando (os da
+     esquerda nos meios segundos pares, os da direita nos ímpares), cada um com o seu sinal (✓ ou ✕) que
+     gira para o lugar. -->
+<style>
+.quadro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*92),92%);display:grid;
+  grid-template-columns:1fr 1fr;gap:calc(var(--u)*2.4);color:var(--cor-texto);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.coluna{display:flex;flex-direction:column;gap:calc(var(--u)*1.4);padding:calc(var(--u)*2.6);border-radius:calc(var(--u)*2.6);
+  background:rgba(14,15,20,.84);border-top:calc(var(--u)*.8) solid var(--c);animation:subir .6s cubic-bezier(.2,.8,.2,1) both}
+.boa{--c:var(--cor-1);--marca:"✓";--d:0s}
+.ruim{--c:var(--cor-2);--marca:"✕";--d:.5s;animation-delay:.1s}
+.cab{font-weight:800;font-size:calc(var(--u)*5.8);letter-spacing:-.02em;color:var(--c);margin-bottom:calc(var(--u)*.4)}
+.linha{display:flex;align-items:flex-start;gap:calc(var(--u)*1.4);font-weight:600;font-size:calc(var(--u)*3.9);line-height:1.25;
+  animation:entrar .45s cubic-bezier(.2,.8,.2,1) calc(.6s + var(--d) + var(--i) * 1s) both}
+.linha::before{content:var(--marca);flex:none;display:grid;place-items:center;width:calc(var(--u)*4);height:calc(var(--u)*4);border-radius:50%;
+  background:var(--c);color:#111;font-weight:900;font-size:calc(var(--u)*2.4);line-height:1;
+  animation:girar .5s cubic-bezier(.3,1.5,.5,1) calc(.7s + var(--d) + var(--i) * 1s) both}
+@keyframes subir{from{opacity:0;transform:translateY(calc(var(--u)*4))}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-2))}}
+@keyframes girar{from{transform:scale(0) rotate(-120deg)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-47%)}}
+</style>
+<div class="quadro"><div class="coluna boa"><div class="cab">{{titulo_1}}</div>{{texto_1:linhas}}</div>
+<div class="coluna ruim"><div class="cab">{{titulo_2}}</div>{{texto_2:linhas}}</div></div>

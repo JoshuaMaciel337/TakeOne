@@ -220,6 +220,28 @@
    }
   },
   {
+   "modelo": "titulo_rolo",
+   "id": "novo_produto",
+   "nome": "Novo e",
+   "padroes": {
+    "texto": "Mais",
+    "palavras": "leve\nrápido\nbonito\nseu",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "chamada_arrastar",
+   "id": "garanta_lancamento",
+   "nome": "Garanta o seu",
+   "padroes": {
+    "texto": "Arraste e garanta o seu",
+    "subtitulo": "pré-venda com 20% de desconto",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

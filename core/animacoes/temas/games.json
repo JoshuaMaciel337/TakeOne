@@ -172,6 +172,34 @@
    }
   },
   {
+   "modelo": "titulo_eco",
+   "id": "eco_game_over",
+   "nome": "Game over em eco",
+   "padroes": {
+    "texto": "GAME OVER",
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff"
+   }
+  },
+  {
+   "modelo": "perfil_cartao",
+   "id": "perfil_streamer",
+   "nome": "Perfil do streamer",
+   "padroes": {
+    "inicial": "Z",
+    "nome": "Zeca Joga",
+    "usuario": "@zecajoga",
+    "numero_1": "1.320",
+    "rotulo_1": "lives",
+    "numero_2": "84 mil",
+    "rotulo_2": "seguidores",
+    "numero_3": "96",
+    "rotulo_3": "seguindo",
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

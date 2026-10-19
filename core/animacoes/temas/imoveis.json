@@ -167,6 +167,29 @@
    }
   },
   {
+   "modelo": "tarja_vidro",
+   "id": "tarja_corretora",
+   "nome": "Tarja de corretora",
+   "padroes": {
+    "nome": "Renata Lima",
+    "funcao": "Corretora de imóveis · CRECI 00000",
+    "detalhe": "",
+    "cor_1": "#35d3a1",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "pros_contras",
+   "id": "casa_apartamento",
+   "nome": "Casa ou apartamento",
+   "padroes": {
+    "titulo_1": "Apartamento",
+    "texto_1": "Portaria e segurança\nLazer no prédio\nMenos manutenção",
+    "titulo_2": "Atenção",
+    "texto_2": "Condomínio mensal\nMenos espaço"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

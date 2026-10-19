@@ -163,6 +163,29 @@
    }
   },
   {
+   "modelo": "pros_contras",
+   "id": "nuvem_comparacao",
+   "nome": "Nuvem ou servidor",
+   "padroes": {
+    "titulo_1": "Nuvem",
+    "texto_1": "Paga só o que usa\nCresce em minutos\nBackup automático",
+    "titulo_2": "Atenção",
+    "texto_2": "Depende da internet\nCusto sobe sem controle"
+   }
+  },
+  {
+   "modelo": "logo_quadrado",
+   "id": "logo_startup",
+   "nome": "Logo de startup",
+   "padroes": {
+    "sigla": "BX",
+    "texto": "Bitex",
+    "slogan": "software sob medida",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

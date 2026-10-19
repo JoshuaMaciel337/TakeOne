@@ -144,6 +144,28 @@
    }
   },
   {
+   "modelo": "agenda",
+   "id": "programa_bazar",
+   "nome": "Programação do bazar",
+   "padroes": {
+    "titulo": "Bazar beneficente",
+    "texto": "09:00 Abertura\n11:00 Leilão de quadros\n13:00 Almoço comunitário\n16:00 Sorteio",
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e"
+   }
+  },
+  {
+   "modelo": "titulo_rolo",
+   "id": "doe",
+   "nome": "Doe",
+   "padroes": {
+    "texto": "Doe",
+    "palavras": "roupas\nalimentos\ntempo\namor",
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

@@ -119,6 +119,28 @@
    }
   },
   {
+   "modelo": "pros_contras",
+   "id": "piso_comparacao",
+   "nome": "Porcelanato ou laminado",
+   "padroes": {
+    "titulo_1": "Porcelanato",
+    "texto_1": "Resiste à água\nDura décadas\nFácil de limpar",
+    "titulo_2": "Laminado",
+    "texto_2": "Não vai em área molhada\nRisca com facilidade"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "carimbo_obra_entregue",
+   "nome": "Carimbo de obra entregue",
+   "padroes": {
+    "texto": "OBRA ENTREGUE",
+    "subtitulo": "no prazo combinado",
+    "cor_1": "#ffc83d",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

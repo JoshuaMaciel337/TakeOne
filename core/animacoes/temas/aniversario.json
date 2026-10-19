@@ -194,6 +194,28 @@
    }
   },
   {
+   "modelo": "titulo_rolo",
+   "id": "parabens_para",
+   "nome": "Parabéns para",
+   "padroes": {
+    "texto": "Parabéns,",
+    "palavras": "amiga\nirmã\nparceira\nJu!",
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "programa_festa",
+   "nome": "Programação da festa",
+   "padroes": {
+    "titulo": "A festa",
+    "texto": "19:00 Recepção\n20:00 Jantar\n21:30 Parabéns\n22:00 Pista aberta",
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

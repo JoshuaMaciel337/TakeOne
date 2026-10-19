@@ -121,6 +121,26 @@
    }
   },
   {
+   "modelo": "horario",
+   "id": "cartao_horario_loja",
+   "nome": "Cartão de horário da loja",
+   "padroes": {
+    "titulo": "Loja aberta",
+    "texto": "Seg a sáb · 9h às 21h\nDomingo · 14h às 20h\nFeriados · 10h às 18h",
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "estrelas_loja",
+   "nome": "Estrelas da loja",
+   "padroes": {
+    "nota": "4,7",
+    "legenda": "5.300 compras avaliadas"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

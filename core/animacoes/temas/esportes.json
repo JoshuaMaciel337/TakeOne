@@ -201,6 +201,28 @@
    }
   },
   {
+   "modelo": "titulo_carimbo",
+   "id": "campeao",
+   "nome": "Campeão",
+   "padroes": {
+    "texto": "CAMPEÃO",
+    "subtitulo": "temporada 2026",
+    "cor_1": "#ffd166",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "tabela_jogos",
+   "nome": "Tabela de jogos",
+   "padroes": {
+    "titulo": "Jogos do fim de semana",
+    "texto": "09:00 Sub-13\n10:30 Sub-15\n14:00 Sub-17\n16:00 Adulto",
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

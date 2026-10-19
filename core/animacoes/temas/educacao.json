@@ -198,6 +198,28 @@
    }
   },
   {
+   "modelo": "lista_numerada",
+   "id": "metodo_estudo",
+   "nome": "Método de estudo",
+   "padroes": {
+    "titulo": "Estude melhor",
+    "texto": "Leia o capítulo\nResuma com suas palavras\nFaça exercícios\nRevise em 3 dias",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "cronograma_aula",
+   "nome": "Cronograma da aula",
+   "padroes": {
+    "titulo": "Aula de hoje",
+    "texto": "19:00 Revisão\n19:20 Conteúdo novo\n20:10 Exercícios\n20:40 Dúvidas",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

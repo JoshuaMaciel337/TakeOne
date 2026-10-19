@@ -1,0 +1,54 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Anéis do centro",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Anéis em cores alternadas crescem do centro até cobrir a tela e depois se abrem num buraco que revela a cena seguinte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Anéis (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Anéis (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Anéis: quatro discos com cores entre as duas do degradê nascem do centro um depois do outro; o último
+     passa da metade da diagonal no meio da duração (tela coberta). Na volta, um buraco cresce do centro
+     em cada disco, do de cima para o de baixo, e a cena nova aparece de dentro para fora. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = 4;
+  const R = Math.hypot(W, H) / 2 + 2;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const meio = dur / 2;
+    ctx.clearRect(0, 0, W, H);
+    for (let i = 0; i < N; i++) {
+      // Os de cima (i maior) nascem depois e abrem primeiro; todos chegam à borda no meio
+      const fora = R * TO.ease.inOutCubic(TO.prog(t, i * 0.07, meio - 0.02));
+      const dentro = R * TO.ease.inOutCubic(TO.prog(t, meio + (N - 1 - i) * 0.07, dur - i * 0.07));
+      if (fora <= dentro) continue;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, fora, 0, 6.2832);
+      if (dentro > 0) ctx.arc(W / 2, H / 2, dentro, 0, 6.2832, true);
+      ctx.fillStyle = TO.mix(C.cor_1, C.cor_2, i / (N - 1));
+      ctx.fill("evenodd");
+    }
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, meio - 0.25, meio - 0.1), 1 - TO.prog(t, meio + 0.05, meio + 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

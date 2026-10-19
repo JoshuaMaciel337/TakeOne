@@ -183,6 +183,27 @@
    }
   },
   {
+   "modelo": "fundo_bokeh",
+   "id": "luzes_natal",
+   "nome": "Luzes de Natal",
+   "padroes": {
+    "titulo": "Feliz Natal",
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_fim_de_ano",
+   "nome": "Horário de fim de ano",
+   "padroes": {
+    "titulo": "Horário especial",
+    "texto": "24/12 · 8h às 14h\n25/12 · fechado\n31/12 · 8h às 14h\n01/01 · fechado",
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

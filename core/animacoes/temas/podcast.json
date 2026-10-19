@@ -224,6 +224,29 @@
    }
   },
   {
+   "modelo": "comentario",
+   "id": "comentario_ouvinte",
+   "nome": "Comentário do ouvinte",
+   "padroes": {
+    "rotulo": "Pergunta de",
+    "usuario": "@ouvinte.fiel",
+    "texto": "Vocês podiam chamar alguém de finanças no próximo episódio!",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "citacao_aspas",
+   "id": "frase_convidado",
+   "nome": "Frase do convidado",
+   "padroes": {
+    "texto": "Ninguém cresce sozinho. A gente cresce junto.",
+    "autor": "convidado do episódio 42",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

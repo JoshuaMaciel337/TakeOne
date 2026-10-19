@@ -242,6 +242,28 @@
    }
   },
   {
+   "modelo": "titulo_carimbo",
+   "id": "preco_baixo",
+   "nome": "Preço baixo",
+   "padroes": {
+    "texto": "PREÇO BAIXO",
+    "subtitulo": "garantido ou devolvemos",
+    "cor_1": "#ffd400",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "chamada_arrastar",
+   "id": "ver_ofertas",
+   "nome": "Ver ofertas",
+   "padroes": {
+    "texto": "Arraste para ver",
+    "subtitulo": "as ofertas da semana",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff7a00"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

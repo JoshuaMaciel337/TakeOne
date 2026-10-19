@@ -102,6 +102,29 @@
    }
   },
   {
+   "modelo": "tarja_vidro",
+   "id": "vidro_advogada",
+   "nome": "Tarja de vidro da advogada",
+   "padroes": {
+    "nome": "Dra. Helena Castro",
+    "funcao": "Advogada trabalhista · OAB 00000",
+    "detalhe": "",
+    "cor_1": "#c79a4b",
+    "cor_2": "#1e3a5f"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "direitos_consumidor",
+   "nome": "Direitos do consumidor",
+   "padroes": {
+    "titulo": "Seus direitos",
+    "texto": "7 dias para desistir online\nGarantia de 90 dias\nPreço da vitrine vale\nNota fiscal sempre",
+    "cor_1": "#c79a4b",
+    "cor_2": "#e8c98f"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

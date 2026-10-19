@@ -342,6 +342,39 @@
    }
   },
   {
+   "modelo": "agenda",
+   "id": "programacao_culto",
+   "nome": "Programação do culto",
+   "padroes": {
+    "titulo": "Culto de domingo",
+    "texto": "09:00 Escola bíblica\n10:30 Louvor\n11:00 Palavra\n12:00 Ceia",
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_cultos",
+   "nome": "Horário dos cultos",
+   "padroes": {
+    "titulo": "Nossos cultos",
+    "texto": "Domingo · 9h e 19h\nQuarta · 20h, oração\nSábado · 17h, jovens",
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
+   "modelo": "citacao_aspas",
+   "id": "versiculo_aspas",
+   "nome": "Versículo em destaque",
+   "padroes": {
+    "texto": "O Senhor é o meu pastor; nada me faltará.",
+    "autor": "Salmos 23:1",
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

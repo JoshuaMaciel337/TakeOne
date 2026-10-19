@@ -130,6 +130,28 @@
    }
   },
   {
+   "modelo": "agenda",
+   "id": "programa_formatura",
+   "nome": "Programação da formatura",
+   "padroes": {
+    "titulo": "Colação de grau",
+    "texto": "18:30 Entrada dos formandos\n19:00 Juramento\n20:00 Entrega dos diplomas\n21:00 Coquetel",
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "formado",
+   "nome": "Formado",
+   "padroes": {
+    "texto": "FORMADO!",
+    "subtitulo": "turma de 2026",
+    "cor_1": "#e8c98f",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

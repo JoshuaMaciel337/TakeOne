@@ -1,0 +1,137 @@
+{
+ "nome": "Odontologia",
+ "ordem": 42,
+ "versoes": [
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_dentista",
+   "nome": "Tarja de dentista",
+   "padroes": {
+    "nome": "Dra. Camila Rocha",
+    "funcao": "Cirurgiã-dentista · CRO 00000",
+    "detalhe": "",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "escovacao",
+   "nome": "Escovação certa",
+   "padroes": {
+    "titulo": "Escovação certa",
+    "texto": "Escova macia\nDois minutos\nFio dental todo dia\nTroque a escova a cada 3 meses",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "clareamento",
+   "nome": "Clareamento",
+   "padroes": {
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "no primeiro dia",
+    "rotulo_depois": "após o clareamento",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_clinica_odonto",
+   "nome": "Avaliação da clínica",
+   "padroes": {
+    "nota": "4,9",
+    "legenda": "1.180 avaliações de pacientes"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_clinica_odonto",
+   "nome": "Horário da clínica",
+   "padroes": {
+    "titulo": "Atendimento",
+    "texto": "Seg a sex · 8h às 20h\nSábado · 8h às 12h\nUrgência · 24 horas",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "agende_consulta_odonto",
+   "nome": "Agende sua consulta",
+   "padroes": {
+    "titulo": "Agende sua avaliação",
+    "contato": "(21) 90000-0000",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "mito_verdade",
+   "nome": "Mito ou verdade",
+   "padroes": {
+    "pergunta": "Escovar com força deixa o dente mais limpo?",
+    "resposta": "Mito. Força demais desgasta o esmalte e machuca a gengiva. O certo é escova macia e movimento suave.",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_sorriso",
+   "nome": "Dica do sorriso",
+   "padroes": {
+    "rotulo": "Dica",
+    "texto": "Beba água depois do café: diminui as manchas e ajuda a proteger o esmalte.",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "prevencao",
+   "nome": "Prevenção",
+   "padroes": {
+    "valor": "90",
+    "legenda": "das cáries podem ser evitadas com prevenção",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "logo_quadrado",
+   "id": "logo_clinica_odonto",
+   "nome": "Logo da clínica",
+   "padroes": {
+    "sigla": "SO",
+    "texto": "Sorriso Odonto",
+    "slogan": "clínica odontológica",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "titulo_eco",
+   "id": "sorria",
+   "nome": "Sorria",
+   "padroes": {
+    "texto": "SORRIA",
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  },
+  {
+   "modelo": "transicao_aneis",
+   "id": "transicao",
+   "nome": "Transição: anéis",
+   "padroes": {
+    "cor_1": "#7ad3f0",
+    "cor_2": "#2a9df4"
+   }
+  }
+ ]
+}

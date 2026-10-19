@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Horário de funcionamento",
+ "categoria": "listas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um cartão com o relógio girando os ponteiros, o título e os horários de cada dia.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título", "tipo": "texto", "padrao": "Horário de atendimento", "maximo": 32},
+  {"id": "texto", "rotulo": "Horários (um por linha)", "tipo": "linhas", "padrao": "Seg a sex · 8h às 18h\nSábado · 8h às 13h\nDomingo · fechado", "maximo": 160},
+  {"id": "cor_1", "rotulo": "Relógio (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Relógio (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Horário: o cartão abre de cima para baixo (clip-path); o relógio do canto gira os ponteiros uma volta
+     e meia até parar, e as linhas dos horários entram uma a uma, separadas por um fio fino. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*80),88%);padding:calc(var(--u)*3.4);
+  border-radius:calc(var(--u)*3);background:rgba(14,15,20,.86);color:var(--cor-texto);box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.3);
+  animation:abrir .7s cubic-bezier(.65,0,.35,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.topo{display:flex;align-items:center;gap:calc(var(--u)*2.4);margin-bottom:calc(var(--u)*2)}
+.relogio{flex:none;position:relative;width:calc(var(--u)*10);height:calc(var(--u)*10);border-radius:50%;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));animation:pular .6s cubic-bezier(.3,1.5,.5,1) .3s both}
+.relogio i{position:absolute;left:50%;bottom:50%;width:calc(var(--u)*.7);margin-left:calc(var(--u)*-.35);border-radius:calc(var(--u)*.35);background:#fff;transform-origin:50% 100%}
+.horas{height:28%;animation:horas 1.6s cubic-bezier(.3,0,.2,1) .4s both}
+.minutos{height:38%;animation:minutos 1.6s cubic-bezier(.3,0,.2,1) .4s both}
+.relogio::after{content:"";position:absolute;left:50%;top:50%;width:calc(var(--u)*1.4);height:calc(var(--u)*1.4);margin:calc(var(--u)*-.7) 0 0 calc(var(--u)*-.7);border-radius:50%;background:#fff}
+.titulo{font-weight:800;font-size:calc(var(--u)*5);letter-spacing:-.02em;line-height:1.1;animation:entrar .5s ease-out .35s both}
+.linha{display:block;padding:calc(var(--u)*1.5) 0;border-top:calc(var(--u)*.15) solid rgba(255,255,255,.14);font-weight:600;font-size:calc(var(--u)*3.8);
+  animation:entrar .5s cubic-bezier(.2,.8,.2,1) calc(.7s + var(--i) * .35s) both}
+@keyframes abrir{from{clip-path:inset(0 0 100% 0 round calc(var(--u)*3))}to{clip-path:inset(0 0 0 0 round calc(var(--u)*3))}}
+@keyframes pular{from{transform:scale(0)}}
+@keyframes horas{from{transform:rotate(-360deg)}to{transform:rotate(60deg)}}
+@keyframes minutos{from{transform:rotate(-1080deg)}to{transform:rotate(0)}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-2.5))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="cartao"><div class="topo"><div class="relogio"><i class="horas"></i><i class="minutos"></i></div><div class="titulo">{{titulo}}</div></div>
+{{texto:linhas}}</div>

@@ -183,6 +183,27 @@
    }
   },
   {
+   "modelo": "horario",
+   "id": "horario_academia",
+   "nome": "Horário da academia",
+   "padroes": {
+    "titulo": "Academia aberta",
+    "texto": "Seg a sex · 5h às 23h\nSábado · 8h às 18h\nDomingo · 8h às 13h",
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1"
+   }
+  },
+  {
+   "modelo": "titulo_eco",
+   "id": "foco",
+   "nome": "Foco",
+   "padroes": {
+    "texto": "FOCO",
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

@@ -138,6 +138,27 @@
    }
   },
   {
+   "modelo": "fundo_formas",
+   "id": "formas_infantil",
+   "nome": "Formas coloridas",
+   "padroes": {
+    "titulo": "Hora de brincar",
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "rotina_crianca",
+   "nome": "Rotina da criança",
+   "padroes": {
+    "titulo": "Rotina da manhã",
+    "texto": "Escovar os dentes\nTomar café\nArrumar a mochila\nIr para a escola",
+    "cor_1": "#ffd166",
+    "cor_2": "#ff8fab"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

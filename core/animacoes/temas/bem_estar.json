@@ -1,0 +1,139 @@
+{
+ "nome": "Bem-estar e yoga",
+ "ordem": 40,
+ "versoes": [
+  {
+   "modelo": "citacao_aspas",
+   "id": "frase_calma",
+   "nome": "Frase de calma",
+   "padroes": {
+    "texto": "Inspire o que acalma, solte o que pesa.",
+    "autor": "prática de respiração",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "respiracao",
+   "nome": "Respiração 4-7-8",
+   "padroes": {
+    "titulo": "Respiração 4-7-8",
+    "texto": "Inspire por 4 segundos\nSegure por 7\nSolte por 8\nRepita 4 vezes",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_aulas_yoga",
+   "nome": "Horário das aulas",
+   "padroes": {
+    "titulo": "Aulas de yoga",
+    "texto": "Seg e qua · 7h e 19h\nTer e qui · 12h\nSábado · 9h ao ar livre",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "tarja_vidro",
+   "id": "tarja_instrutora",
+   "nome": "Tarja de instrutora",
+   "padroes": {
+    "nome": "Luana Prado",
+    "funcao": "Instrutora de yoga e meditação",
+    "detalhe": "@luana.respira",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "contagem_regressiva",
+   "id": "pausa",
+   "nome": "Pausa de 5",
+   "padroes": {
+    "de": "5",
+    "final": "Respire",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "fundo_bokeh",
+   "id": "luzes_calmas",
+   "nome": "Luzes calmas",
+   "padroes": {
+    "titulo": "Meditação guiada",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "progresso_anel",
+   "id": "meta_meditacao",
+   "nome": "Meta de meditação",
+   "padroes": {
+    "valor": "70",
+    "legenda": "dos 30 dias de meditação concluídos",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "titulo_rolo",
+   "id": "momento_para",
+   "nome": "Um momento para",
+   "padroes": {
+    "texto": "Um momento para",
+    "palavras": "respirar\nalongar\nvocê",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_sono",
+   "nome": "Dica de sono",
+   "padroes": {
+    "rotulo": "Para dormir melhor",
+    "texto": "Deixe o celular longe da cama e escureça o quarto meia hora antes de deitar.",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "retiro",
+   "nome": "Retiro",
+   "padroes": {
+    "dia": "18",
+    "mes": "MAI",
+    "titulo": "Retiro de fim de semana",
+    "hora": "Sexta às 18h",
+    "local": "Sítio Vale Verde, Atibaia",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "agende_aula",
+   "nome": "Agende uma aula",
+   "padroes": {
+    "titulo": "Agende sua aula grátis",
+    "contato": "(11) 90000-0000",
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  },
+  {
+   "modelo": "transicao_circulo",
+   "id": "transicao",
+   "nome": "Transição: círculo",
+   "padroes": {
+    "cor_1": "#c3b1e1",
+    "cor_2": "#7fb7be"
+   }
+  }
+ ]
+}

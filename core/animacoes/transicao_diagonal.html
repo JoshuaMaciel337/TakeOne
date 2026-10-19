@@ -1,0 +1,64 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Diagonal em duas cores",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Duas lâminas em diagonal, uma de cada cor, varrem a tela de um canto ao outro. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Primeira lâmina", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Segunda lâmina", "tipo": "cor", "padrao": "#16171c"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Diagonal: as lâminas são faixas a 45°, medidas ao longo do eixo que sai do canto de baixo à esquerda
+     para o de cima à direita. A primeira avança na
+     frente e a segunda logo atrás; no meio da duração a segunda cobre tudo, e as duas continuam e saem
+     pelo canto oposto, a primeira por último. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  // Medido a 45° a partir do canto de baixo à esquerda, o quadro vai de 0 a (W + H) / √2: d vai de 0 a L
+  const L = W + H;
+
+  function faixa(a, b, cor) {
+    // Pinta a região a <= d <= b, com d medido na direção perpendicular às bordas da lâmina
+    if (b <= a) return;
+    ctx.save();
+    ctx.translate(0, H);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = cor;
+    ctx.fillRect(a / Math.SQRT2, -L, (b - a) / Math.SQRT2, L * 2);
+    ctx.restore();
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const meio = dur / 2;
+    const e = TO.ease.inOutCubic;
+    // Bordas da frente (entrada) e de trás (saída) de cada lâmina, em unidades de L
+    const f1 = e(TO.prog(t, 0, meio - 0.06));
+    const f2 = e(TO.prog(t, 0.08, meio));
+    const s2 = e(TO.prog(t, meio, dur - 0.08));
+    const s1 = e(TO.prog(t, meio + 0.06, dur));
+    faixa(Math.max(s1, f2) * L, f1 * L + 1, C.cor_1);
+    faixa(s2 * L, f2 * L + 1, C.cor_2);
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, meio - 0.25, meio - 0.1), 1 - TO.prog(t, meio + 0.1, meio + 0.25));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

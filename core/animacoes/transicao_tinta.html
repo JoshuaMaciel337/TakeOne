@@ -1,0 +1,89 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Mancha de tinta",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.6,
+ "tela_cheia": true,
+ "descricao": "Uma mancha de tinta de borda ondulada se espalha de um canto até cobrir a tela e escorre para o outro lado. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Tinta (borda)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_2", "rotulo": "Tinta (miolo)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Tinta: a mancha é um contorno polar de um quarto de volta, com 160 pontos, centrado no canto de baixo
+     à esquerda; o raio varia com um ruído suave (TO.noise, fixo para o mesmo ângulo e instante) de no
+     máximo 17%, por isso ele vai a 1,2 diagonal e cobre o canto oposto no meio da duração; na volta, uma segunda mancha "vazia" (o buraco) nasce no mesmo canto e
+     cresce igual, então a cena nova aparece pelo mesmo lado por onde a tinta chegou. Respingos pequenos
+     acompanham a borda. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const D = Math.hypot(W, H);
+  const N = 160;
+
+  // Um quarto de volta basta (a mancha nasce no canto), com folga dos dois lados para a borda não aparecer
+  function mancha(r, t, semente) {
+    for (let i = 0; i <= N; i++) {
+      const a = -0.2 + (i / N) * (Math.PI / 2 + 0.4);
+      const onda = TO.noise(i * 0.09 + semente, semente) * 0.12 + TO.noise(i * 0.31 + t * 2, semente + 5) * 0.05;
+      const rr = Math.max(0, r * (1 + onda));
+      ctx.lineTo(Math.cos(a) * rr, -Math.sin(a) * rr);
+    }
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const meio = dur / 2;
+    ctx.clearRect(0, 0, W, H);
+    const fora = D * 1.2 * TO.ease.inOutCubic(TO.prog(t, 0, meio));
+    const dentro = D * 1.2 * TO.ease.inOutCubic(TO.prog(t, meio, dur));
+    if (fora > dentro) {
+      ctx.save();
+      ctx.translate(0, H);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      mancha(fora, t, 3);
+      if (dentro > 0) {
+        ctx.moveTo(0, 0);
+        mancha(dentro, t, 11);
+      }
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(fora, 1));
+      g.addColorStop(0, C.cor_2);
+      g.addColorStop(0.75, C.cor_2);
+      g.addColorStop(1, C.cor_1);
+      ctx.fillStyle = g;
+      ctx.fill("evenodd");
+      // Respingos na frente da borda, só na ida
+      if (fora < D * 1.15 && dentro === 0) {
+        ctx.fillStyle = C.cor_1;
+        for (let k = 0; k < 14; k++) {
+          const a = (TO.hash(k, 4) * 0.5) * Math.PI;
+          const r = fora * (1.08 + TO.hash(k, 9) * 0.12);
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * r, -Math.sin(a) * r, (0.6 + TO.hash(k, 2) * 1.6) * u, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, meio - 0.25, meio - 0.1), 1 - TO.prog(t, meio + 0.05, meio + 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

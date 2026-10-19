@@ -1,0 +1,37 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título em eco",
+ "categoria": "titulos",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "O título cheio na frente e cópias só com o contorno atrás, que se abrem para cima e para baixo como um eco.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "SEM LIMITES", "maximo": 20},
+  {"id": "cor_1", "rotulo": "Eco de cima", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Eco de baixo", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Eco: o título cheio fica no meio e quatro cópias com só o contorno (text-stroke) nascem atrás dele e se
+     abrem, duas para cima e duas para baixo, cada vez mais apagadas; na saída elas voltam para dentro do
+     título e tudo desbota. -->
+<style>
+.eco{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;display:grid;place-items:center;
+  font-family:Montserrat;font-weight:900;font-size:calc(var(--u)*11);line-height:1;letter-spacing:-.01em;text-align:center;
+  animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.eco span{grid-area:1/1;text-wrap:balance}
+.cheio{color:var(--cor-texto);text-shadow:0 calc(var(--u)*.4) calc(var(--u)*2) rgba(0,0,0,.45);animation:entrar .55s cubic-bezier(.2,.8,.2,1) both}
+.copia{color:transparent;-webkit-text-stroke:calc(var(--u)*.38) var(--cor);opacity:var(--o);
+  animation:abrir .7s cubic-bezier(.2,.8,.2,1) calc(.3s + var(--k) * .08s) both,fechar .4s ease-in calc(var(--dur) - .9s) forwards}
+.c1{--cor:var(--cor-1);--y:-1;--k:1;--o:1}
+.c2{--cor:var(--cor-1);--y:-2;--k:2;--o:.55}
+.c3{--cor:var(--cor-2);--y:1;--k:1;--o:1}
+.c4{--cor:var(--cor-2);--y:2;--k:2;--o:.55}
+@keyframes abrir{from{transform:translateY(0);opacity:0}to{transform:translateY(calc(var(--y) * .9em))}}
+@keyframes fechar{from{transform:translateY(calc(var(--y) * .9em))}to{transform:translateY(0);opacity:0}}
+@keyframes entrar{from{opacity:0;transform:scale(1.25)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
+</style>
+<div class="eco"><span class="copia c2">{{texto}}</span><span class="copia c4">{{texto}}</span><span class="copia c1">{{texto}}</span>
+<span class="copia c3">{{texto}}</span><span class="cheio">{{texto}}</span></div>

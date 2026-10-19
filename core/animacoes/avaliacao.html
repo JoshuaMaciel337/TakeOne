@@ -1,0 +1,94 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Avaliação em estrelas",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "A nota sobe até o valor e cinco estrelas se enchem até ela, com o número de avaliações embaixo.",
+ "campos": [
+  {"id": "nota", "rotulo": "Nota (de 0 a 5)", "tipo": "texto", "padrao": "4,9", "maximo": 4},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "2.341 avaliações de clientes", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Estrelas (início)", "tipo": "cor", "padrao": "#ffd25a"},
+  {"id": "cor_2", "rotulo": "Estrelas (fim)", "tipo": "cor", "padrao": "#ffa62b"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Avaliação: a nota (com vírgula ou ponto) é lida do campo e limitada a 0–5. O número conta até ela com
+     uma casa decimal e as estrelas se enchem da esquerda para a direita no mesmo ritmo; cada estrela que
+     completa dá um pulo de mola. A última estrela fica cheia só até a fração da nota. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const lida = parseFloat(String(C.nota).replace(",", "."));
+  const nota = Math.min(5, Math.max(0, isFinite(lida) ? lida : 5));
+  const virgula = String(C.nota).includes(",");
+
+  function estrela(cx, cy, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.4, 0.45, dur);
+    const k = TO.ease.outCubic(TO.prog(t, 0.35, 2.1));
+    const atual = nota * k;
+    ctx.save();
+    ctx.globalAlpha = env;
+    ctx.translate(W / 2, H / 2 + (1 - TO.ease.outCubic(TO.prog(t, 0, 0.5))) * 4 * u);
+    // Cartão escuro atrás
+    const largura = Math.min(W * 0.86, 78 * u);
+    TO.retangulo(ctx, -largura / 2, -21 * u, largura, 42 * u, 4 * u);
+    ctx.fillStyle = "rgba(14,15,20,.86)";
+    ctx.fill();
+    // A nota
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    let texto = atual.toFixed(1);
+    if (virgula) texto = texto.replace(".", ",");
+    ctx.font = TO.fonte(900, 15, "Montserrat");
+    ctx.fillStyle = C.cor_texto;
+    ctx.fillText(texto, 0, -3 * u);
+    // As estrelas
+    const r = Math.min(5.2 * u, (largura * 0.8) / 10);
+    const passo = r * 2.3;
+    for (let i = 0; i < 5; i++) {
+      const cx = (i - 2) * passo;
+      const cy = 6.5 * u;
+      const cheia = TO.clamp(atual - i);
+      const pulo = cheia >= 1 ? TO.spring(t - (0.35 + 1.75 * ((i + 1) / Math.max(nota, 0.01))), 0.35, 3) : 0;
+      const escala = 1 + 0.25 * (1 - Math.abs(1 - pulo)) * (pulo > 0 ? 1 : 0);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(escala, escala);
+      estrela(0, 0, r);
+      ctx.fillStyle = "rgba(255,255,255,.18)";
+      ctx.fill();
+      if (cheia > 0) {
+        ctx.save();
+        estrela(0, 0, r);
+        ctx.clip();
+        ctx.fillStyle = TO.degrade(ctx, -r, -r, r, r);
+        ctx.fillRect(-r, -r, 2 * r * cheia, 2 * r);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    // A legenda
+    ctx.globalAlpha = env * TO.prog(t, 0.9, 1.4);
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(600, TO.caber(ctx, C.legenda, 600, 3.6, largura * 0.88));
+    ctx.fillText(C.legenda, 0, 16.5 * u);
+    ctx.restore();
+  };
+})();
+</script>

@@ -94,6 +94,27 @@
    }
   },
   {
+   "modelo": "grafico_pontos",
+   "id": "agua_corpo",
+   "nome": "Água no corpo",
+   "padroes": {
+    "valor": "60",
+    "legenda": "do corpo humano adulto é água",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff"
+   }
+  },
+  {
+   "modelo": "titulo_eco",
+   "id": "eureka",
+   "nome": "Eureka",
+   "padroes": {
+    "texto": "EUREKA!",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#9b8cff"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

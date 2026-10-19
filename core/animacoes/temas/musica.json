@@ -154,6 +154,26 @@
    }
   },
   {
+   "modelo": "titulo_eco",
+   "id": "ao_vivo_eco",
+   "nome": "Show ao vivo",
+   "padroes": {
+    "texto": "AO VIVO",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "fundo_bokeh",
+   "id": "luzes_show",
+   "nome": "Luzes do show",
+   "padroes": {
+    "titulo": "Acústico",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

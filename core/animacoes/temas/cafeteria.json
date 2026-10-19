@@ -1,0 +1,138 @@
+{
+ "nome": "Cafeteria e confeitaria",
+ "ordem": 43,
+ "versoes": [
+  {
+   "modelo": "cardapio",
+   "id": "menu_cafe",
+   "nome": "Menu do café",
+   "padroes": {
+    "titulo": "Cafés da casa",
+    "texto": "Espresso: R$ 7\nCappuccino: R$ 12\nLatte de baunilha: R$ 14\nCafé coado: R$ 9",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_cafe",
+   "nome": "Horário da cafeteria",
+   "padroes": {
+    "titulo": "Estamos abertos",
+    "texto": "Seg a sex · 7h às 19h\nSábado · 8h às 18h\nDomingo · 9h às 14h",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "titulo_rolo",
+   "id": "cafe_para",
+   "nome": "Café para",
+   "padroes": {
+    "texto": "Café para",
+    "palavras": "acordar\ntrabalhar\nconversar\nagora",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_cafe",
+   "nome": "Avaliação da cafeteria",
+   "padroes": {
+    "nota": "4,8",
+    "legenda": "o melhor pão de queijo do bairro"
+   }
+  },
+  {
+   "modelo": "preco_oferta",
+   "id": "combo_cafe",
+   "nome": "Combo do café",
+   "padroes": {
+    "produto": "Café + pão de queijo",
+    "de": "R$ 16",
+    "por": "R$ 11",
+    "selo": "-30%",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "receita_bolo",
+   "nome": "Receita de bolo",
+   "padroes": {
+    "titulo": "Bolo de caneca",
+    "texto": "4 colheres de farinha\n3 de açúcar e 2 de cacau\n1 ovo e 3 de leite\n2 minutos no micro-ondas",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "logo_brilho",
+   "id": "logo_confeitaria",
+   "nome": "Logo da confeitaria",
+   "padroes": {
+    "texto": "DOCE GRÃO",
+    "slogan": "café e confeitaria",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_doce",
+   "nome": "Qual doce",
+   "padroes": {
+    "pergunta": "Qual doce entra no cardápio?",
+    "opcao_1": "Torta de limão",
+    "pct_1": "55",
+    "opcao_2": "Brownie",
+    "pct_2": "45",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "fresquinho",
+   "nome": "Saiu do forno",
+   "padroes": {
+    "texto": "SAIU DO FORNO",
+    "subtitulo": "pão quentinho às 16h",
+    "cor_1": "#a0522d",
+    "cor_2": "#f2c08a"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "encomendas",
+   "nome": "Encomendas",
+   "padroes": {
+    "titulo": "Encomende seu bolo",
+    "contato": "(31) 90000-0000",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "bolhas",
+   "id": "vapor_cafe",
+   "nome": "Bolhas",
+   "padroes": {
+    "titulo": "Hora do café",
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  },
+  {
+   "modelo": "transicao_tinta",
+   "id": "transicao",
+   "nome": "Transição: tinta",
+   "padroes": {
+    "cor_1": "#f2c08a",
+    "cor_2": "#a0522d"
+   }
+  }
+ ]
+}

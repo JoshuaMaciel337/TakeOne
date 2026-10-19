@@ -1,0 +1,45 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Marca no quadrado",
+ "categoria": "logos",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Um quadrado se desenha com a sigla dentro, desliza para o lado e o nome completo sai de trás dele.",
+ "campos": [
+  {"id": "sigla", "rotulo": "Sigla", "tipo": "texto", "padrao": "NB", "maximo": 3},
+  {"id": "texto", "rotulo": "Nome", "tipo": "texto", "padrao": "Nova Base", "maximo": 22},
+  {"id": "slogan", "rotulo": "Slogan (opcional)", "tipo": "texto", "padrao": "arquitetura e interiores", "maximo": 34},
+  {"id": "cor_1", "rotulo": "Quadrado (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Quadrado (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Quadrado: o contorno é um retângulo SVG cujo traço se desenha (dashoffset de 400 para 0, com
+     pathLength=400); ele se enche com o degradê, a sigla aparece e o conjunto, centrado, abre espaço
+     para o nome: o bloco do nome cresce de largura 0 até a natural (max-width) e o texto desliza de
+     dentro do quadrado. -->
+<style>
+.marca{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;max-width:92%;color:var(--cor-texto);
+  animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.quadro{position:relative;flex:none;width:calc(var(--u)*18);height:calc(var(--u)*18);display:grid;place-items:center;z-index:1}
+.quadro svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.traco{fill:none;stroke:url(#lg);stroke-width:4;stroke-dasharray:400;stroke-dashoffset:400;animation:desenhar .8s cubic-bezier(.65,0,.35,1) both}
+.fundo{fill:url(#lg);opacity:0;animation:encher .35s ease-out .75s both}
+.sigla{position:relative;font-family:Montserrat;font-weight:900;font-size:calc(var(--u)*8);letter-spacing:-.04em;color:#fff;animation:sigla .5s cubic-bezier(.3,1.5,.5,1) .9s both}
+.abre{overflow:hidden;max-width:0;animation:abrir .8s cubic-bezier(.65,0,.35,1) 1.3s forwards}
+.textos{padding-left:calc(var(--u)*3);white-space:nowrap;animation:deslizar .8s cubic-bezier(.65,0,.35,1) 1.3s both}
+.nome{font-family:Montserrat;font-weight:800;font-size:calc(var(--u)*8);line-height:1;letter-spacing:-.02em;text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.45)}
+.slogan{margin-top:calc(var(--u)*1);font-weight:500;font-size:calc(var(--u)*3);letter-spacing:.16em;text-transform:uppercase;opacity:.8}
+.slogan:empty{display:none}
+@keyframes desenhar{to{stroke-dashoffset:0}}
+@keyframes encher{to{opacity:1}}
+@keyframes sigla{from{opacity:0;transform:scale(.4)}}
+@keyframes abrir{to{max-width:calc(var(--u)*120)}}
+@keyframes deslizar{from{transform:translateX(-100%)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-50%) scale(.95)}}
+</style>
+<div class="marca"><div class="quadro"><svg viewBox="0 0 100 100"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--cor-1)"/>
+<stop offset="1" style="stop-color:var(--cor-2)"/></linearGradient></defs><rect class="fundo" x="2" y="2" width="96" height="96" rx="14"/>
+<rect class="traco" x="2" y="2" width="96" height="96" rx="14" pathLength="400"/></svg><div class="sigla">{{sigla}}</div></div>
+<div class="abre"><div class="textos"><div class="nome">{{texto}}</div><div class="slogan">{{slogan}}</div></div></div></div>

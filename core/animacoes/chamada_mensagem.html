@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Mande uma mensagem",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Um cartão com o ícone de conversa balançando, a chamada e o contato em destaque.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Chamada", "tipo": "texto", "padrao": "Fale com a gente", "maximo": 28},
+  {"id": "contato", "rotulo": "Contato", "tipo": "texto", "padrao": "(11) 90000-0000", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Ícone (início)", "tipo": "cor", "padrao": "#35d3a1"},
+  {"id": "cor_2", "rotulo": "Ícone (fim)", "tipo": "cor", "padrao": "#1fa774"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Mensagem: o cartão escuro entra com mola; o círculo do ícone (um balão de conversa genérico, desenhado
+     aqui em SVG) dá dois balanços, como uma notificação, e três pontinhos de "digitando" piscam dentro dele
+     antes de o contato aparecer. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:calc(var(--u)*3);max-width:90%;
+  padding:calc(var(--u)*2.6) calc(var(--u)*4.6) calc(var(--u)*2.6) calc(var(--u)*2.6);border-radius:calc(var(--u)*3);background:rgba(14,15,20,.88);
+  box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.35);color:var(--cor-texto);
+  animation:entrar .7s cubic-bezier(.3,1.4,.5,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.icone{flex:none;width:calc(var(--u)*15);height:calc(var(--u)*15);border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--cor-1),var(--cor-2));animation:balancar .9s ease-in-out .7s both}
+.icone svg{width:58%;height:58%}
+.ponto{animation:piscar .9s ease-in-out infinite;animation-delay:calc(.2s + var(--k) * .15s)}
+.textos{display:flex;flex-direction:column;gap:calc(var(--u)*.6);min-width:0}
+.titulo{font-weight:600;font-size:calc(var(--u)*4.4);opacity:.85;animation:texto .5s ease-out .35s both}
+.contato{font-weight:800;font-size:calc(var(--u)*6.4);letter-spacing:-.01em;white-space:nowrap;animation:texto .5s cubic-bezier(.2,.8,.2,1) .55s both}
+@keyframes balancar{0%,100%{transform:rotate(0)}15%{transform:rotate(-14deg)}30%{transform:rotate(11deg)}45%{transform:rotate(-8deg)}60%{transform:rotate(5deg)}75%{transform:rotate(-2deg)}}
+@keyframes piscar{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}}
+@keyframes texto{from{opacity:0;transform:translateX(calc(var(--u)*-2))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-44%) scale(.95)}}
+</style>
+<div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M12 3C6.5 3 2.5 6.6 2.5 11c0 2.3 1.1 4.3 2.9 5.8L4.6 21l4.3-2.3c1 .3 2 .4 3.1.4 5.5 0 9.5-3.6 9.5-8.1S17.5 3 12 3z" fill="#fff"/>
+<circle class="ponto" style="--k:0" cx="8" cy="11" r="1.4" fill="#222"/><circle class="ponto" style="--k:1" cx="12" cy="11" r="1.4" fill="#222"/>
+<circle class="ponto" style="--k:2" cx="16" cy="11" r="1.4" fill="#222"/></svg></div>
+<div class="textos"><div class="titulo">{{titulo}}</div><div class="contato">{{contato}}</div></div></div>

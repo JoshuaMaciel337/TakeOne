@@ -220,6 +220,29 @@
    }
   },
   {
+   "modelo": "logo_quadrado",
+   "id": "logo_consultoria_quadrado",
+   "nome": "Logo no quadrado",
+   "padroes": {
+    "sigla": "AV",
+    "texto": "Avante",
+    "slogan": "consultoria empresarial",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "clientes_voltam",
+   "nome": "Clientes que voltam",
+   "padroes": {
+    "valor": "73",
+    "legenda": "dos clientes voltam no mesmo mês",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

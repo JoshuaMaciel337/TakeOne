@@ -1,0 +1,38 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Arraste para cima",
+ "categoria": "chamadas",
+ "motor": "css",
+ "duracao": 4,
+ "descricao": "Setas que sobem em sequência sobre uma pílula com a chamada, no pé do vídeo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Chamada", "tipo": "texto", "padrao": "Arraste para cima", "maximo": 28},
+  {"id": "subtitulo", "rotulo": "Linha de baixo (opcional)", "tipo": "texto", "padrao": "e veja a oferta completa", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Setas e pílula (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Setas e pílula (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Arrastar: três divisas (chevrons) acendem de baixo para cima em ciclo de 1,2 s, uma onda contínua que
+     chama o dedo; a pílula da chamada sobe do pé com mola e a linha de baixo aparece depois. -->
+<style>
+.chamada{position:absolute;left:50%;bottom:calc(var(--u)*8);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
+  gap:calc(var(--u)*1.4);width:90%;color:var(--cor-texto);animation:entrar .7s cubic-bezier(.3,1.4,.5,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.setas{display:flex;flex-direction:column-reverse;align-items:center}
+.seta{width:calc(var(--u)*8.5);height:calc(var(--u)*3.6);margin-top:calc(var(--u)*-1);background:linear-gradient(90deg,var(--cor-1),var(--cor-2));
+  clip-path:polygon(0 100%,50% 0,100% 100%,82% 100%,50% 36%,18% 100%);opacity:.3;
+  animation:acender 1.2s ease-in-out calc(.5s + var(--k) * .18s) infinite}
+.s1{--k:0}.s2{--k:1}.s3{--k:2}
+.pilula{padding:calc(var(--u)*1.6) calc(var(--u)*4.4);border-radius:999px;background:linear-gradient(110deg,var(--cor-1),var(--cor-2));
+  font-weight:800;font-size:calc(var(--u)*5.4);letter-spacing:-.01em;text-align:center;box-shadow:0 calc(var(--u)*.8) calc(var(--u)*3) rgba(0,0,0,.3)}
+.sub{font-weight:600;font-size:calc(var(--u)*3.6);text-align:center;text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1.2) rgba(0,0,0,.6);
+  animation:aparecer .5s ease-out .6s both}
+.sub:empty{display:none}
+@keyframes acender{0%,100%{opacity:.25;transform:translateY(0)}35%{opacity:1;transform:translateY(calc(var(--u)*-.8))}}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,calc(var(--u)*10))}}
+@keyframes aparecer{from{opacity:0}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,calc(var(--u)*6))}}
+</style>
+<div class="chamada"><div class="setas"><div class="seta s1"></div><div class="seta s2"></div><div class="seta s3"></div></div>
+<div class="pilula">{{texto}}</div><div class="sub">{{subtitulo}}</div></div>

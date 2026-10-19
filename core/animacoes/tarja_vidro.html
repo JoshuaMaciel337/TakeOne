@@ -1,0 +1,40 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja de vidro",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 5,
+ "descricao": "Um cartão translúcido, como vidro fosco, entra desfocado e fica nítido com o nome, a função e um detalhe.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Marina Lopes", "maximo": 30},
+  {"id": "funcao", "rotulo": "Função", "tipo": "texto", "padrao": "Fundadora do Estúdio Lume", "maximo": 40},
+  {"id": "detalhe", "rotulo": "Detalhe (opcional)", "tipo": "texto", "padrao": "@estudiolume", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Barra (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Barra (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Vidro: o cartão é branco a 14% com uma borda clara e um brilho em diagonal; entra da esquerda desfocado
+     (filter blur) e fica nítido. A barra de cor do lado cresce de cima para baixo e os textos entram em
+     sequência. Na saída, o cartão volta a desfocar e some para a esquerda. -->
+<style>
+.cartao{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*10);max-width:84%;display:flex;gap:calc(var(--u)*2.2);
+  padding:calc(var(--u)*2.2) calc(var(--u)*3.4) calc(var(--u)*2.2) calc(var(--u)*2.2);border-radius:calc(var(--u)*2.4);
+  background:linear-gradient(135deg,rgba(255,255,255,.26),rgba(255,255,255,.08) 55%,rgba(255,255,255,.14));
+  border:calc(var(--u)*.18) solid rgba(255,255,255,.38);box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.28);
+  color:var(--cor-texto);animation:entrar .8s cubic-bezier(.2,.8,.2,1) both,sair .55s cubic-bezier(.6,0,.8,.3) calc(var(--dur) - .55s) forwards}
+.barra{flex:none;width:calc(var(--u)*1);border-radius:calc(var(--u)*.4);background:linear-gradient(180deg,var(--cor-1),var(--cor-2));
+  transform-origin:50% 0;animation:crescer .6s cubic-bezier(.65,0,.35,1) .35s both}
+.textos{display:flex;flex-direction:column;gap:calc(var(--u)*.5);min-width:0;text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1) rgba(0,0,0,.35)}
+.nome{font-weight:800;font-size:calc(var(--u)*6.6);letter-spacing:-.02em;animation:texto .55s cubic-bezier(.2,.8,.2,1) .5s both}
+.funcao{font-weight:500;font-size:calc(var(--u)*3.9);opacity:.9;animation:texto .55s cubic-bezier(.2,.8,.2,1) .62s both}
+.detalhe{font-weight:700;font-size:calc(var(--u)*3.3);color:var(--cor-1);filter:brightness(1.25);animation:texto .55s cubic-bezier(.2,.8,.2,1) .74s both}
+.detalhe:empty{display:none}
+@keyframes entrar{from{opacity:0;filter:blur(calc(var(--u)*1.6));transform:translateX(calc(var(--u)*-8))}}
+@keyframes sair{to{opacity:0;filter:blur(calc(var(--u)*1.6));transform:translateX(calc(var(--u)*-6))}}
+@keyframes crescer{from{transform:scaleY(0)}}
+@keyframes texto{from{opacity:0;transform:translateY(calc(var(--u)*1.6))}}
+</style>
+<div class="cartao"><div class="barra"></div><div class="textos"><div class="nome">{{nome}}</div><div class="funcao">{{funcao}}</div>
+<div class="detalhe">{{detalhe}}</div></div></div>

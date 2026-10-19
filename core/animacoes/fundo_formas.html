@@ -1,0 +1,104 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Formas flutuando",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Círculos, triângulos, cruzes e ondinhas em contorno flutuando e girando devagar, no estilo de um fundo de apresentação.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "", "maximo": 26},
+  {"id": "cor_1", "rotulo": "Formas (uma cor)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Formas (outra cor)", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Formas: até 24 formas sorteadas com semente, espalhadas numa grade com desvio (para não embolar), cada uma
+     com um tipo, tamanho, cor, giro e um balanço próprio em x e y (senos). Elas nascem com mola em ordem
+     sorteada e somem encolhendo no fim. O meio do quadro fica mais vazio, para o título. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const rnd = TO.rng(53);
+  const colunas = W > H ? 6 : 4;
+  const linhas = W > H ? 4 : 6;
+  const formas = [];
+  for (let i = 0; i < colunas; i++) {
+    for (let j = 0; j < linhas; j++) {
+      const x = (i + 0.2 + rnd() * 0.6) / colunas;
+      const y = (j + 0.2 + rnd() * 0.6) / linhas;
+      // Deixa um respiro no meio
+      if (Math.abs(x - 0.5) < 0.18 && Math.abs(y - 0.5) < 0.14) continue;
+      formas.push({
+        x, y, tipo: Math.floor(rnd() * 5), r: (2.6 + rnd() * 2.6) * u, cor: rnd() < 0.5 ? C.cor_1 : C.cor_2,
+        giro: (rnd() - 0.5) * 1.4, ax: (1 + rnd() * 2) * u, ay: (1 + rnd() * 2) * u, fase: rnd() * 6.28,
+        nasce: 0.1 + rnd() * 0.9, a0: rnd() * 6.28,
+      });
+    }
+  }
+
+  function desenhar(f) {
+    const r = f.r;
+    ctx.beginPath();
+    if (f.tipo === 0) ctx.arc(0, 0, r, 0, 6.2832);
+    else if (f.tipo === 1) {
+      for (let k = 0; k < 3; k++) {
+        const a = -Math.PI / 2 + (k * 2 * Math.PI) / 3;
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+    } else if (f.tipo === 2) {
+      ctx.moveTo(-r, 0);
+      ctx.lineTo(r, 0);
+      ctx.moveTo(0, -r);
+      ctx.lineTo(0, r);
+    } else if (f.tipo === 3) {
+      for (let k = 0; k <= 24; k++) {
+        const x = -r * 1.3 + (k / 24) * r * 2.6;
+        const y = Math.sin((k / 24) * Math.PI * 3) * r * 0.35;
+        if (k === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    } else ctx.rect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
+    ctx.stroke();
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    ctx.lineWidth = 0.55 * u;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const f of formas) {
+      const entra = TO.spring(t - f.nasce, 0.45, 1.6);
+      const sai = 1 - TO.ease.inBack(TO.prog(t, dur - 0.9 + f.nasce * 0.3, dur - 0.1));
+      const k = Math.max(0, entra * sai);
+      if (k <= 0) continue;
+      ctx.save();
+      ctx.translate(f.x * W + Math.sin(t * 0.7 + f.fase) * f.ax, f.y * H + Math.cos(t * 0.55 + f.fase) * f.ay);
+      ctx.rotate(f.a0 + t * f.giro);
+      ctx.scale(k, k);
+      ctx.strokeStyle = f.cor;
+      ctx.globalAlpha = 0.9;
+      desenhar(f);
+      ctx.restore();
+    }
+    if (C.titulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 0.8, 1.5)) * (1 - TO.prog(t, dur - 0.8, dur - 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.45)";
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 10, W * 0.6, "Montserrat"), "Montserrat");
+      ctx.fillText(C.titulo, W / 2, H / 2);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

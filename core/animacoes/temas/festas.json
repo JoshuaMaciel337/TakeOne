@@ -216,6 +216,27 @@
    }
   },
   {
+   "modelo": "titulo_rolo",
+   "id": "festa_de",
+   "nome": "Noite de",
+   "padroes": {
+    "texto": "Noite de",
+    "palavras": "música\ndança\namigos\nfesta",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "fundo_bokeh",
+   "id": "luzes_festa",
+   "nome": "Luzes da festa",
+   "padroes": {
+    "titulo": "Bem-vindos",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

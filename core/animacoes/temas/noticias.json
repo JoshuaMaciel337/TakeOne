@@ -149,6 +149,29 @@
    }
   },
   {
+   "modelo": "comentario",
+   "id": "pergunta_leitor",
+   "nome": "Pergunta do leitor",
+   "padroes": {
+    "rotulo": "Pergunta de",
+    "usuario": "@leitor.atento",
+    "texto": "O que muda no imposto de renda deste ano?",
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "agenda_do_dia",
+   "nome": "Agenda do dia",
+   "padroes": {
+    "titulo": "Agenda do dia",
+    "texto": "09:00 Votação na Câmara\n11:00 Entrevista coletiva\n15:00 Dados do emprego\n18:00 Jogo da seleção",
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",
