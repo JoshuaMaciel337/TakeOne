@@ -28,6 +28,7 @@ import {
   montarNaLinha,
   colocarLogo,
   trocarMidiaDosClipes,
+  aplicarModelo,
   aplicarMarcaAosTextos,
   type TrechoNaLinha,
   pulsarNoRitmo,
@@ -58,6 +59,7 @@ import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
+import type { PlanoDoModelo } from "./modelos.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
@@ -103,6 +105,7 @@ export type Comando =
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "modelo.aplicar"; parametros: { plano: PlanoDoModelo } }
   | { comando: "clipe.trocarMidia"; parametros: { clipeIds: string[]; midiaId: string } }
   | { comando: "marca.logo"; parametros: { midiaId: string; transformacao: Transformacao } }
   | { comando: "marca.textos"; parametros: { fonteTitulo: FonteTexto; fonteTexto: FonteTexto; cor: string | null } }
@@ -150,6 +153,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.montar": "montar com vários clipes",
   "marca.logo": "pôr o logo",
   "clipe.trocarMidia": "mudar a forma",
+  "modelo.aplicar": "usar o modelo",
   "marca.textos": "aplicar a marca aos textos",
   "linha.pulsarNoRitmo": "pulsar no ritmo",
   "clipe.animar": "mudar a animação",
@@ -239,6 +243,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
+    case "modelo.aplicar":
+      return aplicarModelo(projeto, ctx, parametros.plano);
     case "clipe.trocarMidia":
       return { projeto: trocarMidiaDosClipes(projeto, ctx, parametros.clipeIds, parametros.midiaId) };
     case "marca.logo": {

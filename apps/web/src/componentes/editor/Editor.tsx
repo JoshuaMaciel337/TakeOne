@@ -193,7 +193,28 @@ export function Editor({ projetoId }: { projetoId: string }) {
     pendentes.current.set(midia.id, { clipeIds });
     void biblioteca.recarregar();
   }
+  // Um comando que precisa de várias mídias novas (as formas de um modelo): roda quando todas estão prontas
+  const grupos = useRef<{ ids: string[]; comando: Comando }[]>([]);
+  function executarQuandoProntas(ids: string[], comando: Comando) {
+    if (!ids.length) {
+      executar(comando);
+      return;
+    }
+    grupos.current.push({ ids, comando });
+    void biblioteca.recarregar();
+  }
   const resolverPendentes = useEffectEvent(() => {
+    grupos.current = grupos.current.filter(({ ids, comando }) => {
+      const lista = ids.map((id) => midias.get(id));
+      const comErro = lista.find((midia) => midia?.status === "erro");
+      if (comErro) {
+        mostrarAviso(`"${comErro.nome}" não ficou pronta: ${comErro.erro ?? "erro desconhecido"}`);
+        return false;
+      }
+      if (!lista.every((midia) => midia?.status === "pronta")) return true;
+      executar(comando);
+      return false;
+    });
     for (const [id, acao] of pendentes.current) {
       const midia = midias.get(id);
       if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
@@ -204,7 +225,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
     }
   });
   useEffect(() => {
-    if (pendentes.current.size) resolverPendentes();
+    if (pendentes.current.size || grupos.current.length) resolverPendentes();
   }, [midias]);
 
   const bibliotecaDoEditor = useMemo(
@@ -312,6 +333,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
           aoPedirAnimacao={pedirAnimacao}
+          aoExecutarQuandoProntas={executarQuandoProntas}
           selecionado={selecionado}
           aoPrever={preverDoPainel}
           legendas={{

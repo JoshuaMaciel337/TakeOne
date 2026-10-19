@@ -23,6 +23,7 @@ import { PainelFormas } from "./PainelFormas";
 import { PainelTransicoes } from "./PainelTransicoes";
 import { PainelLegendas, type PropsLegendas } from "./PainelLegendas";
 import { PainelMarca } from "./PainelMarca";
+import { PainelModelos } from "./PainelModelos";
 import { PainelTranscricao } from "./PainelTranscricao";
 import { PainelTexto } from "./PainelTexto";
 
@@ -42,6 +43,8 @@ type Props = {
   aoAdicionarTexto: (texto: Texto) => void;
   /** Uma animação foi pedida: entra no cursor (ou no instante dado) quando ficar pronta. */
   aoPedirAnimacao: (midia: Midia, inicio?: Tick) => void;
+  /** O comando roda quando as mídias dadas (as formas de um modelo) aparecem prontas na biblioteca. */
+  aoExecutarQuandoProntas: (midiaIds: string[], comando: Comando) => void;
   legendas: PropsLegendas;
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
@@ -129,6 +132,7 @@ export function PainelConteudo({
   aoAdicionarMidia,
   aoAdicionarTexto,
   aoPedirAnimacao,
+  aoExecutarQuandoProntas,
   legendas,
   selecionado,
   aoPrever,
@@ -185,6 +189,14 @@ export function PainelConteudo({
           <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
+        ) : ferramenta.id === "modelos" ? (
+          <PainelModelos
+            midias={biblioteca.midias ?? []}
+            proporcao={legendas.projeto.proporcao}
+            aoExecutar={legendas.aoExecutar}
+            aoExecutarQuandoProntas={aoExecutarQuandoProntas}
+            aoAvisar={legendas.aoAvisar}
+          />
         ) : ferramenta.id === "marca" ? (
           <PainelMarca midias={biblioteca.midias ?? []} proporcao={legendas.projeto.proporcao} aoExecutar={legendas.aoExecutar} aoAvisar={legendas.aoAvisar} />
         ) : (

@@ -454,7 +454,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Fica fora do escopo, pelas regras do dono no HolyCut: avatar de IA, dublagem, clonagem de voz e lip-sync.
 
 ### Fase 6: modelos, elementos e marca (2 semanas)
-- Modelos de projeto (os nossos, criados do zero), guardados no formato do projeto, com animações em Lottie.
+- [x] Modelos de projeto (os nossos, criados do zero): nove modelos com cenas, textos, formas, filtros, transições e animações, nas cores do kit de marca.
 - [x] Formas: retângulo, arredondado, elipse, triângulo, estrela, seta, linha, balão e coração, com cor, contorno e proporção (imagens desenhadas no servidor).
 - Adesivos animados (Lottie, pelo `lottie` do EffectCraft). Desenhos próprios ou com licença aberta.
 - Banco de imagens e vídeos da Pixabay, já no HolyCut.

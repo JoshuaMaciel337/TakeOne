@@ -25,6 +25,7 @@ import {
 } from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
+import type { PlanoDoModelo } from "./modelos.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import { duracaoMaximaDaTransicao, type Transicao } from "./transicao.ts";
 import {
@@ -413,6 +414,82 @@ export function trocarMidiaDosClipes(projeto: Projeto, ctx: Contexto, clipeIds: 
     if (!atual?.imagem) throw new ErroEdicao("Só clipes de imagem trocam de imagem.");
     return { ...clipe, midia_id: midiaId, entrada: 0 };
   });
+}
+
+/** Zoom lento das imagens nas cenas de um modelo, para a foto não ficar parada. */
+const ZOOM_LENTO = 1.12;
+
+/**
+ * Põe um modelo de projeto (lib/projeto/modelos.ts) no fim da faixa principal: as cenas com as mídias
+ * escolhidas (o vídeo mais curto que a cena encurta a cena), o filtro, a transição e o zoom lento das
+ * imagens; os textos e as formas no tempo da cena deles, cortados no fim dela. Tudo num passo do desfazer.
+ */
+export function aplicarModelo(projeto: Projeto, ctx: Contexto, plano: PlanoDoModelo): { projeto: Projeto; selecao: string[] } {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");
+  exigirDestravada(principal);
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  let cursor = principal.clipes.reduce((fim, clipe) => Math.max(fim, fimDoClipe(clipe)), 0);
+  let resultado = projeto;
+  const cenas: { inicio: Tick; fim: Tick; id: string }[] = [];
+  for (const cena of plano.cenas) {
+    const info = ctx.midia(cena.midiaId);
+    if (!info?.video) throw new ErroEdicao("Uma das mídias do modelo não está pronta.");
+    const duracao = ajustarAoQuadro(projeto.taxa, Math.min(cena.duracao, info.duracao));
+    if (duracao < quadro) throw new ErroEdicao("Uma das mídias do modelo é curta demais.");
+    const clipe: Clipe = {
+      id: ctx.novoId(),
+      midia_id: cena.midiaId,
+      inicio: cursor,
+      duracao,
+      entrada: 0,
+      velocidade: 1,
+      volume: 1,
+      fade_entrada: 0,
+      fade_saida: 0,
+      transformacao: limitarTransformacao({ ...TRANSFORMACAO_PADRAO, escala: cena.escala }),
+      recorte: RECORTE_PADRAO,
+      ...(cena.filtro ? { cor: { ...COR_PADRAO, filtro: cena.filtro } } : {}),
+      ...(cena.transicao ? { transicao: cena.transicao } : {}),
+      ...(cena.zoomLento ? { keyframes: { escala: [{ t: 0, valor: cena.escala, curva: "linear" as const }, { t: duracao, valor: cena.escala * ZOOM_LENTO, curva: "linear" as const }] } } : {}),
+    };
+    resultado = inserirNaPrincipal(resultado, clipe, Number.MAX_SAFE_INTEGER);
+    cenas.push({ inicio: cursor, fim: cursor + duracao, id: clipe.id });
+    cursor += duracao;
+  }
+  // Textos e formas: no tempo da cena, até o fim dela (ou antes, se o modelo pede)
+  const trecho = (cena: number, de: Tick, ate: Tick | null) => {
+    const alvo = cenas[cena];
+    const inicio = quadroMaisProximo(projeto.taxa, alvo.inicio + de);
+    const fim = Math.min(alvo.fim, ate === null ? alvo.fim : quadroMaisProximo(projeto.taxa, alvo.inicio + ate));
+    return fim - inicio >= quadro ? { inicio, duracao: fim - inicio } : null;
+  };
+  for (const forma of plano.formas) {
+    const tempo = trecho(forma.cena, forma.de, forma.ate);
+    if (!tempo) continue;
+    if (!ctx.midia(forma.midiaId)?.imagem) throw new ErroEdicao("Uma das formas do modelo não está pronta.");
+    const clipe: Clipe = {
+      id: ctx.novoId(),
+      midia_id: forma.midiaId,
+      ...tempo,
+      entrada: 0,
+      velocidade: 1,
+      volume: 1,
+      fade_entrada: 0,
+      fade_saida: 0,
+      transformacao: limitarTransformacao(forma.transformacao),
+      recorte: RECORTE_PADRAO,
+      animacao: forma.animacao ? limitarAnimacoes(forma.animacao, tempo.duracao) : null,
+    };
+    resultado = colocarLivre(resultado, ctx, "video", clipe);
+  }
+  for (const texto of plano.textos) {
+    const tempo = trecho(texto.cena, texto.de, texto.ate);
+    if (!tempo) continue;
+    const clipe = { ...clipeDeTexto(ctx, tempo.inicio, tempo.duracao, texto.texto), transformacao: limitarTransformacao(texto.transformacao), animacao: texto.animacao ? limitarAnimacoes(texto.animacao, tempo.duracao) : null };
+    resultado = colocarLivre(resultado, ctx, "texto", clipe);
+  }
+  return { projeto: finalizar(resultado), selecao: cenas.map((cena) => cena.id) };
 }
 
 export function moverClipe(projeto: Projeto, ctx: Contexto, clipeId: string, destino: DestinoClipe & { inicio: Tick }): Projeto {

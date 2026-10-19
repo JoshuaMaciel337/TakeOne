@@ -43,7 +43,6 @@ export const FERRAMENTAS: Ferramenta[] = [
     id: "modelos",
     nome: "Modelos",
     icone: LayoutTemplate,
-    emBreve: { fase: "Fase 6", descricao: "Projetos prontos para trocar as mídias e os textos: intro, outro, revelação de logo e cortes para redes." },
   },
   {
     id: "elementos",
