@@ -1,0 +1,268 @@
+// As camadas de um instante da linha do tempo, de baixo para cima: o que a prévia desenha e o que a
+// exportação no navegador desenha, pela mesma conta. Sai daqui também a camada no formato do
+// compositor (lib/previa/compositor.ts), com os efeitos do clipe.
+import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
+import { transformacaoAnimada } from "@/lib/projeto/animacao";
+import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, somarAjustes, tabelaDasCurvas } from "@/lib/projeto/cor";
+import {
+  ajustesDoEfeito,
+  brilhoDoEfeito,
+  colunasDoGrao,
+  desfoqueDoEfeito,
+  deslocamentoDoGrao,
+  desvioDeCor,
+  distorcaoDoEfeito,
+  graoDoEfeito,
+  linhasDoEfeito,
+  luzDoEfeito,
+  posicaoDaLuz,
+} from "@/lib/projeto/efeitos";
+import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
+import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
+import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
+import type { Texto } from "@/lib/projeto/texto";
+import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import type { Midia } from "@/lib/tipos";
+
+import type { Camada } from "./compositor";
+import type { ImagemDeTexto } from "./imagensDeTexto";
+
+/** Um clipe de mídia que precisa de uma fonte de quadros agora (o atual ou o próximo da faixa). */
+export type ItemDaPrevia = {
+  chave: string;
+  clipe: Clipe;
+  faixa: Faixa;
+  midia: Midia;
+  ativo: boolean;
+  /** Efeitos das transições sobre este clipe (só na principal, durante a janela delas). */
+  efeitos?: EfeitoDeTransicao[];
+};
+
+/** Uma camada do quadro atual, de baixo para cima. `segundos` é o instante da mídia que aparece agora. */
+export type CamadaNaTela = {
+  chave: string;
+  clipe: Clipe;
+  faixa: Faixa;
+  recorte: Recorte;
+  /** Onde a camada aparece agora, com a animação. */
+  caixa: Caixa;
+  /** Sem a animação: é nela que as alças da prévia mexem. */
+  caixaBase: Caixa;
+  segundos: number;
+  cor: AjustesCor | null;
+  /** A parte do clipe que aparece numa cortina; sem ela, o clipe inteiro. */
+  revelado?: Revelado;
+  /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
+  imagem?: ImageBitmap;
+  /** As letras do texto que aparecem; sem ela, todas. */
+  mascara?: Cortes;
+  /** Sigma do desfoque, em frações da altura do clipe. */
+  desfoque?: number;
+  /** VHS e glitch: o desvio do vermelho e do azul neste quadro, em frações da largura. */
+  desvio?: number;
+  luz?: { forca: number; posicao: number };
+  grao?: { forca: number; colunas: number; deslocamento: [number, number] };
+  /** A tabela das curvas de cor; null sem curvas. */
+  curvas?: Uint8Array | null;
+};
+
+/** O próximo clipe da faixa começa a carregar quando falta isto para ele entrar. */
+export const ANTECEDENCIA = 2 * TICKS_POR_SEGUNDO;
+
+/**
+ * Clipes que precisam de um elemento agora: os que estão sob o cursor e o próximo da mesma faixa,
+ * para ele já estar carregado quando entrar. A chave é faixa + mídia: depois de dividir um clipe, as
+ * duas metades usam o mesmo elemento e o vídeo segue sem engasgar.
+ *
+ * Na principal, com `comTransicoes`, uma transição deixa dois clipes na tela ao mesmo tempo (o que
+ * sai e o que entra). Se os dois são da mesma mídia, o que entra ganha uma chave própria. O som não
+ * usa as janelas das transições: cada clipe soa só entre o começo e o fim dele.
+ */
+export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, comTransicoes = false): ItemDaPrevia[] {
+  const itens: ItemDaPrevia[] = [];
+  for (const faixa of faixas) {
+    const chaves = new Set<string>();
+    const janelas = comTransicoes && faixa.tipo === "principal" ? janelasDaPrincipal(faixa.clipes) : null;
+    const dentro = (clipe: Clipe) => {
+      const janela = janelas?.get(clipe.id);
+      return janela ? janela.inicio <= tempo && tempo < janela.fim : clipe.inicio <= tempo && tempo < fimDoClipe(clipe);
+    };
+    const comecaEm = (clipe: Clipe) => janelas?.get(clipe.id)?.inicio ?? clipe.inicio;
+    const atuais = faixa.clipes.filter(dentro);
+    const proximo = faixa.clipes.find(
+      (clipe) => comecaEm(clipe) > tempo && comecaEm(clipe) - tempo <= ANTECEDENCIA && !atuais.some((atual) => atual.midia_id === clipe.midia_id),
+    );
+    const candidatos: [Clipe | undefined, boolean][] = [...atuais.map((clipe): [Clipe, boolean] => [clipe, true]), [proximo, false]];
+    for (const [clipe, ativo] of candidatos) {
+      const midia = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
+      if (!clipe || midia?.status !== "pronta") continue;
+      let chave = `${faixa.id}:${clipe.midia_id}`;
+      if (chaves.has(chave)) {
+        if (!ativo) continue;
+        chave = `${chave}:entra`;
+      }
+      chaves.add(chave);
+      const efeitos = janelas?.get(clipe.id)?.efeitos;
+      itens.push({ chave, clipe, faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
+    }
+  }
+  return itens;
+}
+
+/** Os clipes de imagem na tela, de baixo para cima (a primeira faixa da lista é a de cima). */
+export function visuaisNoTempo(projeto: Projeto, midias: ReadonlyMap<string, Midia>, tempo: Tick): ItemDaPrevia[] {
+  return itensNoTempo(
+    projeto.faixas.filter((faixa) => faixa.tipo !== "audio" && !faixa.oculta).reverse(),
+    midias,
+    tempo,
+    true,
+  );
+}
+
+/** Tamanho da imagem da mídia, já com a rotação do celular aplicada (a ingestão guarda assim). */
+function tamanhoDaMidia(midia: Midia): Tamanho | null {
+  return midia.video && midia.video.largura > 0 && midia.video.altura > 0 ? { largura: midia.video.largura, altura: midia.video.altura } : null;
+}
+
+/** Os ajustes que o shader aplica, ou null quando a cor é a original. */
+function corDoClipe(clipe: Clipe): AjustesCor | null {
+  // O efeito (VHS) soma aos ajustes de cor do clipe, como no render
+  const ajustes = somarAjustes(ajustesEfetivos(clipe.cor), ajustesDoEfeito(clipe.efeito));
+  return corNeutra(ajustes) ? null : ajustes;
+}
+
+/** O quadro desde o começo do clipe, na taxa do projeto (o glitch muda de quadro em quadro). */
+function quadroDoClipe(clipe: Clipe, tempo: Tick, taxa: Taxa): number {
+  return Math.floor(((tempo - clipe.inicio) * taxa.num) / (taxa.den * TICKS_POR_SEGUNDO) + 1e-6);
+}
+
+/** Luz e granulação do clipe de mídia neste instante (os textos não têm). */
+function luzEGrao(clipe: Clipe, caixa: Caixa, tempo: Tick, taxa: Taxa): Pick<CamadaNaTela, "luz" | "grao"> {
+  const forcaDaLuz = luzDoEfeito(clipe.efeito);
+  const forcaDoGrao = graoDoEfeito(clipe.efeito);
+  const colunas = colunasDoGrao(caixa.largura, caixa.altura);
+  return {
+    luz: forcaDaLuz ? { forca: forcaDaLuz, posicao: posicaoDaLuz((tempo - clipe.inicio) / TICKS_POR_SEGUNDO) } : undefined,
+    grao: forcaDoGrao ? { forca: forcaDoGrao, colunas, deslocamento: deslocamentoDoGrao(quadroDoClipe(clipe, tempo, taxa), colunas) } : undefined,
+  };
+}
+
+/** As tabelas das curvas, guardadas pelas curvas (a mesma para todo quadro do clipe). */
+const tabelasDasCurvas = new Map<string, Uint8Array>();
+
+function tabelaDoClipe(clipe: Clipe): Uint8Array | null {
+  const curvas = clipe.cor?.curvas;
+  if (curvasNeutras(curvas)) return null;
+  const chave = JSON.stringify(curvas);
+  let tabela = tabelasDasCurvas.get(chave);
+  if (!tabela) {
+    tabela = tabelaDasCurvas(curvas!);
+    if (tabelasDasCurvas.size > 50) tabelasDasCurvas.clear();
+    tabelasDasCurvas.set(chave, tabela);
+  }
+  return tabela;
+}
+
+/** Os textos que precisam de imagem: por id do clipe, e o destaque da fala com ":destaque". */
+export function textosParaImagens(projeto: Projeto): { id: string; texto: Texto }[] {
+  return projeto.faixas
+    .filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta)
+    .flatMap((faixa) =>
+      faixa.clipes.flatMap((clipe) =>
+        !clipe.texto
+          ? []
+          : [{ id: clipe.id, texto: clipe.texto }, ...(clipe.texto.destaque ? [{ id: `${clipe.id}:destaque`, texto: textoDoDestaque(clipe.texto) }] : [])],
+      ),
+    );
+}
+
+/**
+ * As camadas do instante, de baixo para cima, num quadro do tamanho dado: os clipes de mídia (da lista
+ * `visuais`) e, por cima de todos, os textos com a imagem que já chegou.
+ */
+export function camadasNoTempo(
+  projeto: Projeto,
+  visuais: ItemDaPrevia[],
+  tempo: Tick,
+  quadro: Tamanho,
+  imagensDeTexto: ReadonlyMap<string, ImagemDeTexto>,
+): CamadaNaTela[] {
+  const camadas: CamadaNaTela[] = [];
+  if (quadro.largura <= 0) return camadas;
+  for (const item of visuais) {
+    const tamanhoMidia = tamanhoDaMidia(item.midia);
+    if (!item.ativo || !tamanhoMidia) continue;
+    const { clipe, faixa, chave } = item;
+    camadas.push({
+      chave,
+      clipe,
+      faixa,
+      recorte: clipe.recorte,
+      caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, quadro),
+      // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
+      caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro),
+      cor: corDoClipe(clipe),
+      curvas: tabelaDoClipe(clipe),
+      desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
+      ...luzEGrao(clipe, caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro), tempo, projeto.taxa),
+      revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
+      desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
+      segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
+    });
+  }
+  // Os textos ficam por cima de todas as faixas de vídeo (a faixa de texto é sempre a de cima)
+  const faixasDeTexto = projeto.faixas.filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta);
+  for (const faixa of [...faixasDeTexto].reverse()) {
+    const clipe = faixa.clipes.find((item) => item.inicio <= tempo && tempo < fimDoClipe(item));
+    const imagem = clipe ? imagensDeTexto.get(clipe.id) : undefined;
+    if (!clipe || !imagem) continue;
+    const caixa = caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, quadro);
+    const caixaBase = caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, quadro);
+    // Letra a letra: só o trecho que já apareceu
+    const trecho = imagem.layout && temLetraALetra(clipe.animacao) ? trechoVisivel(clipe, imagem.layout, tempo) : null;
+    const comum = {
+      clipe,
+      faixa,
+      recorte: clipe.recorte,
+      caixa,
+      caixaBase,
+      cor: corDoClipe(clipe),
+      curvas: tabelaDoClipe(clipe),
+      desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
+      segundos: 0,
+    };
+    camadas.push({ ...comum, chave: `texto:${clipe.id}`, imagem: imagem.bitmap, mascara: trecho ? cortesDoTrecho(imagem.layout!, trecho) : undefined });
+    // O destaque: a mesma caixa, com a imagem na outra cor, só no trecho da palavra falada
+    const destaque = clipe.texto?.destaque ? imagensDeTexto.get(`${clipe.id}:destaque`) : undefined;
+    if (destaque?.layout) {
+      const mascara = cortesDoTrecho(destaque.layout, trechoVisivel(clipe, destaque.layout, tempo, true)!);
+      camadas.push({ ...comum, chave: `destaque:${clipe.id}`, imagem: destaque.bitmap, mascara });
+    }
+  }
+  return camadas;
+}
+
+/** A camada no formato do compositor, com o quadro da fonte e a máscara do fundo deste instante. */
+export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource, mascaraDoFundo: TexImageSource | null): Camada {
+  return {
+    fonte,
+    recorte: camada.recorte,
+    caixa: camada.caixa,
+    cor: camada.cor,
+    revelado: camada.revelado,
+    mascara: camada.mascara,
+    desfoque: (camada.desfoque ?? 0) + desfoqueDoEfeito(camada.clipe.efeito),
+    curvas: camada.curvas,
+    mesclagem: camada.clipe.mesclagem,
+    brilho: brilhoDoEfeito(camada.clipe.efeito),
+    lente: distorcaoDoEfeito(camada.clipe.efeito),
+    desvio: camada.desvio,
+    linhas: linhasDoEfeito(camada.clipe.efeito),
+    luz: camada.luz,
+    grao: camada.grao,
+    chroma: camada.clipe.texto ? null : camada.clipe.chroma,
+    mascaraDoFundo,
+  };
+}

@@ -85,6 +85,17 @@ export function useImagensDeTexto(textos: { id: string; texto: Texto }[]): Map<s
   return imagens;
 }
 
+/** A imagem de um texto, sem hook (a exportação no navegador espera por ela): a mesma que a prévia usa. */
+export async function imagemDeTexto(texto: Texto): Promise<ImagemDeTexto> {
+  const chave = chaveDoTexto(texto);
+  const guardada = guardadas.get(chave);
+  if (guardada) return guardada;
+  const imagem = await pedirImagem(chave);
+  guardadas.set(chave, imagem);
+  while (guardadas.size > LIMITE_GUARDADAS) guardadas.delete(guardadas.keys().next().value!);
+  return imagem;
+}
+
 /** URL de uma imagem de texto pequena, para as miniaturas dos estilos prontos. */
 export async function urlDaImagemDeTexto(texto: Texto, ladoMenor: number): Promise<string> {
   const resposta = await fetch("/api/textos/imagem", {

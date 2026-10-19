@@ -669,8 +669,10 @@ export class Compositor {
     this.canvas.removeEventListener("webglcontextrestored", this.aoRestaurar);
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
-      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...recursos.mascaras, ...(recursos.grao ? [recursos.grao] : [])]) this.gl.deleteTexture(textura);
+      // As listas podem ter buracos (o brilho cria os framebuffers 2 e 3 sem o 0 e o 1)
+      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...recursos.mascaras, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
+        if (!alvo) continue;
         this.gl.deleteTexture(alvo.textura);
         this.gl.deleteFramebuffer(alvo.buffer);
       }

@@ -7,27 +7,20 @@ import { useEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
 import { aplicarEfeitos, aplicarVolume } from "@/lib/previa/audio";
+import { arquivoDaImagemDoClipe, arquivoDoSom, arquivoDoTom, usaVozLimpa } from "@/lib/previa/arquivos";
+import type { ItemDaPrevia } from "@/lib/previa/camadas";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
-import { chaveDaEstabilizacao, type Clipe, type Faixa, fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
-import { chaveDoTom, type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
+import { fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
+import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
-import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
-import type { Midia } from "@/lib/tipos";
 
 /** Diferença, em segundos, entre a mídia e o relógio do editor a partir da qual ela é reposicionada. */
 const DESVIO_MAXIMO = 0.3;
 
-export type ItemDaPrevia = {
-  chave: string;
-  clipe: Clipe;
-  faixa: Faixa;
-  midia: Midia;
-  ativo: boolean;
-  /** Efeitos das transições sobre este clipe (só na principal, durante a janela delas). */
-  efeitos?: EfeitoDeTransicao[];
-};
+export type { ItemDaPrevia };
+export { arquivoDaImagemDoClipe, arquivoDoTom, usaVozLimpa };
 
 /** Entrega o quadro de um instante da mídia, em segundos; null enquanto não tem. */
 export type FonteDeQuadros = { quadro: (segundos: number) => TexImageSource | null };
@@ -124,13 +117,6 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
   return null;
 }
 
-/** A cópia leve da imagem estável ou sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
-export function arquivoDaImagemDoClipe(clipe: Clipe, midia: Midia): string {
-  const estavel = `${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`;
-  if (clipe.estabilizar && midia.arquivos.includes(estavel)) return estavel;
-  return clipe.imagem_limpa && midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";
-}
-
 function arquivoDaImagem(item: ItemDaPrevia): string {
   return arquivoDaImagemDoClipe(item.clipe, item.midia);
 }
@@ -205,27 +191,6 @@ function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFon
       onSeeked={aoTerQuadro}
     />
   );
-}
-
-/** A voz limpa, quando o clipe pede e ela já está pronta (o mesmo tempo do original); senão, o som do proxy. */
-export function usaVozLimpa(item: ItemDaPrevia): boolean {
-  return Boolean(item.clipe.voz_limpa) && item.midia.arquivos.includes("voz_limpa.m4a");
-}
-
-/** O arquivo da voz no tom do clipe, quando ele pede e o arquivo já está pronto; senão, null. */
-export function arquivoDoTom(item: ItemDaPrevia): string | null {
-  const tom = item.clipe.tom ?? 0;
-  if (!tom) return null;
-  const nome = `${chaveDoTom(tom, usaVozLimpa(item))}.m4a`;
-  return item.midia.arquivos.includes(nome) ? nome : null;
-}
-
-function arquivoDoSom(item: ItemDaPrevia): string {
-  const { midia } = item;
-  const tom = arquivoDoTom(item);
-  if (tom) return arquivoDaMidia(midia.id, tom);
-  if (usaVozLimpa(item)) return arquivoDaMidia(midia.id, "voz_limpa.m4a");
-  return arquivoDaMidia(midia.id, midia.arquivos.includes("proxy.mp4") ? "proxy.mp4" : "proxy.m4a");
 }
 
 /** O som de um clipe, com o volume e os fades pelo Web Audio (até 400%). */

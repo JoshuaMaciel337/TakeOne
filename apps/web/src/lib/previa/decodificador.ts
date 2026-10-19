@@ -197,6 +197,15 @@ export class DecodificadorDeVideo {
     return indice >= 0 ? this.quadros[0] : this.mostrado;
   }
 
+  /**
+   * Para a exportação no navegador: o quadro do instante só quando ele já está decodificado (nunca o
+   * anterior, que a prévia mostra enquanto espera); null enquanto não, e a decodificação continua.
+   */
+  quadroExatoEm(segundos: number): VideoFrame | null {
+    const quadro = this.quadroEm(segundos);
+    return this.indiceQueCobre() >= 0 ? quadro : null;
+  }
+
   /** Índice do quadro guardado que está na tela no instante pedido, ou -1. */
   private indiceQueCobre(): number {
     const inicios = this.quadros.map((quadro) => quadro.timestamp);

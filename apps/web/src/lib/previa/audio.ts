@@ -12,7 +12,7 @@
 // só é criado em `retomarAudio`, chamado quando a pessoa aperta reproduzir.
 import { ECO_ATRASO_S, ECO_REPETICOES, type EfeitosVoz, FAIXAS_DO_EQ, SEM_EFEITOS_VOZ } from "../projeto/som.ts";
 
-type Cadeia = {
+export type Cadeia = {
   ganho: GainNode;
   filtros: Record<keyof typeof FAIXAS_DO_EQ, BiquadFilterNode>;
   ecos: GainNode[];
@@ -36,9 +36,11 @@ export function retomarAudio() {
   if (contexto.state === "suspended") void contexto.resume();
 }
 
-function criarCadeia(ctx: AudioContext, elemento: HTMLMediaElement): Cadeia {
-  // Um elemento só pode ser ligado uma vez; depois disso o som dele sai só por esta cadeia
-  const fonte = ctx.createMediaElementSource(elemento);
+/**
+ * Os nós de um clipe, da fonte ao destino: equalizador, eco e o ganho do clipe. A prévia liga um elemento
+ * `<audio>`; a exportação no navegador, um AudioBuffer num contexto sem tempo real (a mesma cadeia).
+ */
+export function criarCadeia(ctx: BaseAudioContext, fonte: AudioNode, destino: AudioNode): Cadeia {
   const filtro = (tipo: BiquadFilterType, frequencia: number) => {
     const no = ctx.createBiquadFilter();
     no.type = tipo;
@@ -63,14 +65,36 @@ function criarCadeia(ctx: AudioContext, elemento: HTMLMediaElement): Cadeia {
     filtros.agudo.connect(atraso).connect(queda).connect(soma);
     return queda;
   });
-  soma.connect(ganho).connect(ctx.destination);
+  soma.connect(ganho).connect(destino);
   return { ganho, filtros, ecos, sala: null, soma };
+}
+
+/**
+ * Os valores dos efeitos na cadeia. O reverb precisa da resposta da sala: na primeira vez que ele liga, a
+ * cauda nasce e soma ao som seco antes do ganho, sem normalizar (como o afir do render, irnorm=-1).
+ */
+export function ajustarCadeia(ctx: BaseAudioContext, cadeia: Cadeia, efeitos: EfeitosVoz | null | undefined, sala: AudioBuffer | null) {
+  const valores = efeitos ?? SEM_EFEITOS_VOZ;
+  cadeia.filtros.grave.gain.value = valores.grave;
+  cadeia.filtros.medio.gain.value = valores.medio;
+  cadeia.filtros.agudo.gain.value = valores.agudo;
+  cadeia.ecos.forEach((queda, i) => (queda.gain.value = valores.eco ** (i + 1)));
+  if (valores.reverb > 0 && !cadeia.sala && sala) {
+    const convolucao = ctx.createConvolver();
+    convolucao.normalize = false;
+    convolucao.buffer = sala;
+    const volume = ctx.createGain();
+    cadeia.sala = { convolucao, volume };
+    cadeia.soma.connect(convolucao).connect(volume).connect(cadeia.ganho);
+  }
+  if (cadeia.sala) cadeia.sala.volume.gain.value = valores.reverb;
 }
 
 function cadeiaDo(elemento: HTMLMediaElement): Cadeia | null {
   let cadeia = cadeias.get(elemento) ?? null;
   if (!cadeia && contexto) {
-    cadeia = criarCadeia(contexto, elemento);
+    // Um elemento só pode ser ligado uma vez; depois disso o som dele sai só por esta cadeia
+    cadeia = criarCadeia(contexto, contexto.createMediaElementSource(elemento), contexto.destination);
     cadeias.set(elemento, cadeia);
   }
   return cadeia;
@@ -102,23 +126,8 @@ export function aplicarVolume(elemento: HTMLMediaElement, volume: number) {
 export function aplicarEfeitos(elemento: HTMLMediaElement, efeitos: EfeitosVoz | null | undefined) {
   const cadeia = cadeiaDo(elemento);
   if (!cadeia || !contexto) return;
-  const valores = efeitos ?? SEM_EFEITOS_VOZ;
-  cadeia.filtros.grave.gain.value = valores.grave;
-  cadeia.filtros.medio.gain.value = valores.medio;
-  cadeia.filtros.agudo.gain.value = valores.agudo;
-  cadeia.ecos.forEach((queda, i) => (queda.gain.value = valores.eco ** (i + 1)));
-  if (valores.reverb > 0 && !cadeia.sala) {
-    const ctx = contexto;
-    // Sem normalizar: a mesma convolução do afir do render (irnorm=-1)
-    const convolucao = ctx.createConvolver();
-    convolucao.normalize = false;
-    const volume = ctx.createGain();
-    volume.gain.value = valores.reverb;
-    cadeia.sala = { convolucao, volume };
-    void carregarSala(ctx).then((buffer) => {
-      convolucao.buffer = buffer;
-      cadeia.soma.connect(convolucao).connect(volume).connect(cadeia.ganho);
-    });
-  }
-  if (cadeia.sala) cadeia.sala.volume.gain.value = valores.reverb;
+  const ctx = contexto;
+  ajustarCadeia(ctx, cadeia, efeitos, null);
+  // A sala chega depois (baixada uma vez): o reverb liga quando ela estiver aqui
+  if ((efeitos?.reverb ?? 0) > 0 && !cadeia.sala) void carregarSala(ctx).then((sala) => ajustarCadeia(ctx, cadeia, efeitos, sala));
 }
