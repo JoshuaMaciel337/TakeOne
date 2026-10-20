@@ -464,7 +464,7 @@ Cada fase termina com algo que dá para usar e testar.
 
 ### Fase 7: extras
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).
-- Expressões nos keyframes (`wiggle`, `loopOut`), do `expr` do EffectCraft.
+- [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.
 - Servidor MCP, para agentes editarem pelos comandos.
 - Publicar direto no YouTube, TikTok e Instagram.
 - Colaboração e links de aprovação (do HolyCut).

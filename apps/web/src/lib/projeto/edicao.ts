@@ -14,6 +14,9 @@ import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import { type AjustesCor, type Cor, COR_PADRAO, CURVA_NEUTRA, curvasNeutras, FILTROS, LIMITES_COR, PONTOS_MAXIMOS_DA_CURVA, type PontoDaCurva } from "./cor.ts";
 import {
   type Curva,
+  deslocarExpressoes,
+  type Expressao,
+  type Expressoes,
   deslocarKeyframes,
   type Keyframe,
   type Keyframes,
@@ -21,7 +24,7 @@ import {
   keyframeEm,
   type PropriedadeAnimavel,
   PROPRIEDADES_ANIMAVEIS,
-  transformacaoNoTempo,
+  transformacaoParaEditar,
 } from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -619,6 +622,7 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       ...pedacoDoClipe(clipe, clipe.inicio + delta, fimDoClipe(clipe)),
       // Os keyframes e as palavras da legenda ficam no mesmo instante da linha do tempo
       keyframes: deslocarKeyframes(clipe.keyframes, delta),
+      expressoes: deslocarExpressoes(clipe.expressoes, delta),
       texto: deslocarTempos(clipe.texto, delta),
       abaixamento: deslocarAbaixamento(clipe.abaixamento, delta),
     };
@@ -661,6 +665,7 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         // O fade e a animação de entrada ficam com a metade da esquerda; os de saída, com a da direita
         fade_entrada: 0,
         keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
+        expressoes: deslocarExpressoes(clipe.expressoes, t - clipe.inicio),
         texto: deslocarTempos(clipe.texto, t - clipe.inicio),
         abaixamento: deslocarAbaixamento(clipe.abaixamento, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
@@ -770,6 +775,7 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 fade_entrada: primeiro ? clipe.fade_entrada : 0,
                 fade_saida: ultimo ? clipe.fade_saida : 0,
                 keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
+                expressoes: deslocarExpressoes(clipe.expressoes, pedaco.inicio - clipe.inicio),
                 texto: deslocarTempos(clipe.texto, pedaco.inicio - clipe.inicio),
                 abaixamento: deslocarAbaixamento(clipe.abaixamento, pedaco.inicio - clipe.inicio),
                 transicao: ultimo ? clipe.transicao : null,
@@ -873,7 +879,7 @@ function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe,
  */
 export function transformarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Transformacao>, tempo?: Tick): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
-    const atual = tempo === undefined ? clipe.transformacao : transformacaoNoTempo(clipe, tempo);
+    const atual = tempo === undefined ? clipe.transformacao : transformacaoParaEditar(clipe, tempo);
     const nova = limitarTransformacao({ ...atual, ...mudanca });
     const transformacao = { ...clipe.transformacao };
     let keyframes = clipe.keyframes;
@@ -910,6 +916,42 @@ function comPonto(pontos: Keyframe[], novo: Keyframe, projeto: Projeto): Keyfram
 
 export type AcaoDeKeyframe = "alternar" | Curva;
 
+/** Limites do tremido: amplitude na unidade de cada propriedade (posição em fração do quadro, giro em graus). */
+export const LIMITES_TREMOR: Record<PropriedadeAnimavel, number> = { x: 0.5, y: 0.5, escala: 1, rotacao: 180, opacidade: 1 };
+/** Período do tremido: de 0,1 s (10 vezes por segundo) a 10 s. */
+export const PERIODO_TREMOR = { minimo: TICKS_POR_SEGUNDO / 10, maximo: 10 * TICKS_POR_SEGUNDO };
+
+/**
+ * Muda a expressão de uma propriedade (repetir os keyframes, tremer). Com `null` (ou sem repetir nem
+ * tremer), a expressão sai. Repetir precisa de pelo menos dois keyframes na propriedade.
+ */
+export function mudarExpressao(projeto: Projeto, clipeId: string, propriedade: PropriedadeAnimavel, expressao: Expressao | null): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    let nova: Expressao | null = null;
+    if (expressao && (expressao.repetir || expressao.tremer)) {
+      if (expressao.repetir && (clipe.keyframes?.[propriedade]?.length ?? 0) < 2) {
+        throw new ErroEdicao("Para repetir, a propriedade precisa de pelo menos dois keyframes.");
+      }
+      const tremor = expressao.tremer;
+      nova = {
+        repetir: expressao.repetir ?? null,
+        tremer: tremor
+          ? {
+              periodo: Math.round(limitar(tremor.periodo, PERIODO_TREMOR.minimo, PERIODO_TREMOR.maximo)),
+              amplitude: limitar(tremor.amplitude, -LIMITES_TREMOR[propriedade], LIMITES_TREMOR[propriedade]),
+              deslocamento: Math.round(tremor.deslocamento ?? 0),
+            }
+          : null,
+      };
+    }
+    const expressoes: Expressoes = { ...clipe.expressoes };
+    if (nova) expressoes[propriedade] = nova;
+    else delete expressoes[propriedade];
+    const vazias = PROPRIEDADES_ANIMAVEIS.every((p) => !expressoes[p]);
+    return { ...clipe, expressoes: vazias ? null : expressoes };
+  });
+}
+
 /**
  * "alternar": põe um keyframe da propriedade no instante, com o valor que ela tem ali, ou tira o que
  * já estava. Tirar o último deixa o clipe parado no valor dele. "linear" ou "suave": muda a curva do
@@ -934,7 +976,7 @@ export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: Pr
       const vazios = PROPRIEDADES_ANIMAVEIS.every((p) => !keyframes[p]?.length);
       return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: existente.valor } };
     }
-    const valor = transformacaoNoTempo(clipe, tempo)[propriedade];
+    const valor = transformacaoParaEditar(clipe, tempo)[propriedade];
     return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: comPonto(pontos, { t, valor, curva: curvaEm(pontos, t) }, projeto) } };
   });
 }
@@ -1047,7 +1089,7 @@ export function pulsarNoRitmo(projeto: Projeto, batidas: Tick[], escala: number 
 
 /** Volta posição, escala, giro, opacidade e recorte ao padrão, sem keyframes. */
 export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
-  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null }));
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null, expressoes: null }));
 }
 
 export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Recorte): Projeto {

@@ -181,6 +181,38 @@ class KeyframesEntrada(BaseModel):
         return self
 
 
+# Os limites do tremido de cada propriedade, os de LIMITES_TREMOR em apps/web/src/lib/projeto/edicao.ts
+LIMITES_TREMOR = {"x": 0.5, "y": 0.5, "escala": 1, "rotacao": 180, "opacidade": 1}
+
+
+class TremorEntrada(BaseModel):
+    # Período de 0,1 s a 10 s, em ticks; o deslocamento é o tempo que o tremido já tinha andado
+    periodo: int = Field(ge=TICKS_POR_SEGUNDO // 10, le=10 * TICKS_POR_SEGUNDO)
+    amplitude: float
+    deslocamento: int = 0
+
+
+class ExpressaoEntrada(BaseModel):
+    repetir: Literal["ciclo", "vaivem"] | None = None
+    tremer: TremorEntrada | None = None
+
+
+class ExpressoesEntrada(BaseModel):
+    x: ExpressaoEntrada | None = None
+    y: ExpressaoEntrada | None = None
+    escala: ExpressaoEntrada | None = None
+    rotacao: ExpressaoEntrada | None = None
+    opacidade: ExpressaoEntrada | None = None
+
+    @model_validator(mode="after")
+    def nos_limites(self):
+        for nome, limite in LIMITES_TREMOR.items():
+            expressao = getattr(self, nome)
+            if expressao and expressao.tremer and abs(expressao.tremer.amplitude) > limite:
+                raise ValueError(f"O tremido de {nome} passa do limite.")
+        return self
+
+
 class EfeitosVozEntrada(BaseModel):
     """Os limites são os de apps/web/src/lib/projeto/som.ts."""
     grave: float = Field(default=0, ge=-12, le=12, description="dB")
@@ -404,6 +436,8 @@ class ClipeEntrada(BaseModel):
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
     recorte: RecorteEntrada = Field(default_factory=RecorteEntrada)
     keyframes: KeyframesEntrada | None = None
+    # Repetir os keyframes e tremer, por propriedade (lib/projeto/keyframes.ts)
+    expressoes: ExpressoesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
     efeito: EfeitoEntrada | None = None

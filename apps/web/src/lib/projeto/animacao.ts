@@ -98,7 +98,7 @@ export function loopAtivo(loop: Loop | null | undefined): loop is Loop {
 
 /** A transformação do clipe no instante `t`, com os keyframes e as animações aplicados. */
 export function transformacaoAnimada(
-  clipe: Pick<Clipe, "inicio" | "duracao" | "animacao" | "transformacao" | "keyframes">,
+  clipe: Pick<Clipe, "inicio" | "duracao" | "animacao" | "transformacao" | "keyframes" | "expressoes">,
   t: Tick,
 ): Transformacao {
   const animacao = clipe.animacao ?? SEM_ANIMACAO;

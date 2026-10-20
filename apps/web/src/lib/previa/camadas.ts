@@ -18,7 +18,7 @@ import {
   posicaoDaLuz,
 } from "@/lib/projeto/efeitos";
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
-import { transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
@@ -202,7 +202,7 @@ export function camadasNoTempo(
       recorte: clipe.recorte,
       caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, quadro),
       // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
-      caixaBase: caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro),
+      caixaBase: caixaDoClipe(transformacaoParaEditar(clipe, tempo), clipe.recorte, tamanhoMidia, quadro),
       cor: corDoClipe(clipe),
       curvas: tabelaDoClipe(clipe),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
@@ -219,7 +219,7 @@ export function camadasNoTempo(
     const imagem = clipe ? imagensDeTexto.get(clipe.id) : undefined;
     if (!clipe || !imagem) continue;
     const caixa = caixaDoTexto(transformacaoAnimada(clipe, tempo), imagem, quadro);
-    const caixaBase = caixaDoTexto(transformacaoNoTempo(clipe, tempo), imagem, quadro);
+    const caixaBase = caixaDoTexto(transformacaoParaEditar(clipe, tempo), imagem, quadro);
     // Letra a letra: só o trecho que já apareceu
     const trecho = imagem.layout && temLetraALetra(clipe.animacao) ? trechoVisivel(clipe, imagem.layout, tempo) : null;
     const comum = {

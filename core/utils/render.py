@@ -45,7 +45,13 @@ from core.utils.efeitos import (
 )
 from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
-from core.utils.keyframes import animadas, comandos_de_opacidade, expressao, transformacao_de_base
+from core.utils.keyframes import (
+    animadas,
+    comandos_de_opacidade,
+    expressao_da_propriedade,
+    maior_escala,
+    transformacao_de_base,
+)
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
 from core.utils.som import (
     CURVA_PADRAO,
@@ -217,7 +223,6 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
-    pontos = clipe.get("keyframes") or {}
     recorte = clipe["recorte"]
     leitura = leitura or Leitura(segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"]))
     inicio = leitura.inicio
@@ -345,7 +350,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         # Giro por quadro (graus, sentido horário); a saída é um quadrado na diagonal, cabe qualquer ângulo.
         # O que sobra fora do clipe é pintado de transparente a cada quadro: com c=none ficava o rastro
         # dos ângulos anteriores. O balanço do loop soma ao giro dos keyframes (ou ao fixo)
-        giro = (expressao(pontos["rotacao"], inicio_clipe) if "rotacao" in com_keyframes
+        giro = (expressao_da_propriedade(clipe, "rotacao", inicio_clipe) if "rotacao" in com_keyframes
                 else _numero(clipe["transformacao"]["rotacao"]))
         if animacao["rotacao"]:
             giro = f"{giro}+{animacao['rotacao']}"
@@ -365,12 +370,12 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     termos = {"dx": [animacao["dx"]], "dy": [animacao["dy"]],
               "escala": [animacao["escala"]] if animacao["escala"] else []}
     if "x" in com_keyframes:
-        termos["dx"].append(f"({expressao(pontos['x'], inicio_clipe)})-({_numero(base['x'])})")
+        termos["dx"].append(f"({expressao_da_propriedade(clipe, 'x', inicio_clipe)})-({_numero(base['x'])})")
     if "y" in com_keyframes:
-        termos["dy"].append(f"({expressao(pontos['y'], inicio_clipe)})-({_numero(base['y'])})")
+        termos["dy"].append(f"({expressao_da_propriedade(clipe, 'y', inicio_clipe)})-({_numero(base['y'])})")
     if "escala" in com_keyframes:
-        maior = max(ponto["valor"] for ponto in pontos["escala"])
-        termos["escala"].append(f"({expressao(pontos['escala'], inicio_clipe)})/{_numero(maior)}")
+        termos["escala"].append(f"({expressao_da_propriedade(clipe, 'escala', inicio_clipe)})"
+                                f"/{_numero(maior_escala(clipe))}")
     zoom_do_loop = maior_zoom_do_loop(clipe)
     if zoom_do_loop != 1:
         # O pulsar cresce até zoom_do_loop: a caixa já tem esse tamanho e o fator volta ao normal
@@ -735,7 +740,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             fim_do_clipe = segundos(clipe["inicio"] + clipe["duracao"])
             janela = (leitura.inicio, leitura.fim) if leitura else (segundos(clipe["inicio"]), fim_do_clipe)
             roteiro = f"{pasta}/opacidade_{clipe['id']}_{numero}.txt"
-            conteudo = comandos_de_opacidade(clipe["keyframes"]["opacidade"], segundos(clipe["inicio"]), janela,
+            conteudo = comandos_de_opacidade(clipe, segundos(clipe["inicio"]), janela,
                                              float(taxa_em_fracao(taxa)), f"colorchannelmixer@op{numero}")
             auxiliares[roteiro] = ArquivoAuxiliar(roteiro, "comandos", {}, conteudo=conteudo)
         mascara = None

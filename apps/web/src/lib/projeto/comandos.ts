@@ -34,6 +34,7 @@ import {
   pulsarNoRitmo,
   importarLegendas,
   type MudancaDeAudio,
+  mudarExpressao,
   mudarKeyframe,
   reenquadrarClipe,
   seguirObjetoClipe,
@@ -57,7 +58,7 @@ import {
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
-import type { PropriedadeAnimavel } from "./keyframes.ts";
+import type { Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import type { PlanoDoModelo } from "./modelos.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
@@ -84,6 +85,7 @@ export type Comando =
   | { comando: "projeto.fundo"; parametros: { cor: string } }
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
   | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
+  | { comando: "clipe.expressao"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; expressao: Expressao | null } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
   | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
@@ -129,6 +131,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "projeto.fundo": "mudar o fundo",
   "clipe.transformar": "mudar posição e tamanho",
   "clipe.keyframe": "mudar keyframe",
+  "clipe.expressao": "mudar a expressão",
   "clipe.reenquadrar": "seguir o rosto",
   "clipe.seguirObjeto": "seguir o objeto",
   "clipe.abaixar": "abaixar na fala",
@@ -221,6 +224,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: seguirObjetoClipe(projeto, parametros.clipeId, parametros.caminho) };
     case "clipe.keyframe":
       return { projeto: mudarKeyframe(projeto, parametros.clipeId, parametros.propriedade, parametros.tempo, parametros.acao) };
+    case "clipe.expressao":
+      return { projeto: mudarExpressao(projeto, parametros.clipeId, parametros.propriedade, parametros.expressao) };
     case "clipe.recortar":
       return { projeto: recortarClipes(projeto, parametros.clipeIds, parametros.recorte) };
     case "clipe.restaurar":

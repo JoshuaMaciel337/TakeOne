@@ -15,6 +15,7 @@ from core.modelos.midia import chave_arquivo, montar_midia
 from core.utils import storage
 from core.utils.fila import pegar_proximo_job
 from core.utils.geometria import caixa_do_clipe
+from core.utils.keyframes import valor_com_expressao
 from core.utils.tempo import segundos_para_ticks
 from tests.integracao.test_api import cadastrar
 from worker.worker_principal import processar_job
@@ -473,3 +474,26 @@ def test_render_aceita_giro_e_escala_com_keyframes(cliente, db_limpo):
     assert _perto(fim_do_giro[360 - 252, 640 + 142], CORES[(0, 0)]), fim_do_giro[360 - 252, 640 + 142]
     # Fora do clipe girado (que vai de x = 356 a 924), mas dentro da área do giro: só o fundo, sem rastro
     assert _perto(fim_do_giro[360, 220], FUNDO), fim_do_giro[360, 220]
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_repete_os_keyframes_e_treme(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    # x vai de -0,25 a +0,25 em 0,8 s e repete do começo; y treme 5% do quadro, uma vez por segundo
+    keyframes = {"x": [{"t": 0, "valor": -0.25, "curva": "linear"},
+                       {"t": round(0.8 * SEGUNDO), "valor": 0.25, "curva": "linear"}]}
+    tremor = {"periodo": SEGUNDO, "amplitude": 0.05, "deslocamento": 0}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9",
+                          transformacao={"x": 0, "y": 0, "escala": 0.5, "rotacao": 0, "opacidade": 1},
+                          keyframes=keyframes, expressoes={"x": {"repetir": "ciclo"}, "y": {"tremer": tremor}})
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    # Em 1,2 s o ciclo está na metade (x = 0: o clipe de 640 × 360 começa em x = 320); sem repetir, x seria
+    # 0,25. O y é o do tremido nesse instante (a conta da prévia), e a borda de cima do clipe anda com ele
+    dy = round(valor_com_expressao(None, 0, {"tremer": tremor}, "y", 1.2 * SEGUNDO) * 720)
+    assert dy != 0
+    quadro = quadro_do_video(video, 1.2, 1280, 720)
+    topo = 180 + dy
+    assert _perto(quadro[topo + 8, 320 + 8], CORES[(0, 0)]), quadro[topo + 8, 320 + 8]
+    assert _perto(quadro[topo - 8, 320 + 8], FUNDO), quadro[topo - 8, 320 + 8]
+    assert _perto(quadro[topo + 8, 320 - 8], FUNDO), quadro[topo + 8, 320 - 8]

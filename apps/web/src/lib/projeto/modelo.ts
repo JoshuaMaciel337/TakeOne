@@ -5,7 +5,7 @@ import type { Abaixamento } from "./abaixar.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { Efeito } from "./efeitos.ts";
-import type { Keyframes } from "./keyframes.ts";
+import type { Expressoes, Keyframes } from "./keyframes.ts";
 import { type CurvaDoFade, type EfeitosVoz, ganhoDoFade } from "./som.ts";
 import { type PontoDeVelocidade, tempoNaMidiaComCurva } from "./velocidade.ts";
 import type { Transicao } from "./transicao.ts";
@@ -98,6 +98,8 @@ export type Clipe = {
   transformacao: Transformacao;
   /** Posição, escala, rotação e opacidade mudando ao longo do clipe (lib/projeto/keyframes.ts). */
   keyframes?: Keyframes | null;
+  /** Repetir os keyframes e tremer, por propriedade (lib/projeto/keyframes.ts). */
+  expressoes?: Expressoes | null;
   recorte: Recorte;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
