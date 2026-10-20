@@ -44,3 +44,15 @@ def db_limpo(db):
     for nome in db.list_collection_names():
         db[nome].delete_many({})
     return db
+
+
+def pytest_runtest_logreport(report):
+    """No GitHub Actions, cada falha vira uma anotação (::error), que aparece no resumo da execução sem
+    precisar abrir o log inteiro."""
+    if not os.environ.get("GITHUB_ACTIONS") or not report.failed:
+        return
+    caminho, linha, _ = report.location
+    texto = str(report.longrepr).strip().splitlines()
+    resumo = " | ".join(texto[-6:])[:900].replace("%", "%25").replace("\r", "").replace("\n", " ")
+    titulo = f"{report.nodeid} ({report.when})"
+    print(f"\n::error file={caminho},line={(linha or 0) + 1},title={titulo}::{resumo}", flush=True)
