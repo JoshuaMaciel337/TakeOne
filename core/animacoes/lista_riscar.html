@@ -15,19 +15,18 @@
 }
 </script>
 <!-- Riscada: cada item entra deslizando e, meio segundo depois, um traço um pouco inclinado (scaleX de 0
-     a 1, a partir da esquerda) passa por cima do texto; o texto apaga um pouco quando é riscado. -->
+     a 1, a partir da esquerda) passa por cima do texto. -->
 <style>
 .lista{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*84),88%);display:flex;flex-direction:column;align-items:flex-start;
   gap:calc(var(--u)*1.8);color:var(--cor-texto);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
 .titulo{font-family:Montserrat;font-weight:800;font-size:calc(var(--u)*5.6);letter-spacing:-.02em;color:var(--cor-2);margin-bottom:calc(var(--u)*.6);
   text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.6) rgba(0,0,0,.5);animation:entrar .5s cubic-bezier(.2,.8,.2,1) both}
 .linha{position:relative;padding:calc(var(--u)*.8) calc(var(--u)*2);border-radius:calc(var(--u)*1.4);background:rgba(14,15,20,.78);font-weight:700;font-size:calc(var(--u)*4.4);
-  animation:entrar .45s cubic-bezier(.2,.8,.2,1) calc(.4s + var(--i) * .75s) both,apagar .3s ease-out calc(.95s + var(--i) * .75s) both}
+  animation:entrar .45s cubic-bezier(.2,.8,.2,1) calc(.4s + var(--i) * .75s) both}
 .linha::before{content:"";position:absolute;left:calc(var(--u)*.6);right:calc(var(--u)*.6);top:50%;height:calc(var(--u)*.55);margin-top:calc(var(--u)*-.1);
   border-radius:calc(var(--u)*.3);background:var(--cor-1);transform:rotate(-1.2deg) scaleX(0);transform-origin:0 50%;
   animation:riscar .4s cubic-bezier(.6,0,.3,1) calc(.95s + var(--i) * .75s) forwards}
 @keyframes riscar{to{transform:rotate(-1.2deg) scaleX(1)}}
-@keyframes apagar{to{color:color-mix(in srgb,var(--cor-texto) 60%,transparent)}}
 @keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-3))}}
 @keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
 </style>
