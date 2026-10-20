@@ -1,0 +1,82 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Luz vazada",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 5,
+ "tela_cheia": true,
+ "descricao": "Manchas de luz quente que entram pela borda e atravessam o quadro, como luz vazando no filme; ponha sobre fotos e vídeos.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "", "maximo": 26},
+  {"id": "cor_1", "rotulo": "Luz (quente)", "tipo": "cor", "padrao": "#ff9a3c"},
+  {"id": "cor_2", "rotulo": "Luz (rosada)", "tipo": "cor", "padrao": "#ff4f7b"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Luz vazada: quatro manchas elípticas grandes, com degradê radial que some na borda, desenhadas em modo
+     "lighter" (a luz soma). Cada uma anda por um caminho próprio (senos com fase e velocidade sorteadas com
+     semente) e a intensidade sobe e desce devagar; uma faixa diagonal clara passa no meio, como o reflexo
+     de uma lente. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const rnd = TO.rng(77);
+  const manchas = Array.from({ length: 4 }, (_, i) => ({
+    cor: i % 2 ? C.cor_2 : C.cor_1,
+    x0: rnd() < 0.5 ? -0.15 : 1.15, y0: 0.2 + rnd() * 0.6,
+    vx: 0.08 + rnd() * 0.08, vy: (rnd() - 0.5) * 0.08,
+    r: 0.45 + rnd() * 0.35, fase: rnd() * 6.28, ritmo: 0.6 + rnd() * 0.8,
+  }));
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.9, 0.9, dur);
+    const D = Math.max(W, H);
+    ctx.globalCompositeOperation = "lighter";
+    for (const m of manchas) {
+      const lado = m.x0 < 0 ? 1 : -1;
+      const x = (m.x0 + lado * m.vx * t) * W + Math.sin(t * 0.7 + m.fase) * 4 * u;
+      const y = (m.y0 + m.vy * t) * H + Math.cos(t * 0.5 + m.fase) * 6 * u;
+      const r = m.r * D;
+      const intensidade = env * (0.38 + 0.22 * Math.sin(t * m.ritmo + m.fase));
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, TO.rgba(m.cor, intensidade));
+      g.addColorStop(0.45, TO.rgba(m.cor, intensidade * 0.45));
+      g.addColorStop(1, TO.rgba(m.cor, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // Reflexo de lente: uma faixa diagonal clara que atravessa uma vez
+    const k = TO.prog(t, dur * 0.25, dur * 0.75);
+    if (k > 0 && k < 1) {
+      ctx.save();
+      ctx.translate(-W * 0.4 + k * W * 1.8, H / 2);
+      ctx.rotate(-0.35);
+      const g = ctx.createLinearGradient(-12 * u, 0, 12 * u, 0);
+      g.addColorStop(0, "rgba(255,240,220,0)");
+      g.addColorStop(0.5, `rgba(255,240,220,${0.28 * env * Math.sin(k * Math.PI)})`);
+      g.addColorStop(1, "rgba(255,240,220,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-12 * u, -D, 24 * u, D * 2);
+      ctx.restore();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    if (C.titulo) {
+      const kt = TO.ease.outCubic(TO.prog(t, 0.8, 1.5)) * (1 - TO.prog(t, dur - 0.8, dur - 0.2));
+      ctx.globalAlpha = kt;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.5)";
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 10, W * 0.84, "Montserrat"), "Montserrat");
+      ctx.fillText(C.titulo, W / 2, H / 2);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

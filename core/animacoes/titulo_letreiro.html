@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Letreiro de lâmpadas",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 5,
+ "descricao": "Um letreiro de teatro com lâmpadas em volta que acendem em sequência, como num luminoso antigo, e o título no meio.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "GRANDE ESTREIA", "maximo": 22},
+  {"id": "subtitulo", "rotulo": "Linha de baixo (opcional)", "tipo": "texto", "padrao": "sexta, às 20h", "maximo": 32},
+  {"id": "cor_1", "rotulo": "Lâmpadas", "tipo": "cor", "padrao": "#ffd36b"},
+  {"id": "cor_2", "rotulo": "Moldura", "tipo": "cor", "padrao": "#c8102e"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Letreiro: a placa (moldura na cor 2, miolo escuro) cresce do centro; as lâmpadas ficam em volta, a
+     cada 4,2 u, e acendem uma a uma ao redor (a primeira volta em 0,8 s); depois piscam em "perseguição":
+     de três em três, uma acesa e duas meio apagadas, andando um passo a cada 0,12 s. Cada lâmpada acesa é
+     o carimbo de brilho do comum.js por baixo de um ponto claro. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+
+  function pontosDaBorda(x, y, w, h, passo) {
+    const pts = [];
+    const perim = 2 * (w + h);
+    const n = Math.max(8, Math.round(perim / passo));
+    for (let i = 0; i < n; i++) {
+      let d = (i / n) * perim;
+      if (d < w) pts.push([x + d, y]);
+      else if ((d -= w) < h) pts.push([x + w, y + d]);
+      else if ((d -= h) < w) pts.push([x + w - d, y + h]);
+      else pts.push([x, y + h - (d - w)]);
+    }
+    return pts;
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.01, 0.45, dur);
+    const abre = TO.ease.outBack(TO.prog(t, 0, 0.55), 1.2);
+    // Medidas da placa a partir do texto
+    ctx.font = TO.fonte(900, 1, "Montserrat");
+    const tam = TO.caber(ctx, C.texto, 900, 10, Math.min(W * 0.72, 120 * u), "Montserrat");
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    const tw = ctx.measureText(C.texto).width;
+    const w = Math.min(W * 0.9, tw + 16 * u);
+    const h = (C.subtitulo ? 26 : 20) * u;
+    ctx.save();
+    ctx.globalAlpha = env;
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(abre, abre);
+    // Placa
+    TO.retangulo(ctx, -w / 2, -h / 2, w, h, 3 * u);
+    ctx.fillStyle = C.cor_2;
+    ctx.fill();
+    TO.retangulo(ctx, -w / 2 + 3.2 * u, -h / 2 + 3.2 * u, w - 6.4 * u, h - 6.4 * u, 1.6 * u);
+    ctx.fillStyle = "#15100e";
+    ctx.fill();
+    // Lâmpadas
+    const pts = pontosDaBorda(-w / 2 + 1.6 * u, -h / 2 + 1.6 * u, w - 3.2 * u, h - 3.2 * u, 4.2 * u);
+    const brilho = TO.brilho(C.cor_1, 64);
+    pts.forEach(([x, y], i) => {
+      const acendeu = t > 0.3 + (i / pts.length) * 0.8;
+      const passo = Math.floor(t / 0.12);
+      const forte = t > 1.2 ? (i + passo) % 3 === 0 : true;
+      const k = !acendeu ? 0.12 : forte ? 1 : 0.35;
+      if (k > 0.3) {
+        ctx.globalAlpha = env * 0.55 * k;
+        ctx.drawImage(brilho, x - 2.6 * u, y - 2.6 * u, 5.2 * u, 5.2 * u);
+      }
+      ctx.globalAlpha = env;
+      ctx.beginPath();
+      ctx.arc(x, y, 0.85 * u, 0, 6.2832);
+      ctx.fillStyle = k > 0.3 ? TO.mix(C.cor_1, "#ffffff", 0.55 * k) : "rgba(255,255,255,.25)";
+      ctx.fill();
+    });
+    // Título
+    const kt = TO.prog(t, 0.5, 0.9);
+    ctx.globalAlpha = env * kt;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = C.cor_1;
+    ctx.shadowBlur = 2.4 * u;
+    ctx.fillStyle = C.cor_texto;
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.fillText(C.texto, 0, C.subtitulo ? -2.4 * u : 0);
+    ctx.shadowBlur = 0;
+    if (C.subtitulo) {
+      ctx.fillStyle = C.cor_1;
+      ctx.font = TO.fonte(700, TO.caber(ctx, C.subtitulo, 700, 3.6, w - 14 * u));
+      ctx.fillText(C.subtitulo, 0, 6.6 * u);
+    }
+    ctx.restore();
+  };
+})();
+</script>

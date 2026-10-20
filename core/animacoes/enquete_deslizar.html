@@ -1,0 +1,37 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Enquete com emoji",
+ "categoria": "redes",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Uma pergunta com uma régua em degradê: o emoji desliza até a média das respostas e cresce quando para.",
+ "campos": [
+  {"id": "pergunta", "rotulo": "Pergunta", "tipo": "texto", "padrao": "Quanto você ama café?", "maximo": 50},
+  {"id": "emoji", "rotulo": "Emoji", "tipo": "texto", "padrao": "😍", "maximo": 4},
+  {"id": "valor", "rotulo": "Média (0 a 100)", "tipo": "numero", "padrao": "86", "maximo": 0},
+  {"id": "cor_1", "rotulo": "Régua (início)", "tipo": "cor", "padrao": "#ffb547"},
+  {"id": "cor_2", "rotulo": "Régua (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor da pergunta", "tipo": "cor", "padrao": "#1a1b20"}
+ ]
+}
+</script>
+<!-- Enquete: um cartão branco com a pergunta; a régua se enche até o valor enquanto o emoji desliza junto
+     (left em porcentagem, limitado a 0–100 pelo clamp()) com uma curva que passa um pouco e volta; ao parar
+     ele dá um pulo e ganha tamanho. -->
+<style>
+.cartao{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*70),86%);padding:calc(var(--u)*4) calc(var(--u)*4.4) calc(var(--u)*5);
+  border-radius:calc(var(--u)*3.4);background:#fff;color:var(--cor-texto);text-align:center;box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.35);
+  animation:entrar .6s cubic-bezier(.3,1.4,.5,1) both,sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.pergunta{font-weight:800;font-size:calc(var(--u)*5);letter-spacing:-.02em;line-height:1.2;margin-bottom:calc(var(--u)*5);text-wrap:balance}
+.regua{position:relative;height:calc(var(--u)*2.2);border-radius:calc(var(--u)*1.1);background:#e8e6e1}
+.cheio{position:absolute;left:0;top:0;bottom:0;width:clamp(0%,{{valor}}%,100%);border-radius:inherit;background:linear-gradient(90deg,var(--cor-1),var(--cor-2));
+  transform-origin:0 50%;animation:encher 1.3s cubic-bezier(.3,1.25,.5,1) .6s both}
+.emoji{position:absolute;top:50%;left:clamp(0%,{{valor}}%,100%);font-size:calc(var(--u)*8);line-height:1;transform:translate(-50%,-55%);
+  animation:deslizar 1.3s cubic-bezier(.3,1.25,.5,1) .6s both,pular .45s cubic-bezier(.3,1.6,.5,1) 1.9s both}
+@keyframes encher{from{transform:scaleX(0)}}
+@keyframes deslizar{from{left:0%}}
+@keyframes pular{50%{transform:translate(-50%,-75%) scale(1.35)}100%{transform:translate(-50%,-55%) scale(1.15)}}
+@keyframes entrar{from{opacity:0;transform:translate(-50%,-50%) scale(.8)}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-46%)}}
+</style>
+<div class="cartao"><div class="pergunta">{{pergunta}}</div><div class="regua"><div class="cheio"></div><div class="emoji">{{emoji}}</div></div></div>

@@ -119,6 +119,17 @@
    }
   },
   {
+   "modelo": "titulo_letreiro",
+   "id": "letreiro_cinema",
+   "nome": "Letreiro de cinema",
+   "padroes": {
+    "texto": "SESSÃO DA MEIA-NOITE",
+    "subtitulo": "sexta, sala 3",
+    "cor_1": "#ffd166",
+    "cor_2": "#e63946"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

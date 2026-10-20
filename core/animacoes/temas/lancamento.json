@@ -242,6 +242,18 @@
    }
   },
   {
+   "modelo": "chamada_clique",
+   "id": "clique_pre_venda",
+   "nome": "Clique na pré-venda",
+   "padroes": {
+    "texto": "Garantir o meu",
+    "depois": "Reservado ✓",
+    "subtitulo": "pré-venda até domingo",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

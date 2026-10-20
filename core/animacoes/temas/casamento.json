@@ -258,6 +258,18 @@
    }
   },
   {
+   "modelo": "citacao_balao",
+   "id": "recado_padrinhos",
+   "nome": "Recado dos padrinhos",
+   "padroes": {
+    "texto": "Que a casa de vocês seja sempre cheia de risada, café quentinho e amigos.",
+    "nome": "Paula e Edu",
+    "detalhe": "padrinhos",
+    "cor_1": "#f4b6c2",
+    "cor_2": "#d98aa0"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

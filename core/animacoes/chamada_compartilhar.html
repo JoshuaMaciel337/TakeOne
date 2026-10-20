@@ -1,0 +1,112 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Mande para alguém",
+ "categoria": "redes",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "O ícone de compartilhar solta três setas curvas que voam até três avatares, e a chamada aparece embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Chamada", "tipo": "texto", "padrao": "Mande para quem precisa ver isso", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Setas (início)", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_2", "rotulo": "Setas (fim)", "tipo": "cor", "padrao": "#9b8cff"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Compartilhar: o ícone (um avião de papel) fica à esquerda; três curvas de Bézier saem dele para três
+     avatares à direita e se desenham com um ponto na frente (o trecho já percorrido da curva é amostrado
+     em 40 pedaços). Cada avatar acende e pula quando a sua curva chega. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const bez = (a, b, c, k) => (1 - k) * (1 - k) * a + 2 * (1 - k) * k * b + k * k * c;
+
+  function aviao(x, y, s) {
+    ctx.beginPath();
+    ctx.moveTo(x - s, y - 0.1 * s);
+    ctx.lineTo(x + s, y - 0.7 * s);
+    ctx.lineTo(x + 0.25 * s, y + 0.8 * s);
+    ctx.lineTo(x - 0.05 * s, y + 0.15 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.3, 0.45, dur);
+    const larg = Math.min(W * 0.8, 70 * u);
+    const cx = W / 2;
+    const cy = H / 2 - 6 * u;
+    const x0 = cx - larg / 2 + 6 * u;
+    const xa = cx + larg / 2 - 6 * u;
+    ctx.globalAlpha = env;
+    // Ícone
+    const k0 = TO.spring(t, 0.5, 2);
+    ctx.beginPath();
+    ctx.arc(x0, cy, 8 * u * k0, 0, 6.2832);
+    ctx.fillStyle = TO.degrade(ctx, x0 - 8 * u, cy - 8 * u, x0 + 8 * u, cy + 8 * u);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    if (k0 > 0.2) aviao(x0, cy, 4.2 * u * k0);
+    // Curvas e avatares
+    for (let i = 0; i < 3; i++) {
+      const ay = cy + (i - 1) * 12 * u;
+      const inicio = 0.55 + i * 0.18;
+      const k = TO.ease.inOutCubic(TO.prog(t, inicio, inicio + 0.7));
+      const px = (x0 + xa) / 2;
+      const py = cy + (i - 1) * 2 * u - 16 * u;
+      ctx.strokeStyle = TO.mix(C.cor_1, C.cor_2, i / 2);
+      ctx.lineWidth = 0.6 * u;
+      ctx.setLineDash([1.6 * u, 1.4 * u]);
+      ctx.beginPath();
+      const N = 40;
+      for (let j = 0; j <= N * k; j++) {
+        const q = j / N;
+        const x = bez(x0 + 8 * u, px, xa - 5.5 * u, q);
+        const y = bez(cy, py, ay, q);
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (k > 0 && k < 1) {
+        ctx.beginPath();
+        ctx.arc(bez(x0 + 8 * u, px, xa - 5.5 * u, k), bez(cy, py, ay, k), 1.2 * u, 0, 6.2832);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
+      const chegou = TO.clamp(t - (inicio + 0.7));
+      const pulo = chegou > 0 ? 1 + 0.25 * Math.sin(TO.clamp(chegou / 0.3) * Math.PI) : 1;
+      ctx.beginPath();
+      ctx.arc(xa, ay, 4.6 * u * pulo, 0, 6.2832);
+      ctx.fillStyle = chegou > 0 ? TO.mix(C.cor_1, C.cor_2, i / 2) : "rgba(255,255,255,.22)";
+      ctx.fill();
+      ctx.lineWidth = 0.5 * u;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+      // Cabecinha e ombros
+      ctx.fillStyle = chegou > 0 ? "#fff" : "rgba(255,255,255,.6)";
+      ctx.beginPath();
+      ctx.arc(xa, ay - 1.2 * u * pulo, 1.5 * u * pulo, 0, 6.2832);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(xa, ay + 3 * u * pulo, 2.6 * u * pulo, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.fill();
+    }
+    // Chamada
+    ctx.globalAlpha = env * TO.prog(t, 1.4, 1.9);
+    ctx.fillStyle = C.cor_texto;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 1.6 * u;
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.texto, 800, 5, W * 0.86));
+    ctx.fillText(C.texto, cx, cy + 25 * u);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

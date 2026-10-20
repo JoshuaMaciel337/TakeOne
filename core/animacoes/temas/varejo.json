@@ -141,6 +141,20 @@
    }
   },
   {
+   "modelo": "oferta_relampago",
+   "id": "relampago_loja",
+   "nome": "Oferta relâmpago",
+   "padroes": {
+    "titulo": "QUEIMA DE ESTOQUE",
+    "horas": "5",
+    "minutos": "0",
+    "estoque": "30",
+    "legenda": "do estoque ainda na loja",
+    "cor_1": "#ff624a",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

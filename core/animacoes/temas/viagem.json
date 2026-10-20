@@ -200,6 +200,16 @@
    }
   },
   {
+   "modelo": "chamada_compartilhar",
+   "id": "mande_viagem",
+   "nome": "Mande para quem vai junto",
+   "padroes": {
+    "texto": "Mande para quem vai viajar com você",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

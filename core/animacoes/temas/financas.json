@@ -143,6 +143,20 @@
    }
   },
   {
+   "modelo": "grafico_comparacao",
+   "id": "poupanca_tesouro",
+   "nome": "Poupança ou Tesouro",
+   "padroes": {
+    "titulo": "Rendimento em 12 meses",
+    "rotulo_1": "Poupança (%)",
+    "valor_1": "7",
+    "rotulo_2": "Tesouro Selic (%)",
+    "valor_2": "11",
+    "cor_1": "#35d3a1",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

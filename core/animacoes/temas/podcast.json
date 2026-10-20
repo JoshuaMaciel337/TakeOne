@@ -247,6 +247,17 @@
    }
   },
   {
+   "modelo": "tarja_cantos",
+   "id": "tarja_convidado_cantos",
+   "nome": "Tarja do convidado",
+   "padroes": {
+    "nome": "Dra. Renata Luz",
+    "funcao": "Psicóloga, convidada de hoje",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

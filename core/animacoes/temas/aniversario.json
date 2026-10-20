@@ -216,6 +216,17 @@
    }
   },
   {
+   "modelo": "logo_letras",
+   "id": "nome_aniversariante",
+   "nome": "Nome que pula",
+   "padroes": {
+    "texto": "Laurinha",
+    "slogan": "faz 7 anos!",
+    "cor_1": "#ff8fab",
+    "cor_2": "#ffd166"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

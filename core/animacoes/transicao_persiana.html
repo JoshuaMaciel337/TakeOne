@@ -1,0 +1,54 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Persiana",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "Lâminas verticais giram e fecham a tela como uma persiana, e abrem de novo do outro lado. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Lâminas (frente)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Lâminas (verso)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Persiana: 10 lâminas (8 no quadro em pé) que crescem de largura a partir do próprio centro, com um atraso
+     da esquerda para a direita; no meio da duração todas estão inteiras (tela coberta). Na volta elas
+     encolhem na mesma ordem, mostrando o verso (a outra cor), como se tivessem dado meia-volta. -->
+<script>
+(() => {
+  const { largura: W, altura: H } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const N = W > H ? 10 : 8;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const meio = dur / 2;
+    ctx.clearRect(0, 0, W, H);
+    const larg = W / N;
+    const atraso = 0.035;
+    for (let i = 0; i < N; i++) {
+      const d = i * atraso;
+      const fecha = TO.ease.inOutCubic(TO.prog(t, d, meio - (N - 1) * atraso + d - 0.01));
+      const abre = TO.ease.inOutCubic(TO.prog(t, meio + d, dur - (N - 1) * atraso + d));
+      const k = abre > 0 ? 1 - abre : fecha;
+      if (k <= 0) continue;
+      const w = larg * k + (k >= 1 ? 1 : 0);
+      ctx.fillStyle = abre > 0 ? C.cor_2 : C.cor_1;
+      ctx.fillRect(i * larg + (larg - w) / 2, 0, w + 0.5, H);
+    }
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, meio - 0.25, meio - 0.1), 1 - TO.prog(t, meio + 0.05, meio + 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

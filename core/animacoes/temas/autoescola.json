@@ -1,0 +1,140 @@
+{
+ "nome": "Autoescola e trânsito",
+ "ordem": 50,
+ "versoes": [
+  {
+   "modelo": "lista_numerada",
+   "id": "etapas_cnh",
+   "nome": "Etapas da CNH",
+   "padroes": {
+    "titulo": "Como tirar a CNH",
+    "texto": "Exame médico e psicológico\nAulas teóricas\nProva teórica\nAulas e prova práticas",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "lista_riscar",
+   "id": "erros_baliza",
+   "nome": "Erros na baliza",
+   "padroes": {
+    "titulo": "Erros que reprovam",
+    "texto": "Subir na calçada\nEsquecer a seta\nPassar do tempo\nEncostar no cone",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "pergunta_transito",
+   "nome": "Dúvida de trânsito",
+   "padroes": {
+    "pergunta": "Posso usar o celular no semáforo?",
+    "resposta": "Não. Mesmo parado no sinal é infração gravíssima: 7 pontos na carteira e multa.",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "aprovacao",
+   "nome": "Aprovação",
+   "padroes": {
+    "valor": "94",
+    "legenda": "dos nossos alunos passam na primeira prova",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "calendario_dias",
+   "id": "prova_pratica",
+   "nome": "Prova prática",
+   "padroes": {
+    "dias": "5",
+    "rotulo": "FALTAM",
+    "legenda": "dias para a prova prática",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "tarja_dois_tons",
+   "id": "tarja_instrutor",
+   "nome": "Tarja do instrutor",
+   "padroes": {
+    "nome": "Instrutor Sérgio",
+    "funcao": "15 anos de autoescola",
+    "cor_1": "#2a9d8f",
+    "cor_2": "#16171c"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "aprovado_cnh",
+   "nome": "Aprovado",
+   "padroes": {
+    "texto": "APROVADO",
+    "subtitulo": "carteira na mão",
+    "cor_1": "#2fbf71",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "dica",
+   "id": "dica_direcao",
+   "nome": "Dica de direção",
+   "padroes": {
+    "rotulo": "Dica do instrutor",
+    "texto": "Ajuste banco e espelhos antes de ligar o carro. Na prova, o avaliador repara nisso.",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_autoescola",
+   "nome": "Horário da autoescola",
+   "padroes": {
+    "titulo": "Atendimento",
+    "texto": "Seg a sex · 7h às 20h\nSábado · 7h às 13h\nAulas práticas · também à noite",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "chamada_clique",
+   "id": "matricula",
+   "nome": "Matrícula",
+   "padroes": {
+    "texto": "Fazer matrícula",
+    "depois": "Matrícula feita ✓",
+    "subtitulo": "parcelamos em até 10 vezes",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "velocimetro",
+   "id": "limite_velocidade",
+   "nome": "Limite de velocidade",
+   "padroes": {
+    "valor": "60",
+    "maximo": "120",
+    "unidade": "km/h",
+    "legenda": "limite em vias urbanas arteriais",
+    "cor_1": "#ffd400",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
+   "modelo": "transicao_diagonal",
+   "id": "transicao",
+   "nome": "Transição: diagonal",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#1a1a1a"
+   }
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja com cantoneiras",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Quatro cantoneiras se desenham em volta do nome e da função, como o enquadramento de uma câmera.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Thiago Nunes", "maximo": 30},
+  {"id": "funcao", "rotulo": "Função", "tipo": "texto", "padrao": "Diretor de fotografia", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Cantoneiras", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Função", "tipo": "cor", "padrao": "#ffd36b"},
+  {"id": "cor_texto", "rotulo": "Cor do nome", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Cantoneiras: cada canto é um elemento com duas bordas que nasce no ponto do canto e cresce (scale)
+     para dentro; os quatro chegam em sequência, como um foco que fecha. O nome e a função sobem de uma
+     máscara e um pontinho de "gravando" pisca ao lado da função. -->
+<style>
+.tarja{position:absolute;left:calc(var(--u)*7);bottom:calc(var(--u)*11);padding:calc(var(--u)*2.4) calc(var(--u)*3.4);color:var(--cor-texto);max-width:86%;
+  text-shadow:0 calc(var(--u)*.3) calc(var(--u)*1.4) rgba(0,0,0,.55);animation:sair .45s ease-in calc(var(--dur) - .45s) forwards}
+.canto{position:absolute;width:calc(var(--u)*4);height:calc(var(--u)*4);border:0 solid var(--cor-1);animation:canto .45s cubic-bezier(.2,.8,.2,1) both}
+.c1{left:0;top:0;border-left-width:calc(var(--u)*.5);border-top-width:calc(var(--u)*.5);transform-origin:0 0;animation-delay:.1s}
+.c2{right:0;top:0;border-right-width:calc(var(--u)*.5);border-top-width:calc(var(--u)*.5);transform-origin:100% 0;animation-delay:.18s}
+.c3{right:0;bottom:0;border-right-width:calc(var(--u)*.5);border-bottom-width:calc(var(--u)*.5);transform-origin:100% 100%;animation-delay:.26s}
+.c4{left:0;bottom:0;border-left-width:calc(var(--u)*.5);border-bottom-width:calc(var(--u)*.5);transform-origin:0 100%;animation-delay:.34s}
+.mascara{overflow:hidden}
+.nome{font-weight:800;font-size:calc(var(--u)*6.4);letter-spacing:-.02em;white-space:nowrap;animation:subir .55s cubic-bezier(.2,.8,.2,1) .4s both}
+.funcao{display:flex;align-items:center;gap:calc(var(--u)*1.2);font-weight:600;font-size:calc(var(--u)*3.4);letter-spacing:.12em;text-transform:uppercase;color:var(--cor-2);
+  white-space:nowrap;animation:subir .55s cubic-bezier(.2,.8,.2,1) .55s both}
+.funcao::before{content:"";width:calc(var(--u)*1.4);height:calc(var(--u)*1.4);border-radius:50%;background:#ff3b3b;animation:piscar 1s steps(1) .9s infinite}
+@keyframes canto{from{opacity:0;transform:scale(0)}}
+@keyframes subir{from{transform:translateY(110%)}}
+@keyframes piscar{50%{opacity:.15}}
+@keyframes sair{to{opacity:0;transform:scale(.97)}}
+</style>
+<div class="tarja"><i class="canto c1"></i><i class="canto c2"></i><i class="canto c3"></i><i class="canto c4"></i>
+<div class="mascara"><div class="nome">{{nome}}</div></div><div class="mascara"><div class="funcao">{{funcao}}</div></div></div>

@@ -1,0 +1,138 @@
+{
+ "nome": "Energia solar",
+ "ordem": 47,
+ "versoes": [
+  {
+   "modelo": "grafico_comparacao",
+   "id": "conta_de_luz",
+   "nome": "Conta de luz",
+   "padroes": {
+    "titulo": "Conta de luz por mês",
+    "rotulo_1": "Sem placas (R$)",
+    "valor_1": "100",
+    "rotulo_2": "Com placas (R$)",
+    "valor_2": "8",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "grafico_pontos",
+   "id": "economia_solar",
+   "nome": "Economia",
+   "padroes": {
+    "valor": "92",
+    "legenda": "de economia na conta de luz",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "como_instalar",
+   "nome": "Como funciona",
+   "padroes": {
+    "titulo": "Do orçamento ao sol",
+    "texto": "Visita técnica grátis\nProjeto e aprovação\nInstalação em 2 dias\nEconomia no mês seguinte",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "contador",
+   "id": "paineis_instalados",
+   "nome": "Painéis instalados",
+   "padroes": {
+    "valor": "18000",
+    "prefixo": "+",
+    "sufixo": "",
+    "legenda": "painéis instalados no estado",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "pros_contras",
+   "id": "solar_vale",
+   "nome": "Vale a pena?",
+   "padroes": {
+    "titulo_1": "Vantagens",
+    "texto_1": "Conta até 95% menor\nValoriza o imóvel\nDura mais de 25 anos",
+    "titulo_2": "Atenção",
+    "texto_2": "Investimento inicial\nPrecisa de telhado ao sol"
+   }
+  },
+  {
+   "modelo": "tarja_cantos",
+   "id": "tarja_engenheiro",
+   "nome": "Tarja do engenheiro",
+   "padroes": {
+    "nome": "Eng. Paulo Mendes",
+    "funcao": "Engenheiro eletricista",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "raios_sol",
+   "id": "raios_energia",
+   "nome": "Raios de sol",
+   "padroes": {
+    "titulo": "ENERGIA DO SOL",
+    "subtitulo": "na sua casa, sem conta alta",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "orcamento_solar",
+   "nome": "Peça seu orçamento",
+   "padroes": {
+    "titulo": "Peça seu orçamento grátis",
+    "contato": "(62) 90000-0000",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "chuva_solar",
+   "nome": "Funciona com chuva?",
+   "padroes": {
+    "pergunta": "E em dia nublado, funciona?",
+    "resposta": "Funciona, só que gera menos. O que sobra nos dias de sol vira crédito e cobre os dias nublados.",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "titulo_empilhado",
+   "id": "sol_economia",
+   "nome": "Sol e economia",
+   "padroes": {
+    "texto": "SOL\nÉ\nECONOMIA",
+    "cor_1": "#ffd400",
+    "cor_2": "#ff8a00"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_solar",
+   "nome": "Avaliação da empresa",
+   "padroes": {
+    "nota": "4,9",
+    "legenda": "1.300 instalações avaliadas"
+   }
+  },
+  {
+   "modelo": "transicao_diagonal",
+   "id": "transicao",
+   "nome": "Transição: diagonal",
+   "padroes": {
+    "cor_1": "#ffd400",
+    "cor_2": "#1a1a1a"
+   }
+  }
+ ]
+}

@@ -1,0 +1,111 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Faltam X dias",
+ "categoria": "numeros",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "descricao": "Uma folhinha de calendário vira as páginas até o número de dias que faltam, com a chamada embaixo.",
+ "campos": [
+  {"id": "dias", "rotulo": "Dias que faltam", "tipo": "numero", "padrao": "7", "maximo": 0},
+  {"id": "rotulo", "rotulo": "Topo da folhinha", "tipo": "texto", "padrao": "FALTAM", "maximo": 12},
+  {"id": "legenda", "rotulo": "Legenda", "tipo": "texto", "padrao": "dias para a Black Friday", "maximo": 36},
+  {"id": "cor_1", "rotulo": "Topo (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Topo (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor da legenda", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Folhinha: começa em dias + 6 e vira uma folha a cada 0,17 s até chegar em "dias"; a folha que sai gira
+     para cima em volta da argola (escala vertical de 1 a -1, mais escura quando de costas). Depois da
+     última, a folhinha dá um pulinho. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const final = Math.max(0, parseInt(C.dias, 10) || 0);
+  const PASSOS = 6;
+  const PASSO = 0.17;
+
+  function folha(x, y, w, h, n) {
+    TO.retangulo(ctx, x, y, w, h, 2 * u);
+    ctx.fillStyle = "#fbfaf7";
+    ctx.fill();
+    ctx.fillStyle = "#1a1b20";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(900, TO.caber(ctx, String(n), 900, 20, w * 0.8, "Montserrat"), "Montserrat");
+    ctx.fillText(String(n), x + w / 2, y + h * 0.52);
+  }
+
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const env = TO.envelope(t, 0.3, 0.45, dur);
+    const w = 34 * u;
+    const topo = 9 * u;
+    const h = 30 * u;
+    const x = W / 2 - w / 2;
+    const y = H / 2 - (topo + h) / 2 - 6 * u;
+    const inicioVirar = 0.4;
+    const virados = TO.clamp((t - inicioVirar) / PASSO, 0, PASSOS);
+    const inteiro = Math.min(PASSOS, Math.floor(virados));
+    const fracao = inteiro >= PASSOS ? 0 : virados - inteiro;
+    const fim = inicioVirar + PASSOS * PASSO;
+    const pulo = t > fim ? Math.sin(TO.clamp((t - fim) / 0.35) * Math.PI) * 1.6 * u : 0;
+    ctx.save();
+    ctx.globalAlpha = env;
+    ctx.translate(0, -pulo);
+    // Sombra e topo
+    ctx.shadowColor = "rgba(0,0,0,.4)";
+    ctx.shadowBlur = 3 * u;
+    TO.retangulo(ctx, x, y, w, topo + h, 2.4 * u);
+    ctx.fillStyle = "#fbfaf7";
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.save();
+    TO.retangulo(ctx, x, y, w, topo + 2 * u, 2.4 * u);
+    ctx.clip();
+    ctx.fillStyle = TO.degrade(ctx, x, y, x + w, y);
+    ctx.fillRect(x, y, w, topo);
+    ctx.restore();
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(800, TO.caber(ctx, C.rotulo, 800, 4, w * 0.8));
+    ctx.fillText(C.rotulo, x + w / 2, y + topo / 2 + 0.3 * u);
+    // Folha de baixo (a próxima) e a que está virando
+    const atual = final + PASSOS - inteiro;
+    folha(x, y + topo, w, h, Math.max(final, atual - (fracao > 0 ? 1 : 0)));
+    if (fracao > 0) {
+      const e = TO.ease.inOutCubic(fracao);
+      const s = Math.cos(e * Math.PI);
+      ctx.save();
+      ctx.translate(0, y + topo);
+      ctx.scale(1, s);
+      ctx.translate(0, -(y + topo));
+      if (s > 0) folha(x, y + topo, w, h, atual);
+      else {
+        TO.retangulo(ctx, x, y + topo, w, h, 2 * u);
+        ctx.fillStyle = "#d9d6cf";
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // Argolas
+    for (const ax of [x + w * 0.28, x + w * 0.72]) {
+      TO.retangulo(ctx, ax - 0.9 * u, y - 2.2 * u, 1.8 * u, 4.4 * u, 0.9 * u);
+      ctx.fillStyle = "#3a3b42";
+      ctx.fill();
+    }
+    // Legenda
+    ctx.globalAlpha = env * TO.prog(t, fim - 0.2, fim + 0.3);
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,.55)";
+    ctx.shadowBlur = 1.6 * u;
+    ctx.font = TO.fonte(700, TO.caber(ctx, C.legenda, 700, 5, W * 0.86));
+    ctx.fillText(C.legenda, W / 2, y + topo + h + 8 * u);
+    ctx.restore();
+  };
+})();
+</script>

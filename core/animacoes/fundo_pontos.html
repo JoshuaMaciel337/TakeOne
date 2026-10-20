@@ -1,0 +1,67 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Grade de pontos em onda",
+ "categoria": "fundos",
+ "motor": "canvas",
+ "duracao": 6,
+ "tela_cheia": true,
+ "descricao": "Uma grade de pontos por cima do vídeo que respira em ondas a partir do centro, mudando de tamanho e de cor.",
+ "campos": [
+  {"id": "titulo", "rotulo": "Título (opcional)", "tipo": "texto", "padrao": "", "maximo": 26},
+  {"id": "cor_1", "rotulo": "Pontos (perto)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Pontos (longe)", "tipo": "cor", "padrao": "#6bd8f2"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Pontos: uma grade a cada 5 u; o raio de cada ponto é um seno da distância ao centro menos o tempo (uma
+     onda que sai do meio), e a cor vai de uma para a outra conforme a crista passa. A grade aparece do
+     centro para fora e some no fim. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const passo = 5 * u;
+  const R = Math.hypot(W, H) / 2;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.clearRect(0, 0, W, H);
+    const fim = 1 - TO.prog(t, dur - 0.8, dur);
+    const alcance = TO.ease.outCubic(TO.prog(t, 0, 1.2)) * R * 1.1;
+    const cols = Math.ceil(W / passo) + 1;
+    const lins = Math.ceil(H / passo) + 1;
+    const ox = (W - (cols - 1) * passo) / 2;
+    const oy = (H - (lins - 1) * passo) / 2;
+    for (let j = 0; j < lins; j++) {
+      for (let i = 0; i < cols; i++) {
+        const x = ox + i * passo;
+        const y = oy + j * passo;
+        const d = Math.hypot(x - W / 2, y - H / 2);
+        if (d > alcance) continue;
+        const onda = 0.5 + 0.5 * Math.sin(d / (14 * u) - t * 2.6);
+        const r = (0.45 + 1.05 * onda) * u * fim;
+        if (r <= 0.05) continue;
+        ctx.globalAlpha = (0.45 + 0.55 * onda) * fim;
+        ctx.fillStyle = TO.mix(C.cor_2, C.cor_1, onda);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+    if (C.titulo) {
+      const k = TO.ease.outCubic(TO.prog(t, 0.6, 1.3)) * (1 - TO.prog(t, dur - 0.8, dur - 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,.6)";
+      ctx.shadowBlur = 3 * u;
+      ctx.font = TO.fonte(800, TO.caber(ctx, C.titulo, 800, 10, W * 0.84, "Montserrat"), "Montserrat");
+      ctx.fillText(C.titulo, W / 2, H / 2);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+</script>

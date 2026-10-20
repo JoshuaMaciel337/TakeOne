@@ -200,6 +200,15 @@
    }
   },
   {
+   "modelo": "transicao_pixels",
+   "id": "transicao_pixels_games",
+   "nome": "Transição: pixels",
+   "padroes": {
+    "cor_1": "#39ff88",
+    "cor_2": "#00d1ff"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

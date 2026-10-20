@@ -141,6 +141,18 @@
    }
   },
   {
+   "modelo": "calendario_dias",
+   "id": "entrega_obra",
+   "nome": "Entrega da obra",
+   "padroes": {
+    "dias": "30",
+    "rotulo": "FALTAM",
+    "legenda": "dias para a entrega das chaves",
+    "cor_1": "#ffc83d",
+    "cor_2": "#ff7a00"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

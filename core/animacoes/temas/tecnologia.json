@@ -186,6 +186,18 @@
    }
   },
   {
+   "modelo": "chamada_clique",
+   "id": "baixar_app",
+   "nome": "Baixar o app",
+   "padroes": {
+    "texto": "Baixar o app",
+    "depois": "Baixando… ✓",
+    "subtitulo": "grátis para celular e computador",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

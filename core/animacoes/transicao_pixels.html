@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Pixels",
+ "categoria": "transicoes",
+ "motor": "canvas",
+ "duracao": 1.5,
+ "tela_cheia": true,
+ "descricao": "A tela se enche de quadradinhos que aparecem em ordem sorteada, como um jogo antigo, e somem do mesmo jeito. Ponha em cima de um corte.",
+ "campos": [
+  {"id": "texto", "rotulo": "Texto no meio (opcional)", "tipo": "texto", "padrao": "", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Pixels (uma cor)", "tipo": "cor", "padrao": "#39ff88"},
+  {"id": "cor_2", "rotulo": "Pixels (outra cor)", "tipo": "cor", "padrao": "#00d1ff"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#111111"}
+ ]
+}
+</script>
+<!-- Pixels: uma grade de quadrados de 6 u; cada um tem um instante sorteado (hash do índice) para acender
+     na primeira metade e outro para apagar na segunda, com um pouco de preferência pela distância ao centro
+     (o meio enche antes e esvazia antes). A cor de cada quadrado sai do sorteio entre as duas. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const lado = 6 * u;
+  const cols = Math.ceil(W / lado);
+  const lins = Math.ceil(H / lado);
+  const maxD = Math.hypot(cols / 2, lins / 2);
+  const quadros = [];
+  for (let j = 0; j < lins; j++) {
+    for (let i = 0; i < cols; i++) {
+      const idx = j * cols + i;
+      const d = Math.hypot(i + 0.5 - cols / 2, j + 0.5 - lins / 2) / maxD;
+      quadros.push({
+        x: i * lado, y: j * lado,
+        // Entre 0 e 1: a fração da metade da duração em que o quadrado acende (e, na volta, apaga)
+        entra: 0.6 * TO.hash(idx, 3) + 0.4 * d,
+        sai: 0.6 * TO.hash(idx, 8) + 0.4 * d,
+        cor: TO.hash(idx, 5) < 0.5 ? C.cor_1 : C.cor_2,
+      });
+    }
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    const meio = dur / 2;
+    ctx.clearRect(0, 0, W, H);
+    // Todos acesos um pouco antes do meio, todos apagados um pouco antes do fim
+    const ida = TO.clamp(t / (meio - 0.03));
+    const volta = TO.clamp((t - meio) / (meio - 0.03));
+    for (const q of quadros) {
+      if (ida < 1 && ida < q.entra) continue;
+      if (volta > 0 && (volta >= 1 || volta >= q.sai)) continue;
+      ctx.fillStyle = q.cor;
+      ctx.fillRect(q.x, q.y, lado + 1, lado + 1);
+    }
+    if (C.texto) {
+      const k = Math.min(TO.prog(t, meio - 0.25, meio - 0.1), 1 - TO.prog(t, meio + 0.05, meio + 0.2));
+      ctx.globalAlpha = k;
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 9, W * 0.8));
+      ctx.fillText(C.texto, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+  };
+})();
+</script>

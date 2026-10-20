@@ -167,6 +167,18 @@
    }
   },
   {
+   "modelo": "enquete_deslizar",
+   "id": "fofura",
+   "nome": "Nível de fofura",
+   "padroes": {
+    "pergunta": "Qual o nível de fofura deste filhote?",
+    "emoji": "🥰",
+    "valor": "100",
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

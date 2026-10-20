@@ -204,6 +204,18 @@
    }
   },
   {
+   "modelo": "calendario_dias",
+   "id": "dias_natal",
+   "nome": "Faltam dias para o Natal",
+   "padroes": {
+    "dias": "24",
+    "rotulo": "DEZEMBRO",
+    "legenda": "dias para o Natal",
+    "cor_1": "#e63946",
+    "cor_2": "#2a9d8f"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

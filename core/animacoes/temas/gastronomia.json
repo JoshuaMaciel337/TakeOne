@@ -205,6 +205,20 @@
    }
   },
   {
+   "modelo": "oferta_relampago",
+   "id": "relampago_delivery",
+   "nome": "Oferta relâmpago",
+   "padroes": {
+    "titulo": "COMBO RELÂMPAGO",
+    "horas": "1",
+    "minutos": "29",
+    "estoque": "22",
+    "legenda": "combos restantes",
+    "cor_1": "#ffb547",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
    "modelo": "transicao_bolhas",
    "id": "transicao",
    "nome": "Transição: círculos",

@@ -152,6 +152,18 @@
    }
   },
   {
+   "modelo": "calendario_dias",
+   "id": "dias_formatura",
+   "nome": "Faltam dias",
+   "padroes": {
+    "dias": "20",
+    "rotulo": "FALTAM",
+    "legenda": "dias para a nossa formatura",
+    "cor_1": "#e8c98f",
+    "cor_2": "#c79a4b"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",

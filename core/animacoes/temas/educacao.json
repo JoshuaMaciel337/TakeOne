@@ -220,6 +220,17 @@
    }
   },
   {
+   "modelo": "lista_riscar",
+   "id": "erros_redacao",
+   "nome": "Erros na redação",
+   "padroes": {
+    "titulo": "Erros que tiram nota",
+    "texto": "Fugir do tema\nNão ter proposta de intervenção\nLetra ilegível\nTexto curto demais",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

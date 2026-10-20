@@ -147,6 +147,28 @@
    }
   },
   {
+   "modelo": "enquete_deslizar",
+   "id": "enquete_emoji_criador",
+   "nome": "Enquete com emoji",
+   "padroes": {
+    "pergunta": "Quanto você quer a parte 2?",
+    "emoji": "🔥",
+    "valor": "94",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
+   "modelo": "chamada_compartilhar",
+   "id": "mande_amigo",
+   "nome": "Mande para um amigo",
+   "padroes": {
+    "texto": "Mande para aquele amigo que precisa ver",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

@@ -243,6 +243,17 @@
    }
   },
   {
+   "modelo": "tarja_dois_tons",
+   "id": "tarja_diretora",
+   "nome": "Tarja em dois blocos",
+   "padroes": {
+    "nome": "Luciana Prado",
+    "funcao": "Diretora comercial",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#3b82f6"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

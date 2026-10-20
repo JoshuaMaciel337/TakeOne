@@ -1,0 +1,138 @@
+{
+ "nome": "Tatuagem",
+ "ordem": 49,
+ "versoes": [
+  {
+   "modelo": "titulo_eco",
+   "id": "tattoo_eco",
+   "nome": "Tattoo",
+   "padroes": {
+    "texto": "TATTOO",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "tarja_cantos",
+   "id": "tarja_tatuador",
+   "nome": "Tarja do tatuador",
+   "padroes": {
+    "nome": "Kika Duarte",
+    "funcao": "Tatuadora · fineline",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "cuidados_tattoo",
+   "nome": "Cuidados",
+   "padroes": {
+    "titulo": "Tatuagem nova",
+    "texto": "Lave com sabonete neutro\nPasse a pomada indicada\nNada de sol por 30 dias\nNão coce a casquinha",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "agenda",
+   "id": "flash_day",
+   "nome": "Flash day",
+   "padroes": {
+    "titulo": "Flash day",
+    "texto": "10:00 Abertura\n10:30 Desenhos prontos\n14:00 Sorteio\n18:00 Últimas vagas",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "cobertura",
+   "nome": "Cobertura",
+   "padroes": {
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "tatuagem antiga",
+    "rotulo_depois": "cobertura nova",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "agenda_aberta_tattoo",
+   "nome": "Agenda aberta",
+   "padroes": {
+    "texto": "AGENDA ABERTA",
+    "subtitulo": "novembro e dezembro",
+    "cor_1": "#e63946",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "orcamento_tattoo",
+   "nome": "Orçamento",
+   "padroes": {
+    "titulo": "Mande sua ideia",
+    "contato": "(11) 90000-0000",
+    "cor_1": "#e63946",
+    "cor_2": "#9d0208"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_estudio_tattoo",
+   "nome": "Avaliação do estúdio",
+   "padroes": {
+    "nota": "5,0",
+    "legenda": "940 tatuagens feitas"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "dor_tattoo",
+   "nome": "Dói?",
+   "padroes": {
+    "pergunta": "Tatuagem na costela dói muito?",
+    "resposta": "Dói mais que no braço, porque a pele é fina e fica em cima do osso. Mas é rápido e a gente faz pausas.",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "logo_letras",
+   "id": "logo_tattoo",
+   "nome": "Logo do estúdio",
+   "padroes": {
+    "texto": "Tinta Viva",
+    "slogan": "tattoo e piercing",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "estilo_tattoo",
+   "nome": "Qual estilo",
+   "padroes": {
+    "pergunta": "Qual estilo vem no próximo flash?",
+    "opcao_1": "Fineline",
+    "pct_1": "57",
+    "opcao_2": "Old school",
+    "pct_2": "43",
+    "cor_1": "#f5f5f5",
+    "cor_2": "#e63946"
+   }
+  },
+  {
+   "modelo": "transicao_tinta",
+   "id": "transicao",
+   "nome": "Transição: tinta",
+   "padroes": {
+    "cor_1": "#9d0208",
+    "cor_2": "#e63946"
+   }
+  }
+ ]
+}

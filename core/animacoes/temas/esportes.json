@@ -223,6 +223,16 @@
    }
   },
   {
+   "modelo": "titulo_empilhado",
+   "id": "treino_jogo",
+   "nome": "Treino e jogo",
+   "padroes": {
+    "texto": "TREINE\nJOGUE\nVENÇA",
+    "cor_1": "#35d3a1",
+    "cor_2": "#22c55e"
+   }
+  },
+  {
    "modelo": "transicao_circulo",
    "id": "transicao",
    "nome": "Transição: círculo",

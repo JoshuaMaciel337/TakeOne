@@ -237,6 +237,17 @@
    }
   },
   {
+   "modelo": "titulo_letreiro",
+   "id": "letreiro_festa",
+   "nome": "Letreiro da festa",
+   "padroes": {
+    "texto": "NOITE DE GALA",
+    "subtitulo": "sábado, 22h",
+    "cor_1": "#9b8cff",
+    "cor_2": "#ff3478"
+   }
+  },
+  {
    "modelo": "transicao_cortina",
    "id": "transicao",
    "nome": "Transição: cortina",

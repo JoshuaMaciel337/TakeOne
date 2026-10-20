@@ -1,0 +1,144 @@
+{
+ "nome": "Idiomas",
+ "ordem": 46,
+ "versoes": [
+  {
+   "modelo": "titulo_rolo",
+   "id": "bom_dia_idiomas",
+   "nome": "Bom dia em vários idiomas",
+   "padroes": {
+    "texto": "Bom dia em",
+    "palavras": "inglês\nespanhol\nfrancês\nitaliano",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "pergunta_resposta",
+   "id": "como_se_diz",
+   "nome": "Como se diz",
+   "padroes": {
+    "pergunta": "Como se diz \"saudade\" em inglês?",
+    "resposta": "Não tem uma palavra só. O mais perto é \"I miss you\", eu sinto sua falta.",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "lista_riscar",
+   "id": "erros_comuns",
+   "nome": "Erros comuns",
+   "padroes": {
+    "titulo": "Erros que todo mundo comete",
+    "texto": "Traduzir palavra por palavra\nTer vergonha de errar\nEstudar só a gramática\nNão ouvir nativos",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "metodo_idioma",
+   "nome": "Método",
+   "padroes": {
+    "titulo": "Fluência em 4 hábitos",
+    "texto": "Ouça 15 min por dia\nFale sozinho em voz alta\nAprenda frases inteiras\nRevise antes de dormir",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "tarja_dois_tons",
+   "id": "tarja_professora_idioma",
+   "nome": "Tarja da professora",
+   "padroes": {
+    "nome": "Teacher Mariana",
+    "funcao": "Professora de inglês",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "grafico_comparacao",
+   "id": "evolucao_aluno",
+   "nome": "Evolução do aluno",
+   "padroes": {
+    "titulo": "Compreensão oral",
+    "rotulo_1": "Primeira aula",
+    "valor_1": "25",
+    "rotulo_2": "Depois de 6 meses",
+    "valor_2": "80",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "enquete",
+   "id": "enquete_idioma",
+   "nome": "Qual idioma",
+   "padroes": {
+    "pergunta": "Qual idioma você quer aprender?",
+    "opcao_1": "Inglês",
+    "pct_1": "62",
+    "opcao_2": "Espanhol",
+    "pct_2": "38",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "calendario_dias",
+   "id": "inicio_turma",
+   "nome": "Início da turma",
+   "padroes": {
+    "dias": "10",
+    "rotulo": "FALTAM",
+    "legenda": "dias para a nova turma",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "conversa_chat",
+   "id": "conversa_ingles",
+   "nome": "Conversa em inglês",
+   "padroes": {
+    "texto": "Hi! How are you?\nI'm fine, thanks! And you?\nGreat! Nice to meet you.\nNice to meet you too!",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "chamada_clique",
+   "id": "aula_gratis",
+   "nome": "Aula grátis",
+   "padroes": {
+    "texto": "Quero uma aula grátis",
+    "depois": "Vaga garantida ✓",
+    "subtitulo": "aulas online ao vivo",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "logo_quadrado",
+   "id": "logo_escola_idiomas",
+   "nome": "Logo da escola",
+   "padroes": {
+    "sigla": "FL",
+    "texto": "Fala Logo",
+    "slogan": "escola de idiomas",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  },
+  {
+   "modelo": "transicao_pixels",
+   "id": "transicao",
+   "nome": "Transição: pixels",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#ff624a"
+   }
+  }
+ ]
+}

@@ -1,0 +1,41 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Tarja em dois blocos",
+ "categoria": "tarjas",
+ "motor": "css",
+ "duracao": 4.5,
+ "descricao": "Dois blocos de cor deslizam um sobre o outro: o de cima com o nome, o de baixo, menor, com a função.",
+ "campos": [
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Ana Beatriz Costa", "maximo": 30},
+  {"id": "funcao", "rotulo": "Função", "tipo": "texto", "padrao": "Nutricionista esportiva", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Bloco do nome", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Bloco da função", "tipo": "cor", "padrao": "#16171c"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Dois blocos: em cada bloco, um véu na cor do outro bloco passa da esquerda para a direita (cresce até
+     cobrir e encolhe pelo outro lado); quando ele cobre tudo, o fundo e o texto do bloco aparecem por trás,
+     como nas tarjas de telejornal. O de baixo entra 0,15 s depois e um pouco recuado. Na saída o véu volta
+     a cobrir e tudo some. -->
+<style>
+.tarja{position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*11);display:flex;flex-direction:column;align-items:flex-start;max-width:86%;
+  color:var(--cor-texto);animation:sumir .01s linear calc(var(--dur) - .05s) forwards}
+.bloco{position:relative;white-space:nowrap}
+.fundo,.veu{position:absolute;inset:0}
+.fundo{opacity:0;animation:aparecer .01s linear calc(var(--d) + .35s) forwards}
+.texto{position:relative;opacity:0;animation:aparecer .01s linear calc(var(--d) + .35s) forwards}
+.veu{transform:scaleX(0);animation:cobrir .35s cubic-bezier(.65,0,.35,1) var(--d) forwards,abrir .35s cubic-bezier(.65,0,.35,1) calc(var(--d) + .36s) forwards,
+  fechar .45s cubic-bezier(.65,0,.35,1) calc(var(--dur) - .5s) forwards}
+.nome{--d:.05s;padding:calc(var(--u)*1.6) calc(var(--u)*3);font-weight:800;font-size:calc(var(--u)*5.8);letter-spacing:-.02em}
+.nome .fundo,.funcao .veu{background:var(--cor-1)}
+.funcao{--d:.2s;margin-left:calc(var(--u)*2.4);padding:calc(var(--u)*1.1) calc(var(--u)*2.6);font-weight:600;font-size:calc(var(--u)*3.4)}
+.funcao .fundo,.nome .veu{background:var(--cor-2)}
+@keyframes cobrir{from{transform-origin:0 50%;transform:scaleX(0)}to{transform-origin:0 50%;transform:scaleX(1)}}
+@keyframes abrir{from{transform-origin:100% 50%;transform:scaleX(1)}to{transform-origin:100% 50%;transform:scaleX(0)}}
+@keyframes fechar{from{transform-origin:100% 50%;transform:scaleX(0)}to{transform-origin:100% 50%;transform:scaleX(1)}}
+@keyframes aparecer{to{opacity:1}}
+@keyframes sumir{to{opacity:0}}
+</style>
+<div class="tarja"><div class="bloco nome"><i class="fundo"></i><span class="texto">{{nome}}</span><i class="veu"></i></div>
+<div class="bloco funcao"><i class="fundo"></i><span class="texto">{{funcao}}</span><i class="veu"></i></div></div>

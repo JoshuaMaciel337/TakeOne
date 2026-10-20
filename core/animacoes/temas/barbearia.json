@@ -1,0 +1,136 @@
+{
+ "nome": "Barbearia",
+ "ordem": 45,
+ "versoes": [
+  {
+   "modelo": "logo_letras",
+   "id": "logo_barbearia",
+   "nome": "Logo da barbearia",
+   "padroes": {
+    "texto": "Navalha",
+    "slogan": "barbearia clássica desde 1998",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "tarja_cantos",
+   "id": "tarja_barbeiro",
+   "nome": "Tarja do barbeiro",
+   "padroes": {
+    "nome": "Seu Jorge Ramos",
+    "funcao": "Barbeiro há 25 anos",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "cardapio",
+   "id": "precos_barbearia",
+   "nome": "Tabela de preços",
+   "padroes": {
+    "titulo": "Serviços",
+    "texto": "Corte: R$ 45\nBarba: R$ 35\nCorte e barba: R$ 70\nSobrancelha: R$ 15",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "horario",
+   "id": "horario_barbearia",
+   "nome": "Horário da barbearia",
+   "padroes": {
+    "titulo": "Cadeiras abertas",
+    "texto": "Ter a sex · 9h às 20h\nSábado · 8h às 18h\nDomingo e segunda · fechado",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "antes_depois",
+   "id": "transformacao",
+   "nome": "Antes e depois",
+   "padroes": {
+    "antes": "Antes",
+    "depois": "Depois",
+    "rotulo_antes": "cabelo e barba",
+    "rotulo_depois": "degradê e navalha",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "titulo_letreiro",
+   "id": "letreiro_barbearia",
+   "nome": "Letreiro",
+   "padroes": {
+    "texto": "BARBEARIA",
+    "subtitulo": "corte, barba e bigode",
+    "cor_1": "#ffd36b",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "chamada_mensagem",
+   "id": "agende_horario",
+   "nome": "Agende seu horário",
+   "padroes": {
+    "titulo": "Agende seu horário",
+    "contato": "(11) 90000-0000",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "avaliacao",
+   "id": "avaliacao_barbearia",
+   "nome": "Avaliação da barbearia",
+   "padroes": {
+    "nota": "4,9",
+    "legenda": "620 clientes avaliaram"
+   }
+  },
+  {
+   "modelo": "lista_numerada",
+   "id": "cuidados_barba",
+   "nome": "Cuidados com a barba",
+   "padroes": {
+    "titulo": "Barba em dia",
+    "texto": "Lave com xampu próprio\nUse óleo todo dia\nPenteie no sentido dos fios\nApare a cada 15 dias",
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  },
+  {
+   "modelo": "titulo_carimbo",
+   "id": "corte_novo",
+   "nome": "Corte novo",
+   "padroes": {
+    "texto": "CORTE NOVO",
+    "subtitulo": "agenda da semana aberta",
+    "cor_1": "#e8c98f",
+    "cor_2": "#ffffff"
+   }
+  },
+  {
+   "modelo": "tarja_dois_tons",
+   "id": "tarja_cliente",
+   "nome": "Tarja do cliente",
+   "padroes": {
+    "nome": "Rodrigo Alves",
+    "funcao": "cliente da casa",
+    "cor_1": "#8b5a2b",
+    "cor_2": "#1a1410"
+   }
+  },
+  {
+   "modelo": "transicao_persiana",
+   "id": "transicao",
+   "nome": "Transição: persiana",
+   "padroes": {
+    "cor_1": "#e8c98f",
+    "cor_2": "#8b5a2b"
+   }
+  }
+ ]
+}

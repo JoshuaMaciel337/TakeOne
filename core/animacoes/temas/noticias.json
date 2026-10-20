@@ -172,6 +172,17 @@
    }
   },
   {
+   "modelo": "tarja_cantos",
+   "id": "cantos_reporter",
+   "nome": "Repórter com cantoneiras",
+   "padroes": {
+    "nome": "Bruno Siqueira",
+    "funcao": "Repórter, ao vivo",
+    "cor_1": "#e63946",
+    "cor_2": "#1d4ed8"
+   }
+  },
+  {
    "modelo": "transicao_blocos",
    "id": "transicao",
    "nome": "Transição: blocos",

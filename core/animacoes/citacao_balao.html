@@ -1,0 +1,43 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Depoimento em balão",
+ "categoria": "citacoes",
+ "motor": "css",
+ "duracao": 5.5,
+ "descricao": "Um balão de fala branco cresce a partir da ponta, com o depoimento dentro e o nome de quem falou ao lado de um avatar.",
+ "campos": [
+  {"id": "texto", "rotulo": "Depoimento", "tipo": "texto", "padrao": "Atendimento impecável. Resolveram tudo em um dia e ainda me ligaram para saber se estava tudo certo.", "maximo": 150},
+  {"id": "nome", "rotulo": "Nome", "tipo": "texto", "padrao": "Fernanda S.", "maximo": 28},
+  {"id": "detalhe", "rotulo": "Detalhe (opcional)", "tipo": "texto", "padrao": "cliente desde 2022", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Avatar (início)", "tipo": "cor", "padrao": "#ff624a"},
+  {"id": "cor_2", "rotulo": "Avatar (fim)", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do nome", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Balão: o balão cresce com mola a partir do canto da ponta (transform-origin no rabicho); as palavras do
+     depoimento aparecem em sequência rápida, e o avatar com o nome entra embaixo, do lado da ponta. O texto
+     do balão é sempre escuro, porque o balão é branco. -->
+<style>
+.depoimento{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(var(--u)*80),86%);display:flex;flex-direction:column;
+  gap:calc(var(--u)*3);animation:sair .5s ease-in calc(var(--dur) - .5s) forwards}
+.balao{position:relative;padding:calc(var(--u)*3.4) calc(var(--u)*4);border-radius:calc(var(--u)*4);background:#fff;color:#1a1b20;
+  font-weight:600;font-size:calc(var(--u)*4.4);line-height:1.35;box-shadow:0 calc(var(--u)*1) calc(var(--u)*4) rgba(0,0,0,.35);
+  transform-origin:calc(var(--u)*8) 100%;animation:crescer .6s cubic-bezier(.3,1.4,.5,1) both}
+.balao::after{content:"";position:absolute;left:calc(var(--u)*6);bottom:calc(var(--u)*-2.6);width:calc(var(--u)*5);height:calc(var(--u)*3);background:#fff;
+  clip-path:polygon(0 0,100% 0,10% 100%)}
+.palavra{display:inline-block;margin-right:.24em;animation:aparecer .3s ease-out calc(.45s + var(--i) * .05s) both}
+.autor{display:flex;align-items:center;gap:calc(var(--u)*2);margin-left:calc(var(--u)*4);color:var(--cor-texto);animation:entrar .5s cubic-bezier(.2,.8,.2,1) .9s both;
+  text-shadow:0 calc(var(--u)*.2) calc(var(--u)*1.2) rgba(0,0,0,.55)}
+.avatar{flex:none;width:calc(var(--u)*7);height:calc(var(--u)*7);border-radius:50%;background:linear-gradient(135deg,var(--cor-1),var(--cor-2));
+  border:calc(var(--u)*.5) solid #fff}
+.nome{font-weight:800;font-size:calc(var(--u)*4)}
+.detalhe{font-weight:500;font-size:calc(var(--u)*3);opacity:.8}
+.detalhe:empty{display:none}
+@keyframes crescer{from{opacity:0;transform:scale(.3)}}
+@keyframes aparecer{from{opacity:0;transform:translateY(calc(var(--u)*1))}}
+@keyframes entrar{from{opacity:0;transform:translateX(calc(var(--u)*-3))}}
+@keyframes sair{to{opacity:0;transform:translate(-50%,-47%)}}
+</style>
+<div class="depoimento"><div class="balao">{{texto:palavras}}</div>
+<div class="autor"><div class="avatar"></div><div><div class="nome">{{nome}}</div><div class="detalhe">{{detalhe}}</div></div></div></div>

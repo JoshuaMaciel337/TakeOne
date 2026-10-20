@@ -1,0 +1,142 @@
+{
+ "nome": "Eventos corporativos",
+ "ordem": 48,
+ "versoes": [
+  {
+   "modelo": "agenda",
+   "id": "programa_convencao",
+   "nome": "Programação da convenção",
+   "padroes": {
+    "titulo": "Convenção 2026",
+    "texto": "08:30 Credenciamento\n09:30 Abertura do CEO\n11:00 Resultados do ano\n14:00 Painéis\n18:00 Premiação",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "tarja_dois_tons",
+   "id": "tarja_palestrante",
+   "nome": "Tarja do palestrante",
+   "padroes": {
+    "nome": "Carla Menezes",
+    "funcao": "Diretora de operações",
+    "cor_1": "#1e3a8a",
+    "cor_2": "#0f172a"
+   }
+  },
+  {
+   "modelo": "tarja_cantos",
+   "id": "tarja_painel",
+   "nome": "Tarja de painelista",
+   "padroes": {
+    "nome": "Roberto Faria",
+    "funcao": "Gerente comercial",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "tres_numeros",
+   "id": "numeros_ano",
+   "nome": "Números do ano",
+   "padroes": {
+    "dados": "colaboradores: 1200\ncidades: 48\nde crescimento (%): 23",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "titulo_letreiro",
+   "id": "premiacao",
+   "nome": "Noite de premiação",
+   "padroes": {
+    "texto": "PREMIAÇÃO 2026",
+    "subtitulo": "os destaques do ano",
+    "cor_1": "#ffd36b",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "grafico_comparacao",
+   "id": "meta_batida",
+   "nome": "Meta batida",
+   "padroes": {
+    "titulo": "Vendas do ano",
+    "rotulo_1": "Meta (%)",
+    "valor_1": "100",
+    "rotulo_2": "Resultado (%)",
+    "valor_2": "118",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "citacao_aspas",
+   "id": "frase_lideranca",
+   "nome": "Frase de liderança",
+   "padroes": {
+    "texto": "Sozinhos vamos mais rápido; juntos vamos mais longe.",
+    "autor": "provérbio africano",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "evento_cartao",
+   "id": "kickoff",
+   "nome": "Kick-off",
+   "padroes": {
+    "dia": "03",
+    "mes": "FEV",
+    "titulo": "Kick-off de vendas",
+    "hora": "Das 9h às 17h",
+    "local": "Auditório principal",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "lista_checks",
+   "id": "checklist_evento",
+   "nome": "Checklist do evento",
+   "padroes": {
+    "titulo": "Antes de entrar",
+    "texto": "Crachá no peito\nCelular no silencioso\nApp do evento baixado\nPergunta para o painel",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "enquete_deslizar",
+   "id": "satisfacao_evento",
+   "nome": "Satisfação",
+   "padroes": {
+    "pergunta": "Quanto você curtiu o evento?",
+    "emoji": "🤩",
+    "valor": "92",
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  },
+  {
+   "modelo": "logo_brilho",
+   "id": "logo_empresa_evento",
+   "nome": "Logo da empresa",
+   "padroes": {
+    "texto": "NORTEX",
+    "slogan": "convenção nacional",
+    "cor_1": "#e0f2ff",
+    "cor_2": "#6bd8f2"
+   }
+  },
+  {
+   "modelo": "transicao_persiana",
+   "id": "transicao",
+   "nome": "Transição: persiana",
+   "padroes": {
+    "cor_1": "#6bd8f2",
+    "cor_2": "#1e3a8a"
+   }
+  }
+ ]
+}

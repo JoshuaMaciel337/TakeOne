@@ -204,6 +204,17 @@
    }
   },
   {
+   "modelo": "lista_riscar",
+   "id": "erros_treino",
+   "nome": "Erros no treino",
+   "padroes": {
+    "titulo": "Erros que travam o resultado",
+    "texto": "Pular o aquecimento\nTreinar sem descanso\nDormir pouco\nComer pouco proteína",
+    "cor_1": "#c6ff3d",
+    "cor_2": "#35d3a1"
+   }
+  },
+  {
    "modelo": "transicao_listras",
    "id": "transicao",
    "nome": "Transição: listras",
