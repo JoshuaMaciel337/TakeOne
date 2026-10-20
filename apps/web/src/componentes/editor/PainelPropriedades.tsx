@@ -9,7 +9,7 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
-import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoNoTempo } from "@/lib/projeto/keyframes";
+import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
   CURVAS_DO_FADE,
@@ -34,6 +34,7 @@ import { ControleNumerico } from "./ControleNumerico";
 import { NoRitmo } from "./NoRitmo";
 import { Estabilizar } from "./Estabilizar";
 import { BotaoSeguirObjeto } from "./SeguirObjeto";
+import { SecaoExpressoes } from "./SecaoExpressoes";
 import { SecaoForma } from "./SecaoForma";
 import { SeguirRosto } from "./SeguirRosto";
 
@@ -325,7 +326,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
   // Os valores do instante do cursor: com keyframes, mexer grava um ponto ali
-  const t = transformacaoNoTempo(clipe, tempo);
+  const t = transformacaoParaEditar(clipe, tempo);
   const travada = faixa.travada;
   const ids = [clipe.id];
   const dentro = tempo >= clipe.inicio && tempo <= clipe.inicio + clipe.duracao;
@@ -511,6 +512,9 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             aoIniciar={() => seguirObjeto.aoIniciar(clipe.id)}
           />
         ) : null}
+      </Secao>
+      <Secao titulo="Expressões">
+        <SecaoExpressoes clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
       </Secao>
       {clipe.texto ? null : (
         <Secao titulo="Recorte">
