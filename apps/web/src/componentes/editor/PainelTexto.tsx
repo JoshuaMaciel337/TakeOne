@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 
 import { urlDaImagemDeTexto } from "@/lib/previa/imagensDeTexto";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
+import type { Midia } from "@/lib/tipos";
+
+import { PainelAnimacoes } from "./PainelAnimacoes";
 
 /** Lado menor das miniaturas dos estilos: pequeno, só para mostrar como fica. */
 const LADO_MINIATURA = 360;
@@ -36,16 +39,31 @@ function MiniaturaDoEstilo({ texto, nome }: { texto: Texto; nome: string }) {
   );
 }
 
-/** Painel da ferramenta Texto: um texto em branco ou um dos estilos prontos, no cursor. */
-export function PainelTexto({ aoAdicionar }: { aoAdicionar: (texto: Texto) => void }) {
+type Props = {
+  aoAdicionar: (texto: Texto) => void;
+  proporcao: string;
+  /** Um texto animado foi pedido: entra no cursor quando o worker terminar de gravar. */
+  aoPedir: (midia: Midia) => void;
+};
+
+/**
+ * Painel da ferramenta Texto: um texto em branco ou um dos estilos prontos, no cursor, e embaixo os textos
+ * animados da biblioteca (títulos, tarjas e citações). Com um texto animado aberto, só ele aparece.
+ */
+export function PainelTexto({ aoAdicionar, proporcao, aoPedir }: Props) {
+  const [animadoAberto, setAnimadoAberto] = useState(false);
+  // O painel das animações fica sempre no mesmo lugar da árvore (só o resto some), senão o React o remontaria
+  // e o texto animado aberto se perderia
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" className="botao-principal w-full" onClick={() => aoAdicionar(TEXTO_PADRAO)}>
+      <button type="button" className="botao-principal w-full" hidden={animadoAberto} onClick={() => aoAdicionar(TEXTO_PADRAO)}>
         <Plus className="size-4" aria-hidden />
         Adicionar texto
       </button>
-      <p className="text-xs font-medium text-suave">Estilos prontos · entram onde está o cursor</p>
-      <div className="grid grid-cols-2 gap-2">
+      <p className="text-xs font-medium text-suave" hidden={animadoAberto}>
+        Estilos prontos · entram onde está o cursor
+      </p>
+      <div className="grid grid-cols-2 gap-2" hidden={animadoAberto}>
         {ESTILOS_DE_TEXTO.map((estilo) => (
           <button
             key={estilo.id}
@@ -59,6 +77,7 @@ export function PainelTexto({ aoAdicionar }: { aoAdicionar: (texto: Texto) => vo
           </button>
         ))}
       </div>
+      <PainelAnimacoes grupo="texto" proporcao={proporcao} aoPedir={aoPedir} aoAbrir={setAnimadoAberto} />
     </div>
   );
 }

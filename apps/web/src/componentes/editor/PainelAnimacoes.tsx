@@ -37,6 +37,21 @@ type Props = {
   aoPedir: (midia: Midia) => void;
 };
 
+/** As categorias que são texto (títulos, tarjas com nome, citações) ficam na ferramenta Texto; o resto, em Elementos. */
+const CATEGORIAS_DE_TEXTO = new Set(["titulos", "tarjas", "citacoes"]);
+export type GrupoDeAnimacoes = "texto" | "elementos";
+
+const DO_GRUPO: Record<GrupoDeAnimacoes, (categoria: string) => boolean> = {
+  texto: (categoria) => CATEGORIAS_DE_TEXTO.has(categoria),
+  elementos: (categoria) => !CATEGORIAS_DE_TEXTO.has(categoria),
+};
+
+type PropsDoPainel = Props & {
+  grupo: GrupoDeAnimacoes;
+  /** Avisa quando um modelo é aberto ou fechado, para o painel de fora esconder o resto enquanto ele está aberto. */
+  aoAbrir?: (aberto: boolean) => void;
+};
+
 /** A animação tocando, na mesma página que o worker grava, encolhida para caber no painel. */
 function Previa({ endereco, proporcao }: { endereco: string; proporcao: string }) {
   const caixa = useRef<HTMLDivElement>(null);
@@ -132,9 +147,12 @@ function DescreverAnimacao({ proporcao, aoPedir }: Props) {
   );
 }
 
-/** Tarjas, títulos, CTA, contador e citação: modelos prontos que viram um clipe com transparência. */
-export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
-  const [modelos, setModelos] = useState<Modelo[] | null>(null);
+/**
+ * Modelos prontos que viram um clipe com transparência. A biblioteca é uma só; cada ferramenta mostra o seu
+ * grupo: os textos animados na ferramenta Texto e o resto (chamadas, números, logos, fundos...) em Elementos.
+ */
+export function PainelAnimacoes({ proporcao, aoPedir, grupo, aoAbrir }: PropsDoPainel) {
+  const [todos, setTodos] = useState<Modelo[] | null>(null);
   const [erro, setErro] = useState("");
   const [escolhido, setEscolhido] = useState<Modelo | null>(null);
   const [campos, setCampos] = useState<Record<string, string>>({});
@@ -149,9 +167,10 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
 
   useEffect(() => {
     chamarApi<Modelo[]>("/animacoes/modelos")
-      .then(setModelos)
+      .then(setTodos)
       .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar as animações."));
   }, []);
+  const modelos = useMemo(() => todos?.filter((m) => DO_GRUPO[grupo](m.categoria)) ?? null, [todos, grupo]);
 
   const consulta = useMemo(
     () =>
@@ -166,8 +185,10 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
     return () => window.clearTimeout(espera);
   }, [consulta]);
 
-  function escolher(modelo: Modelo) {
+  function escolher(modelo: Modelo | null) {
     setEscolhido(modelo);
+    aoAbrir?.(modelo !== null);
+    if (!modelo) return;
     setCampos(Object.fromEntries(modelo.campos.map((campo) => [campo.id, campo.padrao])));
     setDuracao(modelo.duracao);
     setAviso("");
@@ -202,16 +223,17 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
     return (
       <div className="flex flex-col gap-3">
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-        <DescreverAnimacao proporcao={proporcao} aoPedir={aoPedir} />
+        {grupo === "elementos" ? <DescreverAnimacao proporcao={proporcao} aoPedir={aoPedir} /> : null}
         <p className="text-xs font-medium text-suave">
-          Biblioteca de animações{modelos ? ` · ${modelos.length} modelos` : ""} · com fundo transparente
+          {grupo === "texto" ? "Textos animados" : "Biblioteca de animações"}
+          {modelos ? ` · ${modelos.length} modelos` : ""} · com fundo transparente
         </p>
         <div className="flex gap-2">
           <input
             type="search"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Procurar (tarja, casamento, 3D…)"
+            placeholder={grupo === "texto" ? "Procurar (título, tarja, casamento…)" : "Procurar (contador, logo, casamento…)"}
             aria-label="Procurar animação"
             className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
           />
@@ -267,8 +289,8 @@ export function PainelAnimacoes({ proporcao, aoPedir }: Props) {
   const camposDeCor = escolhido.campos.filter((campo) => campo.tipo === "cor");
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" onClick={() => setEscolhido(null)} className="flex items-center gap-1 self-start text-xs text-suave hover:text-texto">
-        <ArrowLeft className="size-3.5" aria-hidden /> Todas as animações
+      <button type="button" onClick={() => escolher(null)} className="flex items-center gap-1 self-start text-xs text-suave hover:text-texto">
+        <ArrowLeft className="size-3.5" aria-hidden /> {grupo === "texto" ? "Voltar aos textos" : "Todas as animações"}
       </button>
       <h3 className="text-sm font-semibold">{escolhido.nome}</h3>
       <p className="-mt-2 text-[11px] text-suave">{escolhido.descricao}</p>
