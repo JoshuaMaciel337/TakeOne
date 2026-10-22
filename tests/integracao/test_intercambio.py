@@ -52,6 +52,7 @@ def test_xml_e_zip_com_as_midias(cliente, db_limpo):
         assert nomes == ["Férias.xml", "midias/Viagem praia2026 (2).mp4", "midias/Viagem praia2026.mp4"]
         assert arquivo.read("midias/Viagem praia2026.mp4") == b"conteudo do video " * 100
         assert all(info.compress_type == zipfile.ZIP_STORED for info in arquivo.infolist())
+        assert arquivo.testzip() is None
 
 
 def test_projeto_de_outro_espaco_nao_sai(cliente, db_limpo):

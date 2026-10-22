@@ -3,20 +3,20 @@
 #
 # A linha do tempo em XML de intercâmbio (core/utils/intercambio.py), sozinha ou num ZIP com as mídias
 # originais na pasta midias/ (o XML aponta para lá; no outro editor, a pessoa liga as mídias apontando
-# para essa pasta). O ZIP é montado num arquivo temporário, sem compressão (vídeo já vem comprimido), e
-# apagado depois do download.
+# para essa pasta). O ZIP sai em pedaços enquanto é montado, sem compressão (vídeo já vem comprimido) e
+# sem arquivo temporário: montado inteiro antes, um projeto grande passava dos 30 s do proxy do site antes
+# do primeiro byte, e cada tentativa deixava mais uma cópia de todas as mídias no disco.
 # -----------------------------------------------
+import io
 import re
-import tempfile
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import quote
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.responses import FileResponse
-from starlette.background import BackgroundTask
-from starlette.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 
 from api.dependencias import obter_db, usuario_atual
 from api.rotas.projetos import buscar_projeto
@@ -72,15 +72,44 @@ async def baixar_xml(projeto_id: str, usuario=Depends(usuario_atual), db=Depends
                     headers={"Content-Disposition": _disposicao(projeto.get("nome") or "Projeto", ".xml")})
 
 
-def _montar_zip(projeto: dict, midias: dict, caminhos: dict[str, Path]) -> Path:
-    destino = Path(tempfile.mkstemp(prefix="takeone_intercambio_", suffix=".zip")[1])
+class _Saida(io.RawIOBase):
+    """Onde o ZipFile escreve: guarda os bytes até a resposta levá-los. Sem seek, o ZipFile grava cada
+    tamanho depois do arquivo (descritor de dados), que é o que deixa mandar o ZIP enquanto ele é montado."""
+
+    def __init__(self):
+        self._pedacos: list[bytes] = []
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, dados) -> int:
+        self._pedacos.append(bytes(dados))
+        return len(dados)
+
+    def tirar(self) -> Iterator[bytes]:
+        pedacos, self._pedacos = self._pedacos, []
+        yield from pedacos
+
+
+BLOCO_DO_ZIP = 1 << 20
+
+
+def _zip_em_pedacos(projeto: dict, midias: dict, caminhos: dict[str, Path]) -> Iterator[bytes]:
     nome = nome_de_arquivo(projeto.get("nome") or "Projeto")
-    with zipfile.ZipFile(destino, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as pacote:
+    saida = _Saida()
+    with zipfile.ZipFile(saida, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as pacote:
         pacote.writestr(f"{nome}.xml", montar_xmeml(projeto, midias))
+        yield from saida.tirar()
         for chave, midia in midias.items():
-            if caminhos[chave].is_file():
-                pacote.write(caminhos[chave], f"midias/{midia['arquivo']}")
-    return destino
+            if not caminhos[chave].is_file():
+                continue
+            arquivo = pacote.open(f"midias/{midia['arquivo']}", "w", force_zip64=True)
+            with open(caminhos[chave], "rb") as origem, arquivo as destino:
+                while bloco := origem.read(BLOCO_DO_ZIP):
+                    destino.write(bloco)
+                    yield from saida.tirar()
+            yield from saida.tirar()
+    yield from saida.tirar()
 
 
 @router.get("/{projeto_id}/intercambio.zip")
@@ -89,7 +118,7 @@ async def baixar_zip(projeto_id: str, usuario=Depends(usuario_atual), db=Depends
     projeto, midias, caminhos = await _preparar(db, projeto_id, usuario)
     if not midias:
         raise HTTPException(status.HTTP_409_CONFLICT, "O projeto não tem mídias para levar.")
-    destino = await run_in_threadpool(_montar_zip, projeto, midias, caminhos)
-    return FileResponse(destino, media_type="application/zip",
-                        headers={"Content-Disposition": _disposicao(projeto.get("nome") or "Projeto", ".zip")},
-                        background=BackgroundTask(destino.unlink, missing_ok=True))
+    # Iterador comum: o Starlette lê cada pedaço numa thread, sem prender o laço de eventos
+    disposicao = _disposicao(projeto.get("nome") or "Projeto", ".zip")
+    return StreamingResponse(_zip_em_pedacos(projeto, midias, caminhos), media_type="application/zip",
+                             headers={"Content-Disposition": disposicao})
