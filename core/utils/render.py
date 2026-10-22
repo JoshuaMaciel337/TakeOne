@@ -317,16 +317,21 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap'])}[la{numero}];\n"
                   f"[{entrada_luz}:v]crop=w={largura}:h={altura}:x='floor((1.5-{posicao})*{largura})':y=0,"
                   f"format=gbrap[lz{numero}];\n"
-                  f"[la{numero}][lz{numero}]blend=all_mode=screen,format=rgba")
+                  f"[la{numero}][lz{numero}]blend=c0_mode=screen:c1_mode=screen:c2_mode=screen:c3_mode=normal,"
+                  f"format=rgba")
         filtros = []
     if grao:
         # O recorte da imagem do grão muda a cada quadro (roteiro); as células crescem até o clipe
         entrada_grao, roteiro_grao, colunas = grao
-        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrp'])}[ga{numero}];\n"
+        # Com alfa (gbrap), a luz e o grão misturam só os três planos de cor e o alfa do clipe passa (o modo
+        # normal no 4º plano devolve o de cima), como a prévia. Misturando o alfa também, logos, formas,
+        # animações e recortes do fundo viravam um retângulo opaco
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap'])}[ga{numero}];\n"
                   f"[{entrada_grao}:v]sendcmd=f='{_escapar_caminho(roteiro_grao)}',"
                   f"crop@gr{numero}=w={colunas}:h={GRAO_LINHAS}:x=0:y=0,scale={largura}:{altura}:flags=neighbor,"
-                  f"format=gbrp[gz{numero}];\n"
-                  f"[ga{numero}][gz{numero}]blend=all_mode=grainmerge,format=rgba")
+                  f"format=gbrap[gz{numero}];\n"
+                  f"[ga{numero}][gz{numero}]blend=c0_mode=grainmerge:c1_mode=grainmerge:c2_mode=grainmerge"
+                  f":c3_mode=normal,format=rgba")
         filtros = []
     if roteiro_de_opacidade:
         # A opacidade com keyframes muda por quadro, pelo roteiro (no tempo da janela do clipe)
@@ -338,7 +343,13 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         # Sentido horário, como a prévia; os cantos que sobram ficam transparentes
         angulo = _numero(math.radians(caixa.rotacao))
         filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=black@0")
-    filtros.append(f"setpts=PTS+{_numero(inicio)}/TB")
+    # O clipe vai para o lugar dele em quadros inteiros do projeto. Com `PTS+segundos/TB` o setpts truncava:
+    # um clipe no quadro 31 a 30 fps dava 30,99999 → 30, a mídia saía um quadro adiantada e o último quadro
+    # do clipe ficava vazio (preto na principal). O round() dentro da expressão vale para qualquer base de tempo
+    taxa_do_projeto = taxa_em_fracao(taxa)
+    quadros_ate_o_clipe = math.floor(inicio * taxa_do_projeto.numerator / taxa_do_projeto.denominator + 0.5)
+    filtros.append(f"setpts=PTS+round({quadros_ate_o_clipe}*{taxa_do_projeto.denominator}"
+                   f"/{taxa_do_projeto.numerator}/TB)")
     fim = leitura.fim
     # As animações seguem o começo e o fim do próprio clipe; as transições, a janela delas
     inicio_clipe = segundos(clipe["inicio"])

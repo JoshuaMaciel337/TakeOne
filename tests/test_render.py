@@ -194,7 +194,7 @@ def test_texto_entra_como_imagem_parada_com_a_caixa_do_lado_de_referencia():
     assert plano.entradas[1].argumentos() == ["-loop", "1", "-framerate", "30/1", "-t", "2.000000",
                                               "-i", "/tmp/texto_t1.png"]
     # Em 720 de lado menor, o PNG medido em 1080 fica com dois terços: 360 × 80
-    assert "scale=360:80" in plano.filtro and "setpts=PTS+1/TB" in plano.filtro
+    assert "scale=360:80" in plano.filtro and "setpts=PTS+round(30*1/30/TB)" in plano.filtro
     assert "[1:a]" not in plano.filtro_som, "texto não tem som"
     with pytest.raises(ErroRender, match="texto"):
         planejar_render(projeto_com_texto, MIDIAS, 720, 1280, {})
@@ -413,7 +413,7 @@ def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     assert "enable='gte(t,-0.016667)*lt(t,4.483333)'" in plano.filtro
     assert "enable='gte(t,3.483333)*lt(t,6.983333)'" in plano.filtro
     assert "fade=t=in:st=3.5:d=1:alpha=1" in plano.filtro, "quem entra aparece aos poucos na fusão"
-    assert "setpts=PTS+3.5/TB" in plano.filtro
+    assert "setpts=PTS+round(105*1/30/TB)" in plano.filtro
     # O som do segundo começa no corte: pula o meio segundo a mais que a imagem leu
     assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro_som
     # E o do primeiro para no corte: o meio segundo lido depois do fim, para a imagem, não soa

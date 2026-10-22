@@ -132,14 +132,27 @@ def expressao(pontos: list[dict], inicio_do_clipe: float, var: str = "t") -> str
     ticks desde o começo do clipe; `var` é o tempo do vídeo final, em segundos.
     """
     tempos = [inicio_do_clipe + ponto["t"] / TICKS_POR_SEGUNDO for ponto in pontos]
-    resultado = _n(pontos[-1]["valor"])
-    for i in range(len(pontos) - 2, -1, -1):
-        a, b = pontos[i], pontos[i + 1]
-        p = f"(({var}-{_n(tempos[i])})/{_n(tempos[i + 1] - tempos[i])})"
+
+    def regiao(k: int) -> str:
+        """-1: antes do primeiro ponto; i: entre o ponto i e o i+1; o último: depois do último ponto."""
+        if k < 0:
+            return _n(pontos[0]["valor"])
+        if k >= len(pontos) - 1:
+            return _n(pontos[-1]["valor"])
+        a, b = pontos[k], pontos[k + 1]
+        p = f"(({var}-{_n(tempos[k])})/{_n(tempos[k + 1] - tempos[k])})"
         curva = f"({p}*{p}*(3-2*{p}))" if a["curva"] == "suave" else p
-        trecho = f"({_n(a['valor'])}+{_n(b['valor'] - a['valor'])}*{curva})"
-        resultado = f"if(lt({var},{_n(tempos[i + 1])}),{trecho},{resultado})"
-    return f"if(lt({var},{_n(tempos[0])}),{_n(pontos[0]['valor'])},{resultado})"
+        return f"({_n(a['valor'])}+{_n(b['valor'] - a['valor'])}*{curva})"
+
+    # Busca binária pelos tempos: a região k começa em tempos[k]. Em fila (um if dentro do outro), 100 pontos
+    # passavam do limite de 100 níveis do parser do FFmpeg e a exportação falhava; em árvore, uns 7
+    def arvore(de: int, ate: int) -> str:
+        if de == ate:
+            return regiao(de)
+        meio = (de + ate + 1) // 2
+        return f"if(lt({var},{_n(tempos[meio])}),{arvore(de, meio - 1)},{arvore(meio, ate)})"
+
+    return arvore(-1, len(pontos) - 1)
 
 
 def _tempo_da_repeticao(pontos: list[dict], modo: str, inicio_do_clipe: float, var: str) -> str:

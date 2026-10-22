@@ -58,11 +58,23 @@ def expressao_do_tempo(pontos: list, duracao: float, trecho: float, var: str = "
     """
     amostras = [(k / AMOSTRAS_DO_TEMPO, fracao_na_midia(pontos, k / AMOSTRAS_DO_TEMPO) * trecho)
                 for k in range(AMOSTRAS_DO_TEMPO + 1)]
-    expressao = _n(duracao)
-    for (u0, p0), (u1, p1) in reversed(list(zip(amostras, amostras[1:], strict=False))):
-        trecho_reto = f"{_n(u0 * duracao)}+({var}-{_n(p0)})*{_n((u1 - u0) * duracao / (p1 - p0))}"
-        expressao = f"if(lt({var},{_n(p1)}),{trecho_reto},{expressao})"
-    return expressao
+
+    def regiao(k: int) -> str:
+        """k < AMOSTRAS_DO_TEMPO: a reta entre as amostras k e k+1; depois da última, o fim do clipe."""
+        if k >= AMOSTRAS_DO_TEMPO:
+            return _n(duracao)
+        (u0, p0), (u1, p1) = amostras[k], amostras[k + 1]
+        return f"{_n(u0 * duracao)}+({var}-{_n(p0)})*{_n((u1 - u0) * duracao / (p1 - p0))}"
+
+    # Busca binária pelas amostras (a região k começa na amostra k): em fila eram 96 níveis, perto do limite
+    # de 100 do parser do FFmpeg; em árvore, uns 7
+    def arvore(de: int, ate: int) -> str:
+        if de == ate:
+            return regiao(de)
+        meio = (de + ate + 1) // 2
+        return f"if(lt({var},{_n(amostras[meio][1])}),{arvore(de, meio - 1)},{arvore(meio, ate)})"
+
+    return arvore(0, AMOSTRAS_DO_TEMPO)
 
 
 def atempo_necessarios(pontos: list, velocidade: float, duracao: float) -> int:

@@ -107,3 +107,28 @@ def test_base_do_render_cabe_o_tremido_da_escala():
                             "rotacao": {"tremer": {"periodo": S, "amplitude": 5, "deslocamento": 0}}}}
     base = transformacao_de_base(clipe)
     assert base["escala"] == pytest.approx(0.9) and base["rotacao"] == 0
+
+
+def test_cem_pontos_numa_expressao_que_o_ffmpeg_aceita():
+    # Em fila (um if dentro do outro) passava dos 100 níveis do parser do FFmpeg; em árvore, a profundidade
+    # cresce com log2 do número de pontos
+    import shutil
+    import subprocess
+
+    pontos = [{"t": round(i * 0.05 * S), "valor": (i % 7) / 10, "curva": "suave" if i % 2 else "linear"}
+              for i in range(100)]
+    texto = expressao(pontos, 0.5)
+    profundidade = maior = 0
+    for letra in texto:
+        profundidade += {"(": 1, ")": -1}.get(letra, 0)
+        maior = max(maior, profundidade)
+    assert maior < 40, maior
+    for t in (0.0, 0.5, 0.51, 1.777, 3.0, 5.4, 9.0):
+        assert avaliar(texto, t) == pytest.approx(valor_no_tempo(pontos, (t - 0.5) * S), abs=1e-6)
+    if not shutil.which("ffmpeg"):
+        pytest.skip("FFmpeg não instalado")
+    filtro = f"scale=w='max(2,64*(1+({texto})))':h=16:eval=frame"
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                            "color=c=red:s=64x16:r=30:d=1", "-vf", filtro, "-f", "null", "-"],
+                           capture_output=True, text=True)
+    assert saida.returncode == 0, saida.stderr[-500:]

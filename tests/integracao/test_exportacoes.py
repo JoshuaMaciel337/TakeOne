@@ -497,3 +497,62 @@ def test_render_repete_os_keyframes_e_treme(cliente, db_limpo):
     assert _perto(quadro[topo + 8, 320 + 8], CORES[(0, 0)]), quadro[topo + 8, 320 + 8]
     assert _perto(quadro[topo - 8, 320 + 8], FUNDO), quadro[topo - 8, 320 + 8]
     assert _perto(quadro[topo + 8, 320 - 8], FUNDO), quadro[topo + 8, 320 - 8]
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_clipes_que_comecam_fora_dos_multiplos_de_3_quadros_ficam_no_quadro_certo(cliente, db_limpo):
+    # A 30 fps, um clipe no quadro 31 ia para `PTS+1.033333/TB` = 30,99999, truncado para 30: a imagem saía um
+    # quadro adiantada e o último quadro do clipe ficava vazio (o fundo aparecia no corte)
+    cadastrar(cliente)
+    cores = {"0xff0000": (255, 0, 0), "0x00ff00": (0, 255, 0), "0x0000ff": (0, 0, 255)}
+    ids = [criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False, gerar=gerar_cor(c))
+           for c in cores]
+    quadro = SEGUNDO // 30
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    limites = [(0, 31), (31, 61), (61, 91)]
+    clipes = [{"id": f"c{i}", "midia_id": ids[i], "inicio": a * quadro, "duracao": (b - a) * quadro, "entrada": 0,
+               "velocidade": 1, "volume": 1} for i, (a, b) in enumerate(limites)]
+    corpo = {"versao": projeto["versao"], "nome": "Quadros", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#ff00ff"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    candidatas = {"vermelho": (255, 0, 0), "verde": (0, 255, 0), "azul": (0, 0, 255), "fundo": FUNDO}
+
+    def qual(pixel):
+        return min(candidatas, key=lambda nome: sum((int(a) - b) ** 2 for a, b in zip(pixel, candidatas[nome],
+                                                                                       strict=True)))
+
+    # O -ss pega o primeiro quadro a partir do instante: um pouco antes do começo de cada quadro
+    vistos = {n: qual(quadro_do_video(video, (n - 0.4) / 30, 1280, 720)[360, 640]) for n in (30, 31, 60, 61, 90)}
+    assert vistos == {30: "vermelho", 31: "verde", 60: "verde", 61: "azul", 90: "azul"}, vistos
+
+
+def _imagem_transparente(db, cliente) -> str:
+    """Imagem 400 × 400 transparente com um quadrado vermelho opaco no meio (como um logo)."""
+    from PIL import Image
+
+    organizacao_id = organizacao_de(cliente)
+    midia = montar_midia(organizacao_id, ObjectId(), "logo.png", 100, "image/png")
+    midia.update({"status": "pronta", "imagem": True, "duracao": None,
+                  "video": {"largura": 400, "altura": 400, "transparente": True}, "audio": None})
+    midia_id = db.midias.insert_one(midia).inserted_id
+    caminho = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, "imagem.png"))
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    imagem = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+    imagem.paste((255, 0, 0, 255), (100, 100, 300, 300))
+    imagem.save(caminho)
+    return str(midia_id)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+@pytest.mark.parametrize("tipo", ["granulacao", "luz"])
+def test_luz_e_grao_guardam_a_transparencia_do_clipe(cliente, db_limpo, tipo):
+    # A prévia só mexe na cor onde o clipe aparece; misturando o alfa, o logo virava um quadrado preto
+    cadastrar(cliente)
+    midia_id = _imagem_transparente(db_limpo, cliente)
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", efeito={"tipo": tipo, "intensidade": 1})
+    quadro = quadro_do_video(_exportar(cliente, db_limpo, projeto["id"]), 1.0, 1280, 720)
+    # O logo cabe na altura (720): o quadrado vermelho vai de 180 a 540; fora dele, o fundo
+    for y, x in ((20, 20), (100, 640), (360, 300), (700, 1260)):
+        assert max(abs(int(c) - f) for c, f in zip(quadro[y, x], FUNDO, strict=True)) <= 12, (y, x, quadro[y, x])
+    assert quadro[360, 640][0] > 150 and quadro[360, 640][2] < 110, quadro[360, 640]
