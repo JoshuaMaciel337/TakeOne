@@ -9,6 +9,7 @@ import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Tamanho } from "./geometria.ts";
 import { KEYFRAMES_POR_PROPRIEDADE, type Keyframe } from "./keyframes.ts";
 import type { Clipe } from "./modelo.ts";
+import { segundosNoClipe } from "./velocidade.ts";
 
 /** Uma amostra do rosto: segundos da mídia; centro e área em frações da imagem. */
 export type AmostraDeRosto = { t: number; x: number; y: number; a: number };
@@ -84,7 +85,7 @@ function caminhoQueCabe(pontos: { t: number; alvo: number }[]): Keyframe[] {
  * que o clipe usa. midia: tamanho da imagem como ela aparece (já girada).
  */
 export function reenquadrarPeloRosto(
-  clipe: Pick<Clipe, "entrada" | "duracao" | "velocidade" | "recorte">,
+  clipe: Pick<Clipe, "entrada" | "duracao" | "velocidade" | "curva_velocidade" | "recorte">,
   amostras: AmostraDeRosto[],
   midia: Tamanho,
   quadro: Tamanho,
@@ -111,7 +112,7 @@ export function reenquadrarPeloRosto(
       const u = (a.x - recorte.x) / recorte.largura;
       const v = (a.y - recorte.y) / recorte.altura;
       return {
-        t: (a.t - entrada) / clipe.velocidade,
+        t: segundosNoClipe(clipe, a.t),
         x: limitar((-(u - 0.5) * caixa.largura) / quadro.largura, -folgaX, folgaX),
         y: limitar((-(v - 0.5) * caixa.altura) / quadro.altura, -folgaY, folgaY),
       };

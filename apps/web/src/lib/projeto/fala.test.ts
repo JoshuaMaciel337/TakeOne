@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { falaDosClipes, type Palavra, palavrasDaLinha, trechoDasPalavras } from "./fala.ts";
 import type { Clipe } from "./modelo.ts";
+import { CURVAS_PRONTAS, tempoNaMidiaComCurva } from "./velocidade.ts";
 
 const S = TICKS_POR_SEGUNDO;
 
@@ -26,4 +27,16 @@ test("apagar palavras corta até o começo da seguinte, sem passar do clipe", ()
   assert.deepEqual(emSegundos(trechoDasPalavras(lista, 2, 0)), [0, 1.7], "a seleção pode vir de trás para a frente; \"três\" é a última do clipe");
   assert.deepEqual(emSegundos(trechoDasPalavras(lista, 2, 3)), [1.4, 2.5], "atravessa os clipes e vai até a palavra seguinte do clipe b");
   assert.deepEqual(emSegundos(trechoDasPalavras(lista, 4, 4)), [2.5, 2.8], "a última palavra da linha corta só ela");
+});
+
+test("com curva de velocidade, cada palavra cai no instante em que a mídia toca ela", () => {
+  const acelerando = { ...clipe("a", "m", 2, 10), curva_velocidade: CURVAS_PRONTAS.find((c) => c.id === "acelerar")!.pontos } as Clipe;
+  const palavras: Palavra[] = [1, 3.8, 5.5, 8, 9.6].map((s, i) => ({ texto: `p${i}`, inicio: s, fim: s + 0.2 }));
+  const lista = palavrasDaLinha(falaDosClipes([acelerando], new Map([["m", palavras]])));
+  assert.equal(lista.length, palavras.length);
+  for (const [i, palavra] of lista.entries()) {
+    // A conta da prévia e do render (a mídia no instante da linha) devolve o começo da palavra
+    const naMidia = tempoNaMidiaComCurva({ ...acelerando, curva_velocidade: acelerando.curva_velocidade! }, palavra.inicio) / S;
+    assert.ok(Math.abs(naMidia - palavras[i].inicio) < 1e-3, `${palavra.texto}: ${naMidia} ≠ ${palavras[i].inicio}`);
+  }
 });

@@ -3,6 +3,7 @@
 // automáticas, da limpeza de fala e da edição pelo texto. Função pura.
 import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Clipe } from "./modelo.ts";
+import { segundosNoClipe } from "./velocidade.ts";
 
 /** Uma palavra da transcrição, em segundos da mídia. */
 export type Palavra = { texto: string; inicio: number; fim: number };
@@ -25,8 +26,9 @@ export function falaDosClipes(clipes: Clipe[], palavras: Map<string, Palavra[]>)
     const entrada = clipe.entrada / TICKS_POR_SEGUNDO;
     const fimNaMidia = entrada + (clipe.duracao / TICKS_POR_SEGUNDO) * clipe.velocidade;
     const fimDoClipe = clipe.inicio + clipe.duracao;
+    // Com curva de velocidade, `velocidade` é só a média: o instante vem da inversa da curva
     const noTempo = (s: number): Tick =>
-      Math.min(fimDoClipe, Math.max(clipe.inicio, clipe.inicio + Math.round(((s - entrada) / clipe.velocidade) * TICKS_POR_SEGUNDO)));
+      Math.min(fimDoClipe, Math.max(clipe.inicio, clipe.inicio + Math.round(segundosNoClipe(clipe, s) * TICKS_POR_SEGUNDO)));
     falas.push({
       clipe,
       palavras: daMidia
