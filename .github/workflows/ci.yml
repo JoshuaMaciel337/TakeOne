@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# Um push novo cancela a execução anterior do mesmo ramo: ela testaria um código que já mudou
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python:
     name: Python (lint e testes)
@@ -20,7 +25,11 @@ jobs:
           cache: pip
           cache-dependency-path: "**/requirements*.txt"
       - name: Instalar o FFmpeg e o espeak-ng (testes de ingestão e dos fonemas do texto em fala)
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg espeak-ng
+        # Um espelho do apt travado segurou este passo por mais de uma hora: com limite e novas tentativas
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30
+          sudo apt-get install -y -q --no-install-recommends -o Acquire::Retries=3 -o Acquire::http::Timeout=30 ffmpeg espeak-ng
       - name: Instalar o deep-filter (testes da voz limpa)
         run: |
           sudo curl -sSL -o /usr/local/bin/deep-filter https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-unknown-linux-musl
