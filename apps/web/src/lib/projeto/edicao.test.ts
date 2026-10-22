@@ -33,6 +33,7 @@ import {
   normalizarRotacao,
   palavrasChaveDasLegendas,
   cortarNoRitmo,
+  curvarVelocidade,
   pulsarNoRitmo,
   PULSO_NO_RITMO,
   recortarClipes,
@@ -42,6 +43,7 @@ import {
   VOLUME_MAXIMO,
 } from "./edicao.ts";
 import { transformacaoNoTempo } from "./keyframes.ts";
+import { CURVAS_PRONTAS } from "./velocidade.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
 import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
@@ -749,4 +751,57 @@ test("velocidade e aparar com contas que não dão ticks inteiros (130%, 70% e o
   const comeco = apararClipe(aparado, ctx, id, "inicio", 3 * S + 0.61);
   conferir(comeco);
   assert.ok(Number.isInteger(principal(comeco)[0].entrada));
+});
+
+test("dividir um clipe com transição: ela fica só na metade da direita", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  projeto = definirTransicao(projeto, principal(projeto)[0].id, { tipo: "escurecer", duracao: S / 2 });
+  const [esquerda, direita, ultimo] = principal(dividirClipes(projeto, ctx, 4 * S, []).projeto);
+  assert.equal(esquerda.transicao, null, "no meio da tomada não aparece transição");
+  assert.deepEqual(direita.transicao, { tipo: "escurecer", duracao: S / 2 });
+  assert.equal(ultimo.transicao ?? null, null);
+});
+
+test("mudar a velocidade não tira o abaixar na fala do lugar da fala", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "musica");
+  const pontos = [4.7, 5, 8, 8.5].map((t, i) => ({ t: Math.round(t * S), valor: i === 1 || i === 2 ? 0.25 : 1, curva: "linear" as const }));
+  projeto = {
+    ...projeto,
+    faixas: projeto.faixas.map((faixa) => ({ ...faixa, clipes: faixa.clipes.map((clipe) => ({ ...clipe, abaixamento: { db: -12, pontos } })) })),
+  };
+  const musica = projeto.faixas.find((faixa) => faixa.tipo === "audio")!.clipes[0];
+  const rapida = mudarVelocidade(projeto, musica.id, 2).faixas.find((faixa) => faixa.tipo === "audio")!.clipes[0];
+  assert.deepEqual(rapida.abaixamento?.pontos, pontos);
+});
+
+test("velocidade com curva: pedaço lento demais é recusado e esticar a borda não passa de 16 pontos", () => {
+  const ctx = contexto();
+  const heroi = CURVAS_PRONTAS.find((curva) => curva.id === "heroi")!.pontos;
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const id = principal(projeto)[0].id;
+  projeto = curvarVelocidade(mudarVelocidade(projeto, id, 0.3), id, heroi);
+  const fim = fimDoClipe(principal(projeto)[0]);
+  // A 30%, o pedaço entre 50% e 55% fica só na parte lenta da curva: a 9%, abaixo do mínimo da API
+  const metade = dividirClipes(projeto, ctx, Math.round(fim * 0.5), []).projeto;
+  assert.throws(() => dividirClipes(metade, ctx, Math.round(fim * 0.55), []), ErroEdicao);
+
+  let longo = adicionarClipe(vazio(), ctx, "video47").projeto;
+  const longoId = principal(longo)[0].id;
+  longo = apararClipe(curvarVelocidade(longo, longoId, heroi), ctx, longoId, "fim", 20 * S);
+  for (let vez = 1; vez <= 11; vez++) longo = apararClipe(longo, ctx, longoId, "fim", fimDoClipe(principal(longo)[0]) + S / 2);
+  const curva = principal(longo)[0].curva_velocidade!;
+  assert.ok(curva.length <= 16, `${curva.length} pontos`);
+  assert.equal(curva[0][0], 0);
+  assert.equal(curva[curva.length - 1][0], 1);
+  assert.ok(curva.every((ponto, i) => i === 0 || ponto[0] > curva[i - 1][0]), "pontos em ordem");
+});
+
+test("o editor recusa passar dos limites de clipes da API", () => {
+  const ctx = contexto();
+  const { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const legendas = Array.from({ length: 1501 }, (_, i) => ({ inicio: i * QUADRO * 2, fim: i * QUADRO * 2 + QUADRO, conteudo: `L${i}` }));
+  assert.throws(() => importarLegendas(projeto, ctx, legendas, ESTILO_LEGENDA), /no máximo 1500 clipes/);
 });

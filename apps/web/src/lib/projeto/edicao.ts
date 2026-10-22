@@ -57,6 +57,12 @@ import { ajustarTexto, type FonteTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
 
+/** A velocidade que a API aceita num clipe: um pedaço de um clipe com curva pode passar do controle. */
+const VELOCIDADE_NA_API = { minimo: 0.1, maximo: 100 } as const;
+/** Os limites da API (core/modelos/projeto.py): passar deles faria o salvamento parar. */
+const LIMITE_FAIXAS = 30;
+const LIMITE_CLIPES = 1500;
+
 export type Contexto = {
   novoId: () => string;
   /** null quando a mídia não está na biblioteca (excluída ou ainda sendo preparada). */
@@ -173,6 +179,9 @@ function finalizar(projeto: Projeto): Projeto {
   let duracao = 0;
   for (const faixa of faixas) for (const clipe of faixa.clipes) duracao = Math.max(duracao, fimDoClipe(clipe));
   if (duracao > TICK_MAXIMO) throw new ErroEdicao("O projeto pode ter no máximo 6 horas.");
+  if (faixas.length > LIMITE_FAIXAS) throw new ErroEdicao(`O projeto pode ter no máximo ${LIMITE_FAIXAS} faixas.`);
+  const clipes = faixas.reduce((soma, faixa) => soma + faixa.clipes.length, 0);
+  if (clipes > LIMITE_CLIPES) throw new ErroEdicao(`O projeto pode ter no máximo ${LIMITE_CLIPES} clipes. Apague alguns (ou uma faixa de legendas repetida) antes.`);
   return { ...projeto, faixas, duracao };
 }
 
@@ -528,7 +537,14 @@ export const LIMITES_VELOCIDADE = { minimo: 0.1, maximo: 10 } as const;
  * pedaço leva a curva recortada (lib/projeto/velocidade.ts); sem ela, a conta é a reta de sempre.
  */
 function pedacoDoClipe(clipe: Clipe, de: Tick, ate: Tick): Pick<Clipe, "entrada" | "velocidade" | "curva_velocidade"> {
-  if (clipe.curva_velocidade && clipe.midia_id) return pedacoComCurva({ ...clipe, curva_velocidade: clipe.curva_velocidade }, de, ate);
+  if (clipe.curva_velocidade && clipe.midia_id) {
+    const pedaco = pedacoComCurva({ ...clipe, curva_velocidade: clipe.curva_velocidade }, de, ate);
+    // A velocidade do pedaço é a média da curva nele: num clipe lento, o trecho mais lento sai abaixo do mínimo
+    if (pedaco.velocidade < VELOCIDADE_NA_API.minimo - 1e-9 || pedaco.velocidade > VELOCIDADE_NA_API.maximo + 1e-9) {
+      throw new ErroEdicao("Aqui o pedaço ficaria mais lento que 10% (ou rápido demais). Corte em outro ponto ou suavize a curva de velocidade.");
+    }
+    return pedaco;
+  }
   return { entrada: Math.max(0, clipe.entrada + Math.round((de - clipe.inicio) * clipe.velocidade)), velocidade: clipe.velocidade, curva_velocidade: clipe.curva_velocidade };
 }
 
@@ -576,7 +592,7 @@ export function mudarVelocidade(projeto: Projeto, clipeId: string, velocidade: n
     velocidade: nova,
     duracao,
     keyframes,
-    abaixamento: clipe.abaixamento ? { ...clipe.abaixamento, pontos: escalar(clipe.abaixamento.pontos)! } : clipe.abaixamento,
+    // O abaixar na fala segue a fala das outras faixas, no tempo da linha do tempo: fica onde está
   };
   const clipes = [...faixa.clipes];
   clipes[indice] = novo;
@@ -670,7 +686,8 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         abaixamento: deslocarAbaixamento(clipe.abaixamento, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
-      const esquerda = { ...clipe, ...pedacoDoClipe(clipe, clipe.inicio, t), duracao: t - clipe.inicio, fade_saida: 0, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
+      // A transição é de saída: fica só com a metade da direita (na esquerda, ela apareceria no meio da tomada)
+      const esquerda = { ...clipe, ...pedacoDoClipe(clipe, clipe.inicio, t), duracao: t - clipe.inicio, fade_saida: 0, transicao: null, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
       clipes.push(esquerda, direita);
       novos.push(direita.id);
     }

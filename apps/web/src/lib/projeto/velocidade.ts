@@ -5,7 +5,7 @@
 // quadro pela mesma conta que o setpts do render.
 //
 // Fora de 0 a 1 (ao aparar e esticar o clipe) a curva continua com a velocidade da ponta.
-import type { Tick } from "../tempo.ts";
+import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 
 /** (u, s): no instante u do clipe (0 a 1), s vezes a velocidade de base. */
 export type PontoDeVelocidade = [number, number];
@@ -67,6 +67,55 @@ export function tempoNaMidiaComCurva(clipe: ClipeComVelocidade & { curva_velocid
 }
 
 /**
+ * Em que instante do clipe (segundos desde o começo dele) toca o instante `s` da mídia (segundos). Com
+ * curva, é a inversa de tempoNaMidiaComCurva, por busca binária (a mídia só anda para a frente); sem
+ * ela, a reta de sempre. Fora do trecho do clipe, segue a reta da velocidade média.
+ */
+export function segundosNoClipe(clipe: Omit<ClipeComVelocidade, "inicio">, s: number): number {
+  const entrada = clipe.entrada / TICKS_POR_SEGUNDO;
+  const pontos = clipe.curva_velocidade;
+  if (!pontos) return (s - entrada) / clipe.velocidade;
+  const duracao = clipe.duracao / TICKS_POR_SEGUNDO;
+  const fracao = (s - entrada) / (duracao * clipe.velocidade);
+  if (fracao <= 0 || fracao >= 1) return (s - entrada) / clipe.velocidade;
+  let de = 0;
+  let ate = 1;
+  for (let i = 0; i < 40; i++) {
+    const meio = (de + ate) / 2;
+    if (fracaoNaMidia(pontos, meio) < fracao) de = meio;
+    else ate = meio;
+  }
+  return ((de + ate) / 2) * duracao;
+}
+
+/** Pontos que uma curva de velocidade pode ter (o mesmo limite da API). */
+export const PONTOS_MAXIMOS_DA_CURVA = 16;
+
+/**
+ * Tira os pontos que ficam na reta entre os vizinhos (esticar a borda além da curva repete o último
+ * valor) e, se ainda passar do máximo, os que menos mudam a curva. As pontas ficam.
+ */
+function simplificarCurva(pontos: PontoDeVelocidade[]): PontoDeVelocidade[] {
+  const lista = [...pontos];
+  const desvio = (i: number) => {
+    const [ua, sa] = lista[i - 1];
+    const [u, s] = lista[i];
+    const [ub, sb] = lista[i + 1];
+    return Math.abs(s - (sa + ((sb - sa) * (u - ua)) / (ub - ua)));
+  };
+  for (let i = 1; i < lista.length - 1; ) {
+    if (desvio(i) < 1e-9) lista.splice(i, 1);
+    else i++;
+  }
+  while (lista.length > PONTOS_MAXIMOS_DA_CURVA) {
+    let menor = 1;
+    for (let i = 2; i < lista.length - 1; i++) if (desvio(i) < desvio(menor)) menor = i;
+    lista.splice(menor, 1);
+  }
+  return lista;
+}
+
+/**
  * O pedaço [de, ate) da linha do tempo de um clipe com curva (para aparar, dividir e cortar): onde
  * ele começa na mídia, a velocidade média e a curva do pedaço (a mesma, recortada e esticada para 0 a 1).
  */
@@ -87,6 +136,6 @@ export function pedacoComCurva(
   return {
     entrada: tempoNaMidiaComCurva(clipe, de),
     velocidade: naMidia / (ate - de),
-    curva_velocidade: recortada,
+    curva_velocidade: simplificarCurva(recortada),
   };
 }
