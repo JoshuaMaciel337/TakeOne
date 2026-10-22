@@ -20,6 +20,13 @@ test("palavras andam para trás o tanto que foi cortado antes delas", () => {
   assert.equal(depois.length, 8);
 });
 
+test("cortes que se sobrepõem tiram o tempo uma vez só (o vício dentro da pausa)", () => {
+  // Pausa de 0 a 1,85 s e um "ahn" de 0,8 a 1,2 s dentro dela; a fala começa em 2 s
+  const fala = [{ texto: "Bom", inicio: 2 * S, fim: 2.4 * S }, { texto: "dia", inicio: 2.5 * S, fim: 2.9 * S }];
+  const depois = palavrasDepoisDoCorte(fala, [{ inicio: 0, fim: 1.85 * S }, { inicio: 0.8 * S, fim: 1.2 * S }]);
+  assert.deepEqual(depois.map((p) => [p.texto, Number((p.inicio / S).toFixed(2))]), [["Bom", 0.15], ["dia", 0.65]]);
+});
+
 test("o plano vira trechos de zoom e animações no tempo da linha", () => {
   const plano: Plano = { titulo: "Mostrar tudo", apresentacao: { nome: "Ana", funcao: "", palavra: 4 }, destaques: [{ de: 6, ate: 9 }], cta: "Siga" };
   assert.deepEqual(trechosDosDestaques(plano, palavras), [{ inicio: 6 * S, fim: 9.5 * S }]);

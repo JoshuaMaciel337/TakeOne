@@ -18,7 +18,8 @@ const emSegundos = (trechos: { tipo: string; inicio: number; fim: number }[]) =>
 
 test("vícios de hesitação, sem as palavras normais do português", () => {
   for (const vicio of ["ahn", "Ahnn,", "hã", "hum", "Hmm...", "éééh", "eh", "ãh"]) assert.ok(ehVicio(vicio), vicio);
-  for (const normal of ["é", "um", "tipo", "então", "né?", "humano", "aham"]) assert.ok(!ehVicio(normal), normal);
+  for (const normal of ["é", "um", "tipo", "então", "né?", "humano", "aham", "An", "an"]) assert.ok(!ehVicio(normal), normal);
+  for (const vicio of ["ann", "Aan..."]) assert.ok(ehVicio(vicio), vicio);
 });
 
 test("pausas longas viram trechos, com folga em volta da fala; as curtas ficam", () => {
@@ -80,4 +81,18 @@ test("retake: pares comuns repetidos na fala não contam, só o recomeço depois
   const palavras = new Map([["m", fala("Abra o painel do editor e use as funções do editor com calma.", 0)]]);
   const opcoes = { ...OPCOES_DE_LIMPEZA, pausas: false, vicios: false };
   assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 10)], palavras, opcoes), []);
+});
+
+test("retake: frases que só mudam nos números não são a mesma frase", () => {
+  const fala = (texto: string, inicio: number) => texto.split(" ").map((w, i) => p(w, inicio + i * 0.4, inicio + i * 0.4 + 0.3));
+  const opcoes = { ...OPCOES_DE_LIMPEZA, pausas: false, vicios: false };
+  for (const texto of ["Em 2024 vendemos 300 peças. Em 2025 vendemos 500 peças.", "Vamos contar: 1, 2, 3, 4, 5, 6."]) {
+    assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 10)], new Map([["m", fala(texto, 0)]]), opcoes), [], texto);
+  }
+  // Com uma pausa antes do recomeço, como na transcrição real
+  const datas = new Map([["m", [...fala("As datas são:", 0), ...fala("15 de março, 20 de março e 25 de março.", 1.6)]]]);
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 8)], datas, opcoes), []);
+  // O mesmo número repetido ainda é retake
+  const igual = new Map([["m", [...fala("Custa 300 reais", 0), ...fala("Custa 300 reais por mês.", 1.6)]]]);
+  assert.deepEqual(trechosParaLimpar([clipe("c", "m", 0, 5)], igual, opcoes).map((t) => [t.tipo, t.inicio / S, t.fim / S]), [["retake", 0, 1.6]]);
 });

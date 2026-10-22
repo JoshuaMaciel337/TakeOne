@@ -36,7 +36,8 @@ const PAUSA_DE_FRASE = 0.3;
 const PAUSA_DO_RECOMECO = 0.25;
 
 /** Hesitações, com as letras repetidas que a transcrição escreve ("ahnn", "éééh", "hummm"). */
-const VICIO = /^(a+h+n*|a+n+|ã+h*|h+ã+|h+u+m+|h+m+|u+h+m*|e+h+|é{2,}h*|a+h+m+|m+h*m+)$/;
+// "an" sozinho é o artigo em inglês (e o nome "Ann"): a hesitação repete uma das letras ("ann", "aan")
+const VICIO = /^(a+h+n*|a+n{2,}|a{2,}n+|ã+h*|h+ã+|h+u+m+|h+m+|u+h+m*|e+h+|é{2,}h*|a+h+m+|m+h*m+)$/;
 
 /** A palavra sem pontuação e em minúsculas, para comparar com os vícios. */
 function normalizar(texto: string): string {
@@ -45,6 +46,14 @@ function normalizar(texto: string): string {
 
 export function ehVicio(texto: string): boolean {
   return VICIO.test(normalizar(texto));
+}
+
+/**
+ * A palavra para comparar nos retakes: letras e algarismos, em minúsculas. Sem os algarismos, "2024" e
+ * "2025" viravam a mesma palavra (vazia) e frases que só mudam nos valores eram cortadas como retake.
+ */
+function paraComparar(texto: string): string {
+  return texto.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 /**
@@ -59,7 +68,7 @@ export function ehVicio(texto: string): boolean {
  */
 function retakes(palavras: PalavraNoTempo[]): Trecho[] {
   const lista = palavras.filter((p) => !ehVicio(p.texto));
-  const normais = lista.map((p) => normalizar(p.texto));
+  const normais = lista.map((p) => paraComparar(p.texto));
   const trechos: Trecho[] = [];
   const pausaAntes = (k: number) => (k === 0 ? Number.POSITIVE_INFINITY : (lista[k].inicio - lista[k - 1].fim) / TICKS_POR_SEGUNDO);
   const comecaFrase = (k: number) => k === 0 || FIM_DE_FRASE.test(lista[k - 1].texto) || pausaAntes(k) >= PAUSA_DE_FRASE;
@@ -69,7 +78,7 @@ function retakes(palavras: PalavraNoTempo[]): Trecho[] {
     for (let j = i + 1; j < lista.length && j - i <= PALAVRAS_DA_TENTATIVA; j++) {
       if ((lista[j].inicio - lista[i].inicio) / TICKS_POR_SEGUNDO > DISTANCIA_DO_RETAKE) break;
       let iguais = 0;
-      while (j + iguais < lista.length && i + iguais < j && normais[i + iguais] === normais[j + iguais]) iguais++;
+      while (j + iguais < lista.length && i + iguais < j && normais[i + iguais] !== "" && normais[i + iguais] === normais[j + iguais]) iguais++;
       if (iguais < PALAVRAS_IGUAIS || !recomeca(j)) continue;
       const inteira = iguais === j - i;
       const abandonada = !FIM_DE_FRASE.test(lista[j - 1].texto);

@@ -19,7 +19,14 @@ export const DURACOES_DO_PLANO = { titulo: 2.5, tarja: 4, cta: 4 } as const;
  * somem, e as outras andam para trás o tanto que foi tirado antes delas.
  */
 export function palavrasDepoisDoCorte<P extends PalavraNoTempo>(palavras: P[], trechos: Intervalo[]): P[] {
-  const cortes = [...trechos].sort((a, b) => a.inicio - b.inicio);
+  // Os trechos da limpeza se sobrepõem (o vício fica dentro da pausa vizinha, as pausas dentro do retake):
+  // juntos primeiro, como removerIntervalos faz, senão o tempo sobreposto era tirado duas vezes
+  const cortes: Intervalo[] = [];
+  for (const trecho of [...trechos].sort((a, b) => a.inicio - b.inicio)) {
+    const ultimo = cortes[cortes.length - 1];
+    if (ultimo && trecho.inicio <= ultimo.fim) ultimo.fim = Math.max(ultimo.fim, trecho.fim);
+    else cortes.push({ inicio: trecho.inicio, fim: trecho.fim });
+  }
   const tirado = (t: Tick) => cortes.reduce((soma, corte) => soma + Math.max(0, Math.min(t, corte.fim) - corte.inicio), 0);
   return palavras
     .filter((palavra) => !cortes.some((corte) => palavra.inicio >= corte.inicio && palavra.fim <= corte.fim))
