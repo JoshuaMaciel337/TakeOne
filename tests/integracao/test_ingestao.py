@@ -75,6 +75,9 @@ def test_ingestao_de_video_horizontal(db_limpo):
     assert midia["miniaturas"]["total"] == 10
     assert (midia["miniaturas"]["largura"], midia["miniaturas"]["altura"]) == (160, 90)
     assert sondar_video(arquivo_da(midia, "capa.jpg")) == (640, 360)
+    # O loudness também é medido no vídeo: o resumo do ebur128 saía antes das estatísticas do libx264 e se
+    # perdia nas últimas linhas, e o "Igualar o volume" ficava desligado em todo vídeo com som
+    assert midia["audio"]["lufs"] is not None and -26 < midia["audio"]["lufs"] < -16
 
 
 def test_ingestao_de_video_gravado_em_pe_no_celular(db_limpo):

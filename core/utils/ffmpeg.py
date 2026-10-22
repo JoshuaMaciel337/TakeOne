@@ -113,11 +113,16 @@ def executar_ffmpeg(argumentos: list[str], duracao: float | None = None,
     processo = subprocess.Popen(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True, encoding="utf-8", errors="replace")
     ultimas_linhas: deque[str] = deque(maxlen=LINHAS_ERRO_GUARDADAS)
+    # O resumo do ebur128 sai antes das estatísticas que o libx264 e o AAC escrevem ao fechar: guardado à parte,
+    # ele não some das últimas linhas quando a mesma chamada também codifica vídeo (a ingestão perdia o LUFS)
+    linhas_de_loudness: deque[str] = deque(maxlen=LINHAS_ERRO_GUARDADAS)
 
     def guardar_erros():
         for linha in processo.stderr:
             if linha.strip():
                 ultimas_linhas.append(linha.rstrip())
+                if "LUFS" in linha:
+                    linhas_de_loudness.append(linha.rstrip())
 
     leitor = threading.Thread(target=guardar_erros, daemon=True)
     leitor.start()
@@ -129,4 +134,5 @@ def executar_ffmpeg(argumentos: list[str], duracao: float | None = None,
     leitor.join(timeout=5)
     if codigo != 0:
         raise ErroFFmpeg(f"FFmpeg terminou com código {codigo}: " + " | ".join(ultimas_linhas)[-600:])
-    return "\n".join(ultimas_linhas)
+    # As linhas de loudness vão no fim: quem procura o resumo (ler_loudness) pega a última ocorrência
+    return "\n".join([*ultimas_linhas, *linhas_de_loudness])
