@@ -12,7 +12,8 @@ concurrency:
 jobs:
   python:
     name: Python (lint e testes)
-    runs-on: ubuntu-latest
+    # Fixo no 24.04: o ubuntu-latest passou a ser o 26, e o CI confere o FFmpeg 6.1 deste (o worker usa o 7)
+    runs-on: ubuntu-24.04
     services:
       mongo:
         image: mongo:8.0
@@ -25,8 +26,10 @@ jobs:
           cache: pip
           cache-dependency-path: "**/requirements*.txt"
       - name: Instalar o FFmpeg e o espeak-ng (testes de ingestão e dos fonemas do texto em fala)
-        # Um espelho do apt travado segurou este passo por mais de uma hora: com limite e novas tentativas
-        timeout-minutes: 10
+        # Os espelhos do apt às vezes levam meia hora (medido: 26 min num dia lento); o limite só corta o que travou
+        timeout-minutes: 45
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30
           sudo apt-get install -y -q --no-install-recommends -o Acquire::Retries=3 -o Acquire::http::Timeout=30 ffmpeg espeak-ng
@@ -52,6 +55,9 @@ jobs:
           echo "MODELO_RECORTE=$RUNNER_TEMP/modnet.onnx" >> "$GITHUB_ENV"
       - run: pip install -r requirements-dev.txt
       - name: Instalar o Chromium (testes das animações em HTML)
+        timeout-minutes: 45
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: playwright install --with-deps chromium-headless-shell
       - run: ruff check .
       - run: pytest -q
@@ -60,7 +66,7 @@ jobs:
 
   web:
     name: Web (lint, tipos, testes e build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/web
