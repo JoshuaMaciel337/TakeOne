@@ -50,7 +50,7 @@ export function LegendasDaFala({ projeto, estilo, aoExecutar, aoAvisar }: Props)
       const palavras = await transcreverMidias(midias, idioma, setAndamento, () => ativo.current);
       if (!palavras) return;
       // As linhas cabem na largura do quadro do projeto, com o tamanho de letra do estilo escolhido
-      const legendas = legendasDaFala(faixa.clipes, palavras, opcoesParaOQuadro(projeto.proporcao, estilo.tamanho));
+      const legendas = legendasDaFala(faixa.clipes, palavras, opcoesParaOQuadro(projeto.proporcao, estilo));
       if (!legendas.length) {
         aoAvisar("Não achei fala nos clipes desta faixa.");
         return;

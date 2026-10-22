@@ -5,6 +5,7 @@ import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { falaDosClipes, type Palavra, type PalavraNoTempo } from "./fala.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Clipe } from "./modelo.ts";
+import type { FonteTexto, Texto } from "./texto.ts";
 
 export type { Palavra } from "./fala.ts";
 
@@ -21,19 +22,33 @@ export type OpcoesDaFala = {
 
 export const OPCOES_DA_FALA: OpcoesDaFala = { maxCaracteres: 42, maxLinhas: 1, maxSegundos: 4.5, pausa: 0.6 };
 
-/** Largura média de uma letra, em frações do tamanho da fonte (as fontes do TakeOne, em negrito). */
-const LARGURA_DA_LETRA = 0.6;
+/**
+ * Largura de uma letra, em frações do tamanho da fonte, em minúsculas e em caixa alta: a maior média
+ * por linha medida no desenho do render (core/utils/texto.py) em linhas de fala em português, com e sem
+ * negrito. Em caixa alta a letra é bem mais larga: com uma largura só, a do "Palavra falada" passava do quadro.
+ */
+const LARGURA_DA_LETRA: Record<FonteTexto, { minusculas: number; caixaAlta: number }> = {
+  texto: { minusculas: 0.62, caixaAlta: 0.7 },
+  display: { minusculas: 0.7, caixaAlta: 0.76 },
+  manuscrita: { minusculas: 0.41, caixaAlta: 0.53 },
+};
 /** A legenda ocupa no máximo esta fração da largura do quadro. */
 const LARGURA_UTIL = 0.9;
 
+export type EstiloParaOQuadro = Pick<Texto, "tamanho" | "fonte" | "caixa_alta" | "contorno_espessura">;
+
 /**
- * Quantas letras cabem numa linha no quadro do projeto, com o tamanho da letra do estilo (fração do
- * lado menor do quadro). No 9:16, com o tamanho padrão, uns 21; no 16:9, uns 38.
+ * Quantas letras cabem numa linha no quadro do projeto com o estilo da legenda (o tamanho é fração do
+ * lado menor do quadro; o contorno, do tamanho). No 9:16, com o estilo padrão, umas 28; no 16:9, umas 50.
  */
-export function opcoesParaOQuadro(proporcao: string, tamanhoDaLetra: number): OpcoesDaFala {
+export function opcoesParaOQuadro(proporcao: string, estilo: EstiloParaOQuadro): OpcoesDaFala {
   const [l, a] = proporcao.split(":").map(Number);
   const larguraEmLadosMenores = l && a ? l / Math.min(l, a) : 1;
-  const maxCaracteres = Math.max(10, Math.floor((LARGURA_UTIL * larguraEmLadosMenores) / (LARGURA_DA_LETRA * tamanhoDaLetra)));
+  const letra = LARGURA_DA_LETRA[estilo.fonte] ?? LARGURA_DA_LETRA.display;
+  const largura = (estilo.caixa_alta ? letra.caixaAlta : letra.minusculas) * estilo.tamanho;
+  // O contorno passa da letra dos dois lados da linha
+  const util = LARGURA_UTIL * larguraEmLadosMenores - 2 * estilo.contorno_espessura * estilo.tamanho;
+  const maxCaracteres = Math.max(10, Math.floor(util / largura));
   return { ...OPCOES_DA_FALA, maxCaracteres, maxLinhas: 2 };
 }
 

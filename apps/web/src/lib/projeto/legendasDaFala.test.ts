@@ -57,10 +57,16 @@ test("a linha não passa do fim do clipe nem junta dois clipes", () => {
 });
 
 test("no quadro em pé a legenda usa duas linhas equilibradas e cabe na largura", () => {
-  const emPe = opcoesParaOQuadro("9:16", 0.07);
-  const deitado = opcoesParaOQuadro("16:9", 0.07);
-  assert.equal(emPe.maxCaracteres, 21);
-  assert.equal(deitado.maxCaracteres, 38);
+  const estilo = { tamanho: 0.07, fonte: "texto", caixa_alta: false, contorno_espessura: 0 } as const;
+  const emPe = opcoesParaOQuadro("9:16", estilo);
+  const deitado = opcoesParaOQuadro("16:9", estilo);
+  assert.equal(emPe.maxCaracteres, 20);
+  assert.equal(deitado.maxCaracteres, 36);
+  // "Palavra falada" (display em caixa alta, 0,06): a letra larga cabe menos que as 25 de antes, que
+  // passavam do quadro ("O MUNDO MUDOU MUITO MESMO" ocupava 110% da largura no render)
+  const palavraFalada = opcoesParaOQuadro("9:16", { tamanho: 0.06, fonte: "display", caixa_alta: true, contorno_espessura: 0.12 });
+  assert.equal(palavraFalada.maxCaracteres, 19);
+  assert.ok(0.76 * 0.06 * palavraFalada.maxCaracteres + 2 * 0.12 * 0.06 <= 0.9);
   assert.deepEqual(quebrarEmLinhas("Esse modo é a união de todas as funções".split(" "), 21, 2), ["Esse modo é a união", "de todas as funções"]);
   assert.equal(quebrarEmLinhas("uma frase que passa de duas linhas de vinte e uma letras".split(" "), 21, 2), null);
 

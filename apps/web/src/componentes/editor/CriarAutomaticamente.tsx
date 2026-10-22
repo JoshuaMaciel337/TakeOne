@@ -92,7 +92,7 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
     let mudou = false;
     if (p.opcoes.legendas) {
       const estilo = ESTILOS_DE_LEGENDA[0].texto;
-      const opcoesDoQuadro = opcoesParaOQuadro(projeto.proporcao, estilo.tamanho);
+      const opcoesDoQuadro = opcoesParaOQuadro(projeto.proporcao, estilo);
       let legendas = legendasDaFala(principalDe(base), p.palavras, opcoesDoQuadro);
       let chavesPorTexto: Map<string, number[] | null> | null = null;
       if (legendas.length && p.opcoes.chaves) {
