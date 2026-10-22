@@ -18,6 +18,12 @@ import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 
 /** Diferença, em segundos, entre a mídia e o relógio do editor a partir da qual ela é reposicionada. */
 const DESVIO_MAXIMO = 0.3;
+/**
+ * Na passagem para outro clipe da mesma mídia (os pedaços de um corte dividem o elemento), um quadro
+ * basta: com os 0,3 s, um corte curto (uma palavra apagada, um "ahn") continuava tocando e o som ficava
+ * atrás da boca.
+ */
+const DESVIO_NA_TROCA = 0.04;
 
 export type { ItemDaPrevia };
 export { arquivoDaImagemDoClipe, arquivoDoTom, usaVozLimpa };
@@ -40,23 +46,29 @@ function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>,
     ? Math.max(ANDAMENTO_MINIMO, velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, (tempo - clipe.inicio) / clipe.duracao))
     : clipe.velocidade;
 
+  // O clipe que o elemento segue: trocou, a próxima conferência usa o limite de um quadro
+  const seguido = useRef<{ id: string | null; trocou: boolean }>({ id: null, trocou: false });
+
   useEffect(() => {
     const elemento = elementoRef.current;
     if (!elemento) return;
+    if (seguido.current.id !== clipe.id) seguido.current = { id: clipe.id, trocou: seguido.current.id !== null };
     elemento.playbackRate = velocidade;
     const desvio = Math.abs(elemento.currentTime - alvo);
     if (tocar) {
       if (elemento.paused) {
         if (desvio > 0.05) elemento.currentTime = alvo;
         elemento.play().catch(() => {});
-      } else if (!elemento.seeking && elemento.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && desvio > DESVIO_MAXIMO * velocidade) {
-        elemento.currentTime = alvo;
+        seguido.current.trocou = false;
+      } else if (!elemento.seeking && elemento.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        if (desvio > (seguido.current.trocou ? DESVIO_NA_TROCA : DESVIO_MAXIMO * velocidade)) elemento.currentTime = alvo;
+        seguido.current.trocou = false;
       }
     } else {
       if (!elemento.paused) elemento.pause();
       if (desvio > 0.01) elemento.currentTime = alvo;
     }
-  }, [elementoRef, alvo, tocar, velocidade]);
+  }, [elementoRef, alvo, tocar, velocidade, clipe.id]);
 }
 
 type PropsFonte = {

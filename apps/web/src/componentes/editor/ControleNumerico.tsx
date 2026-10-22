@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 type Props = {
   rotulo: string;
   valor: number;
@@ -39,6 +41,14 @@ export function ControleNumerico({
   acao,
 }: Props) {
   const exibido = Number(arredondar(valor, passo).toFixed(4));
+  // O deslizante mostra o valor preso aos limites e ao passo: confirmar sem a pessoa ter mexido (um clique
+  // no polegar, o Tab que chega nele) trocaria o valor de verdade (5× digitado virava 4×) ou gravaria um keyframe
+  const mexeu = useRef(false);
+  const confirmarDeslizante = (elemento: HTMLInputElement) => {
+    if (!mexeu.current) return;
+    mexeu.current = false;
+    aoConfirmar(elemento.valueAsNumber);
+  };
 
   function confirmarTexto(elemento: HTMLInputElement) {
     const numero = Number(elemento.value.replace(",", "."));
@@ -86,9 +96,12 @@ export function ControleNumerico({
         value={Math.min(maximo, Math.max(minimo, valor))}
         disabled={desativado}
         aria-label={rotulo}
-        onChange={(evento) => aoPrever(evento.currentTarget.valueAsNumber)}
-        onPointerUp={(evento) => aoConfirmar(evento.currentTarget.valueAsNumber)}
-        onKeyUp={(evento) => aoConfirmar(evento.currentTarget.valueAsNumber)}
+        onChange={(evento) => {
+          mexeu.current = true;
+          aoPrever(evento.currentTarget.valueAsNumber);
+        }}
+        onPointerUp={(evento) => confirmarDeslizante(evento.currentTarget)}
+        onKeyUp={(evento) => confirmarDeslizante(evento.currentTarget)}
         className="col-span-2 h-1.5 w-full cursor-pointer accent-destaque disabled:cursor-not-allowed disabled:opacity-50"
       />
     </label>
