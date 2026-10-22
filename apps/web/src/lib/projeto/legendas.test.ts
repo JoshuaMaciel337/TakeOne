@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { segundosParaTicks } from "../tempo.ts";
-import { escreverSrt, escreverVtt, lerLegendas, lerTempo } from "./legendas.ts";
+import { escreverSrt, escreverVtt, lerLegendas, lerTempo, lerTextoDeLegenda } from "./legendas.ts";
 
 const S = segundosParaTicks(1);
 
@@ -54,4 +54,38 @@ test("escrever e ler de novo dá as mesmas legendas", () => {
 test("SRT com linha em branco que tem espaço ou tabulação separa as legendas", () => {
   const srt = "1\n00:00:01,000 --> 00:00:02,000\nUm\n \n2\n00:00:03,000 --> 00:00:04,000\nDois\n\t\n3\n00:00:05,000 --> 00:00:06,000\nTrês\n";
   assert.deepEqual(lerLegendas(srt).map((l) => l.conteudo), ["Um", "Dois", "Três"]);
+});
+
+test("o arquivo de legendas é lido na codificação dele", () => {
+  const texto = "1\n00:00:01,000 --> 00:00:02,000\nAção é já\n";
+  const utf8 = new TextEncoder().encode(texto);
+  // Windows-1252: "ç" é 0xE7, "ã" 0xE3, "é" 0xE9
+  const cp1252 = Uint8Array.from([...texto].map((letra) => ({ ç: 0xe7, ã: 0xe3, é: 0xe9 })[letra as "ç"] ?? letra.charCodeAt(0)));
+  const utf16 = (be: boolean) => {
+    const bytes = new Uint8Array(texto.length * 2);
+    [...texto].forEach((letra, i) => {
+      const codigo = letra.charCodeAt(0);
+      bytes[2 * i + (be ? 1 : 0)] = codigo & 0xff;
+      bytes[2 * i + (be ? 0 : 1)] = codigo >> 8;
+    });
+    return bytes;
+  };
+  const comBom = (bom: number[], bytes: Uint8Array) => Uint8Array.from([...bom, ...bytes]);
+  for (const [nome, bytes] of [
+    ["UTF-8", utf8],
+    ["UTF-8 com BOM", comBom([0xef, 0xbb, 0xbf], utf8)],
+    ["Windows-1252", cp1252],
+    ["UTF-16 LE com BOM", comBom([0xff, 0xfe], utf16(false))],
+    ["UTF-16 BE com BOM", comBom([0xfe, 0xff], utf16(true))],
+    ["UTF-16 LE sem BOM", utf16(false)],
+  ] as const) {
+    assert.deepEqual(lerLegendas(lerTextoDeLegenda(bytes)).map((l) => l.conteudo), ["Ação é já"], nome);
+  }
+});
+
+test("legendas sem a linha em branco entre elas, e as notas do WebVTT de fora", () => {
+  const srt = "1\n00:00:01,000 --> 00:00:02,000\nUm\n2\n00:00:03,000 --> 00:00:04,000\nDois\n";
+  assert.deepEqual(lerLegendas(srt).map((l) => l.conteudo), ["Um", "Dois"]);
+  const vtt = "WEBVTT\n\n00:01.000 --> 00:02.000\nOi\n\nNOTE isto é uma nota\n\n00:03.000 --> 00:04.000\nTchau\n";
+  assert.deepEqual(lerLegendas(vtt).map((l) => l.conteudo), ["Oi", "Tchau"]);
 });

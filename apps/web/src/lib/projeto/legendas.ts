@@ -61,25 +61,60 @@ function limparTexto(linhas: string[]): string {
 }
 
 /**
+ * O texto de um arquivo de legendas, na codificação dele: UTF-8 (com ou sem BOM), UTF-16 (com BOM ou pelos
+ * zeros entre as letras) ou, por último, Windows-1252, a de muito SRT brasileiro antigo. Lido como UTF-8, um
+ * arquivo em Windows-1252 entrava com "Ã©" no lugar do "é". O Windows-1252 nunca falha ao decodificar, por
+ * isso é a última tentativa, depois do UTF-8 estrito.
+ */
+export function lerTextoDeLegenda(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  // UTF-16 sem BOM: texto latino tem um zero em quase todo byte par (ou ímpar)
+  const amostra = bytes.subarray(0, 2000);
+  let zerosPares = 0;
+  let zerosImpares = 0;
+  for (let i = 0; i < amostra.length; i++) {
+    if (amostra[i] !== 0) continue;
+    if (i % 2) zerosImpares++;
+    else zerosPares++;
+  }
+  const metade = amostra.length / 2;
+  if (metade >= 4 && zerosImpares > 0.4 * metade) return new TextDecoder("utf-16le").decode(bytes);
+  if (metade >= 4 && zerosPares > 0.4 * metade) return new TextDecoder("utf-16be").decode(bytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+}
+
+/**
  * Lê um arquivo SRT ou WebVTT. Blocos sem tempo válido são ignorados. As legendas saem em ordem e
- * sem uma por cima da outra: se uma começa antes da anterior acabar, a anterior termina ali.
+ * sem uma por cima da outra: se uma começa antes da anterior acabar, a anterior termina ali. Cada linha de
+ * tempo começa uma legenda, mesmo sem a linha em branco antes (arquivos feitos à mão); o número que o SRT põe
+ * antes do tempo sai do texto da anterior, e depois de uma linha em branco nada mais entra nela (as notas
+ * do WebVTT, por exemplo).
  */
 export function lerLegendas(arquivo: string): Legenda[] {
-  const blocos = arquivo
-    .replace(/^﻿/, "")
-    .replace(/\r\n?/g, "\n")
-    // Uma linha "em branco" com espaços ou tabulação também separa (senão a legenda seguinte virava texto)
-    .split(/\n(?:[ \t]*\n)+/);
+  const linhas = arquivo.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n").split("\n");
+  const blocos: { tempo: string; texto: string[]; fechado: boolean }[] = [];
+  for (const linha of linhas) {
+    const atual = blocos.at(-1);
+    if (linha.includes("-->")) {
+      if (atual && !atual.fechado && /^\s*\d+\s*$/.test(atual.texto.at(-1) ?? "")) atual.texto.pop();
+      blocos.push({ tempo: linha, texto: [], fechado: false });
+    } else if (atual && !atual.fechado) {
+      if (linha.trim()) atual.texto.push(linha);
+      else if (atual.texto.length) atual.fechado = true;
+    }
+  }
   const lidas: Legenda[] = [];
   for (const bloco of blocos) {
-    const linhas = bloco.split("\n");
-    const indice = linhas.findIndex((linha) => linha.includes("-->"));
-    if (indice < 0) continue;
-    const [antes, depois] = linhas[indice].split("-->");
+    const [antes, depois] = bloco.tempo.split("-->");
     // No WebVTT, depois do tempo final podem vir ajustes de posição ("line:90%"): ficam de fora
     const inicio = lerTempo(antes);
     const fim = lerTempo(depois.trim().split(/\s+/)[0] ?? "");
-    const conteudo = limparTexto(linhas.slice(indice + 1));
+    const conteudo = limparTexto(bloco.texto);
     if (inicio === null || fim === null || fim <= inicio || !conteudo) continue;
     lidas.push({ inicio: Math.round(inicio * TICKS_POR_SEGUNDO), fim: Math.round(fim * TICKS_POR_SEGUNDO), conteudo });
   }

@@ -51,9 +51,9 @@ import {
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
-import { type Efeito, EFEITOS } from "./efeitos.ts";
+import { type Efeito, EFEITOS, SO_EM_MIDIA } from "./efeitos.ts";
 import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos, TOM_LIMITE } from "./som.ts";
-import { ajustarTexto, type FonteTexto, type Texto } from "./texto.ts";
+import { ajustarTexto, type FonteTexto, LIMITES_TEXTO, palavrasDoTexto, type Texto } from "./texto.ts";
 
 export class ErroEdicao extends Error {}
 
@@ -688,6 +688,12 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
       };
       // A transição é de saída: fica só com a metade da direita (na esquerda, ela apareceria no meio da tomada)
       const esquerda = { ...clipe, ...pedacoDoClipe(clipe, clipe.inicio, t), duracao: t - clipe.inicio, fade_saida: 0, transicao: null, animacao: clipe.animacao ? { ...clipe.animacao, saida: SEM_ANIMACAO.saida } : clipe.animacao };
+      // Numa legenda, as palavras se repartem pelo cursor: cada metade fica com as que caem nela
+      const repartidas = faixa.tipo === "legenda" && clipe.texto ? repartirLegenda(clipe.texto, t - clipe.inicio, clipe.duracao) : null;
+      if (repartidas) {
+        esquerda.texto = repartidas[0];
+        direita.texto = repartidas[1];
+      }
       clipes.push(esquerda, direita);
       novos.push(direita.id);
     }
@@ -831,6 +837,111 @@ export function duplicarClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
   return { projeto: finalizar(resultado), novos };
 }
 
+/** Um clipe copiado (Ctrl+C), com o tipo e a faixa de onde veio. */
+export type ClipeCopiado = { clipe: Clipe; tipo: TipoFaixa; faixaId: string };
+
+/**
+ * Cola os clipes copiados no cursor, com ids novos e o mesmo espaçamento entre eles. Os da principal entram no
+ * cursor, entre os outros (a principal continua encostada); os das outras faixas voltam para a faixa de onde
+ * vieram, se ela existe e tem lugar, ou vão para uma nova do mesmo tipo.
+ */
+export function colarClipes(projeto: Projeto, ctx: Contexto, copiados: ClipeCopiado[], inicio: Tick): { projeto: Projeto; novos: string[] } {
+  if (!copiados.length) throw new ErroEdicao("Copie um clipe antes (Ctrl+C).");
+  const base = Math.min(...copiados.map(({ clipe }) => clipe.inicio));
+  const cursor = quadroMaisProximo(projeto.taxa, inicio);
+  const novos: string[] = [];
+  let resultado = projeto;
+  const daPrincipal = copiados.filter(({ tipo }) => tipo === "principal").sort((a, b) => a.clipe.inicio - b.clipe.inicio);
+  if (daPrincipal.length) {
+    const principal = resultado.faixas.find((faixa) => faixa.tipo === "principal")!;
+    exigirDestravada(principal);
+    const copias = daPrincipal.map(({ clipe }) => ({ ...clipe, id: ctx.novoId() }));
+    const clipes = [...principal.clipes];
+    clipes.splice(indiceNaPrincipal(principal, cursor), 0, ...copias);
+    resultado = trocarFaixa(resultado, compactar({ ...principal, clipes }));
+    novos.push(...copias.map((copia) => copia.id));
+  }
+  for (const { clipe, tipo, faixaId } of copiados.filter(({ tipo }) => tipo !== "principal")) {
+    const copia: Clipe = { ...clipe, id: ctx.novoId(), inicio: cursor + clipe.inicio - base };
+    const existe = resultado.faixas.some((faixa) => faixa.id === faixaId && faixa.tipo === tipo);
+    resultado = colocarLivre(resultado, ctx, tipo as TipoLivre, copia, existe ? faixaId : undefined);
+    novos.push(copia.id);
+  }
+  return { projeto: finalizar(resultado), novos };
+}
+
+/** Os grupos de ajustes que "Colar ajustes" leva de um clipe para outros. */
+export const GRUPOS_DE_AJUSTES = [
+  { id: "cor", nome: "Cor e filtro" },
+  { id: "efeito", nome: "Efeito e tela verde" },
+  { id: "animacao", nome: "Animações de entrada, saída e loop" },
+  { id: "imagem", nome: "Posição, tamanho, giro, recorte, keyframes e mesclagem" },
+  { id: "audio", nome: "Volume, fades e efeitos de voz" },
+] as const;
+export type GrupoDeAjustes = (typeof GRUPOS_DE_AJUSTES)[number]["id"];
+
+const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
+  cor: ["cor"],
+  efeito: ["efeito", "chroma"],
+  animacao: ["animacao"],
+  imagem: ["transformacao", "recorte", "keyframes", "expressoes", "mesclagem"],
+  audio: ["volume", "fade_entrada", "fade_saida", "curva_fade", "efeitos_voz", "igualar_volume"],
+};
+
+/**
+ * Leva os ajustes dos `grupos` do clipe `origem` para os clipes marcados. Cada grupo só vale onde faz sentido:
+ * o áudio só em clipe com som, a tela verde só em mídia, a luz e a granulação só em vídeo e imagem. Devolve
+ * quantos clipes receberam algo e os grupos que ficaram de fora em algum deles.
+ */
+export function colarAjustes(
+  projeto: Projeto,
+  ctx: Contexto,
+  origem: Clipe,
+  clipeIds: string[],
+  grupos: GrupoDeAjustes[],
+): { projeto: Projeto; alterados: number; deFora: GrupoDeAjustes[] } {
+  const alvos = clipeIds.filter((id) => id !== origem.id);
+  if (!alvos.length) throw new ErroEdicao("Marque os clipes que vão receber os ajustes copiados.");
+  if (!grupos.length) throw new ErroEdicao("Escolha o que colar.");
+  const deFora = new Set<GrupoDeAjustes>();
+  let alterados = 0;
+  const resultado = mudarClipes(projeto, alvos, (clipe, faixa) => {
+    const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    const temImagem = Boolean(clipe.texto) || Boolean(info?.video);
+    const temSom = Boolean(info?.audio) && !clipe.texto;
+    const ehMidia = Boolean(clipe.midia_id) && !clipe.texto;
+    const novo: Clipe = { ...clipe };
+    let mudou = false;
+    for (const grupo of grupos) {
+      const vale =
+        grupo === "audio" ? temSom :
+        grupo === "efeito" ? temImagem && (ehMidia || !origem.efeito || !SO_EM_MIDIA.includes(origem.efeito.tipo)) :
+        grupo === "imagem" ? temImagem && faixa.tipo !== "audio" :
+        temImagem;
+      if (!vale) {
+        deFora.add(grupo);
+        continue;
+      }
+      for (const campo of CAMPOS_DOS_GRUPOS[grupo]) {
+        // A tela verde é só de mídia: num texto, o resto do grupo vai e ela fica
+        if (campo === "chroma" && !ehMidia) continue;
+        (novo as Record<string, unknown>)[campo] = structuredClone(origem[campo]);
+      }
+      mudou = true;
+    }
+    if (!mudou) return clipe;
+    alterados++;
+    // Os fades e as animações de entrada e saída cabem no clipe que recebe (o copiado pode ser mais longo)
+    const fadeEntrada = Math.min(novo.fade_entrada, novo.duracao);
+    novo.fade_entrada = fadeEntrada;
+    novo.fade_saida = Math.min(novo.fade_saida, novo.duracao - fadeEntrada);
+    if (novo.animacao) novo.animacao = limitarAnimacoes(novo.animacao, novo.duracao);
+    return novo;
+  }, { comAudio: true });
+  if (!alterados) throw new ErroEdicao("Nenhum dos ajustes escolhidos vale para os clipes marcados.");
+  return { projeto: finalizar(resultado), alterados, deFora: [...deFora] };
+}
+
 export function alternarFaixa(projeto: Projeto, faixaId: string, propriedade: "oculta" | "muda" | "travada"): Projeto {
   const faixa = projeto.faixas.find((item) => item.id === faixaId);
   if (!faixa) throw new ErroEdicao("Esta faixa não existe mais.");
@@ -874,7 +985,7 @@ function limitarRecorte(r: Recorte): Recorte {
   return { x, y, largura: limitar(r.largura, RECORTE_MINIMO, 1 - x), altura: limitar(r.altura, RECORTE_MINIMO, 1 - y) };
 }
 
-function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe, faixa: Faixa) => Clipe): Projeto {
+function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe, faixa: Faixa) => Clipe, { comAudio = false } = {}): Projeto {
   const alvos = new Set(clipeIds);
   if (!alvos.size) throw new ErroEdicao("Escolha um clipe.");
   let achou = false;
@@ -882,7 +993,7 @@ function mudarClipes(projeto: Projeto, clipeIds: string[], mudar: (clipe: Clipe,
     if (!faixa.clipes.some((clipe) => alvos.has(clipe.id))) return faixa;
     achou = true;
     exigirDestravada(faixa);
-    if (faixa.tipo === "audio") throw new ErroEdicao("Clipes de áudio não aparecem na imagem.");
+    if (faixa.tipo === "audio" && !comAudio) throw new ErroEdicao("Clipes de áudio não aparecem na imagem.");
     return { ...faixa, clipes: faixa.clipes.map((clipe) => (alvos.has(clipe.id) ? mudar(clipe, faixa) : clipe)) };
   });
   if (!achou) throw new ErroEdicao("Este clipe não existe mais.");
@@ -1238,6 +1349,103 @@ export function importarLegendas(projeto: Projeto, ctx: Contexto, legendas: Lege
   const criada = criarFaixa(projeto, ctx, "legenda");
   const resultado = trocarFaixa(criada.projeto, { ...criada.faixa, clipes });
   return { projeto: finalizar(resultado), clipeIds: clipes.map((clipe) => clipe.id) };
+}
+
+/**
+ * Os textos das duas metades de uma legenda dividida em `local` (desde o começo dela): as palavras que começam
+ * antes do corte ficam na primeira, com os tempos e as palavras-chave delas. Sem os tempos da fala, as palavras
+ * dividem a duração pelas letras, como o letra a letra. null quando a legenda tem uma palavra só.
+ */
+function repartirLegenda(texto: Texto, local: Tick, duracao: Tick): [Texto, Texto] | null {
+  const palavras = palavrasDoTexto(texto.conteudo);
+  if (palavras.length < 2) return null;
+  const temTempos = texto.tempos?.length === palavras.length;
+  let tempos = texto.tempos ?? [];
+  if (!temTempos) {
+    const letras = palavras.reduce((soma, palavra) => soma + palavra.length, 0);
+    let antes = 0;
+    tempos = palavras.map((palavra) => {
+      const inicio = Math.round((duracao * antes) / letras);
+      antes += palavra.length;
+      return inicio;
+    });
+  }
+  const primeiraDepois = tempos.findIndex((inicio) => inicio >= local);
+  const corte = Math.min(palavras.length - 1, Math.max(1, primeiraDepois < 0 ? palavras.length - 1 : primeiraDepois));
+  const chaves = texto.palavras_chave ?? [];
+  const metade = (de: number, ate: number, desloca: Tick): Texto => ({
+    ...texto,
+    conteudo: palavras.slice(de, ate).join(" "),
+    tempos: temTempos ? tempos.slice(de, ate).map((t) => t - desloca) : null,
+    palavras_chave: chaves.filter((k) => k >= de && k < ate).map((k) => k - de),
+  });
+  return [metade(0, corte, 0), metade(corte, palavras.length, local)];
+}
+
+/**
+ * Junta legendas seguidas da mesma faixa numa só, do começo da primeira ao fim da última: os textos um depois
+ * do outro, com os tempos das palavras e as palavras-chave levados para o começo da primeira. O estilo é o dela.
+ */
+export function juntarLegendas(projeto: Projeto, clipeIds: string[]): { projeto: Projeto; clipeId: string } {
+  if (clipeIds.length < 2) throw new ErroEdicao("Escolha duas ou mais legendas seguidas para juntar.");
+  const achados = clipeIds.map((id) => acharClipe(projeto, id));
+  const faixa = achados[0]?.faixa;
+  if (!faixa || faixa.tipo !== "legenda" || achados.some((achado) => !achado?.clipe.texto || achado.faixa.id !== faixa.id)) {
+    throw new ErroEdicao("Só legendas da mesma faixa se juntam.");
+  }
+  exigirDestravada(faixa);
+  const escolhidos = new Set(clipeIds);
+  const ordem = ordenar(faixa.clipes);
+  const posicoes = ordem.flatMap((clipe, i) => (escolhidos.has(clipe.id) ? [i] : []));
+  if (posicoes.at(-1)! - posicoes[0] !== posicoes.length - 1) throw new ErroEdicao("As legendas precisam estar seguidas, sem outra no meio.");
+  const juntas = posicoes.map((i) => ordem[i]);
+  const primeira = juntas[0];
+  const conteudo = juntas.map((clipe) => clipe.texto!.conteudo.trim()).join(" ");
+  if (conteudo.length > LIMITES_TEXTO.conteudo) throw new ErroEdicao(`Juntas, as legendas passariam de ${LIMITES_TEXTO.conteudo} letras.`);
+  let contadas = 0;
+  let comTempos = true;
+  const tempos: number[] = [];
+  const chaves: number[] = [];
+  for (const clipe of juntas) {
+    const texto = clipe.texto!;
+    const quantas = palavrasDoTexto(texto.conteudo).length;
+    if (texto.tempos?.length === quantas) tempos.push(...texto.tempos.map((t) => t + clipe.inicio - primeira.inicio));
+    else comTempos = false;
+    chaves.push(...(texto.palavras_chave ?? []).map((k) => k + contadas));
+    contadas += quantas;
+  }
+  const junta: Clipe = {
+    ...primeira,
+    duracao: fimDoClipe(juntas.at(-1)!) - primeira.inicio,
+    texto: ajustarTexto(primeira.texto!, { conteudo, tempos: comTempos ? tempos : null, palavras_chave: chaves.length ? chaves : null }),
+  };
+  const clipes = faixa.clipes.filter((clipe) => !escolhidos.has(clipe.id) || clipe.id === primeira.id).map((clipe) => (clipe.id === primeira.id ? junta : clipe));
+  return { projeto: finalizar(trocarFaixa(projeto, { ...faixa, clipes })), clipeId: primeira.id };
+}
+
+/**
+ * Troca `busca` por `troca` em todas as legendas da faixa, sem diferenciar maiúsculas. Onde o número de
+ * palavras muda, os tempos da fala e as palavras-chave daquela legenda saem (não correspondem mais).
+ */
+export function substituirNasLegendas(projeto: Projeto, faixaId: string, busca: string, troca: string): { projeto: Projeto; trocas: number } {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  if (!faixa || faixa.tipo !== "legenda") throw new ErroEdicao("Esta faixa de legendas não existe mais.");
+  if (!busca.trim()) throw new ErroEdicao("Escreva o que procurar.");
+  exigirDestravada(faixa);
+  const expressao = new RegExp(busca.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  let trocas = 0;
+  const clipes = faixa.clipes.map((clipe) => {
+    if (!clipe.texto) return clipe;
+    const conteudo = clipe.texto.conteudo.replace(expressao, () => {
+      trocas++;
+      return troca;
+    });
+    if (conteudo === clipe.texto.conteudo) return clipe;
+    const mesmas = palavrasDoTexto(conteudo).length === palavrasDoTexto(clipe.texto.conteudo).length;
+    return { ...clipe, texto: ajustarTexto(clipe.texto, mesmas ? { conteudo } : { conteudo, tempos: null, palavras_chave: null }) };
+  });
+  if (!trocas) throw new ErroEdicao(`Nenhuma legenda desta faixa tem "${busca}".`);
+  return { projeto: trocarFaixa(projeto, { ...faixa, clipes }), trocas };
 }
 
 /** As palavras da legenda continuam no mesmo instante quando o começo do clipe anda `delta`. */

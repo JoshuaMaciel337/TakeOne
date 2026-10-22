@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
+import { clipeParaAparar, corteVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import { retomarAudio } from "@/lib/previa/audio";
-import type { Contexto } from "@/lib/projeto/edicao";
+import type { ClipeCopiado, Contexto } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
 import { duracaoDoQuadro, quadroMaisProximo, segundosParaTicks, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
@@ -17,6 +18,8 @@ import { BarraFerramentas } from "./BarraFerramentas";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
+import { JanelaAtalhos } from "./JanelaAtalhos";
+import { JanelaColarAjustes } from "./JanelaColarAjustes";
 import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
@@ -105,6 +108,11 @@ export function Editor({ projetoId }: { projetoId: string }) {
   }, []);
   const [ima, setIma] = useState(true);
   const [exportando, setExportando] = useState(false);
+  const [vendoAtalhos, setVendoAtalhos] = useState(false);
+  // O clipe de onde saem os ajustes enquanto a janela "Colar ajustes" está aberta
+  const [colandoAjustes, setColandoAjustes] = useState<ClipeCopiado | null>(null);
+  // Os clipes copiados (Ctrl+C), na memória desta aba; o primeiro é a origem do "Colar ajustes"
+  const copiados = useRef<ClipeCopiado[]>([]);
 
   const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
   const ctx = useMemo<Contexto>(
@@ -247,6 +255,46 @@ export function Editor({ projetoId }: { projetoId: string }) {
     [biblioteca, mostrarAviso],
   );
 
+  /** Ctrl+C: guarda uma cópia dos clipes marcados, com a faixa de onde vieram, em ordem no tempo. */
+  function copiar() {
+    if (!projeto) return;
+    copiados.current = selecaoValida
+      .flatMap((id) => {
+        const achado = acharClipe(projeto, id);
+        return achado ? [{ clipe: structuredClone(achado.clipe), tipo: achado.faixa.tipo, faixaId: achado.faixa.id }] : [];
+      })
+      .sort((a, b) => a.clipe.inicio - b.clipe.inicio);
+    const quantos = copiados.current.length;
+    mostrarAviso(`${quantos === 1 ? "1 clipe copiado" : `${quantos} clipes copiados`}. Ctrl+V cola no cursor; Ctrl+Alt+V cola só os ajustes nos marcados.`);
+  }
+
+  /** Q e W: apaga do começo do clipe até o cursor, ou do cursor até o fim (o clipe marcado, ou o da principal). */
+  function aparaAteOCursor(borda: "inicio" | "fim") {
+    if (!projeto) return;
+    const clipe = clipeParaAparar(projeto, selecaoValida, tempo);
+    if (!clipe) {
+      mostrarAviso("Ponha o cursor dentro de um clipe (o marcado ou o da principal) para aparar até ele.");
+      return;
+    }
+    executar({ comando: "clipe.aparar", parametros: { clipeId: clipe.id, borda, tempo } });
+  }
+
+  /** Alt+setas: empurra os clipes marcados `quadros` quadros para um lado (só fora da principal, que é encostada). */
+  function empurrar(sentido: -1 | 1, quadros: number) {
+    if (!projeto || !selecaoValida.length) return;
+    const delta = sentido * quadros * duracaoDoQuadro(projeto.taxa);
+    const achados = selecaoValida.map((id) => acharClipe(projeto, id)).filter((achado) => achado !== null);
+    if (achados.some(({ faixa }) => faixa.tipo === "principal")) {
+      mostrarAviso("Na principal os clipes ficam encostados: use Q e W para aparar, ou arraste para mudar a ordem.");
+      return;
+    }
+    // Do lado para onde andam primeiro, para um não esbarrar no outro
+    const ordem = [...achados].sort((a, b) => (b.clipe.inicio - a.clipe.inicio) * sentido);
+    for (const { clipe, faixa } of ordem) {
+      executar({ comando: "clipe.mover", parametros: { clipeId: clipe.id, inicio: Math.max(0, clipe.inicio + delta), faixaId: faixa.id } });
+    }
+  }
+
   const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
     const alvo = evento.target as HTMLElement | null;
     const ctrl = evento.ctrlKey || evento.metaKey;
@@ -256,7 +304,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
     const deslizante = alvo instanceof HTMLInputElement && alvo.type === "range";
     const doDeslizante = deslizante && (tecla.startsWith("arrow") || tecla === "home" || tecla === "end" || tecla === "pageup" || tecla === "pagedown");
     const campo = alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]");
-    if (!projeto || exportando || doDeslizante || (campo && !deslizante)) return;
+    if (!projeto || exportando || vendoAtalhos || colandoAjustes || doDeslizante || (campo && !deslizante)) return;
     if (deslizante && evento.code === "Space") alvo.blur();
     const quadro = duracaoDoQuadro(projeto.taxa);
 
@@ -269,7 +317,22 @@ export function Editor({ projetoId }: { projetoId: string }) {
     else if ((tecla === "s" && !ctrl) || (ctrl && tecla === "b")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
     else if ((tecla === "delete" || tecla === "backspace") && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
     else if (ctrl && tecla === "d" && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
+    else if (ctrl && tecla === "c" && selecaoValida.length) copiar();
+    else if (ctrl && evento.altKey && tecla === "v") {
+      if (!copiados.current.length) mostrarAviso("Copie um clipe antes (Ctrl+C).");
+      else if (!selecaoValida.length) mostrarAviso("Marque os clipes que vão receber os ajustes do clipe copiado.");
+      else setColandoAjustes(copiados.current[0]);
+    } else if (ctrl && tecla === "v") {
+      if (copiados.current.length) executar({ comando: "clipe.colar", parametros: { copiados: copiados.current, inicio: tempo } });
+      else mostrarAviso("Copie um clipe antes (Ctrl+C).");
+    }
     else if (ctrl && tecla === "a") setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id)));
+    else if (evento.altKey && (tecla === "arrowleft" || tecla === "arrowright")) empurrar(tecla === "arrowleft" ? -1 : 1, evento.shiftKey ? 5 : 1);
+    else if ((tecla === "q" || tecla === "w") && !ctrl && !evento.altKey) aparaAteOCursor(tecla === "q" ? "inicio" : "fim");
+    else if ((tecla === "arrowup" || tecla === "arrowdown") && !ctrl && !evento.altKey) {
+      const corte = corteVizinho(projeto, tempo, tecla === "arrowup" ? -1 : 1, quadro / 2);
+      if (corte !== null) buscar(corte);
+    } else if (evento.key === "?") setVendoAtalhos(true);
     else if (tecla === "arrowleft") buscar(quadroMaisProximo(projeto.taxa, tempo) - (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
     else if (tecla === "arrowright") buscar(quadroMaisProximo(projeto.taxa, tempo) + (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
     else if (tecla === "home") buscar(0);
@@ -467,6 +530,17 @@ export function Editor({ projetoId }: { projetoId: string }) {
         </div>
       </div>
 
+      {vendoAtalhos ? <JanelaAtalhos aoFechar={() => setVendoAtalhos(false)} /> : null}
+      {colandoAjustes ? (
+        <JanelaColarAjustes
+          quantos={selecaoValida.filter((id) => id !== colandoAjustes.clipe.id).length}
+          aoFechar={() => setColandoAjustes(null)}
+          aoColar={(grupos) => {
+            setColandoAjustes(null);
+            if (executar({ comando: "clipe.colarAjustes", parametros: { origem: colandoAjustes.clipe, clipeIds: selecaoValida, grupos } })) mostrarAviso("Ajustes colados. Ctrl+Z desfaz.");
+          }}
+        />
+      ) : null}
       {exportando ? (
         <JanelaExportar projetoId={projetoId} projeto={projeto} midias={midias} proporcao={projeto.proporcao} salvamento={edicao.salvamento} aoFechar={() => setExportando(false)} />
       ) : null}

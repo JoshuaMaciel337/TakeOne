@@ -12,6 +12,9 @@ import {
   alternarFaixa,
   apagarClipes,
   apararClipe,
+  aplicarEfeito,
+  colarAjustes,
+  colarClipes,
   type Contexto,
   dividirClipes,
   DURACAO_IMAGEM_S,
@@ -23,6 +26,8 @@ import {
   ErroEdicao,
   estiloDasLegendas,
   importarLegendas,
+  juntarLegendas,
+  substituirNasLegendas,
   zoomNosTrechos,
   moverClipe,
   mudarCor,
@@ -804,4 +809,113 @@ test("o editor recusa passar dos limites de clipes da API", () => {
   const { projeto } = adicionarClipe(vazio(), ctx, "video10");
   const legendas = Array.from({ length: 1501 }, (_, i) => ({ inicio: i * QUADRO * 2, fim: i * QUADRO * 2 + QUADRO, conteudo: `L${i}` }));
   assert.throws(() => importarLegendas(projeto, ctx, legendas, ESTILO_LEGENDA), /no máximo 1500 clipes/);
+});
+
+test("legendas: juntar seguidas, dividir pelas palavras e substituir na faixa", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const legendas = [
+    { inicio: 0, fim: 2 * S, conteudo: "Bom dia", tempos: [0, S], palavras_chave: [1] },
+    { inicio: 2 * S, fim: 4 * S, conteudo: "pessoal tudo bem", tempos: [2 * S, 2.5 * S, 3 * S], palavras_chave: [0] },
+    { inicio: 5 * S, fim: 6 * S, conteudo: "Tchau" },
+  ];
+  projeto = importarLegendas(projeto, ctx, legendas, ESTILO_LEGENDA).projeto;
+  const faixa = () => projeto.faixas.find((f) => f.tipo === "legenda")!;
+  const [a, b, c] = faixa().clipes;
+  assert.throws(() => juntarLegendas(projeto, [a.id, c.id]), /seguidas/);
+  const junta = juntarLegendas(projeto, [b.id, a.id]);
+  const [unida, resto] = junta.projeto.faixas.find((f) => f.tipo === "legenda")!.clipes;
+  assert.equal(unida.texto!.conteudo, "Bom dia pessoal tudo bem");
+  assert.deepEqual([unida.inicio, unida.duracao], [0, 4 * S]);
+  assert.deepEqual(unida.texto!.tempos, [0, S, 2 * S, 2.5 * S, 3 * S]);
+  assert.deepEqual(unida.texto!.palavras_chave, [1, 2], "as palavras-chave da segunda andam as palavras da primeira");
+  assert.equal(resto.id, c.id);
+
+  // Dividir no cursor reparte as palavras pelo tempo delas
+  projeto = junta.projeto;
+  const cursor = 69 * QUADRO; // 2,3 s, num quadro inteiro
+  const dividido = dividirClipes(projeto, ctx, cursor, [unida.id]).projeto;
+  const [esquerda, direita] = dividido.faixas.find((f) => f.tipo === "legenda")!.clipes;
+  assert.equal(esquerda.texto!.conteudo, "Bom dia pessoal");
+  assert.equal(direita.texto!.conteudo, "tudo bem");
+  assert.deepEqual(direita.texto!.tempos, [2.5 * S - cursor, 3 * S - cursor]);
+  assert.deepEqual([esquerda.texto!.palavras_chave, direita.texto!.palavras_chave], [[1, 2], []]);
+
+  // Substituir: sem diferenciar maiúsculas; com o número de palavras mudado, os tempos saem
+  const trocado = substituirNasLegendas(projeto, faixa().id, "PESSOAL", "gente");
+  assert.equal(trocado.trocas, 1);
+  const legenda = trocado.projeto.faixas.find((f) => f.tipo === "legenda")!.clipes[0];
+  assert.equal(legenda.texto!.conteudo, "Bom dia gente tudo bem");
+  assert.ok(legenda.texto!.tempos, "o mesmo número de palavras guarda os tempos");
+  const outro = substituirNasLegendas(projeto, faixa().id, "tudo bem", "beleza").projeto.faixas.find((f) => f.tipo === "legenda")!.clipes[0];
+  assert.equal(outro.texto!.tempos, null);
+  assert.throws(() => substituirNasLegendas(projeto, faixa().id, "nada disso", "x"), /Nenhuma/);
+});
+
+test("colar põe os clipes copiados no cursor, com ids novos e o mesmo espaçamento", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const curto = adicionarClipe(projeto, ctx, "video4");
+  projeto = curto.projeto;
+  const titulo = adicionarTexto(projeto, ctx, 2 * S, TEXTO_PADRAO);
+  projeto = titulo.projeto;
+  const achar = (id: string) => projeto.faixas.flatMap((f) => f.clipes.map((clipe) => ({ clipe, faixa: f }))).find(({ clipe }) => clipe.id === id)!;
+  const copiados = [curto.clipeId, titulo.clipeId].map((id) => {
+    const { clipe, faixa } = achar(id);
+    return { clipe: structuredClone(clipe), tipo: faixa.tipo, faixaId: faixa.id };
+  });
+
+  // No corte entre os dois vídeos: a cópia da principal entra ali e a principal continua encostada
+  const colado = colarClipes(projeto, ctx, copiados, 10 * S);
+  conferir(colado.projeto);
+  const clipes = principal(colado.projeto);
+  assert.deepEqual(clipes.map((clipe) => clipe.midia_id), ["video10", "video4", "video4"]);
+  assert.equal(clipes[1].id, colado.novos[0]);
+  assert.notEqual(clipes[1].id, curto.clipeId);
+  // O texto guarda a distância até o clipe mais cedo copiado (ele, a 2 s): entra no cursor
+  const texto = colado.projeto.faixas.flatMap((f) => f.clipes).find((clipe) => clipe.id === colado.novos[1])!;
+  assert.equal(texto.inicio, 10 * S);
+  assert.equal(texto.texto!.conteudo, TEXTO_PADRAO.conteudo);
+  assert.equal(colado.novos.length, 2);
+  assert.throws(() => colarClipes(projeto, ctx, [], 0), /Copie/);
+});
+
+test("colar ajustes leva só o que vale para cada clipe marcado", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const origem = principal(projeto)[0].id;
+  const alvo = adicionarClipe(projeto, ctx, "video4");
+  const titulo = adicionarTexto(alvo.projeto, ctx, 0, TEXTO_PADRAO);
+  projeto = mudarCor(titulo.projeto, [origem], { temperatura: 0.5 });
+  projeto = aplicarEfeito(projeto, [origem], { tipo: "granulacao", intensidade: 1 });
+  projeto = ajustarAudio(projeto, [origem], { volume: 2 });
+  const fonte = principal(projeto)[0];
+
+  const colado = colarAjustes(projeto, ctx, fonte, [origem, alvo.clipeId, titulo.clipeId], ["cor", "efeito", "audio"]);
+  assert.equal(colado.alterados, 2, "a origem marcada fica como está");
+  const todos = colado.projeto.faixas.flatMap((f) => f.clipes);
+  const video = todos.find((clipe) => clipe.id === alvo.clipeId)!;
+  const texto = todos.find((clipe) => clipe.id === titulo.clipeId)!;
+  assert.equal(video.cor!.temperatura, 0.5);
+  assert.deepEqual(video.efeito, { tipo: "granulacao", intensidade: 1 });
+  assert.equal(video.volume, 2);
+  // O texto ganha a cor; a granulação é só de mídia e o som não existe nele
+  assert.equal(texto.cor!.temperatura, 0.5);
+  assert.ok(!texto.efeito);
+  assert.deepEqual([...colado.deFora].sort(), ["audio", "efeito"]);
+  // Cópia de verdade: mudar a origem depois não muda o colado
+  assert.notEqual(video.cor, fonte.cor);
+
+  // A música, numa faixa de áudio, recebe o som; os fades do clipe de 10 s cabem no de 4 s
+  const musica = adicionarClipe(projeto, ctx, "musica");
+  projeto = ajustarAudio(musica.projeto, [origem], { fade_entrada: 3 * S, fade_saida: 3 * S });
+  const comFades = principal(projeto)[0];
+  const noSom = colarAjustes(projeto, ctx, comFades, [musica.clipeId, alvo.clipeId], ["cor", "audio"]);
+  const [somColado, curtoColado] = [musica.clipeId, alvo.clipeId].map((id) => noSom.projeto.faixas.flatMap((f) => f.clipes).find((clipe) => clipe.id === id)!);
+  assert.equal(somColado.volume, 2);
+  assert.ok(!somColado.cor, "a música não ganha cor");
+  assert.deepEqual([curtoColado.fade_entrada, curtoColado.fade_saida], [3 * S, S]);
+
+  assert.throws(() => colarAjustes(projeto, ctx, fonte, [origem], ["cor"]), /Marque/);
+  assert.throws(() => colarAjustes(projeto, ctx, fonte, [titulo.clipeId], ["audio"]), /Nenhum/);
 });

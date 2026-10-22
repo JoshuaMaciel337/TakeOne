@@ -1,18 +1,20 @@
 "use client";
 
-import { Maximize, Pause, Play, TriangleAlert } from "lucide-react";
+import { Maximize, Pause, Play, SquareDashed, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { Compositor } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
+import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
+import { GuiasDaPrevia } from "./GuiasDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { MarcadorDeObjeto, type ObjetoMarcado } from "./SeguirObjeto";
 import { razao } from "./proporcoes";
@@ -38,6 +40,17 @@ type Props = {
 const ESPERA_QUADRO_MS = 400;
 /** Densidade máxima de pixels do canvas: acima disso o custo cresce e a diferença não aparece. */
 const DENSIDADE_MAXIMA = 2;
+
+/** Onde o navegador guarda as guias escolhidas (vale para todos os projetos). */
+const CHAVE_GUIAS = "takeone-guias-da-previa";
+
+function guiasGuardadas(): ModoDasGuias {
+  try {
+    return modoValido(localStorage.getItem(CHAVE_GUIAS));
+  } catch {
+    return "desligadas";
+  }
+}
 
 /** Mede a área livre e calcula o maior quadro na proporção do projeto que cabe nela. */
 function useQuadro(proporcao: Projeto["proporcao"]) {
@@ -81,6 +94,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [suportado] = useState(webgl2Disponivel);
   const [guias, setGuias] = useState<Guias | null>(null);
+  // A prévia só existe no navegador (o editor abre depois de carregar o projeto), então dá para ler aqui
+  const [modoDasGuias, setModoDasGuias] = useState<ModoDasGuias>(guiasGuardadas);
   const fontes = useRef(new Map<string, FonteDeQuadros>());
   const desenho = useRef<EstadoDoDesenho>({ camadas: [], fundo: "#000000", quadro: tamanho, tocando: false, sujo: true });
 
@@ -245,6 +260,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
               </>
             ) : null}
 
+            <GuiasDaPrevia modo={modoDasGuias} quadro={tamanho} emPe={razao(projeto.proporcao) < 1} />
+
             {marcacao ? <MarcadorDeObjeto aoMarcar={marcarObjeto} aoCancelar={marcacao.aoCancelar} /> : null}
 
             {selecionada && !tocando && !marcacao ? (
@@ -291,7 +308,24 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
             {tocando ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
           </button>
         </div>
-        <div className="flex w-40 justify-end">
+        <div className="flex w-40 items-center justify-end gap-1">
+          <button
+            type="button"
+            className={`botao-icone ${modoDasGuias === "desligadas" ? "" : "text-destaque"}`}
+            onClick={() => {
+              const proximo = proximoModo(modoDasGuias);
+              setModoDasGuias(proximo);
+              try {
+                localStorage.setItem(CHAVE_GUIAS, proximo);
+              } catch {
+                // Sem armazenamento (janela anônima), a escolha vale só até recarregar
+              }
+            }}
+            aria-label={`Guias: ${MODOS_DAS_GUIAS.find((modo) => modo.id === modoDasGuias)?.nome}`}
+            title={`Guias: ${MODOS_DAS_GUIAS.find((modo) => modo.id === modoDasGuias)?.nome} (clique para trocar)`}
+          >
+            <SquareDashed className="size-4" aria-hidden />
+          </button>
           <button
             type="button"
             className="botao-icone"

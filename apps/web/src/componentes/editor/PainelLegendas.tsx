@@ -1,10 +1,10 @@
 "use client";
 
-import { Download, FileUp, Plus } from "lucide-react";
+import { Combine, Download, FileUp, Plus, Replace } from "lucide-react";
 import { useRef, useState } from "react";
 
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
-import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLegendas } from "@/lib/projeto/legendas";
+import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLegendas, lerTextoDeLegenda } from "@/lib/projeto/legendas";
 import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 
@@ -51,15 +51,31 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
   const faixas = projeto.faixas.filter((faixa) => faixa.tipo === "legenda");
   const clipes = faixas.flatMap((faixa) => faixa.clipes.map((clipe) => ({ clipe, faixa }))).sort((a, b) => a.clipe.inicio - b.clipe.inicio);
   const legendas = legendasDasFaixas(projeto.faixas);
+  const [busca, setBusca] = useState("");
+  const [troca, setTroca] = useState("");
+  // As legendas marcadas (Shift+clique na hora delas, ou na linha do tempo) que podem virar uma só
+  const marcadas = clipes.filter(({ clipe }) => selecao.includes(clipe.id));
 
   async function importar(arquivo: File) {
-    const lidas = lerLegendas(await arquivo.text());
+    // Pelos bytes: arquivo.text() só entende UTF-8, e um SRT em Windows-1252 entrava com "Ã©" no lugar do "é"
+    const lidas = lerLegendas(lerTextoDeLegenda(new Uint8Array(await arquivo.arrayBuffer())));
     if (!lidas.length) {
       aoAvisar("Não achei legendas nesse arquivo. Ele precisa ser .srt ou .vtt.");
       return;
     }
     aoExecutar({ comando: "legenda.importar", parametros: { legendas: lidas, estilo } });
     aoAvisar(`${lidas.length} legendas importadas.`);
+  }
+
+  function substituir() {
+    const procurada = busca.trim().toLowerCase();
+    // Uma faixa por vez, só as que têm o texto (normalmente há uma faixa de legendas)
+    const comTexto = faixas.filter((faixa) => faixa.clipes.some((clipe) => clipe.texto?.conteudo.toLowerCase().includes(procurada)));
+    if (!comTexto.length) {
+      aoAvisar(`Nenhuma legenda tem "${busca.trim()}".`);
+      return;
+    }
+    for (const faixa of comTexto) aoExecutar({ comando: "legenda.substituir", parametros: { faixaId: faixa.id, busca: busca.trim(), troca } });
   }
 
   return (
@@ -125,6 +141,32 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
       </div>
 
       {clipes.length ? (
+        <form
+          className="flex flex-col gap-1.5 rounded-lg border border-borda p-2"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            substituir();
+          }}
+        >
+          <span className="text-[11px] font-medium text-suave">Localizar e substituir em todas</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            <input value={busca} onChange={(evento) => setBusca(evento.currentTarget.value)} placeholder="Procurar" aria-label="Procurar nas legendas" className="min-w-0 rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque" />
+            <input value={troca} onChange={(evento) => setTroca(evento.currentTarget.value)} placeholder="Trocar por" aria-label="Trocar por" className="min-w-0 rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque" />
+          </div>
+          <button type="submit" className="botao-secundario px-3 py-1.5 text-xs" disabled={!busca.trim()}>
+            <Replace className="size-4" aria-hidden />
+            Substituir
+          </button>
+        </form>
+      ) : null}
+      {marcadas.length >= 2 ? (
+        <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => aoExecutar({ comando: "legenda.juntar", parametros: { clipeIds: marcadas.map(({ clipe }) => clipe.id) } })}>
+          <Combine className="size-4" aria-hidden />
+          Juntar as {marcadas.length} legendas marcadas
+        </button>
+      ) : null}
+
+      {clipes.length ? (
         <ol className="flex flex-col gap-1.5" aria-label="Legendas do projeto">
           {clipes.map(({ clipe, faixa }) => (
             <li
@@ -134,11 +176,16 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
               <button
                 type="button"
                 className="text-[11px] tabular-nums text-suave hover:text-texto"
-                onClick={() => {
+                onClick={(evento) => {
+                  // Shift+clique marca mais de uma (para juntar); o clique comum vai até ela
+                  if (evento.shiftKey) {
+                    aoSelecionar(selecao.includes(clipe.id) ? selecao.filter((id) => id !== clipe.id) : [...selecao, clipe.id]);
+                    return;
+                  }
                   aoBuscar(clipe.inicio);
                   aoSelecionar([clipe.id]);
                 }}
-                title="Ir para esta legenda"
+                title="Ir para esta legenda (Shift+clique marca várias, para juntar)"
               >
                 {formatarTimecode(clipe.inicio, projeto.taxa)} → {formatarTimecode(clipe.inicio + clipe.duracao, projeto.taxa)}
               </button>

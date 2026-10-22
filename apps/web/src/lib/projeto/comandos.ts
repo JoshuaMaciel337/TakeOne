@@ -24,6 +24,12 @@ import {
   dividirClipes,
   estiloDasLegendas,
   palavrasChaveDasLegendas,
+  juntarLegendas,
+  colarClipes,
+  colarAjustes,
+  type ClipeCopiado,
+  type GrupoDeAjustes,
+  substituirNasLegendas,
   cortarNoRitmo,
   montarNaLinha,
   colocarLogo,
@@ -67,7 +73,7 @@ import type { Efeito } from "./efeitos.ts";
 import type { Chroma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
-import type { Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
+import type { Clipe, Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
@@ -106,6 +112,10 @@ export type Comando =
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
+  | { comando: "legenda.juntar"; parametros: { clipeIds: string[] } }
+  | { comando: "clipe.colar"; parametros: { copiados: ClipeCopiado[]; inicio: Tick } }
+  | { comando: "clipe.colarAjustes"; parametros: { origem: Clipe; clipeIds: string[]; grupos: GrupoDeAjustes[] } }
+  | { comando: "legenda.substituir"; parametros: { faixaId: string; busca: string; troca: string } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "modelo.aplicar"; parametros: { plano: PlanoDoModelo } }
   | { comando: "clipe.trocarMidia"; parametros: { clipeIds: string[]; midiaId: string } }
@@ -152,6 +162,10 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "legenda.importar": "importar legendas",
   "legenda.estilo": "mudar o estilo das legendas",
   "legenda.palavrasChave": "destacar palavras-chave",
+  "legenda.juntar": "juntar legendas",
+  "clipe.colar": "colar clipes",
+  "clipe.colarAjustes": "colar ajustes",
+  "legenda.substituir": "substituir nas legendas",
   "linha.cortarNoRitmo": "cortar no ritmo",
   "linha.montar": "montar com vários clipes",
   "marca.logo": "pôr o logo",
@@ -246,6 +260,18 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };
     case "legenda.palavrasChave":
       return { projeto: palavrasChaveDasLegendas(projeto, parametros.chaves, parametros.cor) };
+    case "clipe.colar": {
+      const resultado = colarClipes(projeto, ctx, parametros.copiados, parametros.inicio);
+      return { projeto: resultado.projeto, selecao: resultado.novos };
+    }
+    case "clipe.colarAjustes":
+      return { projeto: colarAjustes(projeto, ctx, parametros.origem, parametros.clipeIds, parametros.grupos).projeto };
+    case "legenda.juntar": {
+      const resultado = juntarLegendas(projeto, parametros.clipeIds);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "legenda.substituir":
+      return { projeto: substituirNasLegendas(projeto, parametros.faixaId, parametros.busca, parametros.troca).projeto };
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
     case "modelo.aplicar":
