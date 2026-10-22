@@ -58,7 +58,7 @@ def test_ffmpeg_faz_a_mesma_conta(caso):
 def test_janelas_estendem_os_dois_clipes():
     clipes = [{"id": "a", "inicio": 0, "duracao": 4, "transicao": {"tipo": "fusao", "duracao": 1}},
               {"id": "b", "inicio": 4, "duracao": 3}]
-    janelas = janelas_da_principal(clipes)
+    janelas = janelas_da_principal(clipes, 0.25)
     assert (janelas["a"]["inicio"], janelas["a"]["fim"]) == (0, 4.5)
     assert (janelas["b"]["inicio"], janelas["b"]["fim"]) == (3.5, 7)
     assert janelas["b"]["efeitos"] == [{"tipo": "fusao", "papel": "entra", "inicio": 3.5, "duracao": 1}]
@@ -99,3 +99,12 @@ def test_geq_da_cortina_faz_a_mesma_conta(caso):
     if filtro:
         # Só fica ligado até o fim da janela: depois, o clipe aparece inteiro sem pagar o geq
         assert filtro.endswith(f":enable='lt(t,{caso['inicio'] + caso['duracao'] - deslocamento:g})'")
+
+
+def test_janela_com_numero_impar_de_quadros_comeca_num_quadro():
+    # 15 quadros (0,5 s a 30 fps): 7 antes do corte e 8 depois, como em transicao.ts
+    clipes = [{"id": "a", "inicio": 0, "duracao": 60, "transicao": {"tipo": "fusao", "duracao": 15}},
+              {"id": "b", "inicio": 60, "duracao": 60}]
+    janelas = janelas_da_principal(clipes, 1)
+    assert (janelas["b"]["inicio"], janelas["a"]["fim"]) == (53, 68)
+    assert janelas["a"]["efeitos"][0]["duracao"] == 15

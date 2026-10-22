@@ -82,13 +82,12 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             raise ErroDefinitivo(f'O arquivo de "{midia["nome"]}" não foi encontrado no servidor.')
         video = midia.get("video") or {}
         voz = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_VOZ_LIMPA))
-        # Mídias enviadas antes de a ingestão guardar a matriz de cor: lê do arquivo
-        if e_imagem(midia):
-            matriz = None
-        elif "matriz" in video:
-            matriz = video["matriz"]
-        else:
-            matriz = (resumir_sondagem(sondar(caminho))["video"] or {}).get("matriz")
+        # Mídias enviadas antes de a ingestão guardar a matriz de cor e a duração da imagem: lê do arquivo
+        sondado = {}
+        if video and not e_imagem(midia) and ("matriz" not in video or "duracao" not in video):
+            sondado = resumir_sondagem(sondar(caminho))["video"] or {}
+        matriz = None if e_imagem(midia) else video["matriz"] if "matriz" in video else sondado.get("matriz")
+        duracao_video = 0.0 if e_imagem(midia) else float(video.get("duracao") or sondado.get("duracao") or 0)
         preparadas[str(midia["_id"])] = MidiaDoRender(
             caminho=str(caminho),
             largura=int(video.get("largura") or 0),
@@ -112,6 +111,7 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
                                                                                f"{chave}.mp4"))).is_file()),
             lufs=(midia.get("audio") or {}).get("lufs"),
             imagem=e_imagem(midia),
+            duracao_video=duracao_video,
         )
     return preparadas
 

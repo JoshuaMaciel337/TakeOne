@@ -23,7 +23,7 @@ import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVis
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
-import { type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import type { Camada } from "./compositor";
@@ -76,15 +76,15 @@ export const ANTECEDENCIA = 2 * TICKS_POR_SEGUNDO;
  * para ele já estar carregado quando entrar. A chave é faixa + mídia: depois de dividir um clipe, as
  * duas metades usam o mesmo elemento e o vídeo segue sem engasgar.
  *
- * Na principal, com `comTransicoes`, uma transição deixa dois clipes na tela ao mesmo tempo (o que
+ * Na principal, com `quadroDasTransicoes` (a duração de um quadro do projeto), uma transição deixa dois clipes na tela ao mesmo tempo (o que
  * sai e o que entra). Se os dois são da mesma mídia, o que entra ganha uma chave própria. O som não
  * usa as janelas das transições: cada clipe soa só entre o começo e o fim dele.
  */
-export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, comTransicoes = false): ItemDaPrevia[] {
+export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, quadroDasTransicoes?: Tick): ItemDaPrevia[] {
   const itens: ItemDaPrevia[] = [];
   for (const faixa of faixas) {
     const chaves = new Set<string>();
-    const janelas = comTransicoes && faixa.tipo === "principal" ? janelasDaPrincipal(faixa.clipes) : null;
+    const janelas = quadroDasTransicoes && faixa.tipo === "principal" ? janelasDaPrincipal(faixa.clipes, quadroDasTransicoes) : null;
     const dentro = (clipe: Clipe) => {
       const janela = janelas?.get(clipe.id);
       return janela ? janela.inicio <= tempo && tempo < janela.fim : clipe.inicio <= tempo && tempo < fimDoClipe(clipe);
@@ -117,7 +117,7 @@ export function visuaisNoTempo(projeto: Projeto, midias: ReadonlyMap<string, Mid
     projeto.faixas.filter((faixa) => faixa.tipo !== "audio" && !faixa.oculta).reverse(),
     midias,
     tempo,
-    true,
+    duracaoDoQuadro(projeto.taxa),
   );
 }
 

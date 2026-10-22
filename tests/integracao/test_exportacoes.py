@@ -610,3 +610,74 @@ def test_tela_verde_num_logo_transparente_guarda_o_transparente(cliente, db_limp
     for y, x in ((20, 20), (100, 640), (700, 1260)):
         assert max(abs(int(c) - f) for c, f in zip(quadro[y, x], FUNDO, strict=True)) <= 12, (y, x, quadro[y, x])
     assert quadro[360, 640][0] > 150 and quadro[360, 640][2] < 110, quadro[360, 640]
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_imagem_que_acaba_antes_do_som_repete_o_ultimo_quadro(cliente, db_limpo):
+    # Celular: o som passa uns quadros do fim da imagem e o contêiner dura o som. A prévia segura o último
+    # quadro; o render mostrava o fundo nos quadros do fim
+    def gerar(caminho):
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        "color=c=0xff0000:s=640x360:r=30:d=2", "-f", "lavfi", "-i", "sine=f=440:d=2.5",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                        str(caminho)], check=True, timeout=120)
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.5, gerar=gerar)
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", duracao=2.5)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    for segundos_ in (1.9, 2.2, 2.45):
+        pixel = quadro_do_video(video, segundos_, 1280, 720)[360, 640]
+        assert pixel[0] > 200 and pixel[1] < 60 and pixel[2] < 60, (segundos_, pixel)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_fusao_com_numero_impar_de_quadros_segue_a_previa_quadro_a_quadro(cliente, db_limpo):
+    # 0,5 s a 30 fps = 15 quadros: a janela começava no meio de um quadro, o fade do render arredondava e o
+    # último quadro da fusão mostrava o fundo
+    cadastrar(cliente)
+    ids = [criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False, gerar=gerar_cor(c))
+           for c in ("0xc8c8c8", "0x646464")]
+    quadro = SEGUNDO // 30
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    clipes = [{"id": "a", "midia_id": ids[0], "inicio": 0, "duracao": 60 * quadro, "entrada": 0, "velocidade": 1,
+               "volume": 1, "transicao": {"tipo": "fusao", "duracao": SEGUNDO // 2}},
+              {"id": "b", "midia_id": ids[1], "inicio": 60 * quadro, "duracao": 60 * quadro, "entrada": 0,
+               "velocidade": 1, "volume": 1}]
+    corpo = {"versao": projeto["versao"], "nome": "Fusão", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    valores = {n: int(quadro_do_video(video, (n - 0.4) / 30, 1280, 720)[360, 640][1]) for n in range(50, 72)}
+    # A conta da prévia: a janela vai do quadro 53 ao 68 (7 antes do corte e 8 depois); quem entra tem opacidade
+    # p. Os cinzas saem do H.264 uns níveis abaixo (200 vira 197): a conta usa os níveis medidos fora da janela
+    a, b = valores[50], valores[71]
+    erros = {n: (v, round(a + (b - a) * min(1.0, max(0.0, (n - 53) / 15)), 1)) for n, v in valores.items()
+             if abs(v - (a + (b - a) * min(1.0, max(0.0, (n - 53) / 15)))) > 1.5}
+    assert not erros, erros
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+@pytest.mark.parametrize("entrada_em_quadros", [10, 11, 13])
+def test_midia_de_25_fps_aparada_mostra_o_quadro_da_previa(cliente, db_limpo, entrada_em_quadros):
+    # Aberto na entrada, o FFmpeg descartava o quadro que começou antes dela e o render ficava um quadro adiantado.
+    # O brilho de cada quadro da mídia é o número dele vezes 6
+    def gerar(caminho):
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        "color=c=black:s=640x360:r=25:d=3,geq=lum=N*6:cb=128:cr=128", "-c:v", "libx264",
+                        "-preset", "ultrafast", "-qp", "0", "-g", "25", "-pix_fmt", "yuv420p", str(caminho)],
+                       check=True, timeout=120)
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=3.0, audio=False, gerar=gerar)
+    quadro = SEGUNDO // 30
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", duracao=1, entrada=entrada_em_quadros * quadro)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    saida = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "12",
+                            "-vf", "scale=64:36", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+                           capture_output=True, check=True, timeout=60).stdout
+    # O cinza volta pela conversão para BT.709 em faixa limitada; o número do quadro é o mais perto
+    lidos = [round((saida[k * 64 * 36 + 18 * 64 + 32] * 219 / 255 + 16) / 6) for k in range(12)]
+    # A prévia: o último quadro da mídia que começou até o instante (entrada + k/30), em contas exatas
+    esperados = [((entrada_em_quadros + k) * 25) // 30 for k in range(12)]
+    assert lidos == esperados, (lidos, esperados)

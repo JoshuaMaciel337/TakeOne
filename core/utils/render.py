@@ -19,7 +19,7 @@
 import math
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from functools import lru_cache
 
@@ -105,6 +105,7 @@ class MidiaDoRender:
     estaveis: tuple[tuple[str, str], ...] = ()
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
     imagem: bool = False           # imagem parada (foto, logo): aberta em laço, sem tempo próprio
+    duracao_video: float = 0       # onde a imagem acaba (pode ser antes do som); 0 quando não se sabe
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,8 @@ class Leitura:
     pausa_fim: float = 0
     pular_audio: float = 0  # segundos da mídia lida antes de onde o som do clipe começa
     efeitos: tuple = ()     # efeitos das transições, com tempos em segundos
+    congelar_fim: float = 0  # segundos do clipe depois do fim da imagem da mídia (o som dela vai além)
+    antecipar: float = 0    # segundos da mídia abertos antes do trecho (veja ANTECIPAR_LEITURA)
 
 
 @dataclass(frozen=True)
@@ -132,6 +135,19 @@ class ImagemDoTexto:
     altura_referencia: int
     layout: dict | None = None
     destaque: str | None = None
+
+
+# O vídeo é aberto um pouco antes do trecho do clipe, e a cadeia desconta a diferença: assim o primeiro quadro é
+# o último que começou até a entrada, como na prévia. Aberto na entrada, o FFmpeg descarta o quadro que começou
+# antes dela e o render adiantava a mídia um quadro (em mídia de 24 ou 25 fps, em 4 de cada 5 entradas)
+ANTECIPAR_LEITURA = 0.1
+# A folga do decodificador da prévia (FOLGA_US em apps/web/src/lib/previa/amostras.ts), em segundos
+FOLGA_DO_QUADRO = 0.0005
+# A caixa do clipe é a mídia inteira na escala dele, e o render redimensiona até ela: com zoom alto, a 2000%
+# num 1080p ela tinha 38400 × 21600 e o FFmpeg recusava o quadro; a 400% em 4K, cada quadro tinha 531 MB e a
+# vinheta pedia uns 5 GB ao worker. Acima disto, a exportação para antes com uma mensagem
+LADO_MAXIMO_DA_CAIXA = 16384
+AREA_MAXIMA_DA_CAIXA = 7680 * 4320
 
 
 @dataclass(frozen=True)
@@ -230,20 +246,28 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     largura = max(1, round(caixa.largura))
     altura = max(1, round(caixa.altura))
     curva = clipe.get("curva_velocidade")
+    # O começo do trecho vai a zero: o que foi aberto antes dele (antecipar) sai, e a mídia anda a folga da
+    # prévia para trás (um quadro que começa até 0,5 ms depois do instante já vale nele, como em amostras.ts):
+    # sem ela, o quadro que começa bem na entrada perdia para o anterior por arredondamento
+    if leitura.antecipar:
+        zerar = f"PTS-{_numero(leitura.antecipar + FOLGA_DO_QUADRO)}/TB"
+    else:
+        zerar = f"PTS-STARTPTS-{_numero(FOLGA_DO_QUADRO)}/TB"
     if curva:
         # Velocidade com curva: o tempo da mídia vai ao do clipe pela inversa da conta (velocidade.py)
         duracao_s = segundos(clipe["duracao"])
         # A base de tempo fina não deixa o setpts arredondar para a grade da mídia, e o fps com
         # round=up mostra o último quadro que já chegou: o mesmo que o decodificador da prévia
-        tempo = ["settb=1/90000", "setpts=PTS-STARTPTS",
+        tempo = ["settb=1/90000", f"setpts={zerar}",
                  f"setpts='({expressao_do_tempo(curva, duracao_s, duracao_s * clipe['velocidade'])})/TB'"]
-        fps = f"fps={taxa}:round=up"
+        fps = f"fps={taxa}:round=up:start_time=0"
     else:
-        tempo = [f"setpts=(PTS-STARTPTS)/{_numero(clipe['velocidade'])}"]
+        tempo = [f"setpts=({zerar})/{_numero(clipe['velocidade'])}"]
         # round=up: cada quadro do vídeo mostra o último quadro da mídia que já chegou, como o
         # decodificador da prévia. Com o padrão (o mais próximo), um vídeo de 29,97 num projeto de 30
         # saía sempre um quadro adiantado (medido: 1 de 200 quadros iguais; com round=up, 200 de 200)
-        fps = f"fps={taxa}:round=up"
+        # start_time=0: o que foi aberto antes da entrada fica de fora, e o quadro que estava na tela nela entra
+        fps = f"fps={taxa}:round=up:start_time=0"
     filtros = [
         *(entrada_de_cor or []),
         *tempo,
@@ -255,10 +279,12 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         "setsar=1",
         "format=rgba",
     ]
-    if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0:
-        # Sem sobra na mídia para a transição: repete o primeiro ou o último quadro
+    if leitura.pausa_inicio > 0 or leitura.pausa_fim > 0 or leitura.congelar_fim > 0:
+        # Sem sobra na mídia para a transição, ou com a imagem acabando antes do clipe: repete o primeiro ou
+        # o último quadro (o tpad só repete depois que a imagem acaba; a sobra é cortada pelo overlay)
+        parar = leitura.pausa_fim + leitura.congelar_fim
         filtros.insert(filtros.index(fps) + 1, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
-                                              f":stop_mode=clone:stop_duration={_numero(leitura.pausa_fim)}")
+                                              f":stop_mode=clone:stop_duration={_numero(parar)}")
     cabeca = f"[{entrada}:v]"
     if mascara:
         # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram)
@@ -642,23 +668,28 @@ def _atempo_com_roteiro(roteiro: str, alvos: list[str]) -> list[str]:
 def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) -> Leitura:
     """O trecho a ler, contando a janela da transição e o que a mídia tem de sobra."""
     inicio, fim = segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"])
-    if not janela:
-        return Leitura(inicio, fim)
     velocidade = clipe["velocidade"]
-    janela_inicio, janela_fim = segundos(janela["inicio"]), segundos(janela["fim"])
     entrada = segundos(clipe["entrada"])
+    fim_na_midia = entrada + clipe["duracao"] / TICKS_POR_SEGUNDO * velocidade
+    # A imagem pode acabar antes do contêiner (o som passa): o fim dela limita a sobra, e o que falta no
+    # clipe é o último quadro repetido, com uma folga de 0,1 s (a mais é cortada pelo overlay)
+    limite = midia.duracao_video or midia.duracao
+    congelar = (fim_na_midia - midia.duracao_video) / velocidade + 0.1 if midia.duracao_video and \
+        fim_na_midia > midia.duracao_video else 0
+    if not janela:
+        return Leitura(inicio, fim, congelar_fim=congelar)
+    janela_inicio, janela_fim = segundos(janela["inicio"]), segundos(janela["fim"])
     # Antes do começo: quanto a mídia tem, e o resto vira quadro repetido
     antes = (inicio - janela_inicio) * velocidade
     sobra_antes = min(antes, entrada)
     pausa_inicio = (antes - sobra_antes) / velocidade
     # Depois do fim: o mesmo, com o fim da mídia (se for conhecido)
     depois = (janela_fim - fim) * velocidade
-    fim_na_midia = entrada + clipe["duracao"] / TICKS_POR_SEGUNDO * velocidade
-    sobra_depois = min(depois, max(midia.duracao - fim_na_midia, 0)) if midia.duracao else depois
+    sobra_depois = min(depois, max(limite - fim_na_midia, 0)) if limite else depois
     pausa_fim = (depois - sobra_depois) / velocidade
     efeitos = tuple({**e, "inicio": segundos(e["inicio"]), "duracao": segundos(e["duracao"])}
                     for e in janela["efeitos"])
-    return Leitura(janela_inicio, janela_fim, pausa_inicio, pausa_fim, sobra_antes, efeitos)
+    return Leitura(janela_inicio, janela_fim, pausa_inicio, pausa_fim, sobra_antes, efeitos, congelar)
 
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
@@ -696,7 +727,9 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
 
     # Na principal, as transições estendem a janela dos clipes vizinhos
     principal = next((f for f in projeto["faixas"] if f["tipo"] == "principal"), None)
-    janelas = janelas_da_principal(sorted(principal["clipes"], key=lambda c: c["inicio"])) if principal else {}
+    quadro_em_ticks = TICKS_POR_SEGUNDO * projeto["taxa"]["den"] / projeto["taxa"]["num"]
+    janelas = (janelas_da_principal(sorted(principal["clipes"], key=lambda c: c["inicio"]), quadro_em_ticks)
+               if principal else {})
     leituras: dict[str, Leitura] = {}
 
     entradas: list[Entrada] = []
@@ -725,7 +758,9 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(midia.caminho, 0, max(lido, 1 / 1000), imagem=True, taxa=taxa))
             continue
         ss = segundos(clipe["entrada"]) - leitura.pular_audio
-        entradas.append(Entrada(midia.caminho, ss, max(lido, 1 / 1000)))
+        antecipar = min(ANTECIPAR_LEITURA, max(ss, 0))
+        leituras[clipe["id"]] = replace(leitura, antecipar=antecipar)
+        entradas.append(Entrada(midia.caminho, ss - antecipar, max(lido, 1 / 1000) + antecipar))
 
     auxiliares: dict[str, ArquivoAuxiliar] = {}
     cor = projeto["fundo"]["cor"].lstrip("#")
@@ -745,6 +780,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 continue
             midia_tamanho = (midia.largura, midia.altura)
             caixa = caixa_do_clipe(base_do_render(clipe), clipe["recorte"], midia_tamanho, quadro)
+        if max(caixa.largura, caixa.altura) > LADO_MAXIMO_DA_CAIXA or \
+                caixa.largura * caixa.altura > AREA_MAXIMA_DA_CAIXA:
+            raise ErroRender(f"Um clipe ficou grande demais para exportar em {largura} × {altura} (zoom de "
+                             f"{round(base_do_render(clipe)['escala'] * 100)}%). Diminua a escala dele ou exporte "
+                             f"numa resolução menor.")
         # O efeito (VHS) soma aos ajustes de cor do clipe
         ajustes = somar_ajustes(ajustes_efetivos(clipe.get("cor")), ajustes_do_efeito(clipe))
         curvas = (clipe.get("cor") or {}).get("curvas")
@@ -878,7 +918,9 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         for clipe in faixa["clipes"]:
             if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
                 sons.append(f"a{len(sons)}")
-                pular = leituras[clipe["id"]].pular_audio if clipe["id"] in leituras else 0
+                # O som pula a sobra da transição e o que foi aberto antes do trecho
+                leitura = leituras.get(clipe["id"])
+                pular = leitura.pular_audio + leitura.antecipar if leitura else 0
                 entrada_do_som = indice_da_entrada[clipe["id"]]
                 if clipe.get("tom"):
                     # A voz em outro tom (sobre a voz limpa, se ela está ligada) tem o mesmo tempo do original

@@ -65,6 +65,9 @@ def resumir_sondagem(sondagem: dict) -> dict:
             "rotacao": rotacao,
             # Matriz de cor marcada no arquivo (bt709, smpte170m...), ou None sem marcação
             "matriz": video.get("color_space") if video.get("color_space") not in (None, "unknown") else None,
+            # A imagem pode acabar antes do contêiner (o som do celular passa uns quadros): o render repete o
+            # último quadro até o fim, como a prévia, em vez de mostrar o fundo
+            "duracao": float(video["duration"]) if video.get("duration") not in (None, "N/A") else None,
         }
     if audio:
         resumo["audio"] = {

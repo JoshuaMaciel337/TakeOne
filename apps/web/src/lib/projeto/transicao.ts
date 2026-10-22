@@ -54,8 +54,13 @@ export type EfeitoDeTransicao = { tipo: TipoTransicao; papel: "sai" | "entra"; i
 /** Quanto de cada clipe da principal aparece, contando as transições, e os efeitos sobre ele. */
 export type JanelaDoClipe = { inicio: Tick; fim: Tick; efeitos: EfeitoDeTransicao[] };
 
-/** As janelas dos clipes da faixa principal (em ordem, encostados). */
-export function janelasDaPrincipal(clipes: Clipe[]): Map<string, JanelaDoClipe> {
+/**
+ * As janelas dos clipes da faixa principal (em ordem, encostados). `quadro` é a duração de um quadro do
+ * projeto: a transição vira um número inteiro de quadros e a janela começa num quadro (a metade de baixo
+ * antes do corte). Com 15 quadros (0,5 s a 30 fps), a janela começava no meio de um quadro, o fade do
+ * render ia para a grade arredondando e o último quadro da fusão escurecia uns 17 níveis.
+ */
+export function janelasDaPrincipal(clipes: Clipe[], quadro: Tick): Map<string, JanelaDoClipe> {
   const janelas = new Map<string, JanelaDoClipe>();
   for (const clipe of clipes) janelas.set(clipe.id, { inicio: clipe.inicio, fim: clipe.inicio + clipe.duracao, efeitos: [] });
   clipes.forEach((clipe, i) => {
@@ -63,14 +68,16 @@ export function janelasDaPrincipal(clipes: Clipe[]): Map<string, JanelaDoClipe> 
     const transicao = clipe.transicao;
     if (!proximo || !transicao || transicao.duracao <= 0) return;
     const corte = clipe.inicio + clipe.duracao;
-    const inicio = corte - transicao.duracao / 2;
-    const fim = inicio + transicao.duracao;
+    const quadros = Math.max(1, Math.round(transicao.duracao / quadro));
+    const duracao = quadros * quadro;
+    const inicio = corte - Math.floor(quadros / 2) * quadro;
+    const fim = inicio + duracao;
     const sai = janelas.get(clipe.id)!;
     const entra = janelas.get(proximo.id)!;
     sai.fim = fim;
-    sai.efeitos.push({ tipo: transicao.tipo, papel: "sai", inicio, duracao: transicao.duracao });
+    sai.efeitos.push({ tipo: transicao.tipo, papel: "sai", inicio, duracao });
     entra.inicio = inicio;
-    entra.efeitos.push({ tipo: transicao.tipo, papel: "entra", inicio, duracao: transicao.duracao });
+    entra.efeitos.push({ tipo: transicao.tipo, papel: "entra", inicio, duracao });
   });
   return janelas;
 }

@@ -17,22 +17,28 @@ CORTINAS = ("cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cim
 REVELADO_INTEIRO = {"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0}
 
 
-def janelas_da_principal(clipes: list[dict]) -> dict[str, dict]:
-    """id → {"inicio", "fim", "efeitos"}: quanto de cada clipe aparece, contando as transições."""
+def janelas_da_principal(clipes: list[dict], quadro: float) -> dict[str, dict]:
+    """
+    id → {"inicio", "fim", "efeitos"}: quanto de cada clipe aparece, contando as transições. `quadro` é a
+    duração de um quadro do projeto (na unidade dos clipes): a transição vira quadros inteiros e a janela
+    começa num quadro, como em transicao.ts.
+    """
     janelas = {c["id"]: {"inicio": c["inicio"], "fim": c["inicio"] + c["duracao"], "efeitos": []} for c in clipes}
     for clipe, proximo in zip(clipes, clipes[1:], strict=False):
         transicao = clipe.get("transicao")
         if not transicao or transicao["duracao"] <= 0:
             continue
         corte = clipe["inicio"] + clipe["duracao"]
-        inicio = corte - transicao["duracao"] / 2
-        fim = inicio + transicao["duracao"]
+        quadros = max(1, round(transicao["duracao"] / quadro))
+        duracao = quadros * quadro
+        inicio = corte - (quadros // 2) * quadro
+        fim = inicio + duracao
         janelas[clipe["id"]]["fim"] = fim
         janelas[clipe["id"]]["efeitos"].append({"tipo": transicao["tipo"], "papel": "sai", "inicio": inicio,
-                                                "duracao": transicao["duracao"]})
+                                                "duracao": duracao})
         janelas[proximo["id"]]["inicio"] = inicio
         janelas[proximo["id"]]["efeitos"].append({"tipo": transicao["tipo"], "papel": "entra", "inicio": inicio,
-                                                  "duracao": transicao["duracao"]})
+                                                  "duracao": duracao})
     return janelas
 
 

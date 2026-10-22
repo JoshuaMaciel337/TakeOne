@@ -70,11 +70,14 @@ def test_entradas_abrem_so_o_trecho_de_cada_clipe():
     plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 2), rapido])]), MIDIAS, 1080, 1920)
     assert plano.duracao == 4
     assert plano.taxa == "30/1"
+    # O segundo abre 0,1 s antes da entrada e a cadeia desconta (mais a folga de 0,5 ms da prévia)
     assert [e.argumentos() for e in plano.entradas] == [
         ["-ss", "0.000000", "-t", "2.000000", "-i", "/m/deitado.mp4"],
-        ["-ss", "1.000000", "-t", "4.000000", "-i", "/m/deitado.mp4"],   # 2 s no vídeo, em dobro
+        ["-ss", "0.900000", "-t", "4.100000", "-i", "/m/deitado.mp4"],   # 2 s no vídeo, em dobro
     ]
-    assert "setpts=(PTS-STARTPTS)/2" in plano.filtro
+    assert "setpts=(PTS-STARTPTS-0.0005/TB)/1" in plano.filtro
+    assert "setpts=(PTS-0.1005/TB)/2" in plano.filtro
+    assert "atrim=start=0.1:duration=4" in plano.filtro_som
     assert "atempo=2" in plano.filtro_som
 
 
@@ -349,7 +352,9 @@ def test_remover_fundo_le_a_mascara_como_o_clipe_e_usa_alphamerge():
     mascara = next(e for e in plano.entradas if e.caminho == "/m/mascara.mp4")
     video = next(e for e in plano.entradas if e.caminho == "/m/empe.mp4")
     assert (mascara.inicio, mascara.duracao) == (video.inicio, video.duracao), "o mesmo trecho"
-    assert "scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-STARTPTS)/1,fps=30/1:round=up,crop=" in plano.filtro
+    # A máscara abre com o clipe (0,1 s antes da entrada) e desconta o mesmo tanto
+    assert ("scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-0.1005/TB)/1,"
+            "fps=30/1:round=up:start_time=0,crop=") in plano.filtro
     assert "[vf2][mf2]alphamerge" in plano.filtro
     sem_mascara = {**MIDIAS}
     with pytest.raises(ErroRender, match="recorte do fundo"):
@@ -409,13 +414,13 @@ def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     plano = planejar_render(projeto([faixa("principal", [primeiro, segundo])], duracao=7), midias, 1080, 1920)
     # O primeiro lê meio segundo além do fim (até 4,5 s); o segundo, meio segundo antes (de 4,5 s)
     assert [e.argumentos()[:4] for e in plano.entradas] == [["-ss", "0.000000", "-t", "4.500000"],
-                                                         ["-ss", "4.500000", "-t", "3.500000"]]
+                                                         ["-ss", "4.400000", "-t", "3.600000"]]
     assert "enable='gte(t,-0.016667)*lt(t,4.483333)'" in plano.filtro
     assert "enable='gte(t,3.483333)*lt(t,6.983333)'" in plano.filtro
     assert "fade=t=in:st=3.5:d=1:alpha=1" in plano.filtro, "quem entra aparece aos poucos na fusão"
     assert "setpts=PTS+round(105*1/30/TB)" in plano.filtro
     # O som do segundo começa no corte: pula o meio segundo a mais que a imagem leu
-    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.5:duration=3,asetpts=PTS-STARTPTS" in plano.filtro_som
+    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.6:duration=3,asetpts=PTS-STARTPTS" in plano.filtro_som
     # E o do primeiro para no corte: o meio segundo lido depois do fim, para a imagem, não soa
     assert "[0:a]asetpts=PTS-STARTPTS,atrim=start=0:duration=4,asetpts=PTS-STARTPTS" in plano.filtro_som
     assert "tpad" not in plano.filtro, "havia sobra nos dois lados"
@@ -461,8 +466,18 @@ def test_voz_limpa_entra_no_lugar_do_som_original():
     plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, entrada=1, voz_limpa=True)])]),
                             com_voz, 1080, 1920)
     # O mesmo trecho da voz limpa, numa entrada a mais; o som do clipe sai dela, não do vídeo
-    assert plano.entradas[1].argumentos() == ["-ss", "1.000000", "-t", "4.000000", "-i", "/m/voz_limpa.m4a"]
+    assert plano.entradas[1].argumentos() == ["-ss", "0.900000", "-t", "4.100000", "-i", "/m/voz_limpa.m4a"]
     assert "[1:a]asetpts" in plano.filtro_som and "[0:a]" not in plano.filtro_som
     with pytest.raises(ErroRender, match="voz limpa"):
         sem_voz = projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, voz_limpa=True)])])
         planejar_render(sem_voz, MIDIAS, 1080, 1920)
+
+
+def test_zoom_alto_demais_para_antes_com_uma_mensagem():
+    # A 2000% num 1080p a caixa teria 38400 × 21600 e o FFmpeg recusaria o quadro (erro -22)
+    grande = clipe("c1", "deitado", 0, 4, transformacao={"x": 0, "y": 0, "escala": 20, "rotacao": 0, "opacidade": 1})
+    with pytest.raises(ErroRender, match="grande demais"):
+        planejar_render({**projeto([faixa("principal", [grande])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080)
+    # 400% num 1080p ainda exporta
+    normal = clipe("c1", "deitado", 0, 4, transformacao={"x": 0, "y": 0, "escala": 4, "rotacao": 0, "opacidade": 1})
+    assert planejar_render({**projeto([faixa("principal", [normal])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080).filtro
