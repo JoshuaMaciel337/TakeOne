@@ -183,17 +183,21 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     largura, altura = exportacao["largura"], exportacao["altura"]
     pasta = caminho(ARQUIVO_FILTRO).parent
     pasta.mkdir(parents=True, exist_ok=True)
-    textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
-    try:
-        plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta))
-    except ErroRender as e:
-        raise ErroDefinitivo(str(e)) from e
-    logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
-
     # Os grafos ficam num arquivo: com muitos clipes eles passam do limite da linha de comando
     filtro = caminho(ARQUIVO_FILTRO)
     parcial = caminho(ARQUIVO_PARCIAL)
+    # Tudo o que o render grava fica dentro do try: com o plano recusado ou o FFmpeg falhando, os PNGs dos
+    # textos (e dos destaques) e o vídeo pela metade ficavam na pasta até a exportação ser excluída
+    textos: dict = {}
+    plano = None
+    gerou = False
     try:
+        textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
+        try:
+            plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta))
+        except ErroRender as e:
+            raise ErroDefinitivo(str(e)) from e
+        logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
         # LUTs da cor e imagens das vinhetas que o grafo usa (as duas passadas abrem as mesmas entradas)
         for auxiliar in plano.auxiliares:
             if auxiliar.tipo == "lut":
@@ -216,14 +220,20 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         argumentos = argumentos_do_video(plano, str(filtro))
         argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))
         executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(15 + int(f * 80), "Gerando o vídeo"))
+        gerou = True
     finally:
         filtro.unlink(missing_ok=True)
-        if plano.som:
-            Path(plano.som).unlink(missing_ok=True)
         for imagem in textos.values():
             Path(imagem.caminho).unlink(missing_ok=True)
-        for auxiliar in plano.auxiliares:
-            Path(auxiliar.caminho).unlink(missing_ok=True)
+            if imagem.destaque:
+                Path(imagem.destaque).unlink(missing_ok=True)
+        if plano:
+            if plano.som:
+                Path(plano.som).unlink(missing_ok=True)
+            for auxiliar in plano.auxiliares:
+                Path(auxiliar.caminho).unlink(missing_ok=True)
+        if not gerou:
+            parcial.unlink(missing_ok=True)
 
     reportar(97, "Conferindo o vídeo")
     try:

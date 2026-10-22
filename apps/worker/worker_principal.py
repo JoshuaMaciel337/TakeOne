@@ -81,8 +81,16 @@ def enviar_sinal_de_vida(db, worker_id: str, recursos: list[str], tipos: list[st
         _parar.wait(INTERVALO_SINAL_DE_VIDA_SEGUNDOS)
 
 
+class PosseVencida(Exception):
+    """O job não é mais deste worker: foi cancelado (a mídia ou a exportação saiu) ou voltou para a fila."""
+
+
 def criar_reportador(db, job_id, worker_id: str):
-    """Função que a tarefa chama para informar progresso, com limite de frequência."""
+    """
+    Função que a tarefa chama para informar progresso, com limite de frequência. Se o job não é mais deste
+    worker, ela para a tarefa (PosseVencida): antes, o FFmpeg ou o modelo seguiam até o fim ocupando o worker,
+    e o resultado era jogado fora.
+    """
     ultimo = {"momento": 0.0}
 
     def reportar(progresso: int, mensagem: str = ""):
@@ -90,7 +98,8 @@ def criar_reportador(db, job_id, worker_id: str):
         if progresso < 100 and instante - ultimo["momento"] < INTERVALO_MINIMO_PROGRESSO_SEGUNDOS:
             return
         ultimo["momento"] = instante
-        atualizar_progresso(db, job_id, worker_id, progresso, mensagem)
+        if atualizar_progresso(db, job_id, worker_id, progresso, mensagem) is False:
+            raise PosseVencida("O job foi cancelado ou passou para outro worker.")
 
     return reportar
 

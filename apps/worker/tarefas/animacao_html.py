@@ -35,7 +35,7 @@ from core.modelos.animacao_html import (
 from core.modelos.job import ErroDefinitivo, montar_job
 from core.modelos.midia import ARQUIVO_MASCARA, PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo
 from core.utils import storage
-from core.utils.ffmpeg import MARCAS_BT709
+from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709
 from core.utils.mongo import agora
 
 # Pausa todas as animações CSS no instante pedido (ms) e desenha o quadro dos modelos em Canvas (s)
@@ -199,7 +199,7 @@ def gravar_animacao(pagina_html: str, largura: int, altura: int, duracao: float,
     quadros saíram. Animação que não mostra nada é recusada."""
     total = quadros_da_animacao(duracao)
     escritor_cor = _escritor(largura, altura, "rgb24", cor,
-                             ["-vf", "scale=out_color_matrix=bt709:out_range=tv", *MARCAS_BT709])
+                             ["-vf", f"scale=out_color_matrix=bt709:out_range=tv,{FILTRO_MARCAS_BT709}", *MARCAS_BT709])
     escritor_alfa = _escritor(largura, altura, "gray", mascara, ["-color_range", "tv"])
     feitos = 0
     visivel = False

@@ -24,7 +24,7 @@ from core.modelos.midia import (
     e_imagem,
 )
 from core.utils import storage
-from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709
+from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709
 from core.utils.mongo import agora
 from worker.tarefas.ingestao import FILTRO_PROXY, FPS_MAXIMO_PROXY, reduzir_quadros
 
@@ -83,7 +83,7 @@ def executar_estabilizacao(db, job: dict, reportar: Callable[[int, str], None]) 
                             duracao, lambda f: reportar(2 + int(f * 38), "Medindo o tremor da câmera"))
             transformar = (f"vidstabtransform=input={movimento}:smoothing={suavizacao_em_quadros(video.get('fps'))}"
                            ":optzoom=1:interpol=bicubic")
-            filtro = ",".join([*leitura, transformar, "scale=out_color_matrix=bt709:out_range=tv"])
+            filtro = ",".join([*leitura, transformar, "scale=out_color_matrix=bt709:out_range=tv", FILTRO_MARCAS_BT709])
             executar_ffmpeg(["-i", str(fonte), "-map", "0:v:0", "-an", "-vf", filtro, "-fps_mode", "passthrough",
                              "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p",
                              *MARCAS_BT709, "-movflags", "+faststart", str(parciais[0])],

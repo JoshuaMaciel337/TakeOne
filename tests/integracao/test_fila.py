@@ -3,6 +3,7 @@ import gzip
 from datetime import timedelta
 
 import bson
+import pytest
 
 from backup.agendador_backup import executar_backup
 from core.modelos.job import STATUS_CONCLUIDO, STATUS_ERRO, STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
@@ -161,3 +162,16 @@ def test_backup_exporta_colecoes_em_bson(db_limpo, tmp_path):
         documentos = bson.decode_all(arquivo.read())
     assert len(documentos) == 2
     assert documentos[0]["tipo"] == "teste"
+
+
+def test_job_cancelado_para_a_tarefa_no_proximo_progresso(db_limpo, monkeypatch):
+    from worker import worker_principal
+
+    job_id = novo_job(db_limpo)
+    pegar_proximo_job(db_limpo, ["teste"], "w1")
+    reportar = worker_principal.criar_reportador(db_limpo, job_id, "w1")
+    reportar(10, "andando")
+    # A API cancela (a mídia foi excluída): o job sai deste worker
+    db_limpo.jobs.update_one({"_id": job_id}, {"$set": {"status": STATUS_ERRO, "worker_id": None}})
+    with pytest.raises(worker_principal.PosseVencida):
+        reportar(100, "fim")

@@ -78,6 +78,11 @@ def test_ingestao_de_video_horizontal(db_limpo):
     # O loudness também é medido no vídeo: o resumo do ebur128 saía antes das estatísticas do libx264 e se
     # perdia nas últimas linhas, e o "Igualar o volume" ficava desligado em todo vídeo com som
     assert midia["audio"]["lufs"] is not None and -26 < midia["audio"]["lufs"] < -16
+    # A cor sai toda marcada: no FFmpeg 7, só com as opções, as primárias e a curva saíam "unknown"
+    cor = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=color_space,color_primaries,color_transfer,color_range", "-of", "csv=p=0",
+                          str(arquivo_da(midia, "proxy.mp4"))], capture_output=True, text=True, check=True).stdout
+    assert cor.strip() == "tv,bt709,bt709,bt709", cor
 
 
 def test_ingestao_de_video_gravado_em_pe_no_celular(db_limpo):
@@ -93,6 +98,19 @@ def test_ingestao_de_video_gravado_em_pe_no_celular(db_limpo):
     assert max(forma["picos"]) == 0                   # áudio mudo
     assert midia["miniaturas"]["largura"] == 160
 
+
+
+def test_ingestao_de_video_cuja_imagem_acaba_antes_do_som(db_limpo):
+    # Foto parada com música: a imagem dura meio segundo e o som 5 s. As miniaturas e a capa seguiam a duração do
+    # contêiner (o som), o FFmpeg não recebia quadro e a ingestão inteira falhava
+    midia_id = preparar_midia(db_limpo, "Foto com musica.mp4", lambda c: gerar(
+        c, "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30:duration=0.5",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac"))
+    resultado, midia, job = processar(db_limpo, midia_id)
+    assert resultado == "concluido", job.get("erro")
+    assert {"miniaturas.jpg", "capa.jpg"} <= set(midia["arquivos"])
+    assert 0.3 < midia["video"]["duracao"] < 0.7 and 4.5 < midia["duracao"] < 5.5
 
 def test_ingestao_de_audio(db_limpo):
     midia_id = preparar_midia(db_limpo, "Trilha.m4a", lambda c: gerar(

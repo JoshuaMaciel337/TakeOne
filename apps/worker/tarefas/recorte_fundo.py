@@ -50,11 +50,13 @@ def tamanhos(largura: int, altura: int) -> tuple[tuple[int, int], tuple[int, int
 
 def _sondar(caminho) -> tuple[int, int, str, float]:
     saida = subprocess.run([FFPROBE, "-v", "error", "-select_streams", "v:0", "-show_entries",
-                            "stream=width,height,r_frame_rate:format=duration", "-of", "json", str(caminho)],
+                            "stream=width,height,r_frame_rate,duration:format=duration", "-of", "json", str(caminho)],
                            capture_output=True, text=True, check=True, timeout=60).stdout
     dados = json.loads(saida)
     fluxo = dados["streams"][0]
-    return int(fluxo["width"]), int(fluxo["height"]), fluxo["r_frame_rate"], float(dados["format"]["duration"])
+    # A duração da imagem, não a do contêiner (que segue o som): é por ela que se conta os quadros
+    duracao = fluxo.get("duration") if fluxo.get("duration") not in (None, "N/A") else dados["format"]["duration"]
+    return int(fluxo["width"]), int(fluxo["height"]), fluxo["r_frame_rate"], float(duracao)
 
 
 def executar_recorte_fundo(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
@@ -106,14 +108,29 @@ def executar_recorte_fundo(db, job: dict, reportar: Callable[[int, str], None]) 
             feitos += 1
             if feitos % 30 == 0:
                 reportar(min(95, 2 + int(93 * feitos / total)), "Recortando o fundo")
-    finally:
-        leitor.stdout.close()
-        escritor.stdin.close()
+    except BaseException:
+        # Parou no meio (o job foi cancelado, o modelo falhou): os dois FFmpeg saem e a máscara pela metade também
+        leitor.kill()
+        escritor.kill()
         leitor.wait(timeout=60)
-        codigo = escritor.wait(timeout=600)
-    if codigo != 0 or feitos == 0:
+        escritor.wait(timeout=60)
         parcial.unlink(missing_ok=True)
-        raise RuntimeError("O vídeo da máscara não foi gravado.")
+        raise
+    finally:
+        # Fechar o stdin de um escritor que morreu lança BrokenPipeError: o código dele, conferido abaixo, já diz
+        for fluxo in (leitor.stdout, escritor.stdin):
+            try:
+                fluxo.close()
+            except OSError:
+                pass
+        codigo_do_leitor = leitor.wait(timeout=60)
+        codigo = escritor.wait(timeout=600)
+    # O laço também acaba quando o leitor morre no meio: sem conferir o código dele (e quantos quadros vieram),
+    # a máscara pela metade era gravada como pronta e o fim do clipe ficava sem recorte
+    if codigo != 0 or feitos == 0 or codigo_do_leitor != 0 or feitos < 0.9 * total:
+        parcial.unlink(missing_ok=True)
+        raise RuntimeError(f"O vídeo da máscara não foi gravado (leitor {codigo_do_leitor}, "
+                           f"{feitos} de {total} quadros).")
     parcial.replace(destino)
     db.midias.update_one({"_id": midia_id}, {
         "$set": {"recorte_fundo": {"status": "pronta", "erro": None}, "atualizado_em": agora()},

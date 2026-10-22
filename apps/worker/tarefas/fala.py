@@ -16,7 +16,7 @@ from bson import ObjectId
 
 from core.config import ESPEAK, MODELO_FALA, MODO_IA
 from core.modelos.job import ErroDefinitivo, montar_job
-from core.modelos.midia import PRIORIDADE_INGESTAO, chave_arquivo
+from core.modelos.midia import PRIORIDADE_INGESTAO, chave_arquivo, pasta_da_midia
 from core.utils import storage
 from core.utils.fala import TAXA, sintetizar
 from core.utils.ffmpeg import executar_ffmpeg
@@ -56,6 +56,9 @@ def executar_fala(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     if not len(som):
         raise ErroDefinitivo("O texto não tem nada que dê para falar.")
 
+    # A síntese leva até um minuto: se a mídia foi excluída nesse meio-tempo, a pasta não é recriada
+    if db.midias.count_documents({"_id": midia_id}, limit=1) == 0:
+        raise ErroDefinitivo("A mídia foi excluída enquanto a fala era gerada.")
     original = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, midia["original"]))
     original.parent.mkdir(parents=True, exist_ok=True)
     parcial = original.with_name("fala.parcial.m4a")
@@ -79,7 +82,9 @@ def executar_fala(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
         "job_ingestao_id": ingestao_id, "enviado_em": momento, "atualizado_em": momento,
     }})
     if resultado.matched_count == 0:
+        # Excluída enquanto o áudio era salvo: a pasta que o worker criou sai junto, senão fica órfã no disco
         db.jobs.delete_one({"_id": ingestao_id})
+        storage.remover_pasta(pasta_da_midia(organizacao_id, midia_id))
         raise ErroDefinitivo("A mídia foi excluída enquanto a fala era gerada.")
     logging.info(f"[{organizacao_id}] [midia {midia_id}] Fala gerada ({len(som) / TAXA:.1f} s); ingestão na fila.")
     reportar(100, "Fala pronta")

@@ -15,7 +15,7 @@ from bson import ObjectId
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import ARQUIVO_IMAGEM_LIMPA, ARQUIVO_IMAGEM_LIMPA_PROXY, chave_arquivo
 from core.utils import storage
-from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709
+from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709
 from core.utils.mongo import agora
 from worker.tarefas.ingestao import FILTRO_PROXY, FPS_MAXIMO_PROXY, reduzir_quadros
 
@@ -52,7 +52,7 @@ def executar_limpeza_imagem(db, job: dict, reportar: Callable[[int, str], None])
     try:
         # Resolução cheia, sem ruído e já em BT.709 marcado, no tempo do original (para o render)
         filtro = ",".join([*ler_como_bt709(video.get("matriz")), FILTRO_DE_RUIDO,
-                           "scale=out_color_matrix=bt709:out_range=tv"])
+                           "scale=out_color_matrix=bt709:out_range=tv", FILTRO_MARCAS_BT709])
         executar_ffmpeg(["-i", str(original), "-map", "0:v:0", "-an", "-vf", filtro, "-fps_mode", "passthrough",
                          "-c:v", "libx264", "-preset", "medium", "-crf", "14", "-pix_fmt", "yuv420p", *MARCAS_BT709,
                          "-movflags", "+faststart", str(parciais[0])],

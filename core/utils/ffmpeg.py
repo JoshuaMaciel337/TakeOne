@@ -15,6 +15,9 @@ TIMEOUT_FFPROBE_SEGUNDOS = 60
 # Cor: a prévia (Chrome) lê vídeo sem marcação de cor como BT.709. O render e o proxy fazem igual, e
 # tudo o que o TakeOne gera sai convertido para BT.709 e marcado, para todo player mostrar a mesma cor.
 MARCAS_BT709 = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+# As mesmas marcas nos quadros, no fim do grafo: no FFmpeg 7 o codificador usa as dos quadros, e só com as opções
+# acima as primárias e a curva saíam "unknown" (medido no ffprobe do vídeo exportado e da cópia leve)
+FILTRO_MARCAS_BT709 = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv"
 LINHAS_ERRO_GUARDADAS = 15
 
 
@@ -129,10 +132,20 @@ def executar_ffmpeg(argumentos: list[str], duracao: float | None = None,
 
     leitor = threading.Thread(target=guardar_erros, daemon=True)
     leitor.start()
-    for linha in processo.stdout:
-        segundos = ler_progresso(linha)
-        if segundos is not None and duracao and reportar:
-            reportar(min(max(segundos / duracao, 0.0), 1.0))
+    try:
+        for linha in processo.stdout:
+            segundos = ler_progresso(linha)
+            if segundos is not None and duracao and reportar:
+                reportar(min(max(segundos / duracao, 0.0), 1.0))
+    except BaseException as erro:
+        # Quem acompanha mandou parar (o job foi cancelado, por exemplo): o FFmpeg não segue até o fim sozinho.
+        # Vira ErroFFmpeg para as tarefas apagarem o arquivo pela metade pelo caminho de sempre
+        processo.kill()
+        processo.wait()
+        leitor.join(timeout=5)
+        if isinstance(erro, Exception):
+            raise ErroFFmpeg(f"FFmpeg interrompido: {erro}") from erro
+        raise
     codigo = processo.wait()
     leitor.join(timeout=5)
     if codigo != 0:

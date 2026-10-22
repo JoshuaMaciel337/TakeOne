@@ -37,7 +37,15 @@ from core.modelos.midia import (
     e_imagem,
 )
 from core.utils import storage
-from core.utils.ffmpeg import MARCAS_BT709, ErroFFmpeg, executar_ffmpeg, ler_como_bt709, resumir_sondagem, sondar
+from core.utils.ffmpeg import (
+    FILTRO_MARCAS_BT709,
+    MARCAS_BT709,
+    ErroFFmpeg,
+    executar_ffmpeg,
+    ler_como_bt709,
+    resumir_sondagem,
+    sondar,
+)
 from core.utils.imagem import ImagemInvalida, preparar_imagem
 from core.utils.mongo import agora
 from core.utils.render import ler_loudness
@@ -59,7 +67,8 @@ LARGURA_CAPA = 640
 # para BT.709 (o proxy é o que a prévia mostra; ele sai marcado, como o vídeo exportado)
 FILTRO_PROXY = (
     "scale=w='if(gte(iw,ih),-2,trunc(min(720,iw)/2)*2)'"
-    ":h='if(gte(iw,ih),trunc(min(720,ih)/2)*2,-2)':out_color_matrix=bt709:out_range=tv,setsar=1"
+    ":h='if(gte(iw,ih),trunc(min(720,ih)/2)*2,-2)':out_color_matrix=bt709:out_range=tv,setsar=1,"
+    + FILTRO_MARCAS_BT709
 )
 
 
@@ -219,14 +228,18 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     # 4. Miniaturas e capa, a partir da cópia leve
     miniaturas = None
     if tem_video:
-        plano = planejar_miniaturas(duracao)
         proxy = str(caminho(ARQUIVO_PROXY_VIDEO))
+        # Pela duração da imagem na cópia leve, não a do contêiner (que segue o som): numa foto parada com
+        # música, as miniaturas e a capa pediam quadros depois do fim da imagem e a ingestão inteira falhava
+        duracao_da_imagem = (resumir_sondagem(sondar(caminho(ARQUIVO_PROXY_VIDEO)))["video"] or {}).get("duracao")
+        duracao_da_imagem = min(duracao, duracao_da_imagem) if duracao_da_imagem else duracao
+        plano = planejar_miniaturas(duracao_da_imagem)
         executar_ffmpeg(
             ["-i", proxy, "-an", "-vf",
-             f"fps={plano['total']}/{duracao:.3f},scale={LARGURA_MINIATURA}:-2,"
+             f"fps={plano['total']}/{duracao_da_imagem:.3f},scale={LARGURA_MINIATURA}:-2,"
              f"tile={plano['colunas']}x{plano['linhas']}",
              "-frames:v", "1", "-q:v", "5", "-update", "1", str(caminho(ARQUIVO_MINIATURAS))],
-            duracao, lambda f: reportar(85 + int(f * 10), "Gerando as miniaturas"),
+            duracao_da_imagem, lambda f: reportar(85 + int(f * 10), "Gerando as miniaturas"),
         )
         sprite = resumir_sondagem(sondar(caminho(ARQUIVO_MINIATURAS)))["video"]
         miniaturas = {**plano, "largura": sprite["largura"] // plano["colunas"],
@@ -234,7 +247,7 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
         arquivos.append(ARQUIVO_MINIATURAS)
 
         reportar(97, "Escolhendo a capa")
-        executar_ffmpeg(["-ss", f"{min(duracao * 0.1, 30):.2f}", "-i", proxy, "-frames:v", "1",
+        executar_ffmpeg(["-ss", f"{min(duracao_da_imagem * 0.1, 30):.2f}", "-i", proxy, "-frames:v", "1",
                          "-vf", f"scale={LARGURA_CAPA}:-2", "-q:v", "3", "-update", "1",
                          str(caminho(ARQUIVO_CAPA))])
         arquivos.append(ARQUIVO_CAPA)
