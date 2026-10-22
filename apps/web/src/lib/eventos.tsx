@@ -13,6 +13,7 @@ type Ouvinte = (job: Job) => void;
 const ESPERA_PRONTO_MS = 5_000;
 const INTERVALO_CONSULTA_MS = 3_000;
 const LIMITE_CONSULTA = 20;
+const ESPERA_MAXIMA_RELIGAR_MS = 30_000;
 
 type ContextoEventos = {
   conexao: EstadoConexao;
@@ -32,7 +33,10 @@ export function ProvedorEventos({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelado = false;
     let recebeuPronto = false;
+    let fonte: EventSource | null = null;
     let consulta: ReturnType<typeof setInterval> | undefined;
+    let religar: ReturnType<typeof setTimeout> | undefined;
+    let tentativas = 0;
     const vistos = new Map<string, string>(); // id do job → atualizado_em já repassado
 
     const repassar = (job: Job) => {
@@ -46,31 +50,55 @@ export function ProvedorEventos({ children }: { children: React.ReactNode }) {
           if (!cancelado) lista.forEach(repassar);
         })
         .catch(() => undefined);
-
-    const fonte = new EventSource("/api/eventos");
-    fonte.addEventListener("pronto", () => {
-      recebeuPronto = true;
-      setConexao("ao-vivo");
-      consultar(); // recupera o que mudou enquanto a conexão estava fora
-    });
-    fonte.addEventListener("job", (evento) => repassar(JSON.parse((evento as MessageEvent<string>).data) as Job));
-    fonte.onerror = () => {
-      if (recebeuPronto) setConexao("reconectando");
+    const consultarSempre = () => {
+      if (consulta !== undefined) return;
+      consultar();
+      consulta = setInterval(consultar, INTERVALO_CONSULTA_MS);
     };
+    const pararConsulta = () => {
+      clearInterval(consulta);
+      consulta = undefined;
+    };
+
+    const conectar = () => {
+      const atual = new EventSource("/api/eventos");
+      fonte = atual;
+      atual.addEventListener("pronto", () => {
+        recebeuPronto = true;
+        tentativas = 0;
+        pararConsulta();
+        setConexao("ao-vivo");
+        consultar(); // recupera o que mudou enquanto a conexão estava fora
+      });
+      atual.addEventListener("job", (evento) => repassar(JSON.parse((evento as MessageEvent<string>).data) as Job));
+      atual.onerror = () => {
+        if (!recebeuPronto) return;
+        setConexao("reconectando");
+        // Queda simples: o navegador tenta de novo sozinho. Com uma resposta que não é 200 (a API
+        // reiniciando atrás do proxy do site), ele desiste de vez: a aba consulta enquanto isso e abre
+        // o fluxo de novo, esperando cada vez mais
+        if (atual.readyState !== EventSource.CLOSED) return;
+        consultarSempre();
+        religar = setTimeout(() => {
+          if (!cancelado) conectar();
+        }, Math.min(ESPERA_MAXIMA_RELIGAR_MS, 2_000 * 2 ** tentativas++));
+      };
+    };
+    conectar();
 
     const espera = setTimeout(() => {
       if (recebeuPronto || cancelado) return;
-      fonte.close();
+      fonte?.close();
       setConexao("consulta");
-      consultar();
-      consulta = setInterval(consultar, INTERVALO_CONSULTA_MS);
+      consultarSempre();
     }, ESPERA_PRONTO_MS);
 
     return () => {
       cancelado = true;
       clearTimeout(espera);
-      clearInterval(consulta);
-      fonte.close();
+      clearTimeout(religar);
+      pararConsulta();
+      fonte?.close();
     };
   }, []);
 
