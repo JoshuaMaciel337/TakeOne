@@ -208,7 +208,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     roteiro_de_opacidade: str | None = None,
                     mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None,
                     luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None,
-                    mascara_do_fundo: int | None = None) -> tuple[str, str]:
+                    mascara_do_fundo: int | None = None, alfa_na_fonte: bool = False) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -220,6 +220,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     luz: (entrada com a tira de luz, segundos do começo da janela até o começo do clipe).
     grao: (entrada com a imagem do grão, roteiro do sendcmd do recorte, colunas de células).
     mascara_do_fundo: entrada com o vídeo da máscara da pessoa (recorte do fundo), lida como o clipe.
+    alfa_na_fonte: a imagem já chega com transparência (texto, logo, forma).
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -250,7 +251,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         # Recorte em frações da imagem, como o compositor da prévia faz nas coordenadas da textura
         f"crop=w=iw*{_numero(recorte['largura'])}:h=ih*{_numero(recorte['altura'])}"
         f":x=iw*{_numero(recorte['x'])}:y=ih*{_numero(recorte['y'])}",
-        f"scale={largura}:{altura}:flags=bicubic",
+        *_sem_aro(f"scale={largura}:{altura}:flags=bicubic", alfa_na_fonte),
         "setsar=1",
         "format=rgba",
     ]
@@ -276,17 +277,31 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                   f"[vf{numero}][mf{numero}]alphamerge")
         filtros = []
     distorcao = distorcao_do_efeito(clipe)
+    com_alfa = alfa_na_fonte or mascara_do_fundo is not None
     if distorcao:
         # Olho de peixe: a lente do FFmpeg e um zoom de (1 + k) no meio, para não sobrar canto vazio
-        filtros += [f"lenscorrection=k1={_numero(distorcao)}:k2=0:i=bilinear",
-                    f"scale={round(largura * (1 + distorcao))}:{round(altura * (1 + distorcao))}:flags=bilinear",
-                    f"crop={largura}:{altura}"]
+        maior_l, maior_a = round(largura * (1 + distorcao)), round(altura * (1 + distorcao))
+        filtros += _sem_aro(f"lenscorrection=k1={_numero(distorcao)}:k2=0:i=bilinear,"
+                            f"scale={maior_l}:{maior_a}:flags=bilinear", com_alfa)
+        filtros.append(f"crop={largura}:{altura}")
     chroma = clipe.get("chroma")
     if chroma and not clipe.get("texto"):
         # Tela verde: o alfa vira a distância à cor em RGB (o shader da prévia faz a mesma conta)
         semelhanca = _numero(max(chroma["semelhanca"], 1e-5))
-        filtros.append(f"colorkey=color=0x{chroma['cor'].lstrip('#')}:similarity={semelhanca}"
-                       f":blend={_numero(chroma['suavidade'])}")
+        colorkey = (f"colorkey=color=0x{chroma['cor'].lstrip('#')}:similarity={semelhanca}"
+                    f":blend={_numero(chroma['suavidade'])}")
+        if com_alfa:
+            # O colorkey troca o alfa: com transparência antes (logo, recorte do fundo), o alfa dele é
+            # multiplicado pelo que já havia, senão o transparente voltava opaco
+            cabeca = (f"{_continuar(cabeca, [*filtros, 'format=rgba', 'split'])}[ka{numero}][kb{numero}];\n"
+                      f"[kb{numero}]alphaextract[kc{numero}];\n"
+                      f"[ka{numero}]{colorkey},split[kd{numero}][ke{numero}];\n"
+                      f"[ke{numero}]alphaextract[kf{numero}];\n"
+                      f"[kf{numero}][kc{numero}]blend=all_mode=multiply[kg{numero}];\n"
+                      f"[kd{numero}][kg{numero}]alphamerge")
+            filtros = []
+        else:
+            filtros.append(colorkey)
     brilho = brilho_do_efeito(clipe)
     if brilho:
         # Brilho: o clipe desfocado, na força do brilho, somado em "tela" ao clipe (no alfa
@@ -342,7 +357,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     if caixa.rotacao:
         # Sentido horário, como a prévia; os cantos que sobram ficam transparentes
         angulo = _numero(math.radians(caixa.rotacao))
-        filtros.append(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=black@0")
+        filtros += _sem_aro(f"rotate=a={angulo}:ow=rotw({angulo}):oh=roth({angulo}):c=black@0", com_alfa)
     # O clipe vai para o lugar dele em quadros inteiros do projeto. Com `PTS+segundos/TB` o setpts truncava:
     # um clipe no quadro 31 a 30 fps dava 30,99999 → 30, a mídia saía um quadro adiantada e o último quadro
     # do clipe ficava vazio (preto na principal). O round() dentro da expressão vale para qualquer base de tempo
@@ -365,7 +380,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                 else _numero(clipe["transformacao"]["rotacao"]))
         if animacao["rotacao"]:
             giro = f"{giro}+{animacao['rotacao']}"
-        filtros.append(f"rotate=a='({giro})*PI/180':ow='hypot(iw,ih)':oh=ow:c=black@0")
+        filtros += _sem_aro(f"rotate=a='({giro})*PI/180':ow='hypot(iw,ih)':oh=ow:c=black@0", com_alfa)
     if leitura.efeitos:
         transicao = filtros_de_transicao(list(leitura.efeitos))
         escalas = [e for e in (animacao["escala"], transicao["escala"]) if e]
@@ -406,7 +421,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         if gira:
             lado_l = lado_a = math.ceil(math.hypot(largura, altura)) + 2
         fator = animacao["escala"]
-        filtros.append(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame")
+        filtros += _sem_aro(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame", com_alfa)
         filtros.append(f"pad=w={lado_l}:h={lado_a}:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame")
     # O clipe aparece nos quadros com início <= t < fim, como na prévia. Os limites ficam meio quadro
     # antes: nenhum quadro cai bem na fronteira, e o arredondamento não tira nem põe quadros
@@ -421,13 +436,13 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
 
 
 def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alvo: str,
-              roteiro: str) -> tuple[list[str], str | None]:
+              roteiro: str, transparente: bool = False) -> tuple[list[str], str | None]:
     """
     (filtros, conteúdo do roteiro do sendcmd) do desfoque do clipe, ou ([], None) sem desfoque. O
     sigma é uma fração da altura do clipe (a mesma conta da prévia, que desfoca a textura) e muda por
     quadro na transição. A imagem ganha bordas repetidas antes do gblur e perde depois: assim a borda
-    se comporta como o CLAMP_TO_EDGE da prévia. Com transparência (textos), o desfoque é feito no
-    alfa pré-multiplicado, como na textura da prévia.
+    se comporta como o CLAMP_TO_EDGE da prévia. Com transparência (textos, logos, formas), o desfoque
+    é feito no alfa pré-multiplicado, como na textura da prévia.
     """
     efeitos = list(leitura.efeitos) if leitura else []
     fixo = desfoque_do_efeito(clipe)
@@ -442,14 +457,14 @@ def _desfoque(clipe: dict, leitura: Leitura | None, altura: int, fps: float, alv
         return [], None
     if max(sigmas) - min(sigmas) < 1e-3:
         # Sigma fixo (só o efeito): sem roteiro
-        return _filtros_do_gblur(f"gblur=sigma={maior:.4f}:steps=6", maior, bool(clipe.get("texto"))), None
+        return _filtros_do_gblur(f"gblur=sigma={maior:.4f}:steps=6", maior, transparente), None
     linhas, anterior = [], None
     for n, sigma in enumerate(sigmas):
         if anterior is None or abs(sigma - anterior) > 1e-3:
             linhas.append(f"{n / fps:.6f} gblur@{alvo} sigma {sigma:.4f}, gblur@{alvo} sigmaV {sigma:.4f};")
             anterior = sigma
     gblur = f"sendcmd=f='{_escapar_caminho(roteiro)}',gblur@{alvo}=sigma=0:steps=6"
-    return _filtros_do_gblur(gblur, maior, bool(clipe.get("texto"))), "\n".join(linhas) + "\n"
+    return _filtros_do_gblur(gblur, maior, transparente), "\n".join(linhas) + "\n"
 
 
 def _cores_separadas(clipe: dict, leitura: Leitura | None, largura: int, fps: float, alvo: str,
@@ -487,6 +502,18 @@ def _roteiro_do_grao(clipe: dict, inicio: float, fim: float, fps: float, alvo: s
         x, y = deslocamento_do_grao(quadro, colunas)
         linhas.append(f"{n / fps:.6f} {alvo} x {x}, {alvo} y {y};")
     return "\n".join(linhas) + "\n"
+
+
+def _sem_aro(filtro: str, com_alfa: bool) -> list[str]:
+    """
+    O filtro que interpola pixels (redimensionar, girar, a lente) no alfa pré-multiplicado, quando a imagem
+    tem transparência, como a textura da prévia. Em alfa reto, a cor dos pixels transparentes (preta nos
+    PNG) entrava na borda: um aro escuro em volta de logos, formas e textos. Num clipe opaco não faz
+    diferença (medido: girar um vídeo branco sobre branco não escurece a borda), e fica de fora.
+    """
+    if not com_alfa:
+        return [filtro]
+    return ["format=gbrap", "premultiply=inplace=1", filtro, "unpremultiply=inplace=1"]
 
 
 def _filtros_do_gblur(gblur: str, maior: float, transparente: bool) -> list[str]:
@@ -787,8 +814,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(midia.imagem_limpa, lida.inicio, lida.duracao))
             entrada_de_cor = []
         caminho_desfoque = f"{pasta}/desfoque_{clipe['id']}_{numero}.txt"
+        # Texto e imagem parada podem ter transparência: desfocados no alfa pré-multiplicado
+        alfa_na_fonte = bool(clipe.get("texto")) or e_imagem_parada
         desfoque, roteiro_desfoque = _desfoque(clipe, leituras.get(clipe["id"]), max(1, round(caixa.altura)),
-                                               float(taxa_em_fracao(taxa)), f"d{numero}", caminho_desfoque)
+                                               float(taxa_em_fracao(taxa)), f"d{numero}", caminho_desfoque,
+                                               alfa_na_fonte)
         if roteiro_desfoque:
             auxiliares[caminho_desfoque] = ArquivoAuxiliar(caminho_desfoque, "comandos", {}, conteudo=roteiro_desfoque)
         caminho_cores = f"{pasta}/cores_{clipe['id']}_{numero}.txt"
@@ -827,7 +857,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(midia.mascara, lida.inicio, lida.duracao))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao,
-                                          mascara_do_fundo)
+                                          mascara_do_fundo, alfa_na_fonte)
         linhas.append(f"{cadeia}[c{numero}]")
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":

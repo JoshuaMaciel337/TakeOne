@@ -556,3 +556,57 @@ def test_luz_e_grao_guardam_a_transparencia_do_clipe(cliente, db_limpo, tipo):
     for y, x in ((20, 20), (100, 640), (360, 300), (700, 1260)):
         assert max(abs(int(c) - f) for c, f in zip(quadro[y, x], FUNDO, strict=True)) <= 12, (y, x, quadro[y, x])
     assert quadro[360, 640][0] > 150 and quadro[360, 640][2] < 110, quadro[360, 640]
+
+
+def _logo(db, cliente, cor: tuple[int, int, int], lado: int = 800) -> str:
+    """Disco na cor, num PNG transparente com o fundo preto (como a maioria dos logos)."""
+    from PIL import Image, ImageDraw
+
+    organizacao_id = organizacao_de(cliente)
+    midia = montar_midia(organizacao_id, ObjectId(), "logo.png", 100, "image/png")
+    midia.update({"status": "pronta", "imagem": True, "duracao": None,
+                  "video": {"largura": lado, "altura": lado, "transparente": True}, "audio": None})
+    midia_id = db.midias.insert_one(midia).inserted_id
+    caminho = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, "imagem.png"))
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    imagem = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    ImageDraw.Draw(imagem).ellipse((lado // 8, lado // 8, lado * 7 // 8, lado * 7 // 8), fill=(*cor, 255))
+    imagem.save(caminho)
+    return str(midia_id)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+@pytest.mark.parametrize("caso", ["logo reduzido", "logo desfocado", "logo girado"])
+def test_bordas_sem_aro_escuro_sobre_fundo_claro(cliente, db_limpo, caso):
+    # Redimensionar, desfocar e girar em alfa reto misturava a cor dos pixels transparentes (preta) na borda;
+    # a prévia faz tudo no alfa pré-multiplicado. Vermelho ou branco sobre branco nunca baixa o vermelho
+    cadastrar(cliente)
+    midia_id = _logo(db_limpo, cliente, (255, 0, 0) if caso == "logo desfocado" else (255, 255, 255))
+    extra = {
+        "logo reduzido": {"transformacao": {"x": 0, "y": 0, "escala": 0.4, "rotacao": 0, "opacidade": 1}},
+        "logo desfocado": {"efeito": {"tipo": "desfoque", "intensidade": 1}},
+        "logo girado": {"transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 30, "opacidade": 1}},
+    }[caso]
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    clipe = {"id": "c1", "midia_id": midia_id, "inicio": 0, "duracao": 2 * SEGUNDO, "entrada": 0,
+             "velocidade": 1, "volume": 1, **extra}
+    corpo = {"versao": projeto["versao"], "nome": "Aro", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#ffffff"}, "faixas": [{**projeto["faixas"][0], "clipes": [clipe]}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    quadro = quadro_do_video(_exportar(cliente, db_limpo, projeto["id"]), 1.0, 1280, 720)
+    vermelho = quadro[:, :, 0].astype(int)
+    # Com o aro, o vermelho da borda descia a uns 170-190
+    assert vermelho.min() >= 235, (caso, int(vermelho.min()), int((vermelho < 235).sum()))
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_tela_verde_num_logo_transparente_guarda_o_transparente(cliente, db_limpo):
+    # O colorkey troca o alfa: sem multiplicar pelo que já havia, o fundo transparente do logo saía preto
+    cadastrar(cliente)
+    midia_id = _imagem_transparente(db_limpo, cliente)
+    chroma = {"cor": "#00ff00", "semelhanca": 0.3, "suavidade": 0.1}
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", chroma=chroma)
+    quadro = quadro_do_video(_exportar(cliente, db_limpo, projeto["id"]), 1.0, 1280, 720)
+    for y, x in ((20, 20), (100, 640), (700, 1260)):
+        assert max(abs(int(c) - f) for c, f in zip(quadro[y, x], FUNDO, strict=True)) <= 12, (y, x, quadro[y, x])
+    assert quadro[360, 640][0] > 150 and quadro[360, 640][2] < 110, quadro[360, 640]

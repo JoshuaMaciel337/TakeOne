@@ -226,7 +226,8 @@ void main() {
     vec3 c = texel.rgb / texel.a;
     float d = length(c - u_chromaCor) / sqrt(3.0);
     float k = u_suavidade > 0.0001 ? clamp((d - u_semelhanca) / u_suavidade, 0.0, 1.0) : (d > u_semelhanca ? 1.0 : 0.0);
-    texel = vec4(c * k, k);
+    // Multiplica o alfa que já havia (logo, recorte do fundo, borda suave), como o render
+    texel = texel * k;
   }
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
