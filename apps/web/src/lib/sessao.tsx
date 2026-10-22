@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { chamarApi, ErroApi } from "@/lib/api";
@@ -13,9 +12,16 @@ type ContextoSessao = {
 
 const Contexto = createContext<ContextoSessao | null>(null);
 
+/**
+ * Leva ao login recarregando a página, não pelo roteador: o kit de marca guardado no módulo e os envios
+ * esperando nova tentativa são da conta que saiu, e numa navegação suave passavam para quem entrasse depois.
+ */
+function irParaOLogin(destino: string) {
+  window.location.replace(destino);
+}
+
 /** Carrega a sessão uma vez para toda a área logada. Se a API recusar, apaga o cookie e volta ao login. */
 export function ProvedorSessao({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [erro, setErro] = useState("");
 
@@ -25,17 +31,17 @@ export function ProvedorSessao({ children }: { children: React.ReactNode }) {
       .catch(async (e) => {
         if (e instanceof ErroApi && e.status === 401) {
           await chamarApi("/auth/sair", { metodo: "POST" }).catch(() => undefined);
-          router.replace(`/entrar?proximo=${encodeURIComponent(window.location.pathname)}`);
+          irParaOLogin(`/entrar?proximo=${encodeURIComponent(window.location.pathname)}`);
           return;
         }
         setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar sua conta.");
       });
-  }, [router]);
+  }, []);
 
   const sair = useCallback(async () => {
     await chamarApi("/auth/sair", { metodo: "POST" }).catch(() => undefined);
-    router.replace("/entrar");
-  }, [router]);
+    irParaOLogin("/entrar");
+  }, []);
 
   if (!sessao) {
     return (

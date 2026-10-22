@@ -2,11 +2,11 @@
 // então o cookie de sessão vai junto sem configuração extra.
 
 export class ErroApi extends Error {
-  constructor(
-    public status: number,
-    mensagem: string,
-  ) {
+  status: number;
+
+  constructor(status: number, mensagem: string) {
     super(mensagem);
+    this.status = status;
     this.name = "ErroApi";
   }
 }
@@ -49,10 +49,19 @@ export async function chamarApi<T>(caminho: string, opcoes: Opcoes = {}): Promis
   return dados as T;
 }
 
-/** Aceita só caminhos internos, para o parâmetro ?proximo= não virar redirecionamento para fora. */
+/**
+ * Aceita só caminhos internos, para o parâmetro ?proximo= não virar redirecionamento para fora. O
+ * caminho é lido como o navegador lê: "/\site" e "/<tab>/site" viram "//site", outro endereço.
+ */
 export function destinoSeguro(proximo: string | null, padrao = "/app"): string {
-  if (!proximo || !proximo.startsWith("/") || proximo.startsWith("//")) return padrao;
-  return proximo;
+  if (!proximo || !proximo.startsWith("/")) return padrao;
+  const base = "https://takeone.invalid";
+  try {
+    const url = new URL(proximo, base);
+    return url.origin === base ? `${url.pathname}${url.search}${url.hash}` : padrao;
+  } catch {
+    return padrao;
+  }
 }
 
 /** Endereço de um arquivo gerado pela ingestão (cópia leve, capa, miniaturas, forma de onda). */
