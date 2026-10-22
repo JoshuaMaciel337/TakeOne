@@ -104,7 +104,10 @@ export function BarraSuperior({
         >
           <Redo2 className="size-4" aria-hidden />
         </button>
-        <BotaoTema />
+        {/* No celular o nome do projeto precisa do espaço: o tema também se troca no painel */}
+        <span className="max-sm:hidden">
+          <BotaoTema />
+        </span>
       </div>
 
       <label className="sr-only" htmlFor="proporcao">
@@ -114,7 +117,7 @@ export function BarraSuperior({
         id="proporcao"
         value={proporcao}
         onChange={(evento) => aoMudarProporcao(evento.target.value as Proporcao)}
-        className="w-24 shrink-0 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs font-medium outline-none focus:border-destaque sm:w-auto"
+        className="w-[4.5rem] shrink-0 rounded-md border border-borda bg-painel-2 px-1.5 py-1.5 text-xs font-medium outline-none focus:border-destaque sm:w-auto sm:px-2"
         title="Proporção do vídeo"
       >
         {PROPORCOES.map((opcao) => (

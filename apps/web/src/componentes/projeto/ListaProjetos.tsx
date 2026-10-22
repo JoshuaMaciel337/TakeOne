@@ -88,10 +88,10 @@ export function ListaProjetos({ aoCriar, criando }: { aoCriar: () => void; crian
                 ) : (
                   <Film className="size-7 text-suave" aria-hidden />
                 )}
-                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
                   {formatarTempo(projeto.duracao / TICKS_POR_SEGUNDO)}
                 </span>
-                <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium">{projeto.proporcao}</span>
+                <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">{projeto.proporcao}</span>
               </span>
               <span className="block px-3 py-2">
                 <span className="block truncate text-sm font-medium">{projeto.nome}</span>
@@ -103,7 +103,7 @@ export function ListaProjetos({ aoCriar, criando }: { aoCriar: () => void; crian
               onClick={() => {
                 if (window.confirm(`Excluir o projeto "${projeto.nome}"? As mídias continuam na biblioteca.`)) void excluir(projeto.id);
               }}
-              className="absolute right-1.5 top-1.5 hidden size-7 items-center justify-center rounded-md bg-black/70 text-white transition hover:bg-erro group-hover:flex group-focus-within:flex"
+              className="absolute right-1.5 top-1.5 hidden size-7 items-center justify-center rounded-md bg-black/70 text-white transition hover:bg-erro group-hover:flex group-focus-within:flex [@media(hover:none)]:flex"
               aria-label={`Excluir o projeto ${projeto.nome}`}
               title="Excluir projeto"
             >

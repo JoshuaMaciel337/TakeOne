@@ -80,72 +80,76 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
           </button>
         </div>
 
-        <div className="space-y-3 border-b border-borda p-4">
-          <fieldset className="grid grid-cols-3 gap-2">
-            <legend className="mb-2 text-xs text-suave">Resolução</legend>
-            {RESOLUCOES.map((opcao) => (
-              <label
-                key={opcao.id}
-                title={opcao.dica}
-                className={`cursor-pointer rounded-lg border px-2 py-2 text-center transition ${
-                  resolucao === opcao.id ? "border-destaque bg-destaque/10" : "border-borda hover:bg-painel-2"
-                }`}
-              >
-                <input type="radio" name="resolucao" value={opcao.id} checked={resolucao === opcao.id} onChange={() => setResolucao(opcao.id)} className="sr-only" />
-                <span className="block text-sm font-semibold">{opcao.nome}</span>
-                <span className="block text-[11px] tabular-nums text-suave">{tamanhoDeSaida(proporcao, opcao.lado)}</span>
-              </label>
-            ))}
-          </fieldset>
-          <p className="text-xs text-suave">MP4 (H.264 e AAC), com o volume no padrão das redes sociais (-14 LUFS).</p>
-          <button type="button" className="botao-principal w-full" disabled={!salvo || enviando} onClick={pedir}>
-            {enviando ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
-            {salvo ? "Exportar" : "Esperando salvar…"}
-          </button>
-          {aviso ? <p className="text-xs text-erro">{aviso}</p> : null}
-        </div>
-
-        <ExportarNoNavegador projeto={projeto} midias={midias} salvo={salvo} />
-
-        <div className="space-y-2 border-b border-borda p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Levar para outro editor</h3>
-          <p className="text-[11px] text-suave">
-            Um XML que os editores profissionais abrem: os cortes, as faixas, o trecho de cada mídia, a velocidade, o volume e as transições (como fusões); os textos viram marcadores. Posição, cor, efeitos e animações ficam aqui.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { arquivo: "intercambio.xml", nome: "Só o XML", Icone: FileCode, dica: "Para quem tem as mídias originais no computador" },
-              { arquivo: "intercambio.zip", nome: "XML com as mídias", Icone: FolderArchive, dica: "Um ZIP com a pasta midias/: no outro editor, aponte para ela" },
-            ].map(({ arquivo, nome, Icone, dica }) => (
-              <a
-                key={arquivo}
-                href={salvo ? `/api/projetos/${projetoId}/${arquivo}` : undefined}
-                download
-                title={dica}
-                aria-disabled={!salvo}
-                className={`botao-secundario px-3 py-1.5 text-xs ${salvo ? "" : "pointer-events-none opacity-50"}`}
-              >
-                <Icone className="size-4" aria-hidden />
-                {nome}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-suave">Exportações deste projeto</h3>
-          {erro ? <p className="text-xs text-erro">{erro}</p> : null}
-          {exportacoes === null ? (
-            <p className="text-xs text-suave">Carregando…</p>
-          ) : exportacoes.length === 0 ? (
-            <p className="text-xs text-suave">Nenhuma ainda. O vídeo fica guardado aqui para baixar quando quiser.</p>
-          ) : (
-            <ul className="space-y-2">
-              {exportacoes.map((exportacao) => (
-                <ItemExportacao key={exportacao.id} exportacao={exportacao} aoExcluir={() => void excluir(exportacao.id)} />
+        {/* A janela inteira rola, não só a lista: numa tela de 768 px a lista ficava com uns 75 px e o QR do
+            celular não cabia nela */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3 border-b border-borda p-4">
+            <fieldset className="grid grid-cols-3 gap-2">
+              <legend className="mb-2 text-xs text-suave">Resolução</legend>
+              {RESOLUCOES.map((opcao) => (
+                <label
+                  key={opcao.id}
+                  title={opcao.dica}
+                  className={`cursor-pointer rounded-lg border px-2 py-2 text-center transition ${
+                    resolucao === opcao.id ? "border-destaque bg-destaque/10" : "border-borda hover:bg-painel-2"
+                  }`}
+                >
+                  <input type="radio" name="resolucao" value={opcao.id} checked={resolucao === opcao.id} onChange={() => setResolucao(opcao.id)} className="sr-only" />
+                  <span className="block text-sm font-semibold">{opcao.nome}</span>
+                  <span className="block text-[11px] tabular-nums text-suave">{tamanhoDeSaida(proporcao, opcao.lado)}</span>
+                </label>
               ))}
-            </ul>
-          )}
+            </fieldset>
+            <p className="text-xs text-suave">MP4 (H.264 e AAC), com o volume no padrão das redes sociais (-14 LUFS).</p>
+            <button type="button" className="botao-principal w-full" disabled={!salvo || enviando} onClick={pedir}>
+              {enviando ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
+              {salvo ? "Exportar" : "Esperando salvar…"}
+            </button>
+            {aviso ? <p className="text-xs text-erro">{aviso}</p> : null}
+          </div>
+
+          <ExportarNoNavegador projeto={projeto} midias={midias} salvo={salvo} />
+
+          <div className="space-y-2 border-b border-borda p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Levar para outro editor</h3>
+            <p className="text-[11px] text-suave">
+              Um XML que os editores profissionais abrem: os cortes, as faixas, o trecho de cada mídia, a velocidade, o volume e as transições (como fusões); os textos viram marcadores. Posição, cor, efeitos e animações ficam aqui.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { arquivo: "intercambio.xml", nome: "Só o XML", Icone: FileCode, dica: "Para quem tem as mídias originais no computador" },
+                { arquivo: "intercambio.zip", nome: "XML com as mídias", Icone: FolderArchive, dica: "Um ZIP com a pasta midias/: no outro editor, aponte para ela" },
+              ].map(({ arquivo, nome, Icone, dica }) => (
+                <a
+                  key={arquivo}
+                  href={salvo ? `/api/projetos/${projetoId}/${arquivo}` : undefined}
+                  download
+                  title={dica}
+                  aria-disabled={!salvo}
+                  className={`botao-secundario px-3 py-1.5 text-xs ${salvo ? "" : "pointer-events-none opacity-50"}`}
+                >
+                  <Icone className="size-4" aria-hidden />
+                  {nome}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-suave">Exportações deste projeto</h3>
+            {erro ? <p className="text-xs text-erro">{erro}</p> : null}
+            {exportacoes === null ? (
+              <p className="text-xs text-suave">Carregando…</p>
+            ) : exportacoes.length === 0 ? (
+              <p className="text-xs text-suave">Nenhuma ainda. O vídeo fica guardado aqui para baixar quando quiser.</p>
+            ) : (
+              <ul className="space-y-2">
+                {exportacoes.map((exportacao) => (
+                  <ItemExportacao key={exportacao.id} exportacao={exportacao} aoExcluir={() => void excluir(exportacao.id)} />
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

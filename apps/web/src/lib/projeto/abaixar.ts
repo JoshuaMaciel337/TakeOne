@@ -19,6 +19,8 @@ export const SOLTURA_S = 0.5;
 export const PAUSA_QUE_JUNTA_S = ATAQUE_S + SOLTURA_S;
 export const DB_PADRAO = -12;
 export const DB_LIMITES = { minimo: -40, maximo: -3 };
+/** Pontos que a curva pode ter (o limite da API: passar dele fazia todo salvamento seguinte voltar 422). */
+export const PONTOS_MAXIMOS = 4000;
 
 /** O fator da curva no instante `t` da linha do tempo (1 sem curva), como o volume do render. */
 export function fatorDoAbaixamento(clipe: Pick<Clipe, "inicio" | "abaixamento">, t: Tick): number {
@@ -42,12 +44,22 @@ function juntar(trechos: TrechoDeFala[], pausa: Tick): TrechoDeFala[] {
  * O som começa a descer ATAQUE_S antes da fala e volta em SOLTURA_S depois dela, em linha reta.
  */
 export function abaixamentoNaFala(clipe: Pick<Clipe, "inicio" | "duracao">, falas: TrechoDeFala[], db = DB_PADRAO): Abaixamento | null {
+  // Com fala demais (uma palestra longa), as falas se juntam com pausas cada vez maiores até a curva caber
+  let pausa = Math.round(PAUSA_QUE_JUNTA_S * TICKS_POR_SEGUNDO);
+  for (;;) {
+    const curva = curvaDaFala(clipe, falas, db, pausa);
+    if (!curva || curva.pontos.length <= PONTOS_MAXIMOS) return curva;
+    pausa = Math.round(pausa * 1.5);
+  }
+}
+
+function curvaDaFala(clipe: Pick<Clipe, "inicio" | "duracao">, falas: TrechoDeFala[], db: number, pausa: Tick): Abaixamento | null {
   const ataque = Math.round(ATAQUE_S * TICKS_POR_SEGUNDO);
   const soltura = Math.round(SOLTURA_S * TICKS_POR_SEGUNDO);
   const fator = 10 ** (db / 20);
   const fim = clipe.duracao;
   // Os trechos no tempo do clipe, só os que mexem nele
-  const trechos = juntar(falas, Math.round(PAUSA_QUE_JUNTA_S * TICKS_POR_SEGUNDO))
+  const trechos = juntar(falas, pausa)
     .map((t) => ({ inicio: t.inicio - clipe.inicio, fim: t.fim - clipe.inicio }))
     .filter((t) => t.fim + soltura > 0 && t.inicio - ataque < fim);
   if (!trechos.length) return null;

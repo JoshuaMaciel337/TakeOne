@@ -3,7 +3,7 @@
 // Adaptado do QrDoCelular do HolyCut. O botão e o painel ficam separados, para o painel ocupar a
 // linha inteira da exportação.
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { chamarApi, ErroApi } from "@/lib/api";
 import type { LinkCelular } from "@/lib/tipos";
@@ -33,8 +33,13 @@ export function useLinkCelular(exportacaoId: string) {
 /** O QR code: aponte a câmera do celular e o download começa. */
 export function PainelQrCelular({ link, aoFechar }: { link: { url: string; expira_em: string }; aoFechar: () => void }) {
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+  // O QR abre embaixo da exportação, quase sempre fora da parte visível da lista: rola até ele
+  const painel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    painel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [link.url]);
   return (
-    <div className="col-span-full mt-2 flex flex-col items-center gap-3 rounded-lg border border-borda bg-painel p-4 text-center">
+    <div ref={painel} className="col-span-full mt-2 flex flex-col items-center gap-3 rounded-lg border border-borda bg-painel p-4 text-center">
       <div className="flex w-full items-center justify-between">
         <p className="text-sm font-semibold">Aponte a câmera do celular</p>
         <button type="button" onClick={aoFechar} aria-label="Fechar o QR code" className="botao-icone size-6">

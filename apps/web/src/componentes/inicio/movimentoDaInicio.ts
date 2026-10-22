@@ -253,6 +253,9 @@ export function ligarMovimento(raiz: HTMLElement, reduzir: boolean): Desfazer {
           const alvo = id ? document.getElementById(id) : null;
           if (!alvo) return;
           e.preventDefault();
+          // O menu do celular para a rolagem suave enquanto está aberto: parada, ela ignorava o pedido e o link
+          // não levava a lugar nenhum
+          lenis?.start();
           if (lenis) lenis.scrollTo(alvo, { offset: id === "top-reel" ? 0 : -72, duration: 1.4 });
           else alvo.scrollIntoView({ behavior: reduzir ? "auto" : "smooth" });
         });

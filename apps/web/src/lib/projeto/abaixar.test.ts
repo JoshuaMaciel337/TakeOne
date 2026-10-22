@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { abaixamentoNaFala, fatorDoAbaixamento, mudarProfundidade } from "./abaixar.ts";
+import { abaixamentoNaFala, fatorDoAbaixamento, mudarProfundidade, PONTOS_MAXIMOS } from "./abaixar.ts";
 
 const S = TICKS_POR_SEGUNDO;
 const g = 10 ** (-12 / 20);
@@ -36,4 +36,15 @@ test("mudar a profundidade mantém a forma da curva", () => {
   const mais = mudarProfundidade(r, -24);
   assert.ok(perto(fatorDoAbaixamento({ inicio: 0, abaixamento: mais }, 3 * S), 10 ** (-24 / 20)));
   assert.ok(perto(fatorDoAbaixamento({ inicio: 0, abaixamento: mais }, 9 * S), 1));
+});
+
+test("fala demais: a curva junta as falas até caber no limite da API", () => {
+  const S = TICKS_POR_SEGUNDO;
+  // 1500 falas de 0,5 s separadas por 1 s: 4 pontos cada passaria de 4000
+  const falas = Array.from({ length: 1500 }, (_, i) => ({ inicio: i * 1.5 * S, fim: (i * 1.5 + 0.5) * S }));
+  const curva = abaixamentoNaFala({ inicio: 0, duracao: 2300 * S }, falas)!;
+  assert.ok(curva.pontos.length <= PONTOS_MAXIMOS, `${curva.pontos.length} pontos`);
+  assert.ok(curva.pontos.every((p, i) => i === 0 || p.t >= curva.pontos[i - 1].t));
+  // Uma fala curta ainda abaixa onde ela está
+  assert.ok(fatorDoAbaixamento({ inicio: 0, abaixamento: curva }, 0.25 * S) < 0.5);
 });

@@ -62,9 +62,9 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
             <Loader2 className="size-6 animate-spin text-suave" aria-hidden />
           )}
           {pronta && midia.imagem ? (
-            <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium">Imagem</span>
+            <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">Imagem</span>
           ) : pronta && midia.duracao ? (
-            <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+            <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
               {formatarTempo(midia.duracao)}
             </span>
           ) : null}
@@ -84,7 +84,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
         <button
           type="button"
           onClick={() => aoExcluir(midia)}
-          className="absolute right-1 top-1 hidden size-7 items-center justify-center rounded-md bg-black/70 text-white transition hover:bg-erro group-hover:flex group-focus-within:flex"
+          className="absolute right-1 top-1 hidden size-7 items-center justify-center rounded-md bg-black/70 text-white transition hover:bg-erro group-hover:flex group-focus-within:flex [@media(hover:none)]:flex"
           aria-label={`Excluir ${midia.nome}`}
           title="Excluir"
         >
@@ -95,7 +95,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
         <button
           type="button"
           onClick={() => aoAdicionar!(midia)}
-          className="absolute left-1 top-1 hidden size-7 items-center justify-center rounded-md bg-destaque text-white shadow transition hover:brightness-110 group-hover:flex group-focus-within:flex"
+          className="absolute left-1 top-1 hidden size-7 items-center justify-center rounded-md bg-destaque text-white shadow transition hover:brightness-110 group-hover:flex group-focus-within:flex [@media(hover:none)]:flex"
           aria-label={`Adicionar ${midia.nome} à linha do tempo`}
           title="Adicionar à linha do tempo"
         >

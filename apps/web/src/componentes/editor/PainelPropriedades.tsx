@@ -152,7 +152,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
 
   return (
     <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
-      <div role="tablist" aria-label="Propriedades" className="flex shrink-0 gap-1 overflow-x-auto border-b border-borda px-2 py-1.5">
+      {/* As abas quebram em linhas: com rolagem para o lado, Animação e Cor ficavam escondidas num painel estreito */}
+      <div role="tablist" aria-label="Propriedades" className="flex shrink-0 flex-wrap gap-1 border-b border-borda px-2 py-1.5">
         {abas.map((item) => (
           <button
             key={item.id}

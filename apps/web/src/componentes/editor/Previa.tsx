@@ -267,7 +267,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
             ) : null}
 
             {vazio ? (
-              <p className="pointer-events-none absolute inset-0 flex items-center justify-center p-[10%] text-center text-xs text-suave">
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center p-[10%] text-center text-xs text-white/60">
                 Arraste mídias da biblioteca para a linha do tempo para ver aqui.
               </p>
             ) : null}

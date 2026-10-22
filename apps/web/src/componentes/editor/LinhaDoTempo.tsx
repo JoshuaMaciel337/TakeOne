@@ -487,8 +487,8 @@ export function LinhaDoTempo({
                   {formatarTempo(segundo)}
                 </span>
               ))}
-              <span className="absolute top-0 z-10 h-full w-px bg-white" style={{ left: xCursor }} aria-hidden>
-                <span className="absolute -left-[5px] top-0 size-[11px] rounded-sm bg-white" />
+              <span className="absolute top-0 z-10 h-full w-px bg-texto" style={{ left: xCursor }} aria-hidden>
+                <span className="absolute -left-[5px] top-0 size-[11px] rounded-sm bg-texto" />
               </span>
             </div>
 
@@ -577,7 +577,7 @@ export function LinhaDoTempo({
               ))}
 
               {guia !== null ? <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-amber-300" style={{ left: px(guia) }} aria-hidden /> : null}
-              <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-white" style={{ left: xCursor }} aria-hidden />
+              <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-texto" style={{ left: xCursor }} aria-hidden />
             </div>
           </div>
         </div>
