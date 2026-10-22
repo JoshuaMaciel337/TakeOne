@@ -169,6 +169,32 @@ def _conferir_livre(campos: dict) -> dict:
     return saida
 
 
+def aproveitar_campos(modelo: str, campos: dict) -> dict:
+    """
+    Os campos que o LLM preencheu ao escolher um modelo pronto, prontos para conferir_campos: o vazio sai
+    (vale o padrão do modelo), o texto é cortado no máximo, o número fica só com os algarismos ("1.000")
+    e a cor fora do formato sai. Antes, um "" num número ou uma legenda longa descartava o modelo pronto
+    e a animação era escrita do zero, o caminho que o modelo de 8B acerta pouco.
+    """
+    saida = {}
+    for chave, _rotulo, tipo, _padrao, maximo in MODELOS[modelo]["campos"]:
+        valor = " ".join(str(campos.get(chave) or "").split()) if tipo != "linhas" else str(campos.get(chave) or "")
+        valor = valor.strip()
+        if not valor:
+            continue
+        if tipo == "numero":
+            valor = re.sub(r"\D", "", valor)
+            if not 1 <= len(valor) <= 7:
+                continue
+        elif tipo == "cor":
+            if not _COR.fullmatch(valor):
+                continue
+        else:
+            valor = valor[:maximo].rstrip()
+        saida[chave] = valor
+    return saida
+
+
 def conferir_campos(modelo: str, campos: dict) -> dict:
     """Os campos do modelo, com o padrão no que faltar. Recusa cor, número ou texto fora do esperado."""
     if modelo == LIVRE:

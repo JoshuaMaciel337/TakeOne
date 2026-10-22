@@ -141,3 +141,47 @@ def test_classes_sem_ponto_ganham_o_ponto():
     assert ".num, .num:hover{" in corrigido and " span{" in corrigido and "@keyframes a{from{" in corrigido
     with pytest.raises(ErroAnimacao, match="sem preencher"):
         separar_resposta({"css": "@keyframes a{}", "html": "<div>{{titulo}}</div>"})
+
+
+def test_classe_com_o_nome_da_animacao_nao_perde_a_animacao():
+    from core.modelos.animacao_descrita import separar_resposta
+
+    css, _ = separar_resposta({"css": "pulsar{animation: pulsar 1s infinite} @keyframes pulsar{from{opacity:0}"
+                                      "to{opacity:1}} @media (max-width:9px){pulsar{color:red}}",
+                               "html": '<div class="pulsar">Oferta</div>'})
+    assert css.startswith(".pulsar{animation: pulsar 1s infinite}"), css
+    assert "@keyframes pulsar{from{opacity:0}to{opacity:1}}" in css and "{.pulsar{color:red}}" in css
+
+
+def test_formas_do_svg_ficam_irmas():
+    from core.modelos.animacao_descrita import limpar_html
+
+    html = limpar_html('<svg class="sol" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20"/>'
+                       '<line x1="0" y1="0" x2="9" y2="9"/><path d="M0 0L9 9"></path></svg><p>a<br>b</p>')
+    assert html == ('<svg class="sol" viewbox="0 0 100 100"><circle cx="50" cy="50" r="20"/>'
+                    '<line x1="0" y1="0" x2="9" y2="9"/><path d="M0 0L9 9"/></svg><p>a<br>b</p>'), html
+
+
+def test_css_com_escapes_e_longo_sem_separadores():
+    import time
+
+    from core.modelos.animacao_descrita import limpar_css, limpar_html
+
+    css = limpar_css(r".a{background:u\rl(http://x);color:red} @imp\6f rt 'x.css'; .b{width:1px}")
+    assert "\\" not in css and "http" not in css and "color:red" in css and "width:1px" in css
+    assert "style" not in limpar_html(r'<div style="background:u\rl(x)">a</div>')
+    inicio = time.monotonic()
+    limpar_css("a" * 15000 + "url(")
+    assert time.monotonic() - inicio < 0.5
+
+
+def test_campos_da_escolha_aproveitam_o_modelo_pronto():
+    from core.modelos.animacao_html import MODELOS, aproveitar_campos, conferir_campos
+
+    # O LLM deixa "" no que o pedido não diz e às vezes passa do tamanho: vale o padrão e o texto é cortado
+    campos = aproveitar_campos("contador", {"valor": "", "prefixo": "", "legenda": "seguidores " * 10, "x": "1"})
+    conferidos = conferir_campos("contador", campos)
+    maximo = {chave: m for chave, _, _, _, m in MODELOS["contador"]["campos"]}
+    assert "valor" not in campos and "x" not in campos
+    assert len(conferidos["legenda"]) <= maximo["legenda"]
+    assert aproveitar_campos("contador", {"valor": "1.000"})["valor"] == "1000"

@@ -20,7 +20,7 @@ from core.modelos.animacao_descrita import (
     resposta_simulada,
     separar_resposta,
 )
-from core.modelos.animacao_html import LIVRE, MODELOS, ErroAnimacao, conferir_campos
+from core.modelos.animacao_html import LIVRE, MODELOS, ErroAnimacao, aproveitar_campos, conferir_campos
 from core.modelos.job import ErroDefinitivo, montar_job
 from core.utils.mongo import agora
 from worker.tarefas.llm import conversar
@@ -38,8 +38,8 @@ def executar_animacao_descrita(db, job: dict, reportar: Callable[[int, str], Non
                             "O modelo está escolhendo a animação")
         if escolha.get("modelo") in MODELOS:
             try:
-                campos = conferir_campos(escolha["modelo"], {**(escolha.get("campos") or {}),
-                                                             **entrada.get("cores", {})})
+                preenchidos = aproveitar_campos(escolha["modelo"], escolha.get("campos") or {})
+                campos = conferir_campos(escolha["modelo"], {**preenchidos, **entrada.get("cores", {})})
                 modelo = escolha["modelo"]
             except ErroAnimacao as e:
                 logging.info(f"[midia {midia_id}] Modelo {escolha['modelo']} com campos ruins ({e}); "

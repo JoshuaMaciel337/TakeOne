@@ -11,10 +11,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import AnimacaoDescritaEntrada, AnimacaoHtmlEntrada, MidiaSaida
 from api.rotas.midias import para_saida
+from core.modelos.animacao_descrita import CSS_MAXIMO, HTML_MAXIMO
 from core.modelos.animacao_html import (
     ARQUIVOS_COMUNS,
     DURACAO_MAXIMA,
@@ -71,7 +73,8 @@ async def modelos(request: Request, _usuario=Depends(usuario_atual)):
 @router.get("/previa", response_class=HTMLResponse)
 async def previa(modelo: str, proporcao: str = "16:9", duracao: float = Query(default=4, ge=DURACAO_MINIMA,
                                                                                  le=DURACAO_MAXIMA),
-                 campos: str = "{}", _usuario=Depends(usuario_atual)):
+                 campos: str = Query(default="{}", max_length=CSS_MAXIMO + HTML_MAXIMO + 2000),
+                 _usuario=Depends(usuario_atual)):
     """A página da animação, para o iframe do painel (que roda sem acesso ao site)."""
     if proporcao not in QUADROS:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Proporção desconhecida.")
@@ -79,7 +82,9 @@ async def previa(modelo: str, proporcao: str = "16:9", duracao: float = Query(de
         valores = json.loads(campos)
         if not isinstance(valores, dict):
             raise ValueError
-        pagina = montar_html(modelo, valores, duracao, proporcao, "/api/animacoes/fontes", "/api/animacoes/arquivos")
+        # Numa thread: a limpeza do modelo livre roda expressões no CSS, e no laço de eventos ela pararia a API
+        pagina = await run_in_threadpool(montar_html, modelo, valores, duracao, proporcao, "/api/animacoes/fontes",
+                                         "/api/animacoes/arquivos")
     except (ValueError, ErroAnimacao) as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e) or "Campos inválidos.") from e
     # O laço entra depois dos módulos do modelo (que definem o renderAt)

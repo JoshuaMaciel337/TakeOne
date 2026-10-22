@@ -27,10 +27,16 @@ ESQUEMA = {
 TAGS = {"div", "span", "p", "h1", "h2", "h3", "strong", "em", "b", "i", "br", "svg", "g", "path", "circle",
         "rect", "line", "polyline", "polygon", "ellipse"}
 VAZIAS = {"br", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse"}
+# Dentro do <svg> o HTML não fecha tag sozinho: a forma sem "/>" ficava aberta, a seguinte virava filha dela
+# e não aparecia. O <br> é HTML e fica como está
+FORMAS_DO_SVG = VAZIAS - {"br"}
 ATRIBUTOS = {"class", "style", "viewbox", "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2",
              "width", "height", "points", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
              "stroke-dasharray", "stroke-dashoffset", "transform", "opacity", "pathlength"}
-_PROIBIDO_NO_CSS = re.compile(r"url\s*\(|@import|expression\s*\(|javascript:|behavior\s*:|-moz-binding|</|<", re.I)
+# A barra invertida também: com os escapes do CSS, "u\rl(" e "@imp\6f rt" passavam pelos outros nomes
+_DECLARACAO_PROIBIDA = re.compile(r"url\s*\(|expression\s*\(|javascript:|behavior\s*:|-moz-binding|\\", re.I)
+_PROIBIDO_NO_CSS = re.compile(r"url\s*\(|@import|expression\s*\(|javascript:|behavior\s*:|-moz-binding|</|<|\\",
+                              re.I)
 
 
 def _instrucoes() -> str:
@@ -127,7 +133,8 @@ class _Limpador(HTMLParser):
             if nome == "style" and _PROIBIDO_NO_CSS.search(valor):
                 continue
             limpos.append(f'{nome}="{escape(valor, quote=True)}"')
-        self.partes.append(f"<{tag}{''.join(' ' + a for a in limpos)}>")
+        fim = "/>" if tag in FORMAS_DO_SVG else ">"
+        self.partes.append(f"<{tag}{''.join(' ' + a for a in limpos)}{fim}")
         if tag not in VAZIAS:
             self.abertas.append(tag)
 
@@ -169,22 +176,54 @@ def limpar_css(css: str) -> str:
     css = re.sub(r"</?style[^>]*>", "", css, flags=re.I)
     css = re.sub(r"@font-face\s*\{[^}]*\}", "", css, flags=re.I)
     css = re.sub(r"@import[^;]*;?", "", css, flags=re.I)
-    # Declaração a declaração: some só a que tem algo proibido
-    css = re.sub(r"[^;{}]*(url\s*\(|expression\s*\(|javascript:|behavior\s*:|-moz-binding)[^;{}]*;?", "", css,
-                 flags=re.I)
+    # Declaração a declaração: some só a que tem algo proibido. Separado nos ";", "{" e "}" (conta linear):
+    # a expressão antiga voltava letra por letra e um CSS longo sem separadores prendia a API por segundos
+    pedacos = re.split(r"([;{}])", css)
+    css = "".join(pedaco for pedaco in pedacos if pedaco in ";{}" or not _DECLARACAO_PROIBIDA.search(pedaco))
     return css.replace("<", "").strip()
+
+
+def _nos_seletores(css: str, trocar) -> str:
+    """
+    Aplica `trocar` só no texto dos seletores (antes do "{" de cada regra), nunca nas declarações nem no
+    nome e nos passos de um @keyframes: com a troca no CSS inteiro, `animation: pulsar 1s` e
+    `@keyframes pulsar` ganhavam o ponto quando a classe tinha o mesmo nome, e a animação sumia.
+    """
+    pedacos, pilha, inicio = [], [], 0
+    for j, letra in enumerate(css):
+        if letra == "{":
+            preludio = css[inicio:j]
+            if pilha and pilha[-1] != "grupo":
+                tipo = "regra"
+            elif preludio.strip().startswith("@"):
+                tipo = "keyframes" if re.match(r"\s*@(-\w+-)?keyframes\b", preludio, re.I) else "grupo"
+            else:
+                tipo, preludio = "regra", trocar(preludio)
+            pedacos += [preludio, "{"]
+            pilha.append(tipo)
+            inicio = j + 1
+        elif letra == "}":
+            pedacos += [css[inicio:j], "}"]
+            if pilha:
+                pilha.pop()
+            inicio = j + 1
+    pedacos.append(css[inicio:])
+    return "".join(pedacos)
 
 
 def corrigir_seletores(css: str, html: str) -> str:
     """O modelo pequeno às vezes esquece o ponto da classe ("titulo{...}" em vez de ".titulo{...}"): põe o
     ponto nas classes que o HTML usa e que não são nome de tag. Também tira as regras de body e html."""
     css = re.sub(r"(^|[}\s])(?:html|body)\s*\{[^}]*\}", r"\1", css)
-    for classe in set(re.findall(r'class="([^"]+)"', html)):
-        for nome in classe.split():
-            if nome in TAGS or not re.fullmatch(r"[\w-]+", nome):
-                continue
-            css = re.sub(rf"(^|[}},\s>+~]){re.escape(nome)}(?=\s*[{{,:.>+~\[\s])", rf"\1.{nome}", css)
-    return css
+    nomes = {nome for classe in re.findall(r'class="([^"]+)"', html) for nome in classe.split()
+             if nome not in TAGS and re.fullmatch(r"[\w-]+", nome)}
+
+    def trocar(seletor: str) -> str:
+        for nome in nomes:
+            seletor = re.sub(rf"(^|[,\s>+~]){re.escape(nome)}(?=\s*[,:.>+~\[\s]|\s*$)", rf"\1.{nome}", seletor)
+        return seletor
+
+    return _nos_seletores(css, trocar)
 
 
 def separar_resposta(bruto: dict) -> tuple[str, str]:
