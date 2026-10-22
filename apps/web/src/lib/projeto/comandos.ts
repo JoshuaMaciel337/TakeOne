@@ -286,6 +286,9 @@ type Passo = { projeto: Projeto; nome: string };
 
 export type Historico = { passado: Passo[]; presente: Projeto; futuro: Passo[] };
 
+/** O que o editor devolve ao executar um comando: o projeto novo, ou null se o comando falhou (o aviso já apareceu). */
+export type ResultadoDoComando = { projeto: Projeto; selecao?: string[] } | null;
+
 export function iniciarHistorico(projeto: Projeto): Historico {
   return { passado: [], presente: projeto, futuro: [] };
 }

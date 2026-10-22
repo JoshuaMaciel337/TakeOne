@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { chamarApi } from "@/lib/api";
 import { pedirPalavrasChave } from "@/lib/palavrasChave";
-import type { Comando } from "@/lib/projeto/comandos";
+import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import { animacoesDoPlano, palavrasDepoisDoCorte, type Plano, trechosDosDestaques } from "@/lib/projeto/direcao";
 import { falaDosClipes, type Palavra, palavrasDaLinha, type PalavraDaLinha } from "@/lib/projeto/fala";
 import { ESTILOS_DE_LEGENDA } from "@/lib/projeto/legendas";
@@ -32,14 +32,17 @@ type Job = { id: string; status: StatusJob; progresso: number; mensagem: string;
 
 type Props = {
   projeto: Projeto;
-  aoExecutar: (comando: Comando) => void;
+  aoExecutar: (comando: Comando) => ResultadoDoComando;
   aoAvisar: (mensagem: string) => void;
   /** Uma animação pedida entra no instante dado quando ficar pronta. */
   aoPedirAnimacao: (midia: Midia, inicio: Tick) => void;
 };
 
 /** O que falta fazer depois que a limpeza mudar a linha do tempo. */
-type Pendente = { clipesAntes: Clipe[]; palavras: Map<string, Palavra[]>; plano: Plano | null; finais: PalavraDaLinha[]; duracao: Tick; opcoes: Opcoes };
+type Pendente = { palavras: Map<string, Palavra[]>; plano: Plano | null; finais: PalavraDaLinha[]; duracao: Tick; opcoes: Opcoes };
+
+const principalDe = (projeto: Projeto): Clipe[] => projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
+const faixasDe = (projeto: Projeto) => JSON.stringify(projeto.faixas);
 
 /** Pede o plano ao LLM local (job de GPU) e espera. */
 async function pedirPlano(palavras: PalavraDaLinha[], duracao: Tick, aoAndamento: (texto: string) => void, ativo: () => boolean): Promise<Plano | null> {
@@ -63,11 +66,15 @@ async function pedirPlano(palavras: PalavraDaLinha[], duracao: Tick, aoAndamento
  * local o título, a tarja, os zooms e a chamada. Tudo entra como passos normais do editor (Ctrl+Z desfaz).
  */
 export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAnimacao }: Props) {
-  const clipes = projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
+  const clipes = principalDe(projeto);
   const [opcoes, setOpcoes] = useState<Opcoes>({ limpar: true, legendas: true, chaves: true, titulo: true, tarja: true, zoom: true, cta: true });
   const [andamento, setAndamento] = useState<string | null>(null);
-  const pendente = useRef<Pendente | null>(null);
   const ativo = useRef(true);
+  // O projeto mais novo, para conferir no fim de cada espera se a pessoa mexeu na linha do tempo
+  const projetoAgora = useRef(projeto);
+  useEffect(() => {
+    projetoAgora.current = projeto;
+  });
   useEffect(() => {
     ativo.current = true;
     return () => {
@@ -75,11 +82,19 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
     };
   }, []);
 
-  async function aplicarResto(p: Pendente, clipesAgora: Clipe[]) {
+  /**
+   * Legendas, zooms e animações, sobre a linha do tempo já cortada (`base`). Os zooms e as animações
+   * apontam instantes dessa linha: se ela mudar enquanto as palavras-chave são escolhidas, eles ficam de
+   * fora, e as legendas são refeitas sobre a linha nova.
+   */
+  async function aplicarResto(p: Pendente, base: Projeto) {
     const feitos: string[] = [];
+    let mudou = false;
     if (p.opcoes.legendas) {
       const estilo = ESTILOS_DE_LEGENDA[0].texto;
-      let legendas = legendasDaFala(clipesAgora, p.palavras, opcoesParaOQuadro(projeto.proporcao, estilo.tamanho));
+      const opcoesDoQuadro = opcoesParaOQuadro(projeto.proporcao, estilo.tamanho);
+      let legendas = legendasDaFala(principalDe(base), p.palavras, opcoesDoQuadro);
+      let chavesPorTexto: Map<string, number[] | null> | null = null;
       if (legendas.length && p.opcoes.chaves) {
         // As palavras-chave vêm antes de criar as legendas: elas já nascem pintadas, num passo só
         try {
@@ -88,15 +103,27 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
             setAndamento,
             () => ativo.current,
           );
-          if (chaves) legendas = legendas.map((legenda, i) => ({ ...legenda, palavras_chave: chaves[String(i)] ?? null }));
+          if (chaves) chavesPorTexto = new Map(legendas.map((legenda, i) => [legenda.conteudo, chaves[String(i)] ?? null]));
         } catch (erro) {
           aoAvisar(erro instanceof Error ? erro.message : "Não foi possível escolher as palavras-chave.");
         }
+        if (!ativo.current) return;
+        // A espera pelo modelo é longa: se a linha mudou, as legendas são refeitas sobre a linha nova, e as
+        // de mesmo texto ficam com as palavras-chave delas
+        mudou = faixasDe(projetoAgora.current) !== faixasDe(base);
+        if (mudou) legendas = legendasDaFala(principalDe(projetoAgora.current), p.palavras, opcoesDoQuadro);
       }
+      const porTexto = chavesPorTexto;
+      if (porTexto) legendas = legendas.map((legenda) => ({ ...legenda, palavras_chave: porTexto.get(legenda.conteudo) ?? null }));
       if (legendas.length) {
         aoExecutar({ comando: "legenda.importar", parametros: { legendas, estilo } });
         feitos.push(`${legendas.length} legendas`);
       }
+    }
+    if (mudou && p.plano) {
+      if (ativo.current) setAndamento(null);
+      aoAvisar(`${feitos.length ? `Pronto: ${feitos.join(", ")}. ` : ""}A linha do tempo mudou durante a espera: os zooms e as animações ficaram de fora. Clique de novo para refazer.`);
+      return;
     }
     if (p.plano && p.opcoes.zoom) {
       const trechos = trechosDosDestaques(p.plano, p.finais);
@@ -126,18 +153,17 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
     aoAvisar(feitos.length ? `Pronto: ${feitos.join(", ")}. Ctrl+Z desfaz cada passo.` : "Nada para mudar neste vídeo.");
   }
 
-  // A limpeza muda a linha do tempo; o resto é feito em cima dela
-  useEffect(() => {
-    const p = pendente.current;
-    if (!p || p.clipesAntes === clipes) return;
-    pendente.current = null;
-    void aplicarResto(p, clipes);
-  });
-
   async function criar() {
+    const noClique = faixasDe(projeto);
     const midias = [...new Set(clipes.flatMap((clipe) => (clipe.midia_id ? [clipe.midia_id] : [])))];
     if (!midias.length) {
       aoAvisar("Coloque um vídeo com fala na faixa principal.");
+      return;
+    }
+    // Os cortes da limpeza passam por todas as faixas com clipes: travada, uma delas faria o fluxo parar
+    // no fim, minutos depois
+    if (opcoes.limpar && projeto.faixas.some((faixa) => faixa.travada && faixa.clipes.length)) {
+      aoAvisar("Há uma faixa travada. Destrave o cadeado para tirar as pausas, ou desmarque essa opção.");
       return;
     }
     try {
@@ -155,14 +181,25 @@ export function CriarAutomaticamente({ projeto, aoExecutar, aoAvisar, aoPedirAni
       const querPlano = opcoes.titulo || opcoes.tarja || opcoes.zoom || opcoes.cta;
       const plano = querPlano ? await pedirPlano(finais, duracao, setAndamento, () => ativo.current) : null;
       if (!ativo.current || (querPlano && !plano)) return;
-      const p: Pendente = { clipesAntes: clipes, palavras, plano, finais, duracao, opcoes };
-      setAndamento("Aplicando");
-      if (trechos.length) {
-        pendente.current = p;
-        aoExecutar({ comando: "linha.removerIntervalos", parametros: { intervalos: trechos.map(({ inicio, fim }) => ({ inicio, fim })) } });
-      } else {
-        await aplicarResto(p, clipes);
+      // Os cortes e o plano foram calculados na linha do clique: aplicados numa linha que mudou, cortariam fala
+      if (faixasDe(projetoAgora.current) !== noClique) {
+        aoAvisar("A linha do tempo mudou enquanto o vídeo era analisado. Clique de novo para criar sobre ela.");
+        setAndamento(null);
+        return;
       }
+      const p: Pendente = { palavras, plano, finais, duracao, opcoes };
+      setAndamento("Aplicando");
+      let base = projetoAgora.current;
+      if (trechos.length) {
+        const resultado = aoExecutar({ comando: "linha.removerIntervalos", parametros: { intervalos: trechos.map(({ inicio, fim }) => ({ inicio, fim })) } });
+        if (!resultado) {
+          // O editor já mostrou o porquê (uma faixa travada, por exemplo); nada do resto é aplicado
+          setAndamento(null);
+          return;
+        }
+        base = resultado.projeto;
+      }
+      await aplicarResto(p, base);
     } catch (erro) {
       if (ativo.current) {
         aoAvisar(erro instanceof Error ? erro.message : "Não foi possível criar agora.");

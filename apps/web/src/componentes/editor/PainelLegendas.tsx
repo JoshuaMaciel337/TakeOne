@@ -3,7 +3,7 @@
 import { Download, FileUp, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
-import type { Comando } from "@/lib/projeto/comandos";
+import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLegendas } from "@/lib/projeto/legendas";
 import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
@@ -16,7 +16,7 @@ export type PropsLegendas = {
   nome: string;
   tempo: Tick;
   selecao: string[];
-  aoExecutar: (comando: Comando) => void;
+  aoExecutar: (comando: Comando) => ResultadoDoComando;
   aoBuscar: (tempo: Tick) => void;
   aoSelecionar: (ids: string[]) => void;
   aoAvisar: (mensagem: string) => void;

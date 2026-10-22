@@ -3,7 +3,7 @@
 import { Eraser, LoaderCircle, ScrollText, Scissors } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { Comando } from "@/lib/projeto/comandos";
+import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import { falaDosClipes, type Palavra, palavrasDaLinha, trechoDasPalavras } from "@/lib/projeto/fala";
 import { OPCOES_DE_LIMPEZA, type OpcoesDeLimpeza, segundosDosTrechos, trechosParaLimpar } from "@/lib/projeto/limpezaDeFala";
 import type { Projeto } from "@/lib/projeto/modelo";
@@ -18,7 +18,7 @@ import { IDIOMAS } from "./LegendasDaFala";
 export type PropsTranscricao = {
   projeto: Projeto;
   tempo: Tick;
-  aoExecutar: (comando: Comando) => void;
+  aoExecutar: (comando: Comando) => ResultadoDoComando;
   aoBuscar: (tempo: Tick) => void;
   aoAvisar: (mensagem: string) => void;
   aoPedirAnimacao: (midia: Midia, inicio: Tick) => void;
