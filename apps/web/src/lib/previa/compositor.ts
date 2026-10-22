@@ -87,6 +87,30 @@ void main() {
   cor = soma / pesos;
 }`;
 
+// A camada já recortada (máscara do fundo e tela verde), pré-multiplicada, num framebuffer: com brilho, o
+// desenho e a cópia desfocada saem dela, como no render (o brilho vem depois do alphamerge e do colorkey).
+// Desfocando o quadro cru, o fundo removido voltava como névoa e o preto das animações escurecia o vídeo
+const FRAGMENTOS_RECORTE = `#version 300 es
+precision highp float;
+in vec2 v_pos;
+uniform sampler2D u_fonte;
+uniform sampler2D u_mascara;
+uniform bool u_comMascara;
+uniform bool u_comChroma;
+uniform vec3 u_chromaCor;
+uniform float u_semelhanca;
+uniform float u_suavidade;
+out vec4 cor;
+void main() {
+  vec4 texel = texture(u_fonte, v_pos);
+  if (u_comMascara) texel *= texture(u_mascara, v_pos).r;
+  if (u_comChroma && texel.a > 0.0) {
+    float d = length(texel.rgb / texel.a - u_chromaCor) / sqrt(3.0);
+    texel *= u_suavidade > 0.0001 ? clamp((d - u_semelhanca) / u_suavidade, 0.0, 1.0) : (d > u_semelhanca ? 1.0 : 0.0);
+  }
+  cor = texel;
+}`;
+
 /** Sigma (em pixels do nível do mipmap) acima do qual a passada lê um nível menor. */
 const SIGMA_POR_NIVEL = 4;
 
@@ -218,8 +242,12 @@ void main() {
     vec2 d = vec2(u_desvio * u_recorte.z, 0.0);
     vec2 minimo = u_recorte.xy;
     vec2 maximo = u_recorte.xy + u_recorte.zw;
-    texel.r = texture(u_textura, clamp(uv - d, minimo, maximo)).r;
-    texel.b = texture(u_textura, clamp(uv + d, minimo, maximo)).b;
+    // Em cor direta e com o alfa deste pixel, como o rgbashift do render: com a cor pré-multiplicada do
+    // vizinho, fora das letras sobravam fantasmas vermelho e azul que o vídeo não tem
+    vec4 vermelho = texture(u_textura, clamp(uv - d, minimo, maximo));
+    vec4 azul = texture(u_textura, clamp(uv + d, minimo, maximo));
+    texel.r = vermelho.a > 0.0 ? vermelho.r / vermelho.a * texel.a : 0.0;
+    texel.b = azul.a > 0.0 ? azul.b / azul.a * texel.a : 0.0;
   }
   if (u_comMascaraDoFundo) texel *= texture(u_mascaraDoFundo, uv).r;
   if (u_comChroma && texel.a > 0.0) {
@@ -291,6 +319,10 @@ type Alvo = { buffer: WebGLFramebuffer; textura: WebGLTexture; largura: number; 
 type Recursos = {
   programa: WebGLProgram;
   desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
+  recorte: {
+    programa: WebGLProgram;
+    uniformes: Record<"fonte" | "mascara" | "comMascara" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade", WebGLUniformLocation | null>;
+  };
   /** Os dois framebuffers das passadas do desfoque. */
   alvos: Alvo[];
   /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
@@ -360,6 +392,25 @@ export class Compositor {
         limite: localDesfoque("u_limite"),
       },
     };
+    const programaRecorte = gl.createProgram()!;
+    gl.attachShader(programaRecorte, compilar(gl, gl.VERTEX_SHADER, VERTICES_DESFOQUE));
+    gl.attachShader(programaRecorte, compilar(gl, gl.FRAGMENT_SHADER, FRAGMENTOS_RECORTE));
+    gl.bindAttribLocation(programaRecorte, 0, "a_pos");
+    gl.linkProgram(programaRecorte);
+    if (!gl.getProgramParameter(programaRecorte, gl.LINK_STATUS)) throw new Error(`Recorte da prévia: ${gl.getProgramInfoLog(programaRecorte)}`);
+    const localRecorte = (nome: string) => gl.getUniformLocation(programaRecorte, nome);
+    const recorte = {
+      programa: programaRecorte,
+      uniformes: {
+        fonte: localRecorte("u_fonte"),
+        mascara: localRecorte("u_mascara"),
+        comMascara: localRecorte("u_comMascara"),
+        comChroma: localRecorte("u_comChroma"),
+        chromaCor: localRecorte("u_chromaCor"),
+        semelhanca: localRecorte("u_semelhanca"),
+        suavidade: localRecorte("u_suavidade"),
+      },
+    };
     gl.useProgram(programa);
 
     const vertices = gl.createBuffer();
@@ -416,6 +467,7 @@ export class Compositor {
       grao: null,
       mascaras: [],
       desfoque,
+      recorte,
       alvos: [],
     };
   }
@@ -478,6 +530,7 @@ export class Compositor {
     const primeiro = this.alvo(primeiroAlvo, w, h);
     const segundo = this.alvo(primeiroAlvo + 1, w, h);
     gl.bindTexture(gl.TEXTURE_2D, textura);
+    const filtro = gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER) as number;
     if (nivel > 0) {
       gl.generateMipmap(gl.TEXTURE_2D);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -502,10 +555,41 @@ export class Compositor {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, textura);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // O filtro de antes: forçar LINEAR tirava o mipmap da camada reduzida e o texto com brilho serrilhava
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filtro);
     gl.enable(gl.BLEND);
     gl.useProgram(programa);
     return segundo.textura;
+  }
+
+  /**
+   * A camada (a textura ligada na unidade 0) já com a máscara do fundo (unidade 4) e a tela verde, no
+   * framebuffer 4, do tamanho da textura. Devolve a textura dele, ligada na unidade 0.
+   */
+  private recortarCamada(textura: WebGLTexture, camada: Camada, largura: number, altura: number): WebGLTexture {
+    const gl = this.gl;
+    const { recorte, programa } = this.recursos!;
+    const alvo = this.alvo(4, largura, altura);
+    gl.useProgram(recorte.programa);
+    gl.disable(gl.BLEND);
+    gl.uniform1i(recorte.uniformes.fonte, 0);
+    gl.uniform1i(recorte.uniformes.mascara, 4);
+    gl.uniform1i(recorte.uniformes.comMascara, camada.mascaraDoFundo ? 1 : 0);
+    gl.uniform1i(recorte.uniformes.comChroma, camada.chroma ? 1 : 0);
+    if (camada.chroma) {
+      gl.uniform3f(recorte.uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
+      gl.uniform1f(recorte.uniformes.semelhanca, camada.chroma.semelhanca);
+      gl.uniform1f(recorte.uniformes.suavidade, camada.chroma.suavidade);
+    }
+    gl.viewport(0, 0, largura, altura);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, alvo.buffer);
+    gl.bindTexture(gl.TEXTURE_2D, textura);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.enable(gl.BLEND);
+    gl.useProgram(programa);
+    gl.bindTexture(gl.TEXTURE_2D, alvo.textura);
+    return alvo.textura;
   }
 
   private textura(indice: number): WebGLTexture {
@@ -568,8 +652,39 @@ export class Compositor {
           gl.bindTexture(gl.TEXTURE_2D, desfocada);
         }
       }
+      if (camada.mascaraDoFundo) {
+        // A unidade 4 fica ativa antes de criar e ligar a textura: com a 0 ativa, o quadro do vídeo era trocado
+        // pela máscara e o primeiro quadro da camada saía com a silhueta branca
+        gl.activeTexture(gl.TEXTURE4);
+        let textura = recursos.mascaras[indice];
+        if (!textura) {
+          textura = gl.createTexture()!;
+          gl.bindTexture(gl.TEXTURE_2D, textura);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          recursos.mascaras[indice] = textura;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, textura);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.mascaraDoFundo);
+        gl.uniform1i(uniformes.mascaraDoFundo, 4);
+        gl.activeTexture(gl.TEXTURE0);
+      }
       const brilho = camada.brilho ?? 0;
       gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
+      // Com brilho, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
+      const recortadaAntes = brilho > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma);
+      if (recortadaAntes) {
+        this.recortarCamada(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture, camada, largura, altura);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        if (reducao > REDUCAO_COM_MIPMAP) {
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        } else {
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
+      }
       if (brilho > 0 && largura > 0) {
         // A cópia desfocada do brilho, nos framebuffers 2 e 3, na unidade 2
         const atual = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
@@ -584,25 +699,8 @@ export class Compositor {
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
       gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
       gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
-      gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo ? 1 : 0);
-      if (camada.mascaraDoFundo) {
-        let textura = recursos.mascaras[indice];
-        if (!textura) {
-          textura = gl.createTexture()!;
-          gl.bindTexture(gl.TEXTURE_2D, textura);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          recursos.mascaras[indice] = textura;
-        }
-        gl.activeTexture(gl.TEXTURE4);
-        gl.bindTexture(gl.TEXTURE_2D, textura);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.mascaraDoFundo);
-        gl.uniform1i(uniformes.mascaraDoFundo, 4);
-        gl.activeTexture(gl.TEXTURE0);
-      }
-      gl.uniform1i(uniformes.comChroma, camada.chroma ? 1 : 0);
+      gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo && !recortadaAntes ? 1 : 0);
+      gl.uniform1i(uniformes.comChroma, camada.chroma && !recortadaAntes ? 1 : 0);
       if (camada.chroma) {
         gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
         gl.uniform1f(uniformes.semelhanca, camada.chroma.semelhanca);
@@ -679,6 +777,7 @@ export class Compositor {
       }
       this.gl.deleteProgram(recursos.programa);
       this.gl.deleteProgram(recursos.desfoque.programa);
+      this.gl.deleteProgram(recursos.recorte.programa);
     }
     this.recursos = null;
   }
