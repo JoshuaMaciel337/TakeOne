@@ -194,7 +194,10 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
           mostrarAviso(e.message);
           return null;
         }
-        throw e;
+        // Erro de programação: a ação não acontece, mas a pessoa fica sabendo (antes, nada mudava em silêncio)
+        console.error(`Comando ${comando.comando} falhou:`, e);
+        mostrarAviso("Não foi possível fazer isso. Tente de novo; se continuar, recarregue a página.");
+        return null;
       }
     },
     [estado, ctx, mostrarAviso],

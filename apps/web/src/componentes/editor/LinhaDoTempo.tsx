@@ -369,7 +369,7 @@ export function LinhaDoTempo({
   const guia = arrasto && "guia" in arrasto ? arrasto.guia : null;
 
   return (
-    <section aria-label="Linha do tempo" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
+    <section aria-label="Linha do tempo" style={style} className={`isolate flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-borda px-2">
         <button
           type="button"

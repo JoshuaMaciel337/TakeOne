@@ -92,7 +92,17 @@ export function Editor({ projetoId }: { projetoId: string }) {
   const [ferramenta, setFerramenta] = useState<IdFerramenta>("midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
   const [midiaId, setMidiaId] = useState<string | null>(null);
-  const [selecao, setSelecao] = useState<string[]>([]);
+  const [selecao, definirSelecao] = useState<string[]>([]);
+  /**
+   * Troca a seleção. Antes, tira o foco do campo do painel que estiver sendo editado: o onBlur dele roda com o
+   * clipe de antes e confirma o valor ali. Sem isso, a linha do tempo e a prévia trocavam a seleção no
+   * pointerdown e o valor digitado ia para o clipe novo (ou se perdia, com o painel desmontado).
+   */
+  const setSelecao = useCallback((ids: string[]) => {
+    const ativo = document.activeElement;
+    if (ativo instanceof HTMLElement && ativo.matches("input, textarea, select")) ativo.blur();
+    definirSelecao(ids);
+  }, []);
   const [ima, setIma] = useState(true);
   const [exportando, setExportando] = useState(false);
 
@@ -172,7 +182,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
       if (resultado?.selecao) setSelecao(resultado.selecao);
       return resultado;
     },
-    [executarNoProjeto],
+    [executarNoProjeto, setSelecao],
   );
 
   /** Pelo botão "+": entra no cursor, e o cursor vai para o fim do clipe novo, como no CapCut. */
@@ -239,9 +249,15 @@ export function Editor({ projetoId }: { projetoId: string }) {
 
   const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
     const alvo = evento.target as HTMLElement | null;
-    if (!projeto || alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]") || exportando) return;
     const ctrl = evento.ctrlKey || evento.metaKey;
     const tecla = evento.key.toLowerCase();
+    // Num controle deslizante, só as setas e Home/End são dele: desfazer, refazer e o espaço continuam valendo
+    // (antes, depois de mexer num controle, o foco ficava nele e esses atalhos paravam)
+    const deslizante = alvo instanceof HTMLInputElement && alvo.type === "range";
+    const doDeslizante = deslizante && (tecla.startsWith("arrow") || tecla === "home" || tecla === "end" || tecla === "pageup" || tecla === "pagedown");
+    const campo = alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]");
+    if (!projeto || exportando || doDeslizante || (campo && !deslizante)) return;
+    if (deslizante && evento.code === "Space") alvo.blur();
     const quadro = duracaoDoQuadro(projeto.taxa);
 
     if (evento.code === "Space") {
@@ -350,7 +366,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
             aoAvisar: mostrarAviso,
           }}
           aoFechar={() => setPainelNoCelular(false)}
-          className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-30 max-md:h-[55dvh] ${
+          className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-40 max-md:h-[55dvh] ${
             painelNoCelular ? "" : "max-md:hidden"
           }`}
         />
