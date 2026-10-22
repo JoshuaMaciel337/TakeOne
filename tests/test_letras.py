@@ -61,3 +61,20 @@ def test_layout_bate_com_a_imagem_e_separa_as_linhas():
     meio_da_linha = round(primeira["y1"] * imagem.height / 2)
     x_do_o = round((primeira["xs"][1] - 0.01) * imagem.width)
     assert max(alfa.getpixel((x, meio_da_linha)) for x in range(x_do_o - 5, x_do_o)) > 0
+
+
+def test_destaque_de_texto_com_brilho_tem_o_tamanho_e_o_layout_do_texto():
+    from core.utils.letras import texto_do_destaque
+    from core.utils.texto import TEXTO_PADRAO, desenhar_texto, layout_do_texto
+
+    texto = {**TEXTO_PADRAO, "conteudo": "Bom dia, pessoal", "tamanho": 0.06, "brilho": 0.5,
+             "destaque": {"modo": "karaoke", "cor": "#ffd400"}}
+    destaque = texto_do_destaque(texto)
+    assert desenhar_texto(destaque, 1080).size == desenhar_texto(texto, 1080).size
+    assert layout_do_texto(destaque, 1080) == layout_do_texto(texto, 1080)
+    # A luz do destaque não aparece: na folga do brilho (a borda da imagem) o alfa fica 0, e no texto não
+    import numpy as np
+
+    alfa_destaque = np.asarray(desenhar_texto(destaque, 1080).getchannel("A"))
+    alfa_texto = np.asarray(desenhar_texto(texto, 1080).getchannel("A"))
+    assert alfa_destaque[:4].max() == 0 and alfa_texto[:40].max() > 0

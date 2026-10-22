@@ -112,6 +112,14 @@ export function temLetraALetra(animacao: Animacoes | null | undefined): boolean 
 }
 
 /** O texto na cor do destaque, sem fundo nem sombra: ele cobre as letras do texto de baixo. */
+/**
+ * O brilho do destaque quando o texto tem brilho (o mesmo de core/utils/letras.py): a imagem ganha a mesma folga
+ * e a luz desenhada fica com alfa 0. Sem brilho, o PNG do destaque saía menor e as letras coloridas, esticadas
+ * até a caixa do texto, ficavam fora do lugar.
+ */
+export const BRILHO_SO_NA_MEDIDA = 1e-6;
+
 export function textoDoDestaque(texto: Texto): Texto {
-  return { ...texto, cor: texto.destaque!.cor, fundo_opacidade: 0, sombra: 0, brilho: 0, destaque: null, palavras_chave: null };
+  const brilho = texto.brilho > 0 ? BRILHO_SO_NA_MEDIDA : 0;
+  return { ...texto, cor: texto.destaque!.cor, fundo_opacidade: 0, sombra: 0, brilho, destaque: null, palavras_chave: null };
 }

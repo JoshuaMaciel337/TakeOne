@@ -187,8 +187,15 @@ def tem_destaque(clipe: dict) -> bool:
     return bool(texto.get("destaque"))
 
 
+# O brilho do destaque quando o texto tem brilho: a imagem ganha a mesma folga (a medida conta o brilho) e a luz
+# desenhada fica com alfa 0. Sem brilho nenhum, o PNG do destaque saía menor que o do texto e, esticado até a
+# caixa dele, as letras coloridas ficavam maiores e fora do lugar
+BRILHO_SO_NA_MEDIDA = 1e-6
+
+
 def texto_do_destaque(texto: dict) -> dict:
     """O texto na cor do destaque, sem fundo nem sombra: ele cobre as letras do texto de baixo (inclusive as
     palavras-chave, que a fala também pinta quando passa)."""
-    return {**texto, "cor": texto["destaque"]["cor"], "fundo_opacidade": 0, "sombra": 0, "brilho": 0, "destaque": None,
-            "palavras_chave": None}
+    brilho = BRILHO_SO_NA_MEDIDA if texto.get("brilho", 0) > 0 else 0
+    return {**texto, "cor": texto["destaque"]["cor"], "fundo_opacidade": 0, "sombra": 0, "brilho": brilho,
+            "destaque": None, "palavras_chave": None}
