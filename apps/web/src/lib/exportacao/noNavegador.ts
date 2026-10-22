@@ -334,5 +334,6 @@ export async function exportarNoNavegador(projeto: Projeto, midias: ReadonlyMap<
 }
 
 export function foiCancelado(erro: unknown): boolean {
-  return erro instanceof Cancelado;
+  // O fetch do som recebe o mesmo sinal e, cancelado, rejeita com AbortError (uma mensagem em inglês)
+  return erro instanceof Cancelado || (erro instanceof DOMException && erro.name === "AbortError");
 }

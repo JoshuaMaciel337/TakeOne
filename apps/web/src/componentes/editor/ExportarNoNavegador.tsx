@@ -23,28 +23,33 @@ export function ExportarNoNavegador({ projeto, midias, salvo }: Props) {
   const [pronto, setPronto] = useState<{ url: string; tamanho: number } | null>(null);
   const [erro, setErro] = useState("");
   const cancelar = useRef<AbortController | null>(null);
+  const urlPronta = useRef<string | null>(null);
   const motivo = motivoParaOServidor(projeto, midias);
   const { largura, altura } = tamanhoNoNavegador(projeto.proporcao);
   const nomeDoArquivo = `${(projeto.nome || "Projeto").replace(/[\\/:*?"<>|]/g, "").trim() || "Projeto"} 720p.mp4`;
 
-  // O arquivo pronto ocupa memória: sai quando a janela fecha
+  // Ao fechar a janela: para a exportação e solta o arquivo pronto, que ocupa memória. Só ao desmontar:
+  // dependendo do `pronto`, a limpeza rodava no segundo clique e abortava a exportação que acabava de começar
   useEffect(
     () => () => {
       cancelar.current?.abort();
-      if (pronto) URL.revokeObjectURL(pronto.url);
+      if (urlPronta.current) URL.revokeObjectURL(urlPronta.current);
     },
-    [pronto],
+    [],
   );
 
   function exportar() {
     const controle = new AbortController();
     cancelar.current = controle;
+    if (urlPronta.current) URL.revokeObjectURL(urlPronta.current);
+    urlPronta.current = null;
     setErro("");
     setPronto(null);
     setAndamento({ fracao: 0, etapa: "Começando" });
     exportarNoNavegador(projeto, midias, (fracao, etapa) => setAndamento({ fracao, etapa }), controle.signal)
       .then((arquivo) => {
         const url = URL.createObjectURL(arquivo);
+        urlPronta.current = url;
         setPronto({ url, tamanho: arquivo.size });
         // Já baixa, como o botão do servidor faz quando o vídeo fica pronto
         const link = document.createElement("a");
