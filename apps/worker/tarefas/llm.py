@@ -60,8 +60,16 @@ def garantir_modelo(reportar: Callable[[int, str], None]):
 
 
 def esperar_a_placa(reportar: Callable[[int, str], None]):
+    from worker.tarefas.geracao_video import soltar_comfyui_parado
+
     inicio = time.monotonic()
+    soltou = False
     while (livre := _vram_livre_mb()) is not None and livre < VRAM_LIVRE_MINIMA_MB:
+        # Um Wan esquecido no ComfyUI parado (geração órfã) sai primeiro
+        if not soltou:
+            soltou = soltar_comfyui_parado()
+            if soltou:
+                continue
         if time.monotonic() - inicio > ESPERA_MAXIMA_PELA_PLACA_S:
             raise ErroDefinitivo("A placa de vídeo ficou ocupada por 15 minutos. "
                                  "Peça de novo quando ela estiver livre.")
@@ -70,15 +78,24 @@ def esperar_a_placa(reportar: Callable[[int, str], None]):
         time.sleep(20)
 
 
+# O contexto do modelo: com ele, o Qwen3 8B cabe inteiro nos 8 GB da placa. Os pedidos são medidos para caber
+CONTEXTO = 8192
+
+
 def conversar(mensagens: list[dict], esquema: dict, reportar: Callable[[int, str], None], mensagem: str,
-              temperatura: float = 0.2) -> dict:
-    """Pergunta ao modelo e devolve o JSON da resposta (preso ao esquema)."""
-    garantir_modelo(reportar)
-    esperar_a_placa(reportar)
-    reportar(45, mensagem)
+              temperatura: float = 0.2, primeiro: bool = True, ultimo: bool = True,
+              progresso: int = 45) -> dict:
+    """
+    Pergunta ao modelo e devolve o JSON da resposta (preso ao esquema). Numa sequência de pedidos (lotes),
+    só o primeiro espera a placa (depois, quem ocupa a placa é o próprio modelo) e só o último solta o modelo.
+    """
+    if primeiro:
+        garantir_modelo(reportar)
+        esperar_a_placa(reportar)
+    reportar(progresso, mensagem)
     inicio = time.monotonic()
     corpo = {"model": MODELO_LLM, "messages": mensagens, "format": esquema, "stream": False, "think": False,
-             "keep_alive": 0, "options": {"temperature": temperatura, "num_ctx": 8192}}
+             "keep_alive": 0 if ultimo else "2m", "options": {"temperature": temperatura, "num_ctx": CONTEXTO}}
     try:
         with _pedir("/api/chat", corpo, tempo_limite=900) as resposta:
             conteudo = json.load(resposta)["message"]["content"]

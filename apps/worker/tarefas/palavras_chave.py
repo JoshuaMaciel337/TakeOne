@@ -10,7 +10,13 @@ from collections.abc import Callable
 
 from core.config import MODO_IA
 from core.modelos.job import ErroDefinitivo
-from core.modelos.palavras_chave import ESQUEMA, conferir_escolhas, escolhas_simuladas, montar_mensagens
+from core.modelos.palavras_chave import (
+    ESQUEMA,
+    MAXIMO_DE_LEGENDAS,
+    conferir_escolhas,
+    escolhas_simuladas,
+    montar_mensagens,
+)
 from worker.tarefas.llm import conversar
 
 
@@ -20,8 +26,14 @@ def executar_palavras_chave(db, job: dict, reportar: Callable[[int, str], None])
         raise ErroDefinitivo("Não há legendas para destacar.")
     if MODO_IA != "real":
         return {"chaves": escolhas_simuladas(legendas)}
-    bruto = conversar(montar_mensagens(legendas), ESQUEMA, reportar, "O modelo está lendo as legendas")
-    chaves = conferir_escolhas(bruto, legendas)
+    # Em lotes que cabem no contexto do modelo; cada lote é numerado do zero e conferido sozinho
+    lotes = [legendas[i:i + MAXIMO_DE_LEGENDAS] for i in range(0, len(legendas), MAXIMO_DE_LEGENDAS)]
+    chaves = {}
+    for n, lote in enumerate(lotes):
+        texto = "O modelo está lendo as legendas" + (f" ({n + 1} de {len(lotes)})" if len(lotes) > 1 else "")
+        bruto = conversar(montar_mensagens(lote), ESQUEMA, reportar, texto, primeiro=n == 0,
+                          ultimo=n == len(lotes) - 1, progresso=45 + 50 * n // len(lotes))
+        chaves.update(conferir_escolhas(bruto, lote))
     logging.info(f"Palavras-chave em {len(chaves)} de {len(legendas)} legendas.")
     reportar(100, "Palavras-chave prontas")
     return {"chaves": chaves}

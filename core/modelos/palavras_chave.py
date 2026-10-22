@@ -10,7 +10,9 @@
 import re
 import unicodedata
 
-MAXIMO_DE_LEGENDAS = 400           # uns 20 min de legenda; cabe no contexto de 8 mil tokens
+# Legendas por pedido ao modelo. Medido no Qwen3: uns 35 tokens por legenda numerada (400 davam 13.870 e
+# passavam dos 8.192 do contexto); 120 dão uns 4.300, com lugar para a resposta. Mais que isso vai em lotes
+MAXIMO_DE_LEGENDAS = 120
 MAXIMO_POR_LEGENDA = 2
 
 ESQUEMA = {

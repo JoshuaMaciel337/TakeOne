@@ -10,7 +10,10 @@
 import re
 import unicodedata
 
-MAXIMO_DE_PALAVRAS = 1800          # uns 12 min de fala; cabe no contexto de 8 mil tokens com folga
+# Medido no Qwen3 (prompt_eval_count): uns 7,3 tokens por palavra numerada, mais 180 das regras. Com 1800,
+# o pedido dava 13.267 tokens e o Ollama cortava o começo (as regras e a abertura da fala); com 900, uns
+# 6.400, e sobra lugar para a resposta nos 8.192 do contexto. O editor manda o começo e o fim da fala
+MAXIMO_DE_PALAVRAS = 900
 MAXIMO_DE_DESTAQUES = 4
 DESTAQUE_MINIMO_S = 1.2
 DESTAQUE_MAXIMO_S = 7.0

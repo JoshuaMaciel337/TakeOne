@@ -82,9 +82,27 @@ def _enviar_imagem(caminho: Path) -> str:
     return f"{dados['subfolder']}/{dados['name']}" if dados.get("subfolder") else dados["name"]
 
 
+def soltar_comfyui_parado() -> bool:
+    """
+    Pede ao ComfyUI para soltar o modelo quando a fila dele está vazia, e diz se pediu. Uma geração órfã (o
+    worker morreu no meio, num rebuild) termina sozinha no ComfyUI e deixa o Wan na placa: as esperas pela
+    placa duravam até dar erro, porque só o worker que mandou o pedido pedia o /free no fim.
+    """
+    try:
+        fila = _pedir("/queue", tempo_limite=10) or {}
+        if fila.get("queue_running") or fila.get("queue_pending"):
+            return False
+        _pedir("/free", {"unload_models": True, "free_memory": True}, tempo_limite=30)
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        # Sem o perfil video, o ComfyUI nem está ligado: não há o que soltar
+        return False
+
+
 def _esperar_a_placa(midia_existe: Callable[[], bool], reportar: Callable[[int, str], None]):
     """Espera ter VRAM e RAM para o Wan. O ComfyUI desligado é erro definitivo, com o comando para ligar."""
     inicio = time.monotonic()
+    soltou = False
     while True:
         try:
             estado = _pedir("/system_stats", tempo_limite=10)
@@ -95,6 +113,10 @@ def _esperar_a_placa(midia_existe: Callable[[], bool], reportar: Callable[[int, 
         ram = _ram_livre_gb()
         if vram >= VRAM_LIVRE_MINIMA_GB and ram >= RAM_LIVRE_MINIMA_GB:
             return
+        if not soltou:
+            soltou = soltar_comfyui_parado()
+            if soltou:
+                continue
         if not midia_existe():
             raise ErroDefinitivo("A mídia foi excluída antes de o vídeo ser gerado.")
         if time.monotonic() - inicio > ESPERA_MAXIMA_PELA_PLACA_S:
