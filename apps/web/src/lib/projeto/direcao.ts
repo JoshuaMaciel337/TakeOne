@@ -74,9 +74,11 @@ export function animacoesDoPlano(plano: Plano, palavras: PalavraNoTempo[], durac
   if (plano.titulo) animacoes.push({ modelo: "titulo", campos: { texto: plano.titulo }, inicio: 0, duracao: DURACOES_DO_PLANO.titulo });
   const apresentacao = plano.apresentacao;
   if (apresentacao && apresentacao.palavra < palavras.length) {
-    // Depois do título, para os dois não se cobrirem
-    const inicio = Math.max(palavras[apresentacao.palavra].inicio, plano.titulo ? DURACOES_DO_PLANO.titulo * s : 0);
-    animacoes.push({ modelo: "tarja", campos: { nome: apresentacao.nome, funcao: apresentacao.funcao }, inicio, duracao: DURACOES_DO_PLANO.tarja });
+    // Depois do título, para os dois não se cobrirem, e antes do fim: a tarja que passasse do fim alongava o vídeo
+    // com segundos só dela sobre o fundo. Sem lugar entre os dois, fica de fora
+    const depoisDoTitulo = plano.titulo ? DURACOES_DO_PLANO.titulo * s : 0;
+    const inicio = Math.min(Math.max(palavras[apresentacao.palavra].inicio, depoisDoTitulo), duracaoDoVideo - DURACOES_DO_PLANO.tarja * s);
+    if (inicio >= depoisDoTitulo) animacoes.push({ modelo: "tarja", campos: { nome: apresentacao.nome, funcao: apresentacao.funcao }, inicio, duracao: DURACOES_DO_PLANO.tarja });
   }
   if (plano.cta && duracaoDoVideo >= (DURACOES_DO_PLANO.cta + DURACOES_DO_PLANO.titulo) * s) {
     animacoes.push({ modelo: "cta", campos: { texto: plano.cta }, inicio: duracaoDoVideo - DURACOES_DO_PLANO.cta * s, duracao: DURACOES_DO_PLANO.cta });

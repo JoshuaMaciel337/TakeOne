@@ -21,6 +21,8 @@ export type EstadoSalvamento = "salvo" | "pendente" | "salvando" | "sem-conexao"
 const ESPERA_SALVAR_MS = 1200;
 const ESPERA_NOVA_TENTATIVA_MS = 5000;
 const DURACAO_AVISO_MS = 4000;
+/** Depois de um comando que falhou, os avisos deste intervalo (o sucesso do painel) não aparecem. */
+const JANELA_DO_ERRO_MS = 100;
 
 type Rascunho = { versao: number; nome: string; projeto: Projeto };
 
@@ -96,8 +98,12 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
   const [situacao, setSituacao] = useState<"ocioso" | "salvando" | "sem-conexao" | "conflito" | "erro">("ocioso");
   const [aviso, setAviso] = useState("");
   const temporizadorAviso = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Quando um comando falhou: o aviso que chega logo depois, no mesmo clique, é o "pronto, Ctrl+Z desfaz" do
+  // painel, que não aconteceu. Ele trocava o erro por um sucesso, e o Ctrl+Z sugerido desfazia a edição anterior
+  const falhaDoComando = useRef(-Infinity);
 
   const mostrarAviso = useCallback((mensagem: string) => {
+    if (performance.now() - falhaDoComando.current < JANELA_DO_ERRO_MS) return;
     setAviso(mensagem);
     clearTimeout(temporizadorAviso.current);
     temporizadorAviso.current = setTimeout(() => setAviso(""), DURACAO_AVISO_MS);
@@ -192,11 +198,13 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
       } catch (e) {
         if (e instanceof ErroEdicao) {
           mostrarAviso(e.message);
+          falhaDoComando.current = performance.now();
           return null;
         }
         // Erro de programação: a ação não acontece, mas a pessoa fica sabendo (antes, nada mudava em silêncio)
         console.error(`Comando ${comando.comando} falhou:`, e);
         mostrarAviso("Não foi possível fazer isso. Tente de novo; se continuar, recarregue a página.");
+        falhaDoComando.current = performance.now();
         return null;
       }
     },
@@ -208,10 +216,21 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
   return {
     projeto: estado?.historico.presente ?? null,
     nome: estado?.nome ?? "",
-    renomear: useCallback((nome: string) => despachar({ tipo: "renomear", nome }), []),
+    // Depois de um salvamento recusado, desfazer, refazer e renomear também voltam a salvar (a dica da barra manda
+    // desfazer; antes, só um comando novo destravava, e o que já estava certo não ia para o servidor)
+    renomear: useCallback((nome: string) => {
+      despachar({ tipo: "renomear", nome });
+      setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
+    }, []),
     executar,
-    desfazer: useCallback(() => despachar({ tipo: "desfazer" }), []),
-    refazer: useCallback(() => despachar({ tipo: "refazer" }), []),
+    desfazer: useCallback(() => {
+      despachar({ tipo: "desfazer" });
+      setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
+    }, []),
+    refazer: useCallback(() => {
+      despachar({ tipo: "refazer" });
+      setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
+    }, []),
     nomeDesfazer: estado?.historico.passado.at(-1)?.nome ?? null,
     nomeRefazer: estado?.historico.futuro[0]?.nome ?? null,
     salvamento,

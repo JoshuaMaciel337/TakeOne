@@ -50,3 +50,8 @@ test("escrever e ler de novo dá as mesmas legendas", () => {
   assert.ok(vtt.startsWith("WEBVTT\n\n00:00:00.000 --> 00:00:01.500\n"));
   assert.deepEqual(lerLegendas(vtt), legendas);
 });
+
+test("SRT com linha em branco que tem espaço ou tabulação separa as legendas", () => {
+  const srt = "1\n00:00:01,000 --> 00:00:02,000\nUm\n \n2\n00:00:03,000 --> 00:00:04,000\nDois\n\t\n3\n00:00:05,000 --> 00:00:06,000\nTrês\n";
+  assert.deepEqual(lerLegendas(srt).map((l) => l.conteudo), ["Um", "Dois", "Três"]);
+});

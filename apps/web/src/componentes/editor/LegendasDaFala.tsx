@@ -40,7 +40,9 @@ export function LegendasDaFala({ projeto, estilo, aoExecutar, aoAvisar }: Props)
     };
   }, []);
 
-  const faixa = faixas.find((item) => item.id === faixaId) ?? faixas[0];
+  // Sem escolha, a principal (é onde costuma estar a fala): a primeira da lista é a de cima, quase sempre a
+  // das animações, que não têm fala
+  const faixa = faixas.find((item) => item.id === faixaId) ?? faixas.find((item) => item.tipo === "principal") ?? faixas[0];
   if (!faixa) return null;
 
   async function gerar() {

@@ -35,9 +35,11 @@ test("o plano vira trechos de zoom e animações no tempo da linha", () => {
     animacoes.map((a) => [a.modelo, a.inicio / S]),
     [["titulo", 0], ["tarja", 4], ["cta", 8]],
   );
-  // Num vídeo curto não cabe a chamada, e a tarja espera o título sair
+  // A tarja espera o título sair; num vídeo curto não cabe a chamada, e a tarja só cabe se terminar antes do fim
+  const medio = animacoesDoPlano({ ...plano, apresentacao: { nome: "Ana", funcao: "", palavra: 1 } }, palavras, 7 * S);
+  assert.deepEqual(medio.map((a) => [a.modelo, a.inicio / S]), [["titulo", 0], ["tarja", 2.5], ["cta", 3]]);
   const curto = animacoesDoPlano({ ...plano, apresentacao: { nome: "Ana", funcao: "", palavra: 1 } }, palavras, 5 * S);
-  assert.deepEqual(curto.map((a) => [a.modelo, a.inicio / S]), [["titulo", 0], ["tarja", 2.5]]);
+  assert.deepEqual(curto.map((a) => [a.modelo, a.inicio / S]), [["titulo", 0]]);
 });
 
 test("fala longa: o modelo lê o começo e o fim, e o plano volta para os números da fala inteira", () => {
@@ -50,4 +52,12 @@ test("fala longa: o modelo lê o começo e o fim, e o plano volta para os númer
   assert.equal(naFala.apresentacao?.palavra, 4);
   assert.deepEqual(naFala.destaques, [{ de: 4760, ate: 4770 }], "o número fora do que foi enviado sai");
   assert.equal(planoNaFala({ ...plano, apresentacao: { nome: "Ana", funcao: "", palavra: 999 } }, enviadas).apresentacao, null);
+});
+
+test("a tarja termina antes do fim do vídeo", () => {
+  const plano: Plano = { titulo: "", apresentacao: { nome: "Ana", funcao: "", palavra: 9 }, destaques: [], cta: null };
+  // "tudo" (a palavra 9) começa em 9 s num vídeo de 10 s: a tarja de 4 s entra em 6 s
+  const [tarja] = animacoesDoPlano(plano, palavras, 10 * S);
+  assert.deepEqual([tarja.modelo, tarja.inicio / S], ["tarja", 6]);
+  assert.deepEqual(animacoesDoPlano(plano, palavras, 3 * S), [], "num vídeo mais curto que a tarja, ela fica de fora");
 });

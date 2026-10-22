@@ -68,7 +68,8 @@ export function lerLegendas(arquivo: string): Legenda[] {
   const blocos = arquivo
     .replace(/^﻿/, "")
     .replace(/\r\n?/g, "\n")
-    .split(/\n{2,}/);
+    // Uma linha "em branco" com espaços ou tabulação também separa (senão a legenda seguinte virava texto)
+    .split(/\n(?:[ \t]*\n)+/);
   const lidas: Legenda[] = [];
   for (const bloco of blocos) {
     const linhas = bloco.split("\n");

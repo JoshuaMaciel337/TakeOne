@@ -31,6 +31,7 @@ import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/proj
 import { PROPRIEDADES_ANIMAVEIS } from "@/lib/projeto/keyframes";
 import { acharClipe, type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
+import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -560,7 +561,7 @@ export function LinhaDoTempo({
                           <button
                             key={`t-${clipe.id}`}
                             type="button"
-                            title={`Transição: ${clipe.transicao.tipo}`}
+                            title={`Transição: ${TIPOS_TRANSICAO.find((tipo) => tipo.id === clipe.transicao!.tipo)?.nome ?? clipe.transicao.tipo}`}
                             aria-label="Transição para o próximo clipe"
                             onPointerDown={(evento) => evento.stopPropagation()}
                             onClick={() => aoSelecionar([clipe.id])}
@@ -619,9 +620,12 @@ function CabecalhoDaFaixa({
           {faixa.oculta ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
         </button>
       ) : null}
-      <button type="button" className={botao} onClick={() => aoAlternar("muda")} aria-pressed={faixa.muda} aria-label={faixa.muda ? `Ligar o som de ${nome}` : `Silenciar ${nome}`} title={faixa.muda ? "Ligar o som" : "Silenciar"}>
-        {faixa.muda ? <VolumeX className="size-3.5" aria-hidden /> : <Volume2 className="size-3.5" aria-hidden />}
-      </button>
+      {/* Texto e legenda não têm som: o botão não fazia nada */}
+      {faixa.tipo !== "texto" && faixa.tipo !== "legenda" ? (
+        <button type="button" className={botao} onClick={() => aoAlternar("muda")} aria-pressed={faixa.muda} aria-label={faixa.muda ? `Ligar o som de ${nome}` : `Silenciar ${nome}`} title={faixa.muda ? "Ligar o som" : "Silenciar"}>
+          {faixa.muda ? <VolumeX className="size-3.5" aria-hidden /> : <Volume2 className="size-3.5" aria-hidden />}
+        </button>
+      ) : null}
       <button type="button" className={botao} onClick={() => aoAlternar("travada")} aria-pressed={faixa.travada} aria-label={faixa.travada ? `Destravar ${nome}` : `Travar ${nome}`} title={faixa.travada ? "Destravar" : "Travar"}>
         {faixa.travada ? <Lock className="size-3.5" aria-hidden /> : <LockOpen className="size-3.5" aria-hidden />}
       </button>

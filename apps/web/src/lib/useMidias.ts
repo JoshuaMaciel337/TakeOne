@@ -74,7 +74,8 @@ export function useMidias() {
       return;
     }
     // A geração com IA mostra o progresso na própria mídia, como a ingestão que vem depois dela
-    if (!["ingestao", "geracao_video", "animacao_html", "animacao_descrita"].includes(job.tipo)) return;
+    // "fala": o texto em fala nasce como mídia processando; sem ele, uma falha deixava o cartão parado para sempre
+    if (!["ingestao", "geracao_video", "animacao_html", "animacao_descrita", "fala"].includes(job.tipo)) return;
     if (job.status === "concluido" || job.status === "erro") {
       void recarregar();
       return;

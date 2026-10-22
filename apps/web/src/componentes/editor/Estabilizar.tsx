@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { chamarApi } from "@/lib/api";
 import type { Comando } from "@/lib/projeto/comandos";
@@ -10,9 +10,10 @@ import type { Midia } from "@/lib/tipos";
 /**
  * Pede ao worker a imagem estável que o clipe usa: sobre a imagem sem ruído quando "Tirar o ruído" está
  * ligado (e pronto), senão sobre a original. Roda na aba Básico e na aba Cor, porque ligar o ruído troca
- * a versão de que o clipe precisa. Devolve o erro do pedido, se houver.
+ * a versão de que o clipe precisa. Devolve o erro do pedido, se houver, e como pedir de novo depois de uma
+ * falha (a falha conta como pedida: sem o botão, nada a refazia e a exportação ficava recusada).
  */
-export function usePedirImagemEstavel(clipe: Clipe, midia: Midia): string {
+export function usePedirImagemEstavel(clipe: Clipe, midia: Midia): { erro: string; pedirDeNovo: () => void } {
   const [erro, setErro] = useState("");
   const limpa = Boolean(clipe.imagem_limpa);
   const chave = chaveDaEstabilizacao(limpa);
@@ -29,12 +30,18 @@ export function usePedirImagemEstavel(clipe: Clipe, midia: Midia): string {
       vivo = false;
     };
   }, [podePedir, midia.id, limpa]);
-  return erro;
+  const pedirDeNovo = useCallback(() => {
+    setErro("");
+    chamarApi(`/midias/${midia.id}/estabilizacao`, { metodo: "POST", corpo: { limpa } }).catch((e: unknown) =>
+      setErro(e instanceof Error ? e.message : "Não foi possível pedir a estabilização agora."),
+    );
+  }, [midia.id, limpa]);
+  return { erro, pedirDeNovo };
 }
 
 /** Estabilizar (tirar o tremor da câmera): o worker gera a versão estável e a prévia e o render usam ela. */
 export function Estabilizar({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
-  const erroDoPedido = usePedirImagemEstavel(clipe, midia);
+  const { erro: erroDoPedido, pedirDeNovo } = usePedirImagemEstavel(clipe, midia);
   const limpa = Boolean(clipe.imagem_limpa);
   const estado = midia.estabilizacoes?.[chaveDaEstabilizacao(limpa)];
   const esperandoLimpa = limpa && midia.imagem_limpa?.status !== "pronta";
@@ -59,6 +66,11 @@ export function Estabilizar({ clipe, midia, travada, aoExecutar }: { clipe: Clip
                 ? "Esperando a imagem sem ruído ficar pronta para estabilizar sobre ela."
                 : "Estabilizando. Até terminar, a prévia mostra a imagem tremida."}
         </p>
+      ) : null}
+      {clipe.estabilizar && (estado?.status === "erro" || erroDoPedido) ? (
+        <button type="button" className="mt-1 text-[11px] text-destaque underline-offset-2 hover:underline" onClick={pedirDeNovo}>
+          Tentar de novo
+        </button>
       ) : null}
     </div>
   );
