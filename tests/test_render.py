@@ -408,6 +408,18 @@ def test_cor_vira_lut_e_vinheta_vira_blend_multiplicando():
     assert [e.imagem for e in plano.entradas] == [False, False, False, True, True]
 
 
+def test_zoom_animado_com_transparencia_volta_ao_alfa_reto_so_depois_do_pad():
+    # O unpremultiply só aceita quadros do tamanho do primeiro: logo depois do scale, o zoom ficava parado
+    logo = MidiaDoRender("/m/logo.png", 800, 400, video=True, audio=False, imagem=True)
+    pontos = [{"t": 0, "valor": 0.3, "curva": "frear"}, {"t": 4 * S, "valor": 0.6, "curva": "linear"}]
+    zoom = clipe("l1", "logo", 0, 4, keyframes={"escala": pontos})
+    faixas = [faixa("video", [zoom]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]
+    plano = planejar_render(projeto(faixas), {**MIDIAS, "logo": logo}, 720, 1280)
+    cadeia = next(parte for parte in plano.filtro.split(";") if "eval=frame" in parte)
+    assert "premultiply=inplace=1,scale=w='max(1,iw*" in cadeia
+    assert ":eval=frame,pad=w=" in cadeia and cadeia.index("pad=w=") < cadeia.index("eval=frame,unpremultiply")
+
+
 def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     # A mídia "deitado" tem 10 s; o primeiro clipe usa de 0 a 4 s, o segundo de 5 a 8 s
     midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}

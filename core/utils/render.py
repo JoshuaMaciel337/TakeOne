@@ -449,8 +449,12 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         if gira:
             lado_l = lado_a = math.ceil(math.hypot(largura, altura)) + 2
         fator = animacao["escala"]
-        filtros += _sem_aro(f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame", com_alfa)
-        filtros.append(f"pad=w={lado_l}:h={lado_a}:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame")
+        # No alfa pré-multiplicado (_sem_aro), a volta ao alfa reto fica depois do pad: o unpremultiply só aceita
+        # quadros do tamanho do primeiro, e logo depois do scale ele prendia o zoom no tamanho inicial (textos,
+        # imagens e formas com zoom animado saíam parados)
+        redimensionar = f"scale=w='max(1,iw*{fator})':h='max(1,ih*{fator})':eval=frame"
+        encaixar = f"pad=w={lado_l}:h={lado_a}:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame"
+        filtros += _sem_aro(f"{redimensionar},{encaixar}", com_alfa)
     # O clipe aparece nos quadros com início <= t < fim, como na prévia. Os limites ficam meio quadro
     # antes: nenhum quadro cai bem na fronteira, e o arredondamento não tira nem põe quadros
     meio = 0.5 / float(taxa_em_fracao(taxa))
