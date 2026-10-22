@@ -13,7 +13,16 @@
 import type { Tick } from "../tempo.ts";
 import type { Clipe, Transformacao } from "./modelo.ts";
 
-export type Curva = "linear" | "suave";
+export type Curva = "linear" | "suave" | "acelerar" | "frear" | "parado";
+
+/** As curvas na ordem do seletor do painel. */
+export const CURVAS_DE_KEYFRAME: { id: Curva; nome: string }[] = [
+  { id: "linear", nome: "Linear" },
+  { id: "suave", nome: "Suave" },
+  { id: "acelerar", nome: "Acelerando" },
+  { id: "frear", nome: "Freando" },
+  { id: "parado", nome: "Parado" },
+];
 /** `t`: tempo desde o começo do clipe, na linha do tempo. `curva`: como o valor vai até o ponto seguinte. */
 export type Keyframe = { t: Tick; valor: number; curva: Curva };
 export type PropriedadeAnimavel = "x" | "y" | "escala" | "rotacao" | "opacidade";
@@ -37,9 +46,17 @@ export const ESCALA_MINIMA = 0.01;
 /** Pontos por propriedade, no máximo (o render monta uma expressão com todos). */
 export const KEYFRAMES_POR_PROPRIEDADE = 100;
 
-/** Curva em S: começa e termina devagar. */
-function suave(p: number): number {
-  return p * p * (3 - 2 * p);
+/**
+ * Quanto do caminho até o ponto seguinte já foi andado em `p` (0 a 1) do tempo. Suave é a curva em S (começa e
+ * termina devagar); acelerando começa devagar; freando termina devagar; parado fica no valor até o próximo
+ * ponto e salta nele. A mesma conta em core/utils/keyframes.py e nas expressões do FFmpeg.
+ */
+export function andadoNaCurva(curva: Curva, p: number): number {
+  if (curva === "suave") return p * p * (3 - 2 * p);
+  if (curva === "acelerar") return p * p;
+  if (curva === "frear") return p * (2 - p);
+  if (curva === "parado") return 0;
+  return p;
 }
 
 /** O valor da propriedade no instante `t` (desde o começo do clipe). A lista vem em ordem. */
@@ -50,7 +67,7 @@ export function valorNoTempo(pontos: Keyframe[], t: Tick): number {
     const b = pontos[i + 1];
     if (t < b.t) {
       const p = (t - a.t) / (b.t - a.t);
-      return a.valor + (b.valor - a.valor) * (a.curva === "suave" ? suave(p) : p);
+      return a.valor + (b.valor - a.valor) * andadoNaCurva(a.curva, p);
     }
   }
   return pontos[pontos.length - 1].valor;

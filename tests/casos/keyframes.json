@@ -7,7 +7,12 @@
   {"nome": "depois do último vale o último", "pontos": [{"t": 0, "valor": 1, "curva": "linear"}, {"t": 2, "valor": 1.5, "curva": "linear"}], "t": 9, "valor": 1.5},
   {"nome": "três pontos, no segundo trecho", "pontos": [{"t": 0, "valor": 0, "curva": "linear"}, {"t": 1, "valor": 90, "curva": "linear"}, {"t": 3, "valor": -90, "curva": "linear"}], "t": 2, "valor": 0},
   {"nome": "um ponto só vale sempre", "pontos": [{"t": 2, "valor": 0.7, "curva": "linear"}], "t": 5, "valor": 0.7},
-  {"nome": "valor negativo", "pontos": [{"t": 0, "valor": -0.5, "curva": "linear"}, {"t": 2, "valor": 0.5, "curva": "linear"}], "t": 0.5, "valor": -0.25}
+  {"nome": "valor negativo", "pontos": [{"t": 0, "valor": -0.5, "curva": "linear"}, {"t": 2, "valor": 0.5, "curva": "linear"}], "t": 0.5, "valor": -0.25},
+  {"nome": "acelerando a um quarto anda um dezesseis avos", "pontos": [{"t": 0, "valor": 0, "curva": "acelerar"}, {"t": 4, "valor": 1, "curva": "linear"}], "t": 1, "valor": 0.0625},
+  {"nome": "freando a um quarto já andou sete dezesseis avos", "pontos": [{"t": 0, "valor": 0, "curva": "frear"}, {"t": 4, "valor": 1, "curva": "linear"}], "t": 1, "valor": 0.4375},
+  {"nome": "parado fica no valor até o ponto seguinte", "pontos": [{"t": 0, "valor": 0, "curva": "parado"}, {"t": 4, "valor": 1, "curva": "linear"}], "t": 3.9, "valor": 0},
+  {"nome": "parado salta bem no ponto seguinte", "pontos": [{"t": 0, "valor": 0, "curva": "parado"}, {"t": 4, "valor": 1, "curva": "linear"}, {"t": 6, "valor": 0.5, "curva": "linear"}], "t": 4, "valor": 1},
+  {"nome": "parado em dois terços de segundo salta no quadro do ponto", "pontos": [{"t": 0, "valor": 0.2, "curva": "parado"}, {"t": 0.6666666666666666, "valor": 0.8, "curva": "linear"}], "t": 0.6666666666666666, "valor": 0.8}
  ],
  "transformacoes": [
   {"nome": "keyframes na posição e zoom de entrada por cima",

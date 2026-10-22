@@ -420,6 +420,22 @@ def test_zoom_animado_com_transparencia_volta_ao_alfa_reto_so_depois_do_pad():
     assert ":eval=frame,pad=w=" in cadeia and cadeia.index("pad=w=") < cadeia.index("eval=frame,unpremultiply")
 
 
+def test_virar_le_o_recorte_espelhado_e_vira_depois_da_cor_e_antes_da_vinheta():
+    recorte = {"x": 0.1, "y": 0, "largura": 0.5, "altura": 1}
+    virado = clipe("c1", "deitado", 0, 4, recorte=recorte, virar={"horizontal": True, "vertical": True},
+                   cor={"saturacao": -0.5, "vinheta": 0.6, "filtro": None, "intensidade": 1})
+    plano = planejar_render(projeto([faixa("principal", [virado])]), MIDIAS, 720, 1280, pasta="/trabalho")
+    # O recorte é do que aparece: na mídia, o pedaço espelhado (x = 1 - 0,1 - 0,5)
+    assert "crop=w=iw*0.5:h=ih*1:x=iw*0.4:y=ih*0" in plano.filtro
+    cadeia = plano.filtro
+    ordem = [cadeia.index(filtro) for filtro in ("lut3d", "hflip", "vflip", "blend=all_mode=multiply")]
+    assert ordem == sorted(ordem)
+    # Sem virar, nada muda
+    reto = clipe("c1", "deitado", 0, 4, recorte=recorte)
+    reto = planejar_render(projeto([faixa("principal", [reto])]), MIDIAS, 720, 1280)
+    assert "hflip" not in reto.filtro and "vflip" not in reto.filtro and "x=iw*0.1:" in reto.filtro
+
+
 def test_transicao_estende_os_dois_clipes_e_repete_quadro_sem_sobra():
     # A mídia "deitado" tem 10 s; o primeiro clipe usa de 0 a 4 s, o segundo de 5 a 8 s
     midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}

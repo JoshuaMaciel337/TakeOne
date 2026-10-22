@@ -249,6 +249,7 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource, 
   return {
     fonte,
     recorte: camada.recorte,
+    virar: camada.clipe.virar,
     caixa: camada.caixa,
     cor: camada.cor,
     revelado: camada.revelado,

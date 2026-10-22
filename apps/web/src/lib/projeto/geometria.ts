@@ -4,7 +4,7 @@
 // A mídia recortada entra inteira no quadro, do maior tamanho que cabe e centralizada. Depois a
 // transformação aumenta ou diminui a partir do centro, gira e desloca. As medidas da caixa são em
 // pixels do quadro, então valem em qualquer resolução (prévia pequena, 1080p ou 4K).
-import type { Recorte, Transformacao } from "./modelo.ts";
+import type { Recorte, Transformacao, Virar } from "./modelo.ts";
 
 export type Tamanho = { largura: number; altura: number };
 
@@ -20,6 +20,23 @@ export type Caixa = {
   rotacao: number;
   opacidade: number;
 };
+
+/**
+ * O recorte nas coordenadas da mídia como ela é. O recorte do clipe é do que aparece (já virado), então o
+ * clipe virado na horizontal lê, da mídia, o pedaço espelhado: x vai a 1 - x - largura. O tamanho não muda.
+ */
+export function recorteNaFonte(recorte: Recorte, virar: Virar | null | undefined): Recorte {
+  return {
+    ...recorte,
+    x: virar?.horizontal ? 1 - recorte.x - recorte.largura : recorte.x,
+    y: virar?.vertical ? 1 - recorte.y - recorte.altura : recorte.y,
+  };
+}
+
+/** Um ponto da mídia (em frações) onde ele aparece no clipe virado; a mesma conta volta da tela para a mídia. */
+export function pontoVirado(ponto: Ponto, virar: Virar | null | undefined): Ponto {
+  return { x: virar?.horizontal ? 1 - ponto.x : ponto.x, y: virar?.vertical ? 1 - ponto.y : ponto.y };
+}
 
 /** O PNG de um texto é medido num quadro com este lado menor; em outro tamanho, a caixa escala junto. */
 export const LADO_REFERENCIA_TEXTO = 1080;

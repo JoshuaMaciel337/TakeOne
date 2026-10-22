@@ -5,16 +5,18 @@
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
-import type { Caixa, Tamanho } from "../projeto/geometria.ts";
+import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Chroma, Mesclagem, Recorte } from "../projeto/modelo.ts";
+import type { Chroma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
   /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs ou uma imagem. */
   fonte: TexImageSource;
+  /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
+  virar?: Virar | null;
   /** Ajustes de cor já com o filtro somado (lib/projeto/cor.ts); null quando não há. */
   cor?: AjustesCor | null;
   /** Em pixels do quadro passado para `desenhar`. */
@@ -123,8 +125,11 @@ uniform vec2 u_centro;
 uniform vec2 u_tamanho;
 uniform float u_rotacao;
 uniform vec4 u_recorte;
+// 1 no sentido virado: o render vira depois da cor e antes da cortina, da vinheta, da luz e do grão
+uniform vec2 u_virar;
 out vec2 v_uv;
 out vec2 v_local;
+out vec2 v_fonte;
 
 void main() {
   // a_pos vai de -0.5 a 0.5, com y para baixo, como na tela
@@ -133,9 +138,10 @@ void main() {
   float s = sin(u_rotacao);
   p = u_centro + vec2(p.x * c - p.y * s, p.x * s + p.y * c);
   gl_Position = vec4(p.x / u_quadro.x * 2.0 - 1.0, 1.0 - p.y / u_quadro.y * 2.0, 0.0, 1.0);
-  v_uv = u_recorte.xy + (a_pos + 0.5) * u_recorte.zw;
-  // Posição dentro do clipe (0 a 1), para a vinheta
+  // Posição dentro do clipe (0 a 1), para a vinheta; e a mesma posição na imagem antes de virar
   v_local = a_pos + 0.5;
+  v_fonte = mix(v_local, 1.0 - v_local, u_virar);
+  v_uv = u_recorte.xy + v_fonte * u_recorte.zw;
 }`;
 
 // A conta da cor é a de lib/projeto/cor.ts (aplicarCor e escurecimentoDaVinheta), linha a linha.
@@ -143,6 +149,7 @@ const FRAGMENTOS = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 in vec2 v_local;
+in vec2 v_fonte;
 uniform sampler2D u_textura;
 uniform float u_opacidade;
 uniform bool u_comCor;
@@ -222,15 +229,16 @@ void main() {
   if (v_local.x < u_revelado.x || v_local.x > u_revelado.z || v_local.y < u_revelado.y || v_local.y > u_revelado.w) {
     discard;
   }
-  // Como as caixas do render: pelo centro do pixel, antes do começo do trecho e a partir do fim
-  if (v_local.y < u_corteDe.x || (v_local.y < u_corteDe.y && v_local.x < u_corteDe.z) ||
-      v_local.y >= u_corteAte.y || (v_local.y >= u_corteAte.x && v_local.x >= u_corteAte.z)) {
+  // Como as caixas do render: pelo centro do pixel, antes do começo do trecho e a partir do fim (nas letras
+  // como estão na imagem: o render esconde antes de virar)
+  if (v_fonte.y < u_corteDe.x || (v_fonte.y < u_corteDe.y && v_fonte.x < u_corteDe.z) ||
+      v_fonte.y >= u_corteAte.y || (v_fonte.y >= u_corteAte.x && v_fonte.x >= u_corteAte.z)) {
     discard;
   }
   vec2 uv = v_uv;
   if (u_lente > 0.0) {
     // O zoom de (1 + k) no meio e depois a lente: o ponto da imagem que cai neste pixel
-    vec2 s = 0.5 + (v_local - 0.5) / (1.0 + u_lente);
+    vec2 s = 0.5 + (v_fonte - 0.5) / (1.0 + u_lente);
     vec2 desvio = (s - 0.5) * u_tamanho;
     float r2 = dot(desvio, desvio) / (dot(u_tamanho, u_tamanho) / 4.0);
     vec2 p = 0.5 + (s - 0.5) * (1.0 + u_lente * r2);
@@ -332,7 +340,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -432,6 +440,7 @@ export class Compositor {
         tamanho: local("u_tamanho"),
         rotacao: local("u_rotacao"),
         recorte: local("u_recorte"),
+        virar: local("u_virar"),
         opacidade: local("u_opacidade"),
         comCor: local("u_comCor"),
         cor1: local("u_cor1"),
@@ -629,7 +638,9 @@ export class Compositor {
     gl.uniform1i(uniformes.textura, 0);
     gl.activeTexture(gl.TEXTURE0);
     camadas.forEach((camada, indice) => {
-      const { caixa, recorte } = camada;
+      const { caixa } = camada;
+      // Daqui em diante, o recorte na textura: o pedaço espelhado quando o clipe está virado
+      const recorte = recorteNaFonte(camada.recorte, camada.virar);
       if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
       gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
@@ -721,6 +732,7 @@ export class Compositor {
       gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
       gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
       gl.uniform4f(uniformes.recorte, recorte.x, recorte.y, recorte.largura, recorte.altura);
+      gl.uniform2f(uniformes.virar, camada.virar?.horizontal ? 1 : 0, camada.virar?.vertical ? 1 : 0);
       gl.uniform1f(uniformes.opacidade, caixa.opacidade);
       const revelado = camada.revelado ?? REVELADO_INTEIRO;
       gl.uniform4f(uniformes.revelado, revelado.x0, revelado.y0, revelado.x1, revelado.y1);

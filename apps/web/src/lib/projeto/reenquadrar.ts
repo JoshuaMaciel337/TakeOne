@@ -6,7 +6,7 @@
 // a margem, faz um movimento só até onde ele para, com a curva suave. O caminho do rosto é suavizado
 // antes (com as amostras dos dois lados, sem atraso), para o tremido da detecção não virar tremido da imagem.
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import type { Tamanho } from "./geometria.ts";
+import { pontoVirado, type Tamanho } from "./geometria.ts";
 import { KEYFRAMES_POR_PROPRIEDADE, type Keyframe } from "./keyframes.ts";
 import type { Clipe } from "./modelo.ts";
 import { segundosNoClipe } from "./velocidade.ts";
@@ -85,7 +85,7 @@ function caminhoQueCabe(pontos: { t: number; alvo: number }[]): Keyframe[] {
  * que o clipe usa. midia: tamanho da imagem como ela aparece (já girada).
  */
 export function reenquadrarPeloRosto(
-  clipe: Pick<Clipe, "entrada" | "duracao" | "velocidade" | "curva_velocidade" | "recorte">,
+  clipe: Pick<Clipe, "entrada" | "duracao" | "velocidade" | "curva_velocidade" | "recorte" | "virar">,
   amostras: AmostraDeRosto[],
   midia: Tamanho,
   quadro: Tamanho,
@@ -108,9 +108,11 @@ export function reenquadrarPeloRosto(
   const pontos = noTrecho
     .filter((a) => a.a >= AREA_MINIMA * tipica)
     .map((a) => {
-      // O rosto dentro do recorte, de 0 a 1; o deslocamento que o põe no centro do quadro
-      const u = (a.x - recorte.x) / recorte.largura;
-      const v = (a.y - recorte.y) / recorte.altura;
+      // O rosto dentro do recorte, de 0 a 1 (onde ele aparece, com o clipe virado); o deslocamento que o põe no
+      // centro do quadro
+      const rosto = pontoVirado(a, clipe.virar);
+      const u = (rosto.x - recorte.x) / recorte.largura;
+      const v = (rosto.y - recorte.y) / recorte.altura;
       return {
         t: segundosNoClipe(clipe, a.t),
         x: limitar((-(u - 0.5) * caixa.largura) / quadro.largura, -folgaX, folgaX),

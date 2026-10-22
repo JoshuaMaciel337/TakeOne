@@ -216,5 +216,100 @@
         "opacidade": 0.8
       }
     }
+  ],
+  "descricao_virar": "O recorte (do que aparece) nas coordenadas da mídia como ela é, com o clipe virado (recorteNaFonte e recorte_na_fonte).",
+  "casos_virar": [
+    {
+      "nome": "sem virar",
+      "recorte": {
+        "x": 0.1,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      },
+      "virar": null,
+      "fonte": {
+        "x": 0.1,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      }
+    },
+    {
+      "nome": "na horizontal",
+      "recorte": {
+        "x": 0.1,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      },
+      "virar": {
+        "horizontal": true,
+        "vertical": false
+      },
+      "fonte": {
+        "x": 0.4,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      }
+    },
+    {
+      "nome": "na vertical",
+      "recorte": {
+        "x": 0.1,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      },
+      "virar": {
+        "horizontal": false,
+        "vertical": true
+      },
+      "fonte": {
+        "x": 0.1,
+        "y": 0.2,
+        "largura": 0.5,
+        "altura": 0.6
+      }
+    },
+    {
+      "nome": "nos dois, recorte inteiro",
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      },
+      "virar": {
+        "horizontal": true,
+        "vertical": true
+      },
+      "fonte": {
+        "x": 0,
+        "y": 0,
+        "largura": 1,
+        "altura": 1
+      }
+    },
+    {
+      "nome": "nos dois, canto",
+      "recorte": {
+        "x": 0,
+        "y": 0,
+        "largura": 0.25,
+        "altura": 0.5
+      },
+      "virar": {
+        "horizontal": true,
+        "vertical": true
+      },
+      "fonte": {
+        "x": 0.75,
+        "y": 0.5,
+        "largura": 0.25,
+        "altura": 0.5
+      }
+    }
   ]
 }

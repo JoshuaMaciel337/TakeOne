@@ -8,9 +8,9 @@
 // Quadro a quadro dá pontos demais: o caminho é simplificado (Ramer–Douglas–Peucker) até caber no limite
 // de keyframes, com a menor tolerância que couber.
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { type Caixa, caixaDoClipe, deslocamentoDoCentro, type Ponto, pontoNaCaixa, type Tamanho } from "./geometria.ts";
+import { type Caixa, caixaDoClipe, deslocamentoDoCentro, type Ponto, pontoNaCaixa, pontoVirado, type Tamanho } from "./geometria.ts";
 import { KEYFRAMES_POR_PROPRIEDADE, type Keyframe, transformacaoNoTempo } from "./keyframes.ts";
-import { type Clipe, fimDoClipe, type Recorte, tempoNaMidia } from "./modelo.ts";
+import { type Clipe, fimDoClipe, type Recorte, tempoNaMidia, type Virar } from "./modelo.ts";
 
 /** Um ponto do caminho: [segundos da mídia, centro x, centro y, largura, altura, nota de 0 a 1]. */
 export type PontoDoObjeto = [number, number, number, number, number, number];
@@ -59,9 +59,11 @@ export function caminhoConfiavel(pontos: PontoDoObjeto[]): PontoDoObjeto[] {
 }
 
 /** O ponto da imagem (frações) no quadro do projeto, como deslocamento do centro (a unidade de x e y). */
-export function pontoNoQuadro(alvo: Pick<Clipe, "inicio" | "transformacao" | "keyframes" | "recorte">, instante: Tick, imagem: { x: number; y: number }, midia: Tamanho, quadro: Tamanho): Ponto {
+export function pontoNoQuadro(alvo: Pick<Clipe, "inicio" | "transformacao" | "keyframes" | "recorte" | "virar">, instante: Tick, naMidia: { x: number; y: number }, midia: Tamanho, quadro: Tamanho): Ponto {
   const caixa = caixaDoClipe(transformacaoNoTempo(alvo, instante), alvo.recorte, midia, quadro);
   const { recorte } = alvo;
+  // O rastreador mede na mídia como ela é; no vídeo virado, o objeto aparece espelhado
+  const imagem = pontoVirado(naMidia, alvo.virar);
   // Dentro da caixa, sem o giro e com a origem no centro
   const lx = ((imagem.x - recorte.x) / recorte.largura - 0.5) * caixa.largura;
   const ly = ((imagem.y - recorte.y) / recorte.altura - 0.5) * caixa.altura;
@@ -81,7 +83,7 @@ export type CaixaNaImagem = { x: number; y: number; largura: number; altura: num
  * embaixo, ou null se ele cai fora da imagem. Com o clipe girado, fica o retângulo da imagem que contém
  * os quatro cantos.
  */
-export function retanguloNaImagem(caixa: Caixa, recorte: Recorte, retangulo: { esquerda: number; topo: number; largura: number; altura: number }): CaixaNaImagem | null {
+export function retanguloNaImagem(caixa: Caixa, recorte: Recorte, retangulo: { esquerda: number; topo: number; largura: number; altura: number }, virar?: Virar | null): CaixaNaImagem | null {
   const cantos = [
     { x: retangulo.esquerda, y: retangulo.topo },
     { x: retangulo.esquerda + retangulo.largura, y: retangulo.topo },
@@ -89,8 +91,8 @@ export function retanguloNaImagem(caixa: Caixa, recorte: Recorte, retangulo: { e
     { x: retangulo.esquerda, y: retangulo.topo + retangulo.altura },
   ].map((canto) => {
     const local = pontoNaCaixa(caixa, canto);
-    // Da caixa (origem no centro) para a imagem inteira, passando pelo recorte
-    return { x: recorte.x + (local.x / caixa.largura + 0.5) * recorte.largura, y: recorte.y + (local.y / caixa.altura + 0.5) * recorte.altura };
+    // Da caixa (origem no centro) para a imagem inteira, passando pelo recorte; e da imagem virada para a mídia
+    return pontoVirado({ x: recorte.x + (local.x / caixa.largura + 0.5) * recorte.largura, y: recorte.y + (local.y / caixa.altura + 0.5) * recorte.altura }, virar);
   });
   const limite = (v: number) => Math.min(1, Math.max(0, v));
   const x0 = limite(Math.min(...cantos.map((c) => c.x)));

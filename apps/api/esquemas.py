@@ -151,10 +151,15 @@ class TransformacaoEntrada(BaseModel):
     opacidade: float = Field(default=1, ge=0, le=1)
 
 
+class VirarEntrada(BaseModel):
+    horizontal: bool = False
+    vertical: bool = False
+
+
 class KeyframeEntrada(BaseModel):
     t: int = Field(description="Ticks desde o começo do clipe (pode ser negativo depois de aparar o começo)")
     valor: float
-    curva: Literal["linear", "suave"] = "linear"
+    curva: Literal["linear", "suave", "acelerar", "frear", "parado"] = "linear"
 
 
 # Os mesmos limites da TransformacaoEntrada; no máximo 100 pontos por propriedade (o render monta
@@ -448,6 +453,8 @@ class ClipeEntrada(BaseModel):
     expressoes: ExpressoesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
+    # A imagem espelhada; o recorte é do que aparece (core/utils/geometria.py, recorte_na_fonte)
+    virar: VirarEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Velocidade com curva: (u, s) do começo (u = 0) ao fim (u = 1) do clipe; s de 0,2 a 5

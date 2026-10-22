@@ -37,6 +37,18 @@ test("o ponto da imagem vai para o quadro pela caixa do clipe, com zoom e giro",
   perto(recortado.x, 0);
 });
 
+test("no vídeo virado, o objeto aparece espelhado e o retângulo marcado volta à mídia como ela é", () => {
+  const virar = { horizontal: true, vertical: false };
+  // O rastreador viu o objeto à direita da mídia; virada, ela mostra o objeto à esquerda do centro
+  perto(pontoNoQuadro(video({ virar }), 0, { x: 0.75, y: 0.5 }, MIDIA, QUADRO).x, -0.25);
+  // A metade direita do que aparece, no meio da tela: na mídia, o ponto 0,25
+  const tela = { largura: 640, altura: 360 };
+  const recorte = { x: 0.5, y: 0, largura: 0.5, altura: 1 };
+  const marcado = retanguloNaImagem(caixaDoClipe(TRANSFORMACAO_PADRAO, recorte, MIDIA, tela), recorte, { esquerda: 315, topo: 175, largura: 10, altura: 10 }, virar)!;
+  perto(marcado.x + marcado.largura / 2, 0.25);
+  perto(marcado.y + marcado.altura / 2, 0.5);
+});
+
 test("objeto no meio de um buraco passa reto, e nas pontas fica parado", () => {
   const pontos: PontoDoObjeto[] = [
     [1, 0.2, 0.2, 0.1, 0.1, 1],

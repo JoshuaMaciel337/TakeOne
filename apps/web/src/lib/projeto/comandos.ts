@@ -47,6 +47,7 @@ import {
   zoomNosTrechos,
   abaixarClipe,
   mesclarClipes,
+  virarClipes,
   aplicarEfeito,
   chromaClipes,
   removerFundo,
@@ -73,7 +74,7 @@ import type { Efeito } from "./efeitos.ts";
 import type { Chroma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
-import type { Clipe, Projeto, Proporcao, Recorte, Transformacao } from "./modelo.ts";
+import type { Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
@@ -96,6 +97,7 @@ export type Comando =
   | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
+  | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
   | { comando: "clipe.removerFundo"; parametros: { clipeIds: string[]; ligar: boolean } }
@@ -146,6 +148,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.seguirObjeto": "seguir o objeto",
   "clipe.abaixar": "abaixar na fala",
   "clipe.mesclar": "mudar a mesclagem",
+  "clipe.virar": "virar o clipe",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
   "clipe.removerFundo": "recortar o fundo",
@@ -230,6 +233,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: aplicarEfeito(projeto, parametros.clipeIds, parametros.efeito) };
     case "clipe.mesclar":
       return { projeto: mesclarClipes(projeto, parametros.clipeIds, parametros.mesclagem) };
+    case "clipe.virar":
+      return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
     case "clipe.abaixar":
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Diamond, MousePointerClick, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, FlipHorizontal2, FlipVertical2, MousePointerClick, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -9,7 +9,7 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
-import { type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
+import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
   CURVAS_DO_FADE,
@@ -431,6 +431,23 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           {...controleDeTransformacao("escala", 100)}
         />
         <ControleNumerico rotulo="Giro" minimo={-180} maximo={180} passo={0.5} sufixo="°" {...controleDeTransformacao("rotacao", 1)} />
+        <div className="flex items-center gap-2 text-xs">
+          <span className="flex-1 text-suave">Virar</span>
+          {(["horizontal", "vertical"] as const).map((sentido) => (
+            <button
+              key={sentido}
+              type="button"
+              className={`botao-icone ${clipe.virar?.[sentido] ? "bg-destaque/15 text-destaque" : ""}`}
+              disabled={travada}
+              aria-pressed={Boolean(clipe.virar?.[sentido])}
+              aria-label={`Virar na ${sentido}`}
+              title={`Virar na ${sentido}`}
+              onClick={() => aoExecutar({ comando: "clipe.virar", parametros: { clipeIds: [clipe.id], sentido } })}
+            >
+              {sentido === "horizontal" ? <FlipHorizontal2 className="size-4" aria-hidden /> : <FlipVertical2 className="size-4" aria-hidden />}
+            </button>
+          ))}
+        </div>
         <ControleNumerico rotulo="Opacidade" minimo={opacidade.minimo * 100} maximo={opacidade.maximo * 100} sufixo="%" {...controleDeTransformacao("opacidade", 100)} />
         <label className="mt-1 flex items-center gap-2 text-xs">
           <span className="flex-1 text-suave">Mesclagem</span>
@@ -484,15 +501,18 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
                   value={curvaAtual}
                   disabled={travada}
                   onChange={(evento) => {
-                    const acao = evento.currentTarget.value as "linear" | "suave";
+                    const acao = evento.currentTarget.value as Curva;
                     for (const propriedade of noInstante) {
                       aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade, tempo, acao } });
                     }
                   }}
                   className="rounded-md border border-borda bg-painel-2 px-1 py-0.5 text-[11px] text-texto outline-none focus:border-destaque"
                 >
-                  <option value="linear">Linear</option>
-                  <option value="suave">Suave</option>
+                  {CURVAS_DE_KEYFRAME.map(({ id, nome }) => (
+                    <option key={id} value={id}>
+                      {nome}
+                    </option>
+                  ))}
                 </select>
               </label>
             ) : (

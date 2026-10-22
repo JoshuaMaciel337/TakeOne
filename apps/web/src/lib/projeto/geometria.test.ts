@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { ajustarAsGuias, type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, deslocamentoDoCentro, limitesDaCaixa } from "./geometria.ts";
-import type { Recorte, Transformacao } from "./modelo.ts";
+import { ajustarAsGuias, type Caixa, caixaDoClipe, caixaDoTexto, contemPonto, deslocamentoDoCentro, limitesDaCaixa, recorteNaFonte } from "./geometria.ts";
+import type { Recorte, Transformacao, Virar } from "./modelo.ts";
 
 type Caso = {
   nome: string;
@@ -16,10 +16,18 @@ type Caso = {
 
 // Os mesmos casos que tests/test_geometria.py confere no render
 type CasoTexto = Omit<Caso, "midia" | "recorte"> & { imagem: { largura: number; altura: number } };
-const { casos, casos_texto: casosTexto } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/geometria.json", import.meta.url), "utf-8")) as {
+const { casos, casos_texto: casosTexto, casos_virar: casosVirar } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/geometria.json", import.meta.url), "utf-8")) as {
   casos: Caso[];
   casos_texto: CasoTexto[];
+  casos_virar: { nome: string; recorte: Recorte; virar: Virar | null; fonte: Recorte }[];
 };
+
+for (const caso of casosVirar) {
+  test(`recorte do clipe virado: ${caso.nome}`, () => {
+    const fonte = recorteNaFonte(caso.recorte, caso.virar);
+    for (const chave of Object.keys(caso.fonte) as (keyof Recorte)[]) assert.ok(Math.abs(fonte[chave] - caso.fonte[chave]) < 1e-12, chave);
+  });
+}
 
 for (const caso of casosTexto) {
   test(`caixa do texto: ${caso.nome}`, () => {

@@ -21,6 +21,16 @@ class Caixa:
     opacidade: float
 
 
+def recorte_na_fonte(recorte: dict, virar: dict | None) -> dict:
+    """O recorte nas coordenadas da mídia como ela é (o do clipe é do que aparece, já virado)."""
+    virar = virar or {}
+    return {
+        **recorte,
+        "x": 1 - recorte["x"] - recorte["largura"] if virar.get("horizontal") else recorte["x"],
+        "y": 1 - recorte["y"] - recorte["altura"] if virar.get("vertical") else recorte["y"],
+    }
+
+
 # O PNG de um texto é medido num quadro com este lado menor; em outro tamanho, a caixa escala junto
 LADO_REFERENCIA_TEXTO = 1080
 

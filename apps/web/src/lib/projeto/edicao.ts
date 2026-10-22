@@ -48,6 +48,7 @@ import {
   type TipoFaixa,
   type Transformacao,
   TRANSFORMACAO_PADRAO,
+  type Virar,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
@@ -875,7 +876,7 @@ export const GRUPOS_DE_AJUSTES = [
   { id: "cor", nome: "Cor e filtro" },
   { id: "efeito", nome: "Efeito e tela verde" },
   { id: "animacao", nome: "Animações de entrada, saída e loop" },
-  { id: "imagem", nome: "Posição, tamanho, giro, recorte, keyframes e mesclagem" },
+  { id: "imagem", nome: "Posição, tamanho, giro, virar, recorte, keyframes e mesclagem" },
   { id: "audio", nome: "Volume, fades e efeitos de voz" },
 ] as const;
 export type GrupoDeAjustes = (typeof GRUPOS_DE_AJUSTES)[number]["id"];
@@ -884,7 +885,7 @@ const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
   cor: ["cor"],
   efeito: ["efeito", "chroma"],
   animacao: ["animacao"],
-  imagem: ["transformacao", "recorte", "keyframes", "expressoes", "mesclagem"],
+  imagem: ["transformacao", "recorte", "virar", "keyframes", "expressoes", "mesclagem"],
   audio: ["volume", "fade_entrada", "fade_saida", "curva_fade", "efeitos_voz", "igualar_volume"],
 };
 
@@ -1082,8 +1083,8 @@ export function mudarExpressao(projeto: Projeto, clipeId: string, propriedade: P
 
 /**
  * "alternar": põe um keyframe da propriedade no instante, com o valor que ela tem ali, ou tira o que
- * já estava. Tirar o último deixa o clipe parado no valor dele. "linear" ou "suave": muda a curva do
- * ponto do instante até o seguinte.
+ * já estava. Tirar o último deixa o clipe parado no valor dele. Uma curva (lib/projeto/keyframes.ts,
+ * CURVAS_DE_KEYFRAME): muda a curva do ponto do instante até o seguinte.
  */
 export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: PropriedadeAnimavel, tempo: Tick, acao: AcaoDeKeyframe): Projeto {
   return mudarClipes(projeto, [clipeId], (clipe) => {
@@ -1599,6 +1600,14 @@ export function aplicarEfeito(projeto: Projeto, clipeIds: string[], efeito: Efei
   if (efeito && !EFEITOS.some((item) => item.id === efeito.tipo)) throw new ErroEdicao("Este efeito não existe.");
   const limpo = efeito ? { tipo: efeito.tipo, intensidade: limitar(efeito.intensidade, 0, 1) } : null;
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, efeito: limpo }));
+}
+
+/** Vira a imagem dos clipes no sentido pedido; virar de novo desvira. */
+export function virarClipes(projeto: Projeto, clipeIds: string[], sentido: keyof Virar): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const virar = { horizontal: false, vertical: false, ...clipe.virar, [sentido]: !clipe.virar?.[sentido] };
+    return { ...clipe, virar: virar.horizontal || virar.vertical ? virar : null };
+  });
 }
 
 /** O modo de mesclagem dos clipes (de imagem: os de áudio não aparecem). */

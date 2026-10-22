@@ -468,6 +468,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Estudo dos apps da ArtCraft (FilmCraft, LightCraft, EffectCraft, PhotoCraft, SoundCraft, VectorCraft): 42 funções para trazer do nosso jeito, por lotes. Ficam de fora os pesos do SAM 3, o RawNIND (GPL), o potrace (GPL), o CairoSVG (LGPL), o Depth Anything Base/Large (não comercial) e as animações do LottieFiles.
   - [x] Lote A (edição do dia a dia): legendas em qualquer codificação (UTF-8, UTF-16 e Windows-1252), juntar, dividir pelas palavras e localizar e substituir; atalhos Q, W, Alt+setas e ↑ ↓ de corte em corte, com a janela "?"; copiar e colar clipes e "Colar ajustes" (Ctrl+Alt+V); guias na prévia (margens seguras, terços e as áreas cobertas no celular).
   - [ ] Lote B: virar o clipe, keyframe parado e suave, chave de luminância e cantos arredondados (precisam da prévia igual ao render).
+    - [x] Virar o clipe na horizontal e na vertical, e as curvas Acelerando, Freando e Parado nos keyframes.
   - [ ] Deslizar conteúdo (slip) e mover o corte (roll), e o resto das 42.
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).
 - [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.

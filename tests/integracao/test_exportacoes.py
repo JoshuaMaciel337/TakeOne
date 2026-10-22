@@ -212,6 +212,32 @@ def test_render_segue_a_geometria_da_previa(cliente, db_limpo):
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_vira_a_imagem_e_recorta_o_que_aparece(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    # Virada nos dois sentidos, a imagem mostra azul e amarelo em cima, verde e vermelho embaixo; o recorte
+    # da metade esquerda do que aparece fica com o azul em cima e o verde embaixo
+    recorte = {"x": 0, "y": 0, "largura": 0.5, "altura": 1}
+    projeto = projeto_com(cliente, midia_id, recorte=recorte, virar={"horizontal": True, "vertical": True})
+    assert projeto["faixas"][0]["clipes"][0]["virar"] == {"horizontal": True, "vertical": True}
+    cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"})
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"organizacao_id": organizacao_de(cliente)})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    quadro = quadro_do_video(video, 1.0, 720, 1280)
+    padrao = {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}
+    caixa = caixa_do_clipe(padrao, recorte, (640, 360), (720, 1280))
+    for fracao_y, esperada in ((0.25, CORES[(1, 1)]), (0.75, CORES[(1, 0)])):
+        for fracao_x in (0.2, 0.5, 0.8):
+            x = round(caixa.cx + (fracao_x - 0.5) * caixa.largura)
+            y = round(caixa.cy + (fracao_y - 0.5) * caixa.altura)
+            obtida = tuple(int(c) for c in quadro[y, x])
+            assert max(abs(a - b) for a, b in zip(obtida, esperada, strict=True)) <= 48, ((x, y), esperada, obtida)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
 def test_render_poe_o_texto_no_lugar_da_previa(cliente, db_limpo):
     from core.utils.geometria import LADO_REFERENCIA_TEXTO, caixa_do_texto
     from core.utils.texto import desenhar_texto

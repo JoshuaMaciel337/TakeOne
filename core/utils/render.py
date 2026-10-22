@@ -44,7 +44,7 @@ from core.utils.efeitos import (
     luz_do_efeito,
 )
 from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
-from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
+from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, recorte_na_fonte
 from core.utils.keyframes import (
     animadas,
     comandos_de_opacidade,
@@ -242,7 +242,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
-    recorte = clipe["recorte"]
+    # O recorte do clipe é do que aparece; na mídia, o virado lê o pedaço espelhado (a prévia faz a mesma conta)
+    recorte = recorte_na_fonte(clipe["recorte"], clipe.get("virar"))
     leitura = leitura or Leitura(segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"]))
     inicio = leitura.inicio
     largura = max(1, round(caixa.largura))
@@ -343,6 +344,13 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros = []
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
+    # Virar: o que veio antes (recorte, letras, desfoque, lente, cores separadas, tela verde, brilho) é da imagem
+    # como ela é; a cortina, a vinheta, a luz e o grão ficam no clipe como aparece. O shader faz a mesma divisão
+    virar = clipe.get("virar") or {}
+    if virar.get("horizontal"):
+        filtros.append("hflip")
+    if virar.get("vertical"):
+        filtros.append("vflip")
     # Cortina: some o que ainda não foi revelado, nas coordenadas do clipe (antes de girar, como a prévia)
     cortina = filtro_de_cortina(list(leitura.efeitos), inicio) if leitura.efeitos else None
     if cortina:

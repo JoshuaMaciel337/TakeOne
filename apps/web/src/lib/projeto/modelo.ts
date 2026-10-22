@@ -41,8 +41,11 @@ export type Transformacao = {
   opacidade: number;
 };
 
-/** Parte da mídia que aparece, em frações da largura e da altura dela. */
+/** Parte da mídia que aparece, em frações da largura e da altura dela (como ela aparece, já virada). */
 export type Recorte = { x: number; y: number; largura: number; altura: number };
+
+/** A imagem do clipe espelhada na horizontal, na vertical ou nos dois sentidos. */
+export type Virar = { horizontal: boolean; vertical: boolean };
 
 /**
  * Como o clipe se mistura com o que está embaixo. "normal" cobre; "multiplicar" escurece; "tela"
@@ -101,6 +104,8 @@ export type Clipe = {
   /** Repetir os keyframes e tremer, por propriedade (lib/projeto/keyframes.ts). */
   expressoes?: Expressoes | null;
   recorte: Recorte;
+  /** Espelha a imagem dentro da caixa (lib/projeto/geometria.ts, recorteNaFonte); sem ele, como veio. */
+  virar?: Virar | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

@@ -178,7 +178,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       return camada.clipe.id !== marcacao.seguidorId && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
     });
     if (!alvo) return "Marque em cima de um vídeo (não do próprio clipe que vai seguir).";
-    const caixa = retanguloNaImagem(alvo.caixa, alvo.recorte, retangulo);
+    const caixa = retanguloNaImagem(alvo.caixa, alvo.recorte, retangulo, alvo.clipe.virar);
     if (!caixa) return "O retângulo ficou fora da imagem do vídeo.";
     marcacao.aoConfirmar({ alvoId: alvo.clipe.id, caixa });
     return null;

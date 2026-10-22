@@ -21,8 +21,23 @@ FASE_DO_TREMOR = {"x": 0, "y": 7.3, "escala": 13.1, "rotacao": 19.7, "opacidade"
 ESCALA_MINIMA = 0.01
 
 
-def _suave(p: float) -> float:
-    return p * p * (3 - 2 * p)
+def andado_na_curva(curva: str, p: float) -> float:
+    """Quanto do caminho até o ponto seguinte já foi andado em p (0 a 1); andadoNaCurva em keyframes.ts."""
+    if curva == "suave":
+        return p * p * (3 - 2 * p)
+    if curva == "acelerar":
+        return p * p
+    if curva == "frear":
+        return p * (2 - p)
+    if curva == "parado":
+        return 0.0
+    return p
+
+
+# Quanto antes de um ponto o tempo já conta como dele (relativo ao tempo do ponto). No roteiro da opacidade, o
+# tempo do quadro vem de uma conta em ponto flutuante e chegava a um fio antes do ponto: no "parado", que salta,
+# o quadro do ponto ficava com o valor anterior. A prévia conta em ticks inteiros e não precisa
+FOLGA_RELATIVA = 1e-9
 
 
 def valor_no_tempo(pontos: list[dict], t: float) -> float:
@@ -30,9 +45,9 @@ def valor_no_tempo(pontos: list[dict], t: float) -> float:
     if t <= pontos[0]["t"]:
         return pontos[0]["valor"]
     for a, b in zip(pontos, pontos[1:], strict=False):
-        if t < b["t"]:
-            p = (t - a["t"]) / (b["t"] - a["t"])
-            return a["valor"] + (b["valor"] - a["valor"]) * (_suave(p) if a["curva"] == "suave" else p)
+        if t < b["t"] - FOLGA_RELATIVA * max(1.0, abs(b["t"])):
+            p = max(0.0, (t - a["t"]) / (b["t"] - a["t"]))
+            return a["valor"] + (b["valor"] - a["valor"]) * andado_na_curva(a["curva"], p)
     return pontos[-1]["valor"]
 
 
@@ -140,8 +155,11 @@ def expressao(pontos: list[dict], inicio_do_clipe: float, var: str = "t") -> str
         if k >= len(pontos) - 1:
             return _n(pontos[-1]["valor"])
         a, b = pontos[k], pontos[k + 1]
+        if a["curva"] == "parado":
+            return _n(a["valor"])
         p = f"(({var}-{_n(tempos[k])})/{_n(tempos[k + 1] - tempos[k])})"
-        curva = f"({p}*{p}*(3-2*{p}))" if a["curva"] == "suave" else p
+        curvas = {"suave": f"({p}*{p}*(3-2*{p}))", "acelerar": f"({p}*{p})", "frear": f"({p}*(2-{p}))"}
+        curva = curvas.get(a["curva"], p)
         return f"({_n(a['valor'])}+{_n(b['valor'] - a['valor'])}*{curva})"
 
     # Busca binária pelos tempos: a região k começa em tempos[k]. Em fila (um if dentro do outro), 100 pontos
@@ -150,7 +168,9 @@ def expressao(pontos: list[dict], inicio_do_clipe: float, var: str = "t") -> str
         if de == ate:
             return regiao(de)
         meio = (de + ate + 1) // 2
-        return f"if(lt({var},{_n(tempos[meio])}),{arvore(de, meio - 1)},{arvore(meio, ate)})"
+        # O tempo vai com 6 casas: 1 µs antes, o quadro que cai bem no ponto é sempre dele (o arredondamento para
+        # cima deixava esse quadro com o valor anterior, e no "parado" o salto saía um quadro atrasado)
+        return f"if(lt({var},{_n(tempos[meio] - 1e-6)}),{arvore(de, meio - 1)},{arvore(meio, ate)})"
 
     return arvore(-1, len(pontos) - 1)
 

@@ -15,6 +15,7 @@ import {
   aplicarEfeito,
   colarAjustes,
   colarClipes,
+  virarClipes,
   type Contexto,
   dividirClipes,
   DURACAO_IMAGEM_S,
@@ -918,4 +919,17 @@ test("colar ajustes leva só o que vale para cada clipe marcado", () => {
 
   assert.throws(() => colarAjustes(projeto, ctx, fonte, [origem], ["cor"]), /Marque/);
   assert.throws(() => colarAjustes(projeto, ctx, fonte, [titulo.clipeId], ["audio"]), /Nenhum/);
+});
+
+test("virar liga e desliga cada sentido; sem nenhum, o campo some", () => {
+  const ctx = contexto();
+  const video = adicionarClipe(vazio(), ctx, "video10");
+  let projeto = virarClipes(video.projeto, [video.clipeId], "horizontal");
+  assert.deepEqual(principal(projeto)[0].virar, { horizontal: true, vertical: false });
+  projeto = virarClipes(projeto, [video.clipeId], "vertical");
+  assert.deepEqual(principal(projeto)[0].virar, { horizontal: true, vertical: true });
+  projeto = virarClipes(virarClipes(projeto, [video.clipeId], "horizontal"), [video.clipeId], "vertical");
+  assert.equal(principal(projeto)[0].virar, null);
+  const musica = adicionarClipe(projeto, ctx, "musica");
+  assert.throws(() => virarClipes(musica.projeto, [musica.clipeId], "horizontal"), /áudio/);
 });
