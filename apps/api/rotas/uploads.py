@@ -15,6 +15,7 @@ import asyncio
 import base64
 import binascii
 import logging
+from datetime import timedelta
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -90,18 +91,24 @@ def chave_original(midia: dict) -> str:
 
 
 async def concluir_envio(db, midia: dict, usuario: dict):
-    """Último pedaço chegou: a mídia vai para a fila de ingestão."""
+    """
+    Último pedaço chegou: a mídia vai para a fila de ingestão. Pode ser chamado duas vezes (o PATCH e o HEAD
+    de um cliente que tentou de novo): só o primeiro troca o status, e o job do segundo é apagado.
+    """
     job = montar_job("ingestao", midia["organizacao_id"], {"midia_id": str(midia["_id"])},
                      prioridade=PRIORIDADE_INGESTAO, criado_por=usuario["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     momento = agora()
-    await db.midias.update_one({"_id": midia["_id"], "status": STATUS_ENVIANDO}, {"$set": {
+    resultado = await db.midias.update_one({"_id": midia["_id"], "status": STATUS_ENVIANDO}, {"$set": {
         "status": STATUS_PROCESSANDO,
         "bytes_recebidos": midia["tamanho_total"],
         "job_ingestao_id": job_id,
         "enviado_em": momento,
         "atualizado_em": momento,
     }})
+    if not resultado.modified_count:
+        await db.jobs.delete_one({"_id": job_id})
+        return
     logging.info(f"[{midia['organizacao_id']}] Envio concluído: {midia['nome_original']} "
                  f"({midia['tamanho_total'] / 1024**2:.1f} MB). Ingestão na fila.")
 
@@ -142,9 +149,19 @@ async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depen
                             mensagem="Formato não aceito. Envie um vídeo (MP4, MOV, MKV...), "
                                      "um áudio (MP3, WAV, M4A...) ou uma imagem (JPG, PNG, WebP).")
     livre = await run_in_threadpool(storage.espaco_livre)
-    if livre - total < ESPACO_MINIMO_LIVRE_BYTES:
+    # Os envios em andamento ainda vão ocupar o que falta deles: vários arquivos escolhidos juntos viam o
+    # mesmo espaço livre e passavam todos
+    reservado = 0
+    cursor = await db.midias.aggregate([
+        # Só os que receberam pedaço no último dia: um envio abandonado no meio não reserva espaço para sempre
+        {"$match": {"status": STATUS_ENVIANDO, "atualizado_em": {"$gte": agora() - timedelta(days=1)}}},
+        {"$group": {"_id": None, "falta": {"$sum": {"$subtract": ["$tamanho_total", "$bytes_recebidos"]}}}},
+    ])
+    async for andamento in cursor:
+        reservado = max(0, int(andamento["falta"]))
+    if livre - reservado - total < ESPACO_MINIMO_LIVRE_BYTES:
         logging.warning(f"Envio recusado por falta de espaço: {total / 1024**3:.1f} GB, "
-                        f"{livre / 1024**3:.1f} GB livres.")
+                        f"{livre / 1024**3:.1f} GB livres, {reservado / 1024**3:.1f} GB a caminho.")
         return resposta_tus(status.HTTP_507_INSUFFICIENT_STORAGE,
                             mensagem="O servidor está sem espaço para esse arquivo. "
                                      "Avise quem cuida do servidor do TakeOne.")
@@ -166,6 +183,10 @@ async def consultar_envio(upload_id: str, request: Request, usuario=Depends(usua
     recebido = await run_in_threadpool(storage.tamanho, chave_original(midia)) if midia else None
     if recebido is None:
         return resposta_tus(status.HTTP_404_NOT_FOUND)
+    # O arquivo chegou inteiro mas o PATCH caiu antes de pôr a mídia na fila (a API reiniciou, o Mongo piscou):
+    # o cliente vê o tamanho completo, dá o envio por concluído e não manda outro pedaço. A fila é aqui, então
+    if midia["status"] == STATUS_ENVIANDO and recebido == midia["tamanho_total"]:
+        await concluir_envio(db, midia, usuario)
     return resposta_tus(status.HTTP_200_OK, {"Upload-Offset": str(recebido),
                                              "Upload-Length": str(midia["tamanho_total"])})
 

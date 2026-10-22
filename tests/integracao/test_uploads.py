@@ -101,6 +101,28 @@ def test_envio_recusado(cliente, monkeypatch):
     assert "sem espaço" in sem_espaco.text
 
 
+
+def test_head_poe_na_fila_o_envio_que_chegou_inteiro(cliente, db_limpo):
+    # O PATCH gravou tudo mas caiu antes de pôr a mídia na fila: o HEAD de quem tenta de novo põe, uma vez só
+    conteudo = os.urandom(1000)
+    local = criar_envio(cliente, len(conteudo)).headers["Location"]
+    midia_id = ObjectId(local.rsplit("/", 1)[1])
+    midia = db_limpo.midias.find_one({"_id": midia_id})
+    storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia_id, "original.mp4")).write_bytes(conteudo)
+    for _ in range(2):
+        resposta = cliente.head(local, headers=TUS)
+        assert resposta.headers["Upload-Offset"] == str(len(conteudo))
+    assert db_limpo.midias.find_one({"_id": midia_id})["status"] == "processando"
+    assert db_limpo.jobs.count_documents({"tipo": "ingestao", "entrada.midia_id": str(midia_id)}) == 1
+
+
+def test_envios_em_andamento_contam_no_espaco(cliente, monkeypatch):
+    # Vários arquivos escolhidos juntos: cada POST via o mesmo espaço livre e todos passavam
+    monkeypatch.setattr(storage, "espaco_livre", lambda: 5 * 1024**3)
+    assert criar_envio(cliente, 2 * 1024**3).status_code == 201
+    segundo = criar_envio(cliente, 2 * 1024**3)
+    assert segundo.status_code == 507, "3 GB livres menos os 2 GB a caminho ficam abaixo da margem de 2 GB"
+
 def test_pedaco_invalido(cliente):
     local = criar_envio(cliente, 10).headers["Location"]
     sem_tipo = cliente.patch(local, headers={**TUS, "Upload-Offset": "0"}, content=b"12345")
