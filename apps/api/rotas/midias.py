@@ -113,9 +113,18 @@ async def para_saida(db, midias: list[dict]) -> list[MidiaSaida]:
 # ROTAS
 # -----------------------------------------------
 @router.get("", response_model=list[MidiaSaida])
-async def listar_midias(limite: int = Query(default=30, ge=1, le=100),
+async def listar_midias(limite: int = Query(default=30, ge=1, le=200),
+                        antes: str | None = Query(default=None, description="id da última mídia da página anterior"),
                         usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    cursor = db.midias.find({"organizacao_id": usuario["organizacao_id"]}).sort("criado_em", -1).limit(limite)
+    """As mídias do espaço, das mais novas para as mais antigas, em páginas: a seguinte começa depois de `antes`
+    (o id da última da página). O editor busca todas, porque um projeto pode usar uma mídia antiga."""
+    filtro: dict = {"organizacao_id": usuario["organizacao_id"]}
+    if antes:
+        try:
+            filtro["_id"] = {"$lt": ObjectId(antes)}
+        except InvalidId as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Página inválida.") from erro
+    cursor = db.midias.find(filtro).sort("_id", -1).limit(limite)
     return await para_saida(db, [m async for m in cursor])
 
 

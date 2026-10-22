@@ -184,3 +184,20 @@ def test_projetos_sao_separados_por_espaco(cliente):
     assert cliente.get(f"/api/projetos/{projeto['id']}").status_code == 404
     assert salvar(cliente, projeto, projeto["faixas"]).status_code == 404
     assert cliente.delete(f"/api/projetos/{projeto['id']}").status_code == 404
+
+
+def test_lista_de_midias_em_paginas_traz_todas_sem_repetir(cliente, db_limpo):
+    # O editor busca todas as páginas: antes ele só conhecia as 60 mais novas, e um projeto com uma mídia
+    # mais antiga perdia o clipe na prévia
+    cadastrar(cliente)
+    ids = {criar_midia(db_limpo, cliente) for _ in range(7)}
+    vistas, antes = [], None
+    while True:
+        pagina = cliente.get("/api/midias", params={"limite": 3, **({"antes": antes} if antes else {})}).json()
+        vistas += [m["id"] for m in pagina]
+        if len(pagina) < 3:
+            break
+        antes = pagina[-1]["id"]
+    assert len(vistas) == len(set(vistas)) == 7 and set(vistas) == ids
+    assert vistas == sorted(vistas, reverse=True), "das mais novas para as mais antigas"
+    assert cliente.get("/api/midias", params={"antes": "nao-e-id"}).status_code == 422

@@ -7,7 +7,20 @@ import { useEnvios } from "@/lib/envios";
 import { useEventosJobs } from "@/lib/eventos";
 import type { Midia } from "@/lib/tipos";
 
-const LIMITE_MIDIAS = 60;
+/** Mídias por página da API; a biblioteca busca todas as páginas (um projeto pode usar uma mídia antiga). */
+const POR_PAGINA = 200;
+/** Teto de segurança: um espaço com mais que isso mostra só as mais novas. */
+const MAXIMO_DE_MIDIAS = 10_000;
+
+async function todasAsMidias(): Promise<Midia[]> {
+  const lista: Midia[] = [];
+  for (;;) {
+    const depois = lista.length ? `&antes=${lista[lista.length - 1].id}` : "";
+    const pagina = await chamarApi<Midia[]>(`/midias?limite=${POR_PAGINA}${depois}`);
+    lista.push(...pagina);
+    if (pagina.length < POR_PAGINA || lista.length >= MAXIMO_DE_MIDIAS) return lista;
+  }
+}
 // Jobs que geram um arquivo a mais para uma mídia pronta, e o campo da mídia que mostra o andamento.
 // null: o andamento fica num dicionário (um por tom ou por versão); só o fim recarrega.
 const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | null> = {
@@ -30,7 +43,7 @@ export function useMidias() {
 
   const recarregar = useCallback(() => {
     const numero = ++pedido.current;
-    return chamarApi<Midia[]>(`/midias?limite=${LIMITE_MIDIAS}`)
+    return todasAsMidias()
       .then((lista) => {
         if (numero !== pedido.current) return;
         setMidias(lista);
