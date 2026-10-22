@@ -11,6 +11,31 @@ export type Plano = {
   cta: string | null;
 };
 
+/** Palavras que o modelo lê de uma vez (MAXIMO_DE_PALAVRAS em core/modelos/direcao.py, medido no contexto dele). */
+export const PALAVRAS_DO_PLANO = 900;
+/** Numa fala mais longa, quantas das enviadas são do fim: a chamada para a ação costuma estar lá. */
+const PALAVRAS_DO_FIM = 250;
+/** Letras por palavra que a API aceita (um link transcrito vira uma palavra enorme). */
+export const LETRAS_POR_PALAVRA = 60;
+
+/** As posições (em `palavras`) que vão ao modelo: todas, ou o começo e o fim de uma fala longa. */
+export function palavrasParaOPlano(total: number): number[] {
+  if (total <= PALAVRAS_DO_PLANO) return Array.from({ length: total }, (_, i) => i);
+  const comeco = PALAVRAS_DO_PLANO - PALAVRAS_DO_FIM;
+  return [...Array.from({ length: comeco }, (_, i) => i), ...Array.from({ length: PALAVRAS_DO_FIM }, (_, i) => total - PALAVRAS_DO_FIM + i)];
+}
+
+/** O plano com os números das palavras enviadas (`enviadas`, de palavrasParaOPlano) trocados pelos da fala inteira. */
+export function planoNaFala(plano: Plano, enviadas: number[]): Plano {
+  const na = (i: number) => (Number.isInteger(i) && i >= 0 && i < enviadas.length ? enviadas[i] : -1);
+  const palavra = plano.apresentacao ? na(plano.apresentacao.palavra) : -1;
+  return {
+    ...plano,
+    apresentacao: plano.apresentacao && palavra >= 0 ? { ...plano.apresentacao, palavra } : null,
+    destaques: plano.destaques.map(({ de, ate }) => ({ de: na(de), ate: na(ate) })).filter(({ de, ate }) => de >= 0 && ate >= de),
+  };
+}
+
 /** Duração das animações que o plano põe no vídeo (s). */
 export const DURACOES_DO_PLANO = { titulo: 2.5, tarja: 4, cta: 4 } as const;
 

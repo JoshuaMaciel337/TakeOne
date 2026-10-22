@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { animacoesDoPlano, palavrasDepoisDoCorte, type Plano, trechosDosDestaques } from "./direcao.ts";
+import { animacoesDoPlano, palavrasDepoisDoCorte, palavrasParaOPlano, type Plano, planoNaFala, trechosDosDestaques } from "./direcao.ts";
 
 const S = TICKS_POR_SEGUNDO;
 const palavras = ["Oi", "eu", "sou", "a", "Ana", "e", "hoje", "vou", "mostrar", "tudo"].map((texto, i) => ({
@@ -38,4 +38,16 @@ test("o plano vira trechos de zoom e animações no tempo da linha", () => {
   // Num vídeo curto não cabe a chamada, e a tarja espera o título sair
   const curto = animacoesDoPlano({ ...plano, apresentacao: { nome: "Ana", funcao: "", palavra: 1 } }, palavras, 5 * S);
   assert.deepEqual(curto.map((a) => [a.modelo, a.inicio / S]), [["titulo", 0], ["tarja", 2.5]]);
+});
+
+test("fala longa: o modelo lê o começo e o fim, e o plano volta para os números da fala inteira", () => {
+  assert.deepEqual(palavrasParaOPlano(3), [0, 1, 2]);
+  const enviadas = palavrasParaOPlano(5000);
+  assert.equal(enviadas.length, 900);
+  assert.deepEqual([enviadas[0], enviadas[649], enviadas[650], enviadas[899]], [0, 649, 4750, 4999]);
+  const plano: Plano = { titulo: "T", apresentacao: { nome: "Ana", funcao: "", palavra: 4 }, destaques: [{ de: 660, ate: 670 }, { de: 2, ate: 950 }], cta: "Siga" };
+  const naFala = planoNaFala(plano, enviadas);
+  assert.equal(naFala.apresentacao?.palavra, 4);
+  assert.deepEqual(naFala.destaques, [{ de: 4760, ate: 4770 }], "o número fora do que foi enviado sai");
+  assert.equal(planoNaFala({ ...plano, apresentacao: { nome: "Ana", funcao: "", palavra: 999 } }, enviadas).apresentacao, null);
 });

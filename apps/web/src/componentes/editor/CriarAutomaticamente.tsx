@@ -6,7 +6,15 @@ import { useEffect, useRef, useState } from "react";
 import { chamarApi } from "@/lib/api";
 import { pedirPalavrasChave } from "@/lib/palavrasChave";
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
-import { animacoesDoPlano, palavrasDepoisDoCorte, type Plano, trechosDosDestaques } from "@/lib/projeto/direcao";
+import {
+  animacoesDoPlano,
+  LETRAS_POR_PALAVRA,
+  palavrasDepoisDoCorte,
+  palavrasParaOPlano,
+  type Plano,
+  planoNaFala,
+  trechosDosDestaques,
+} from "@/lib/projeto/direcao";
 import { falaDosClipes, type Palavra, palavrasDaLinha, type PalavraDaLinha } from "@/lib/projeto/fala";
 import { ESTILOS_DE_LEGENDA } from "@/lib/projeto/legendas";
 import { legendasDaFala, opcoesParaOQuadro } from "@/lib/projeto/legendasDaFala";
@@ -47,9 +55,14 @@ const faixasDe = (projeto: Projeto) => JSON.stringify(projeto.faixas);
 /** Pede o plano ao LLM local (job de GPU) e espera. */
 async function pedirPlano(palavras: PalavraDaLinha[], duracao: Tick, aoAndamento: (texto: string) => void, ativo: () => boolean): Promise<Plano | null> {
   const s = TICKS_POR_SEGUNDO;
+  // O modelo lê até umas 900 palavras: numa fala longa vão o começo e o fim, e os números voltam para a fala inteira
+  const enviadas = palavrasParaOPlano(palavras.length);
   let job = await chamarApi<Job>("/direcoes", {
     metodo: "POST",
-    corpo: { palavras: palavras.map((p) => ({ texto: p.texto, inicio: p.inicio / s, fim: p.fim / s })), duracao: duracao / s },
+    corpo: {
+      palavras: enviadas.map((i) => palavras[i]).map((p) => ({ texto: p.texto.slice(0, LETRAS_POR_PALAVRA), inicio: p.inicio / s, fim: p.fim / s })),
+      duracao: duracao / s,
+    },
   });
   while (ativo() && job.status !== "concluido" && job.status !== "erro") {
     aoAndamento(job.status === "pendente" ? "Plano na fila do worker de GPU" : `${job.mensagem || "Montando o plano"} · ${job.progresso}%`);
@@ -58,7 +71,7 @@ async function pedirPlano(palavras: PalavraDaLinha[], duracao: Tick, aoAndamento
   }
   if (!ativo()) return null;
   if (job.status === "erro" || !job.saida?.plano) throw new Error(`O plano falhou: ${job.erro ?? "sem resposta do modelo"}`);
-  return job.saida.plano;
+  return planoNaFala(job.saida.plano, enviadas);
 }
 
 /**
