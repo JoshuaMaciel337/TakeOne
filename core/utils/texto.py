@@ -108,6 +108,21 @@ def _medidas(texto: dict, lado_menor: int) -> dict:
             "folga": folga, "largura": int(largura_texto) + 2 * folga, "altura": altura_texto + 2 * folga}
 
 
+# Teto do bloco de texto, em múltiplos do lado menor do quadro: sem ele, 500 letras numa linha só com a letra
+# no maior tamanho pediam uma imagem de dezenas de milhares de pixels e vários GB de memória por pedido.
+# Um título grande de várias linhas fica bem abaixo disso.
+LADO_MAXIMO_DO_TEXTO = 8
+AREA_MAXIMA_DO_TEXTO = 6
+
+
+def texto_cabe(texto: dict, lado_menor: int = 1080) -> bool:
+    """O bloco de texto fica dentro do teto (só mede: não desenha nada)."""
+    medidas = _medidas({**TEXTO_PADRAO, **texto}, lado_menor)
+    largura, altura = medidas["largura"], medidas["altura"]
+    return (max(largura, altura) <= LADO_MAXIMO_DO_TEXTO * lado_menor
+            and largura * altura <= AREA_MAXIMA_DO_TEXTO * lado_menor * lado_menor)
+
+
 def _mascara_das_chaves(texto: dict, medidas: dict) -> Image.Image | None:
     """Onde ficam as palavras-chave: uma faixa por palavra, da altura da linha, que vai até o meio dos espaços
     vizinhos (para levar junto o contorno das letras). None se não há palavra-chave."""

@@ -46,3 +46,23 @@ def test_brilho_espalha_a_cor_em_volta_das_letras():
     # Na borda de cima, longe das letras, a luz é vermelha e meio transparente
     vermelhos = [com.getpixel((x, com.height // 8)) for x in range(com.width)]
     assert any(r > 200 and g < 80 and 0 < a < 255 for r, g, _, a in vermelhos)
+
+
+def test_texto_grande_demais_fica_de_fora_sem_desenhar():
+    # 500 letras numa linha, com a letra no maior tamanho: pedia dezenas de milhares de pixels e vários GB
+    from core.utils.texto import texto_cabe
+
+    assert not texto_cabe({"conteudo": "W" * 500, "tamanho": 0.3, "sombra": 1, "brilho": 1})
+    # Um título grande de várias linhas e uma legenda comum cabem com folga
+    assert texto_cabe({"conteudo": "PROMOÇÃO\nDE VERÃO\nSÓ HOJE", "tamanho": 0.15, "brilho": 1})
+    assert texto_cabe({"conteudo": "Uma legenda comum de duas linhas\ncom o texto da fala", "tamanho": 0.05})
+
+
+def test_api_recusa_o_texto_grande_demais():
+    import pytest
+    from pydantic import ValidationError
+
+    from api.esquemas import ImagemTextoEntrada
+
+    with pytest.raises(ValidationError, match="grande demais"):
+        ImagemTextoEntrada(texto={"conteudo": "W" * 500, "tamanho": 0.3}, lado_menor=2160)

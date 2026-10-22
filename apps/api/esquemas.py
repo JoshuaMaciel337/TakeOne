@@ -15,6 +15,7 @@ from core.modelos.geracao import DESCRICAO_MAXIMA, DESCRICAO_MINIMA, DURACOES
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import STATUS_ERRO, STATUS_PROCESSANDO, arquivo_publico
 from core.utils.tempo import TICKS_POR_SEGUNDO
+from core.utils.texto import texto_cabe
 
 
 def _limpar_espacos(valor):
@@ -328,6 +329,13 @@ class TextoEntrada(BaseModel):
     # Palavras pintadas na cor_chave (números contados como em core/modelos/palavras_chave.py)
     palavras_chave: list[Annotated[int, Field(ge=0, le=500)]] | None = Field(default=None, max_length=60)
     cor_chave: str = Field(default="#ffd400", pattern=COR)
+
+    @model_validator(mode="after")
+    def cabe_no_teto(self):
+        # Medido no lado de referência; o render desenha no tamanho do vídeo, na mesma proporção
+        if not texto_cabe(self.model_dump()):
+            raise ValueError("O texto ficou grande demais. Quebre em linhas ou diminua o tamanho da letra.")
+        return self
 
 
 class AnimacaoEntrada(BaseModel):
