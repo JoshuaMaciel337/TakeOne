@@ -99,7 +99,9 @@ def test_camadas_de_baixo_para_cima_com_a_caixa_da_geometria():
     assert "colorchannelmixer=aa=0.5" in sobreposicao
     assert "rotate=a=0.523599" in sobreposicao
     assert "overlay=x=648-overlay_w/2:y=480-overlay_h/2:format=rgb" in linhas[4]
-    assert linhas[5] == "[base2]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]"
+    # A saída marca a cor nos quadros também: só com as opções, o FFmpeg 7 deixava as primárias "unknown"
+    assert linhas[5] == ("[base2]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,"
+                         "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv[v]")
     # Sem marcação de cor, o vídeo é lido como BT.709 (como o Chrome na prévia); com marcação, como ela diz
     assert linhas[1].startswith("[0:v]setparams=colorspace=bt709,setpts=")
     assert linhas[3].startswith("[1:v]setpts=")
@@ -481,3 +483,15 @@ def test_zoom_alto_demais_para_antes_com_uma_mensagem():
     # 400% num 1080p ainda exporta
     normal = clipe("c1", "deitado", 0, 4, transformacao={"x": 0, "y": 0, "escala": 4, "rotacao": 0, "opacidade": 1})
     assert planejar_render({**projeto([faixa("principal", [normal])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080).filtro
+
+
+def test_glitch_num_clipe_ampliado_fica_no_limite_do_rgbashift():
+    # 4% da largura de uma caixa ampliada passava dos ±255 px que o rgbashift aceita
+    glitch = clipe("c1", "deitado", 0, 4, efeito={"tipo": "glitch", "intensidade": 1},
+                   transformacao={"x": 0, "y": 0, "escala": 6, "rotacao": 0, "opacidade": 1})
+    # Em 720p, a 600% a caixa tem 7680 de largura: 4% dela são 307 px
+    plano = planejar_render({**projeto([faixa("principal", [glitch])]), "proporcao": "16:9"}, MIDIAS, 1280, 720)
+    roteiros = [a for a in plano.auxiliares if a.tipo == "comandos" and "rgbashift" in (a.conteudo or "")]
+    valores = [int(v.rstrip(";,")) for r in roteiros for v in r.conteudo.split()
+               if v.rstrip(";,").lstrip("-").isdigit()]
+    assert valores and max(abs(v) for v in valores) <= 255

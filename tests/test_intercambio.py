@@ -91,6 +91,17 @@ def test_faixa_muda_sai_desligada_e_taxa_ntsc_e_marcada():
     assert float(musica.find("filter/effect/parameter").findtext("value")) == 0
 
 
+
+def test_faixa_de_video_oculta_sai_sem_som():
+    # No TakeOne, esconder a principal também tira o som dela: no XML, o áudio dela sai desligado e no zero
+    projeto = _projeto()
+    projeto["faixas"][2]["oculta"] = True
+    sequencia = _arvore(projeto).find("sequence")
+    som_da_principal = sequencia.findall("media/audio/track")[0].findall("clipitem")
+    assert som_da_principal and all(item.findtext("enabled") == "FALSE" for item in som_da_principal)
+    musica = sequencia.findall("media/audio/track")[1].find("clipitem")
+    assert musica.findtext("enabled") == "TRUE"
+
 def test_leitura_independente_pelo_opentimelineio():
     otio = pytest.importorskip("opentimelineio")
     pytest.importorskip("otio_fcp_adapter")

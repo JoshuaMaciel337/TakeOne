@@ -629,6 +629,10 @@ def test_imagem_que_acaba_antes_do_som_repete_o_ultimo_quadro(cliente, db_limpo)
     for segundos_ in (1.9, 2.2, 2.45):
         pixel = quadro_do_video(video, segundos_, 1280, 720)[360, 640]
         assert pixel[0] > 200 and pixel[1] < 60 and pixel[2] < 60, (segundos_, pixel)
+    cor = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=color_space,color_primaries,color_transfer,color_range", "-of", "csv=p=0",
+                          str(video)], capture_output=True, text=True, check=True).stdout
+    assert cor.strip() == "tv,bt709,bt709,bt709", "o vídeo exportado sai com a cor toda marcada"
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
@@ -681,3 +685,41 @@ def test_midia_de_25_fps_aparada_mostra_o_quadro_da_previa(cliente, db_limpo, en
     # A prévia: o último quadro da mídia que começou até o instante (entrada + k/30), em contas exatas
     esperados = [((entrada_em_quadros + k) * 25) // 30 for k in range(12)]
     assert lidos == esperados, (lidos, esperados)
+
+
+def test_render_recusado_nao_deixa_arquivos_na_pasta(cliente, db_limpo):
+    # O plano recusado (zoom alto demais) vinha depois de gravar os PNGs dos textos, que ficavam na pasta
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False,
+                           gerar=gerar_cor("0x00ff00"))
+    grande = {"x": 0, "y": 0, "escala": 20, "rotacao": 0, "opacidade": 1}
+    projeto = projeto_com(cliente, midia_id, transformacao=grande)
+    clipe_texto = {"id": "t1", "midia_id": None, "texto": {"conteudo": "Oi"}, "inicio": 0, "duracao": 2 * SEGUNDO,
+                   "entrada": 0}
+    faixa_texto = {"id": "ft", "tipo": "texto", "oculta": False, "muda": False, "travada": False,
+                   "clipes": [clipe_texto]}
+    corpo = {campo: projeto[campo] for campo in ("versao", "nome", "proporcao", "taxa", "fundo")}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json={**corpo, "faixas": [faixa_texto, *projeto["faixas"]]}
+                       ).status_code == 200
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "erro"
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    assert "grande demais" in doc["erro"]
+    pasta = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO)).parent
+    assert not pasta.exists() or not list(pasta.iterdir()), list(pasta.iterdir())
+
+
+def test_midia_de_uma_exportacao_em_andamento_nao_sai(cliente, db_limpo):
+    # A exportação guarda uma cópia do projeto: tirar o clipe da linha do tempo não libera a mídia até o vídeo sair
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente)
+    projeto = projeto_com(cliente, midia_id)
+    cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"})
+    vazio = {campo: projeto[campo] for campo in ("versao", "nome", "proporcao", "taxa", "fundo")}
+    principal = {**projeto["faixas"][0], "clipes": []}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json={**vazio, "faixas": [principal]}).status_code == 200
+    recusa = cliente.delete(f"/api/midias/{midia_id}")
+    assert recusa.status_code == 409 and "exportado" in recusa.json()["detail"]
+    db_limpo.exportacoes.update_many({}, {"$set": {"status": "pronta"}})
+    assert cliente.delete(f"/api/midias/{midia_id}").status_code == 204

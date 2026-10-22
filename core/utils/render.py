@@ -43,7 +43,7 @@ from core.utils.efeitos import (
     linhas_do_efeito,
     luz_do_efeito,
 )
-from core.utils.ffmpeg import MARCAS_BT709, ler_como_bt709
+from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto
 from core.utils.keyframes import (
     animadas,
@@ -148,6 +148,8 @@ FOLGA_DO_QUADRO = 0.0005
 # vinheta pedia uns 5 GB ao worker. Acima disto, a exportação para antes com uma mensagem
 LADO_MAXIMO_DA_CAIXA = 16384
 AREA_MAXIMA_DA_CAIXA = 7680 * 4320
+# O deslocamento máximo do rgbashift (VHS e glitch), em pixels
+RGBASHIFT_MAXIMO = 255
 
 
 @dataclass(frozen=True)
@@ -507,7 +509,8 @@ def _cores_separadas(clipe: dict, leitura: Leitura | None, largura: int, fps: fl
     desvios = []
     for n in range(round((fim - inicio) * fps) + 1):
         quadro = math.floor((inicio + n / fps - inicio_clipe) * fps + 1e-6)
-        desvios.append(round(desvio_de_cor(clipe, quadro) * largura))
+        # O rgbashift só aceita ±255 px: num clipe ampliado, 4% da largura passava disso e o filtro não abria
+        desvios.append(max(-RGBASHIFT_MAXIMO, min(RGBASHIFT_MAXIMO, round(desvio_de_cor(clipe, quadro) * largura))))
     if len(set(desvios)) == 1:
         desvio = desvios[0]
         return ([f"rgbashift=rh={desvio}:bh={-desvio}:edge=smear"] if desvio else []), None
@@ -911,7 +914,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             linhas.append(f"[{anterior}][l{numero}]blend=all_mode={MODOS_DE_MESCLAGEM[mesclagem]},format=gbrp[base{numero}]")
         anterior = f"base{numero}"
     # A saída é sempre BT.709, marcada (argumentos_de_saida): todo player mostra a cor da prévia
-    linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]")
+    linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,{FILTRO_MARCAS_BT709}[v]")
 
     sons, linhas_som = [], []
     for faixa in com_som:

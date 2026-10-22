@@ -186,9 +186,11 @@ def montar_xmeml(projeto: dict, midias: dict[str, dict]) -> str:
         faixas_de_som.append((faixa, clipes))
     for faixa, clipes in faixas_de_som:
         trilha = ET.SubElement(audio, "track")
+        # No TakeOne, esconder uma faixa de vídeo também tira o som dela (como silenciar)
+        calada = faixa.get("muda") or (faixa["tipo"] != "audio" and faixa.get("oculta"))
         for clipe in clipes:
-            volume = 0.0 if faixa.get("muda") else float(clipe.get("volume", 1))
-            _clipe(trilha, clipe, midias[clipe["midia_id"]], arquivos, num, den, "audio", not faixa.get("muda"), volume)
+            volume = 0.0 if calada else float(clipe.get("volume", 1))
+            _clipe(trilha, clipe, midias[clipe["midia_id"]], arquivos, num, den, "audio", not calada, volume)
 
     # Textos e legendas: marcadores com o conteúdo, onde cada um aparece
     for faixa in (f for f in faixas if f["tipo"] in ("texto", "legenda")):
