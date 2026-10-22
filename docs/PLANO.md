@@ -12,7 +12,8 @@ Nome do projeto: **TakeOne** (neste documento, também "o editor").
 | FilmCraft (`storytold/filmcraft`) | MIT ou Apache-2.0 | Copiar e adaptar código, mantendo os avisos de licença e o `NOTICE`. A marca ArtCraft não pode ir junto. |
 | LightCraft (`storytold/lightcraft`) | MIT ou Apache-2.0 | Igual ao FilmCraft. |
 | EffectCraft, PhotoCraft, SoundCraft, VectorCraft (`storytold/...`) | MIT ou Apache-2.0 | Igual ao FilmCraft. |
-| ArtCraft e artcraft-services (`storytold/artcraft`, `storytold/artcraft-services`) | "ArtCraft License" (fair source) | **Não usar.** A licença proíbe usar o código para criar um produto concorrente de ferramentas de imagem e vídeo com IA, e é o caso do editor. Também ficam de fora os repositórios sem licença (`artcraftx`, `storyteller-ml`, `cloud-worker`, `realtime-voice-conversion`). |
+| ArtCraft (`storytold/artcraft`) | MIT ou Apache-2.0 (desde 2026; conferido em 22/10/2026) | Igual ao FilmCraft. Antes era a "ArtCraft License" (fair source), que proibia um produto concorrente. A marca, o logo e os ícones dos apps continuam de fora. |
+| artcraft-services (`storytold/artcraft-services`) | "ArtCraft License" (fair source) | **Não usar.** A licença proíbe usar o código para criar um produto concorrente de ferramentas de imagem e vídeo com IA, e é o caso do editor. Também ficam de fora os repositórios sem licença (`artcraftx`, `storyteller-ml`, `cloud-worker`, `realtime-voice-conversion`). |
 | HolyCut (`JoshuaMaciel337/HolyCut`) | Projeto do próprio dono | Copiar o que servir para dentro do editor. O HolyCut continua um projeto independente, sem ligação por código, banco ou login. |
 
 Regras para o código que vier do FilmCraft e do LightCraft:
@@ -463,6 +464,8 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Exportação rápida no navegador para vídeos curtos: 720p, até 3 min, com o desenho e o som da prévia.
 
 ### Fase 7: extras
+- [x] Auditoria de ponta a ponta (22/10/2026): 97 achados confirmados no código e no navegador, uns 80 diferentes. Corrigidos os graves (velocidade e zoom com ticks fracionários, valor digitado indo para outro clipe, 60 mídias no editor, LUFS perdido na ingestão, keyframes demais para o FFmpeg, início do clipe um quadro adiantado no render, luz e grão apagando a transparência, retake falso com números, cortes sobrepostos no "Criar automaticamente", ZIP de intercâmbio preso no disco, gaveta do celular sob a linha do tempo). Faltam os médios e os pequenos.
+- Estudo dos apps da ArtCraft (FilmCraft, LightCraft, EffectCraft, PhotoCraft, SoundCraft, VectorCraft): 42 funções para trazer do nosso jeito, por lotes. Ficam de fora os pesos do SAM 3, o RawNIND (GPL), o potrace (GPL), o CairoSVG (LGPL), o Depth Anything Base/Large (não comercial) e as animações do LottieFiles.
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).
 - [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.
 - Servidor MCP, para agentes editarem pelos comandos.
