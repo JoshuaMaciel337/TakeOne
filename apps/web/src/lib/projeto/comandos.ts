@@ -48,8 +48,10 @@ import {
   abaixarClipe,
   mesclarClipes,
   virarClipes,
+  arredondarClipes,
   aplicarEfeito,
   chromaClipes,
+  chaveLumaClipes,
   removerFundo,
   estabilizarClipes,
   limparImagem,
@@ -71,7 +73,7 @@ import type { PlanoDoModelo } from "./modelos.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
-import type { Chroma, Mesclagem } from "./modelo.ts";
+import type { Cantos, ChaveLuma, Chroma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
@@ -98,8 +100,10 @@ export type Comando =
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
+  | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
+  | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
   | { comando: "clipe.removerFundo"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.estabilizar"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.limparImagem"; parametros: { clipeIds: string[]; ligar: boolean } }
@@ -149,8 +153,10 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.abaixar": "abaixar na fala",
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.virar": "virar o clipe",
+  "clipe.cantos": "mudar os cantos",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
+  "clipe.chaveLuma": "mudar a chave de luminância",
   "clipe.removerFundo": "recortar o fundo",
   "clipe.estabilizar": "estabilizar",
   "clipe.limparImagem": "tirar o ruído da imagem",
@@ -229,12 +235,16 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: estabilizarClipes(projeto, ctx, parametros.clipeIds, parametros.ligar) };
     case "clipe.chroma":
       return { projeto: chromaClipes(projeto, parametros.clipeIds, parametros.chroma) };
+    case "clipe.chaveLuma":
+      return { projeto: chaveLumaClipes(projeto, parametros.clipeIds, parametros.chave) };
     case "clipe.efeito":
       return { projeto: aplicarEfeito(projeto, parametros.clipeIds, parametros.efeito) };
     case "clipe.mesclar":
       return { projeto: mesclarClipes(projeto, parametros.clipeIds, parametros.mesclagem) };
     case "clipe.virar":
       return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
+    case "clipe.cantos":
+      return { projeto: arredondarClipes(projeto, parametros.clipeIds, parametros.cantos) };
     case "clipe.abaixar":
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":

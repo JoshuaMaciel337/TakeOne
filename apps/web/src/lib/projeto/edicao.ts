@@ -39,6 +39,9 @@ import {
   fimDoClipe,
   type InfoMidia,
   tempoNaMidia,
+  BORDA_MAXIMA,
+  type Cantos,
+  type ChaveLuma,
   type Chroma,
   MESCLAGENS,
   type Mesclagem,
@@ -47,6 +50,7 @@ import {
   type Recorte,
   type TipoFaixa,
   type Transformacao,
+  RAIO_MAXIMO,
   TRANSFORMACAO_PADRAO,
   type Virar,
 } from "./modelo.ts";
@@ -876,16 +880,16 @@ export const GRUPOS_DE_AJUSTES = [
   { id: "cor", nome: "Cor e filtro" },
   { id: "efeito", nome: "Efeito e tela verde" },
   { id: "animacao", nome: "Animações de entrada, saída e loop" },
-  { id: "imagem", nome: "Posição, tamanho, giro, virar, recorte, keyframes e mesclagem" },
+  { id: "imagem", nome: "Posição, tamanho, giro, virar, recorte, cantos, keyframes e mesclagem" },
   { id: "audio", nome: "Volume, fades e efeitos de voz" },
 ] as const;
 export type GrupoDeAjustes = (typeof GRUPOS_DE_AJUSTES)[number]["id"];
 
 const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
   cor: ["cor"],
-  efeito: ["efeito", "chroma"],
+  efeito: ["efeito", "chroma", "chave_luma"],
   animacao: ["animacao"],
-  imagem: ["transformacao", "recorte", "virar", "keyframes", "expressoes", "mesclagem"],
+  imagem: ["transformacao", "recorte", "virar", "cantos", "keyframes", "expressoes", "mesclagem"],
   audio: ["volume", "fade_entrada", "fade_saida", "curva_fade", "efeitos_voz", "igualar_volume"],
 };
 
@@ -925,7 +929,7 @@ export function colarAjustes(
       }
       for (const campo of CAMPOS_DOS_GRUPOS[grupo]) {
         // A tela verde é só de mídia: num texto, o resto do grupo vai e ela fica
-        if (campo === "chroma" && !ehMidia) continue;
+        if ((campo === "chroma" || campo === "chave_luma") && !ehMidia) continue;
         (novo as Record<string, unknown>)[campo] = structuredClone(origem[campo]);
       }
       mudou = true;
@@ -1585,6 +1589,16 @@ export function estabilizarClipes(projeto: Projeto, ctx: Contexto, clipeIds: str
   });
 }
 
+/** A chave de luminância dos clipes de mídia; null tira. */
+export function chaveLumaClipes(projeto: Projeto, clipeIds: string[], chave: ChaveLuma | null): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto) throw new ErroEdicao("A chave de luminância vale só em vídeos e imagens.");
+    if (!chave) return { ...clipe, chave_luma: null };
+    if (chave.tirar !== "escuro" && chave.tirar !== "claro") throw new ErroEdicao("Escolha tirar o escuro ou o claro.");
+    return { ...clipe, chave_luma: { tirar: chave.tirar, limiar: limitar(chave.limiar, 0, 1), suavidade: limitar(chave.suavidade, 0, 1) } };
+  });
+}
+
 /** A tela verde dos clipes de mídia; null tira. */
 export function chromaClipes(projeto: Projeto, clipeIds: string[], chroma: Chroma | null): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
@@ -1600,6 +1614,16 @@ export function aplicarEfeito(projeto: Projeto, clipeIds: string[], efeito: Efei
   if (efeito && !EFEITOS.some((item) => item.id === efeito.tipo)) throw new ErroEdicao("Este efeito não existe.");
   const limpo = efeito ? { tipo: efeito.tipo, intensidade: limitar(efeito.intensidade, 0, 1) } : null;
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, efeito: limpo }));
+}
+
+/** Os cantos arredondados e a borda dos clipes; null (ou raio e borda zerados) tira. */
+export function arredondarClipes(projeto: Projeto, clipeIds: string[], cantos: Cantos | null): Projeto {
+  if (cantos && !/^#[0-9a-f]{6}$/i.test(cantos.cor)) throw new ErroEdicao("Cor inválida.");
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (!cantos) return { ...clipe, cantos: null };
+    const limpos = { raio: limitar(cantos.raio, 0, RAIO_MAXIMO), borda: limitar(cantos.borda, 0, BORDA_MAXIMA), cor: cantos.cor.toLowerCase() };
+    return { ...clipe, cantos: limpos.raio > 0 || limpos.borda > 0 ? limpos : null };
+  });
 }
 
 /** Vira a imagem dos clipes no sentido pedido; virar de novo desvira. */

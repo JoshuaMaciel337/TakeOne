@@ -44,6 +44,15 @@ export type Transformacao = {
 /** Parte da mídia que aparece, em frações da largura e da altura dela (como ela aparece, já virada). */
 export type Recorte = { x: number; y: number; largura: number; altura: number };
 
+/**
+ * Cantos arredondados e borda: o raio e a espessura em frações do lado menor do clipe (como ele aparece), e a
+ * cor da borda. A conta é a de core/utils/cantos.py, que o shader da prévia repete.
+ */
+export type Cantos = { raio: number; borda: number; cor: string };
+export const CANTOS_PADRAO: Cantos = { raio: 0.08, borda: 0, cor: "#ffffff" };
+export const RAIO_MAXIMO = 0.5;
+export const BORDA_MAXIMA = 0.25;
+
 /** A imagem do clipe espelhada na horizontal, na vertical ou nos dois sentidos. */
 export type Virar = { horizontal: boolean; vertical: boolean };
 
@@ -66,6 +75,14 @@ export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
  */
 export type Chroma = { cor: string; semelhanca: number; suavidade: number };
 export const CHROMA_PADRAO: Chroma = { cor: "#00ff00", semelhanca: 0.3, suavidade: 0.1 };
+
+/**
+ * Chave de luminância: some o escuro (ou o claro) pela luma BT.709 da cor. No escuro, abaixo de `limiar`
+ * some de vez e aparece aos poucos por mais `suavidade`; no claro, o contrário. Para luz, fogo e fumaça
+ * gravados sobre preto, e desenhos sobre papel branco.
+ */
+export type ChaveLuma = { tirar: "escuro" | "claro"; limiar: number; suavidade: number };
+export const CHAVE_LUMA_PADRAO: ChaveLuma = { tirar: "escuro", limiar: 0.1, suavidade: 0.1 };
 
 export const TRANSFORMACAO_PADRAO: Transformacao = { x: 0, y: 0, escala: 1, rotacao: 0, opacidade: 1 };
 export const RECORTE_PADRAO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
@@ -106,6 +123,8 @@ export type Clipe = {
   recorte: Recorte;
   /** Espelha a imagem dentro da caixa (lib/projeto/geometria.ts, recorteNaFonte); sem ele, como veio. */
   virar?: Virar | null;
+  /** Cantos arredondados e borda; sem eles, o retângulo inteiro. */
+  cantos?: Cantos | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
@@ -118,6 +137,8 @@ export type Clipe = {
   estabilizar?: boolean;
   /** Tela verde: a cor que some (só em vídeos e imagens). */
   chroma?: Chroma | null;
+  /** Chave de luminância: some o preto ou o branco (só em vídeos e imagens). */
+  chave_luma?: ChaveLuma | null;
   /** Velocidade com curva (lib/projeto/velocidade.ts); sem ela, a velocidade é a mesma o clipe todo. */
   curva_velocidade?: PontoDeVelocidade[] | null;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */

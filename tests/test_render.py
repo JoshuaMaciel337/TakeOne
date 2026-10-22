@@ -420,6 +420,28 @@ def test_zoom_animado_com_transparencia_volta_ao_alfa_reto_so_depois_do_pad():
     assert ":eval=frame,pad=w=" in cadeia and cadeia.index("pad=w=") < cadeia.index("eval=frame,unpremultiply")
 
 
+def test_chave_de_luminancia_vira_rampa_na_luma_e_multiplica_o_alfa():
+    escuro = clipe("c1", "deitado", 0, 2, chave_luma={"tirar": "escuro", "limiar": 0.2, "suavidade": 0.1})
+    claro = clipe("c2", "deitado", 2, 2, chave_luma={"tirar": "claro", "limiar": 0.8, "suavidade": 0})
+    plano = planejar_render(projeto([faixa("principal", [escuro, claro])]), MIDIAS, 720, 1280)
+    assert plano.filtro.count("colorchannelmixer=rr=0.2126:rg=0.7152:rb=0.0722") == 2
+    # 20% de 255 = 51; a rampa de 10% (25,5 níveis) vai de 0 a 255
+    assert "lutrgb=r='clip((val-51)*10+0.5,0,255)'" in plano.filtro
+    assert "lutrgb=r='lt(val,204)*255'" in plano.filtro
+    assert plano.filtro.count("alphaextract") == 2 and plano.filtro.count("alphamerge") == 2
+
+
+def test_cantos_multiplicam_o_alfa_e_a_borda_vai_por_cima_antes_da_cortina():
+    com_borda = clipe("c1", "deitado", 0, 2, cantos={"raio": 0.2, "borda": 0.05, "cor": "#ff0000"})
+    so_cantos = clipe("c2", "deitado", 2, 2, cantos={"raio": 0.2, "borda": 0, "cor": "#ffffff"})
+    plano = planejar_render(projeto([faixa("principal", [com_borda, so_cantos])]), MIDIAS, 720, 1280, pasta="/t")
+    tipos = sorted(a.tipo for a in plano.auxiliares if a.tipo in ("cantos", "anel"))
+    assert tipos == ["anel", "cantos", "cantos"]
+    cantos = next(a for a in plano.auxiliares if a.caminho == "/t/cantos_c1.png")
+    assert (cantos.largura, cantos.altura) == (720, 405)
+    assert plano.filtro.count("alphaextract") == 2 and plano.filtro.count("overlay=format=rgb,format=rgba") == 1
+
+
 def test_virar_le_o_recorte_espelhado_e_vira_depois_da_cor_e_antes_da_vinheta():
     recorte = {"x": 0.1, "y": 0, "largura": 0.5, "altura": 1}
     virado = clipe("c1", "deitado", 0, 4, recorte=recorte, virar={"horizontal": True, "vertical": True},

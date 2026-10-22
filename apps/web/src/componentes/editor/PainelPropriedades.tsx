@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Diamond, FlipHorizontal2, FlipVertical2, MousePointerClick, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, MousePointerClick, RotateCcw, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
 import { useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -8,7 +8,7 @@ import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
-import { type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
+import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
@@ -444,7 +444,8 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
               title={`Virar na ${sentido}`}
               onClick={() => aoExecutar({ comando: "clipe.virar", parametros: { clipeIds: [clipe.id], sentido } })}
             >
-              {sentido === "horizontal" ? <FlipHorizontal2 className="size-4" aria-hidden /> : <FlipVertical2 className="size-4" aria-hidden />}
+              {/* O eixo tracejado é o espelho: vertical para virar na horizontal */}
+              {sentido === "horizontal" ? <TrianglesCenterlineDashedVertical className="size-4" aria-hidden /> : <TrianglesCenterlineDashedHorizontal className="size-4" aria-hidden />}
             </button>
           ))}
         </div>
@@ -464,10 +465,12 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             ))}
           </select>
         </label>
+        <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {midia?.elemento && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
+        {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {!clipe.texto && midia?.video && !midia.imagem ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
         {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
@@ -712,6 +715,85 @@ function TelaVerde({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; tra
             aoConfirmar={(cor) => aoExecutar(comando({ ...chroma, cor }))}
           />
           <ControleNumerico rotulo="Semelhança" minimo={1} maximo={100} sufixo="%" {...controle("semelhanca")} />
+          <ControleNumerico rotulo="Suavidade" minimo={0} maximo={100} sufixo="%" {...controle("suavidade")} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Cantos arredondados e borda: o raio, a espessura e a cor da borda. */
+function CantosDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
+  const cantos = clipe.cantos ?? null;
+  const comando = (valor: Cantos | null): Comando => ({ comando: "clipe.cantos", parametros: { clipeIds: [clipe.id], cantos: valor } });
+  const controle = (campo: "raio" | "borda") => ({
+    valor: (cantos?.[campo] ?? 0) * 100,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ ...cantos!, [campo]: valor / 100 })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - cantos![campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ ...cantos!, [campo]: valor / 100 }));
+    },
+  });
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={cantos !== null} disabled={travada} onChange={(evento) => aoExecutar(comando(evento.currentTarget.checked ? CANTOS_PADRAO : null))} />
+        <span className="flex-1">Cantos arredondados e borda</span>
+      </label>
+      {cantos ? (
+        <>
+          <ControleNumerico rotulo="Arredondar" minimo={0} maximo={50} sufixo="%" {...controle("raio")} />
+          <ControleNumerico rotulo="Borda" minimo={0} maximo={BORDA_MAXIMA * 100} passo={0.5} sufixo="%" {...controle("borda")} />
+          {cantos.borda > 0 ? (
+            <CampoCor
+              rotulo="Cor da borda"
+              cor={cantos.cor}
+              desativado={travada}
+              aoPrever={(cor) => aoPrever(comando({ ...cantos, cor }))}
+              aoConfirmar={(cor) => aoExecutar(comando({ ...cantos, cor }))}
+            />
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Chave de luminância de um clipe de mídia: tira o escuro ou o claro, com o limite e a suavidade. */
+function ChaveDeLuma({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
+  const chave = clipe.chave_luma ?? null;
+  const comando = (valor: ChaveLuma | null): Comando => ({ comando: "clipe.chaveLuma", parametros: { clipeIds: [clipe.id], chave: valor } });
+  const controle = (campo: "limiar" | "suavidade") => ({
+    valor: (chave?.[campo] ?? 0) * 100,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ ...chave!, [campo]: valor / 100 })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - chave![campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ ...chave!, [campo]: valor / 100 }));
+    },
+  });
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={chave !== null} disabled={travada} onChange={(evento) => aoExecutar(comando(evento.currentTarget.checked ? CHAVE_LUMA_PADRAO : null))} />
+        <span className="flex-1">Tirar o fundo preto ou branco</span>
+      </label>
+      {chave ? (
+        <>
+          <label className="mt-1 flex items-center gap-2 text-xs">
+            <span className="flex-1 text-suave">Some o</span>
+            <select
+              value={chave.tirar}
+              disabled={travada}
+              onChange={(evento) => aoExecutar(comando({ ...chave, tirar: evento.currentTarget.value as ChaveLuma["tirar"] }))}
+              className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque"
+            >
+              <option value="escuro">Escuro</option>
+              <option value="claro">Claro</option>
+            </select>
+          </label>
+          <ControleNumerico rotulo="Até" minimo={0} maximo={100} sufixo="%" {...controle("limiar")} />
           <ControleNumerico rotulo="Suavidade" minimo={0} maximo={100} sufixo="%" {...controle("suavidade")} />
         </>
       ) : null}

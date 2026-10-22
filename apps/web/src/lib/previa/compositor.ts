@@ -8,7 +8,7 @@ import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Chroma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
+import type { Cantos, ChaveLuma, Chroma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
@@ -45,6 +45,10 @@ export type Camada = {
   grao?: { forca: number; colunas: number; deslocamento: [number, number] };
   /** Tela verde (lib/projeto/modelo.ts): a cor que some, como o colorkey do render. */
   chroma?: Chroma | null;
+  /** Cantos arredondados e borda (core/utils/cantos.py), entre as curvas e a vinheta, como no render. */
+  cantos?: Cantos | null;
+  /** Chave de luminância: o escuro ou o claro que some, depois da tela verde. */
+  chaveLuma?: ChaveLuma | null;
   /** Recorte do fundo: o quadro da máscara da pessoa (o alfa), no mesmo enquadramento do vídeo. */
   mascaraDoFundo?: TexImageSource | null;
 };
@@ -92,6 +96,17 @@ void main() {
 // A camada já recortada (máscara do fundo e tela verde), pré-multiplicada, num framebuffer: com brilho, o
 // desenho e a cópia desfocada saem dela, como no render (o brilho vem depois do alphamerge e do colorkey).
 // Desfocando o quadro cru, o fundo removido voltava como névoa e o preto das animações escurecia o vídeo
+// Chave de luminância (lib/projeto/modelo.ts, ChaveLuma): 1 some o escuro, 2 o claro, pela luma BT.709 da cor
+// direta; a mesma rampa do lutrgb do render
+const CHAVE_DE_LUMA = `uniform int u_luma;
+uniform float u_lumaLimiar;
+uniform float u_lumaSuavidade;
+float alfaDaLuma(vec3 c) {
+  float y = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  float d = u_luma == 1 ? y - u_lumaLimiar : u_lumaLimiar - y;
+  return u_lumaSuavidade > 0.0001 ? clamp(d / u_lumaSuavidade, 0.0, 1.0) : (d > 0.0 ? 1.0 : 0.0);
+}`;
+
 const FRAGMENTOS_RECORTE = `#version 300 es
 precision highp float;
 in vec2 v_pos;
@@ -102,6 +117,7 @@ uniform bool u_comChroma;
 uniform vec3 u_chromaCor;
 uniform float u_semelhanca;
 uniform float u_suavidade;
+${CHAVE_DE_LUMA}
 out vec4 cor;
 void main() {
   vec4 texel = texture(u_fonte, v_pos);
@@ -110,6 +126,7 @@ void main() {
     float d = length(texel.rgb / texel.a - u_chromaCor) / sqrt(3.0);
     texel *= u_suavidade > 0.0001 ? clamp((d - u_semelhanca) / u_suavidade, 0.0, 1.0) : (d > u_semelhanca ? 1.0 : 0.0);
   }
+  if (u_luma > 0 && texel.a > 0.0) texel *= alfaDaLuma(texel.rgb / texel.a);
   cor = texel;
 }`;
 
@@ -201,6 +218,18 @@ uniform vec2 u_graoDeslocamento;
 uniform sampler2D u_graoTextura;
 const vec2 GRAO_TEXTURA = vec2(${GRAO_TEXTURA[0].toFixed(1)}, ${GRAO_TEXTURA[1].toFixed(1)});
 const float GRAO_LINHAS = ${GRAO_LINHAS.toFixed(1)};
+${CHAVE_DE_LUMA}
+// Cantos arredondados (core/utils/cantos.py): raio e borda em frações do lado menor do clipe; a distância de cada
+// pixel da tela ao retângulo arredondado, com 1 pixel de borda suave
+uniform vec2 u_cantos;
+uniform vec3 u_corDaBorda;
+uniform float u_pixelsPorUnidade;
+float coberturaDoCanto(vec2 p, vec2 meia, float raio) {
+  if (meia.x <= 0.0 || meia.y <= 0.0) return 0.0;
+  raio = min(raio, min(meia.x, meia.y));
+  vec2 q = abs(p) - (meia - raio);
+  return clamp(0.5 - (length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - raio), 0.0, 1.0);
+}
 out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -265,18 +294,34 @@ void main() {
     // Multiplica o alfa que já havia (logo, recorte do fundo, borda suave), como o render
     texel = texel * k;
   }
+  if (u_luma > 0 && texel.a > 0.0) texel *= alfaDaLuma(texel.rgb / texel.a);
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
     texel = texel + luz - texel * luz;
   }
-  if ((u_comCor || u_comCurvas || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0) && texel.a > 0.0) {
+  bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0;
+  if ((u_comCor || u_comCurvas || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos) && (texel.a > 0.0 || comCantos)) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
-    // A ordem é a do render: a LUT (ajustes e curvas) e depois a vinheta
-    vec3 c = texel.rgb / texel.a;
+    // A ordem é a do render: a LUT (ajustes e curvas), os cantos e depois a vinheta
+    vec3 c = texel.a > 0.0 ? texel.rgb / texel.a : vec3(0.0);
+    float alfa = texel.a;
     if (u_comCor) c = aplicarCor(c);
     if (u_comCurvas) {
       vec3 i = (clamp(c, 0.0, 1.0) * 255.0 + 0.5) / 256.0;
       c = vec3(texture(u_curvas, vec2(i.r, 0.5)).r, texture(u_curvas, vec2(i.g, 0.5)).g, texture(u_curvas, vec2(i.b, 0.5)).b);
+    }
+    if (comCantos) {
+      // O clipe fica com a parte de dentro e a borda (o anel) vai por cima, como o alphamerge e o overlay do render
+      vec2 meia = u_tamanho * u_pixelsPorUnidade / 2.0;
+      vec2 p = (v_local - 0.5) * meia * 2.0;
+      float lado = 2.0 * min(meia.x, meia.y);
+      float raio = u_cantos.x * lado;
+      float borda = u_cantos.y * lado;
+      float dentro = coberturaDoCanto(p, meia - borda, max(raio - borda, 0.0));
+      float anel = clamp(coberturaDoCanto(p, meia, raio) - dentro, 0.0, 1.0);
+      float a = alfa * dentro;
+      alfa = anel + a * (1.0 - anel);
+      c = alfa > 0.0 ? (u_corDaBorda * anel + c * a * (1.0 - anel)) / alfa : c;
     }
     if (u_comCor) {
       float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
@@ -293,7 +338,7 @@ void main() {
       float n = texture(u_graoTextura, (celula + u_graoDeslocamento + 0.5) / GRAO_TEXTURA).r;
       c = clamp(c + (n - 0.5) * u_grao, 0.0, 1.0);
     }
-    texel = vec4(c * texel.a, texel.a);
+    texel = vec4(c * alfa, alfa);
   }
   cor = texel * u_opacidade;
   if (u_mesclagem == 1) cor = vec4(cor.rgb + (1.0 - cor.a), 1.0);
@@ -315,6 +360,18 @@ function compilar(gl: WebGL2RenderingContext, tipo: number, codigo: string): Web
   return shader;
 }
 
+/** Os uniformes da chave de luminância (0 desligada, 1 tira o escuro, 2 o claro). */
+function definirChaveDeLuma(
+  gl: WebGL2RenderingContext,
+  uniformes: Record<"luma" | "lumaLimiar" | "lumaSuavidade", WebGLUniformLocation | null>,
+  chave: ChaveLuma | null | undefined,
+) {
+  gl.uniform1i(uniformes.luma, chave ? (chave.tirar === "escuro" ? 1 : 2) : 0);
+  if (!chave) return;
+  gl.uniform1f(uniformes.lumaLimiar, chave.limiar);
+  gl.uniform1f(uniformes.lumaSuavidade, chave.suavidade);
+}
+
 /** "#ff6a3d" → [1, 0.416, 0.239]. */
 export function corParaRgb(hex: string): [number, number, number] {
   const valor = Number.parseInt(hex.slice(1, 7), 16);
@@ -329,7 +386,7 @@ type Recursos = {
   desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
   recorte: {
     programa: WebGLProgram;
-    uniformes: Record<"fonte" | "mascara" | "comMascara" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade", WebGLUniformLocation | null>;
+    uniformes: Record<"fonte" | "mascara" | "comMascara" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade", WebGLUniformLocation | null>;
   };
   /** Os dois framebuffers das passadas do desfoque. */
   alvos: Alvo[];
@@ -340,7 +397,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -417,6 +474,9 @@ export class Compositor {
         chromaCor: localRecorte("u_chromaCor"),
         semelhanca: localRecorte("u_semelhanca"),
         suavidade: localRecorte("u_suavidade"),
+        luma: localRecorte("u_luma"),
+        lumaLimiar: localRecorte("u_lumaLimiar"),
+        lumaSuavidade: localRecorte("u_lumaSuavidade"),
       },
     };
     gl.useProgram(programa);
@@ -462,6 +522,12 @@ export class Compositor {
         graoDeslocamento: local("u_graoDeslocamento"),
         graoTextura: local("u_graoTextura"),
         comChroma: local("u_comChroma"),
+        cantos: local("u_cantos"),
+        corDaBorda: local("u_corDaBorda"),
+        pixelsPorUnidade: local("u_pixelsPorUnidade"),
+        luma: local("u_luma"),
+        lumaLimiar: local("u_lumaLimiar"),
+        lumaSuavidade: local("u_lumaSuavidade"),
         comMascaraDoFundo: local("u_comMascaraDoFundo"),
         mascaraDoFundo: local("u_mascaraDoFundo"),
         chromaCor: local("u_chromaCor"),
@@ -590,6 +656,7 @@ export class Compositor {
       gl.uniform1f(recorte.uniformes.semelhanca, camada.chroma.semelhanca);
       gl.uniform1f(recorte.uniformes.suavidade, camada.chroma.suavidade);
     }
+    definirChaveDeLuma(gl, recorte.uniformes, camada.chaveLuma);
     gl.viewport(0, 0, largura, altura);
     gl.bindFramebuffer(gl.FRAMEBUFFER, alvo.buffer);
     gl.bindTexture(gl.TEXTURE_2D, textura);
@@ -685,7 +752,7 @@ export class Compositor {
       const brilho = camada.brilho ?? 0;
       gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
       // Com brilho, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
-      const recortadaAntes = brilho > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma);
+      const recortadaAntes = brilho > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
       if (recortadaAntes) {
         this.recortarCamada(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture, camada, largura, altura);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -716,6 +783,12 @@ export class Compositor {
         gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
         gl.uniform1f(uniformes.semelhanca, camada.chroma.semelhanca);
         gl.uniform1f(uniformes.suavidade, camada.chroma.suavidade);
+      }
+      definirChaveDeLuma(gl, uniformes, recortadaAntes ? null : camada.chaveLuma);
+      gl.uniform2f(uniformes.cantos, camada.cantos?.raio ?? 0, camada.cantos?.borda ?? 0);
+      if (camada.cantos) {
+        gl.uniform3f(uniformes.corDaBorda, ...corParaRgb(camada.cantos.cor));
+        gl.uniform1f(uniformes.pixelsPorUnidade, this.canvas.width / quadro.largura);
       }
       gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);
       gl.uniform1f(uniformes.luzPosicao, camada.luz?.posicao ?? 0);

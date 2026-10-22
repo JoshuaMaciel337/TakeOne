@@ -151,6 +151,19 @@ class TransformacaoEntrada(BaseModel):
     opacidade: float = Field(default=1, ge=0, le=1)
 
 
+class ChaveLumaEntrada(BaseModel):
+    tirar: Literal["escuro", "claro"] = "escuro"
+    limiar: float = Field(default=0.1, ge=0, le=1)
+    suavidade: float = Field(default=0.1, ge=0, le=1)
+
+
+class CantosEntrada(BaseModel):
+    # Frações do lado menor do clipe; os limites são os de core/utils/cantos.py
+    raio: float = Field(default=0, ge=0, le=0.5)
+    borda: float = Field(default=0, ge=0, le=0.25)
+    cor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
+
+
 class VirarEntrada(BaseModel):
     horizontal: bool = False
     vertical: bool = False
@@ -455,8 +468,11 @@ class ClipeEntrada(BaseModel):
     mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
     # A imagem espelhada; o recorte é do que aparece (core/utils/geometria.py, recorte_na_fonte)
     virar: VirarEntrada | None = None
+    cantos: CantosEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
+    # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
+    chave_luma: ChaveLumaEntrada | None = None
     # Velocidade com curva: (u, s) do começo (u = 0) ao fim (u = 1) do clipe; s de 0,2 a 5
     curva_velocidade: list[tuple[float, float]] | None = Field(default=None, min_length=2, max_length=16)
 

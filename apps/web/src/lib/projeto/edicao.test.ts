@@ -16,6 +16,8 @@ import {
   colarAjustes,
   colarClipes,
   virarClipes,
+  chaveLumaClipes,
+  arredondarClipes,
   type Contexto,
   dividirClipes,
   DURACAO_IMAGEM_S,
@@ -932,4 +934,25 @@ test("virar liga e desliga cada sentido; sem nenhum, o campo some", () => {
   assert.equal(principal(projeto)[0].virar, null);
   const musica = adicionarClipe(projeto, ctx, "musica");
   assert.throws(() => virarClipes(musica.projeto, [musica.clipeId], "horizontal"), /áudio/);
+});
+
+test("a chave de luminância vale em vídeos e imagens, nos limites, e sai com null", () => {
+  const ctx = contexto();
+  const video = adicionarClipe(vazio(), ctx, "video10");
+  let projeto = chaveLumaClipes(video.projeto, [video.clipeId], { tirar: "claro", limiar: 1.4, suavidade: -1 });
+  assert.deepEqual(principal(projeto)[0].chave_luma, { tirar: "claro", limiar: 1, suavidade: 0 });
+  projeto = chaveLumaClipes(projeto, [video.clipeId], null);
+  assert.equal(principal(projeto)[0].chave_luma, null);
+  const titulo = adicionarTexto(projeto, ctx, 0, TEXTO_PADRAO);
+  assert.throws(() => chaveLumaClipes(titulo.projeto, [titulo.clipeId], { tirar: "escuro", limiar: 0.1, suavidade: 0.1 }), /vídeos e imagens/);
+});
+
+test("cantos nos limites; zerados ou null, o campo some", () => {
+  const ctx = contexto();
+  const video = adicionarClipe(vazio(), ctx, "video10");
+  let projeto = arredondarClipes(video.projeto, [video.clipeId], { raio: 0.9, borda: 0.4, cor: "#FF0000" });
+  assert.deepEqual(principal(projeto)[0].cantos, { raio: 0.5, borda: 0.25, cor: "#ff0000" });
+  projeto = arredondarClipes(projeto, [video.clipeId], { raio: 0, borda: 0, cor: "#ffffff" });
+  assert.equal(principal(projeto)[0].cantos, null);
+  assert.throws(() => arredondarClipes(projeto, [video.clipeId], { raio: 0.1, borda: 0, cor: "vermelho" }), /Cor/);
 });

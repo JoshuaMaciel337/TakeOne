@@ -212,6 +212,56 @@ def test_render_segue_a_geometria_da_previa(cliente, db_limpo):
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_arredonda_os_cantos_com_borda(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    cantos = {"raio": 0.3, "borda": 0.05, "cor": "#ffffff"}
+    projeto = projeto_com(cliente, midia_id, cantos=cantos)
+    cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"})
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"organizacao_id": organizacao_de(cliente)})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    quadro = quadro_do_video(video, 1.0, 720, 1280)
+    padrao = {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}
+    caixa = caixa_do_clipe(padrao, {"x": 0, "y": 0, "largura": 1, "altura": 1}, (640, 360), (720, 1280))
+    esquerda, topo = caixa.cx - caixa.largura / 2, caixa.cy - caixa.altura / 2
+    borda = 0.05 * caixa.altura
+    pontos = {
+        "canto": ((esquerda + 3, topo + 3), FUNDO),
+        "borda de cima": ((caixa.cx - caixa.largura / 4, topo + borda / 2), (255, 255, 255)),
+        "dentro": ((caixa.cx - caixa.largura / 4, caixa.cy - caixa.altura / 4), CORES[(0, 0)]),
+    }
+    for nome, ((x, y), esperada) in pontos.items():
+        obtida = tuple(int(c) for c in quadro[round(y), round(x)])
+        assert max(abs(a - b) for a, b in zip(obtida, esperada, strict=True)) <= 48, (nome, esperada, obtida)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_tira_o_escuro_pela_luma(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    # Luma BT.709: vermelho 0,21, azul 0,07 (somem abaixo de 30%); verde 0,72 e amarelo 0,93 ficam
+    projeto = projeto_com(cliente, midia_id, chave_luma={"tirar": "escuro", "limiar": 0.3, "suavidade": 0})
+    cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"})
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+
+    doc = db_limpo.exportacoes.find_one({"organizacao_id": organizacao_de(cliente)})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    quadro = quadro_do_video(video, 1.0, 720, 1280)
+    padrao = {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1}
+    caixa = caixa_do_clipe(padrao, {"x": 0, "y": 0, "largura": 1, "altura": 1}, (640, 360), (720, 1280))
+    esperadas = {(0, 0): FUNDO, (1, 0): CORES[(1, 0)], (0, 1): CORES[(0, 1)], (1, 1): FUNDO}
+    for (lado, baixo), esperada in esperadas.items():
+        x = round(caixa.cx + (0.25 if lado else -0.25) * caixa.largura)
+        y = round(caixa.cy + (0.25 if baixo else -0.25) * caixa.altura)
+        obtida = tuple(int(c) for c in quadro[y, x])
+        assert max(abs(a - b) for a, b in zip(obtida, esperada, strict=True)) <= 48, ((lado, baixo), esperada, obtida)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
 def test_render_vira_a_imagem_e_recorta_o_que_aparece(cliente, db_limpo):
     cadastrar(cliente)
     midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)

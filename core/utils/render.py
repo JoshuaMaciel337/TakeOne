@@ -26,6 +26,7 @@ from functools import lru_cache
 from core.config import FFMPEG
 from core.modelos.midia import chave_da_estabilizacao, chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
+from core.utils.cantos import tem_cantos
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
     BRILHO_SIGMA,
@@ -171,7 +172,7 @@ class Entrada:
 class ArquivoAuxiliar:
     """Arquivo que o worker gera antes do FFmpeg: a LUT da cor, a imagem da vinheta ou o roteiro do sendcmd."""
     caminho: str
-    tipo: str          # "lut", "vinheta", "comandos", "reverb", "luz" ou "grao"
+    tipo: str          # "lut", "vinheta", "cantos", "anel", "comandos", "reverb", "luz" ou "grao"
     ajustes: dict
     largura: int = 0
     altura: int = 0
@@ -226,7 +227,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     roteiro_de_opacidade: str | None = None,
                     mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None,
                     luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None,
-                    mascara_do_fundo: int | None = None, alfa_na_fonte: bool = False) -> tuple[str, str]:
+                    mascara_do_fundo: int | None = None, alfa_na_fonte: bool = False,
+                    cantos: tuple[int, int | None] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -239,6 +241,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     grao: (entrada com a imagem do grão, roteiro do sendcmd do recorte, colunas de células).
     mascara_do_fundo: entrada com o vídeo da máscara da pessoa (recorte do fundo), lida como o clipe.
     alfa_na_fonte: a imagem já chega com transparência (texto, logo, forma).
+    cantos: (entrada com a máscara dos cantos, entrada com o anel da borda ou None), quando o clipe os tem.
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -331,6 +334,25 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
             filtros = []
         else:
             filtros.append(colorkey)
+    chave_luma = clipe.get("chave_luma")
+    if chave_luma and not clipe.get("texto"):
+        # Chave de luminância: a luma BT.709 (colorchannelmixer) vira o fator do alfa numa rampa (lutrgb, com
+        # +0,5 porque a tabela trunca), que multiplica o alfa que já havia. O shader da prévia faz a mesma conta
+        limiar = chave_luma["limiar"] * 255
+        if chave_luma["suavidade"] > 0.0001:
+            ganho = 255 / (chave_luma["suavidade"] * 255)
+            distancia = f"(val-{_numero(limiar)})" if chave_luma["tirar"] == "escuro" else f"({_numero(limiar)}-val)"
+            rampa = f"clip({distancia}*{_numero(ganho)}+0.5,0,255)"
+        else:
+            corte = "gt" if chave_luma["tirar"] == "escuro" else "lt"
+            rampa = f"{corte}(val,{_numero(limiar)})*255"
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=rgba', 'split=3'])}[ya{numero}][yb{numero}][yc{numero}];\n"
+                  f"[yb{numero}]colorchannelmixer=rr=0.2126:rg=0.7152:rb=0.0722,lutrgb=r='{rampa}',format=gbrap,"
+                  f"extractplanes=r[yd{numero}];\n"
+                  f"[yc{numero}]alphaextract[ye{numero}];\n"
+                  f"[ye{numero}][yd{numero}]blend=all_mode=multiply[yf{numero}];\n"
+                  f"[ya{numero}][yf{numero}]alphamerge")
+        filtros = []
     brilho = brilho_do_efeito(clipe)
     if brilho:
         # Brilho: o clipe desfocado, na força do brilho, somado em "tela" ao clipe (no alfa
@@ -351,6 +373,20 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros.append("hflip")
     if virar.get("vertical"):
         filtros.append("vflip")
+    if cantos:
+        # Cantos arredondados (core/utils/cantos.py): o alfa multiplicado pela parte de dentro e a borda por cima,
+        # no clipe como aparece e antes da cortina (que esconde a borda junto); o shader faz isso entre as curvas
+        # e a vinheta
+        mascara_dos_cantos, anel = cantos
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=rgba', 'split'])}[qa{numero}][qb{numero}];\n"
+                  f"[qb{numero}]alphaextract[qc{numero}];\n"
+                  f"[{mascara_dos_cantos}:v]format=gray[qd{numero}];\n"
+                  f"[qc{numero}][qd{numero}]blend=all_mode=multiply[qe{numero}];\n"
+                  f"[qa{numero}][qe{numero}]alphamerge")
+        if anel is not None:
+            cabeca += (f"[qf{numero}];\n[{anel}:v]format=rgba[qg{numero}];\n"
+                       f"[qf{numero}][qg{numero}]overlay=format=rgb,format=rgba")
+        filtros = []
     # Cortina: some o que ainda não foi revelado, nas coordenadas do clipe (antes de girar, como a prévia)
     cortina = filtro_de_cortina(list(leitura.efeitos), inicio) if leitura.efeitos else None
     if cortina:
@@ -821,6 +857,19 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
             # A vinheta encontra o clipe já na velocidade dele: dura a janela no vídeo final
             entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
+        cantos = None
+        if tem_cantos(clipe):
+            # A máscara dos cantos e, com borda, o anel na cor dela: imagens do tamanho do clipe, como a vinheta
+            tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))
+            leitura = leituras.get(clipe["id"])
+            janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
+            imagens = []
+            for parte in ("cantos", "anel") if clipe["cantos"].get("borda") else ("cantos",):
+                caminho = f"{pasta}/{parte}_{clipe['id']}.png"
+                auxiliares[caminho] = ArquivoAuxiliar(caminho, parte, dict(clipe["cantos"]), *tamanho)
+                imagens.append(len(entradas))
+                entradas.append(Entrada(caminho, 0, janela, imagem=True, taxa=taxa))
+            cantos = (imagens[0], imagens[1] if len(imagens) > 1 else None)
         e_imagem_parada = not clipe.get("texto") and midias[clipe["midia_id"]].imagem
         # Texto e imagem parada são PNG em RGB: entram como estão, como a prévia desenha
         entrada_de_cor = None
@@ -912,7 +961,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(midia.mascara, lida.inicio, lida.duracao))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao,
-                                          mascara_do_fundo, alfa_na_fonte)
+                                          mascara_do_fundo, alfa_na_fonte, cantos)
         linhas.append(f"{cadeia}[c{numero}]")
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":
