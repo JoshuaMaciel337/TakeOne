@@ -91,9 +91,51 @@ def test_job_de_worker_que_caiu_volta_para_fila(db_limpo):
     pegar_proximo_job(db_limpo, ["teste"], "w-caiu")
     db_limpo.jobs.update_many({}, {"$set": {"lease_ate": agora() - timedelta(minutes=1)}})
 
-    assert liberar_jobs_expirados(db_limpo) == 2
+    avisados = []
+    assert liberar_jobs_expirados(db_limpo, lambda job, mensagem: avisados.append((job["_id"], mensagem))) == 2
     assert db_limpo.jobs.find_one({"_id": devolvido})["status"] == STATUS_PENDENTE
     assert db_limpo.jobs.find_one({"_id": esgotado})["status"] == STATUS_ERRO
+    # Só o esgotado chama o ao_falhar da tarefa (o devolvido ainda vai rodar de novo)
+    assert avisados == [(esgotado, "O worker parou de responder durante o processamento.")]
+
+
+def test_voz_limpa_esgotada_por_posse_vencida_sai_de_processando(db_limpo):
+    from bson import ObjectId
+
+    from worker.worker_principal import avisar_tarefa_esgotada
+
+    midia = {"organizacao_id": "org1", "voz_limpa": {"status": "processando"}}
+    midia_id = db_limpo.midias.insert_one(midia).inserted_id
+    job = montar_job("limpeza_voz", "org1", {"midia_id": str(midia_id)})
+    job["max_tentativas"] = 1
+    enfileirar_job(db_limpo, job)
+    pegar_proximo_job(db_limpo, ["limpeza_voz"], "w-caiu")
+    db_limpo.jobs.update_many({}, {"$set": {"lease_ate": agora() - timedelta(minutes=1)}})
+    assert liberar_jobs_expirados(db_limpo, avisar_tarefa_esgotada(db_limpo)) == 1
+    assert db_limpo.midias.find_one({"_id": ObjectId(midia_id)})["voz_limpa"]["status"] == "erro"
+
+
+def test_heartbeat_continua_depois_de_uma_falha_do_banco(db_limpo, monkeypatch):
+    import threading
+
+    from worker import worker_principal
+
+    respostas = iter([None, None, True, False])
+    chamadas = []
+
+    def renovar(_db, _job_id, _worker_id):
+        chamadas.append(1)
+        return next(respostas)
+
+    monkeypatch.setattr(worker_principal, "renovar_lease", renovar)
+    monkeypatch.setattr(worker_principal, "HEARTBEAT_SEGUNDOS", 0.01)
+    fim = threading.Event()
+    linha = threading.Thread(target=worker_principal.manter_posse, args=(db_limpo, "j", "w", fim))
+    linha.start()
+    linha.join(timeout=5)
+    fim.set()
+    # Duas falhas do banco não param o heartbeat; a posse perdida (False) para
+    assert not linha.is_alive() and len(chamadas) == 4
 
 
 def test_worker_processa_job_de_teste_de_ponta_a_ponta(db_limpo):

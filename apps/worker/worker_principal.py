@@ -63,9 +63,12 @@ def pedir_parada(_sinal, _frame):
 
 
 def manter_posse(db, job_id, worker_id: str, fim: threading.Event):
-    """Heartbeat: renova a posse do job até a tarefa terminar."""
+    """
+    Heartbeat: renova a posse do job até a tarefa terminar. Se o banco não responde, tenta de novo no
+    próximo intervalo; só para quando a posse foi perdida de fato.
+    """
     while not fim.wait(HEARTBEAT_SEGUNDOS):
-        if not renovar_lease(db, job_id, worker_id):
+        if renovar_lease(db, job_id, worker_id) is False:
             logging.warning(f"[{worker_id}] Posse do job {job_id} perdida. Outro worker pode reprocessá-lo.")
             return
 
@@ -95,6 +98,15 @@ def criar_reportador(db, job_id, worker_id: str):
 # -----------------------------------------------
 # FUNÇÕES PRINCIPAIS
 # -----------------------------------------------
+def avisar_tarefa_esgotada(db):
+    """O ao_esgotar do liberar_jobs_expirados: chama o ao_falhar da tarefa do job."""
+    def avisar(job: dict, mensagem: str):
+        tarefa = REGISTRO.get(job["tipo"])
+        if tarefa and tarefa.ao_falhar:
+            tarefa.ao_falhar(db, job, mensagem)
+    return avisar
+
+
 def processar_job(db, job: dict, worker_id: str) -> str:
     """Executa um job e grava o resultado. Nunca deixa exceção escapar."""
     rotulo = f"[{worker_id}] [{job['tipo']} {job['_id']}]"
@@ -137,7 +149,7 @@ def executar_loop(db, tipos: list[str], worker_id: str, somente_disponiveis: boo
     while not _parar.is_set():
         try:
             if time.monotonic() - ultima_limpeza >= INTERVALO_LIMPEZA_SEGUNDOS:
-                liberar_jobs_expirados(db)
+                liberar_jobs_expirados(db, avisar_tarefa_esgotada(db))
                 ultima_limpeza = time.monotonic()
 
             job = pegar_proximo_job(db, tipos, worker_id)

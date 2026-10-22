@@ -6,6 +6,7 @@
 # worker cair, a posse vence e outro worker pega o job de novo.
 # -----------------------------------------------
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 
 from pymongo import ReturnDocument
@@ -90,8 +91,11 @@ def pegar_proximo_job(db, tipos: list[str], worker_id: str) -> dict | None:
         return None
 
 
-def _atualizar_posse(db, job_id, worker_id: str, campos: dict) -> bool:
-    """Atualiza um job que ainda pertence a este worker. False se a posse foi perdida."""
+def _atualizar_posse(db, job_id, worker_id: str, campos: dict) -> bool | None:
+    """
+    Atualiza um job que ainda pertence a este worker. False se a posse foi perdida; None se o banco não
+    respondeu (a posse pode continuar valendo, e quem chama tenta de novo).
+    """
     momento = agora()
     campos = {**campos, "atualizado_em": momento, "lease_ate": momento + timedelta(minutes=LEASE_MINUTOS)}
     try:
@@ -102,15 +106,15 @@ def _atualizar_posse(db, job_id, worker_id: str, campos: dict) -> bool:
         return resultado.matched_count == 1
     except Exception as e:
         logging.error(f"[{worker_id}] Erro ao atualizar job {job_id}: {e}")
-        return False
+        return None
 
 
-def renovar_lease(db, job_id, worker_id: str) -> bool:
+def renovar_lease(db, job_id, worker_id: str) -> bool | None:
     """Heartbeat: estende a posse do job."""
     return _atualizar_posse(db, job_id, worker_id, {})
 
 
-def atualizar_progresso(db, job_id, worker_id: str, progresso: int, mensagem: str = "") -> bool:
+def atualizar_progresso(db, job_id, worker_id: str, progresso: int, mensagem: str = "") -> bool | None:
     """Grava o progresso (0 a 100) e renova a posse."""
     return _atualizar_posse(db, job_id, worker_id, {
         "progresso": max(0, min(100, int(progresso))),
@@ -171,22 +175,37 @@ def falhar_job(db, job: dict, worker_id: str, erro: str, definitivo: bool = Fals
         return None
 
 
-def liberar_jobs_expirados(db) -> int:
-    """Devolve para a fila os jobs cujo worker parou de dar sinal. Retorna quantos foram tratados."""
+ERRO_SEM_RESPOSTA = "O worker parou de responder durante o processamento."
+
+
+def liberar_jobs_expirados(db, ao_esgotar: Callable[[dict, str], None] | None = None) -> int:
+    """
+    Devolve para a fila os jobs cujo worker parou de dar sinal. Retorna quantos foram tratados. Os que já
+    usaram todas as tentativas vão para erro, e `ao_esgotar(job, mensagem)` faz o que a tarefa faria ao
+    falhar (o ao_falhar dela): sem isso, a voz limpa, o recorte e afins ficavam "processando" para sempre.
+    """
     momento = agora()
     filtro = {"status": STATUS_EXECUTANDO, "lease_ate": {"$lt": momento}}
     try:
-        esgotados = db[COLECAO_JOBS].update_many(
-            {**filtro, "$expr": {"$gte": ["$tentativas", "$max_tentativas"]}},
-            {"$set": {
+        esgotados = 0
+        for job in list(db[COLECAO_JOBS].find({**filtro, "$expr": {"$gte": ["$tentativas", "$max_tentativas"]}})):
+            # Um por vez e com o mesmo filtro: se o worker renovou a posse no meio, o job fica com ele
+            resultado = db[COLECAO_JOBS].update_one({**filtro, "_id": job["_id"]}, {"$set": {
                 "status": STATUS_ERRO,
                 "mensagem": "Falhou",
-                "erro": "O worker parou de responder durante o processamento.",
+                "erro": ERRO_SEM_RESPOSTA,
                 "lease_ate": None,
                 "concluido_em": momento,
                 "atualizado_em": momento,
-            }},
-        )
+            }})
+            if not resultado.modified_count:
+                continue
+            esgotados += 1
+            if ao_esgotar:
+                try:
+                    ao_esgotar(job, ERRO_SEM_RESPOSTA)
+                except Exception as e:
+                    logging.error(f"Erro ao registrar a falha do job {job['_id']}: {e}")
         devolvidos = db[COLECAO_JOBS].update_many(
             filtro,
             {"$set": {
@@ -198,10 +217,10 @@ def liberar_jobs_expirados(db) -> int:
                 "atualizado_em": momento,
             }},
         )
-        total = esgotados.modified_count + devolvidos.modified_count
+        total = esgotados + devolvidos.modified_count
         if total:
             logging.warning(f"Jobs com posse vencida: {devolvidos.modified_count} devolvidos, "
-                            f"{esgotados.modified_count} marcados como erro.")
+                            f"{esgotados} marcados como erro.")
         return total
     except Exception as e:
         logging.error(f"Erro ao liberar jobs expirados: {e}")
