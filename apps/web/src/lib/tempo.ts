@@ -82,10 +82,14 @@ export function duracaoDoQuadro(taxa: Taxa): Tick {
   return Number((T * BigInt(den)) / BigInt(num));
 }
 
-/** Índice do quadro que contém `t` (arredondado para baixo). */
+/**
+ * Índice do quadro que contém `t` (arredondado para baixo). `t` pode vir fracionário (divisão pela
+ * velocidade, pixels da linha do tempo com zoom): as bordas dos quadros são ticks inteiros, então tirar a
+ * fração antes dá o mesmo quadro. Sem isso, o BigInt de um número fracionário lançava RangeError.
+ */
 export function quadroEm(taxa: Taxa, t: Tick): number {
   const { num, den } = taxaValida(taxa);
-  return Number(dividirParaBaixo(BigInt(t) * BigInt(num), T * BigInt(den)));
+  return Number(dividirParaBaixo(BigInt(Math.floor(t)) * BigInt(num), T * BigInt(den)));
 }
 
 /** Tick em que começa o quadro `quadro`. */

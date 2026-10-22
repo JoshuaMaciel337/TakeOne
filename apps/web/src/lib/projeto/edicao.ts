@@ -1005,16 +1005,19 @@ export function zoomNosTrechos(projeto: Projeto, trechos: Intervalo[], escala: n
       const ate = quadroDoClipe(projeto, clipe, trecho.fim + saida);
       if (ate - de < 2 * entrada || (pontos.length && de <= pontos[pontos.length - 1].t)) continue;
       const cheio = Math.min(de + entrada * 2, ate - saida);
-      const fimCheio = Math.max(cheio, ate - saida);
-      pontos.push(
+      // Num destaque curto (ou cortado pela borda do clipe) o zoom cheio não dura: sem o ponto repetido,
+      // que a API recusa (dois keyframes no mesmo instante)
+      const grupo: Keyframe[] = [
         { t: de, valor: base, curva: "suave" },
         { t: cheio, valor: base * escala, curva: "suave" },
-        { t: fimCheio, valor: base * escala, curva: "suave" },
+        ...(ate - saida > cheio ? [{ t: ate - saida, valor: base * escala, curva: "suave" as const }] : []),
         { t: ate, valor: base, curva: "suave" },
-      );
+      ];
+      // Só grupos inteiros cabem no limite de keyframes
+      if (pontos.length + grupo.length > KEYFRAMES_POR_PROPRIEDADE) break;
+      pontos.push(...grupo);
     }
     if (!pontos.length) return clipe;
-    if (pontos.length > KEYFRAMES_POR_PROPRIEDADE) pontos.length = KEYFRAMES_POR_PROPRIEDADE - (KEYFRAMES_POR_PROPRIEDADE % 4);
     return { ...clipe, keyframes: { ...clipe.keyframes, escala: pontos } };
   });
   return finalizar(trocarFaixa(projeto, { ...principal, clipes }));

@@ -203,7 +203,9 @@ export function LinhaDoTempo({
   const layout = useMemo(() => montarLinhas(exibido), [exibido]);
 
   const px = (t: Tick) => (t / TICKS_POR_SEGUNDO) * zoom;
-  const ticks = (pixels: number) => (pixels / zoom) * TICKS_POR_SEGUNDO;
+  // Ticks são inteiros: com o zoom mudado (Ctrl+roda, deslizante) ou com escala de tela fracionária, a conta
+  // dava frações, que quebravam as contas de quadro e a API recusaria
+  const ticks = (pixels: number) => Math.round((pixels / zoom) * TICKS_POR_SEGUNDO);
   const tolerancia = ticks(TOLERANCIA_IMA_PX);
 
   const duracaoSegundos = exibido.duracao / TICKS_POR_SEGUNDO;

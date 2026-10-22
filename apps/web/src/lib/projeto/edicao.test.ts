@@ -55,6 +55,8 @@ function contexto(): Contexto {
   const midias: Record<string, { duracao: number; video: boolean; audio: boolean; transparente?: boolean; imagem?: boolean }> = {
     video10: { duracao: 10 * S, video: true, audio: true },
     video4: { duracao: 4 * S, video: true, audio: true },
+    // Duração "real", que não divide em segundos inteiros
+    video47: { duracao: segundosParaTicks(47.047), video: true, audio: true },
     musica: { duracao: 30 * S, video: false, audio: true },
     animacao: { duracao: 3 * S, video: true, audio: false, transparente: true },
     foto: { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, imagem: true },
@@ -232,6 +234,25 @@ test("zoom nos destaques: a escala sobe antes do trecho, fica e volta depois", (
   // Quem já tem keyframes de escala fica como está
   assert.deepEqual(zoomNosTrechos(projeto, [{ inicio: 0, fim: 2 * S }]), projeto);
   conferir(projeto);
+});
+
+test("zoom nos destaques: destaque que passa da borda do clipe não repete keyframe no mesmo instante", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "video10"));
+  // De 9,7 s a 12 s: no primeiro clipe só sobra o pedaço até 10 s (o caso da auditoria)
+  projeto = zoomNosTrechos(projeto, [{ inicio: 9.7 * S, fim: 12 * S }]);
+  for (const clipe of principal(projeto)) {
+    const ts = (clipe.keyframes?.escala ?? []).map((p) => p.t);
+    for (let i = 1; i < ts.length; i++) assert.ok(ts[i] > ts[i - 1], `keyframes em ordem estrita: ${ts.join(", ")}`);
+  }
+  // Muitos destaques: nunca passa do limite e só entram grupos inteiros (o último ponto volta à escala de base)
+  let longo = adicionarClipe(vazio(), ctx, "video47").projeto;
+  const trechos = Array.from({ length: 40 }, (_, i) => ({ inicio: i * S + 0.3 * S, fim: i * S + 0.6 * S }));
+  longo = zoomNosTrechos(longo, trechos);
+  const pontos = principal(longo)[0].keyframes!.escala!;
+  assert.ok(pontos.length <= 100);
+  assert.equal(pontos[pontos.length - 1].valor, 1);
 });
 
 test("dividir no cursor e apagar fechando o espaço na principal", () => {
@@ -706,4 +727,26 @@ test("velocidade: o mesmo trecho da mídia em outra duração, empurrando a prin
   assert.equal(rapido.keyframes?.x?.[0].t, 2 * S, "o keyframe anda junto");
   // Os limites: de 0,1× a 10×
   assert.equal(principal(mudarVelocidade(p, primeiro.id, 50))[0].velocidade, 10);
+});
+
+test("velocidade e aparar com contas que não dão ticks inteiros (130%, 70% e o tempo da linha com zoom)", () => {
+  const ctx = contexto();
+  let p = adicionarClipe(vazio(), ctx, "video47").projeto;
+  const id = principal(p)[0].id;
+  // Antes, 47,047 s a 1,3× dava 9190168615384,615 ticks e o BigInt lançava RangeError
+  for (const velocidade of [1.3, 0.7, 0.55, 1.1, 1.45]) {
+    const q = mudarVelocidade(p, id, velocidade);
+    conferir(q);
+    const clipe = principal(q)[0];
+    assert.ok(Number.isInteger(clipe.duracao), `duração inteira a ${velocidade}×`);
+    assert.equal(clipe.duracao % QUADRO, 0, `duração no quadro a ${velocidade}×`);
+  }
+  p = mudarVelocidade(p, id, 1.3);
+  // Tempo do ponteiro com o zoom mudado (fracionário): apara no quadro mais perto, sem quebrar
+  const aparado = apararClipe(p, ctx, id, "fim", 20 * S + 0.37);
+  conferir(aparado);
+  assert.equal(principal(aparado)[0].duracao % QUADRO, 0);
+  const comeco = apararClipe(aparado, ctx, id, "inicio", 3 * S + 0.61);
+  conferir(comeco);
+  assert.ok(Number.isInteger(principal(comeco)[0].entrada));
 });
