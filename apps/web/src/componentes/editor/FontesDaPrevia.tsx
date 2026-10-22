@@ -46,13 +46,16 @@ function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>,
     ? Math.max(ANDAMENTO_MINIMO, velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, (tempo - clipe.inicio) / clipe.duracao))
     : clipe.velocidade;
 
-  // O clipe que o elemento segue: trocou, a próxima conferência usa o limite de um quadro
-  const seguido = useRef<{ id: string | null; trocou: boolean }>({ id: null, trocou: false });
+  // O clipe que o elemento segue (trocou: a próxima conferência usa o limite de um quadro) e onde ele estava ao
+  // começar a tocar. O elemento só anda uns 250 ms depois do play (no primeiro, o contexto de áudio nasce ali),
+  // enquanto o relógio já anda: sem conferir de novo quando ele começa de fato, o som ficava esse tanto atrás,
+  // abaixo do limite de 0,3 s, até a pessoa pausar
+  const seguido = useRef<{ id: string | null; trocou: boolean; partida: number | null }>({ id: null, trocou: false, partida: null });
 
   useEffect(() => {
     const elemento = elementoRef.current;
     if (!elemento) return;
-    if (seguido.current.id !== clipe.id) seguido.current = { id: clipe.id, trocou: seguido.current.id !== null };
+    if (seguido.current.id !== clipe.id) seguido.current = { id: clipe.id, trocou: seguido.current.id !== null, partida: null };
     elemento.playbackRate = velocidade;
     const desvio = Math.abs(elemento.currentTime - alvo);
     if (tocar) {
@@ -60,9 +63,14 @@ function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>,
         if (desvio > 0.05) elemento.currentTime = alvo;
         elemento.play().catch(() => {});
         seguido.current.trocou = false;
+        seguido.current.partida = elemento.currentTime;
       } else if (!elemento.seeking && elemento.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-        if (desvio > (seguido.current.trocou ? DESVIO_NA_TROCA : DESVIO_MAXIMO * velocidade)) elemento.currentTime = alvo;
+        const { partida, trocou } = seguido.current;
+        // Logo depois do play, espera o elemento andar de fato antes de conferir
+        if (partida !== null && Math.abs(elemento.currentTime - partida) < 0.05) return;
+        if (desvio > (trocou || partida !== null ? DESVIO_NA_TROCA : DESVIO_MAXIMO * velocidade)) elemento.currentTime = alvo;
         seguido.current.trocou = false;
+        seguido.current.partida = null;
       }
     } else {
       if (!elemento.paused) elemento.pause();
