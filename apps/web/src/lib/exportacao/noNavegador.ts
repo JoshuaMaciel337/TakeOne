@@ -16,6 +16,7 @@ import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodifi
 import { imagemDeTexto, type ImagemDeTexto } from "@/lib/previa/imagensDeTexto";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { fatorDosFades, type Projeto } from "@/lib/projeto/modelo";
+import { pendenciaParaONavegador } from "@/lib/projeto/pendencias";
 import { ganhoParaIgualar } from "@/lib/projeto/som";
 import { duracaoDoQuadro, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -64,7 +65,7 @@ export function motivoParaOServidor(projeto: Projeto, midias: ReadonlyMap<string
   if (clipesComSom(projeto, midias).some(({ clipe }) => clipe.velocidade !== 1 || clipe.curva_velocidade)) {
     return "Há som com a velocidade mudada: o navegador não muda a velocidade sem mudar o tom.";
   }
-  return null;
+  return pendenciaParaONavegador(projeto, midias);
 }
 
 class Cancelado extends Error {}
