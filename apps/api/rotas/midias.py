@@ -35,6 +35,7 @@ from api.esquemas import (
 from core.modelos.batidas import STATUS_NENHUMA as BATIDAS_NENHUMA
 from core.modelos.batidas import STATUS_PRONTO as BATIDAS_PRONTAS
 from core.modelos.batidas import montar_batidas
+from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
 from core.modelos.geracao import nome_da_midia
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
@@ -139,9 +140,11 @@ async def gerar_video(dados: GerarVideoEntrada, usuario=Depends(usuario_atual), 
             raise HTTPException(status.HTTP_409_CONFLICT, "Escolha uma imagem da biblioteca para começar o vídeo.")
         if imagem["status"] != STATUS_PRONTA:
             raise HTTPException(status.HTTP_409_CONFLICT, "A imagem ainda está sendo preparada.")
-    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome_da_midia(dados.descricao)}.mp4", 0,
-                         "video/mp4")
-    midia["nome_original"] = midia["nome"]
+    # O nome vem do texto pedido e não passa por montar_midia, que o lê como caminho: uma barra cortava o nome,
+    # ou deixava a mídia sem extensão e a rota dava 500
+    nome = nome_da_midia(dados.descricao)
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], "gerado.mp4", 0, "video/mp4")
+    midia["nome"] = midia["nome_original"] = nome
     midia["status"] = STATUS_PROCESSANDO
     midia["gerada"] = {"descricao": dados.descricao, "formato": dados.formato, "duracao": dados.duracao,
                        "imagem_id": dados.imagem_id}
@@ -164,8 +167,8 @@ async def gerar_fala(dados: FalaEntrada, usuario=Depends(usuario_atual), db=Depe
     texto = " ".join(dados.texto.split())
     trecho = texto if len(texto) <= 40 else texto[:40].rsplit(" ", 1)[0] + "…"
     nome = f"Fala · {trecho.rstrip('.,;: ')}"
-    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], f"{nome}.m4a", 0, "audio/mp4")
-    midia["nome_original"] = midia["nome"]
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], "fala.m4a", 0, "audio/mp4")
+    midia["nome"] = midia["nome_original"] = nome
     midia["status"] = STATUS_PROCESSANDO
     midia["fala"] = {"texto": dados.texto, "voz": dados.voz, "velocidade": dados.velocidade}
     midia_id = (await db.midias.insert_one(midia)).inserted_id
@@ -203,6 +206,14 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
         quantos = "1 projeto" if em_projetos == 1 else f"{em_projetos} projetos"
         raise HTTPException(status.HTTP_409_CONFLICT,
                             f"Esta mídia está em {quantos}. Tire os clipes dela da linha do tempo antes de excluir.")
+    # A exportação guarda uma cópia do projeto: tirada da linha do tempo, a mídia ainda é usada pelo vídeo
+    # que está sendo gerado, e excluí-la derrubava a exportação
+    exportando = await db.exportacoes.count_documents({
+        "organizacao_id": usuario["organizacao_id"], "status": STATUS_EXPORTACAO_PROCESSANDO,
+        "projeto.faixas.clipes.midia_id": str(midia["_id"])}, limit=1)
+    if exportando:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Um vídeo que usa esta mídia ainda está sendo exportado. Espere terminar para excluir.")
     momento = agora()
     # Jobs que ainda iam mexer nesta mídia param aqui
     await db.jobs.update_many(

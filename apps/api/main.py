@@ -100,8 +100,16 @@ def traduzir_erro(erro: dict) -> str:
         return f"{rotulo} precisa ter pelo menos {contexto.get('min_length')} caracteres."
     if tipo == "string_too_long":
         return f"{rotulo} pode ter no máximo {contexto.get('max_length')} caracteres."
+    if tipo == "too_long":
+        return f"{rotulo} pode ter no máximo {contexto.get('max_length')} itens."
     if campo == "email":
         return "E-mail inválido."
+    if tipo == "value_error":
+        # A mensagem dos validadores do esquema já é para a pessoa ("O texto ficou grande demais..."): sem isto,
+        # ela virava "valor inválido." e a pessoa não sabia o que mudar
+        mensagem = str(erro.get("msg", "")).removeprefix("Value error, ").strip()
+        if mensagem:
+            return mensagem
     return f"{rotulo}: valor inválido."
 
 

@@ -25,6 +25,10 @@ def test_pedido_valida_o_texto_e_a_voz(cliente, db_limpo):
     assert midia["status"] == "processando" and midia["nome"] == "Fala · Olá! Hoje tem novidade no canal"
     job = db_limpo.jobs.find_one({"tipo": "fala"})
     assert job["recurso"] == "cpu" and job["entrada"]["voz"] == "pm_alex"
+    # Uma barra no texto não vira caminho: o nome fica inteiro e a mídia continua .m4a
+    com_barra = cliente.post("/api/midias/fala", json={"texto": "Promoção 2/3 e/ou 50% off/"})
+    assert com_barra.status_code == 201, com_barra.text
+    assert com_barra.json()["nome"] == "Fala · Promoção 2/3 e/ou 50% off/"
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
