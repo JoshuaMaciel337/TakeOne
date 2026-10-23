@@ -28,6 +28,7 @@ import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
+import { type EstadoDaTransformacao, type ModoDaTransformacao, TransformacaoNaPrevia } from "./TransformacaoNaPrevia";
 import type { CorDoCanal } from "./PainelCanais";
 import type { FerramentaObjeto } from "./useObjeto";
 
@@ -102,6 +103,14 @@ type Props = {
   veu?: { fonte: CanvasImageSource; quadro: number; cinza: boolean } | null;
   /** Só um canal de cor, em cinza (painel Canais). */
   corAVista?: CorDoCanal | null;
+  /** A transformação livre em andamento (a da seleção): a caixa com as alças, por cima de tudo. */
+  transformacao?: {
+    estado: EstadoDaTransformacao;
+    modo: ModoDaTransformacao;
+    origem: { imagem: CanvasImageSource; largura: number; altura: number } | null;
+    aoMudar: (estado: EstadoDaTransformacao) => void;
+    aoConfirmar: () => void;
+  } | null;
   /** A seleção do documento: as formigas (com `bordas`) e, com uma ferramenta de seleção, o desenho dela. */
   selecaoDoDocumento?: {
     selecao: Selecao | null;
@@ -165,6 +174,7 @@ export function PreviaDaImagem({
   selecaoDoDocumento = null,
   veu = null,
   corAVista = null,
+  transformacao = null,
 }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
@@ -559,8 +569,19 @@ export function PreviaDaImagem({
               />
             ) : null}
             {veu && tamanho.largura > 1 ? <VeuDaMascaraRapida fonte={veu.fonte} tamanho={tamanho} quadro={veu.quadro} cinza={veu.cinza} /> : null}
-            {selecaoDoDocumento?.bordas && !(veu && !veu.cinza) && tamanho.largura > 1 ? <FormigasDaSelecao selecao={selecaoDoDocumento.selecao} quadro={tamanho} /> : null}
-            {selecaoDoDocumento?.ferramenta && !recorte && tamanho.largura > 1 ? (
+            {transformacao && tamanho.largura > 1 ? (
+              <TransformacaoNaPrevia
+                estado={transformacao.estado}
+                modo={transformacao.modo}
+                quadro={tamanho}
+                documento={imagem}
+                origem={transformacao.origem}
+                aoMudar={transformacao.aoMudar}
+                aoConfirmar={transformacao.aoConfirmar}
+              />
+            ) : null}
+            {selecaoDoDocumento?.bordas && !transformacao && !(veu && !veu.cinza) && tamanho.largura > 1 ? <FormigasDaSelecao selecao={selecaoDoDocumento.selecao} quadro={tamanho} /> : null}
+            {selecaoDoDocumento?.ferramenta && !recorte && !transformacao && tamanho.largura > 1 ? (
               <SelecaoNaPrevia
                 ferramenta={selecaoDoDocumento.ferramenta}
                 selecao={selecaoDoDocumento.selecao}

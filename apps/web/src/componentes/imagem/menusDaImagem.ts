@@ -98,6 +98,8 @@ export type AcoesDosMenus = {
   /** Salvar a seleção num canal alfa, carregar a de um canal e a luminosidade (Ctrl+Alt+2). */
   canalDaSelecao: (acao: "salvar" | "carregar" | "luminosidade") => void;
   temCanais: boolean;
+  /** Selecionar › Transformar seleção. */
+  transformarSelecao: () => void;
   /** Editar › Definir predefinição de pincel (a seleção vira a ponta). */
   definirPincel: () => void;
   /** Selecionar › Encontrar camadas e Isolar camadas. */
@@ -353,6 +355,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Difusão…", atalho: "Shift+F6", aoEscolher: () => a.modificarSelecao("difusao") },
           ],
         },
+        { nome: "Transformar seleção", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.transformarSelecao },
         { nome: "Aumentar", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(true) },
         { nome: "Semelhante", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(false) },
         "-",

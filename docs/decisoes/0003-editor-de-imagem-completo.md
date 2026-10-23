@@ -123,7 +123,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Área de foco; Assunto (a pessoa, pelo MODNet); Céu (pela linha do céu, sem modelo)
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
 - [x] Aumentar e Semelhante
-- [ ] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
+- [x] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
 - [x] Máscara rápida (Q) com pintura
 - [x] Seleção pela transparência da camada (Ctrl + clique na miniatura; Shift soma, Alt subtrai) e pela máscara dela
 - [x] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2); painel Canais

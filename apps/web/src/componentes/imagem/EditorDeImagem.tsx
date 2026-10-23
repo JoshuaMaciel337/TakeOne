@@ -62,6 +62,8 @@ import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
 import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
+import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
+import { desenharNaMalha } from "@/lib/transformar/malha";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
@@ -207,6 +209,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoCanal, setJanelaDoCanal] = useState<"salvar" | "carregar" | null>(null);
   // Editar › Definir predefinição de pincel (pede o nome) e os pedidos ao painel Camadas (encontrar e isolar)
   const [nomeDoPincel, setNomeDoPincel] = useState(false);
+  // Selecionar › Transformar seleção: a caixa (em pixels do documento), o modo, o pedaço da seleção em resolução cheia
+  // (a fonte) e a cópia pequena dele para a prévia
+  const [transformando, setTransformando] = useState<{
+    estado: EstadoDaTransformacao;
+    modo: ModoDaTransformacao;
+    fonte: HTMLCanvasElement;
+    previa: { imagem: HTMLCanvasElement; largura: number; altura: number };
+  } | null>(null);
   const [pedidoAsCamadas, setPedidoAsCamadas] = useState<{ tipo: "procurar" | "isolar"; vez: number; faixaIds: string[] } | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
@@ -542,6 +552,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o canal.");
     }
+  };
+  /** Começa a transformar a seleção: a caixa em volta dela, com a seleção cortada nela. */
+  const transformarSelecao = () => {
+    const selecao = selecaoNoDocumento;
+    const caixa = selecao ? limites(selecao) : null;
+    if (!selecao || !caixa) return;
+    const largura = caixa.x1 - caixa.x0;
+    const altura = caixa.y1 - caixa.y0;
+    const fonte = document.createElement("canvas");
+    fonte.width = largura;
+    fonte.height = altura;
+    fonte.getContext("2d")!.drawImage(selecaoParaCanvas(selecao), -caixa.x0, -caixa.y0);
+    const fator = Math.min(1, 800 / Math.max(largura, altura));
+    const pequena = document.createElement("canvas");
+    pequena.width = Math.max(1, Math.round(largura * fator));
+    pequena.height = Math.max(1, Math.round(altura * fator));
+    pequena.getContext("2d")!.drawImage(fonte, 0, 0, pequena.width, pequena.height);
+    const quad: EstadoDaTransformacao["quad"] = [{ x: caixa.x0, y: caixa.y0 }, { x: caixa.x1, y: caixa.y0 }, { x: caixa.x1, y: caixa.y1 }, { x: caixa.x0, y: caixa.y1 }];
+    setTransformando({ estado: { quad, malha: null }, modo: "livre", fonte, previa: { imagem: pequena, largura: pequena.width, altura: pequena.height } });
+  };
+  /** Enter: a seleção desenhada pelo mapa da transformação, na resolução cheia. */
+  const confirmarTransformacao = () => {
+    if (!transformando || !projeto) return;
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    desenharNaMalha(ctx2d, transformando.fonte, transformando.fonte.width, transformando.fonte.height, mapaDoEstado(transformando.estado), 48);
+    const nova = selecaoDoCanvas(canvas, "alfa");
+    setTransformando(null);
+    if (!temAlgo(nova)) mostrarAviso("A seleção ficou sem nenhum pixel mais da metade selecionado.");
+    setSelecaoDoDocumento(temAlgo(nova) ? nova : null);
+    setBordasDaSelecao(true);
   };
   /** A seleção vira a ponta de um pincel: o escuro da imagem pinta, vezes a cobertura da seleção, como lá. */
   const definirPincelDaSelecao = (nome: string) => {
@@ -1164,6 +1208,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     alternarMascaraRapida,
     temCanais: canais.length > 0,
     definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
+    transformarSelecao,
     camadasNoPainel: (como) => {
       area.abrir("camadas");
       setPedidoAsCamadas((atual) => ({ tipo: como, vez: (atual?.vez ?? 0) + 1, faixaIds }));
@@ -1336,6 +1381,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         mudarPincel({ tamanho: Math.min(5000, Math.max(1, maior ? t + passo : t - (t <= 10 ? 1 : t <= 100 ? 10 : passo))) });
       }
     }
+    else if (tecla === "Enter" && transformando) confirmarTransformacao();
+    else if (tecla === "Escape" && transformando) setTransformando(null);
     else if (tecla === "Enter" && recorte) confirmarCorte();
     else if (tecla === "Escape") {
       if (recorte) cancelarCorte();
@@ -1669,6 +1716,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoMudarPincel={mudarPincel}
         simetria={simetria}
         aoMudarSimetria={setSimetria}
+        transformacao={
+          transformando
+            ? {
+                modo: transformando.modo,
+                aoModo: (modo) => setTransformando((atual) => (atual ? { ...atual, modo } : atual)),
+                aoConfirmar: confirmarTransformacao,
+                aoCancelar: () => setTransformando(null),
+              }
+            : null
+        }
         selecaoDoDocumento={{
           opcoes: opcoesDaSelecao,
           aoMudar: (mudanca) => setOpcoesDaSelecao((atual) => ({ ...atual, ...mudanca })),
@@ -1754,6 +1811,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   : null
             }
             corAVista={canalDaVez ? null : corAVista}
+            transformacao={
+              transformando
+                ? {
+                    estado: transformando.estado,
+                    modo: transformando.modo,
+                    origem: transformando.previa,
+                    aoMudar: (estado) => setTransformando((atual) => (atual ? { ...atual, estado } : atual)),
+                    aoConfirmar: confirmarTransformacao,
+                  }
+                : null
+            }
             selecaoDoDocumento={{
               selecao: selecaoNoDocumento,
               bordas: bordasDaSelecao,

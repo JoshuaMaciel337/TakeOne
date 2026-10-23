@@ -13,6 +13,15 @@ import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
 import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
+import type { ModoDaTransformacao } from "./TransformacaoNaPrevia";
+
+const MODOS_DA_TRANSFORMACAO: { id: ModoDaTransformacao; nome: string }[] = [
+  { id: "livre", nome: "Livre" },
+  { id: "inclinar", nome: "Inclinar" },
+  { id: "distorcer", nome: "Distorcer" },
+  { id: "perspectiva", nome: "Perspectiva" },
+  { id: "deformar", nome: "Deformar" },
+];
 import type { FerramentaObjeto } from "./useObjeto";
 
 /** As opções da ferramenta Forma (a cor de preenchimento é a de primeiro plano). */
@@ -55,6 +64,8 @@ type Props = {
   aoMudarSimetria?: (simetria: Simetria | null) => void;
   /** As ferramentas da seleção do documento: as opções, se há seleção (e numa foto) e o Desmarcar. */
   selecaoDoDocumento?: { opcoes: OpcoesDaSelecao; aoMudar: (mudanca: Partial<OpcoesDaSelecao>) => void; temSelecao: boolean; naFoto: boolean; aoDesmarcar: () => void };
+  /** A transformação livre em andamento: os modos, confirmar (Enter) e cancelar (Esc). */
+  transformacao?: { modo: ModoDaTransformacao; aoModo: (modo: ModoDaTransformacao) => void; aoConfirmar: () => void; aoCancelar: () => void } | null;
   /** A seleção de objeto: o localizador (o realce com o ponteiro parado) ligado ou não. */
   localizador?: boolean;
   aoMudarLocalizador?: (ligado: boolean) => void;
@@ -103,7 +114,28 @@ export function BarraDeOpcoes(props: Props) {
   const selecao = MODO_DA_SELECAO[ferramenta];
 
   let opcoes: React.ReactNode = null;
-  if (ferramenta === "mover") {
+  if (props.transformacao) {
+    const t = props.transformacao;
+    opcoes = (
+      <>
+        <span className="flex items-center gap-0.5" role="group" aria-label="Modo da transformação">
+          {MODOS_DA_TRANSFORMACAO.map((item) => (
+            <button key={item.id} type="button" className={`rounded px-2 py-0.5 text-xs ${t.modo === item.id ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`} aria-pressed={t.modo === item.id} onClick={() => t.aoModo(item.id)}>
+              {item.nome}
+            </button>
+          ))}
+        </span>
+        <span className="text-suave">Arraste as alças; fora dos cantos gira (Shift de 15°); Ctrl num canto distorce.</span>
+        {SEPARADOR}
+        <button type="button" className="botao-icone size-6" title="Cancelar (Esc)" aria-label="Cancelar a transformação" onClick={t.aoCancelar}>
+          <X className="size-4" aria-hidden />
+        </button>
+        <button type="button" className="botao-icone size-6 text-sucesso" title="Confirmar (Enter)" aria-label="Confirmar a transformação" onClick={t.aoConfirmar}>
+          <Check className="size-4" aria-hidden />
+        </button>
+      </>
+    );
+  } else if (ferramenta === "mover") {
     opcoes = (
       <>
         <span className="text-suave">Selecionar automaticamente: Camada</span>
