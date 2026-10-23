@@ -654,3 +654,22 @@ def test_mistura_sem_sobra_na_midia_soa_so_o_que_existe():
     # A mídia acaba no fim do primeiro e o segundo começa no zero dela: nenhum dos dois tem o que tocar a mais
     assert "atrim=start=0:duration=4," in plano.filtro_som and "atrim=start=0:duration=3," in plano.filtro_som
     assert "adelay=192000S" in plano.filtro_som
+
+
+def test_pixelizar_reduz_pela_area_e_amplia_sem_suavizar():
+    video = clipe("c1", "deitado", 0, 4, efeito={"tipo": "pixelizar", "intensidade": 0.5})
+    plano = planejar_render(projeto([faixa("principal", [video])]), MIDIAS, 1080, 1920)
+    # O clipe deitado num quadro em pé: 1080 × 608, 18 células no lado menor
+    assert "scale=32:18:flags=area,scale=1080:608:flags=neighbor" in plano.filtro
+
+
+def test_zoom_e_giro_sao_a_media_das_copias():
+    zoom = clipe("c1", "deitado", 0, 4, efeito={"tipo": "zoom", "intensidade": 1})
+    plano = planejar_render(projeto([faixa("principal", [zoom])]), MIDIAS, 1080, 1920)
+    assert "split=16" in plano.filtro and "mix=inputs=16:weights='1 1 1" in plano.filtro
+    # A última cópia lê 0,7 do caminho até o meio: ampliada 1/0,7 vezes e cortada no tamanho do clipe
+    assert f"scale={1080 / 0.7:.4f}:{608 / 0.7:.4f}:flags=bilinear,crop=1080:608" in plano.filtro
+    giro = clipe("c1", "deitado", 0, 4, efeito={"tipo": "giro", "intensidade": 1})
+    plano = planejar_render(projeto([faixa("principal", [giro])]), MIDIAS, 1080, 1920)
+    assert "rotate=-0.175000:ow=1080:oh=608:c=black@0:bilinear=1" in plano.filtro
+    assert "rotate=0.175000:ow=1080:oh=608" in plano.filtro and "unpremultiply=inplace=1" in plano.filtro

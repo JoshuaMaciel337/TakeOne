@@ -8,12 +8,20 @@
 #   - distorção: lente de olho de peixe (lenscorrection do FFmpeg) com zoom para não sobrar canto vazio;
 #   - nitidez: o clipe mais a diferença entre ele e uma cópia pouco desfocada (máscara de nitidez);
 #   - clareza: a mesma conta com uma cópia bem desfocada, pesada nos meios-tons (contraste local);
+#   - zoom e giro: a média de AMOSTRAS_DO_BORRAO cópias, cada uma mais ampliada (ou girada) em volta do meio;
+#   - pixelizar: a grade de células presa ao canto do clipe, cada uma com a média dela;
 #   - VHS, glitch, luz e granulação: veja abaixo.
 # -----------------------------------------------
 import numpy as np
 from PIL import Image
 
-TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez", "clareza")
+TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez", "clareza", "zoom", "giro",
+         "pixelizar")
+AMOSTRAS_DO_BORRAO = 16
+ZOOM_MAXIMO = 0.3
+GIRO_MAXIMO = 0.35
+PIXEL_MINIMO = 0.01
+PIXEL_MAXIMO = 0.1
 # Com intensidade 1
 DESFOQUE_MAXIMO = 0.025
 BRILHO_SIGMA = 0.02
@@ -61,6 +69,33 @@ def contraste_local_do_efeito(clipe: dict) -> tuple[float, float, bool] | None:
     if efeito and efeito["tipo"] == "clareza":
         return CLAREZA_SIGMA, CLAREZA_MAXIMA * efeito["intensidade"], True
     return None
+
+
+def borrao_do_efeito(clipe: dict) -> tuple[str, float] | None:
+    """Zoom ou giro: (tipo, força), a força sendo o encolhimento máximo ou o ângulo total em radianos."""
+    efeito = efeito_do_clipe(clipe)
+    if efeito and efeito["tipo"] == "zoom":
+        return "zoom", ZOOM_MAXIMO * efeito["intensidade"]
+    if efeito and efeito["tipo"] == "giro":
+        return "giro", GIRO_MAXIMO * efeito["intensidade"]
+    return None
+
+
+def celulas_do_pixelizar(clipe: dict, largura: float, altura: float) -> tuple[int, int]:
+    """Quantas células na largura e na altura do clipe, como celulasDoPixelizar ((0, 0) sem o efeito)."""
+    efeito = efeito_do_clipe(clipe)
+    if not efeito or efeito["tipo"] != "pixelizar" or largura <= 0 or altura <= 0:
+        return 0, 0
+    celula = PIXEL_MINIMO + (PIXEL_MAXIMO - PIXEL_MINIMO) * efeito["intensidade"]
+    no_menor = max(1, _arredondar(1 / celula))
+    if largura <= altura:
+        return no_menor, max(1, _arredondar(no_menor * altura / largura))
+    return max(1, _arredondar(no_menor * largura / altura)), no_menor
+
+
+def _arredondar(valor: float) -> int:
+    """Como o Math.round do TS (meio para cima), não o arredondamento do Python (meio para o par)."""
+    return int(np.floor(valor + 0.5))
 
 
 def distorcao_do_efeito(clipe: dict) -> float:

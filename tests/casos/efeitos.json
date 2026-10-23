@@ -1,5 +1,5 @@
 {
-  "descricao": "Sorteio dos efeitos (hash de inteiros) e o desvio das cores no glitch e no VHS. Lidos por apps/web/src/lib/projeto/efeitos.test.ts e tests/test_efeitos.py.",
+  "descricao": "Sorteio dos efeitos (hash de inteiros) e o desvio das cores no glitch e no VHS, e as células do pixelizar. Lidos por apps/web/src/lib/projeto/efeitos.test.ts e tests/test_efeitos.py.",
   "hash": [
     [
       0,
@@ -266,5 +266,13 @@
       -0.3,
       0.3000000000000001
     ]
-  }
+  },
+  "pixelizar": [
+    {"intensidade": 0.0, "largura": 1920, "altura": 1080, "celulas": [0, 0]},
+    {"intensidade": 0.5, "largura": 1920, "altura": 1080, "celulas": [32, 18]},
+    {"intensidade": 1.0, "largura": 1920, "altura": 1080, "celulas": [18, 10]},
+    {"intensidade": 0.6, "largura": 1080, "altura": 1920, "celulas": [16, 28]},
+    {"intensidade": 0.37, "largura": 700, "altura": 700, "celulas": [23, 23]},
+    {"intensidade": 0.25, "largura": 1000, "altura": 1001, "celulas": [31, 31]}
+  ]
 }

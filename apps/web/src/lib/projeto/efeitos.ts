@@ -5,10 +5,12 @@
 //   - distorção: lente de olho de peixe (a do lenscorrection do FFmpeg), com zoom para não sobrar canto vazio;
 //   - nitidez: o clipe mais a diferença entre ele e uma cópia pouco desfocada (máscara de nitidez);
 //   - clareza: a mesma conta com uma cópia bem desfocada, pesada nos meios-tons (contraste local);
+//   - zoom e giro: a média de AMOSTRAS_DO_BORRAO cópias, cada uma mais ampliada (ou girada) em volta do meio;
+//   - pixelizar: a grade de células presa ao canto do clipe, cada uma com a média dela;
 //   - VHS, glitch, luz e granulação: veja abaixo.
 import type { AjustesCor } from "./cor.ts";
 
-export type TipoEfeito = "desfoque" | "brilho" | "distorcao" | "vhs" | "glitch" | "luz" | "granulacao" | "nitidez" | "clareza";
+export type TipoEfeito = "desfoque" | "brilho" | "distorcao" | "vhs" | "glitch" | "luz" | "granulacao" | "nitidez" | "clareza" | "zoom" | "giro" | "pixelizar";
 export type Efeito = { tipo: TipoEfeito; intensidade: number };
 
 export const EFEITOS: { id: TipoEfeito; nome: string; descricao: string }[] = [
@@ -21,7 +23,40 @@ export const EFEITOS: { id: TipoEfeito; nome: string; descricao: string }[] = [
   { id: "glitch", nome: "Glitch", descricao: "As cores saltam para os lados em alguns quadros" },
   { id: "luz", nome: "Luz", descricao: "Uma faixa de luz quente atravessa a imagem" },
   { id: "granulacao", nome: "Granulação", descricao: "Grão de filme sobre a imagem" },
+  { id: "zoom", nome: "Zoom", descricao: "Desfoque que sai do meio, como um zoom rápido" },
+  { id: "giro", nome: "Giro", descricao: "Desfoque girando em volta do meio" },
+  { id: "pixelizar", nome: "Pixelizar", descricao: "A imagem em quadradinhos grandes" },
 ];
+
+/** Zoom e giro: quantas cópias entram na média (as mesmas na prévia e no render). */
+export const AMOSTRAS_DO_BORRAO = 16;
+/** Com intensidade 1: a cópia mais ampliada lê 0,7 do caminho até o meio; o giro abre 0,35 rad (uns 20°). */
+export const ZOOM_MAXIMO = 0.3;
+export const GIRO_MAXIMO = 0.35;
+/** Pixelizar: o lado da célula em frações do lado menor do clipe, da intensidade 0 à 1. */
+export const PIXEL_MINIMO = 0.01;
+export const PIXEL_MAXIMO = 0.1;
+
+/** Zoom ou giro: o tipo e a força (o encolhimento máximo, ou o ângulo total em radianos); null sem eles. */
+export function borraoDoEfeito(efeito: Efeito | null | undefined): { tipo: "zoom" | "giro"; forca: number } | null {
+  if (!efeitoAtivo(efeito)) return null;
+  if (efeito.tipo === "zoom") return { tipo: "zoom", forca: ZOOM_MAXIMO * efeito.intensidade };
+  if (efeito.tipo === "giro") return { tipo: "giro", forca: GIRO_MAXIMO * efeito.intensidade };
+  return null;
+}
+
+/**
+ * Pixelizar: quantas células na largura e na altura do clipe (0 sem o efeito). O lado menor tem 1/célula
+ * células, arredondado, e o maior, na proporção; as mesmas na prévia e no render (que reduz a imagem a esse
+ * tamanho pela média e amplia sem suavizar).
+ */
+export function celulasDoPixelizar(efeito: Efeito | null | undefined, largura: number, altura: number): [number, number] {
+  if (!efeitoAtivo(efeito) || efeito.tipo !== "pixelizar" || largura <= 0 || altura <= 0) return [0, 0];
+  const celula = PIXEL_MINIMO + (PIXEL_MAXIMO - PIXEL_MINIMO) * efeito.intensidade;
+  const noMenor = Math.max(1, Math.round(1 / celula));
+  if (largura <= altura) return [noMenor, Math.max(1, Math.round((noMenor * altura) / largura))];
+  return [Math.max(1, Math.round((noMenor * largura) / altura)), noMenor];
+}
 
 /** Com intensidade 1. */
 export const DESFOQUE_MAXIMO = 0.025;

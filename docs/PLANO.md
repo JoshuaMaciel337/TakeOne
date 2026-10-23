@@ -515,7 +515,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
   - [x] Congelar o quadro (a foto do instante entre as metades do vídeo, por 3 s).
   - [ ] Transições de máscara.
-  - [ ] Desfoque de zoom e de giro e pixelizar.
+  - [x] Desfoque de zoom e de giro e pixelizar (efeitos).
+  - [ ] A transição zoom com desfoque (a força das 16 cópias muda no tempo; mais pesada no render).
   - [ ] Inverter o clipe.
   - [ ] Câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

@@ -7,6 +7,7 @@ import pytest
 from core.utils.cor import desenhar_vinheta
 from core.utils.efeitos import (
     ajustes_do_efeito,
+    celulas_do_pixelizar,
     deslocamento_do_grao,
     desvio_de_cor,
     hash32,
@@ -49,3 +50,9 @@ def test_grao_e_luz_iguais_aos_da_previa():
     valores = valores_do_grao().ravel()
     assert [round(float(valores[i]) * 255) for i, _ in grao["celulas"]] == [v for _, v in grao["celulas"]]
     assert [posicao_da_luz(s) for s in luz["segundos"]] == pytest.approx(luz["posicoes"], abs=1e-12)
+
+
+def test_pixelizar_tem_as_celulas_da_previa():
+    for caso in CASOS["pixelizar"]:
+        clipe = {"efeito": {"tipo": "pixelizar", "intensidade": caso["intensidade"]}}
+        assert list(celulas_do_pixelizar(clipe, caso["largura"], caso["altura"])) == caso["celulas"]

@@ -29,11 +29,14 @@ from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_lo
 from core.utils.cantos import tem_cantos, tem_mascara
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, hsl_neutro, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
+    AMOSTRAS_DO_BORRAO,
     BRILHO_SIGMA,
     GRAO_LINHAS,
     LUZ_PERIODO,
     ajustes_do_efeito,
+    borrao_do_efeito,
     brilho_do_efeito,
+    celulas_do_pixelizar,
     colunas_do_grao,
     contraste_local_do_efeito,
     desfoque_do_efeito,
@@ -319,6 +322,34 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros = []
     distorcao = distorcao_do_efeito(clipe)
     com_alfa = alfa_na_fonte or mascara_do_fundo is not None
+    celulas = celulas_do_pixelizar(clipe, largura, altura)
+    if celulas[0]:
+        # Pixelizar: a média de cada célula (reduzir pela área) e as células grandes de novo (ampliar sem
+        # suavizar): as bordas das células ficam nas mesmas frações do clipe que a prévia usa
+        filtros += _sem_aro(f"scale={celulas[0]}:{celulas[1]}:flags=area,scale={largura}:{altura}:flags=neighbor",
+                            com_alfa)
+    borrao = borrao_do_efeito(clipe)
+    if borrao:
+        # Zoom ou giro: a média de cópias, cada uma mais ampliada ou girada em volta do meio, como o shader
+        # (a mesma lista de amostras); no alfa pré-multiplicado, porque o giro deixa os cantos transparentes
+        tipo_do_borrao, forca = borrao
+        copias = []
+        for i in range(AMOSTRAS_DO_BORRAO):
+            parte = i / (AMOSTRAS_DO_BORRAO - 1)
+            if tipo_do_borrao == "zoom":
+                encolhe = 1 - forca * parte
+                copias.append(f"scale={largura / encolhe:.4f}:{altura / encolhe:.4f}:flags=bilinear,"
+                              f"crop={largura}:{altura}")
+            else:
+                copias.append(f"rotate={forca * (parte - 0.5):.6f}:ow={largura}:oh={altura}:c=black@0:bilinear=1")
+        rotulos = [f"bz{numero}_{i}" for i in range(AMOSTRAS_DO_BORRAO)]
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=rgba', 'premultiply=inplace=1', f'split={len(rotulos)}'])}"
+                  + "".join(f"[{r}]" for r in rotulos) + ";\n"
+                  + "".join(f"[{r}]{copia}[{r}m];\n" for r, copia in zip(rotulos, copias, strict=True))
+                  + "".join(f"[{r}m]" for r in rotulos)
+                  + f"mix=inputs={len(rotulos)}:weights='{' '.join(['1'] * len(rotulos))}',unpremultiply=inplace=1")
+        filtros = []
+        com_alfa = True
     if distorcao:
         # Olho de peixe: a lente do FFmpeg e um zoom de (1 + k) no meio, para não sobrar canto vazio
         maior_l, maior_a = round(largura * (1 + distorcao)), round(altura * (1 + distorcao))

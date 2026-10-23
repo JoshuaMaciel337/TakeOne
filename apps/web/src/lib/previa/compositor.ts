@@ -6,7 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
-import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
+import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -40,6 +40,10 @@ export type Camada = {
   contrasteLocal?: { sigma: number; forca: number; meiosTons: boolean } | null;
   /** Efeito olho de peixe: o k1 da lente. */
   lente?: number;
+  /** Zoom ou giro (lib/projeto/efeitos.ts): a média das cópias no shader. */
+  borrao?: { tipo: "zoom" | "giro"; forca: number } | null;
+  /** Pixelizar: quantas células na largura e na altura (0 sem o efeito). */
+  celulas?: [number, number];
   /** VHS e glitch: quanto o vermelho anda para a direita (e o azul para a esquerda), em frações da largura. */
   desvio?: number;
   /** VHS: quanto as linhas escuras escurecem. */
@@ -200,11 +204,24 @@ uniform sampler2D u_desfocada;
 uniform float u_lente;
 uniform vec2 u_tamanho;
 uniform vec4 u_recorte;
+// Zoom (1) e giro (2): a média de AMOSTRAS cópias, como o mix do render; pixelizar: a média de cada célula
+uniform int u_borrao;
+uniform float u_borraoForca;
+uniform vec2 u_celulas;
+const int AMOSTRAS = ${AMOSTRAS_DO_BORRAO};
 // VHS e glitch: o vermelho e o azul lidos deslocados (como o rgbashift, com a borda repetida)
 uniform float u_desvio;
 // Recorte do fundo: o alfa vem da máscara da pessoa (unidade 4), como o alphamerge do render
 uniform bool u_comMascaraDoFundo;
 uniform sampler2D u_mascaraDoFundo;
+// O texel do ponto do clipe (frações de 0 a 1), transparente fora dele, já com a máscara do recorte do fundo
+vec4 noClipe(vec2 local) {
+  if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0) return vec4(0.0);
+  vec2 p = u_recorte.xy + local * u_recorte.zw;
+  vec4 t = texture(u_textura, p);
+  if (u_comMascaraDoFundo) t *= texture(u_mascaraDoFundo, p).r;
+  return t;
+}
 // Tela verde: o alfa vira a distância à cor (em RGB, de 0 a 1), como o colorkey do FFmpeg
 uniform bool u_comChroma;
 uniform vec3 u_chromaCor;
@@ -302,7 +319,37 @@ void main() {
     if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
     uv = u_recorte.xy + p * u_recorte.zw;
   }
-  vec4 texel = texture(u_textura, uv);
+  vec4 texel;
+  bool jaMascarado = false;
+  if (u_celulas.x > 0.0) {
+    // Pixelizar: a média da célula (8 × 8 pontos dentro dela), presa ao canto do clipe
+    vec2 celula = floor(v_fonte * u_celulas);
+    vec4 soma = vec4(0.0);
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) soma += noClipe((celula + (vec2(float(i), float(j)) + 0.5) / 8.0) / u_celulas);
+    }
+    texel = soma / 64.0;
+    jaMascarado = true;
+  } else if (u_borrao > 0) {
+    // Zoom: cada cópia lê mais perto do meio; giro: cada cópia girada em volta do meio, simétricas
+    vec4 soma = vec4(0.0);
+    for (int i = 0; i < AMOSTRAS; i++) {
+      float parte = float(i) / float(AMOSTRAS - 1);
+      vec2 local;
+      if (u_borrao == 1) {
+        local = 0.5 + (v_fonte - 0.5) * (1.0 - u_borraoForca * parte);
+      } else {
+        float a = u_borraoForca * (parte - 0.5);
+        vec2 d = (v_fonte - 0.5) * u_tamanho;
+        local = 0.5 + vec2(cos(a) * d.x - sin(a) * d.y, sin(a) * d.x + cos(a) * d.y) / u_tamanho;
+      }
+      soma += noClipe(local);
+    }
+    texel = soma / float(AMOSTRAS);
+    jaMascarado = true;
+  } else {
+    texel = texture(u_textura, uv);
+  }
   if (u_desvio != 0.0) {
     vec2 d = vec2(u_desvio * u_recorte.z, 0.0);
     vec2 minimo = u_recorte.xy;
@@ -314,7 +361,7 @@ void main() {
     texel.r = vermelho.a > 0.0 ? vermelho.r / vermelho.a * texel.a : 0.0;
     texel.b = azul.a > 0.0 ? azul.b / azul.a * texel.a : 0.0;
   }
-  if (u_comMascaraDoFundo) texel *= texture(u_mascaraDoFundo, uv).r;
+  if (u_comMascaraDoFundo && !jaMascarado) texel *= texture(u_mascaraDoFundo, uv).r;
   if (u_comChroma && texel.a > 0.0) {
     vec3 c = texel.rgb / texel.a;
     float d = length(c - u_chromaCor) / sqrt(3.0);
@@ -432,7 +479,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -548,6 +595,9 @@ export class Compositor {
         meiosTons: local("u_meiosTons"),
         desfocada: local("u_desfocada"),
         lente: local("u_lente"),
+        borrao: local("u_borrao"),
+        borraoForca: local("u_borraoForca"),
+        celulas: local("u_celulas"),
         desvio: local("u_desvio"),
         linhas: local("u_linhas"),
         luz: local("u_luz"),
@@ -835,6 +885,9 @@ export class Compositor {
         gl.bindTexture(gl.TEXTURE_2D, atual);
       }
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
+      gl.uniform1i(uniformes.borrao, camada.borrao ? (camada.borrao.tipo === "zoom" ? 1 : 2) : 0);
+      gl.uniform1f(uniformes.borraoForca, camada.borrao?.forca ?? 0);
+      gl.uniform2f(uniformes.celulas, camada.celulas?.[0] ?? 0, camada.celulas?.[1] ?? 0);
       gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
       gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
       gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo && !recortadaAntes ? 1 : 0);
