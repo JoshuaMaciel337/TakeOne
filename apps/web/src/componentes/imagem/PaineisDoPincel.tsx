@@ -2,11 +2,11 @@
 
 // Os painéis Pincéis (as predefinições, em pastas) e Configurações do pincel (F5), como nos editores de imagem: a
 // forma da ponta e as seções de variação à esquerda, os controles da escolhida à direita e a prévia do traço embaixo.
-import { ChevronDown, ChevronRight, Lock, Search, Unlock } from "lucide-react";
+import { ChevronDown, ChevronRight, LoaderCircle, Lock, Search, Trash2, Unlock } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { desenharAmostraDoTraco } from "@/lib/pintura/amostraDoTraco";
-import { amostraDaPonta, PONTAS_DE_AMOSTRA, TEXTURAS, ladrilhoDaTextura } from "@/lib/pintura/pontas";
+import { amostraDaPonta, type IdDaPontaPersonalizada, PONTAS_DE_AMOSTRA, TEXTURAS, ladrilhoDaTextura } from "@/lib/pintura/pontas";
 import { comPredefinicao, PASTAS_DE_PINCEIS, type PastaDePinceis, type Predefinicao, PREDEFINICOES } from "@/lib/pintura/predefinicoes";
 import { type Controle, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Variacao } from "@/lib/pintura/traco";
 
@@ -38,17 +38,51 @@ function MiniaturaDaPonta({ ponta, tamanho = 28 }: { ponta: OpcoesDoPincel["pont
       gradiente.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = gradiente;
       ctx.fillRect(0, 0, tamanho, tamanho);
-    } else ctx.drawImage(amostraDaPonta(ponta), 0, 0, tamanho, tamanho);
+    } else {
+      const amostra = amostraDaPonta(ponta);
+      if (amostra) {
+        // Proporcional, no meio (as pontas importadas não são quadradas)
+        const escala = tamanho / Math.max(amostra.width, amostra.height);
+        ctx.drawImage(amostra, (tamanho - amostra.width * escala) / 2, (tamanho - amostra.height * escala) / 2, amostra.width * escala, amostra.height * escala);
+      }
+    }
   }, [ponta, tamanho]);
   return <canvas ref={canvasRef} width={tamanho} height={tamanho} aria-hidden />;
 }
 
-/** Painel Pincéis: as predefinições em pastas, com busca e o tamanho das miniaturas. */
-export function PainelPinceis({ opcoes, cor, aoEscolher, aoAbrirConfiguracoes }: { opcoes: OpcoesDoPincel; cor: string; aoEscolher: (predefinicao: Predefinicao) => void; aoAbrirConfiguracoes: () => void }) {
+/**
+ * Painel Pincéis: as predefinições em pastas, com busca e o tamanho das miniaturas, os pincéis do espaço (salvos e
+ * importados de um .abr), "Novo pincel" com as opções da vez e "Importar pincéis".
+ */
+export function PainelPinceis({
+  opcoes,
+  cor,
+  doEspaco,
+  ocupado,
+  aoEscolher,
+  aoAbrirConfiguracoes,
+  aoSalvar,
+  aoImportar,
+  aoExcluir,
+}: {
+  opcoes: OpcoesDoPincel;
+  cor: string;
+  doEspaco: Predefinicao[];
+  /** O que está acontecendo (importando, salvando), ou null. */
+  ocupado: string | null;
+  aoEscolher: (predefinicao: Predefinicao) => void;
+  aoAbrirConfiguracoes: () => void;
+  aoSalvar: (nome: string) => void;
+  aoImportar: (arquivo: File) => void;
+  aoExcluir: (predefinicao: Predefinicao) => void;
+}) {
   const [busca, setBusca] = useState("");
   const [grandes, setGrandes] = useState(true);
   const [fechadas, setFechadas] = useState<Set<PastaDePinceis>>(new Set());
+  const [nomeNovo, setNomeNovo] = useState<string | null>(null);
+  const arquivoRef = useRef<HTMLInputElement>(null);
   const procura = busca.trim().toLocaleLowerCase("pt-BR");
+  const todas = [...PREDEFINICOES, ...doEspaco];
   return (
     <div className="flex h-full min-h-0 flex-col text-xs">
       <div className="flex shrink-0 items-center gap-1.5 border-b border-borda p-2">
@@ -63,7 +97,7 @@ export function PainelPinceis({ opcoes, cor, aoEscolher, aoAbrirConfiguracoes }:
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {PASTAS_DE_PINCEIS.map((pasta) => {
-          const itens = PREDEFINICOES.filter((item) => item.pasta === pasta.id && (!procura || item.nome.toLocaleLowerCase("pt-BR").includes(procura)));
+          const itens = todas.filter((item) => item.pasta === pasta.id && (!procura || item.nome.toLocaleLowerCase("pt-BR").includes(procura)));
           if (!itens.length) return null;
           const aberta = !fechadas.has(pasta.id) || Boolean(procura);
           return (
@@ -87,13 +121,21 @@ export function PainelPinceis({ opcoes, cor, aoEscolher, aoAbrirConfiguracoes }:
               {aberta
                 ? itens.map((item) => {
                     const amostra = comPredefinicao(opcoes, item);
+                    const doEspacoTambem = item.id.startsWith("espaco:");
                     return (
-                      <button key={item.id} type="button" title={item.nome} aria-label={item.nome} onClick={() => aoEscolher(item)} className="flex w-full items-center gap-2 border-b border-borda/40 px-2 py-1 text-left hover:bg-painel-2">
-                        <MiniaturaDaPonta ponta={amostra.ponta} tamanho={22} />
-                        <span className="w-10 shrink-0 text-right tabular-nums text-suave">{Math.round(amostra.tamanho)}</span>
-                        {grandes ? <PreviaDoTraco opcoes={amostra} cor={cor} largura={150} altura={34} className="min-w-0 flex-1" /> : null}
-                        <span className="min-w-0 truncate">{item.nome}</span>
-                      </button>
+                      <div key={item.id} className="group flex items-center border-b border-borda/40 hover:bg-painel-2">
+                        <button type="button" title={item.nome} aria-label={item.nome} onClick={() => aoEscolher(item)} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left">
+                          <MiniaturaDaPonta ponta={amostra.ponta} tamanho={22} />
+                          <span className="w-10 shrink-0 text-right tabular-nums text-suave">{Math.round(amostra.tamanho)}</span>
+                          {grandes ? <PreviaDoTraco opcoes={amostra} cor={cor} largura={150} altura={34} className="min-w-0 flex-1" /> : null}
+                          <span className="min-w-0 truncate">{item.nome}</span>
+                        </button>
+                        {doEspacoTambem ? (
+                          <button type="button" className="botao-icone mr-1 size-6 opacity-0 group-hover:opacity-100 focus:opacity-100" title={`Excluir ${item.nome}`} aria-label={`Excluir ${item.nome}`} onClick={() => aoExcluir(item)}>
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </button>
+                        ) : null}
+                      </div>
                     );
                   })
                 : null}
@@ -101,10 +143,59 @@ export function PainelPinceis({ opcoes, cor, aoEscolher, aoAbrirConfiguracoes }:
           );
         })}
       </div>
-      <div className="flex h-8 shrink-0 items-center justify-end gap-1 border-t border-borda px-1.5">
-        <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" onClick={aoAbrirConfiguracoes} title="Configurações do pincel (F5)">
-          Configurações…
-        </button>
+      {nomeNovo !== null ? (
+        <form
+          className="flex shrink-0 items-center gap-1 border-t border-borda p-1.5"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            if (nomeNovo.trim()) aoSalvar(nomeNovo.trim());
+            setNomeNovo(null);
+          }}
+        >
+          <input
+            autoFocus
+            value={nomeNovo}
+            maxLength={80}
+            onChange={(evento) => setNomeNovo(evento.currentTarget.value)}
+            onKeyDown={(evento) => evento.key === "Escape" && setNomeNovo(null)}
+            aria-label="Nome do pincel novo"
+            className={`${campo} min-w-0 flex-1`}
+          />
+          <button type="submit" className="botao-principal px-2 py-0.5 text-xs" disabled={!nomeNovo.trim()}>
+            Salvar
+          </button>
+        </form>
+      ) : null}
+      <div className="flex h-8 shrink-0 items-center gap-1 border-t border-borda px-1.5">
+        {ocupado ? (
+          <span className="flex min-w-0 items-center gap-1 truncate text-suave" role="status">
+            <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
+            {ocupado}
+          </span>
+        ) : null}
+        <span className="ml-auto flex items-center gap-1">
+          <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" onClick={() => setNomeNovo("Meu pincel")} title="Novo pincel predefinido: guarda as opções da vez no espaço">
+            Novo…
+          </button>
+          <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" disabled={Boolean(ocupado)} onClick={() => arquivoRef.current?.click()} title="Importar pincéis de um arquivo .abr (as pontas de amostra)">
+            Importar…
+          </button>
+          <input
+            ref={arquivoRef}
+            type="file"
+            accept=".abr"
+            className="hidden"
+            aria-label="Arquivo de pincéis"
+            onChange={(evento) => {
+              const arquivo = evento.currentTarget.files?.[0];
+              evento.currentTarget.value = "";
+              if (arquivo) aoImportar(arquivo);
+            }}
+          />
+          <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" onClick={aoAbrirConfiguracoes} title="Configurações do pincel (F5)">
+            Configurações…
+          </button>
+        </span>
       </div>
     </div>
   );
@@ -185,7 +276,10 @@ export function PainelConfiguracoesDoPincel({
   travadas,
   aoTravar,
   aoAbrirPredefinicoes,
+  pontasDoEspaco,
 }: {
+  /** As pontas dos pincéis do espaço, que também aparecem na escolha da ponta. */
+  pontasDoEspaco: IdDaPontaPersonalizada[];
   opcoes: OpcoesDoPincel;
   cor: string;
   aoMudar: (mudanca: Partial<OpcoesDoPincel>) => void;
@@ -208,13 +302,13 @@ export function PainelConfiguracoesDoPincel({
     controles = (
       <div className="space-y-2">
         <div className="grid grid-cols-6 gap-1" role="listbox" aria-label="Ponta do pincel">
-          {(["redonda", ...PONTAS_DE_AMOSTRA.map((item) => item.id)] as OpcoesDoPincel["ponta"][]).map((ponta) => (
+          {(["redonda", ...PONTAS_DE_AMOSTRA.map((item) => item.id), ...pontasDoEspaco] as OpcoesDoPincel["ponta"][]).map((ponta) => (
             <button
               key={ponta}
               type="button"
               role="option"
               aria-selected={opcoes.ponta === ponta}
-              title={ponta === "redonda" ? "Redonda" : PONTAS_DE_AMOSTRA.find((item) => item.id === ponta)?.nome}
+              title={ponta === "redonda" ? "Redonda" : (PONTAS_DE_AMOSTRA.find((item) => item.id === ponta)?.nome ?? "Ponta importada")}
               onClick={() => aoMudar({ ponta })}
               className={`grid aspect-square place-items-center rounded border bg-black ${opcoes.ponta === ponta ? "border-destaque" : "border-borda"}`}
             >

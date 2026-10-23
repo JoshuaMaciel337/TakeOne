@@ -51,6 +51,7 @@ import { usePinturas } from "./usePinturas";
 import type { AlvoDaPintura } from "./PinturaNaPrevia";
 import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
 import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
+import { criarPincel, excluirPincel, importarAbr, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
 import { criarCamadaDePixels } from "@/lib/pixels";
 
 const SEM_SEGUIR = {
@@ -128,6 +129,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [simetria, setSimetria] = useState<Simetria | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
+  const pinceisDoEspaco = usePinceisDoEspaco();
+  const [ocupadoComPinceis, setOcupadoComPinceis] = useState<string | null>(null);
   const [selecao, definirSelecao] = useState<string[]>([]);
   const [exportando, setExportando] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
@@ -682,6 +685,33 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <PainelPinceis
           opcoes={pinceis[pincelDosPaineis]}
           cor={cores.primeiroPlano}
+          doEspaco={pinceisDoEspaco.pinceis.map(predefinicaoDoEspaco)}
+          ocupado={ocupadoComPinceis}
+          aoSalvar={(nome) => {
+            setOcupadoComPinceis("Salvando o pincel…");
+            criarPincel({ nome, pasta: "meus", opcoes: pinceis[pincelDosPaineis] })
+              .then(() => {
+                pinceisDoEspaco.recarregar();
+                mostrarAviso(`O pincel "${nome}" está em Meus pincéis.`);
+              })
+              .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível salvar o pincel."))
+              .finally(() => setOcupadoComPinceis(null));
+          }}
+          aoImportar={(arquivo) => {
+            setOcupadoComPinceis("Importando os pincéis…");
+            importarAbr(arquivo, (feitas, total) => setOcupadoComPinceis(`Importando ${feitas} de ${total}…`))
+              .then((quantos) => mostrarAviso(quantos === 1 ? "Um pincel entrou em Importados." : `${quantos} pincéis entraram em Importados.`))
+              .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível importar os pincéis."))
+              .finally(() => {
+                pinceisDoEspaco.recarregar();
+                setOcupadoComPinceis(null);
+              });
+          }}
+          aoExcluir={(predefinicao) =>
+            excluirPincel(predefinicao.id.replace("espaco:", ""))
+              .then(pinceisDoEspaco.recarregar)
+              .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível excluir o pincel."))
+          }
           aoEscolher={(predefinicao) => {
             setPinceis((atual) => ({ ...atual, [pincelDosPaineis]: comPredefinicao(atual[pincelDosPaineis], predefinicao, secoesTravadas) }));
             if (!ferramentaDePintura) escolherFerramenta("pincel");
@@ -707,6 +737,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             })
           }
           aoAbrirPredefinicoes={() => area.abrir("pinceis")}
+          pontasDoEspaco={pinceisDoEspaco.pinceis.filter((pincel) => pincel.tem_ponta).map((pincel) => `pincel:${pincel.id}` as const)}
         />
       ),
     },

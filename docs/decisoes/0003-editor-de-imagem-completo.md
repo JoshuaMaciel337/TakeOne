@@ -95,7 +95,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Pincel (B): tamanho, dureza, opacidade, fluxo, aerógrafo, suavização (corda puxada, recuperar o traço), pressão no tamanho e na opacidade, modo (os 27 e Limpar)
 - [x] Lápis (B), com "Apagar automaticamente"
 - [x] Borracha (E): pincel, lápis e bloco; com a transparência travada, pinta a cor de fundo (a camada de fundo vem com o item dela)
-- [ ] Painel Pincéis: predefinições em pastas (gerais, materiais secos, molhados e efeitos especiais), busca, tamanho da miniatura, Definir predefinição de pincel a partir da seleção, importar .abr
+- [x] Painel Pincéis: predefinições em pastas (gerais, materiais secos, molhados e efeitos especiais), busca, tamanho da miniatura, importar .abr, Novo pincel predefinido
+- [ ] Definir predefinição de pincel a partir da seleção (precisa da seleção do documento, 13.3)
 - [x] Painel Configurações do pincel (F5): forma da ponta (ângulo, arredondamento, espaçamento, virar), dinâmica de forma, dispersão, textura, pincel duplo, dinâmica de cor, transferência, pose, ruído, bordas molhadas, acúmulo, suavização, proteger textura, travas das seções, prévia do traço
 - [x] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
 - [x] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois

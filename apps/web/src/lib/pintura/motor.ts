@@ -5,7 +5,7 @@
 // pela opacidade do traço, só no retângulo que mudou. Ao soltar, a tela vira a camada. A opacidade é o teto do
 // traço (passar de novo no mesmo traço não escurece além dela) e o fluxo é quanto cada marca deposita.
 import { juntarTraco } from "./mesclar.ts";
-import { amostraDaPonta, type IdDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
+import { amostraDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
 import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, type PontoDoTraco } from "./traco.ts";
 
 export type Retangulo = { x0: number; y0: number; x1: number; y1: number };
@@ -281,7 +281,10 @@ export class Pintura {
       const base = ponta(marca.diametro, opcoes.dureza, dura);
       return pontaMudada(base, `r|${base.width}|${opcoes.dureza.toFixed(2)}|${dura}|${opcoes.bordasMolhadas}|${opcoes.ruido}`, opcoes.bordasMolhadas, opcoes.ruido);
     }
-    return pontaMudada(amostraDaPonta(opcoes.ponta), `a|${opcoes.ponta}|${opcoes.bordasMolhadas}|${opcoes.ruido}`, opcoes.bordasMolhadas, opcoes.ruido);
+    const amostra = amostraDaPonta(opcoes.ponta);
+    // A ponta de um pincel do espaço que ainda não chegou: a redonda no lugar
+    if (!amostra) return ponta(marca.diametro, opcoes.dureza, dura);
+    return pontaMudada(amostra, `a|${opcoes.ponta}|${opcoes.bordasMolhadas}|${opcoes.ruido}`, opcoes.bordasMolhadas, opcoes.ruido);
   }
 
   /** Uma marca no canvas do traço, com o giro, o achatamento, as viradas, a textura, o pincel duplo e a cor. */
@@ -342,7 +345,7 @@ export class Pintura {
         }
         const ctxDuplo = duplo.getContext("2d")!;
         ctxDuplo.clearRect(0, 0, lado, lado);
-        const pontaDupla = opcoes.duplo.ponta === "redonda" ? ponta(d * opcoes.duplo.tamanho, 1, false) : amostraDaPonta(opcoes.duplo.ponta as IdDaPonta);
+        const pontaDupla = (opcoes.duplo.ponta === "redonda" ? null : amostraDaPonta(opcoes.duplo.ponta)) ?? ponta(d * opcoes.duplo.tamanho, 1, false);
         const dd = Math.max(1, d * opcoes.duplo.tamanho);
         for (let i = 0; i < Math.max(1, opcoes.duplo.contagem); i++) {
           const espalhar = opcoes.duplo.dispersao * d;

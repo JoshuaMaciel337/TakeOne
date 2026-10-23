@@ -3,7 +3,10 @@
 // ponto da prévia para o pixel da camada. O desenho em si fica em motor.ts.
 import type { Caixa } from "../projeto/geometria.ts";
 import type { Recorte, Virar } from "../projeto/modelo.ts";
-import type { IdDaPonta, IdDaTextura } from "./pontas.ts";
+import type { IdDaPonta, IdDaPontaPersonalizada, IdDaTextura } from "./pontas.ts";
+
+/** A ponta: a redonda (com a dureza), uma das desenhadas aqui ou a de um pincel do espaço. */
+export type PontaDoPincel = "redonda" | IdDaPonta | IdDaPontaPersonalizada;
 
 /**
  * Um ponto do traço: a posição, a pressão (1 no mouse) e, quando a caneta dá, a inclinação (-1 a 1 nos dois eixos) e
@@ -69,7 +72,7 @@ export type OpcoesDoPincel = {
   borracha: "pincel" | "lapis" | "bloco";
   // As seções do painel Configurações do pincel (F5), como nos editores de imagem
   /** A ponta: redonda (com a dureza) ou uma amostra (lib/pintura/pontas.ts). */
-  ponta: "redonda" | IdDaPonta;
+  ponta: PontaDoPincel;
   /** O giro da ponta (graus) e o achatamento (1 é redonda). */
   angulo: number;
   arredondamento: number;
@@ -99,7 +102,7 @@ const SEM_VARIACAO: Variacao = { tremor: 0, controle: "nenhum", minimo: 0 };
 export type DinamicaDeForma = { ligado: boolean; tamanho: Variacao; angulo: Variacao; arredondamento: Variacao; virarX: boolean; virarY: boolean };
 export type Dispersao = { ligado: boolean; quanto: number; ambosEixos: boolean; contagem: number; tremorDaContagem: number };
 export type TexturaDoPincel = { ligado: boolean; id: IdDaTextura; escala: number; profundidade: number; inverter: boolean };
-export type PincelDuplo = { ligado: boolean; ponta: "redonda" | IdDaPonta; tamanho: number; espacamento: number; dispersao: number; contagem: number };
+export type PincelDuplo = { ligado: boolean; ponta: PontaDoPincel; tamanho: number; espacamento: number; dispersao: number; contagem: number };
 export type DinamicaDeCor = { ligado: boolean; primeiroFundo: Variacao; matiz: number; saturacao: number; brilho: number; pureza: number; porPonta: boolean };
 export type Transferencia = { ligado: boolean; opacidade: Variacao; fluxo: Variacao };
 /** Para quem pinta sem caneta: a inclinação, o giro e a pressão de mentira, no lugar dos da caneta. */

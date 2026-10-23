@@ -3,12 +3,15 @@
 // do pincel, menos as seções travadas no painel Configurações do pincel (e a textura, com "Proteger textura").
 import { type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, SECOES_DO_PINCEL, type Variacao } from "./traco.ts";
 
-export type PastaDePinceis = "gerais" | "secos" | "molhados" | "efeitos";
+export type PastaDePinceis = "gerais" | "secos" | "molhados" | "efeitos" | "meus" | "importados";
 export const PASTAS_DE_PINCEIS: { id: PastaDePinceis; nome: string }[] = [
   { id: "gerais", nome: "Gerais" },
   { id: "secos", nome: "Materiais secos" },
   { id: "molhados", nome: "Materiais molhados" },
   { id: "efeitos", nome: "Efeitos especiais" },
+  // Os do espaço (lib/pinceis.ts): salvos pela pessoa e importados de um .abr
+  { id: "meus", nome: "Meus pincéis" },
+  { id: "importados", nome: "Importados" },
 ];
 
 /** As opções que a predefinição muda (as seções vêm inteiras, sobre as do padrão). */

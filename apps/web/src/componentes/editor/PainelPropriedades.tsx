@@ -530,7 +530,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
   return (
     <div>
       {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
-      {aoTrocarImagem && clipe.midia_id ? (
+      {aoTrocarImagem && clipe.midia_id && !clipe.pixels ? (
         <button type="button" className="botao-secundario mb-2 w-full px-3 py-1.5 text-xs" disabled={travada} onClick={() => aoTrocarImagem(clipe.id)} title="Outra imagem no mesmo lugar e tamanho">
           <ImageIcon className="size-3.5" aria-hidden />
           Trocar a imagem

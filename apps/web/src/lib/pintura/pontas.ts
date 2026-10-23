@@ -228,12 +228,26 @@ function desenharAmostra(id: IdDaPonta, n: number): Float32Array {
   return alfa;
 }
 
-/** A amostra da ponta (branco com o alfa), guardada. */
-export function amostraDaPonta(id: IdDaPonta): HTMLCanvasElement {
+/** A ponta de um pincel do espaço (importado de um .abr ou salvo), pelo id dele: "pincel:<id>". */
+export type IdDaPontaPersonalizada = `pincel:${string}`;
+const PERSONALIZADAS = new Map<string, HTMLCanvasElement>();
+
+/** Guarda a ponta de um pincel do espaço (branco com o alfa), para o motor e as miniaturas. */
+export function registrarPonta(id: IdDaPontaPersonalizada, canvas: HTMLCanvasElement) {
+  PERSONALIZADAS.set(id, canvas);
+}
+
+export function pontaRegistrada(id: IdDaPontaPersonalizada): boolean {
+  return PERSONALIZADAS.has(id);
+}
+
+/** A amostra da ponta (branco com o alfa), guardada; a de um pincel do espaço só depois de baixada (senão null). */
+export function amostraDaPonta(id: IdDaPonta | IdDaPontaPersonalizada): HTMLCanvasElement | null {
+  if (id.startsWith("pincel:")) return PERSONALIZADAS.get(id) ?? null;
   const guardada = AMOSTRAS.get(id);
   if (guardada) return guardada;
   const n = LADO_DA_AMOSTRA;
-  const alfa = desenharAmostra(id, n);
+  const alfa = desenharAmostra(id as IdDaPonta, n);
   const canvas = document.createElement("canvas");
   canvas.width = n;
   canvas.height = n;
