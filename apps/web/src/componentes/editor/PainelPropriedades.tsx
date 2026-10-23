@@ -9,7 +9,7 @@ import {
   type Sombra,
   SOMBRA_PADRAO,
 } from "@/lib/projeto/silhueta";
-import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, X } from "lucide-react";
 import { useContext, useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -153,11 +153,13 @@ type Props = {
   modo?: "video" | "imagem";
   /** No editor de imagem: abre a escolha de outra imagem para a camada, no mesmo lugar. */
   aoTrocarImagem?: (clipeId: string) => void;
+  /** Abaixo da tela larga o painel é uma folha por cima, com botão de fechar. */
+  aoFechar?: () => void;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -207,6 +209,14 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
 
   return (
     <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
+      {aoFechar ? (
+        <div className="flex h-10 shrink-0 items-center justify-between border-b border-borda px-3 lg:hidden">
+          <h2 className="text-sm font-semibold">Ajustes do clipe</h2>
+          <button type="button" onClick={aoFechar} className="botao-icone" aria-label="Fechar os ajustes">
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+      ) : null}
       {/* As abas quebram em linhas: com rolagem para o lado, Animação e Cor ficavam escondidas num painel estreito */}
       <div role="tablist" aria-label="Propriedades" className="flex shrink-0 flex-wrap gap-1 border-b border-borda px-2 py-1.5">
         {abas.map((item) => (

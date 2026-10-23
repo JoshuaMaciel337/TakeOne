@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { LoaderCircle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
@@ -101,6 +101,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const { iniciar: iniciarEnvio } = useEnvios();
   const [ferramenta, setFerramenta] = useState<IdFerramenta>(() => FERRAMENTAS.find((item) => item.id === ferramentaInicial && !item.emBreve)?.id ?? "midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
+  // Abaixo da tela larga as propriedades não cabem ao lado da prévia: abrem numa folha pelo botão "Ajustar"
+  const [propriedadesNoCelular, setPropriedadesNoCelular] = useState(false);
   const [midiaId, setMidiaId] = useState<string | null>(null);
   const [selecao, definirSelecao] = useState<string[]>([]);
   /**
@@ -437,6 +439,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           aoEscolher={(id) => {
             setFerramenta(id);
             setPainelNoCelular(true);
+            setPropriedadesNoCelular(false);
           }}
           className="max-md:order-2"
         />
@@ -496,7 +499,20 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col max-md:order-1">
-          <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 flex-1">
+            {selecionado && !propriedadesNoCelular ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPropriedadesNoCelular(true);
+                  setPainelNoCelular(false);
+                }}
+                className="botao-secundario absolute right-3 top-3 z-30 px-3 py-1.5 text-xs shadow-lg lg:hidden"
+              >
+                <SlidersHorizontal className="size-3.5" aria-hidden />
+                Ajustar
+              </button>
+            ) : null}
             <Previa
               projeto={projetoNaTela ?? projeto}
               midias={midias}
@@ -559,7 +575,12 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 setProvisorio(null);
                 executar(comando);
               }}
-              className="w-[var(--largura-propriedades)] max-lg:hidden"
+              aoFechar={() => setPropriedadesNoCelular(false)}
+              className={`w-[var(--largura-propriedades)] ${
+                propriedadesNoCelular && selecionado
+                  ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-50 max-lg:h-[60dvh] max-lg:w-auto max-lg:border-t max-lg:border-borda max-lg:shadow-2xl"
+                  : "max-lg:hidden"
+              }`}
             />
           </div>
           <Divisor
