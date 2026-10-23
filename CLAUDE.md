@@ -153,12 +153,11 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 
 Parte do trabalho foi feita numa máquina sem FFmpeg, sem Docker e sem GPU. Isto só dá para conferir no Nitro (ou, no caso dos testes, no CI). Tire da lista o que for conferido.
 
-Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato com quadros B, cores com BT.709), pilha no Docker, todos os testes com FFmpeg (render, texto, animação, cor, vinheta e transição), exportação de 1080p e 4K pela API, transição sem sobra na mídia e licença do Wan 2.2 (Apache 2.0, sem cadastro). Falta:
+Conferido em 23/10/2026: o 4K longo (2 min com três vídeos e uma foto na principal, com fusões, uma foto por cima, um texto e um som numa faixa de áudio) saiu em 344 s, com pico de 5,3 GiB no worker; o de 6 s tinha usado 4,5 GiB, então a memória não cresce com a duração e o 4K fica sem limite. Conferido em 14/10/2026: CI verde, prévia contra render no Chrome (quadro exato com quadros B, cores com BT.709), pilha no Docker, todos os testes com FFmpeg (render, texto, animação, cor, vinheta e transição), exportação de 1080p e 4K pela API, transição sem sobra na mídia e licença do Wan 2.2 (Apache 2.0, sem cadastro). Falta:
 
 - [ ] Exportar com um vídeo gravado no celular de verdade. O teste usou um vídeo gerado com rotação de 90° e quadros B, que passou, e um vídeo de 29,98 quadros por segundo (que achou o quadro adiantado do render, já corrigido).
 - [ ] QR code no celular pelo túnel da Cloudflare (pelo localhost o celular não abre).
 - [ ] Uma exportação com mesclagem (a primeira depois de reconstruir a pilha) perdeu o clipe da principal a partir de 3,5 s; as 12 seguintes, do mesmo projeto e pelo mesmo comando, saíram certas. Se voltar a acontecer, olhar a leitura da mídia nessa exportação.
-- [ ] 4K longo: o de 6 s usou 4,5 GiB dos 7,4 GiB que o Docker tem no WSL. Medir um de alguns minutos, com várias camadas, antes de liberar 4K sem limite.
 
 ## Arquitetura em um minuto
 
