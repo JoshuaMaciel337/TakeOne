@@ -283,7 +283,10 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                  f"setpts='({expressao_do_tempo(curva, duracao_s, duracao_s * clipe['velocidade'])})/TB'"]
         fps = f"fps={taxa}:round=up:start_time=0"
     else:
-        tempo = [f"setpts=({zerar})/{_numero(clipe['velocidade'])}"]
+        # A base de tempo fina também aqui: num vídeo de celular com base 1/600, o setpts levava a folga para a
+        # grade da mídia e o clipe inteiro saía um quadro adiantado (medido num vídeo de 46 fps: todo quadro
+        # igual ao seguinte da prévia; com a base fina, igual ao mesmo)
+        tempo = ["settb=1/90000", f"setpts=({zerar})/{_numero(clipe['velocidade'])}"]
         # round=up: cada quadro do vídeo mostra o último quadro da mídia que já chegou, como o
         # decodificador da prévia. Com o padrão (o mais próximo), um vídeo de 29,97 num projeto de 30
         # saía sempre um quadro adiantado (medido: 1 de 200 quadros iguais; com round=up, 200 de 200)

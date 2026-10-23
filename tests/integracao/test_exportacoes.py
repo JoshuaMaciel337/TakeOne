@@ -485,6 +485,45 @@ def gerar_cor(cor: str):
     return gerar
 
 
+def gerar_quadros_numerados(caminho):
+    """46 quadros por segundo com a base de tempo 1/600 (a dos celulares): sete faixas pretas ou brancas
+    escrevem o número de cada quadro em binário (resto por 128), que a conversão de cor não estraga."""
+    faixas = "255*mod(floor(mod(N,128)/pow(2,floor(X*7/W))),2)"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                    "-i", "color=c=black:s=644x360:r=46:d=5", "-vf", f"geq=lum='{faixas}':cb=128:cr=128",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-qp", "0", "-pix_fmt", "yuv420p",
+                    "-video_track_timescale", "600", str(caminho)], check=True, timeout=120)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_mostra_o_ultimo_quadro_que_chegou_na_base_dos_celulares(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=644, altura=360, duracao=5.0, audio=False,
+                           gerar=gerar_quadros_numerados)
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9", duracao=2, entrada=2 * SEGUNDO)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    doc = db_limpo.midias.find_one({"_id": ObjectId(midia_id)})
+    original = storage.caminho_local(chave_arquivo(doc["organizacao_id"], doc["_id"], doc["original"]))
+    tempos = sorted(float(t) for t in subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0",
+         str(original)], capture_output=True, text=True, check=True).stdout.split())
+    saida = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-frames:v", "60", "-f", "rawvideo",
+                            "-pix_fmt", "gray", "-"], capture_output=True, check=True, timeout=60).stdout
+    quadros = np.frombuffer(saida, np.uint8).reshape(-1, 720, 1280)
+    largura_da_faixa = 1280 / 7
+    errados = []
+    for n, quadro in enumerate(quadros):
+        # O último quadro que começou até o instante (com a folga de meio milissegundo da prévia)
+        esperado = max(i for i, t in enumerate(tempos) if t <= 2 + n / 30 + 0.0005) % 128
+        bits = [quadro[200:520, int((b + 0.3) * largura_da_faixa):int((b + 0.7) * largura_da_faixa)].mean() > 128
+                for b in range(7)]
+        obtido = sum(1 << b for b, ligado in enumerate(bits) if ligado)
+        if obtido != esperado:
+            errados.append((n, esperado, obtido))
+    # Com o setpts na base 1/600, a folga ia para a grade da mídia e uns quadros saíam adiantados
+    assert not errados, errados
+
+
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
 def test_render_faz_a_cortina_como_a_previa(cliente, db_limpo):
     cadastrar(cliente)

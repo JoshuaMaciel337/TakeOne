@@ -103,8 +103,8 @@ def test_camadas_de_baixo_para_cima_com_a_caixa_da_geometria():
     assert linhas[5] == ("[base2]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,"
                          "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv[v]")
     # Sem marcação de cor, o vídeo é lido como BT.709 (como o Chrome na prévia); com marcação, como ela diz
-    assert linhas[1].startswith("[0:v]setparams=colorspace=bt709,setpts=")
-    assert linhas[3].startswith("[1:v]setpts=")
+    assert linhas[1].startswith("[0:v]setparams=colorspace=bt709,settb=1/90000,setpts=")
+    assert linhas[3].startswith("[1:v]settb=1/90000,setpts=")
     # E o vídeo final sai marcado como BT.709
     saida = argumentos_de_saida(plano, "/tmp/v.mp4", 1920)
     assert saida[saida.index("-colorspace") + 1] == "bt709" and saida[saida.index("-color_range") + 1] == "tv"
@@ -373,7 +373,7 @@ def test_remover_fundo_le_a_mascara_como_o_clipe_e_usa_alphamerge():
     video = next(e for e in plano.entradas if e.caminho == "/m/empe.mp4")
     assert (mascara.inicio, mascara.duracao) == (video.inicio, video.duracao), "o mesmo trecho"
     # A máscara abre com o clipe (0,1 s antes da entrada) e desconta o mesmo tanto
-    assert ("scale=in_range=tv:out_range=pc,format=gray,setpts=(PTS-0.1005/TB)/1,"
+    assert ("scale=in_range=tv:out_range=pc,format=gray,settb=1/90000,setpts=(PTS-0.1005/TB)/1,"
             "fps=30/1:round=up:start_time=0,crop=") in plano.filtro
     assert "[vf2][mf2]alphamerge" in plano.filtro
     sem_mascara = {**MIDIAS}
@@ -387,7 +387,7 @@ def test_imagem_sem_ruido_le_o_video_limpo_e_o_som_do_original():
     plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, imagem_limpa=True)])]),
                             {**MIDIAS, "deitado": limpa}, 720, 1280)
     assert [e.caminho for e in plano.entradas] == ["/m/deitado.mp4", "/m/limpo.mp4"]
-    assert "[1:v]setpts=" in plano.filtro, "a imagem vem do limpo, já em BT.709 (sem setparams)"
+    assert "[1:v]settb=1/90000,setpts=" in plano.filtro, "a imagem vem do limpo, já em BT.709 (sem setparams)"
     assert "[0:a]" in plano.filtro_som, "o som continua vindo do original"
 
 
@@ -399,7 +399,7 @@ def test_imagem_estavel_le_o_video_estavel_e_sobre_a_limpa_quando_ela_esta_ligad
         estavel = clipe("c1", "deitado", 0, 4, estabilizar=True, **extra)
         plano = planejar_render(projeto([faixa("principal", [estavel])]), {**MIDIAS, "deitado": midia}, 720, 1280)
         assert [e.caminho for e in plano.entradas] == ["/m/deitado.mp4", esperado]
-        assert "[1:v]setpts=" in plano.filtro, "a imagem vem do estável, já em BT.709 (sem setparams)"
+        assert "[1:v]settb=1/90000,setpts=" in plano.filtro, "a imagem vem do estável, já em BT.709 (sem setparams)"
         assert "[0:a]" in plano.filtro_som, "o som continua vindo do original"
     so_a_comum = MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, matriz=None, estaveis=estaveis[:1])
     with pytest.raises(ErroRender, match="estável"):
