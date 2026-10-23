@@ -11,7 +11,7 @@ import type { Midia } from "@/lib/tipos";
 import { carregarBitmap } from "../previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
-import { type ImagemDeTexto, imagemDeTextoNoLado } from "../previa/imagensDeTexto";
+import { type ImagemDeTexto, imagemDeTextoNoLado, soltarImagensDeTexto } from "../previa/imagensDeTexto";
 
 export type FormatoDaImagem = "png" | "jpeg" | "webp";
 
@@ -77,5 +77,6 @@ export async function exportarImagem(
     );
   } finally {
     compositor.destruir();
+    soltarImagensDeTexto(imagensDeTexto.values());
   }
 }

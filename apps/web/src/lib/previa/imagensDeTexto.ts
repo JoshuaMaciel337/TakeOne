@@ -13,12 +13,26 @@ export type ImagemDeTexto = { bitmap: ImageBitmap; largura: number; altura: numb
 
 /** Espera depois da última mudança antes de pedir a imagem (enquanto a pessoa digita). */
 const ESPERA_MS = 120;
-const LIMITE_GUARDADAS = 200;
+const LIMITE_GUARDADAS = 120;
 
 const guardadas = new Map<string, ImagemDeTexto>();
 const pedidos = new Map<string, Promise<void>>();
 /** A última imagem mostrada de cada clipe: fica na tela enquanto a do texto editado não chega. */
 const ultimaDoClipe = new Map<string, ImagemDeTexto>();
+
+/**
+ * Guarda a imagem, tirando as usadas há mais tempo quando passa do limite. A que sai é solta (close) se nenhum clipe
+ * está mostrando ela: sem isso, o bitmap só saía da memória quando o coletor passasse.
+ */
+function guardar(chave: string, imagem: ImagemDeTexto) {
+  guardadas.delete(chave);
+  guardadas.set(chave, imagem);
+  while (guardadas.size > LIMITE_GUARDADAS) {
+    const [antiga, saindo] = guardadas.entries().next().value!;
+    guardadas.delete(antiga);
+    if (![...ultimaDoClipe.values()].includes(saindo)) saindo.bitmap.close();
+  }
+}
 
 /** O destaque e os tempos das palavras não mudam a imagem: ficam fora da chave. */
 function chaveDoTexto(texto: Texto): string {
@@ -61,9 +75,7 @@ export function useImagensDeTexto(textos: { id: string; texto: Texto }[]): Map<s
       for (const chave of faltando) {
         const pedido = pedirImagem(chave)
           .then((imagem) => {
-            guardadas.set(chave, imagem);
-            // Sem guardar para sempre: as mais antigas saem primeiro
-            while (guardadas.size > LIMITE_GUARDADAS) guardadas.delete(guardadas.keys().next().value!);
+            guardar(chave, imagem);
             setVersao((versao) => versao + 1);
           })
           .catch(() => {})
@@ -76,28 +88,45 @@ export function useImagensDeTexto(textos: { id: string; texto: Texto }[]): Map<s
 
   const imagens = new Map<string, ImagemDeTexto>();
   for (const { id, texto } of textos) {
-    const atual = guardadas.get(chaveDoTexto(texto));
-    // Guardar a última é idempotente: renderizar de novo dá o mesmo resultado
-    if (atual) ultimaDoClipe.set(id, atual);
+    const chave = chaveDoTexto(texto);
+    const atual = guardadas.get(chave);
+    if (atual) {
+      // Usada agora: vai para o fim da fila (a última a sair). Guardar a última do clipe é idempotente
+      guardadas.delete(chave);
+      guardadas.set(chave, atual);
+      ultimaDoClipe.set(id, atual);
+    }
     const imagem = atual ?? ultimaDoClipe.get(id);
     if (imagem) imagens.set(id, imagem);
   }
+  // A última imagem só fica para os clipes da lista: os que saíram da janela (ou do projeto) a soltam
+  const naLista = new Set(textos.map((item) => item.id));
+  for (const id of [...ultimaDoClipe.keys()]) if (!naLista.has(id)) ultimaDoClipe.delete(id);
   return imagens;
 }
 
-/** A imagem de um texto, sem hook (a exportação no navegador espera por ela): a mesma que a prévia usa. */
+/**
+ * A imagem de um texto, sem hook (a exportação no navegador espera por ela): a mesma que a prévia usa, numa cópia
+ * do bitmap que é de quem pediu (feche no fim). Sem a cópia, a guardada podia ser solta pela prévia no meio da
+ * exportação, que pede todos os textos antes de desenhar.
+ */
 export async function imagemDeTexto(texto: Texto): Promise<ImagemDeTexto> {
   const chave = chaveDoTexto(texto);
-  const guardada = guardadas.get(chave);
-  if (guardada) return guardada;
-  const imagem = await pedirImagem(chave);
-  guardadas.set(chave, imagem);
-  while (guardadas.size > LIMITE_GUARDADAS) guardadas.delete(guardadas.keys().next().value!);
-  return imagem;
+  let guardada = guardadas.get(chave);
+  if (!guardada) {
+    guardada = await pedirImagem(chave);
+    guardar(chave, guardada);
+  }
+  return { ...guardada, bitmap: await createImageBitmap(guardada.bitmap) };
+}
+
+/** Fecha os bitmaps de uma lista de imagens de texto que pertence a quem pediu (o fim de uma exportação). */
+export function soltarImagensDeTexto(imagens: Iterable<ImagemDeTexto>) {
+  for (const imagem of imagens) imagem.bitmap.close();
 }
 
 /**
- * A imagem de um texto desenhada para um quadro com outro lado menor (a exportação do editor de imagem, nítida
+ * A imagem de um texto desenhada para um quadro com outro lado menor (de quem pediu, como a de `imagemDeTexto`) (a exportação do editor de imagem, nítida
  * no tamanho final). O tamanho volta medido em LADO_REFERENCIA_TEXTO, como a prévia mede: a caixa sai igual e o
  * bitmap maior só deixa as letras mais nítidas (o render do vídeo faz o mesmo).
  */

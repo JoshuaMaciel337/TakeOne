@@ -197,12 +197,16 @@ function camadaDeAjuste(clipe: Clipe, faixa: Faixa, tempo: Tick, quadro: Tamanho
 const RECORTE_INTEIRO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
 
 /** Os textos que precisam de imagem: por id do clipe, e o destaque da fala com ":destaque". */
-export function textosParaImagens(projeto: Projeto): { id: string; texto: Texto }[] {
+/**
+ * Os textos que a prévia precisa desenhar. Com `janela`, só os que tocam nela: com centenas de legendas, pedir a
+ * imagem de todas de uma vez fazia centenas de pedidos e segurava centenas de MB de bitmaps.
+ */
+export function textosParaImagens(projeto: Projeto, janela?: { de: Tick; ate: Tick }): { id: string; texto: Texto }[] {
   return projeto.faixas
     .filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta)
     .flatMap((faixa) =>
       faixa.clipes.flatMap((clipe) =>
-        !clipe.texto
+        !clipe.texto || (janela && (fimDoClipe(clipe) <= janela.de || clipe.inicio >= janela.ate))
           ? []
           : [{ id: clipe.id, texto: clipe.texto }, ...(clipe.texto.destaque ? [{ id: `${clipe.id}:destaque`, texto: textoDoDestaque(clipe.texto) }] : [])],
       ),

@@ -10,7 +10,7 @@ import { contemPonto, type Guias, pontoNaCaixa, type Tamanho } from "@/lib/proje
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
-import { duracaoDoQuadro, formatarTimecode, type Tick } from "@/lib/tempo";
+import { duracaoDoQuadro, formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
@@ -46,6 +46,8 @@ type Props = {
 
 /** Quanto a prévia espera um vídeo carregar o quadro antes de desenhar sem ele. */
 const ESPERA_QUADRO_MS = 400;
+/** Os textos com a imagem pedida: de 2 s antes do degrau do cursor até 12 s depois, em degraus de 4 s. */
+const JANELA_DOS_TEXTOS = { degrau: 4 * TICKS_POR_SEGUNDO, antes: 2 * TICKS_POR_SEGUNDO, depois: 12 * TICKS_POR_SEGUNDO };
 /** Densidade máxima de pixels do canvas: acima disso o custo cresce e a diferença não aparece. */
 const DENSIDADE_MAXIMA = 2;
 
@@ -120,7 +122,10 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
     true,
   ).filter((item) => item.midia.audio && !item.clipe.som_separado);
   // O texto com destaque pede também a imagem na cor do destaque, que vai por cima
-  const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
+  // Só os textos perto do cursor, numa janela que anda em degraus (para não mudar a cada quadro): o que vem pela
+  // frente chega antes de aparecer, tocando ou não
+  const degrau = Math.floor(tempo / JANELA_DOS_TEXTOS.degrau) * JANELA_DOS_TEXTOS.degrau;
+  const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto, { de: degrau - JANELA_DOS_TEXTOS.antes, ate: degrau + JANELA_DOS_TEXTOS.depois }));
   // As tabelas das LUTs importadas: quando uma chega, a prévia volta a montar as camadas com ela
   useTabelasDasLuts(lutsDoProjeto(projeto));
   const camadas = camadasNoTempo(projeto, visuais, tempo, tamanho, imagensDeTexto);

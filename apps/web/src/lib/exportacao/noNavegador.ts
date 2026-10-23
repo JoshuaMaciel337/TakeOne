@@ -14,7 +14,7 @@ import { arquivoDaImagemDoClipe, arquivoDoSom, clipeNaFonte } from "@/lib/previa
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, type ItemDaPrevia, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { type Camada, Compositor, FUNDO } from "@/lib/previa/compositor";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
-import { imagemDeTexto, type ImagemDeTexto } from "@/lib/previa/imagensDeTexto";
+import { imagemDeTexto, type ImagemDeTexto, soltarImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { fatorDoNivelamento } from "@/lib/projeto/nivelar";
 import { volumeNoTempo } from "@/lib/projeto/keyframes";
@@ -281,9 +281,9 @@ export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: Read
   const compositor = new Compositor(canvas);
   const fontes = new Fontes();
   const tamanho = { largura, altura };
+  // As imagens dos textos, todas antes (cópias das que a prévia usa, soltas no fim)
+  const imagensDeTexto = new Map<string, ImagemDeTexto>();
   try {
-    // As imagens dos textos, todas antes (a mesma que a prévia usa)
-    const imagensDeTexto = new Map<string, ImagemDeTexto>();
     await Promise.all(textosParaImagens(projeto).map(async ({ id, texto }) => imagensDeTexto.set(id, await imagemDeTexto(texto))));
     for (let k = 0; k < totalDeQuadros; k++) {
       conferir(sinal);
@@ -358,6 +358,7 @@ export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: Read
     aoProgresso(1, "Pronto");
     return new Blob([alvo.buffer], { type: "video/mp4" });
   } finally {
+    soltarImagensDeTexto(imagensDeTexto.values());
     fontes.fechar();
     compositor.destruir();
     if (codificadorDoVideo.state !== "closed") codificadorDoVideo.close();
