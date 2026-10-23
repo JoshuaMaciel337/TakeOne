@@ -512,12 +512,12 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Efeitos: sombra com cor, direção, distância, desfoque e espalhar; até dois contornos por fora; tamanho do brilho; texto vazado.
   - [x] Degradê em textos e formas e estilos prontos novos (Dourado, Cromado, Quadrinhos, Baixo relevo, Vazado e Pôr do sol).
   - [x] Texto em arco (arcos paralelos; desliga o destaque da fala e o letra a letra).
-- [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
+- [x] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
   - [x] Congelar o quadro (a foto do instante entre as metades do vídeo, por 3 s).
   - [x] Transições de máscara: relógio, íris, losango, persianas e diagonal, com a borda suave.
   - [x] Blocos sorteados (um sorteio em inteiros pequenos, o mesmo no geq e no shader).
   - [x] Desfoque de zoom e de giro e pixelizar (efeitos).
-  - [ ] A transição zoom com desfoque (a força das 16 cópias muda no tempo; mais pesada no render).
+  - [x] A transição zoom com desfoque (as 16 cópias ampliadas só ligam na janela, pelo `enable`).
   - [x] Inverter o clipe (o vídeo invertido em blocos no worker; aba Velocidade).
   - [x] Câmera lenta suave (minterpolate no trecho do clipe; aba Velocidade).
 - [x] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

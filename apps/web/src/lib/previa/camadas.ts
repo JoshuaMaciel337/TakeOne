@@ -28,7 +28,7 @@ import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVis
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import { clipeNaFonte } from "./arquivos";
-import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type MascaraDeTransicao, mascaraNaTransicao, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type MascaraDeTransicao, mascaraNaTransicao, type Revelado, reveladoNaTransicao, transformacaoNaTransicao, zoomNaTransicao } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -70,6 +70,8 @@ export type CamadaNaTela = {
   mascara?: Cortes;
   /** Sigma do desfoque, em frações da altura do clipe. */
   desfoque?: number;
+  /** O peso das cópias ampliadas da transição zoom com desfoque (zoomNaTransicao). */
+  zoomDaTransicao?: number;
   /** VHS e glitch: o desvio do vermelho e do azul neste quadro, em frações da largura. */
   desvio?: number;
   luz?: { forca: number; posicao: number };
@@ -238,6 +240,7 @@ export function camadasNoTempo(
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
       mascaraDaTransicao: item.efeitos?.length ? mascaraNaTransicao(item.efeitos, tempo) : null,
       desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
+      zoomDaTransicao: item.efeitos?.length ? zoomNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
@@ -335,6 +338,7 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource |
     contrasteLocal: contrasteLocalDoEfeito(camada.clipe.efeito),
     lente: distorcaoDoEfeito(camada.clipe.efeito),
     borrao: borraoDoEfeito(camada.clipe.efeito),
+    zoomDaTransicao: camada.zoomDaTransicao,
     celulas: celulasDoPixelizar(camada.clipe.efeito, camada.caixa.largura, camada.caixa.altura),
     desvio: camada.desvio,
     linhas: linhasDoEfeito(camada.clipe.efeito),

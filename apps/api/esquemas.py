@@ -613,7 +613,7 @@ class ChromaEntrada(BaseModel):
 
 class TransicaoEntrada(BaseModel):
     tipo: Literal["fusao", "escurecer", "deslizar", "empurrar", "zoom", "relogio", "iris", "losango", "persianas",
-                  "diagonal", "blocos",
+                  "diagonal", "blocos", "zoom_desfoque",
                   "cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima", "desfoque"]
     duracao: int = Field(gt=0, description="Em ticks")
     # Os dois sons se cruzam na janela da transição (lib/projeto/transicao.ts, janelasDoSom)

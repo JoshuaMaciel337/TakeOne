@@ -22,6 +22,9 @@ COLUNAS_DOS_BLOCOS = 12
 SUAVIDADE_DA_TRANSICAO = 0.04
 FAIXAS_DAS_PERSIANAS = 8
 REVELADO_INTEIRO = {"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0}
+# Zoom com desfoque (transicao.ts): as cópias vão de 1 a 1 + ZOOM_DO_DESFOQUE, e o próximo aparece nesse trecho
+ZOOM_DO_DESFOQUE = 0.35
+TROCA_DO_ZOOM_DESFOQUE = (0.4, 0.6)
 
 
 def janelas_da_principal(clipes: list[dict], quadro: float) -> dict[str, dict]:
@@ -97,6 +100,9 @@ def transformacao_na_transicao(base: dict, efeitos: list[dict], t: float) -> dic
             resultado["opacidade"] *= p
         elif efeito["tipo"] == "desfoque" and entra:
             resultado["opacidade"] *= p
+        elif efeito["tipo"] == "zoom_desfoque" and entra:
+            de, ate = TROCA_DO_ZOOM_DESFOQUE
+            resultado["opacidade"] *= min(1.0, max(0.0, (p - de) / (ate - de)))
     return resultado
 
 
@@ -111,6 +117,51 @@ def desfoque_na_transicao(efeitos: list[dict], t: float) -> float:
             p = min(1.0, max(0.0, (t - efeito["inicio"]) / efeito["duracao"]))
             desfoque = max(desfoque, DESFOQUE_TRANSICAO * (1 - abs(2 * p - 1)))
     return desfoque
+
+
+def zoom_na_transicao(efeitos: list[dict], t: float) -> float:
+    """O peso das cópias ampliadas do zoom com desfoque no instante t (zoomNaTransicao)."""
+    peso = 0.0
+    for efeito in efeitos:
+        if efeito["tipo"] == "zoom_desfoque":
+            p = min(1.0, max(0.0, (t - efeito["inicio"]) / efeito["duracao"]))
+            peso = max(peso, 1 - abs(2 * p - 1))
+    return peso
+
+
+def filtros_do_zoom_desfoque(efeitos: list[dict], comeco: float, largura: int, altura: int,
+                             amostras: int, rotulo: str) -> str | None:
+    """
+    O pedaço do grafo do zoom com desfoque (no alfa pré-multiplicado, entre a entrada e a saída do pedaço), ou
+    None sem ele. comeco: o instante da linha do tempo em que o tempo do pedaço é zero. As cópias ampliadas são
+    o perspective (que, ao contrário do scale, liga e desliga pelo enable) e o mix e o blend também só ligam
+    na janela: fora dela o clipe passa direto, e o render não paga as cópias no clipe inteiro.
+    """
+    zooms = [e for e in efeitos if e["tipo"] == "zoom_desfoque"]
+    if not zooms:
+        return None
+    janelas = "+".join(f"between(t,{_n(e['inicio'] - comeco)},{_n(e['inicio'] + e['duracao'] - comeco)})"
+                       for e in zooms)
+    ligado = f"enable='{janelas}'"
+    pesos = [f"(1-abs(2*clip((T+{_n(comeco - e['inicio'])})/{_n(e['duracao'])},0,1)-1))" for e in zooms]
+    peso = pesos[0] if len(pesos) == 1 else f"max({','.join(pesos)})"
+    copias = []
+    for i in range(1, amostras):
+        ampliacao = 1 + ZOOM_DO_DESFOQUE * i / (amostras - 1)
+        # O canto da fonte que vai para o canto do clipe, com o centro do pixel no lugar em que o shader lê
+        meio_l, meio_a = largura / 2, altura / 2
+        d = 0.5 / ampliacao - 0.5
+        x0, x1 = meio_l - meio_l / ampliacao + d, meio_l + meio_l / ampliacao + d
+        y0, y1 = meio_a - meio_a / ampliacao + d, meio_a + meio_a / ampliacao + d
+        copias.append(f"perspective=x0={_n(x0)}:y0={_n(y0)}:x1={_n(x1)}:y1={_n(y0)}:x2={_n(x0)}:y2={_n(y1)}"
+                      f":x3={_n(x1)}:y3={_n(y1)}:interpolation=linear:{ligado}")
+    nomes = [f"{rotulo}c{i}" for i in range(amostras)]
+    fim = ";\n"
+    return (f"split={amostras + 1}[{rotulo}n]" + "".join(f"[{n}]" for n in nomes) + fim
+            + "".join(f"[{n}]{c}[{n}m]{fim}" for n, c in zip(nomes[1:], copias, strict=True))
+            + f"[{nomes[0]}]" + "".join(f"[{n}m]" for n in nomes[1:])
+            + f"mix=inputs={amostras}:weights='{' '.join(['1'] * amostras)}':{ligado}[{rotulo}b]{fim}"
+            + f"[{rotulo}n][{rotulo}b]blend=all_expr='A+(B-A)*{peso}+0.5':{ligado}")
 
 
 def revelado_na_transicao(efeitos: list[dict], t: float) -> dict:
@@ -248,6 +299,9 @@ def filtros_de_transicao(efeitos: list[dict], var_tempo: str = "t") -> dict:
             dx.append(falta if entra else f"({falta}-1)")
         elif tipo == "desfoque" and entra:
             fades.append(f"fade=t=in:st={_n(inicio)}:d={_n(duracao)}:alpha=1")
+        elif tipo == "zoom_desfoque" and entra:
+            de, ate = TROCA_DO_ZOOM_DESFOQUE
+            fades.append(f"fade=t=in:st={_n(inicio + de * duracao)}:d={_n((ate - de) * duracao)}:alpha=1")
         elif tipo == "zoom" and entra:
             fades.append(f"fade=t=in:st={_n(inicio)}:d={_n(duracao)}:alpha=1")
             escala.append(f"({_n(ZOOM_TRANSICAO)}+{_n(1 - ZOOM_TRANSICAO)}*(1-{falta}))")

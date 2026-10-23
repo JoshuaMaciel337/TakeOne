@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Clipe, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "./modelo.ts";
-import { campoDaTransicao, desfoqueNaTransicao, fatorDaMistura, limiarDaTransicao, type MascaraDeTransicao, mascaraNaTransicao, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
+import { campoDaTransicao, desfoqueNaTransicao, fatorDaMistura, limiarDaTransicao, type MascaraDeTransicao, mascaraNaTransicao, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao, zoomNaTransicao } from "./transicao.ts";
 
 type Caso = {
   nome: string;
@@ -16,6 +16,7 @@ type Caso = {
   esperado: Transformacao;
   revelado?: Revelado;
   desfoque?: number;
+  zoom?: number;
 };
 const { base, casos } = JSON.parse(readFileSync(new URL("../../../../../tests/casos/transicao.json", import.meta.url), "utf-8")) as {
   base: Transformacao;
@@ -32,6 +33,9 @@ for (const caso of casos) {
     }
     if (caso.desfoque !== undefined) {
       assert.ok(Math.abs(desfoqueNaTransicao([efeito], caso.t * S) - caso.desfoque) < 1e-12);
+    }
+    if (caso.zoom !== undefined) {
+      assert.ok(Math.abs(zoomNaTransicao([efeito], caso.t * S) - caso.zoom) < 1e-12);
     }
     if (caso.revelado) {
       const revelado = reveladoNaTransicao([efeito], caso.t * S);

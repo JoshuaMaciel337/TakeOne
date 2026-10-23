@@ -26,7 +26,8 @@ export type TipoTransicao =
   | "losango"
   | "persianas"
   | "diagonal"
-  | "blocos";
+  | "blocos"
+  | "zoom_desfoque";
 /** `misturar_som`: os dois sons se cruzam na janela (janelasDoSom); sem ela, cada clipe soa só entre o começo e o fim dele. */
 export type Transicao = { tipo: TipoTransicao; duracao: Tick; misturar_som?: boolean };
 
@@ -47,7 +48,16 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "persianas", nome: "Persianas", descricao: "O próximo aparece em faixas, como uma persiana" },
   { id: "diagonal", nome: "Diagonal", descricao: "O próximo é revelado do canto de cima para o de baixo" },
   { id: "blocos", nome: "Blocos", descricao: "O próximo aparece em blocos, numa ordem sorteada" },
+  { id: "zoom_desfoque", nome: "Zoom com desfoque", descricao: "Os dois disparam num zoom borrado no corte, e o próximo aparece nele" },
 ];
+
+/**
+ * Zoom com desfoque: perto do corte, a imagem vai para a média de AMOSTRAS_DO_BORRAO cópias ampliadas em volta
+ * do meio, de 1 a 1 + ZOOM_DO_DESFOQUE (a mesma lista de cópias no shader e no render). O peso dessa média sobe
+ * em linha reta até o corte e desce depois, e o próximo aparece entre 40% e 60% da janela, já borrado.
+ */
+export const ZOOM_DO_DESFOQUE = 0.35;
+export const TROCA_DO_ZOOM_DESFOQUE = { de: 0.4, ate: 0.6 };
 
 /**
  * Transições de máscara: o próximo aparece por uma forma que cresce, com a borda suave. Cada tipo é um campo
@@ -209,6 +219,9 @@ export function transformacaoNaTransicao(base: Transformacao, efeitos: EfeitoDeT
       opacidade *= p;
     } else if (efeito.tipo === "desfoque" && entra) {
       opacidade *= p;
+    } else if (efeito.tipo === "zoom_desfoque" && entra) {
+      const { de, ate } = TROCA_DO_ZOOM_DESFOQUE;
+      opacidade *= Math.min(1, Math.max(0, (p - de) / (ate - de)));
     }
   }
   return { ...base, x, escala, opacidade };
@@ -223,6 +236,17 @@ export function desfoqueNaTransicao(efeitos: EfeitoDeTransicao[], t: Tick): numb
     desfoque = Math.max(desfoque, DESFOQUE_TRANSICAO * (1 - Math.abs(2 * p - 1)));
   }
   return desfoque;
+}
+
+/** O peso das cópias ampliadas do zoom com desfoque no instante `t`: sobe até o corte e desce depois. */
+export function zoomNaTransicao(efeitos: EfeitoDeTransicao[], t: Tick): number {
+  let peso = 0;
+  for (const efeito of efeitos) {
+    if (efeito.tipo !== "zoom_desfoque") continue;
+    const p = Math.min(1, Math.max(0, (t - efeito.inicio) / efeito.duracao));
+    peso = Math.max(peso, 1 - Math.abs(2 * p - 1));
+  }
+  return peso;
 }
 
 /** A parte do clipe que aparece no instante `t`: as cortinas revelam quem entra, com a curva do movimento. */

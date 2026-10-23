@@ -12,11 +12,13 @@ from core.utils.transicao import (
     fator_da_mistura,
     filtro_de_cortina,
     filtros_de_transicao,
+    filtros_do_zoom_desfoque,
     janelas_da_principal,
     janelas_do_som,
     limiar_da_transicao,
     revelado_na_transicao,
     transformacao_na_transicao,
+    zoom_na_transicao,
 )
 
 DADOS = json.loads((Path(__file__).parent / "casos" / "transicao.json").read_text(encoding="utf-8"))
@@ -70,6 +72,24 @@ def test_janelas_estendem_os_dois_clipes():
 
 
 DESFOQUES = [c for c in CASOS if "desfoque" in c]
+ZOOMS = [c for c in CASOS if "zoom" in c]
+
+
+@pytest.mark.parametrize("caso", ZOOMS, ids=[c["nome"] for c in ZOOMS])
+def test_peso_do_zoom_com_desfoque_igual_ao_da_previa(caso):
+    assert zoom_na_transicao([efeito_do(caso)], caso["t"]) == pytest.approx(caso["zoom"], abs=1e-12)
+
+
+def test_zoom_com_desfoque_liga_as_copias_so_na_janela():
+    efeitos = [{"tipo": "zoom_desfoque", "papel": "entra", "inicio": 2.0, "duracao": 1.0}]
+    grafo = filtros_do_zoom_desfoque(efeitos, 1.5, 640, 360, 4, "z")
+    # A janela no tempo do pedaço (que começa aos 1,5 s da linha) e o peso pelo T do blend
+    assert grafo.count("enable='between(t,0.5,1.5)'") == 5, "3 cópias, o mix e o blend"
+    assert "split=5[zn][zc0][zc1][zc2][zc3]" in grafo and "[zc0][zc1m][zc2m][zc3m]mix=inputs=4" in grafo
+    assert "blend=all_expr='A+(B-A)*(1-abs(2*clip((T+-0.5)/1,0,1)-1))+0.5'" in grafo
+    # A última cópia lê o retângulo do meio de 1/1,35 do clipe (com o centro dos pixels no lugar do shader)
+    assert "x0=82.833333:y0=46.537037" in grafo
+    assert filtros_do_zoom_desfoque([{**efeitos[0], "tipo": "fusao"}], 0, 640, 360, 4, "z") is None
 
 
 @pytest.mark.parametrize("caso", DESFOQUES, ids=[c["nome"] for c in DESFOQUES])

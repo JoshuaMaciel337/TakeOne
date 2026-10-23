@@ -553,6 +553,47 @@ def test_render_faz_a_cortina_como_a_previa(cliente, db_limpo):
     assert depois[360, 1240][2] > 200 and depois[360, 1240][0] < 50, "depois da janela o azul aparece inteiro"
 
 
+def gerar_degrade(caminho):
+    """640 × 360, 2 s: o vermelho sobe da esquerda para a direita (o zoom em volta do meio muda cada coluna)."""
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+                    "-i", "color=c=black:s=640x360:r=30:d=2", "-vf", "geq=r='X/W*255':g=128:b=128",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "8", "-pix_fmt", "yuv444p", str(caminho)],
+                   check=True, timeout=120)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_faz_o_zoom_com_desfoque_so_na_janela(cliente, db_limpo):
+    from core.utils.efeitos import AMOSTRAS_DO_BORRAO
+    from core.utils.transicao import ZOOM_DO_DESFOQUE
+
+    cadastrar(cliente)
+    degrade = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False, gerar=gerar_degrade)
+    azul = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False,
+                       gerar=gerar_cor("0x0000ff"))
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    base = {"velocidade": 1, "volume": 1, "entrada": 0, "duracao": SEGUNDO}
+    clipes = [{**base, "id": "a", "midia_id": degrade, "inicio": 0,
+               "transicao": {"tipo": "zoom_desfoque", "duracao": SEGUNDO}},
+              {**base, "id": "b", "midia_id": azul, "inicio": SEGUNDO}]
+    corpo = {"versao": projeto["versao"], "nome": "Zoom", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    # Antes da janela (0,5 a 1,5 s), a imagem como veio; aos 0,9 s (40% da janela), 80% das cópias ampliadas
+    # e o próximo ainda sem aparecer
+    nitido = quadro_do_video(video, 0.3, 1280, 720)[360, :, 0].astype(float)
+    no_zoom = quadro_do_video(video, 0.9, 1280, 720)[360, :, 0].astype(float)
+    colunas = np.arange(1280) + 0.5
+    copias = [np.interp(640 + (colunas - 640) / (1 + ZOOM_DO_DESFOQUE * k / (AMOSTRAS_DO_BORRAO - 1)) - 0.5,
+                        np.arange(1280), nitido) for k in range(AMOSTRAS_DO_BORRAO)]
+    esperado = nitido + (np.mean(copias, axis=0) - nitido) * 0.8
+    trecho = slice(40, 1240)
+    assert np.abs(no_zoom[trecho] - esperado[trecho]).max() < 3, np.abs(no_zoom[trecho] - esperado[trecho]).max()
+    assert np.abs(no_zoom[1100:1240] - nitido[1100:1240]).min() > 6, "nas pontas o zoom puxa para o meio"
+    depois = quadro_do_video(video, 1.8, 1280, 720)
+    assert depois[360, 1200][2] > 200 and depois[360, 1200][0] < 50, "depois da janela o azul aparece inteiro"
+
+
 def _exportar(cliente, db, projeto_id: str):
     exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto_id, "resolucao": "720p"}).json()
     job = pegar_proximo_job(db, ["renderizacao"], "w-teste")

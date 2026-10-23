@@ -74,6 +74,7 @@ from core.utils.transicao import (
     expressao_da_mistura,
     filtro_de_cortina,
     filtros_de_transicao,
+    filtros_do_zoom_desfoque,
     janelas_da_principal,
     janelas_do_som,
 )
@@ -363,6 +364,17 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                   + "".join(f"[{r}]{copia}[{r}m];\n" for r, copia in zip(rotulos, copias, strict=True))
                   + "".join(f"[{r}m]" for r in rotulos)
                   + f"mix=inputs={len(rotulos)}:weights='{' '.join(['1'] * len(rotulos))}',unpremultiply=inplace=1")
+        filtros = []
+        com_alfa = True
+    zoom_desfoque = (None if borrao or celulas[0] or not leitura.efeitos else
+                     filtros_do_zoom_desfoque(list(leitura.efeitos), leitura.inicio, largura, altura,
+                                              AMOSTRAS_DO_BORRAO, f"zd{numero}"))
+    if zoom_desfoque:
+        # Transição zoom com desfoque: a imagem misturada à média das cópias ampliadas, só na janela; no alfa
+        # pré-multiplicado, como o borrão (o zoom e o giro do clipe e o pixelizar ficam no lugar dela)
+        # (em gbrap desde antes do split: as cópias desligadas não pagam uma conversão cada)
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=rgba', 'premultiply=inplace=1', 'format=gbrap'])},"
+                  f"{zoom_desfoque},format=rgba,unpremultiply=inplace=1")
         filtros = []
         com_alfa = True
     if distorcao:

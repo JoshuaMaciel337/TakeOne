@@ -4,7 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
-import { COLUNAS_DOS_BLOCOS, FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO } from "../projeto/transicao.ts";
+import { COLUNAS_DOS_BLOCOS, FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO, ZOOM_DO_DESFOQUE } from "../projeto/transicao.ts";
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
@@ -50,6 +50,8 @@ export type Camada = {
   mascaraDaTransicao?: { tipo: MascaraDeTransicao; limiar: number } | null;
   /** Zoom ou giro (lib/projeto/efeitos.ts): a média das cópias no shader. */
   borrao?: { tipo: "zoom" | "giro"; forca: number } | null;
+  /** Transição zoom com desfoque: o peso da média das cópias ampliadas (0 fora da janela). */
+  zoomDaTransicao?: number;
   /** Pixelizar: quantas células na largura e na altura (0 sem o efeito). */
   celulas?: [number, number];
   /** VHS e glitch: quanto o vermelho anda para a direita (e o azul para a esquerda), em frações da largura. */
@@ -274,6 +276,9 @@ float campoDaTransicao(vec2 local, vec2 tamanho) {
 // Zoom (1) e giro (2): a média de AMOSTRAS cópias, como o mix do render; pixelizar: a média de cada célula
 uniform int u_borrao;
 uniform float u_borraoForca;
+// Transição zoom com desfoque: o peso da média das cópias ampliadas de 1 a 1 + ZOOM_DO_DESFOQUE
+uniform float u_zoomTransicao;
+const float ZOOM_DO_DESFOQUE = ${ZOOM_DO_DESFOQUE.toFixed(6)};
 uniform vec2 u_celulas;
 const int AMOSTRAS = ${AMOSTRAS_DO_BORRAO};
 // VHS e glitch: o vermelho e o azul lidos deslocados (como o rgbashift, com a borda repetida)
@@ -405,6 +410,8 @@ void main() {
     discard;
   }
   vec2 uv = v_uv;
+  // O ponto do clipe que cai neste pixel (a lente muda)
+  vec2 fonte = v_fonte;
   if (u_lente > 0.0) {
     // O zoom de (1 + k) no meio e depois a lente: o ponto da imagem que cai neste pixel
     vec2 s = 0.5 + (v_fonte - 0.5) / (1.0 + u_lente);
@@ -413,6 +420,7 @@ void main() {
     vec2 p = 0.5 + (s - 0.5) * (1.0 + u_lente * r2);
     if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
     uv = u_recorte.xy + p * u_recorte.zw;
+    fonte = p;
   }
   vec4 texel;
   bool jaMascarado = false;
@@ -441,6 +449,15 @@ void main() {
       soma += noClipe(local);
     }
     texel = soma / float(AMOSTRAS);
+    jaMascarado = true;
+  } else if (u_zoomTransicao > 0.0) {
+    // Zoom com desfoque: a imagem misturada à média das cópias ampliadas (antes da lente, como no render)
+    vec4 soma = vec4(0.0);
+    for (int i = 0; i < AMOSTRAS; i++) {
+      float parte = float(i) / float(AMOSTRAS - 1);
+      soma += noClipe(0.5 + (fonte - 0.5) / (1.0 + ZOOM_DO_DESFOQUE * parte));
+    }
+    texel = mix(noClipe(fonte), soma / float(AMOSTRAS), u_zoomTransicao);
     jaMascarado = true;
   } else {
     texel = texture(u_textura, uv);
@@ -603,7 +620,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -755,6 +772,7 @@ export class Compositor {
         transicaoLimiar: local("u_transicaoLimiar"),
         borrao: local("u_borrao"),
         borraoForca: local("u_borraoForca"),
+        zoomTransicao: local("u_zoomTransicao"),
         celulas: local("u_celulas"),
         desvio: local("u_desvio"),
         linhas: local("u_linhas"),
@@ -1074,6 +1092,8 @@ export class Compositor {
     gl.uniform1f(uniformes.transicaoLimiar, mascaraDaTransicao?.limiar ?? 0);
     gl.uniform1i(uniformes.borrao, camada.borrao ? (camada.borrao.tipo === "zoom" ? 1 : 2) : 0);
     gl.uniform1f(uniformes.borraoForca, camada.borrao?.forca ?? 0);
+    // A transição não soma ao zoom, ao giro e ao pixelizar do clipe (o render também não)
+    gl.uniform1f(uniformes.zoomTransicao, camada.borrao || camada.celulas?.[0] ? 0 : (camada.zoomDaTransicao ?? 0));
     gl.uniform2f(uniformes.celulas, camada.celulas?.[0] ?? 0, camada.celulas?.[1] ?? 0);
     gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
     gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
