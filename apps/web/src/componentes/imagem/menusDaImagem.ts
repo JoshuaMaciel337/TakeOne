@@ -98,6 +98,8 @@ export type AcoesDosMenus = {
   /** Salvar a seleção num canal alfa, carregar a de um canal e a luminosidade (Ctrl+Alt+2). */
   canalDaSelecao: (acao: "salvar" | "carregar" | "luminosidade") => void;
   temCanais: boolean;
+  /** Selecionar › Selecionar e mascarar (Ctrl+Alt+R). */
+  selecionarEMascarar: () => void;
   /** Selecionar › Transformar seleção. */
   transformarSelecao: () => void;
   /** Editar › Definir predefinição de pincel (a seleção vira a ponta). */
@@ -359,6 +361,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Aumentar", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(true) },
         { nome: "Semelhante", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(false) },
         "-",
+        { nome: "Selecionar e mascarar…", atalho: "Ctrl+Alt+R", aoEscolher: a.selecionarEMascarar },
         { nome: "Assunto", aoEscolher: () => a.selecionarPor("assunto") },
         { nome: "Céu", aoEscolher: () => a.selecionarPor("ceu") },
         { nome: "Intervalo de cores…", aoEscolher: () => a.selecionarPor("cores") },

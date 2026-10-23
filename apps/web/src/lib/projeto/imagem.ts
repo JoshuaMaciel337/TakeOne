@@ -120,8 +120,8 @@ export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId:
  * Uma camada de pixels nova (a mídia já criada, vazia, do tamanho da imagem) acima da escolhida, cobrindo o quadro.
  * Não depende da mídia estar na biblioteca da tela: a pessoa começa a pintar logo depois de criar.
  */
-export function adicionarCamadaDePixels(projeto: Projeto, ctx: Contexto, midiaId: string, nome: string, acima?: string | null): { projeto: Projeto; clipeId: string } {
-  const clipe = clipeDaCamada(ctx.novoId(), { midia_id: midiaId, pixels: { versao: 0 } });
+export function adicionarCamadaDePixels(projeto: Projeto, ctx: Contexto, midiaId: string, nome: string, acima?: string | null, versao = 0): { projeto: Projeto; clipeId: string } {
+  const clipe = clipeDaCamada(ctx.novoId(), { midia_id: midiaId, pixels: { versao } });
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
 }
 

@@ -62,6 +62,7 @@ import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
 import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
+import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { desenharNaMalha } from "@/lib/transformar/malha";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
@@ -209,6 +210,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoCanal, setJanelaDoCanal] = useState<"salvar" | "carregar" | null>(null);
   // Editar › Definir predefinição de pincel (pede o nome) e os pedidos ao painel Camadas (encontrar e isolar)
   const [nomeDoPincel, setNomeDoPincel] = useState(false);
+  // Selecionar e mascarar: a camada sozinha (ou a imagem), o resto das camadas e o clipe da camada
+  const [refinando, setRefinando] = useState<{ imagem: ImagemRgba; fundo: ImagemRgba | null; clipeId: string | null; faixaId: string | null } | null>(null);
   // Selecionar › Transformar seleção: a caixa (em pixels do documento), o modo, o pedaço da seleção em resolução cheia
   // (a fonte) e a cópia pequena dele para a prévia
   const [transformando, setTransformando] = useState<{
@@ -551,6 +554,62 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o canal.");
+    }
+  };
+  /** Selecionar e mascarar: lê a camada escolhida sozinha (ou a imagem inteira) e o resto, para a vista "Nas camadas". */
+  const abrirSelecionarEMascarar = () => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const faixa = selecionado?.faixa ?? null;
+    const ler = (projetoParaLer: Projeto) => exportarImagem(projetoParaLer, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }).then(imagemDoBlob);
+    const daCamada = faixa ? ler(projetoSoCom(atual, [faixa.id], { neutras: new Set([faixa.id]), semEstilo: true, semMascara: true })) : imagemParaSelecao(true);
+    const resto = faixa ? ler({ ...atual, faixas: atual.faixas.map((item) => (item.id === faixa.id ? { ...item, oculta: true } : item)) }) : Promise.resolve(null);
+    Promise.all([daCamada, resto])
+      .then(([imagem, fundo]) => setRefinando({ imagem, fundo, clipeId: selecionado?.clipe.id ?? null, faixaId: faixa?.id ?? null }))
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
+  /** A saída do Selecionar e mascarar: a seleção, a máscara da camada, uma camada nova (recortada) ou com máscara. */
+  const saidaDoRefinamento = async (resultado: ResultadoDoRefinamento) => {
+    const contexto = refinando;
+    setRefinando(null);
+    if (!contexto || !projeto) return;
+    const { selecao, saida, descontaminada } = resultado;
+    if (saida === "selecao") {
+      setSelecaoDoDocumento(temAlgo(selecao) ? selecao : null);
+      setBordasDaSelecao(true);
+      return;
+    }
+    if (saida === "mascara") {
+      await criarMascara("revelarSelecao", selecao);
+      return;
+    }
+    // Uma camada nova acima da escolhida: os pixels dela (descontaminados, se pedido), recortados pela seleção ou inteiros
+    const imagem = descontaminada ?? contexto.imagem;
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    try {
+      setGerandoPixels(true);
+      const nome = `${contexto.faixaId ? nomeDaFaixa(projeto.faixas.find((f) => f.id === contexto.faixaId)!) : "Camada"} (refinada)`;
+      const png = await pngDoDocumento((ctx2d) => {
+        const dados = ctx2d.createImageData(largura, altura);
+        dados.data.set(imagem.dados);
+        if (saida === "camada") for (let i = 0; i < selecao.dados.length; i++) dados.data[i * 4 + 3] = Math.round((dados.data[i * 4 + 3] * selecao.dados[i]) / 255);
+        ctx2d.putImageData(dados, 0, 0);
+      })();
+      const midia = await criarCamadaDePixels(largura, altura, nome);
+      setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
+      const versao = await enviarVersao(midia.id, png);
+      const criado = executar({ comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome, acima: contexto.faixaId, versao } });
+      const clipeId = criado?.selecao?.[0];
+      if (saida === "camadaComMascara" && clipeId) {
+        const { midia: mascara, versao: versaoDaMascara } = await subirMascara(pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, selecao)));
+        executar({ comando: "mascara.definir", parametros: { clipeId, mascara: { midia_id: mascara.id, versao: versaoDaMascara, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz: IDENTIDADE } } });
+      }
+      // A camada de origem fica escondida, como lá (a nova toma o lugar dela)
+      if (contexto.faixaId) executar({ comando: "imagem.camada", parametros: { faixaIds: [contexto.faixaId], mudanca: { oculta: true } } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar a camada.");
+    } finally {
+      setGerandoPixels(false);
     }
   };
   /** Começa a transformar a seleção: a caixa em volta dela, com a seleção cortada nela. */
@@ -1064,8 +1123,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Camada › Máscara de camada: revelar tudo (branca), ocultar tudo (preta) ou a partir da transparência (o alfa da
    * camada, desenhada sozinha, vira o cinza). A matriz é a da caixa da camada agora: a máscara anda com ela.
    */
-  const criarMascara = async (como: "revelar" | "ocultar" | "revelarSelecao" | "ocultarSelecao" | "transparencia") => {
-    const daSelecao = selecaoNoDocumento;
+  const criarMascara = async (como: "revelar" | "ocultar" | "revelarSelecao" | "ocultarSelecao" | "transparencia", selecaoDada?: Selecao) => {
+    const daSelecao = selecaoDada ?? selecaoNoDocumento;
     if ((como === "revelarSelecao" || como === "ocultarSelecao") && !daSelecao) return mostrarAviso("Não há seleção.");
     const alvo = selecionado;
     if (!alvo || !projeto || gerandoPixels) return;
@@ -1209,6 +1268,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     temCanais: canais.length > 0,
     definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
     transformarSelecao,
+    selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
       area.abrir("camadas");
       setPedidoAsCamadas((atual) => ({ tipo: como, vez: (atual?.vez ?? 0) + 1, faixaIds }));
@@ -1331,7 +1391,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1908,6 +1968,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             setJanelaDaSelecao(null);
             selecionarNoDocumento(selecao);
           }}
+        />
+      ) : null}
+      {refinando ? (
+        <SelecionarEMascarar
+          imagem={refinando.imagem}
+          fundo={refinando.fundo}
+          selecao={selecaoNoDocumento}
+          temCamada={Boolean(refinando.clipeId)}
+          aoFechar={() => setRefinando(null)}
+          aoConfirmar={(resultado) => void saidaDoRefinamento(resultado)}
         />
       ) : null}
       {nomeDoPincel ? (

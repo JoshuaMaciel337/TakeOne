@@ -552,7 +552,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [ ] Onda 13, o editor de imagem completo ([ADR 0003](decisoes/0003-editor-de-imagem-completo.md)): tudo o que se faz no editor de imagem profissional e no PhotoCraft, em 16 partes, com o inventário item a item no ADR.
   - [x] 13.1 Árvore de camadas (grupos, máscara de corte, travas, alinhar, os 27 modos de mesclagem).
   - [x] 13.2 Camadas de pixels e o pincel (pincel, lápis, borracha, máscara pintável, mesclar e achatar, pincel do histórico).
-  - [ ] 13.3 Seleção (todas as ferramentas e o menu Selecionar, canais, selecionar e mascarar).
+  - [x] 13.3 Seleção (todas as ferramentas e o menu Selecionar, canais, selecionar e mascarar; o Converter em forma vai com os caminhos, na 13.7).
   - [ ] 13.4 Seleção em uso e área de transferência (copiar e colar, preencher, traçado, cortar, aparar).
   - [ ] 13.5 Retoque e pintura avançada (carimbo, recuperação, correção, borrar, subexposição, balde, degradê, padrões).
   - [ ] 13.6 Transformação e geometria (transformação livre completa, marionete, perspectiva, tamanho da imagem e da tela, dissolver).

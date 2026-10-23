@@ -205,7 +205,7 @@ export type Comando =
   | { comando: "imagem.apagarOcultas"; parametros: Record<string, never> }
   | { comando: "imagem.posicoes"; parametros: { mudancas: { clipeId: string; transformacao: Partial<Transformacao> }[] } }
   | { comando: "imagem.soEsta"; parametros: { faixaId: string } }
-  | { comando: "imagem.adicionarPixels"; parametros: { midiaId: string; nome: string; acima?: string | null } }
+  | { comando: "imagem.adicionarPixels"; parametros: { midiaId: string; nome: string; acima?: string | null; versao?: number } }
   | { comando: "imagem.substituirPorPixels"; parametros: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number } }
   | { comando: "imagem.camadaDeFundo"; parametros: { faixaId: string; ligar: boolean } }
   | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
@@ -554,7 +554,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: resultado.projeto, selecao: resultado.clipeIds };
     }
     case "imagem.adicionarPixels": {
-      const resultado = adicionarCamadaDePixels(projeto, ctx, parametros.midiaId, parametros.nome, parametros.acima);
+      const resultado = adicionarCamadaDePixels(projeto, ctx, parametros.midiaId, parametros.nome, parametros.acima, parametros.versao);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.substituirPorPixels": {
