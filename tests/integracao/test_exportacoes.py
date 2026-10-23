@@ -820,3 +820,40 @@ def test_midia_de_uma_exportacao_em_andamento_nao_sai(cliente, db_limpo):
     assert recusa.status_code == 409 and "exportado" in recusa.json()["detail"]
     db_limpo.exportacoes.update_many({}, {"$set": {"status": "pronta"}})
     assert cliente.delete(f"/api/midias/{midia_id}").status_code == 204
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_camada_de_ajuste_muda_a_cor_do_que_esta_embaixo_so_na_mascara_e_no_tempo_dela(cliente, db_limpo):
+    from core.utils.cor import AJUSTES_NEUTROS, aplicar_cor
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    projeto = projeto_com(cliente, midia_id, proporcao="16:9")
+    # Preto e branco na metade da esquerda (máscara retangular), de 1 s a 2 s
+    ajuste = {"id": "aj", "midia_id": None, "ajuste": True, "inicio": SEGUNDO, "duracao": SEGUNDO, "entrada": 0,
+              "velocidade": 1, "volume": 1, "cor": {"saturacao": -1},
+              "mascara": {"forma": "retangulo", "x": 0.25, "y": 0.5, "largura": 0.5, "altura": 1, "suavidade": 0,
+                          "inverter": False}}
+    corpo = {"versao": projeto["versao"], "nome": "Ajuste", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#ff00ff"},
+             "faixas": [{"id": "s1", "tipo": "video", "oculta": False, "muda": False, "travada": False,
+                         "clipes": [ajuste]}, *projeto["faixas"]]}
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json=corpo)
+    assert salvo.status_code == 200, salvo.text
+    # Na principal não pode
+    principal = projeto["faixas"][0]
+    errado = {**corpo, "versao": salvo.json()["versao"],
+              "faixas": [{**principal, "clipes": [*principal["clipes"], {**ajuste, "inicio": 2 * SEGUNDO}]}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=errado).status_code == 422
+
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    video = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    cinza = round(255 * aplicar_cor((1, 0, 0), {**AJUSTES_NEUTROS, "saturacao": -1})[0])
+    antes, durante = quadro_do_video(video, 0.5, 1280, 720), quadro_do_video(video, 1.5, 1280, 720)
+    # Antes da camada, o vermelho; durante, o vermelho (à esquerda) vira cinza e o verde (à direita) fica verde
+    assert antes[180, 320][0] > 200 and antes[180, 320][1] < 60, antes[180, 320]
+    assert max(abs(int(c) - cinza) for c in durante[180, 320]) <= 20, durante[180, 320]
+    assert durante[180, 960][1] > 200 and durante[180, 960][0] < 60, durante[180, 960]

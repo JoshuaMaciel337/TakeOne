@@ -592,3 +592,16 @@ def test_mascara_de_forma_entra_na_imagem_dos_cantos():
     assert dentro[50, 100] == 1 and dentro[5, 5] == 0
     invertida, _ = coberturas(200, 100, {"mascara": {**mascara, "inverter": True}})
     assert invertida[50, 100] == 0 and invertida[5, 5] == 1
+
+
+def test_camada_de_ajuste_passa_o_que_esta_embaixo_pela_lut_e_volta_por_cima_no_tempo_dela():
+    ajuste = {"id": "aj", "midia_id": None, "ajuste": True, "inicio": 1 * S, "duracao": 2 * S, "entrada": 0,
+              "velocidade": 1, "volume": 1,
+              "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5},
+              "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1}, "cor": {"saturacao": -1}}
+    plano = planejar_render(projeto([faixa("video", [ajuste]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 720, 1280)
+    assert "[base1]split[ja2][jb2]" in plano.filtro and "lut3d=" in plano.filtro
+    assert "[ja2][jg2]overlay=format=rgb:eof_action=pass:enable='gte(t,0.983333)*lt(t,2.983333)'[base2]" in plano.filtro
+    alfa = next(a for a in plano.auxiliares if a.tipo == "cantos")
+    assert alfa.ajustes["opacidade"] == 0.5 and (alfa.largura, alfa.altura) == (720, 1280)

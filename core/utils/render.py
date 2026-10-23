@@ -26,7 +26,7 @@ from functools import lru_cache
 from core.config import FFMPEG
 from core.modelos.midia import chave_da_estabilizacao, chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
-from core.utils.cantos import tem_cantos
+from core.utils.cantos import tem_cantos, tem_mascara
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, hsl_neutro, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
     BRILHO_SIGMA,
@@ -760,6 +760,53 @@ def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) ->
     return Leitura(janela_inicio, janela_fim, pausa_inicio, pausa_fim, sobra_antes, efeitos, congelar)
 
 
+def _camada_de_ajuste(clipe: dict, anterior: str, numero: int, largura: int, altura: int, taxa: str, pasta: str,
+                      quadro: tuple[int, int], entradas: list, auxiliares: dict, linhas: list[str]) -> str:
+    """
+    Camada de ajuste: o que já está embaixo passa pela LUT da cor dela (e pela vinheta), e volta por cima do
+    original com a opacidade e a máscara de forma como alfa, só enquanto o clipe dura. Devolve o nome da base nova.
+    """
+    ajustes = ajustes_efetivos(clipe.get("cor"))
+    curvas = (clipe.get("cor") or {}).get("curvas")
+    hsl = (clipe.get("cor") or {}).get("hsl")
+    filtros = []
+    if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas) or not hsl_neutro(hsl):
+        com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas,
+                      "hsl": None if hsl_neutro(hsl) else hsl}
+        lut = f"{pasta}/{nome_da_lut(com_curvas)}"
+        auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
+        filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
+    inicio, fim = segundos(clipe["inicio"]), segundos(clipe["inicio"] + clipe["duracao"])
+    meio_quadro = 0.5 / float(taxa_em_fracao(taxa))
+    linhas.append(f"[{anterior}]split[ja{numero}][jb{numero}]")
+    cadeia = f"[jb{numero}]{','.join([*filtros, 'format=gbrap'])}"
+    if ajustes["vinheta"] > 0:
+        # A vinheta da camada multiplica o quadro inteiro, como a de um clipe do tamanho do quadro
+        imagem_vinheta = f"{pasta}/vinheta_{clipe['id']}.png"
+        auxiliares[imagem_vinheta] = ArquivoAuxiliar(imagem_vinheta, "vinheta", {**ajustes, "linhas": 0}, largura,
+                                                     altura)
+        indice = len(entradas)
+        entradas.append(Entrada(imagem_vinheta, 0, fim, imagem=True, taxa=taxa))
+        linhas.append(f"{cadeia}[jc{numero}]")
+        linhas.append(f"[{indice}:v]format=gbrap[jd{numero}]")
+        cadeia = f"[jc{numero}][jd{numero}]blend=all_mode=multiply,format=gbrap"
+    # O alfa: a máscara de forma (a imagem dos cantos, no tamanho do quadro) vezes a opacidade
+    opacidade = (clipe.get("transformacao") or {}).get("opacidade", 1)
+    if tem_mascara(clipe) or opacidade < 1:
+        imagem_alfa = f"{pasta}/cantos_{clipe['id']}.png"
+        auxiliares[imagem_alfa] = ArquivoAuxiliar(imagem_alfa, "cantos", {"mascara": clipe.get("mascara"),
+                                                                             "opacidade": opacidade}, largura, altura)
+        indice = len(entradas)
+        entradas.append(Entrada(imagem_alfa, 0, fim, imagem=True, taxa=taxa))
+        linhas.append(f"{cadeia}[je{numero}]")
+        linhas.append(f"[{indice}:v]format=gray[jf{numero}]")
+        cadeia = f"[je{numero}][jf{numero}]alphamerge"
+    linhas.append(f"{cadeia}[jg{numero}]")
+    linhas.append(f"[ja{numero}][jg{numero}]overlay=format=rgb:eof_action=pass:"
+                  f"enable='gte(t,{_numero(inicio - meio_quadro)})*lt(t,{_numero(fim - meio_quadro)})'[base{numero}]")
+    return f"base{numero}"
+
+
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
                     textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".",
                     ganho_db: float = 0.0) -> PlanoDeRender:
@@ -805,6 +852,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     indice_do_destaque: dict[str, int] = {}
     for clipe in clipes:
         indice_da_entrada[clipe["id"]] = len(entradas)
+        if clipe.get("ajuste"):
+            continue
         if clipe.get("texto"):
             imagem = textos.get(clipe["id"])
             if imagem is None:
@@ -838,6 +887,10 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     camadas = [(c, destaque) for f in visuais for c in f["clipes"]
                for destaque in ((False, True) if c["id"] in indice_do_destaque else (False,))]
     for numero, (clipe, destaque) in enumerate(camadas, start=1):
+        if clipe.get("ajuste"):
+            anterior = _camada_de_ajuste(clipe, anterior, numero, largura, altura, taxa, pasta, quadro, entradas,
+                                         auxiliares, linhas)
+            continue
         if clipe.get("texto"):
             imagem = textos[clipe["id"]]
             referencia = (imagem.largura_referencia, imagem.altura_referencia)

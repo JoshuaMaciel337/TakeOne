@@ -152,6 +152,15 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str 
             return problema
         anterior_fim = 0
         for clipe in clipes:
+            if clipe.get("ajuste"):
+                # A camada de ajuste não tem mídia nem texto, e muda o que está embaixo: só nas sobreposições
+                if faixa["tipo"] != FAIXA_VIDEO or clipe.get("texto") or clipe.get("midia_id"):
+                    return "A camada de ajuste fica só numa faixa de sobreposição, sem mídia nem texto."
+                problema = _conferir_posicao(faixa, clipe, anterior_fim)
+                if problema:
+                    return problema
+                anterior_fim = fim_do_clipe(clipe)
+                continue
             if faixa["tipo"] in FAIXAS_DE_TEXTO or clipe.get("texto") or not clipe.get("midia_id"):
                 if faixa["tipo"] not in FAIXAS_DE_TEXTO or not clipe.get("texto") or clipe.get("midia_id"):
                     return "Textos ficam só na faixa de texto, e a faixa de texto só tem textos."

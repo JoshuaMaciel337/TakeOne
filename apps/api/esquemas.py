@@ -515,6 +515,8 @@ class ClipeEntrada(BaseModel):
     virar: VirarEntrada | None = None
     cantos: CantosEntrada | None = None
     mascara: MascaraEntrada | None = None
+    # Camada de ajuste: sem mídia nem texto, muda a cor de tudo o que está embaixo
+    ajuste: bool = False
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)

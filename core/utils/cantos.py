@@ -63,8 +63,12 @@ def coberturas(largura: int, altura: int, cantos: dict) -> tuple[np.ndarray, np.
 
 
 def desenhar_cantos(largura: int, altura: int, cantos: dict) -> tuple[Image.Image, Image.Image | None]:
-    """A máscara cinza da parte de dentro e, com borda, o anel RGBA na cor dela (None sem borda)."""
+    """
+    A máscara cinza da parte de dentro e, com borda, o anel RGBA na cor dela (None sem borda). Com
+    cantos["opacidade"] (a camada de ajuste), a máscara já sai multiplicada por ela.
+    """
     dentro, anel = coberturas(largura, altura, cantos)
+    dentro = dentro * cantos.get("opacidade", 1)
     mascara = Image.fromarray(np.round(255 * dentro).astype(np.uint8), mode="L")
     if not cantos.get("borda"):
         return mascara, None
