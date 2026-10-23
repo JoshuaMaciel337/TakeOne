@@ -367,6 +367,12 @@ export type Marcador = { id: string; t: Tick; nome: string; cor: string };
 export const CORES_DOS_MARCADORES = ["#ff624a", "#ffd400", "#3ddc84", "#3d8bff", "#b36bff", "#ff3478"] as const;
 export const MARCADORES_MAXIMOS = 200;
 
+/**
+ * Um canal alfa do editor de imagem (ADR 0003, onda 13.3): uma seleção guardada, numa camada de pixels cinza do tamanho
+ * da imagem (branco é selecionado). Pintar nele sobe uma versão nova, como na máscara de camada.
+ */
+export type Canal = { id: string; nome: string; midia_id: string; versao: number };
+
 /** Os marcadores como capítulos: "mm:ss Nome" (ou "h:mm:ss" depois de uma hora), um por linha, em ordem. */
 export function textoDosCapitulos(marcadores: Marcador[]): string {
   const dois = (n: number) => String(n).padStart(2, "0");
@@ -398,6 +404,8 @@ export type Projeto = {
   duracao: Tick;
   /** Marcadores na régua (tecla M); viram capítulos na janela Exportar. */
   marcadores?: Marcador[];
+  /** Os canais alfa do editor de imagem: as seleções guardadas (painel Canais). */
+  canais?: Canal[];
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

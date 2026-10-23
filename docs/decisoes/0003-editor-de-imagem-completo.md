@@ -124,9 +124,9 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
 - [x] Aumentar e Semelhante
 - [ ] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
-- [ ] Máscara rápida (Q) com pintura
+- [x] Máscara rápida (Q) com pintura
 - [x] Seleção pela transparência da camada (Ctrl + clique na miniatura; Shift soma, Alt subtrai) e pela máscara dela
-- [ ] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2); painel Canais
+- [x] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2); painel Canais
 - [ ] Selecionar e mascarar (Ctrl+Alt+R): vistas (casca de cebola, formigas, sobreposição, no preto, no branco, preto e branco, nas camadas), pincel de refinar borda, raio e raio inteligente, suavizar, difusão, contraste, deslocar borda, descontaminar cores, saída (seleção, máscara, camada nova, com máscara, documento novo)
 - [ ] Encontrar camadas (Ctrl+Alt+Shift+F) e Isolar camadas
 - [x] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (vindo da 13.2)

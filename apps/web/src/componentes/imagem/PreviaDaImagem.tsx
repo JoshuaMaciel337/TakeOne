@@ -27,6 +27,8 @@ import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
+import { VeuDaMascaraRapida } from "./MascaraRapida";
+import type { CorDoCanal } from "./PainelCanais";
 import type { FerramentaObjeto } from "./useObjeto";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
@@ -93,6 +95,13 @@ type Props = {
   fonteDaMascara?: (clipe: Clipe) => HTMLCanvasElement | null;
   /** Alt + clique na miniatura da máscara: a prévia mostra só a máscara desta camada (o clipe), em cinza. */
   mascaraAVista?: string | null;
+  /**
+   * O véu por cima da prévia: a máscara rápida (Q, em vermelho) ou o canal alfa à vista (em cinza), com a imagem que
+   * os pincéis pintam e o quadro do traço (o véu desenha de novo quando muda).
+   */
+  veu?: { fonte: CanvasImageSource; quadro: number; cinza: boolean } | null;
+  /** Só um canal de cor, em cinza (painel Canais). */
+  corAVista?: CorDoCanal | null;
   /** A seleção do documento: as formigas (com `bordas`) e, com uma ferramenta de seleção, o desenho dela. */
   selecaoDoDocumento?: {
     selecao: Selecao | null;
@@ -154,6 +163,8 @@ export function PreviaDaImagem({
   fonteDaMascara,
   mascaraAVista = null,
   selecaoDoDocumento = null,
+  veu = null,
+  corAVista = null,
 }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
@@ -437,7 +448,21 @@ export function PreviaDaImagem({
             onPointerMove={aoMover}
             onPointerUp={aoSoltar}
           >
-            <canvas ref={canvasRef} className="absolute inset-0 size-full" />
+            <canvas ref={canvasRef} className="absolute inset-0 size-full" style={corAVista ? { filter: `url(#to-canal-${corAVista})` } : undefined} />
+            {corAVista ? (
+              <svg width="0" height="0" className="absolute" aria-hidden>
+                {/* Um canal de cor nos três, para a imagem aparecer em cinza por ele */}
+                <filter id="to-canal-r" x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+                  <feColorMatrix type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 1 0" />
+                </filter>
+                <filter id="to-canal-g" x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+                  <feColorMatrix type="matrix" values="0 1 0 0 0  0 1 0 0 0  0 1 0 0 0  0 0 0 1 0" />
+                </filter>
+                <filter id="to-canal-b" x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+                  <feColorMatrix type="matrix" values="0 0 1 0 0  0 0 1 0 0  0 0 1 0 0  0 0 0 1 0" />
+                </filter>
+              </svg>
+            ) : null}
             {semWebgl ? (
               <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs text-black/70">
                 Este navegador não tem WebGL2, que o editor usa para desenhar. Use o Chrome ou o Edge atualizados.
@@ -533,7 +558,8 @@ export function PreviaDaImagem({
                 aria-hidden
               />
             ) : null}
-            {selecaoDoDocumento?.bordas && tamanho.largura > 1 ? <FormigasDaSelecao selecao={selecaoDoDocumento.selecao} quadro={tamanho} /> : null}
+            {veu && tamanho.largura > 1 ? <VeuDaMascaraRapida fonte={veu.fonte} tamanho={tamanho} quadro={veu.quadro} cinza={veu.cinza} /> : null}
+            {selecaoDoDocumento?.bordas && !(veu && !veu.cinza) && tamanho.largura > 1 ? <FormigasDaSelecao selecao={selecaoDoDocumento.selecao} quadro={tamanho} /> : null}
             {selecaoDoDocumento?.ferramenta && !recorte && tamanho.largura > 1 ? (
               <SelecaoNaPrevia
                 ferramenta={selecaoDoDocumento.ferramenta}
@@ -563,7 +589,7 @@ export function PreviaDaImagem({
                 aoAjustar={pintura.aoAjustar}
                 simetria={pintura.simetria}
                 emCinza={pintura.emCinza}
-                selecao={selecaoDoDocumento?.selecao}
+                selecao={veu ? null : selecaoDoDocumento?.selecao}
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}

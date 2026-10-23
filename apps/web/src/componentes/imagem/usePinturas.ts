@@ -120,5 +120,5 @@ export function usePinturas({ executar, aoAvisar }: { executar: (comando: Comand
     }
   }, []);
 
-  return { fonte, fonteDaMascara, preparar, avisarQuadro, soltar, esperar, quadro, enviando: enviando > 0 };
+  return { fonte, fonteDaMascara, fonteDe: fonteDoAlvo, preparar, avisarQuadro, soltar, esperar, quadro, enviando: enviando > 0 };
 }

@@ -27,7 +27,7 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Canal, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
@@ -61,10 +61,15 @@ import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
 import { JanelaAreaDeFoco, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
+import { selecaoEmCinza } from "./MascaraRapida";
+import { type CorDoCanal, PainelCanais } from "./PainelCanais";
+import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
+import type { AlvoDoMotor } from "./usePinturas";
+import { Pintura } from "@/lib/pintura/motor";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { type Afim, compor, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
+import { type Afim, compor, IDENTIDADE, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 import { borda, cheia, combinar, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
-import { imagemDoBlob, imagemNoDocumento, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
+import { imagemDoBlob, imagemNoDocumento, selecaoDoCanvas, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
 import { aumentar, type ImagemRgba, varinha } from "@/lib/selecao/varinha";
 
@@ -81,27 +86,29 @@ const AREAS: Record<string, EstadoDaArea> = {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras", "formas"], ativa: "cor", altura: 190 },
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "biblioteca", "modelos"], ativa: "propriedades", altura: 340 },
-      { id: "g-camadas", abas: ["camadas", "historico"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "historico"], ativa: "camadas" },
     ],
   },
   fotografia: {
     direita: [
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "filtros"], ativa: "propriedades", altura: 360 },
       { id: "g-biblioteca", abas: ["biblioteca", "fotoIA"], ativa: "biblioteca", altura: 220 },
-      { id: "g-camadas", abas: ["camadas", "historico"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "historico"], ativa: "camadas" },
     ],
   },
   grafico: {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras"], ativa: "cor", altura: 190 },
       { id: "g-propriedades", abas: ["propriedades", "estilos", "formas", "modelos"], ativa: "propriedades", altura: 340 },
-      { id: "g-camadas", abas: ["camadas", "historico", "biblioteca"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "historico", "biblioteca"], ativa: "camadas" },
     ],
   },
 };
 const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DA_IMAGEM);
 
 type Pendente = { trocar?: string[]; camadaDe?: string; caixa?: RetanguloDaImagem };
+/** A chave do motor da máscara rápida (não é um clipe). */
+const CHAVE_DA_MASCARA_RAPIDA = "#mascaraRapida";
 type ModificacaoDaSelecao = "borda" | "suavizar" | "expandir" | "contrair" | "difusao";
 
 /** O número de cada Selecionar › Modificar: o rótulo, o padrão e os limites, em pixels. */
@@ -190,6 +197,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A janela do Intervalo de cores ou da Área de foco, com a imagem que ela lê
   const [janelaDaSelecao, setJanelaDaSelecao] = useState<{ tipo: "cores" | "foco"; imagem: ImagemRgba } | null>(null);
   const [achandoAssunto, setAchandoAssunto] = useState(false);
+  // A máscara rápida (Q): o motor do documento com a seleção em cinza, e o quadro do traço (o véu redesenha)
+  const [mascaraRapida, setMascaraRapida] = useState<Pintura | null>(null);
+  const [quadroDaRapida, setQuadroDaRapida] = useState(0);
+  // Os canais: o de cor à vista, o alfa à vista e pintado (com a imagem da versão dele) e a janela de salvar ou carregar
+  const [corAVista, setCorAVista] = useState<CorDoCanal | null>(null);
+  const [canalAtivo, setCanalAtivo] = useState<string | null>(null);
+  const [imagemDoCanal, setImagemDoCanal] = useState<{ chave: string; imagem: ImageBitmap } | null>(null);
+  const [janelaDoCanal, setJanelaDoCanal] = useState<"salvar" | "carregar" | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -433,6 +448,126 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }, [ferramenta, projeto, camadaDaRapida]);
   // A seleção da IA (na foto) vira a seleção do documento, com as formigas, para as outras ferramentas usarem
   const arquivoDoObjeto = objeto.selecao?.arquivo ?? null;
+  const canais = projeto?.canais ?? [];
+  const canalDaVez = canalAtivo ? (canais.find((canal) => canal.id === canalAtivo) ?? null) : null;
+  /** O motor de um canal alfa: pintar nele sobe uma versão nova e muda o número no projeto (um passo do desfazer). */
+  const alvoDoCanal = (canal: Canal): AlvoDoMotor => ({
+    chave: `#canal:${canal.id}`,
+    midiaId: canal.midia_id,
+    versao: canal.versao,
+    aoSubir: (versao) => ({ comando: "canal.mudar", parametros: { id: canal.id, mudanca: { versao } } }),
+  });
+  // A versão do canal à vista, para o véu cinza (enquanto ninguém pinta nele)
+  const chaveDoCanal = canalDaVez ? arquivoDaMidia(canalDaVez.midia_id, arquivoDaVersao(canalDaVez.versao)) : null;
+  useEffect(() => {
+    if (!chaveDoCanal) return;
+    let vivo = true;
+    carregarBitmap(chaveDoCanal)
+      .then((imagem) => {
+        if (vivo) setImagemDoCanal({ chave: chaveDoCanal, imagem });
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [chaveDoCanal]);
+  /** O canal alfa como seleção (o branco é selecionado), no tamanho do documento. */
+  const selecaoDoCanal = async (canal: Canal): Promise<Selecao> => {
+    const documento = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    const imagem = pinturas.fonteDe(alvoDoCanal(canal)) ?? (await carregarBitmap(arquivoDaMidia(canal.midia_id, arquivoDaVersao(canal.versao))));
+    return imagemNoDocumento(imagem, [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0], documento, "cinza");
+  };
+  /** Salvar a seleção: num canal novo, ou num que existe (substituir, somar, subtrair ou intersectar). */
+  const salvarSelecaoNoCanal = async (destino: string | null, nome: string, operacao: ModoDaSelecao) => {
+    const selecao = selecaoNoDocumento;
+    if (!selecao || !projeto) return;
+    try {
+      await pinturas.esperar();
+      if (!destino) {
+        const { largura, altura } = tamanhoDaImagem(projeto);
+        const midia = await criarCamadaDePixels(largura, altura, nome);
+        const versao = await enviarVersao(midia.id, await pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, selecao))());
+        executar({ comando: "canal.adicionar", parametros: { canal: { nome, midia_id: midia.id, versao } } });
+        return;
+      }
+      const canal = canais.find((item) => item.id === destino);
+      if (!canal) return;
+      const atual = await selecaoDoCanal(canal);
+      const nova = operacao === "nova" ? selecao : (combinar(atual, selecao, operacao) ?? atual);
+      const versao = await enviarVersao(canal.midia_id, await pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, nova))());
+      executar({ comando: "canal.mudar", parametros: { id: canal.id, mudanca: { versao } } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível salvar a seleção.");
+    }
+  };
+  /** Carregar a seleção de um canal (ou da transparência da camada escolhida), invertida ou não, no modo. */
+  const carregarSelecaoDoCanal = async (fonte: string, inverter: boolean, modo: ModoDaSelecao) => {
+    try {
+      if (fonte === "transparencia") {
+        if (selecionado) await selecionarDaCamada(selecionado.clipe.id, modo, "camada", inverter);
+        return;
+      }
+      const canal = canais.find((item) => item.id === fonte);
+      if (!canal) return;
+      const lida = await selecaoDoCanal(canal);
+      const resultado = combinar(selecaoNoDocumento, inverter ? inverterSelecao(lida) : lida, modo);
+      if (resultado && !temAlgo(resultado)) mostrarAviso("Nenhum pixel ficou mais da metade selecionado: as bordas da seleção não vão aparecer.");
+      setSelecaoDoDocumento(resultado);
+      setBordasDaSelecao(true);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível carregar a seleção.");
+    }
+  };
+  /** Um canal alfa novo, preto (nada selecionado), já à vista para pintar. */
+  const novoCanal = async () => {
+    if (!projeto) return;
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    const nome = `Alfa ${canais.length + 1}`;
+    try {
+      const midia = await criarCamadaDePixels(largura, altura, nome);
+      const versao = await enviarVersao(midia.id, await pngDoDocumento((ctx2d) => {
+        ctx2d.fillStyle = "#000";
+        ctx2d.fillRect(0, 0, largura, altura);
+      })());
+      const resultado = executar({ comando: "canal.adicionar", parametros: { canal: { nome, midia_id: midia.id, versao } } });
+      const criado = resultado?.projeto.canais?.at(-1);
+      if (criado) {
+        setCorAVista(null);
+        setCanalAtivo(criado.id);
+        if (!FERRAMENTAS_DE_PINTURA.has(ferramenta)) escolherFerramenta("pincel");
+      }
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o canal.");
+    }
+  };
+  /** Selecionar › Luminosidade (Ctrl+Alt+2): a luz da imagem inteira vira a seleção (o claro mais selecionado). */
+  const selecionarLuminosidade = () => {
+    imagemParaSelecao(true)
+      .then((imagem) => {
+        const selecao: Selecao = { largura: imagem.largura, altura: imagem.altura, dados: new Uint8Array(imagem.largura * imagem.altura) };
+        const d = imagem.dados;
+        for (let i = 0; i < selecao.dados.length; i++) selecao.dados[i] = Math.round(((0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) * d[i * 4 + 3]) / 255);
+        if (!temAlgo(selecao)) mostrarAviso("Nenhum pixel é claro o bastante: as bordas da seleção não vão aparecer.");
+        setSelecaoDoDocumento(selecao);
+        setBordasDaSelecao(true);
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
+  /** Q: entra na máscara rápida (a seleção vira cinza para pintar) ou sai dela (o cinza volta a ser a seleção). */
+  const alternarMascaraRapida = () => {
+    if (!projeto) return;
+    if (mascaraRapida) {
+      const nova = selecaoDoCanvas(mascaraRapida.camada, "cinza");
+      setMascaraRapida(null);
+      selecionarNoDocumento(temAlgo(nova) ? nova : null);
+      return;
+    }
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    const pintura = new Pintura(largura, altura);
+    pintura.carregar(selecaoEmCinza(selecaoNoDocumento, largura, altura));
+    setMascaraRapida(pintura);
+    if (!FERRAMENTAS_DE_PINTURA.has(ferramenta)) escolherFerramenta("pincel");
+  };
   /** Uma máscara cinza da foto escolhida (a do objeto, a do assunto) como seleção do documento; null sem a camada na prévia. */
   const mascaraDaFotoNoDocumento = async (arquivo: string): Promise<Selecao | null> => {
     const medida = selecionado ? caixasRef.current.get(selecionado.clipe.id) : undefined;
@@ -505,7 +640,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (arquivoDoObjeto) levarObjeto(arquivoDoObjeto);
   }, [arquivoDoObjeto]);
   /** Ctrl + clique na miniatura: a seleção pela transparência da camada (sozinha) ou pelo cinza da máscara dela. */
-  const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => {
+  const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara", inverter = false) => {
     const atual = projetoRef.current;
     const achado = atual ? acharClipe(atual, clipeId) : null;
     if (!atual || !achado) return;
@@ -527,7 +662,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         nova = imagemNoDocumento(imagem, [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0], documento, "alfa");
         imagem.close();
       }
-      const resultado = combinar(selecaoNoDocumento, nova, modo);
+      const resultado = combinar(selecaoNoDocumento, inverter ? inverterSelecao(nova) : nova, modo);
       if (resultado && !temAlgo(resultado)) mostrarAviso("A camada não tem nenhum pixel mais da metade opaco: nada foi selecionado.");
       selecionarNoDocumento(resultado);
     } catch (e) {
@@ -673,6 +808,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const alvoDaPintura = async (): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
+    // Na máscara rápida, todo pincel pinta a seleção (do tamanho do documento, parada no lugar)
+    if (mascaraRapida) {
+      return { clipeId: CHAVE_DA_MASCARA_RAPIDA, chave: CHAVE_DA_MASCARA_RAPIDA, pintura: mascaraRapida, mascara: { vinculada: false, matriz: IDENTIDADE }, recorte: { x: 0, y: 0, largura: 1, altura: 1 }, virar: null, travarTransparencia: true };
+    }
+    // Com um canal alfa à vista, o pincel pinta nele, em cinza
+    const canal = canalAtivo ? (atual.canais ?? []).find((item) => item.id === canalAtivo) : undefined;
+    if (canal) {
+      const alvo = alvoDoCanal(canal);
+      try {
+        const pintura = await pinturas.preparar(alvo, tamanhoDaImagem(atual));
+        return { clipeId: alvo.chave, chave: alvo.chave, pintura, mascara: { vinculada: false, matriz: IDENTIDADE }, recorte: { x: 0, y: 0, largura: 1, altura: 1 }, virar: null, travarTransparencia: true };
+      } catch {
+        mostrarAviso("Não foi possível abrir o canal para pintar. Tente de novo.");
+        return null;
+      }
+    }
     // Os pincéis do histórico pintam na camada de pixels escolhida, com ela como estava na fonte
     if (ferramenta === "historico" || ferramenta === "historicoArtistico") {
       const achado = selecionado?.clipe.pixels ? acharClipe(atual, selecionado.clipe.id) : null;
@@ -981,6 +1132,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     modificarSelecao: (como) => selecaoNoDocumento && setModificando(como),
     aumentarSelecao,
     selecionarPor,
+    mascaraRapida: Boolean(mascaraRapida),
+    alternarMascaraRapida,
+    temCanais: canais.length > 0,
+    canalDaSelecao: (acao) => (acao === "luminosidade" ? selecionarLuminosidade() : setJanelaDoCanal(acao)),
     podeDesfazer: edicao.nomeDesfazer,
     podeRefazer: edicao.nomeRefazer,
     area: area.area,
@@ -1098,7 +1253,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1294,6 +1449,29 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       ),
     },
+    canais: {
+      nome: PAINEIS_DA_IMAGEM.canais,
+      conteudo: (
+        <PainelCanais
+          canais={canais}
+          corAVista={corAVista}
+          aoVerCor={setCorAVista}
+          canalAtivo={canalDaVez?.id ?? null}
+          aoAtivar={(id) => {
+            setCanalAtivo(id);
+            if (id && !FERRAMENTAS_DE_PINTURA.has(ferramenta)) escolherFerramenta("pincel");
+          }}
+          aoCarregar={(id, modo) => void carregarSelecaoDoCanal(id, false, modo)}
+          aoSalvar={() => setJanelaDoCanal("salvar")}
+          aoNovo={() => void novoCanal()}
+          aoApagar={(id) => {
+            if (executar({ comando: "canal.apagar", parametros: { id } }) && canalAtivo === id) setCanalAtivo(null);
+          }}
+          aoRenomear={(id, nome) => executar({ comando: "canal.mudar", parametros: { id, mudanca: { nome } } })}
+          temSelecao={Boolean(selecaoNoDocumento)}
+        />
+      ),
+    },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
       conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} />,
@@ -1479,6 +1657,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             area.abrir("cor");
           }}
           aoTrocarCores={() => setCores((atual) => ({ ...atual, primeiroPlano: atual.fundo, fundo: atual.primeiroPlano }))}
+          mascaraRapida={Boolean(mascaraRapida)}
+          aoMascaraRapida={alternarMascaraRapida}
           aoCoresPadrao={() => setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }))}
           aoDuploClique={(id) => setZoom(id === "zoom" ? 1 : null)}
         />
@@ -1517,8 +1697,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     opcoes: pinceis[ferramentaDePintura],
                     cores,
                     aoPedirAlvo: alvoDaPintura,
-                    aoQuadro: pinturas.avisarQuadro,
-                    aoSoltar: pinturas.soltar,
+                    aoQuadro: mascaraRapida ? () => setQuadroDaRapida((atual) => atual + 1) : pinturas.avisarQuadro,
+                    aoSoltar: (clipeId) => (clipeId === CHAVE_DA_MASCARA_RAPIDA ? setQuadroDaRapida((atual) => atual + 1) : pinturas.soltar(clipeId)),
                     aoAjustar: mudarPincel,
                     simetria,
                     // Na máscara, a tinta é cinza: a luz das cores (o branco mostra, o preto esconde)
@@ -1529,6 +1709,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             fonteDosPixels={pinturas.fonte}
             fonteDaMascara={pinturas.fonteDaMascara}
             mascaraAVista={mascaraAVista}
+            veu={
+              mascaraRapida
+                ? { fonte: mascaraRapida.fonte, quadro: quadroDaRapida, cinza: false }
+                : canalDaVez
+                  ? (() => {
+                      // O canal à vista: o canvas do motor enquanto pinta (ou com traços subindo), senão a versão dele
+                      const fonte = pinturas.fonteDe(alvoDoCanal(canalDaVez)) ?? (imagemDoCanal?.chave === chaveDoCanal ? imagemDoCanal.imagem : null);
+                      return fonte ? { fonte, quadro: pinturas.quadro, cinza: true } : null;
+                    })()
+                  : null
+            }
+            corAVista={canalDaVez ? null : corAVista}
             selecaoDoDocumento={{
               selecao: selecaoNoDocumento,
               bordas: bordasDaSelecao,
@@ -1614,6 +1806,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(selecao) => {
             setJanelaDaSelecao(null);
             selecionarNoDocumento(selecao);
+          }}
+        />
+      ) : null}
+      {janelaDoCanal === "salvar" ? (
+        <JanelaSalvarSelecao
+          canais={canais}
+          aoFechar={() => setJanelaDoCanal(null)}
+          aoConfirmar={(destino, nome, operacao) => {
+            setJanelaDoCanal(null);
+            void salvarSelecaoNoCanal(destino, nome, operacao);
+          }}
+        />
+      ) : null}
+      {janelaDoCanal === "carregar" ? (
+        <JanelaCarregarSelecao
+          canais={canais}
+          camada={selecionado ? nomeDaFaixa(selecionado.faixa) : null}
+          temSelecao={Boolean(selecaoNoDocumento)}
+          aoFechar={() => setJanelaDoCanal(null)}
+          aoConfirmar={(fonte, inverter, operacao) => {
+            setJanelaDoCanal(null);
+            void carregarSelecaoDoCanal(fonte, inverter, operacao);
           }}
         />
       ) : null}

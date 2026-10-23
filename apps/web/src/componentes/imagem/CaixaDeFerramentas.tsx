@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, Circle, CircleDashed } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { type FerramentaDaImagem, GRUPOS_DE_FERRAMENTAS, type IdFerramentaDaImagem } from "./ferramentasDaImagem";
@@ -18,6 +18,9 @@ type Props = {
   aoCoresPadrao: () => void;
   /** Duplo clique na Mão ajusta à tela; no Zoom, 100%. */
   aoDuploClique: (id: IdFerramentaDaImagem) => void;
+  /** O modo Máscara rápida (Q) ligado, e o botão que liga e desliga. */
+  mascaraRapida?: boolean;
+  aoMascaraRapida?: () => void;
 };
 
 const SEGURAR_MS = 350;
@@ -27,7 +30,7 @@ const SEGURAR_MS = 350;
  * outras; o botão direito (ou segurar) abre a lista do grupo, com o nome e a tecla de cada uma. Embaixo, as cores de
  * primeiro plano e de fundo, as cores padrão (D) e a troca (X).
  */
-export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, fundo, aoEditarCor, aoTrocarCores, aoCoresPadrao, aoDuploClique }: Props) {
+export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, fundo, aoEditarCor, aoTrocarCores, aoCoresPadrao, aoDuploClique, mascaraRapida = false, aoMascaraRapida }: Props) {
   const [lista, setLista] = useState<{ grupo: number; topo: number } | null>(null);
   const segurando = useRef<number | null>(null);
   const caixaRef = useRef<HTMLDivElement>(null);
@@ -143,6 +146,18 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
             style={{ background: primeiroPlano }}
           />
         </div>
+        {aoMascaraRapida ? (
+          <button
+            type="button"
+            onClick={aoMascaraRapida}
+            title={mascaraRapida ? "Editar no modo Padrão (Q)" : "Editar no modo Máscara rápida (Q)"}
+            aria-label="Máscara rápida"
+            aria-pressed={mascaraRapida}
+            className={`botao-icone mt-1 size-7 ${mascaraRapida ? "bg-painel-3 text-erro" : ""}`}
+          >
+            {mascaraRapida ? <Circle className="size-4 fill-current opacity-60" aria-hidden /> : <CircleDashed className="size-4" aria-hidden />}
+          </button>
+        ) : null}
       </div>
     </div>
   );

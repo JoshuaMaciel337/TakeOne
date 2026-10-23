@@ -6,7 +6,8 @@ import { Minus, Pipette, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { areaDeFoco, FAIXAS_DE_CORES, type FaixaDeCores, imagemMenor, INTERVALO_PADRAO, intervaloDeCores, type OpcoesDaAreaDeFoco, type OpcoesDoIntervalo, type Rgb } from "@/lib/selecao/cores";
-import type { Selecao } from "@/lib/selecao/mascara";
+import type { Canal } from "@/lib/projeto/modelo";
+import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
 import type { ImagemRgba } from "@/lib/selecao/varinha";
 
 /** O lado maior da prévia das janelas. */
@@ -203,6 +204,111 @@ export function JanelaAreaDeFoco({ imagem, aoFechar, aoConfirmar }: { imagem: Im
           </label>
           <p className="text-suave">O que está nítido fica branco na prévia; aumente o intervalo para pegar mais da imagem.</p>
         </div>
+      </div>
+    </Moldura>
+  );
+}
+
+const OPERACOES_NO_CANAL: { id: ModoDaSelecao; nome: string }[] = [
+  { id: "nova", nome: "Substituir o canal" },
+  { id: "somar", nome: "Adicionar ao canal" },
+  { id: "subtrair", nome: "Subtrair do canal" },
+  { id: "intersectar", nome: "Fazer interseção com o canal" },
+];
+const OPERACOES_NA_SELECAO: { id: ModoDaSelecao; nome: string }[] = [
+  { id: "nova", nome: "Nova seleção" },
+  { id: "somar", nome: "Adicionar à seleção" },
+  { id: "subtrair", nome: "Subtrair da seleção" },
+  { id: "intersectar", nome: "Fazer interseção com a seleção" },
+];
+const campoDaJanela = "flex-1 rounded border border-borda bg-painel-2 px-1.5 py-0.5";
+
+/** Selecionar › Salvar seleção: num canal novo (com nome) ou num que já existe, com a operação. */
+export function JanelaSalvarSelecao({ canais, aoFechar, aoConfirmar }: { canais: Canal[]; aoFechar: () => void; aoConfirmar: (destino: string | null, nome: string, operacao: ModoDaSelecao) => void }) {
+  const [destino, setDestino] = useState<string>("");
+  const [nome, setNome] = useState(`Alfa ${canais.length + 1}`);
+  const [operacao, setOperacao] = useState<ModoDaSelecao>("nova");
+  return (
+    <Moldura titulo="Salvar seleção" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(destino || null, nome.trim() || `Alfa ${canais.length + 1}`, operacao)}>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          Canal:
+          <select className={campoDaJanela} value={destino} onChange={(evento) => setDestino(evento.currentTarget.value)}>
+            <option value="">Novo</option>
+            {canais.map((canal) => (
+              <option key={canal.id} value={canal.id}>
+                {canal.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        {destino ? (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="mb-1">Operação:</legend>
+            {OPERACOES_NO_CANAL.map((item) => (
+              <label key={item.id} className="flex items-center gap-1.5">
+                <input type="radio" name="operacao" checked={operacao === item.id} onChange={() => setOperacao(item.id)} />
+                {item.nome}
+              </label>
+            ))}
+          </fieldset>
+        ) : (
+          <label className="flex items-center gap-2">
+            Nome:
+            <input className={campoDaJanela} value={nome} maxLength={60} onChange={(evento) => setNome(evento.currentTarget.value)} autoFocus />
+          </label>
+        )}
+      </div>
+    </Moldura>
+  );
+}
+
+/** Selecionar › Carregar seleção: de um canal (ou da transparência da camada escolhida), invertida ou não, com a operação. */
+export function JanelaCarregarSelecao({
+  canais,
+  camada,
+  temSelecao,
+  aoFechar,
+  aoConfirmar,
+}: {
+  canais: Canal[];
+  /** O nome da camada escolhida, para carregar a transparência dela (null sem camada). */
+  camada: string | null;
+  temSelecao: boolean;
+  aoFechar: () => void;
+  aoConfirmar: (fonte: string, inverter: boolean, operacao: ModoDaSelecao) => void;
+}) {
+  const [fonte, setFonte] = useState<string>(canais[0]?.id ?? (camada ? "transparencia" : ""));
+  const [inverter, setInverter] = useState(false);
+  const [operacao, setOperacao] = useState<ModoDaSelecao>("nova");
+  return (
+    <Moldura titulo="Carregar seleção" aoFechar={aoFechar} aoConfirmar={() => fonte && aoConfirmar(fonte, inverter, operacao)}>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          Canal:
+          <select className={campoDaJanela} value={fonte} onChange={(evento) => setFonte(evento.currentTarget.value)}>
+            {canais.map((canal) => (
+              <option key={canal.id} value={canal.id}>
+                {canal.nome}
+              </option>
+            ))}
+            {camada ? <option value="transparencia">Transparência de “{camada}”</option> : null}
+          </select>
+        </label>
+        {!fonte ? <p className="text-suave">Não há canal salvo nem camada escolhida.</p> : null}
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={inverter} onChange={(evento) => setInverter(evento.currentTarget.checked)} />
+          Inverter
+        </label>
+        <fieldset className="flex flex-col gap-1">
+          <legend className="mb-1">Operação:</legend>
+          {OPERACOES_NA_SELECAO.map((item) => (
+            <label key={item.id} className="flex items-center gap-1.5">
+              <input type="radio" name="operacao" disabled={item.id !== "nova" && !temSelecao} checked={operacao === item.id} onChange={() => setOperacao(item.id)} />
+              {item.nome}
+            </label>
+          ))}
+        </fieldset>
       </div>
     </Moldura>
   );

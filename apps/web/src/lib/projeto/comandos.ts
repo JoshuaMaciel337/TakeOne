@@ -147,7 +147,7 @@ import type { Efeito } from "./efeitos.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
-import type { Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
+import type { Canal, Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
@@ -209,6 +209,9 @@ export type Comando =
   | { comando: "imagem.substituirPorPixels"; parametros: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number } }
   | { comando: "imagem.camadaDeFundo"; parametros: { faixaId: string; ligar: boolean } }
   | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
+  | { comando: "canal.adicionar"; parametros: { canal: Omit<Canal, "id"> } }
+  | { comando: "canal.mudar"; parametros: { id: string; mudanca: Partial<Pick<Canal, "nome" | "versao">> } }
+  | { comando: "canal.apagar"; parametros: { id: string } }
   | { comando: "mascara.definir"; parametros: { clipeId: string; mascara: MascaraDePixels | null } }
   | { comando: "projeto.restaurar"; parametros: { projeto: Projeto } }
   | { comando: "mascara.mudar"; parametros: { clipeId: string; mudanca: Partial<Omit<MascaraDePixels, "midia_id">> } }
@@ -321,6 +324,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.substituirPorPixels": "mesclar as camadas",
   "imagem.camadaDeFundo": "mudar a camada de fundo",
   "camada.pixels": "pintar",
+  "canal.adicionar": "salvar a seleção",
+  "canal.mudar": "mudar o canal",
+  "canal.apagar": "apagar o canal",
   "mascara.definir": "mudar a máscara de camada",
   "projeto.restaurar": "restaurar o instantâneo",
   "mascara.mudar": "mudar a máscara de camada",
@@ -559,13 +565,23 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: camadaDeFundo(projeto, parametros.faixaId, parametros.ligar) };
     case "projeto.restaurar":
       // Um instantâneo do Histórico: as camadas, o fundo e o tamanho de então, num passo novo (que se desfaz)
-      return { projeto: { ...projeto, faixas: parametros.projeto.faixas, fundo: parametros.projeto.fundo, tamanho: parametros.projeto.tamanho, proporcao: parametros.projeto.proporcao, marcadores: parametros.projeto.marcadores }, selecao: [] };
+      return { projeto: { ...projeto, faixas: parametros.projeto.faixas, fundo: parametros.projeto.fundo, tamanho: parametros.projeto.tamanho, proporcao: parametros.projeto.proporcao, marcadores: parametros.projeto.marcadores, canais: parametros.projeto.canais }, selecao: [] };
     case "mascara.definir":
       return { projeto: definirMascaraDePixels(projeto, parametros.clipeId, parametros.mascara) };
     case "mascara.mudar":
       return { projeto: mudarMascaraDePixels(projeto, parametros.clipeId, parametros.mudanca) };
     case "camada.pixels":
       return { projeto: trocarVersaoDosPixels(projeto, parametros.clipeId, parametros.versao) };
+    case "canal.adicionar":
+      if ((projeto.canais ?? []).length >= 50) throw new ErroEdicao("A imagem pode ter no máximo 50 canais.");
+      return { projeto: { ...projeto, canais: [...(projeto.canais ?? []), { id: ctx.novoId(), ...parametros.canal }] } };
+    case "canal.mudar": {
+      const canais = projeto.canais ?? [];
+      if (!canais.some((canal) => canal.id === parametros.id)) throw new ErroEdicao("Este canal não existe mais.");
+      return { projeto: { ...projeto, canais: canais.map((canal) => (canal.id === parametros.id ? { ...canal, ...parametros.mudanca } : canal)) } };
+    }
+    case "canal.apagar":
+      return { projeto: { ...projeto, canais: (projeto.canais ?? []).filter((canal) => canal.id !== parametros.id) } };
     case "imagem.soEsta":
       return { projeto: soEstaVisivel(projeto, parametros.faixaId) };
     case "imagem.mover":

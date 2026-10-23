@@ -15,6 +15,7 @@ export const PAINEIS_DA_IMAGEM = {
   amostras: "Amostras",
   biblioteca: "Biblioteca",
   camadas: "Camadas",
+  canais: "Canais",
   configuracoesDoPincel: "Configurações do pincel",
   cor: "Cor",
   estilos: "Estilos de texto",
@@ -94,6 +95,12 @@ export type AcoesDosMenus = {
   aumentarSelecao: (contigua: boolean) => void;
   /** Intervalo de cores e Área de foco (abrem a janela), Assunto (na foto escolhida) e Céu. */
   selecionarPor: (como: "cores" | "foco" | "assunto" | "ceu") => void;
+  /** Salvar a seleção num canal alfa, carregar a de um canal e a luminosidade (Ctrl+Alt+2). */
+  canalDaSelecao: (acao: "salvar" | "carregar" | "luminosidade") => void;
+  temCanais: boolean;
+  /** O modo Máscara rápida (Q). */
+  mascaraRapida: boolean;
+  alternarMascaraRapida: () => void;
   podeDesfazer: string | null;
   podeRefazer: string | null;
   area: string;
@@ -347,6 +354,12 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Intervalo de cores…", aoEscolher: () => a.selecionarPor("cores") },
         { nome: "Área de foco…", aoEscolher: () => a.selecionarPor("foco") },
         { nome: "Objeto", aoEscolher: () => a.ferramenta("objeto") },
+        "-",
+        { nome: "Editar no modo Máscara rápida", atalho: "Q", marcado: a.mascaraRapida, aoEscolher: a.alternarMascaraRapida },
+        "-",
+        { nome: "Carregar seleção…", aoEscolher: () => a.canalDaSelecao("carregar") },
+        { nome: "Salvar seleção…", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.canalDaSelecao("salvar") },
+        { nome: "Luminosidade", atalho: "Ctrl+Alt+2", aoEscolher: () => a.canalDaSelecao("luminosidade") },
       ],
     },
     {
