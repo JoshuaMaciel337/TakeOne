@@ -17,7 +17,8 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
-import type { Selecao } from "@/lib/selecao/mascara";
+import type { MapaDeBordas } from "@/lib/selecao/magnetico";
+import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
 import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
@@ -98,6 +99,8 @@ type Props = {
     ferramenta: FerramentaDeSelecao | null;
     opcoes: OpcoesDaSelecao;
     aoSelecionar: (selecao: Selecao | null) => void;
+    mapaDeBordas: MapaDeBordas | null;
+    aoVarinha: (ponto: { x: number; y: number }, modo: ModoDaSelecao) => void;
   } | null;
 };
 
@@ -538,6 +541,8 @@ export function PreviaDaImagem({
                 opcoes={selecaoDoDocumento.opcoes}
                 aoSelecionar={selecaoDoDocumento.aoSelecionar}
                 mao={maoAtiva}
+                bordas={selecaoDoDocumento.mapaDeBordas}
+                aoVarinha={selecaoDoDocumento.aoVarinha}
               />
             ) : null}
             {pintura && !maoAtiva && !recorte && tamanho.largura > 1 ? (

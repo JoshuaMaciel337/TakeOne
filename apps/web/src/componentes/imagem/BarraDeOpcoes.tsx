@@ -9,6 +9,7 @@ import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
 import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/texto";
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
+import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
 import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
@@ -126,7 +127,33 @@ export function BarraDeOpcoes(props: Props) {
           ))}
         </span>
         {SEPARADOR}
-        {ferramenta === "linhaUnica" || ferramenta === "colunaUnica" ? null : (
+        {ferramenta === "varinha" ? (
+          <>
+            <label className="flex items-center gap-1 text-suave">
+              Tamanho da amostra:
+              <select className={campo} value={o.amostra} onChange={(evento) => aoMudar({ amostra: Number(evento.currentTarget.value) as TamanhoDaAmostra })}>
+                {AMOSTRAS.map((lado) => (
+                  <option key={lado} value={lado}>
+                    {lado === 1 ? "Ponto" : `Média ${lado} × ${lado}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Numero rotulo="Tolerância" valor={o.tolerancia} minimo={0} maximo={255} aoMudar={(tolerancia) => aoMudar({ tolerancia: Math.round(tolerancia) })} largura="w-10" />
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={o.suavizar} onChange={(evento) => aoMudar({ suavizar: evento.currentTarget.checked })} />
+              Suavização de serrilhado
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={o.contigua} onChange={(evento) => aoMudar({ contigua: evento.currentTarget.checked })} />
+              Contígua
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={o.todasAsCamadas} onChange={(evento) => aoMudar({ todasAsCamadas: evento.currentTarget.checked })} />
+              Usar todas as camadas
+            </label>
+          </>
+        ) : ferramenta === "linhaUnica" || ferramenta === "colunaUnica" ? null : (
           <>
             <Numero rotulo="Difusão" valor={o.difusao} minimo={0} maximo={1000} sufixo="px" aoMudar={(difusao) => aoMudar({ difusao })} />
             {ferramenta === "letreiro" ? null : (
@@ -137,6 +164,14 @@ export function BarraDeOpcoes(props: Props) {
             )}
           </>
         )}
+        {ferramenta === "lacoMagnetico" ? (
+          <>
+            {SEPARADOR}
+            <Numero rotulo="Largura" valor={o.larguraDoLaco} minimo={1} maximo={256} sufixo="px" aoMudar={(larguraDoLaco) => aoMudar({ larguraDoLaco: Math.round(larguraDoLaco) })} largura="w-10" />
+            <Numero rotulo="Contraste" valor={Math.round(o.contraste * 100)} minimo={1} maximo={100} sufixo="%" aoMudar={(contraste) => aoMudar({ contraste: contraste / 100 })} largura="w-10" />
+            <Numero rotulo="Frequência" valor={o.frequencia} minimo={0} maximo={100} aoMudar={(frequencia) => aoMudar({ frequencia: Math.round(frequencia) })} largura="w-10" />
+          </>
+        ) : null}
         {letreiro ? (
           <>
             {SEPARADOR}

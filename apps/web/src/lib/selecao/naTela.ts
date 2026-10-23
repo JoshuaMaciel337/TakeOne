@@ -4,6 +4,7 @@
 // canvas, e as formigas (a borda numa imagem do tamanho da prévia, que a máscara do CSS anima).
 import { type Afim, inverter as inverterMatriz } from "../projeto/mascaraDePixels.ts";
 import { bordaNaTela, type Selecao } from "./mascara.ts";
+import type { ImagemRgba } from "./varinha.ts";
 
 /** A seleção como imagem: branco com o alfa da cobertura. */
 export function selecaoParaCanvas(selecao: Selecao): HTMLCanvasElement {
@@ -75,4 +76,16 @@ export function bordaComoImagem(selecao: Selecao, largura: number, altura: numbe
   }
   ctx.putImageData(dados, 0, 0);
   return canvas.toDataURL("image/png");
+}
+
+/** Os pixels de uma imagem (o PNG da exportação), em RGBA sem pré-multiplicar, para a varinha e o laço magnético. */
+export async function imagemDoBlob(blob: Blob): Promise<ImagemRgba> {
+  const bitmap = await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return { largura: canvas.width, altura: canvas.height, dados: ctx.getImageData(0, 0, canvas.width, canvas.height).data };
 }

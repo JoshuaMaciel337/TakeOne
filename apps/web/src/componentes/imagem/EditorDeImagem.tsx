@@ -62,7 +62,9 @@ import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { type Afim, compor, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 import { borda, cheia, combinar, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
-import { imagemNoDocumento, selecaoNaMidia } from "@/lib/selecao/naTela";
+import { imagemDoBlob, imagemNoDocumento, selecaoNaMidia } from "@/lib/selecao/naTela";
+import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
+import { aumentar, type ImagemRgba, varinha } from "@/lib/selecao/varinha";
 
 const SEM_SEGUIR = {
   marcando: null,
@@ -178,6 +180,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [bordasDaSelecao, setBordasDaSelecao] = useState(true);
   const [opcoesDaSelecao, setOpcoesDaSelecao] = useState<OpcoesDaSelecao>(OPCOES_DA_SELECAO);
   const [modificando, setModificando] = useState<ModificacaoDaSelecao | null>(null);
+  // A imagem que a varinha e o laço magnético leem, guardada até o projeto mudar, e as bordas dela para o laço
+  const imagemLida = useRef<{ chave: string; projeto: Projeto; imagem: Promise<ImagemRgba> } | null>(null);
+  const [bordasDaImagem, setBordasDaImagem] = useState<MapaDeBordas | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -345,6 +350,61 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     ctx2d.drawImage(branca, 0, 0);
     return canvas.toDataURL("image/png");
   };
+  /**
+   * Os pixels que a varinha, o Aumentar e o laço magnético leem: a imagem inteira, ou só a camada escolhida (sem
+   * estilos, máscara nem opacidade), no tamanho do documento. Fica guardada até o projeto mudar.
+   */
+  const imagemParaSelecao = (todas: boolean): Promise<ImagemRgba> => {
+    const atual = projetoRef.current ?? projeto!;
+    const so = !todas && selecionado ? selecionado.faixa.id : null;
+    const chave = so ?? "todas";
+    const guardada = imagemLida.current;
+    if (guardada && guardada.projeto === atual && guardada.chave === chave) return guardada.imagem;
+    const desenhar = so ? projetoSoCom(atual, [so], { neutras: new Set([so]), semEstilo: true, semMascara: true }) : atual;
+    const imagem = exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }).then(imagemDoBlob);
+    imagemLida.current = { chave, projeto: atual, imagem };
+    imagem.catch(() => {
+      if (imagemLida.current?.imagem === imagem) imagemLida.current = null;
+    });
+    return imagem;
+  };
+  /** A varinha: a cor do ponto clicado (pixels do documento) e as parecidas, no modo. */
+  const usarVarinha = (ponto: { x: number; y: number }, modo: ModoDaSelecao) => {
+    const antes = selecaoNoDocumento;
+    imagemParaSelecao(opcoesDaSelecao.todasAsCamadas || !selecionado)
+      .then((imagem) => {
+        const { tolerancia, contigua, suavizar: suave, amostra } = opcoesDaSelecao;
+        const nova = varinha(imagem, ponto.x, ponto.y, { tolerancia, contigua, suavizar: suave, amostra });
+        selecionarNoDocumento(combinar(antes, nova, modo));
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
+  /** Aumentar (contígua) e Semelhante (em toda a imagem), com a tolerância da varinha. */
+  const aumentarSelecao = (contigua: boolean) => {
+    const antes = selecaoNoDocumento;
+    if (!antes) return;
+    imagemParaSelecao(opcoesDaSelecao.todasAsCamadas || !selecionado)
+      .then((imagem) => setSelecaoDoDocumento(aumentar(imagem, antes, opcoesDaSelecao.tolerancia, contigua)))
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
+  // O laço magnético lê as bordas da imagem inteira ao ser escolhido, e de novo quando o projeto muda
+  const lerBordas = useEffectEvent((vivo: { atual: boolean }) => {
+    imagemParaSelecao(true)
+      .then((imagem) => {
+        if (vivo.atual) setBordasDaImagem(mapaDeBordas(imagem));
+      })
+      .catch(() => {
+        if (vivo.atual) mostrarAviso("Não foi possível ler as bordas da imagem.");
+      });
+  });
+  useEffect(() => {
+    if (ferramenta !== "lacoMagnetico" || !projeto) return;
+    const vivo = { atual: true };
+    lerBordas(vivo);
+    return () => {
+      vivo.atual = false;
+    };
+  }, [ferramenta, projeto]);
   /** Ctrl + clique na miniatura: a seleção pela transparência da camada (sozinha) ou pelo cinza da máscara dela. */
   const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => {
     const atual = projetoRef.current;
@@ -820,6 +880,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else if (acao === "bordas") setBordasDaSelecao((atual) => !atual);
     },
     modificarSelecao: (como) => selecaoNoDocumento && setModificando(como),
+    aumentarSelecao,
     podeDesfazer: edicao.nomeDesfazer,
     podeRefazer: edicao.nomeRefazer,
     area: area.area,
@@ -1368,6 +1429,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               ferramenta: FERRAMENTAS_DA_SELECAO.has(ferramenta) ? (ferramenta as FerramentaDeSelecao) : null,
               opcoes: opcoesDaSelecao,
               aoSelecionar: selecionarNoDocumento,
+              mapaDeBordas: ferramenta === "lacoMagnetico" ? bordasDaImagem : null,
+              aoVarinha: usarVarinha,
             }}
             ferramenta={ferramenta}
             zoom={zoom}

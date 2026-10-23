@@ -90,6 +90,8 @@ export type AcoesDosMenus = {
   selecaoDoDocumento: (acao: "tudo" | "desmarcar" | "novamente" | "inverter" | "bordas") => void;
   /** Selecionar › Modificar: pergunta o número e muda a seleção. */
   modificarSelecao: (como: "borda" | "suavizar" | "expandir" | "contrair" | "difusao") => void;
+  /** Aumentar (contígua) e Semelhante, com a tolerância da varinha. */
+  aumentarSelecao: (contigua: boolean) => void;
   podeDesfazer: string | null;
   podeRefazer: string | null;
   area: string;
@@ -335,6 +337,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Difusão…", atalho: "Shift+F6", aoEscolher: () => a.modificarSelecao("difusao") },
           ],
         },
+        { nome: "Aumentar", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(true) },
+        { nome: "Semelhante", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(false) },
         "-",
         { nome: "Objeto", aoEscolher: () => a.ferramenta("objeto") },
       ],

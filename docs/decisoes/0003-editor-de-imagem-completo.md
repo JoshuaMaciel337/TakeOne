@@ -113,8 +113,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Letreiro retangular e elíptico com Difusão, Suavização de serrilhado e Estilo (normal, proporção fixa, tamanho fixo); Alt desenha do centro, Espaço reposiciona
 - [x] Letreiro de linha única e de coluna única
 - [x] Laço e Laço poligonal (Shift trava em 45°)
-- [ ] Laço magnético (largura, contraste, frequência)
-- [ ] Varinha mágica (tolerância, contígua, todas as camadas)
+- [x] Laço magnético (largura, contraste, frequência)
+- [x] Varinha mágica (tolerância, contígua, todas as camadas)
 - [ ] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
 - [ ] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
 - [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
@@ -122,7 +122,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
 - [ ] Área de foco; Assunto; Céu
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
-- [ ] Aumentar e Semelhante
+- [x] Aumentar e Semelhante
 - [ ] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
 - [ ] Máscara rápida (Q) com pintura
 - [x] Seleção pela transparência da camada (Ctrl + clique na miniatura; Shift soma, Alt subtrai) e pela máscara dela
