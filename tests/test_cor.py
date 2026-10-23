@@ -78,3 +78,37 @@ def test_imagem_da_vinheta_tem_o_cinza_da_conta():
     assert imagem.getpixel((100, 50)) == (255, 255, 255, 255), "no meio, multiplicar não muda nada"
     cinza = round(255 * (1 - escurecimento_da_vinheta(0.5 / 200, 0.5 / 100, 0.8)))
     assert imagem.getpixel((0, 0)) == (cinza, cinza, cinza, 255)
+
+
+def test_niveis_brancos_pretos_vibracao_e_cor_por_matiz():
+    from core.utils.cor import aplicar_hsl
+
+    cinza = (0.5, 0.5, 0.5)
+    # Níveis: o preto de entrada vira 0 e o branco vira 1
+    assert aplicar_cor((0.1, 0.1, 0.1), {**AJUSTES_NEUTROS, "niveis_preto": 0.1})[0] == pytest.approx(0, abs=1e-9)
+    assert aplicar_cor((0.8, 0.8, 0.8), {**AJUSTES_NEUTROS, "niveis_branco": 0.2})[0] == pytest.approx(1, abs=1e-9)
+    # Gama acima de 0 clareia o meio sem mexer nas pontas
+    assert aplicar_cor(cinza, {**AJUSTES_NEUTROS, "niveis_gama": 1})[0] > 0.6
+    assert aplicar_cor((1, 1, 1), {**AJUSTES_NEUTROS, "niveis_gama": 1})[0] == pytest.approx(1)
+    # Brancos mexem no claro e quase nada no escuro; pretos, o contrário
+    assert aplicar_cor((0.9, 0.9, 0.9), {**AJUSTES_NEUTROS, "brancos": -1})[0] < 0.8
+    assert aplicar_cor((0.1, 0.1, 0.1), {**AJUSTES_NEUTROS, "brancos": -1})[0] == pytest.approx(0.1, abs=1e-3)
+    # Vibração: mais forte na cor apagada que na saturada
+    apagada, viva = (0.5, 0.45, 0.4), (0.9, 0.2, 0.1)
+    vib = {**AJUSTES_NEUTROS, "vibracao": 1}
+    ganho = lambda c: (max(aplicar_cor(c, vib)) - min(aplicar_cor(c, vib))) / (max(c) - min(c))  # noqa: E731
+    assert ganho(apagada) > ganho(viva)
+    # Cor por matiz: o vermelho gira para o laranja, o cinza fica
+    assert aplicar_hsl(cinza, {"vermelho": {"matiz": 1, "saturacao": 1, "luminancia": 1}}) == pytest.approx(cinza)
+    girado = aplicar_hsl((0.9, 0.1, 0.1), {"vermelho": {"matiz": 1, "saturacao": 0, "luminancia": 0}})
+    assert girado[1] > 0.3, "ganhou verde: virou laranja"
+
+
+def test_cor_por_matiz_entra_na_lut_e_no_nome():
+    hsl = {"azul": {"matiz": 0, "saturacao": -1, "luminancia": 0}}
+    com = {**AJUSTES_NEUTROS, "hsl": hsl}
+    assert nome_da_lut(com) != nome_da_lut(AJUSTES_NEUTROS)
+    linhas = gerar_cube(com, pontos=3).strip().split("\n")
+    # O azul puro (r = g = 0, b = 1) perde a saturação: vira cinza
+    azul = [float(v) for v in linhas[2 + 18].split()]
+    assert azul[0] == pytest.approx(azul[1], abs=1e-6) and azul[1] == pytest.approx(azul[2], abs=1e-6)

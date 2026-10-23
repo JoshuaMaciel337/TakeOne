@@ -1178,6 +1178,761 @@
     0.95,
     0.95
    ]
+  },
+  {
+   "nome": "vibracao 0.7 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "vibracao": 0.7
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.1277936,
+    0.4117936,
+    0.6957936
+   ]
+  },
+  {
+   "nome": "vibracao 0.7 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "vibracao": 0.7
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.9270774,
+    0.8455774,
+    0.7640774
+   ]
+  },
+  {
+   "nome": "vibracao 0.7 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "vibracao": 0.7
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.028365464,
+    0.110565464,
+    0.0
+   ]
+  },
+  {
+   "nome": "vibracao 0.7 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "vibracao": 0.7
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.835268,
+    0.160268,
+    0.295268
+   ]
+  },
+  {
+   "nome": "vibracao 0.7 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "vibracao": 0.7
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "vibracao -0.6 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "vibracao": -0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.2618912,
+    0.3898912,
+    0.5178912
+   ]
+  },
+  {
+   "nome": "vibracao -0.6 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "vibracao": -0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.8767908,
+    0.8537908,
+    0.8307908
+   ]
+  },
+  {
+   "nome": "vibracao -0.6 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "vibracao": -0.6
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.068543888,
+    0.090943888,
+    0.055103888
+   ]
+  },
+  {
+   "nome": "vibracao -0.6 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "vibracao": -0.6
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.584056,
+    0.234056,
+    0.304056
+   ]
+  },
+  {
+   "nome": "vibracao -0.6 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "vibracao": -0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "brancos 0.8 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "brancos": 0.8
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.203826733,
+    0.403826733,
+    0.603826733
+   ]
+  },
+  {
+   "nome": "brancos 0.8 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "brancos": 0.8
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    1.0,
+    0.957893138,
+    0.907893138
+   ]
+  },
+  {
+   "nome": "brancos 0.8 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "brancos": 0.8
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.050009766,
+    0.100009766,
+    0.020009766
+   ]
+  },
+  {
+   "nome": "brancos 0.8 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "brancos": 0.8
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.701932373,
+    0.201932373,
+    0.301932373
+   ]
+  },
+  {
+   "nome": "brancos 0.8 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "brancos": 0.8
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5125,
+    0.5125,
+    0.5125
+   ]
+  },
+  {
+   "nome": "pretos -0.7 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "pretos": -0.7
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.172766848,
+    0.372766848,
+    0.572766848
+   ]
+  },
+  {
+   "nome": "pretos -0.7 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "pretos": -0.7
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.899926863,
+    0.849926863,
+    0.799926863
+   ]
+  },
+  {
+   "nome": "pretos -0.7 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "pretos": -0.7
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "nome": "pretos -0.7 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "pretos": -0.7
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.661135811,
+    0.161135811,
+    0.261135811
+   ]
+  },
+  {
+   "nome": "pretos -0.7 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "pretos": -0.7
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.4890625,
+    0.4890625,
+    0.4890625
+   ]
+  },
+  {
+   "nome": "niveis preto 0.15 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "niveis_preto": 0.15
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.058823529,
+    0.294117647,
+    0.529411765
+   ]
+  },
+  {
+   "nome": "niveis preto 0.15 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "niveis_preto": 0.15
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.882352941,
+    0.823529412,
+    0.764705882
+   ]
+  },
+  {
+   "nome": "niveis preto 0.15 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "niveis_preto": 0.15
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "nome": "niveis preto 0.15 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "niveis_preto": 0.15
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.647058824,
+    0.058823529,
+    0.176470588
+   ]
+  },
+  {
+   "nome": "niveis preto 0.15 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "niveis_preto": 0.15
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.411764706,
+    0.411764706,
+    0.411764706
+   ]
+  },
+  {
+   "nome": "niveis branco 0.2 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "niveis_branco": 0.2
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.25,
+    0.5,
+    0.75
+   ]
+  },
+  {
+   "nome": "niveis branco 0.2 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "niveis_branco": 0.2
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "nome": "niveis branco 0.2 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "niveis_branco": 0.2
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.0625,
+    0.125,
+    0.025
+   ]
+  },
+  {
+   "nome": "niveis branco 0.2 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "niveis_branco": 0.2
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.875,
+    0.25,
+    0.375
+   ]
+  },
+  {
+   "nome": "niveis branco 0.2 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "niveis_branco": 0.2
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.625,
+    0.625,
+    0.625
+   ]
+  },
+  {
+   "nome": "niveis gama 0.6 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "niveis_gama": 0.6
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.345821329,
+    0.54633309,
+    0.713895115
+   ]
+  },
+  {
+   "nome": "niveis gama 0.6 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "niveis_gama": 0.6
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.932848923,
+    0.898325767,
+    0.863104211
+   ]
+  },
+  {
+   "nome": "niveis gama 0.6 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "niveis_gama": 0.6
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.138560778,
+    0.218900143,
+    0.075700338
+   ]
+  },
+  {
+   "nome": "niveis gama 0.6 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "niveis_gama": 0.6
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.790319721,
+    0.345821329,
+    0.451885785
+   ]
+  },
+  {
+   "nome": "niveis gama 0.6 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "niveis_gama": 0.6
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.632986241,
+    0.632986241,
+    0.632986241
+   ]
+  },
+  {
+   "nome": "niveis gama -1 [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "niveis_gama": -1
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.04,
+    0.16,
+    0.36
+   ]
+  },
+  {
+   "nome": "niveis gama -1 [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "niveis_gama": -1
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.81,
+    0.7225,
+    0.64
+   ]
+  },
+  {
+   "nome": "niveis gama -1 [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "niveis_gama": -1
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.0025,
+    0.01,
+    0.0004
+   ]
+  },
+  {
+   "nome": "niveis gama -1 [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "niveis_gama": -1
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    0.49,
+    0.04,
+    0.09
+   ]
+  },
+  {
+   "nome": "niveis gama -1 [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "niveis_gama": -1
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.25,
+    0.25,
+    0.25
+   ]
+  },
+  {
+   "nome": "tudo novo [0.2, 0.4, 0.6]",
+   "ajustes": {
+    "niveis_preto": 0.05,
+    "niveis_branco": 0.1,
+    "niveis_gama": 0.3,
+    "brancos": -0.4,
+    "pretos": 0.5,
+    "vibracao": 0.4,
+    "saturacao": 0.2,
+    "contraste": 0.1
+   },
+   "entrada": [
+    0.2,
+    0.4,
+    0.6
+   ],
+   "saida": [
+    0.136335636,
+    0.508640702,
+    0.840574341
+   ]
+  },
+  {
+   "nome": "tudo novo [0.9, 0.85, 0.8]",
+   "ajustes": {
+    "niveis_preto": 0.05,
+    "niveis_branco": 0.1,
+    "niveis_gama": 0.3,
+    "brancos": -0.4,
+    "pretos": 0.5,
+    "vibracao": 0.4,
+    "saturacao": 0.2,
+    "contraste": 0.1
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.8
+   ],
+   "saida": [
+    0.905949031,
+    0.901445813,
+    0.817084443
+   ]
+  },
+  {
+   "nome": "tudo novo [0.05, 0.1, 0.02]",
+   "ajustes": {
+    "niveis_preto": 0.05,
+    "niveis_branco": 0.1,
+    "niveis_gama": 0.3,
+    "brancos": -0.4,
+    "pretos": 0.5,
+    "vibracao": 0.4,
+    "saturacao": 0.2,
+    "contraste": 0.1
+   },
+   "entrada": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "saida": [
+    0.08006694,
+    0.174849143,
+    0.08006694
+   ]
+  },
+  {
+   "nome": "tudo novo [0.7, 0.2, 0.3]",
+   "ajustes": {
+    "niveis_preto": 0.05,
+    "niveis_branco": 0.1,
+    "niveis_gama": 0.3,
+    "brancos": -0.4,
+    "pretos": 0.5,
+    "vibracao": 0.4,
+    "saturacao": 0.2,
+    "contraste": 0.1
+   },
+   "entrada": [
+    0.7,
+    0.2,
+    0.3
+   ],
+   "saida": [
+    1.0,
+    0.188341152,
+    0.375491936
+   ]
+  },
+  {
+   "nome": "tudo novo [0.5, 0.5, 0.5]",
+   "ajustes": {
+    "niveis_preto": 0.05,
+    "niveis_branco": 0.1,
+    "niveis_gama": 0.3,
+    "brancos": -0.4,
+    "pretos": 0.5,
+    "vibracao": 0.4,
+    "saturacao": 0.2,
+    "contraste": 0.1
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.595711621,
+    0.595711621,
+    0.595711621
+   ]
   }
  ],
  "vinhetas": [
@@ -1320,6 +2075,603 @@
     "matiz_claros": 30,
     "forca_claros": 0.175
    }
+  }
+ ],
+ "hsl": [
+  {
+   "nome": "vermelho gira e satura [0.8, 0.3, 0.2]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.8,
+    0.3,
+    0.2
+   ],
+   "saida": [
+    0.9,
+    0.5,
+    0.1
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.2, 0.3, 0.9]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.2,
+    0.3,
+    0.9
+   ],
+   "saida": [
+    0.2,
+    0.3,
+    0.9
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.4, 0.8, 0.2]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.4,
+    0.8,
+    0.2
+   ],
+   "saida": [
+    0.4,
+    0.8,
+    0.2
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.9, 0.85, 0.3]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.3
+   ],
+   "saida": [
+    0.9,
+    0.85,
+    0.3
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.9, 0.2, 0.6]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.9,
+    0.2,
+    0.6
+   ],
+   "saida": [
+    0.975,
+    0.125,
+    0.428571429
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.5, 0.5, 0.5]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "vermelho gira e satura [0.95, 0.1, 0.12]",
+   "hsl": {
+    "vermelho": {
+     "matiz": 1,
+     "saturacao": 0.5,
+     "luminancia": 0
+    }
+   },
+   "entrada": [
+    0.95,
+    0.1,
+    0.12
+   ],
+   "saida": [
+    1.0,
+    0.491470588,
+    0.05
+   ]
+  },
+  {
+   "nome": "azul escurece [0.8, 0.3, 0.2]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.8,
+    0.3,
+    0.2
+   ],
+   "saida": [
+    0.8,
+    0.3,
+    0.2
+   ]
+  },
+  {
+   "nome": "azul escurece [0.2, 0.3, 0.9]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.2,
+    0.3,
+    0.9
+   ],
+   "saida": [
+    0.082222222,
+    0.164444444,
+    0.657777778
+   ]
+  },
+  {
+   "nome": "azul escurece [0.4, 0.8, 0.2]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.4,
+    0.8,
+    0.2
+   ],
+   "saida": [
+    0.4,
+    0.8,
+    0.2
+   ]
+  },
+  {
+   "nome": "azul escurece [0.9, 0.85, 0.3]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.3
+   ],
+   "saida": [
+    0.9,
+    0.85,
+    0.3
+   ]
+  },
+  {
+   "nome": "azul escurece [0.9, 0.2, 0.6]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.9,
+    0.2,
+    0.6
+   ],
+   "saida": [
+    0.9,
+    0.2,
+    0.6
+   ]
+  },
+  {
+   "nome": "azul escurece [0.5, 0.5, 0.5]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "azul escurece [0.95, 0.1, 0.12]",
+   "hsl": {
+    "azul": {
+     "matiz": 0,
+     "saturacao": 0,
+     "luminancia": -1
+    }
+   },
+   "entrada": [
+    0.95,
+    0.1,
+    0.12
+   ],
+   "saida": [
+    0.95,
+    0.1,
+    0.12
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.8, 0.3, 0.2]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.8,
+    0.3,
+    0.2
+   ],
+   "saida": [
+    0.8,
+    0.3,
+    0.2
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.2, 0.3, 0.9]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.2,
+    0.3,
+    0.9
+   ],
+   "saida": [
+    0.2,
+    0.3,
+    0.9
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.4, 0.8, 0.2]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.4,
+    0.8,
+    0.2
+   ],
+   "saida": [
+    0.524864,
+    0.64736,
+    0.42464
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.9, 0.85, 0.3]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.3
+   ],
+   "saida": [
+    0.914895833,
+    0.94625,
+    0.19375
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.9, 0.2, 0.6]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.9,
+    0.2,
+    0.6
+   ],
+   "saida": [
+    0.9,
+    0.2,
+    0.6
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.5, 0.5, 0.5]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "verde e amarelo [0.95, 0.1, 0.12]",
+   "hsl": {
+    "verde": {
+     "matiz": -0.5,
+     "saturacao": -1,
+     "luminancia": 0.4
+    },
+    "amarelo": {
+     "matiz": 0.3,
+     "saturacao": 0.2,
+     "luminancia": -0.2
+    }
+   },
+   "entrada": [
+    0.95,
+    0.1,
+    0.12
+   ],
+   "saida": [
+    0.95,
+    0.1,
+    0.12
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.8, 0.3, 0.2]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.8,
+    0.3,
+    0.2
+   ],
+   "saida": [
+    0.8,
+    0.3,
+    0.2
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.2, 0.3, 0.9]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.2,
+    0.3,
+    0.9
+   ],
+   "saida": [
+    0.2,
+    0.3,
+    0.9
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.4, 0.8, 0.2]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.4,
+    0.8,
+    0.2
+   ],
+   "saida": [
+    0.4,
+    0.8,
+    0.2
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.9, 0.85, 0.3]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.9,
+    0.85,
+    0.3
+   ],
+   "saida": [
+    0.9,
+    0.85,
+    0.3
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.9, 0.2, 0.6]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.9,
+    0.2,
+    0.6
+   ],
+   "saida": [
+    1.0,
+    0.244,
+    0.892
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.5, 0.5, 0.5]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "saida": [
+    0.5,
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "nome": "magenta perto do vermelho [0.95, 0.1, 0.12]",
+   "hsl": {
+    "magenta": {
+     "matiz": -1,
+     "saturacao": 0.8,
+     "luminancia": 0.6
+    }
+   },
+   "entrada": [
+    0.95,
+    0.1,
+    0.12
+   ],
+   "saida": [
+    0.958318316,
+    0.098881684,
+    0.129214742
+   ]
   }
  ]
 }

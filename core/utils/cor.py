@@ -14,11 +14,14 @@ from PIL import Image
 
 AJUSTES_NEUTROS = {"temperatura": 0, "tom": 0, "exposicao": 0, "contraste": 0, "realces": 0, "sombras": 0,
                    "saturacao": 0, "vinheta": 0, "matiz_escuros": 0, "forca_escuros": 0, "matiz_medios": 0,
-                   "forca_medios": 0, "matiz_claros": 0, "forca_claros": 0}
+                   "forca_medios": 0, "matiz_claros": 0, "forca_claros": 0, "vibracao": 0, "brancos": 0, "pretos": 0,
+                   "niveis_preto": 0, "niveis_branco": 0, "niveis_gama": 0}
 LIMITES = {"temperatura": (-1, 1), "tom": (-1, 1), "exposicao": (-2, 2), "contraste": (-1, 1), "realces": (-1, 1),
            "sombras": (-1, 1), "saturacao": (-1, 1), "vinheta": (0, 1), "matiz_escuros": (0, 360),
            "forca_escuros": (0, 1), "matiz_medios": (0, 360), "forca_medios": (0, 1), "matiz_claros": (0, 360),
-           "forca_claros": (0, 1)}
+           "forca_claros": (0, 1), "vibracao": (-1, 1), "brancos": (-1, 1), "pretos": (-1, 1),
+           # Níveis: o preto e o branco de entrada (o branco conta de 1 para baixo) e a gama em potência de 2
+           "niveis_preto": (0, 0.45), "niveis_branco": (0, 0.45), "niveis_gama": (-1, 1)}
 # Rodas de cor: (matiz, força) de escuros, meios-tons e claros. O matiz sozinho não muda nada.
 RODAS = (("matiz_escuros", "forca_escuros"), ("matiz_medios", "forca_medios"), ("matiz_claros", "forca_claros"))
 MATIZES = {matiz for matiz, _ in RODAS}
@@ -37,6 +40,8 @@ FILTROS = {
 FORCA_TEMPERATURA = 0.15
 FORCA_TOM = 0.1
 FORCA_REALCES_SOMBRAS = 0.25
+# Brancos e pretos: como realces e sombras, mas só nas pontas (a quarta potência da luminância)
+FORCA_BRANCOS_PRETOS = 0.25
 FORCA_RODAS = 0.3
 LUMA = (0.2126, 0.7152, 0.0722)
 PONTOS_LUT = 33
@@ -91,6 +96,12 @@ def vetor_da_roda(matiz: float) -> tuple[float, float, float]:
 
 def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float, float]:
     """Cor de um pixel (valores de 0 a 1), sem a vinheta."""
+    # Níveis, antes de tudo e na tela: o preto e o branco de entrada viram 0 e 1, e a gama curva o meio
+    preto = a.get("niveis_preto", 0)
+    branco = 1 - a.get("niveis_branco", 0)
+    expoente = 1 / 2 ** a.get("niveis_gama", 0)
+    rgb = tuple(_limitar((v - preto) / (branco - preto)) ** expoente for v in rgb)
+
     ganho = 2 ** a["exposicao"]
     r = _tela(_linear(rgb[0]) * ganho * (1 + FORCA_TEMPERATURA * a["temperatura"]))
     g = _tela(_linear(rgb[1]) * ganho * (1 - FORCA_TOM * a["tom"]))
@@ -101,6 +112,7 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
 
     y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     soma = FORCA_REALCES_SOMBRAS * (a["realces"] * y * y + a["sombras"] * (1 - y) * (1 - y))
+    soma += FORCA_BRANCOS_PRETOS * (a.get("brancos", 0) * y ** 4 + a.get("pretos", 0) * (1 - y) ** 4)
     c = [_limitar(v + soma) for v in c]
 
     # Rodas de cor: escuros, meios-tons e claros, pesados pela luminância (os pesos somam 1)
@@ -109,23 +121,99 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
     rodas = [[v * a[forca] * FORCA_RODAS for v in vetor_da_roda(a[matiz])] for matiz, forca in RODAS]
     c = [_limitar(c[k] + sum(peso * roda[k] for peso, roda in zip(pesos, rodas, strict=True))) for k in range(3)]
 
+    # Saturação e vibração: a vibração pesa mais nas cores apagadas (pela distância entre o maior e o menor canal)
     y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-    fator = 1 + a["saturacao"]
+    croma = max(c) - min(c)
+    fator = 1 + a["saturacao"] + a.get("vibracao", 0) * (1 - croma)
     c = [_limitar(y2 + (v - y2) * fator) for v in c]
     return c[0], c[1], c[2]
 
 
+# -----------------------------------------------
+# Cor por matiz: oito faixas, cada uma com o giro do matiz, a saturação e a luminância (de -1 a 1)
+# -----------------------------------------------
+FAIXAS_DE_MATIZ = (("vermelho", 0), ("laranja", 30), ("amarelo", 60), ("verde", 120), ("ciano", 180), ("azul", 240),
+                   ("roxo", 270), ("magenta", 300))
+GIRO_MAXIMO = 30       # graus, com o matiz da faixa em 1
+FORCA_LUMINANCIA = 0.3
+
+
+def hsl_neutro(hsl: dict | None) -> bool:
+    return not hsl or all(abs(v) < 1e-9 for faixa in hsl.values() for v in faixa.values())
+
+
+def _pesos_das_faixas(matiz: float) -> list[tuple[str, float]]:
+    """As duas faixas vizinhas do matiz (em graus) e o peso de cada uma, que somam 1."""
+    h = matiz % 360
+    for i, (nome, centro) in enumerate(FAIXAS_DE_MATIZ):
+        proximo_nome, proximo = FAIXAS_DE_MATIZ[(i + 1) % len(FAIXAS_DE_MATIZ)]
+        if i == len(FAIXAS_DE_MATIZ) - 1:
+            proximo += 360
+        if centro <= h < proximo:
+            t = (h - centro) / (proximo - centro)
+            return [(nome, 1 - t), (proximo_nome, t)]
+    return [(FAIXAS_DE_MATIZ[0][0], 1.0)]
+
+
+def _para_hsl(r: float, g: float, b: float) -> tuple[float, float, float]:
+    maior, menor = max(r, g, b), min(r, g, b)
+    luz = (maior + menor) / 2
+    d = maior - menor
+    if d < 1e-12:
+        return 0.0, 0.0, luz
+    s = d / (1 - abs(2 * luz - 1))
+    if maior == r:
+        h = 60 * (((g - b) / d) % 6)
+    elif maior == g:
+        h = 60 * ((b - r) / d + 2)
+    else:
+        h = 60 * ((r - g) / d + 4)
+    return h, s, luz
+
+
+def _de_hsl(h: float, s: float, luz: float) -> tuple[float, float, float]:
+    c = (1 - abs(2 * luz - 1)) * s
+    hh = (h % 360) / 60
+    x = c * (1 - abs(hh % 2 - 1))
+    setor = int(hh) % 6
+    r, g, b = ((c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x))[setor]
+    m = luz - c / 2
+    return r + m, g + m, b + m
+
+
+def aplicar_hsl(rgb: tuple[float, float, float], hsl: dict | None) -> tuple[float, float, float]:
+    """
+    Cor por matiz, depois dos ajustes: cada pixel pega a mistura das duas faixas vizinhas do matiz dele. O giro e a
+    saturação não mexem no cinza (que não tem matiz); a luminância pesa pelo croma, para o cinza também ficar.
+    """
+    if hsl_neutro(hsl):
+        return rgb
+    h, s, luz = _para_hsl(*rgb)
+    croma = max(rgb) - min(rgb)
+    giro = saturacao = luminancia = 0.0
+    for nome, peso in _pesos_das_faixas(h):
+        faixa = hsl.get(nome) or {}
+        giro += peso * faixa.get("matiz", 0)
+        saturacao += peso * faixa.get("saturacao", 0)
+        luminancia += peso * faixa.get("luminancia", 0)
+    s = _limitar(s * (1 + saturacao))
+    luz = _limitar(luz + FORCA_LUMINANCIA * luminancia * croma)
+    r, g, b = _de_hsl(h + GIRO_MAXIMO * giro, s, luz)
+    return _limitar(r), _limitar(g), _limitar(b)
+
+
 def gerar_cube(ajustes: dict, pontos: int = PONTOS_LUT) -> str:
     """
-    LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede). As curvas, se houver
-    (ajustes["curvas"]), entram depois dos ajustes.
+    LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede). A cor por matiz
+    (ajustes["hsl"]) e as curvas (ajustes["curvas"]), se houver, entram depois dos ajustes, nesta ordem.
     """
     linhas = ["# TakeOne: ajustes de cor", f"LUT_3D_SIZE {pontos}"]
     passo = pontos - 1
     for b in range(pontos):
         for g in range(pontos):
             for r in range(pontos):
-                saida = aplicar_curvas(aplicar_cor((r / passo, g / passo, b / passo), ajustes), ajustes.get("curvas"))
+                cor = aplicar_hsl(aplicar_cor((r / passo, g / passo, b / passo), ajustes), ajustes.get("hsl"))
+                saida = aplicar_curvas(cor, ajustes.get("curvas"))
                 linhas.append(" ".join(f"{v:.6f}" for v in saida))
     return "\n".join(linhas) + "\n"
 
@@ -135,6 +223,8 @@ def nome_da_lut(ajustes: dict) -> str:
     chave = ",".join(f"{ajustes[nome]:.6f}" for nome in sorted(AJUSTES_NEUTROS) if nome != "vinheta")
     if ajustes.get("curvas"):
         chave += repr(sorted(ajustes["curvas"].items()))
+    if not hsl_neutro(ajustes.get("hsl")):
+        chave += repr(sorted((nome, sorted(faixa.items())) for nome, faixa in ajustes["hsl"].items()))
     return f"cor_{hashlib.sha1(chave.encode()).hexdigest()[:12]}.cube"
 
 

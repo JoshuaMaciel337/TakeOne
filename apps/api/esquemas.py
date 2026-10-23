@@ -410,6 +410,15 @@ class CurvasEntrada(BaseModel):
         return self
 
 
+FaixaDeMatiz = Literal["vermelho", "laranja", "amarelo", "verde", "ciano", "azul", "roxo", "magenta"]
+
+
+class FaixaDeMatizEntrada(BaseModel):
+    matiz: float = Field(default=0, ge=-1, le=1)
+    saturacao: float = Field(default=0, ge=-1, le=1)
+    luminancia: float = Field(default=0, ge=-1, le=1)
+
+
 class CorEntrada(BaseModel):
     """Os limites são os de apps/web/src/lib/projeto/cor.ts."""
     temperatura: float = Field(default=0, ge=-1, le=1)
@@ -427,6 +436,15 @@ class CorEntrada(BaseModel):
     forca_medios: float = Field(default=0, ge=0, le=1)
     matiz_claros: float = Field(default=0, ge=0, le=360)
     forca_claros: float = Field(default=0, ge=0, le=1)
+    vibracao: float = Field(default=0, ge=-1, le=1)
+    brancos: float = Field(default=0, ge=-1, le=1)
+    pretos: float = Field(default=0, ge=-1, le=1)
+    # Níveis: o preto e o branco de entrada (o branco conta de 1 para baixo) e a gama em potência de 2
+    niveis_preto: float = Field(default=0, ge=0, le=0.45)
+    niveis_branco: float = Field(default=0, ge=0, le=0.45)
+    niveis_gama: float = Field(default=0, ge=-1, le=1)
+    # Cor por matiz (core/utils/cor.py, aplicar_hsl): só as faixas mexidas
+    hsl: dict[FaixaDeMatiz, FaixaDeMatizEntrada] | None = None
     filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama", "cinema"] | None = None
     intensidade: float = Field(default=1, ge=0, le=2)
     curvas: CurvasEntrada | None = None

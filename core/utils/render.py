@@ -27,7 +27,7 @@ from core.config import FFMPEG
 from core.modelos.midia import chave_da_estabilizacao, chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cantos import tem_cantos
-from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, nome_da_lut, somar_ajustes
+from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, hsl_neutro, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
     BRILHO_SIGMA,
     GRAO_LINHAS,
@@ -839,11 +839,13 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         # O efeito (VHS) soma aos ajustes de cor do clipe
         ajustes = somar_ajustes(ajustes_efetivos(clipe.get("cor")), ajustes_do_efeito(clipe))
         curvas = (clipe.get("cor") or {}).get("curvas")
+        hsl = (clipe.get("cor") or {}).get("hsl")
         linhas_vhs = linhas_do_efeito(clipe)
         lut = vinheta = None
-        if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas):
-            # As curvas entram na mesma LUT, depois dos ajustes
-            com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas}
+        if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas) or not hsl_neutro(hsl):
+            # A cor por matiz e as curvas entram na mesma LUT, depois dos ajustes
+            com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas,
+                          "hsl": None if hsl_neutro(hsl) else hsl}
             lut = f"{pasta}/{nome_da_lut(com_curvas)}"
             auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
         if ajustes["vinheta"] > 0 or linhas_vhs > 0:
