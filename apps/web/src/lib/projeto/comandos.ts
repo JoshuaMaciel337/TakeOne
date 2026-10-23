@@ -20,6 +20,7 @@ import {
   apararClipe,
   apararEmOndulacao,
   elevarTrecho,
+  inserirTrecho,
   esticarClipe,
   type AcaoDeKeyframe,
   type Contexto,
@@ -143,6 +144,7 @@ export type Comando =
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
   | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
   | { comando: "linha.elevar"; parametros: { intervalo: Intervalo } }
+  | { comando: "clipe.inserirTrecho"; parametros: { midiaId: string; de: Tick; ate: Tick; tempo: Tick; modo: "inserir" | "sobrescrever" } }
   | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
@@ -236,6 +238,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.apagar": "apagar",
   "linha.removerIntervalos": "remover trechos",
   "linha.elevar": "elevar o trecho",
+  "clipe.inserirTrecho": "pôr o trecho da fonte",
   "linha.zoomNosTrechos": "dar zoom nos destaques",
   "clipe.duplicar": "duplicar",
   "clipe.separarSom": "separar o som",
@@ -356,6 +359,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
     case "linha.elevar":
       return { projeto: elevarTrecho(projeto, ctx, parametros.intervalo) };
+    case "clipe.inserirTrecho": {
+      const resultado = inserirTrecho(projeto, ctx, parametros.midiaId, parametros.de, parametros.ate, parametros.tempo, parametros.modo);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
     case "clipe.apagar":
       return { projeto: apagarClipes(projeto, parametros.clipeIds, parametros.fecharEspaco), selecao: [] };
     case "clipe.duplicar": {

@@ -45,6 +45,7 @@ import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
 import { JanelaSequencia } from "./JanelaSequencia";
 import { MedidoresDeAudio } from "./MedidoresDeAudio";
+import { duracaoNaFonte, MonitorDeOrigem } from "./MonitorDeOrigem";
 import { type AcoesDoVideo, AREAS_DO_VIDEO, type IdPainelDoVideo, menusDoVideo, PAINEIS_DO_VIDEO } from "./menusDoVideo";
 import { ConteudoDaFerramenta, PainelConteudo } from "./PainelConteudo";
 import { PainelComRolagem, PainelEfeitosDoVideo, PainelGraficosEssenciais, PainelSomEssencial, PainelTextoDoVideo } from "./PaineisDoVideo";
@@ -66,7 +67,7 @@ const METADE_DE_CIMA = { padrao: 470, minimo: 240, maximo: 900 };
 /** A área "Edição" dos editores de vídeo profissionais (ADR 0002). */
 const AREAS: Record<string, EstadoDaArea> = {
   edicao: {
-    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "cor", "metadados"], ativa: "controles" }],
+    cimaEsquerda: [{ id: "g-controles", abas: ["fonte", "controles", "cor", "metadados"], ativa: "controles" }],
     cimaDireita: [{ id: "g-propriedades", abas: ["propriedades", "graficos", "texto"], ativa: "propriedades" }],
     baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "marcadores", "historico"], ativa: "projeto" }],
   },
@@ -251,6 +252,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const importarRef = useRef<HTMLInputElement>(null);
   const [ferramentaDaLinha, setFerramentaDaLinha] = useState<IdFerramentaDaLinha>("selecao");
+  // A mídia aberta no monitor de origem (duplo clique no Projeto) e a entrada e a saída dela
+  const [fonte, setFonte] = useState<{ midiaId: string; entrada: Tick | null; saida: Tick | null } | null>(null);
   const [entradaSaida, setEntradaSaida] = useState<{ entrada: Tick | null; saida: Tick | null }>({ entrada: null, saida: null });
   // O painel da ferramenta do endereço fica à vista (depois de ler a área guardada no navegador)
   const abrirDoEndereco = useEffectEvent(() => {
@@ -483,6 +486,20 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     }
   }
 
+  /** Inserir (,) e sobrescrever (.): o trecho da Fonte entra no cursor, e o cursor vai para o fim dele. */
+  function porDaFonte(modo: "inserir" | "sobrescrever") {
+    const midia = fonte ? midias.get(fonte.midiaId) : undefined;
+    if (!fonte || !midia) {
+      mostrarAviso("Abra uma mídia na Fonte antes: dois cliques nela, no painel Projeto.");
+      return;
+    }
+    const de = fonte.entrada ?? 0;
+    const ate = fonte.saida ?? duracaoNaFonte(midia);
+    const resultado = executar({ comando: "clipe.inserirTrecho", parametros: { midiaId: midia.id, de, ate, tempo, modo } });
+    const novo = resultado?.selecao?.[0] ? acharClipe(resultado.projeto, resultado.selecao[0]) : null;
+    if (novo) buscar(fimDoClipe(novo.clipe));
+  }
+
   const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
     const alvo = evento.target as HTMLElement | null;
     const ctrl = evento.ctrlKey || evento.metaKey;
@@ -510,7 +527,9 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if ((tecla === "i" || tecla === "o") && !ctrl && !evento.altKey) {
       if (evento.shiftKey) irParaEntradaSaida(tecla === "i" ? "entrada" : "saida");
       else marcarEntradaSaida(tecla === "i" ? "entrada" : "saida");
-    } else if (evento.key === ";" && !ctrl) tirarTrecho(false);
+    } else if (evento.key === "," && !ctrl && fonte) porDaFonte("inserir");
+    else if (evento.key === "." && !ctrl && fonte) porDaFonte("sobrescrever");
+    else if (evento.key === ";" && !ctrl) tirarTrecho(false);
     else if (evento.key === "'" && !ctrl) tirarTrecho(true);
     else if (tecla === "k" && !ctrl) {
       if (reproducao.tocando) alternar();
@@ -603,6 +622,12 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       setSelecao([]);
     },
     aoAdicionarMidia: adicionarNoCursor,
+    aoAbrirMidia: telaLarga
+      ? (id: string) => {
+          setFonte({ midiaId: id, entrada: null, saida: null });
+          abrirPainel("fonte");
+        }
+      : undefined,
     aoAdicionarTexto: (texto: Texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } }),
     aoPedirAnimacao: pedirAnimacao,
     gravacao: {
@@ -790,6 +815,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       elevar: () => tirarTrecho(false),
       extrair: () => tirarTrecho(true),
       transicaoPadrao,
+      temFonte: Boolean(fonte),
+      porDaFonte,
       selecionarTudo: () => setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id))),
       desmarcarTudo: () => setSelecao([]),
       atalhos: () => setVendoAtalhos(true),
@@ -842,6 +869,20 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         ),
       },
       cor: { nome: PAINEIS_DO_VIDEO.cor, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["cor"]} className="h-full" /> },
+      fonte: {
+        nome: PAINEIS_DO_VIDEO.fonte,
+        conteudo: (
+          <MonitorDeOrigem
+            key={fonte?.midiaId ?? "vazia"}
+            midia={fonte ? (midias.get(fonte.midiaId) ?? null) : null}
+            taxa={projeto.taxa}
+            entrada={fonte?.entrada ?? null}
+            saida={fonte?.saida ?? null}
+            aoMarcar={(qual, t) => setFonte((atual) => (atual ? { ...atual, [qual]: t } : atual))}
+            aoPor={porDaFonte}
+          />
+        ),
+      },
       metadados: { nome: PAINEIS_DO_VIDEO.metadados, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} somenteAbas={["info"]} className="h-full" /> },
       propriedades: { nome: PAINEIS_DO_VIDEO.propriedades, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} pedidoDeAba={pedidoDeAba} className="h-full" /> },
       graficos: { nome: PAINEIS_DO_VIDEO.graficos, conteudo: <PainelGraficosEssenciais conteudo={conteudo} pedido={pedidoGraficos} /> },

@@ -14,6 +14,8 @@ type Props = {
   aoExcluir?: (midia: Midia) => void;
   /** No editor: o botão "+" e o arrastar levam a mídia para a linha do tempo. */
   aoAdicionar?: (midia: Midia) => void;
+  /** Duplo clique: abre a mídia no monitor de origem (a Fonte). */
+  aoAbrir?: (midia: Midia) => void;
 };
 
 function situacao(midia: Midia): string {
@@ -27,7 +29,7 @@ function situacao(midia: Midia): string {
 }
 
 /** Miniatura com nome e duração. A capa aparece quando a ingestão termina. */
-export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir, aoAdicionar }: Props) {
+export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir, aoAdicionar, aoAbrir }: Props) {
   const temCapa = midia.arquivos.includes("capa.jpg");
   const pronta = midia.status === "pronta";
   const adicionavel = Boolean(aoAdicionar) && pronta;
@@ -46,6 +48,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
       <button
         type="button"
         onClick={() => aoSelecionar?.(midia)}
+        onDoubleClick={aoAbrir ? () => aoAbrir(midia) : undefined}
         className="block w-full text-left focus-visible:outline-2 focus-visible:outline-destaque"
         title={midia.nome}
         aria-pressed={selecionada}

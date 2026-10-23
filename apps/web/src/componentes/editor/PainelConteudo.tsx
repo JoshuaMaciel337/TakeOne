@@ -43,6 +43,8 @@ type Props = {
   midiaSelecionadaId: string | null;
   aoSelecionarMidia: (midiaId: string | null) => void;
   aoAdicionarMidia: (midiaId: string) => void;
+  /** Duplo clique numa mídia: abre na Fonte (só no layout profissional). */
+  aoAbrirMidia?: (midiaId: string) => void;
   aoAdicionarTexto: (texto: Texto) => void;
   /** Uma animação foi pedida: entra no cursor (ou no instante dado) quando ficar pronta. */
   aoPedirAnimacao: (midia: Midia, inicio?: Tick) => void;
@@ -69,10 +71,11 @@ function PainelMidia({
   midiaSelecionadaId,
   aoSelecionarMidia,
   aoAdicionarMidia,
+  aoAbrirMidia,
   proporcao,
   aoExecutar,
   aoAvisar,
-}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia"> & {
+}: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia" | "aoAbrirMidia"> & {
   proporcao: string;
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
@@ -102,6 +105,7 @@ function PainelMidia({
                 selecionada={midia.id === midiaSelecionadaId}
                 aoSelecionar={(alvo) => aoSelecionarMidia(alvo.id === midiaSelecionadaId ? null : alvo.id)}
                 aoAdicionar={(alvo) => aoAdicionarMidia(alvo.id)}
+                aoAbrir={aoAbrirMidia ? (alvo) => aoAbrirMidia(alvo.id) : undefined}
                 aoExcluir={(alvo) => {
                   if (!window.confirm(`Excluir "${alvo.nome}"? O arquivo sai da biblioteca.`)) return;
                   if (alvo.id === midiaSelecionadaId) aoSelecionarMidia(null);
@@ -158,6 +162,7 @@ export function ConteudoDaFerramenta({
   midiaSelecionadaId,
   aoSelecionarMidia,
   aoAdicionarMidia,
+  aoAbrirMidia,
   aoAdicionarTexto,
   aoPedirAnimacao,
   gravacao,
@@ -176,6 +181,7 @@ export function ConteudoDaFerramenta({
         midiaSelecionadaId={midiaSelecionadaId}
         aoSelecionarMidia={aoSelecionarMidia}
         aoAdicionarMidia={aoAdicionarMidia}
+        aoAbrirMidia={aoAbrirMidia}
         proporcao={legendas.projeto.proporcao}
         aoExecutar={legendas.aoExecutar}
         aoAvisar={legendas.aoAvisar}

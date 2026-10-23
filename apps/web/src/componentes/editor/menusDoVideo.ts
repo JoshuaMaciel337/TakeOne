@@ -7,6 +7,7 @@ export const PAINEIS_DO_VIDEO = {
   controles: "Controles de efeito",
   cor: "Cor",
   efeitos: "Efeitos",
+  fonte: "Fonte",
   graficos: "Gráficos essenciais",
   historico: "Histórico",
   marca: "Kit de marca",
@@ -55,6 +56,8 @@ export type AcoesDoVideo = {
   elevar: () => void;
   extrair: () => void;
   transicaoPadrao: (doSom: boolean) => void;
+  temFonte: boolean;
+  porDaFonte: (modo: "inserir" | "sobrescrever") => void;
   selecionarTudo: () => void;
   desmarcarTudo: () => void;
   atalhos: () => void;
@@ -125,6 +128,9 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
       nome: "Clipe",
       itens: [
         { nome: "Velocidade/duração…", atalho: "Ctrl+R", desativado: semSelecao, aoEscolher: a.velocidade },
+        "-",
+        { nome: "Inserir", atalho: ",", desativado: !a.temFonte, aoEscolher: () => a.porDaFonte("inserir"), titulo: "O trecho da Fonte entra no cursor e abre o espaço" },
+        { nome: "Sobrescrever", atalho: ".", desativado: !a.temFonte, aoEscolher: () => a.porDaFonte("sobrescrever"), titulo: "O trecho da Fonte entra no cursor por cima do que estava" },
         "-",
         { nome: "Opções de vídeo", itens: [{ nome: "Inserir segmento de quadro congelado", desativado: !a.podeCongelar, aoEscolher: a.congelar }] },
         { nome: "Opções de áudio", itens: [{ nome: "Separar o som", desativado: !a.podeSepararSom, aoEscolher: a.separarSom }] },

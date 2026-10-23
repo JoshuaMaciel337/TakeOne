@@ -547,7 +547,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
   - [x] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
   - [x] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
-  - [ ] 12.6 Monitor de origem, com Inserir e Sobrescrever.
+  - [x] 12.6 Monitor de origem, com Inserir e Sobrescrever.
   - [ ] 12.7 As outras áreas de trabalho e os ajustes finais.
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 

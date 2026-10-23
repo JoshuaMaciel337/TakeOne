@@ -328,6 +328,82 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
   return { projeto: finalizar(resultado), clipeId: clipe.id };
 }
 
+/**
+ * O monitor de origem (a Fonte dos editores profissionais): o trecho [de, ate) da mídia entra no cursor. Inserir (,)
+ * abre o espaço em todas as faixas destravadas (o que atravessa o cursor é dividido e o que vem depois anda);
+ * sobrescrever (.) põe o trecho por cima do que estava na faixa dele, sem mexer no resto. Vídeos e imagens vão para a
+ * principal; o que é só som, para a primeira faixa de áudio.
+ */
+export function inserirTrecho(
+  projeto: Projeto,
+  ctx: Contexto,
+  midiaId: string,
+  de: Tick,
+  ate: Tick,
+  tempo: Tick,
+  modo: "inserir" | "sobrescrever",
+): { projeto: Projeto; clipeId: string } {
+  const info = ctx.midia(midiaId);
+  if (!info) throw new ErroEdicao("Esta mídia ainda não está pronta.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const entrada = info.imagem ? 0 : Math.min(Math.max(0, quadroMaisProximo(projeto.taxa, de)), Number.isFinite(info.duracao) ? info.duracao : Number.POSITIVE_INFINITY);
+  const fim = info.imagem || !Number.isFinite(info.duracao) ? ate : Math.min(ate, info.duracao);
+  const duracao = ajustarAoQuadro(projeto.taxa, fim - (info.imagem ? de : entrada));
+  if (duracao < quadro) throw new ErroEdicao("O trecho entre a entrada e a saída da fonte é curto demais.");
+  const t = Math.min(quadroMaisProximo(projeto.taxa, Math.max(0, tempo)), projeto.duracao);
+  const clipe: Clipe = {
+    id: ctx.novoId(),
+    midia_id: midiaId,
+    inicio: t,
+    duracao,
+    entrada,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: TRANSFORMACAO_PADRAO,
+    recorte: RECORTE_PADRAO,
+    ...(info.transparente && !info.imagem ? { remover_fundo: true } : {}),
+  };
+  const naPrincipal = Boolean(info.video && !info.transparente);
+  const atravessa = (faixa: Faixa, instante: Tick) => faixa.clipes.filter((item) => item.inicio < instante && instante < fimDoClipe(item)).map((item) => item.id);
+  let resultado = projeto;
+
+  if (modo === "inserir") {
+    const livres = resultado.faixas.filter((faixa) => !faixa.travada);
+    const cortados = livres.flatMap((faixa) => atravessa(faixa, t));
+    if (cortados.length) resultado = dividirClipes(resultado, ctx, t, cortados).projeto;
+    resultado = { ...resultado, faixas: resultado.faixas.map((faixa) => (faixa.travada ? faixa : { ...faixa, clipes: faixa.clipes.map((item) => (item.inicio >= t ? { ...item, inicio: item.inicio + duracao } : item)) })) };
+  } else {
+    // Sobrescrever: a faixa de destino perde o que estava entre o cursor e o fim do trecho
+    const destino = naPrincipal ? resultado.faixas.find((faixa) => faixa.tipo === "principal") : resultado.faixas.find((faixa) => faixa.tipo === "audio" && !faixa.travada);
+    if (destino) {
+      exigirDestravada(destino);
+      for (const instante of [t, t + duracao]) {
+        const faixaAgora = resultado.faixas.find((faixa) => faixa.id === destino.id)!;
+        const ids = atravessa(faixaAgora, instante);
+        if (ids.length) resultado = dividirClipes(resultado, ctx, instante, ids).projeto;
+      }
+      const faixaAgora = resultado.faixas.find((faixa) => faixa.id === destino.id)!;
+      const restantes = faixaAgora.clipes.filter((item) => item.inicio < t || item.inicio >= t + duracao);
+      resultado = trocarFaixa(resultado, { ...faixaAgora, clipes: restantes });
+    }
+  }
+
+  if (naPrincipal) {
+    const principal = resultado.faixas.find((faixa) => faixa.tipo === "principal");
+    if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");
+    exigirDestravada(principal);
+    const antes = principal.clipes.filter((item) => item.inicio < t);
+    const depois = principal.clipes.filter((item) => item.inicio >= t);
+    resultado = trocarFaixa(resultado, compactar({ ...principal, clipes: [...antes, clipe, ...depois] }));
+  } else {
+    const audio = resultado.faixas.find((faixa) => faixa.tipo === (info.video ? "video" : "audio") && !faixa.travada);
+    resultado = colocarLivre(resultado, ctx, info.video ? "video" : "audio", clipe, audio?.id);
+  }
+  return { projeto: finalizar(resultado), clipeId: clipe.id };
+}
+
 /** Um trecho da montagem automática (lib/projeto/montagem.ts), em ticks. */
 export type TrechoNaLinha = { midiaId: string; entrada: Tick; duracao: Tick };
 

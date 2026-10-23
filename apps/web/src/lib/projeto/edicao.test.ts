@@ -21,6 +21,7 @@ import {
   apararClipe,
   apararEmOndulacao,
   elevarTrecho,
+  inserirTrecho,
   esticarClipe,
   aplicarEfeito,
   colarAjustes,
@@ -1320,4 +1321,30 @@ test("ondulação, esticar a velocidade e elevar, como as ferramentas dos editor
   assert.deepEqual(principal(projeto).map((c) => [c.inicio, c.duracao]), antes);
   assert.throws(() => elevarTrecho(projeto, ctx, { inicio: 2 * S, fim: 3 * S }), ErroEdicao);
   conferir(projeto);
+});
+
+test("fonte: inserir abre espaço em todas as faixas; sobrescrever troca só o trecho da faixa de destino", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "musica", { inicio: 0 }));
+  const somDe = (p: Projeto) => p.faixas.find((f) => f.tipo === "audio")!.clipes.map((c) => [c.inicio / S, c.duracao / S, c.entrada / S]);
+  const principalDe = (p: Projeto) => principal(p).map((c) => [c.midia_id, c.inicio / S, c.duracao / S, c.entrada / S]);
+
+  // Inserir 2 s do vídeo de 4 s (de 1 s a 3 s) em 5 s
+  projeto = inserirTrecho(projeto, ctx, "video4", 1 * S, 3 * S, 5 * S, "inserir").projeto;
+  assert.deepEqual(principalDe(projeto), [["video10", 0, 5, 0], ["video4", 5, 2, 1], ["video10", 7, 5, 5]]);
+  assert.deepEqual(somDe(projeto), [[0, 5, 0], [7, 25, 5]], "a música abriu o mesmo espaço");
+  conferir(projeto);
+
+  // Sobrescrever 2 s em 1 s: só a principal muda
+  projeto = inserirTrecho(projeto, ctx, "video4", 0, 2 * S, 1 * S, "sobrescrever").projeto;
+  assert.deepEqual(principalDe(projeto), [["video10", 0, 1, 0], ["video4", 1, 2, 0], ["video10", 3, 2, 3], ["video4", 5, 2, 1], ["video10", 7, 5, 5]]);
+  assert.deepEqual(somDe(projeto), [[0, 5, 0], [7, 25, 5]]);
+  conferir(projeto);
+
+  // Só som vai para a faixa de áudio, por cima do que estava
+  projeto = inserirTrecho(projeto, ctx, "musica", 10 * S, 11 * S, 2 * S, "sobrescrever").projeto;
+  assert.deepEqual(somDe(projeto), [[0, 2, 0], [2, 1, 10], [3, 2, 3], [7, 25, 5]]);
+  conferir(projeto);
+  assert.throws(() => inserirTrecho(projeto, ctx, "video4", 2 * S, 2 * S, 0, "inserir"), ErroEdicao);
 });
