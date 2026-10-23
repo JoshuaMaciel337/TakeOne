@@ -128,9 +128,28 @@ class MidiaSaida(BaseModel):
     elemento: dict | None = None
     # Animação em HTML: {modelo, campos, proporcao, duracao}
     animacao: dict | None = None
+    # Camada de pixels do editor de imagem: {largura, altura, ultima} (a última versão enviada)
+    camada_pixels: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
+
+
+class CamadaPixelsEntrada(BaseModel):
+    largura: int = Field(ge=1, le=8192)
+    altura: int = Field(ge=1, le=8192)
+    nome: str | None = Field(default=None, min_length=1, max_length=120)
+
+    @model_validator(mode="after")
+    def _area(self):
+        if self.largura * self.altura > 36_000_000:
+            raise ValueError("A camada passa de 36 milhões de pixels.")
+        return self
+
+
+class VersaoDePixelsSaida(BaseModel):
+    # Só na última parte do envio: o número da versão nova
+    versao: int | None = None
 
 
 class MidiaAtualizarEntrada(BaseModel):
@@ -632,6 +651,10 @@ class FluidoEntrada(BaseModel):
         return self
 
 
+class PixelsDoClipe(BaseModel):
+    versao: int = Field(ge=0, le=9_999_999)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -688,6 +711,8 @@ class ClipeEntrada(BaseModel):
     # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
     pasta: bool = False
     preenchimento: float | None = Field(default=None, ge=0, le=1)
+    # Camada de pixels: a versão do PNG da mídia que o clipe mostra (0 é a camada vazia)
+    pixels: PixelsDoClipe | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)

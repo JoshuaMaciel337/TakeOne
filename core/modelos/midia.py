@@ -59,6 +59,12 @@ _ARQUIVO_FLUIDO_PROXY = re.compile(r"fluido_\d{1,8}_\d{1,8}_proxy\.mp4")
 _ARQUIVO_DA_SELECAO = re.compile(r"selecao_[0-9a-f]{12}\.png")
 # A máscara de um objeto seguido e escondido (tarefa "esconder_objeto"), pelo id do rastreio
 _ARQUIVO_DO_OBJETO = re.compile(r"objeto_[0-9a-f]{24}\.mp4")
+# As versões de uma camada de pixels do editor de imagem (api/rotas/pixels.py)
+_ARQUIVO_DA_VERSAO = re.compile(r"v\d{1,7}\.png")
+
+
+def arquivo_da_versao(versao: int) -> str:
+    return f"v{versao}.png"
 
 
 def arquivo_da_mascara_do_objeto(rastreio_id: str) -> str:
@@ -109,7 +115,7 @@ def arquivo_publico(nome: str) -> bool:
     return (nome in ARQUIVOS_PUBLICOS or bool(_ARQUIVO_DO_TOM.fullmatch(nome))
             or bool(_ARQUIVO_FLUIDO_PROXY.fullmatch(nome))
             or bool(_ARQUIVO_ESTAVEL_PROXY.fullmatch(nome)) or bool(_ARQUIVO_DA_SELECAO.fullmatch(nome))
-            or bool(_ARQUIVO_DO_OBJETO.fullmatch(nome)))
+            or bool(_ARQUIVO_DO_OBJETO.fullmatch(nome)) or bool(_ARQUIVO_DA_VERSAO.fullmatch(nome)))
 
 
 def extensao_aceita(nome_arquivo: str) -> str | None:

@@ -30,6 +30,7 @@ from api.rotas import (
     midias,
     modelos,
     objetos,
+    pixels,
     projetos,
     quadros,
     sistema,
@@ -151,4 +152,5 @@ app.include_router(foto_ia.router)
 app.include_router(quadros.router)
 app.include_router(intercambio.router)
 app.include_router(luts.router)
+app.include_router(pixels.router)
 app.include_router(chaves.router)

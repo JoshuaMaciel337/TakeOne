@@ -151,9 +151,10 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
         clipes = faixa.get("clipes", [])
         da_imagem = any(faixa.get(campo) for campo in CAMPOS_DA_IMAGEM)
         if not imagem:
-            if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None
+            if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None or c.get("pixels")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
-                return "Grupos, recortes, travas parciais e os modos de mesclagem novos só existem no editor de imagem."
+                return ("Grupos, recortes, travas parciais, camadas de pixels e os modos de mesclagem novos só existem"
+                        " no editor de imagem.")
             continue
         clipe = clipes[0] if clipes else None
         if clipe and clipe.get("pasta") and (faixa["tipo"] != FAIXA_VIDEO or clipe.get("midia_id") or clipe.get("texto")
