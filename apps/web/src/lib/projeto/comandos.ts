@@ -61,6 +61,7 @@ import {
   limparImagem,
   mudarVelocidade,
   curvarVelocidade,
+  ajustarMusicaAoVideo,
   devolverSom,
   duplicarClipes,
   moverClipe,
@@ -169,6 +170,7 @@ export type Comando =
   | { comando: "clipe.colarAjustes"; parametros: { origem: Clipe; clipeIds: string[]; grupos: GrupoDeAjustes[] } }
   | { comando: "legenda.substituir"; parametros: { faixaId: string; busca: string; troca: string } }
   | { comando: "linha.cortarNoRitmo"; parametros: { batidas: Tick[] } }
+  | { comando: "musica.ajustar"; parametros: { clipeId: string; fortes: number[] } }
   | { comando: "modelo.aplicar"; parametros: { plano: PlanoDoModelo } }
   | { comando: "clipe.trocarMidia"; parametros: { clipeIds: string[]; midiaId: string } }
   | { comando: "marca.logo"; parametros: { midiaId: string; transformacao: Transformacao } }
@@ -242,6 +244,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.colarAjustes": "colar ajustes",
   "legenda.substituir": "substituir nas legendas",
   "linha.cortarNoRitmo": "cortar no ritmo",
+  "musica.ajustar": "ajustar a música ao vídeo",
   "linha.montar": "montar com vários clipes",
   "marca.logo": "pôr o logo",
   "clipe.trocarMidia": "mudar a forma",
@@ -409,6 +412,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "legenda.substituir":
       return { projeto: substituirNasLegendas(projeto, parametros.faixaId, parametros.busca, parametros.troca).projeto };
+    case "musica.ajustar": {
+      const resultado = ajustarMusicaAoVideo(projeto, ctx, parametros.clipeId, parametros.fortes);
+      return { projeto: resultado.projeto, selecao: resultado.novos };
+    }
     case "linha.cortarNoRitmo":
       return { projeto: cortarNoRitmo(projeto, ctx, parametros.batidas) };
     case "modelo.aplicar":

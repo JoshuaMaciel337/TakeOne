@@ -1211,7 +1211,7 @@ function AbaAudio({
         <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Ritmo">
-        <NoRitmo clipe={clipe} faixa={faixas.find((item) => item.tipo === "principal") ?? faixa} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+        <NoRitmo clipe={clipe} faixa={faixas.find((item) => item.tipo === "principal") ?? faixa} faixaDoClipe={faixa} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Voz">
         <ControleNumerico

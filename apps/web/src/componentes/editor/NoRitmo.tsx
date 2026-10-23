@@ -1,6 +1,6 @@
 "use client";
 
-import { Drum, LoaderCircle, Scissors, Zap } from "lucide-react";
+import { Drum, LoaderCircle, MoveHorizontal, Scissors, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { buscarBatidas, useBatidas } from "@/lib/batidas";
@@ -10,7 +10,10 @@ import { aCada, batidasNaLinha, CADENCIAS } from "@/lib/projeto/ritmo";
 
 type Props = {
   clipe: Clipe;
+  /** A faixa principal, que o "Cortar no ritmo" corta. */
   faixa: Faixa;
+  /** A faixa do próprio clipe: numa faixa de áudio, aparece o "Ajustar à duração do vídeo". */
+  faixaDoClipe: Faixa;
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
 };
@@ -21,7 +24,7 @@ const NOMES_DAS_CADENCIAS: Record<number, string> = { 1: "toda batida", 2: "a ca
  * Ritmo, na aba Áudio de um clipe com som (a música): acha as batidas (worker de CPU), corta a faixa
  * principal nelas e põe um pulso de zoom nos tempos fortes. As marcas aparecem na linha do tempo.
  */
-export function NoRitmo({ clipe, faixa, aoExecutar, aoAvisar }: Props) {
+export function NoRitmo({ clipe, faixa, faixaDoClipe, aoExecutar, aoAvisar }: Props) {
   const midiaId = clipe.midia_id;
   const batidas = useBatidas(midiaId);
   const [cadencia, setCadencia] = useState<number>(2);
@@ -61,7 +64,9 @@ export function NoRitmo({ clipe, faixa, aoExecutar, aoAvisar }: Props) {
           {andamento ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Drum className="size-4" aria-hidden />}
           {andamento ?? "Achar as batidas"}
         </button>
-        <p className="text-[11px] text-suave">Acha o ritmo deste som para cortar os vídeos da faixa principal e animar a imagem nas batidas.</p>
+        <p className="text-[11px] text-suave">
+          Acha o ritmo deste som para cortar os vídeos da faixa principal e animar a imagem nas batidas{faixaDoClipe.tipo === "audio" ? ", e para ajustar a música à duração do vídeo" : ""}.
+        </p>
       </div>
     );
   }
@@ -107,6 +112,25 @@ export function NoRitmo({ clipe, faixa, aoExecutar, aoAvisar }: Props) {
         </button>
       </div>
       <p className="text-[11px] text-suave">Cortar no ritmo faz cada vídeo da principal acabar numa batida. Pulsar dá um zoom curto nos tempos fortes.</p>
+      {faixaDoClipe.tipo === "audio" ? (
+        <>
+          <button
+            type="button"
+            className="botao-secundario px-3 py-1.5 text-xs"
+            disabled={faixaDoClipe.travada}
+            onClick={() =>
+              executar(
+                { comando: "musica.ajustar", parametros: { clipeId: clipe.id, fortes: batidas.fortes } },
+                "A música agora acaba junto com o vídeo, com os cortes nos tempos fortes. Ctrl+Z desfaz.",
+              )
+            }
+          >
+            <MoveHorizontal className="size-4" aria-hidden />
+            Ajustar à duração do vídeo
+          </button>
+          <p className="text-[11px] text-suave">Tira ou repete compassos do meio para a música acabar no final dela, junto com o vídeo.</p>
+        </>
+      ) : null}
     </div>
   );
 }

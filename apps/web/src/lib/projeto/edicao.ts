@@ -73,6 +73,7 @@ import {
   type Virar,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import { planoDaMusica } from "./ajustarMusica.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
 import { type Efeito, EFEITOS, SO_EM_MIDIA } from "./efeitos.ts";
 import { type CurvaDoFade, type EfeitosVoz, efeitosAtivos, limitarEfeitos, TOM_LIMITE } from "./som.ts";
@@ -1676,6 +1677,68 @@ function deslocarTempos(texto: Texto | null | undefined, delta: Tick): Texto | n
 function deslocarAbaixamento(abaixamento: Abaixamento | null | undefined, delta: Tick): Abaixamento | null | undefined {
   if (!abaixamento || delta === 0) return abaixamento;
   return { ...abaixamento, pontos: abaixamento.pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta })) };
+}
+
+/** As junções da música ajustada: um fade curtinho dos dois lados, para o corte não estalar. */
+export const JUNCAO_DA_MUSICA = Math.round(0.005 * TICKS_POR_SEGUNDO);
+/** O fade do fim quando a música é cortada antes do final dela. */
+export const FADE_DO_CORTE_DA_MUSICA = 2 * TICKS_POR_SEGUNDO;
+
+/**
+ * Ajusta a música (um clipe de faixa de áudio) para acabar junto com o vídeo (o fim da principal): tira ou
+ * repete compassos do meio, cortando nos tempos fortes (`fortes`, segundos da mídia), e a música vai do
+ * trecho em que começa até o fim dela (lib/projeto/ajustarMusica.ts). Os pedaços ficam encostados, na mesma
+ * faixa se couberem; o volume, os efeitos e o abaixar na fala seguem no mesmo instante da linha do tempo.
+ */
+export function ajustarMusicaAoVideo(projeto: Projeto, ctx: Contexto, clipeId: string, fortes: number[]): { projeto: Projeto; novos: string[] } {
+  const { faixa, clipe } = acharOuErro(projeto, clipeId);
+  if (faixa.tipo !== "audio" || !clipe.midia_id) throw new ErroEdicao("Escolha uma música numa faixa de áudio.");
+  exigirDestravada(faixa);
+  if (clipe.velocidade !== 1 || clipe.curva_velocidade) throw new ErroEdicao("Volte a velocidade da música a 1× para ajustar.");
+  const midia = ctx.midia(clipe.midia_id);
+  if (!midia) throw new ErroEdicao("A mídia desta música não está pronta.");
+  const principal = projeto.faixas.find((item) => item.tipo === "principal");
+  const fimDoVideo = Math.max(0, ...(principal?.clipes.map(fimDoClipe) ?? []));
+  const alvo = fimDoVideo - clipe.inicio;
+  if (alvo <= 0) throw new ErroEdicao("A música começa depois do fim do vídeo.");
+  if (clipe.duracao === alvo && clipe.entrada + clipe.duracao === midia.duracao) throw new ErroEdicao("A música já acaba junto com o vídeo.");
+  const plano = planoDaMusica(clipe.entrada / TICKS_POR_SEGUNDO, midia.duracao / TICKS_POR_SEGUNDO, fortes, alvo / TICKS_POR_SEGUNDO);
+  if (!plano.trechos.length) throw new ErroEdicao("Não foi possível ajustar esta música.");
+  const novos: string[] = [];
+  let andado = 0;
+  const pedacos = plano.trechos.map((trecho, k): Clipe => {
+    const inicio = clipe.inicio + Math.round(andado * TICKS_POR_SEGUNDO);
+    andado += trecho.fim - trecho.inicio;
+    const duracao = clipe.inicio + Math.round(andado * TICKS_POR_SEGUNDO) - inicio;
+    const ultimo = k === plano.trechos.length - 1;
+    const fadeEntrada = Math.min(k === 0 ? clipe.fade_entrada : JUNCAO_DA_MUSICA, duracao);
+    const fadeSaida = ultimo ? (plano.sobra > 0 ? Math.max(clipe.fade_saida, FADE_DO_CORTE_DA_MUSICA) : clipe.fade_saida) : JUNCAO_DA_MUSICA;
+    const id = k === 0 ? clipe.id : ctx.novoId();
+    if (k > 0) novos.push(id);
+    return {
+      ...clipe,
+      id,
+      inicio,
+      duracao,
+      entrada: Math.round(trecho.inicio * TICKS_POR_SEGUNDO),
+      fade_entrada: fadeEntrada,
+      fade_saida: Math.min(fadeSaida, duracao - fadeEntrada),
+      keyframes: deslocarKeyframes(clipe.keyframes, inicio - clipe.inicio),
+      abaixamento: deslocarAbaixamento(clipe.abaixamento, inicio - clipe.inicio),
+    };
+  });
+  const total = andado * TICKS_POR_SEGUNDO;
+  const semAOriginal = { ...faixa, clipes: faixa.clipes.filter((item) => item.id !== clipe.id) };
+  let resultado = trocarFaixa(projeto, semAOriginal);
+  // Na mesma faixa, se couber; senão, numa faixa de áudio nova logo abaixo
+  let destino = semAOriginal;
+  if (!cabe(semAOriginal, clipe.inicio, Math.round(total))) {
+    const criada = criarFaixa(resultado, ctx, "audio", faixa.id);
+    resultado = criada.projeto;
+    destino = criada.faixa;
+  }
+  resultado = trocarFaixa(resultado, { ...destino, clipes: ordenar([...destino.clipes, ...pedacos]) });
+  return { projeto: finalizar(resultado), novos: [clipe.id, ...novos] };
 }
 
 /** Grava (ou tira, com null) a curva do abaixar na fala de um clipe com som. */

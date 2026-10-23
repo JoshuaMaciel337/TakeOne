@@ -8,6 +8,7 @@ import {
   adicionarLegenda,
   adicionarTexto,
   ajustarAudio,
+  ajustarMusicaAoVideo,
   animarClipes,
   definirTransicao,
   deslizarConteudo,
@@ -1129,4 +1130,24 @@ test("separar o som: o áudio vai para uma faixa própria com o mesmo trecho e o
   // Separar de novo não faz nada; devolver liga o som do vídeo
   assert.throws(() => separarSom(resultado.projeto, ctx, [primeiro.id]), ErroEdicao);
   assert.equal(principal(devolverSom(resultado.projeto, [primeiro.id]))[0].som_separado, false);
+});
+
+test("ajustar a música ao vídeo: pedaços encostados que acabam no fim da música, junto com o vídeo", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const musica = adicionarClipe(projeto, ctx, "musica");
+  projeto = ajustarAudio(musica.projeto, [musica.clipeId], { volume: 0.4, fade_entrada: S });
+  const fortes = Array.from({ length: 15 }, (_, i) => i * 2);
+  const { projeto: ajustado, novos } = ajustarMusicaAoVideo(projeto, ctx, musica.clipeId, fortes);
+  conferir(ajustado);
+  const pedacos = ajustado.faixas.find((f) => f.tipo === "audio")!.clipes;
+  assert.deepEqual(novos, pedacos.map((c) => c.id));
+  assert.equal(pedacos[0].id, musica.clipeId);
+  assert.equal(pedacos.reduce((soma, c) => soma + c.duracao, 0), 10 * S, "acaba junto com o vídeo");
+  const ultimo = pedacos[pedacos.length - 1];
+  assert.equal(ultimo.entrada + ultimo.duracao, 30 * S, "no fim da música");
+  assert.ok(pedacos.every((c, i) => i === 0 || c.inicio === fimDoClipe(pedacos[i - 1])), "encostados");
+  assert.ok(pedacos.every((c) => c.volume === 0.4));
+  assert.equal(pedacos[0].fade_entrada, S);
+  assert.throws(() => ajustarMusicaAoVideo(ajustado, ctx, principal(ajustado)[0].id, fortes), ErroEdicao);
 });
