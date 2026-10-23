@@ -25,6 +25,7 @@ from bson.codec_options import CodecOptions
 from bson.raw_bson import RawBSONDocument
 
 from core.config import DATABASE_NAME, PASTA_RAIZ, TZ
+from core.utils.limpeza_pixels import limpar_versoes
 from core.utils.mongo import conectar
 
 # -----------------------------------------------
@@ -92,6 +93,11 @@ def executar_backup(pasta: Path = PASTA_BACKUP, retencao_dias: int = RETENCAO_DI
         for nome in sorted(db.list_collection_names()):
             total = exportar_colecao(db, nome, destino)
             logging.info(f"  {nome}: {total} documentos")
+        # A manutenção do dia: as versões das camadas de pixels sem uso (depois do backup, que as guardou)
+        try:
+            limpar_versoes(db)
+        except Exception as e:
+            logging.error(f"Erro na limpeza das camadas de pixels: {e}")
         db.client.close()
         remover_backups_antigos(pasta, retencao_dias, momento)
         logging.info(f"Backup concluído em {destino}")

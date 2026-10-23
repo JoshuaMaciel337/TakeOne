@@ -137,7 +137,10 @@ services:
       PASTA_BACKUP: /dados/backups
       BACKUP_HORA: ${BACKUP_HORA:-03:30}
       BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
-    volumes: ["${PASTA_BACKUP_HOST:-./backups}:/dados/backups"]
+    # O armazenamento, para a limpeza diária das versões das camadas de pixels
+    volumes:
+      - "${PASTA_BACKUP_HOST:-./backups}:/dados/backups"
+      - "${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"
     depends_on:
       mongo: {condition: service_healthy}
       worker-cpu: {condition: service_started}

@@ -112,3 +112,43 @@ def test_camada_de_fundo_fica_embaixo(cliente, db_limpo):
     imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
     resposta = salvar(cliente, imagem, [fundo, faixa("a")] + imagem["faixas"][2:])
     assert resposta.status_code == 422 and "fundo" in resposta.json()["detail"]
+
+
+def test_limpeza_das_versoes_sem_uso(cliente, db_limpo):
+    import os
+    from datetime import datetime, timedelta
+
+    from bson import ObjectId
+
+    from core.config import TZ
+    from core.modelos.midia import chave_arquivo
+    from core.utils import storage
+    from core.utils.limpeza_pixels import limpar_versoes
+
+    cadastrar(cliente)
+    camada = cliente.post("/api/camadas-pixels", json={"largura": 16, "altura": 16}).json()
+    sobra = cliente.post("/api/camadas-pixels", json={"largura": 10, "altura": 10}).json()
+    for versao in (1, 2, 3):
+        assert enviar(cliente, camada["id"], png(16, 16), envio=f"{versao:016x}").json() == {"versao": versao}
+    clipe = {"id": "p1", "midia_id": camada["id"], "inicio": 0, "duracao": 5 * SEGUNDO, "entrada": 0, "velocidade": 1,
+             "volume": 1, "pixels": {"versao": 2}}
+    faixa = {"id": "fp", "tipo": "video", "oculta": False, "muda": False, "travada": False, "clipes": [clipe]}
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 16, "altura": 16}}).json()
+    assert salvar(cliente, imagem, [faixa] + imagem["faixas"]).status_code == 200
+
+    midia = db_limpo.midias.find_one({"_id": ObjectId(camada["id"])})
+    caminho = lambda nome: storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], nome))  # noqa: E731
+    # Recentes: nada sai (a folga do histórico das abas abertas)
+    assert limpar_versoes(db_limpo)["versoes"] == 0
+    antigo = (datetime.now(TZ) - timedelta(days=4)).timestamp()
+    for nome in ("v1.png", "v2.png", "v3.png"):
+        os.utime(caminho(nome), (antigo, antigo))
+    velha = datetime.now(TZ) - timedelta(days=4)
+    db_limpo.midias.update_one({"_id": ObjectId(sobra["id"])}, {"$set": {"criado_em": velha}})
+    resumo = limpar_versoes(db_limpo, apagar=False)
+    assert (resumo["versoes"], resumo["camadas"]) == (2, 1) and caminho("v1.png").exists()
+    resumo = limpar_versoes(db_limpo)
+    assert (resumo["versoes"], resumo["camadas"]) == (2, 1)
+    assert not caminho("v1.png").exists() and caminho("v2.png").exists() and not caminho("v3.png").exists()
+    assert db_limpo.midias.find_one({"_id": ObjectId(camada["id"])})["arquivos"] == ["v2.png"]
+    assert db_limpo.midias.find_one({"_id": ObjectId(sobra["id"])}) is None

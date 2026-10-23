@@ -105,7 +105,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Mesclar para baixo (Ctrl+E), Mesclar visíveis (Ctrl+Shift+E), Achatar imagem, Carimbar para baixo (Ctrl+Alt+E), Carimbar visíveis (Ctrl+Alt+Shift+E), Mesclar grupo
 - [ ] Pincel do histórico (Y) e Pincel do histórico artístico, com a fonte escolhida no Histórico
 - [ ] Instantâneos no Histórico; Alternar o último estado (Ctrl+Alt+Z)
-- [ ] Limpeza das versões antigas no servidor
+- [x] Limpeza das versões antigas no servidor
 
 ### Onda 13.3 — Seleção
 
