@@ -499,6 +499,8 @@ class ClipeEntrada(BaseModel):
     abaixamento: AbaixamentoEntrada | None = None
     # Leva a mídia a -14 LUFS pelo loudness medido na ingestão
     igualar_volume: bool = False
+    # O som foi para um clipe de áudio próprio ("Separar o som"): este clipe não soa
+    som_separado: bool = False
     # Recorta o fundo (a pessoa fica; o resto some), pela máscara gerada no worker
     remover_fundo: bool = False
     # Usa a imagem sem ruído (gerada no worker) no lugar da original

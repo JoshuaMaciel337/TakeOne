@@ -61,6 +61,7 @@ import {
   limparImagem,
   mudarVelocidade,
   curvarVelocidade,
+  devolverSom,
   duplicarClipes,
   moverClipe,
   moverCorte,
@@ -69,6 +70,7 @@ import {
   recortarClipes,
   restaurarClipes,
   transformarClipes,
+  separarSom,
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
 import {
@@ -117,6 +119,8 @@ export type Comando =
   | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
   | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
+  | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
+  | { comando: "clipe.devolverSom"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
   | { comando: "projeto.fundo"; parametros: { cor: string } }
@@ -188,6 +192,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.removerIntervalos": "remover trechos",
   "linha.zoomNosTrechos": "dar zoom nos destaques",
   "clipe.duplicar": "duplicar",
+  "clipe.separarSom": "separar o som",
+  "clipe.devolverSom": "devolver o som",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
   "projeto.fundo": "mudar o fundo",
@@ -287,6 +293,12 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = duplicarClipes(projeto, ctx, parametros.clipeIds);
       return { projeto: resultado.projeto, selecao: resultado.novos };
     }
+    case "clipe.separarSom": {
+      const resultado = separarSom(projeto, ctx, parametros.clipeIds);
+      return { projeto: resultado.projeto, selecao: resultado.novos };
+    }
+    case "clipe.devolverSom":
+      return { projeto: devolverSom(projeto, parametros.clipeIds) };
     case "faixa.alternar":
       return { projeto: alternarFaixa(projeto, parametros.faixaId, parametros.propriedade) };
     case "projeto.proporcao":

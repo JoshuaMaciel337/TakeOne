@@ -619,3 +619,12 @@ def test_keyframes_de_volume_entram_no_roteiro_no_lugar_do_volume_fixo():
     assert roteiro[-1] == "1.00 volume@ab2 volume 2.000000;"
     cadeia = next(parte for parte in plano.filtro_som.split(";") if "volume_m1" in parte)
     assert "volume=0.5" not in cadeia and "volume@ab2=volume=1" in cadeia
+
+
+def test_video_com_o_som_separado_nao_soa():
+    video = clipe("c1", "deitado", 0, 4, som_separado=True)
+    som = clipe("s1", "deitado", 0, 4)
+    plano = planejar_render(projeto([faixa("principal", [video]), faixa("audio", [som])]), MIDIAS, 720, 1280,
+                            pasta="/trabalho")
+    # Um som só: o do clipe de áudio
+    assert plano.filtro_som.count("adelay=") == 1

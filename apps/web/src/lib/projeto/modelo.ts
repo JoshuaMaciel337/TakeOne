@@ -122,6 +122,8 @@ export type Clipe = {
   tom?: number;
   /** Leva a mídia a -14 LUFS pelo loudness medido na ingestão (lib/projeto/som.ts). */
   igualar_volume?: boolean;
+  /** O som foi para um clipe de áudio próprio ("Separar o som"): este clipe não soa. */
+  som_separado?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
   abaixamento?: Abaixamento | null;
   transformacao: Transformacao;

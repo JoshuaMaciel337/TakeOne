@@ -106,7 +106,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     projeto.faixas.filter((faixa) => !faixa.muda && (faixa.tipo === "audio" || !faixa.oculta)),
     midias,
     tempo,
-  ).filter((item) => item.midia.audio);
+  ).filter((item) => item.midia.audio && !item.clipe.som_separado);
   // O texto com destaque pede também a imagem na cor do destaque, que vai por cima
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
   const camadas = camadasNoTempo(projeto, visuais, tempo, tamanho, imagensDeTexto);

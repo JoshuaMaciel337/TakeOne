@@ -960,6 +960,55 @@ export function duplicarClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
   return { projeto: finalizar(resultado), novos };
 }
 
+/**
+ * Separa o som dos vídeos escolhidos: cada um ganha um clipe de áudio com o mesmo trecho da mídia, a mesma
+ * velocidade e os mesmos ajustes de som, no mesmo instante, numa faixa de áudio onde caiba; o vídeo fica
+ * mudo (`som_separado`). Daí em diante os dois andam soltos: aparar o som além do corte do vídeo faz os
+ * cortes em J e em L. Devolve os clipes de áudio novos.
+ */
+export function separarSom(projeto: Projeto, ctx: Contexto, clipeIds: string[]): { projeto: Projeto; novos: string[] } {
+  if (!clipeIds.length) throw new ErroEdicao("Escolha um vídeo para separar o som.");
+  const novos: string[] = [];
+  let resultado = projeto;
+  for (const clipeId of clipeIds) {
+    const { faixa, clipe } = acharOuErro(resultado, clipeId);
+    const midia = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    if (faixa.tipo === "audio" || clipe.texto || clipe.som_separado || !midia?.audio || !midia.video || midia.imagem) continue;
+    exigirDestravada(faixa);
+    const som: Clipe = {
+      id: ctx.novoId(),
+      midia_id: clipe.midia_id,
+      inicio: clipe.inicio,
+      duracao: clipe.duracao,
+      entrada: clipe.entrada,
+      velocidade: clipe.velocidade,
+      curva_velocidade: clipe.curva_velocidade,
+      volume: clipe.volume,
+      fade_entrada: clipe.fade_entrada,
+      fade_saida: clipe.fade_saida,
+      curva_fade: clipe.curva_fade,
+      voz_limpa: clipe.voz_limpa,
+      efeitos_voz: clipe.efeitos_voz,
+      tom: clipe.tom,
+      igualar_volume: clipe.igualar_volume,
+      abaixamento: clipe.abaixamento,
+      keyframes: clipe.keyframes?.volume?.length ? { volume: clipe.keyframes.volume } : null,
+      transformacao: TRANSFORMACAO_PADRAO,
+      recorte: RECORTE_PADRAO,
+    };
+    resultado = trocarFaixa(resultado, { ...faixa, clipes: faixa.clipes.map((item) => (item.id === clipeId ? { ...item, som_separado: true } : item)) });
+    resultado = colocarLivre(resultado, ctx, "audio", som);
+    novos.push(som.id);
+  }
+  if (!novos.length) throw new ErroEdicao("Escolha um vídeo com som que ainda não foi separado.");
+  return { projeto: finalizar(resultado), novos };
+}
+
+/** Devolve o som ao vídeo (o clipe de áudio separado, se ainda existe, continua: apague-o para não dobrar o som). */
+export function devolverSom(projeto: Projeto, clipeIds: string[]): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, som_separado: false }));
+}
+
 /** Um clipe copiado (Ctrl+C), com o tipo e a faixa de onde veio. */
 export type ClipeCopiado = { clipe: Clipe; tipo: TipoFaixa; faixaId: string };
 

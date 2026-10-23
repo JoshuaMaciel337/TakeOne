@@ -178,7 +178,7 @@ def montar_xmeml(projeto: dict, midias: dict[str, dict]) -> str:
             _clipe(trilha, clipe, midias[clipe["midia_id"]], arquivos, num, den, "video", not faixa.get("oculta"), None)
             if clipe.get("transicao") and faixa["tipo"] == "principal":
                 _transicao(trilha, clipe, num, den)
-        com_som = [c for c in clipes if midias[c["midia_id"]].get("audio")]
+        com_som = [c for c in clipes if midias[c["midia_id"]].get("audio") and not c.get("som_separado")]
         if com_som:
             faixas_de_som.append((faixa, com_som))
     for faixa in (f for f in faixas if f["tipo"] == "audio"):

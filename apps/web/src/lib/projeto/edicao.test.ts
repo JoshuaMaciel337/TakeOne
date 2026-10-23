@@ -51,6 +51,8 @@ import {
   recortarClipes,
   removerIntervalos,
   restaurarClipes,
+  separarSom,
+  devolverSom,
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
@@ -1098,4 +1100,33 @@ test("keyframes de volume: pôr, mexer no instante, aparar, restaurar a imagem e
   const comPonto = mudarKeyframe(comMusica.projeto, musica, "volume", 1 * S, "alternar");
   assert.equal(comPonto.faixas.find((f) => f.tipo === "audio")?.clipes[0].keyframes?.volume?.length, 1);
   assert.throws(() => mudarKeyframe(comMusica.projeto, musica, "x", 1 * S, "alternar"), ErroEdicao);
+});
+
+test("separar o som: o áudio vai para uma faixa própria com o mesmo trecho e o vídeo fica mudo", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  const [primeiro, segundo] = principal(projeto);
+  projeto = ajustarAudio(projeto, [primeiro.id], { volume: 1.5, fade_entrada: S });
+  projeto = mudarVelocidade(projeto, segundo.id, 2);
+  const resultado = separarSom(projeto, ctx, [primeiro.id, principal(projeto)[1].id]);
+  conferir(resultado.projeto);
+  const audios = resultado.projeto.faixas.filter((f) => f.tipo === "audio");
+  assert.equal(audios.length, 1, "os dois cabem na mesma faixa");
+  const [somA, somB] = audios[0].clipes;
+  assert.deepEqual(resultado.novos, [somA.id, somB.id]);
+  assert.deepEqual([somA.inicio, somA.duracao, somA.entrada, somA.volume, somA.fade_entrada], [0, 10 * S, 0, 1.5, S]);
+  assert.deepEqual([somB.inicio, somB.duracao, somB.velocidade], [10 * S, 2 * S, 2]);
+  assert.ok(principal(resultado.projeto).every((c) => c.som_separado));
+
+  // Corte em L: o vídeo de 10 s aparado em 8 s; o som dele, separado, continua 1 s por cima do seguinte
+  let curto = apararClipe(projeto, ctx, primeiro.id, "fim", 8 * S);
+  const separado = separarSom(curto, ctx, [primeiro.id]);
+  curto = apararClipe(separado.projeto, ctx, separado.novos[0], "fim", 9 * S);
+  const somL = curto.faixas.find((f) => f.tipo === "audio")!.clipes[0];
+  assert.deepEqual([somL.inicio, somL.duracao, principal(curto)[1].inicio], [0, 9 * S, 8 * S]);
+
+  // Separar de novo não faz nada; devolver liga o som do vídeo
+  assert.throws(() => separarSom(resultado.projeto, ctx, [primeiro.id]), ErroEdicao);
+  assert.equal(principal(devolverSom(resultado.projeto, [primeiro.id]))[0].som_separado, false);
 });

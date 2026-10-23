@@ -970,6 +970,22 @@ function AbaAudio({
 }: PropsAba & { midia: Midia | null; faixas: Faixa[]; tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void; aoAvisar: (mensagem: string) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
+  if (clipe.som_separado) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-6 text-center text-xs text-suave">
+        <p>O som deste vídeo foi separado: ele está num clipe da faixa de áudio, onde fica o volume, os fades e os efeitos.</p>
+        <button
+          type="button"
+          className="botao-secundario px-3 py-1.5 text-xs"
+          disabled={faixa.travada}
+          onClick={() => aoExecutar({ comando: "clipe.devolverSom", parametros: { clipeIds: [clipe.id] } })}
+        >
+          Devolver o som ao vídeo
+        </button>
+        <p className="text-[11px]">O clipe de áudio separado continua na linha do tempo: apague-o para o som não tocar duas vezes.</p>
+      </div>
+    );
+  }
   const travada = faixa.travada;
   const ids = [clipe.id];
   const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
@@ -1091,6 +1107,17 @@ function AbaAudio({
               <span className="ml-auto">{pontosDeVolume.length} keyframes de volume</span>
             )}
           </div>
+        ) : null}
+        {faixa.tipo !== "audio" && midia.video && !midia.imagem ? (
+          <button
+            type="button"
+            className="botao-secundario mt-2 w-full px-3 py-1.5 text-xs"
+            disabled={travada}
+            onClick={() => aoExecutar({ comando: "clipe.separarSom", parametros: { clipeIds: ids } })}
+            title="O som vai para um clipe na faixa de áudio: aparar um sem o outro faz os cortes em J e em L"
+          >
+            Separar o som
+          </button>
         ) : null}
         <label className="mt-1 flex items-center gap-2 text-xs">
           <input

@@ -1056,7 +1056,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     sons, linhas_som = [], []
     for faixa in com_som:
         for clipe in faixa["clipes"]:
-            if clipe.get("midia_id") and midias[clipe["midia_id"]].audio:
+            # O vídeo com o som separado não soa: o som está num clipe de áudio próprio
+            if clipe.get("midia_id") and midias[clipe["midia_id"]].audio and not clipe.get("som_separado"):
                 sons.append(f"a{len(sons)}")
                 # O som pula a sobra da transição e o que foi aberto antes do trecho
                 leitura = leituras.get(clipe["id"])

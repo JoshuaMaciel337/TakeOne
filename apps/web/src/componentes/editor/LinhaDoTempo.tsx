@@ -16,6 +16,7 @@ import {
   Scissors,
   Trash2,
   Type,
+  Unlink,
   Volume2,
   VolumeX,
   ZoomIn,
@@ -393,6 +394,12 @@ export function LinhaDoTempo({
     faixa.clipes.some((clipe) => (selecao.length ? selecao.includes(clipe.id) : faixa.tipo === "principal") && tempo > clipe.inicio && tempo < fimDoClipe(clipe)),
   );
   const algumSelecionado = selecao.some((id) => acharClipe(exibido, id));
+  // Os vídeos escolhidos com som ainda junto da imagem
+  const separaveis = selecao.filter((id) => {
+    const achado = acharClipe(exibido, id);
+    const midia = achado ? midiaDoClipe(midias, achado.clipe) : undefined;
+    return achado && achado.faixa.tipo !== "audio" && !achado.clipe.som_separado && midia?.audio && midia.video && !midia.imagem;
+  });
   const guia = arrasto && "guia" in arrasto ? arrasto.guia : null;
 
   return (
@@ -427,6 +434,16 @@ export function LinhaDoTempo({
           aria-label="Duplicar os clipes escolhidos"
         >
           <Copy className="size-4" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className="botao-icone"
+          disabled={!separaveis.length}
+          onClick={() => aoExecutar({ comando: "clipe.separarSom", parametros: { clipeIds: separaveis } })}
+          title="Separar o som do vídeo: ele vai para uma faixa de áudio, para cortes em J e em L"
+          aria-label="Separar o som"
+        >
+          <Unlink className="size-4" aria-hidden />
         </button>
         <button
           type="button"
@@ -710,7 +727,7 @@ function BlocoDoClipe({
         ) : (
           <>
             <MiniaturasDoClipe midia={midia} clipe={clipe} zoom={zoom} largura={largura} altura={alturaInterna} />
-            {midia.audio ? <FormaDeOndaDoClipe midia={midia} clipe={clipe} zoom={zoom} largura={largura} altura={Math.round(alturaInterna / 3)} className="text-white/45" /> : null}
+            {midia.audio && !clipe.som_separado ? <FormaDeOndaDoClipe midia={midia} clipe={clipe} zoom={zoom} largura={largura} altura={Math.round(alturaInterna / 3)} className="text-white/45" /> : null}
           </>
         )
       ) : null}
