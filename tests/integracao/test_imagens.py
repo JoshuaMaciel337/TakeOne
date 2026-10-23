@@ -72,9 +72,11 @@ def test_imagem_entra_na_biblioteca_e_no_projeto(cliente, db_limpo):
     assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 422
 
     # O que é só de vídeo recusa a imagem com uma mensagem clara
-    for rota in ("recorte-fundo", "limpeza-imagem", "rosto", "transcricao", "batidas", "voz-limpa"):
+    for rota in ("limpeza-imagem", "rosto", "transcricao", "batidas", "voz-limpa"):
         resposta = cliente.post(f"/api/midias/{midia_id}/{rota}", json={})
         assert resposta.status_code in (409, 422), (rota, resposta.status_code)
+    # O recorte do fundo vale também em imagens (o editor de imagem)
+    assert cliente.post(f"/api/midias/{midia_id}/recorte-fundo").status_code == 200
 
 
 def test_imagem_que_nao_abre_vira_erro(cliente, db_limpo):
