@@ -1,0 +1,2 @@
+# O servidor MCP do TakeOne (apps/servidor_mcp/servidor.py): roda na máquina de quem usa o assistente
+mcp==1.30.0
