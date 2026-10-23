@@ -32,6 +32,7 @@ from core.utils.efeitos import (
     BRILHO_SIGMA,
     GRAO_LINHAS,
     LUZ_PERIODO,
+    NITIDEZ_SIGMA,
     ajustes_do_efeito,
     brilho_do_efeito,
     colunas_do_grao,
@@ -43,6 +44,7 @@ from core.utils.efeitos import (
     grao_do_efeito,
     linhas_do_efeito,
     luz_do_efeito,
+    nitidez_do_efeito,
 )
 from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, recorte_na_fonte
@@ -363,6 +365,18 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         cabeca = (f"{_continuar(cabeca, [*filtros, 'premultiply=inplace=1', 'split'])}[ba{numero}][bb{numero}];\n"
                   f"[bb{numero}]{','.join(desfocar)},colorchannelmixer=rr={k}:gg={k}:bb={k}:aa={k}[bc{numero}];\n"
                   f"[ba{numero}][bc{numero}]blend=all_mode=screen,unpremultiply=inplace=1")
+        filtros = []
+    nitidez = nitidez_do_efeito(clipe)
+    if nitidez:
+        # Nitidez: o clipe mais (clipe - cópia pouco desfocada) vezes a força, no alfa pré-multiplicado como o
+        # brilho. A conta vai por um lut2 (uma tabela de 256 × 256 por plano, não uma expressão por pixel)
+        sigma = NITIDEZ_SIGMA * altura
+        conta = f"clip(x+(x-y)*{_numero(nitidez)},0,255)"
+        desfocar = _filtros_do_gblur(f"gblur=sigma={sigma:.4f}:steps=6", sigma, False)
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'premultiply=inplace=1', 'format=gbrap', 'split'])}"
+                  f"[na{numero}][nb{numero}];\n"
+                  f"[nb{numero}]{','.join(desfocar)},format=gbrap[nc{numero}];\n"
+                  f"[na{numero}][nc{numero}]lut2=c0='{conta}':c1='{conta}':c2='{conta}':c3=x,unpremultiply=inplace=1")
         filtros = []
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")

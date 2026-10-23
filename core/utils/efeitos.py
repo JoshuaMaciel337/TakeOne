@@ -6,16 +6,20 @@
 #   - desfoque: o mesmo desfoque gaussiano das transições (sigma em frações da altura do clipe);
 #   - brilho: o clipe desfocado somado a ele mesmo em "tela" (a luz se espalha em volta dos claros);
 #   - distorção: lente de olho de peixe (lenscorrection do FFmpeg) com zoom para não sobrar canto vazio;
+#   - nitidez: o clipe mais a diferença entre ele e uma cópia pouco desfocada (máscara de nitidez);
 #   - VHS, glitch, luz e granulação: veja abaixo.
 # -----------------------------------------------
 import numpy as np
 from PIL import Image
 
-TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao")
+TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez")
 # Com intensidade 1
 DESFOQUE_MAXIMO = 0.025
 BRILHO_SIGMA = 0.02
 DISTORCAO_MAXIMA = 0.5
+# Nitidez: o sigma da cópia desfocada (frações da altura do clipe) e quanto da diferença soma, com intensidade 1
+NITIDEZ_SIGMA = 0.0025
+NITIDEZ_MAXIMA = 1.5
 
 
 def efeito_do_clipe(clipe: dict) -> dict | None:
@@ -35,6 +39,12 @@ def brilho_do_efeito(clipe: dict) -> float:
     """Quanto da luz desfocada soma ao clipe (0 sem brilho)."""
     efeito = efeito_do_clipe(clipe)
     return efeito["intensidade"] if efeito and efeito["tipo"] == "brilho" else 0.0
+
+
+def nitidez_do_efeito(clipe: dict) -> float:
+    """Quanto da diferença entre o clipe e a cópia desfocada soma a ele (0 sem nitidez)."""
+    efeito = efeito_do_clipe(clipe)
+    return NITIDEZ_MAXIMA * efeito["intensidade"] if efeito and efeito["tipo"] == "nitidez" else 0.0
 
 
 def distorcao_do_efeito(clipe: dict) -> float:

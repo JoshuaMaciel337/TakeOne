@@ -327,6 +327,16 @@ def test_efeitos_desfoque_brilho_e_olho_de_peixe_no_grafo():
     assert "lenscorrection=k1=0.5:k2=0:i=bilinear,scale=1620:2880:flags=bilinear,crop=1080:1920" in plano.filtro
 
 
+def test_nitidez_soma_a_diferenca_da_copia_pouco_desfocada_por_um_lut2():
+    principal = clipe("c1", "deitado", 0, 4, efeito={"tipo": "nitidez", "intensidade": 0.5})
+    plano = planejar_render(projeto([faixa("principal", [principal])]), MIDIAS, 1080, 1920)
+    # Sigma de 0,25% da altura do clipe (o vídeo deitado tem 608 de altura no 9:16) e força de 1,5 × 0,5, no alfa
+    # pré-multiplicado
+    assert "gblur=sigma=1.5200:steps=6" in plano.filtro
+    assert "premultiply=inplace=1,format=gbrap,split[na1][nb1]" in plano.filtro
+    assert "[na1][nc1]lut2=c0='clip(x+(x-y)*0.75,0,255)'" in plano.filtro and ":c3=x,unpremultiply" in plano.filtro
+
+
 def test_tela_verde_vira_colorkey_so_na_midia():
     verde = {"cor": "#00ff00", "semelhanca": 0.3, "suavidade": 0.1}
     sobre = clipe("s1", "empe", 0, 4, chroma=verde)
