@@ -117,6 +117,11 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             lufs=(midia.get("audio") or {}).get("lufs"),
             imagem=e_imagem(midia),
             duracao_video=duracao_video,
+            fluidos=tuple((chave, str(caminho), float(item.get("zero") or item.get("de") or 0))
+                          for chave, item in (midia.get("fluidos") or {}).items()
+                          if item.get("status") == "pronta"
+                          and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
+                                                                              f"{chave}.mp4"))).is_file()),
             invertido=str(invertido) if (midia.get("invertido") or {}).get("status") == "pronta" and (
                 invertido := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
                                                                  ARQUIVO_INVERTIDO))).is_file() else None,

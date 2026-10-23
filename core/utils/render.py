@@ -24,7 +24,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 from core.config import FFMPEG
-from core.modelos.midia import chave_da_estabilizacao, chave_do_tom
+from core.modelos.midia import chave_da_estabilizacao, chave_do_fluido, chave_do_tom
 from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
 from core.utils.cantos import tem_cantos, tem_mascara
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, hsl_neutro, nome_da_lut, somar_ajustes
@@ -120,6 +120,8 @@ class MidiaDoRender:
     imagem: bool = False           # imagem parada (foto, logo): aberta em laço, sem tempo próprio
     duracao_video: float = 0       # onde a imagem acaba (pode ser antes do som); 0 quando não se sabe
     invertido: str | None = None   # o vídeo ao contrário (com o som), quando já foi gerado
+    # As câmeras lentas suaves prontas, (chave, caminho, zero): o arquivo começa no instante `zero` da mídia
+    fluidos: tuple[tuple[str, str, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1061,7 +1063,25 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                            max(1, round(caixa.largura)), max(1, round(caixa.altura)), destaque)
             auxiliares[mascara[0]] = ArquivoAuxiliar(mascara[0], "comandos", {}, conteudo=conteudo)
         entrada = indice_do_destaque[clipe["id"]] if destaque else indice_da_entrada[clipe["id"]]
-        if clipe.get("estabilizar") and not clipe.get("texto") and not e_imagem_parada:
+        fluido = clipe.get("fluido")
+        if fluido and not clipe.get("texto") and not e_imagem_parada:
+            # Câmera lenta suave: a imagem vem dos quadros inventados para o trecho, no tempo da mídia a partir
+            # de `de` (o som continua vindo do original)
+            midia = midias[clipe["midia_id"]]
+            pronto = {chave: (caminho, zero) for chave, caminho, zero in midia.fluidos}.get(
+                chave_do_fluido(fluido["de"], fluido["ate"]))
+            if not pronto:
+                raise ErroRender("A câmera lenta suave de um clipe ainda está sendo preparada. Espere terminar "
+                                 "ou desligue \"Câmera lenta suave\" para exportar.")
+            caminho, zero = pronto
+            lida = entradas[entrada]
+            if lida.inicio < zero - 1e-6 or lida.inicio + lida.duracao > fluido["ate"] + 0.05:
+                raise ErroRender("O clipe passou do trecho da câmera lenta suave. Ligue a opção de novo para "
+                                 "refazer o trecho.")
+            entrada = len(entradas)
+            entradas.append(Entrada(caminho, lida.inicio - zero, lida.duracao))
+            entrada_de_cor = []
+        elif clipe.get("estabilizar") and not clipe.get("texto") and not e_imagem_parada:
             # A imagem estável no lugar da original (sobre a sem ruído, se ela está ligada; o som não muda)
             midia = midias[clipe["midia_id"]]
             chave = chave_da_estabilizacao(bool(clipe.get("imagem_limpa")))

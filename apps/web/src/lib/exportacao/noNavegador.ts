@@ -54,7 +54,7 @@ function clipesComSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>): Ite
       faixa.clipes.flatMap((clipe) => {
         const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
         return midia?.audio && midia.status === "pronta" && clipe.volume > 0 && !clipe.som_separado
-          ? [{ chave: `${faixa.id}:${clipe.id}`, clipe: clipeNaFonte(clipe, midia), faixa, midia, ativo: true }]
+          ? [{ chave: `${faixa.id}:${clipe.id}`, clipe: clipeNaFonte(clipe, midia, true), faixa, midia, ativo: true }]
           : [];
       }),
     );

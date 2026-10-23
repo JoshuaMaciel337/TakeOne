@@ -1,7 +1,7 @@
 // Os arquivos que a prévia lê de cada clipe (e a exportação no navegador lê os mesmos): a cópia leve da
 // imagem (estável, sem ruído ou a de sempre) e o som (a voz no tom, a voz limpa ou o da cópia leve).
 import { arquivoDaMidia } from "@/lib/api";
-import { chaveDaEstabilizacao, type Clipe } from "@/lib/projeto/modelo";
+import { chaveDaEstabilizacao, chaveDoFluido, type Clipe, zeroDoFluido } from "@/lib/projeto/modelo";
 import { chaveDoTom } from "@/lib/projeto/som";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -22,14 +22,26 @@ export function entradaInvertida(clipe: Pick<Clipe, "entrada" | "duracao" | "vel
   return Math.max(0, Math.round(duracao - (clipe.entrada + clipe.duracao * clipe.velocidade)));
 }
 
-/** O clipe como a fonte o lê: o ao contrário com a entrada espelhada no vídeo invertido; os outros, como são. */
-export function clipeNaFonte(clipe: Clipe, midia: Midia): Clipe {
-  return tocaAoContrario(clipe, midia) ? { ...clipe, entrada: entradaInvertida(clipe, midia) } : clipe;
+/**
+ * O clipe como a fonte o lê: o ao contrário com a entrada espelhada no vídeo invertido; a imagem da câmera lenta
+ * suave com a entrada contada do começo do arquivo dela (`som`: o som continua no original). Fora do trecho
+ * pronto, a câmera lenta suave sai (a imagem volta ao original).
+ */
+export function clipeNaFonte(clipe: Clipe, midia: Midia, som = false): Clipe {
+  if (tocaAoContrario(clipe, midia)) return { ...clipe, entrada: entradaInvertida(clipe, midia) };
+  if (!clipe.fluido) return clipe;
+  const zero = zeroDoFluido(clipe, midia);
+  if (zero === null) return { ...clipe, fluido: null };
+  return som ? clipe : { ...clipe, entrada: clipe.entrada - Math.round(zero * TICKS_POR_SEGUNDO) };
 }
 
 /** A cópia leve da imagem estável ou sem ruído, quando o clipe pede e ela está pronta; senão, a de sempre. */
 export function arquivoDaImagemDoClipe(clipe: Clipe, midia: Midia): string {
   if (tocaAoContrario(clipe, midia)) return "invertido_proxy.mp4";
+  // A câmera lenta suave (o clipe já passou por clipeNaFonte, que tira o `fluido` fora do trecho pronto)
+  if (clipe.fluido && midia.fluidos?.[chaveDoFluido(clipe.fluido.de, clipe.fluido.ate)]?.status === "pronta") {
+    return `${chaveDoFluido(clipe.fluido.de, clipe.fluido.ate)}_proxy.mp4`;
+  }
   const estavel = `${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`;
   if (clipe.estabilizar && midia.arquivos.includes(estavel)) return estavel;
   return clipe.imagem_limpa && midia.arquivos.includes("limpo_proxy.mp4") ? "limpo_proxy.mp4" : "proxy.mp4";

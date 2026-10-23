@@ -114,7 +114,7 @@ export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>
       chaves.add(chave);
       const efeitos = janelas?.get(clipe.id)?.efeitos;
       // O clipe ao contrário lê o vídeo invertido, com a entrada espelhada (lib/previa/arquivos.ts)
-      itens.push({ chave, clipe: clipeNaFonte(clipe, midia), faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
+      itens.push({ chave, clipe: clipeNaFonte(clipe, midia, som), faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
     }
   }
   return itens;

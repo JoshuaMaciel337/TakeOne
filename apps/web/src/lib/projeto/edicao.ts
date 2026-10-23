@@ -1930,7 +1930,20 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
 export function limparImagem(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("Textos não têm ruído para tirar.");
-    return { ...clipe, imagem_limpa: ligar, ...(ligar ? { inverter: false } : {}) };
+    return { ...clipe, imagem_limpa: ligar, ...(ligar ? { inverter: false, fluido: null } : {}) };
+  });
+}
+
+/**
+ * Câmera lenta suave no clipe de vídeo: o trecho da mídia (segundos) cujos quadros do meio o worker inventa; null
+ * tira. Não combina com o ao contrário, o recorte do fundo, a imagem estável e a sem ruído (a edição desliga).
+ */
+export function fluidoNoClipe(projeto: Projeto, ctx: Contexto, clipeId: string, fluido: { de: number; ate: number } | null): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    if (fluido && (clipe.texto || !info?.video || info.imagem)) throw new ErroEdicao("Só vídeos gravados têm câmera lenta suave.");
+    if (!fluido) return { ...clipe, fluido: null };
+    return { ...clipe, fluido, inverter: false, remover_fundo: false, estabilizar: false, imagem_limpa: false };
   });
 }
 
@@ -1947,7 +1960,7 @@ export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
       const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
       if (ligar && (clipe.texto || !info?.video || info.imagem)) throw new ErroEdicao("Só vídeos tocam ao contrário.");
       if (!ligar) return { ...clipe, inverter: false };
-      return { ...clipe, inverter: true, curva_velocidade: null, remover_fundo: false, estabilizar: false, imagem_limpa: false, voz_limpa: false, tom: 0, nivelamento: null };
+      return { ...clipe, inverter: true, curva_velocidade: null, remover_fundo: false, estabilizar: false, imagem_limpa: false, voz_limpa: false, tom: 0, nivelamento: null, fluido: null };
     },
     { comAudio: true },
   );
@@ -1957,7 +1970,7 @@ export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
-    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false } : {}) };
+    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false, fluido: null } : {}) };
   });
 }
 
@@ -1966,7 +1979,7 @@ export function estabilizarClipes(projeto: Projeto, ctx: Contexto, clipeIds: str
   return mudarClipes(projeto, clipeIds, (clipe) => {
     const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
     if (ligar && (clipe.texto || !info?.video || info.imagem || info.transparente)) throw new ErroEdicao("Só vídeos gravados podem ser estabilizados.");
-    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false, inverter: false } : {}) };
+    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false, inverter: false, fluido: null } : {}) };
   });
 }
 

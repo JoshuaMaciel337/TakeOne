@@ -519,7 +519,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Desfoque de zoom e de giro e pixelizar (efeitos).
   - [ ] A transição zoom com desfoque (a força das 16 cópias muda no tempo; mais pesada no render).
   - [x] Inverter o clipe (o vídeo invertido em blocos no worker; aba Velocidade).
-  - [ ] Câmera lenta suave.
+  - [x] Câmera lenta suave (minterpolate no trecho do clipe; aba Velocidade).
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.
 - [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).

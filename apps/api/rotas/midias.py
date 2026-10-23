@@ -15,6 +15,7 @@ from api.esquemas import (
     BatidasSaida,
     EstabilizacaoEntrada,
     FalaEntrada,
+    FluidoEntrada,
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
@@ -50,8 +51,10 @@ from core.modelos.midia import (
     arquivo_do_tom,
     arquivo_publico,
     arquivos_da_estabilizacao,
+    arquivos_do_fluido,
     chave_arquivo,
     chave_da_estabilizacao,
+    chave_do_fluido,
     chave_do_tom,
     e_imagem,
     montar_midia,
@@ -377,6 +380,36 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"recorte_fundo": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Recorte do fundo pedido: {midia['nome']}")
     return (await para_saida(db, [{**midia, "recorte_fundo": atual}]))[0]
+
+
+@router.post("/{midia_id}/fluido", response_model=MidiaSaida)
+async def pedir_fluido(midia_id: str, dados: FluidoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """
+    Põe na fila a câmera lenta suave de um trecho (segundos da mídia, já alinhados aos quadros pelo editor). Se
+    já está pronta ou andando, só devolve a mídia.
+    """
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia) or midia.get("animacao") or not midia["video"].get("fps"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Só vídeos gravados têm câmera lenta suave.")
+    if dados.ate > float(midia.get("duracao") or 0) + 0.05:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O trecho passa do fim do vídeo.")
+    chave = chave_do_fluido(dados.de, dados.ate)
+    atual = (midia.get("fluidos") or {}).get(chave) or {}
+    pronta = atual.get("status") == "pronta" and arquivos_do_fluido(dados.de, dados.ate)[1] in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronta or andando):
+        job = montar_job("fluido", usuario["organizacao_id"],
+                         {"midia_id": str(midia["_id"]), "de": dados.de, "ate": dados.ate}, criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id, "de": dados.de, "ate": dados.ate}
+        await db.midias.update_one({"_id": midia["_id"]},
+                                   {"$set": {f"fluidos.{chave}": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Câmera lenta suave pedida: {midia['nome']} ({chave})")
+    fluidos = {**(midia.get("fluidos") or {}), chave: atual}
+    return (await para_saida(db, [{**midia, "fluidos": fluidos}]))[0]
 
 
 @router.post("/{midia_id}/inversao", response_model=MidiaSaida)

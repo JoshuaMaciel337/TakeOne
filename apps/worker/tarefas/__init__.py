@@ -7,6 +7,7 @@ from worker.tarefas.batidas import executar_batidas, marcar_batidas_com_erro
 from worker.tarefas.direcao import executar_direcao
 from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabilizacao_com_erro
 from worker.tarefas.fala import executar_fala
+from worker.tarefas.fluido import executar_fluido, marcar_fluido_com_erro
 from worker.tarefas.geracao_video import executar_geracao_video, marcar_geracao_com_erro
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
@@ -54,6 +55,7 @@ REGISTRO = {
     "objeto": Tarefa(executar_objeto, ao_falhar=marcar_geracao_com_erro),
     "quadro": Tarefa(executar_quadro, ao_falhar=marcar_geracao_com_erro),
     "inversao": Tarefa(executar_inversao, ao_falhar=marcar_inversao_com_erro),
+    "fluido": Tarefa(executar_fluido, ao_falhar=marcar_fluido_com_erro),
     "direcao": Tarefa(executar_direcao),
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),

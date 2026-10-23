@@ -30,6 +30,7 @@ const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo
   tom: null,
   estabilizacao: null,
   inversao: null,
+  fluido: null,
 };
 
 /**

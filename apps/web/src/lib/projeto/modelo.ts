@@ -1,6 +1,6 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
-import type { Taxa, Tick } from "../tempo.ts";
+import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
 import type { Animacoes } from "./animacao.ts";
@@ -125,6 +125,8 @@ export type Clipe = {
   igualar_volume?: boolean;
   /** Toca ao contrário: a imagem e o som vêm do vídeo invertido que o worker gera (lib/previa/arquivos.ts). */
   inverter?: boolean;
+  /** Câmera lenta suave: a imagem vem dos quadros inventados pelo worker para este trecho da mídia (segundos). */
+  fluido?: { de: number; ate: number } | null;
   /** O som foi para um clipe de áudio próprio ("Separar o som"): este clipe não soa. */
   som_separado?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
@@ -278,6 +280,27 @@ export function faixasDeVideo(projeto: Projeto): Faixa[] {
 }
 
 /** A versão estável de que o clipe precisa, como `chave_da_estabilizacao` em core/modelos/midia.py. */
+/** A chave da câmera lenta suave de um trecho (segundos da mídia): chave_do_fluido no servidor. */
+export function chaveDoFluido(de: number, ate: number): string {
+  return `fluido_${Math.round(de * 1000)}_${Math.round(ate * 1000)}`;
+}
+
+type MidiaComFluidos = { arquivos: string[]; fluidos?: Record<string, { status: string; de: number; ate: number; zero?: number | null }> };
+
+/**
+ * Onde o arquivo da câmera lenta suave do clipe começa (segundos da mídia), quando ele está pronto e cobre o trecho
+ * que o clipe usa agora; senão, null (a imagem fica no original).
+ */
+export function zeroDoFluido(clipe: Pick<Clipe, "fluido" | "entrada" | "duracao" | "velocidade">, midia: MidiaComFluidos): number | null {
+  if (!clipe.fluido) return null;
+  const chave = chaveDoFluido(clipe.fluido.de, clipe.fluido.ate);
+  const pronto = midia.fluidos?.[chave];
+  if (pronto?.status !== "pronta" || !midia.arquivos.includes(`${chave}_proxy.mp4`)) return null;
+  const zero = pronto.zero ?? pronto.de;
+  const fim = (clipe.entrada + clipe.duracao * clipe.velocidade) / TICKS_POR_SEGUNDO_MODELO;
+  return clipe.entrada / TICKS_POR_SEGUNDO_MODELO >= zero - 1e-6 && fim <= clipe.fluido.ate + 0.05 ? zero : null;
+}
+
 export function chaveDaEstabilizacao(limpa: boolean): string {
   return limpa ? "estavel_limpo" : "estavel";
 }

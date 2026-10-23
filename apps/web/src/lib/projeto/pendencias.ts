@@ -3,7 +3,7 @@
 // de sempre enquanto isso; a exportação no navegador, sem esta conferência, baixava um MP4 "pronto" sem o
 // recorte, o tom ou a estabilização pedidos, e sem aviso.
 import type { Midia } from "../tipos.ts";
-import { chaveDaEstabilizacao, type Projeto } from "./modelo.ts";
+import { chaveDaEstabilizacao, type Projeto, zeroDoFluido } from "./modelo.ts";
 import { chaveDoTom } from "./som.ts";
 
 /**
@@ -24,6 +24,7 @@ export function pendenciaParaONavegador(projeto: Projeto, midias: ReadonlyMap<st
       if (clipe.estabilizar && !tem(`${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`)) return "A estabilização de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.imagem_limpa && !clipe.estabilizar && !tem("limpo_proxy.mp4")) return "A imagem sem ruído de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.inverter && !midia.imagem && !tem("invertido_proxy.mp4")) return "O vídeo ao contrário de um clipe ainda está sendo preparado. Espere terminar.";
+      if (clipe.fluido && !clipe.inverter && zeroDoFluido(clipe, midia) === null) return "A câmera lenta suave de um clipe ainda está sendo preparada (ou o clipe passou do trecho dela). Espere terminar ou ligue a opção de novo.";
       if (!midia.audio || faixa.muda || clipe.som_separado) continue;
       if (clipe.voz_limpa && !tem("voz_limpa.m4a")) return "A voz limpa de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.tom && !tem(`${chaveDoTom(clipe.tom, Boolean(clipe.voz_limpa))}.m4a`)) return "O tom da voz de um clipe ainda está sendo preparado. Espere terminar.";

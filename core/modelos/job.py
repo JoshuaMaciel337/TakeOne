@@ -40,6 +40,7 @@ TAREFAS = {
     "objeto": RECURSO_CPU,
     "quadro": RECURSO_CPU,
     "inversao": RECURSO_CPU,
+    "fluido": RECURSO_CPU,
 }
 
 

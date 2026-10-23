@@ -115,6 +115,8 @@ class MidiaSaida(BaseModel):
     estabilizacoes: dict = Field(default_factory=dict)
     # O vídeo ao contrário (status e erro), quando foi pedido
     invertido: dict | None = None
+    # As câmeras lentas suaves pedidas, por chave do trecho: status, erro, de e até
+    fluidos: dict = Field(default_factory=dict)
     # Vídeo gerado com IA: {descricao, formato, duracao}
     gerada: dict | None = None
     # Forma desenhada (POST /api/elementos/formas): o pedido que a gerou
@@ -539,6 +541,18 @@ class TransicaoEntrada(BaseModel):
     misturar_som: bool = False
 
 
+class FluidoEntrada(BaseModel):
+    """O trecho da câmera lenta suave, em segundos da mídia (alinhados aos quadros da fonte pelo editor)."""
+    de: float = Field(ge=0, le=6 * 3600)
+    ate: float = Field(gt=0, le=6 * 3600)
+
+    @model_validator(mode="after")
+    def trecho_curto(self):
+        if self.ate <= self.de or self.ate - self.de > 120:
+            raise ValueError("A câmera lenta suave vale para trechos de até 2 minutos.")
+        return self
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -570,6 +584,8 @@ class ClipeEntrada(BaseModel):
     tom: int = Field(default=0, ge=-12, le=12)
     # Toca ao contrário (a imagem e o som vêm do vídeo invertido que o worker gera)
     inverter: bool = False
+    # Câmera lenta suave: a imagem vem dos quadros inventados pelo worker para este trecho da mídia
+    fluido: FluidoEntrada | None = None
     efeitos_voz: EfeitosVozEntrada | None = None
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
@@ -607,6 +623,9 @@ class ClipeEntrada(BaseModel):
     @model_validator(mode="after")
     def ao_contrario_sozinho(self):
         # O vídeo ao contrário é outro arquivo: o que é medido ou gerado no original não vale nele
+        if self.fluido and (self.inverter or self.remover_fundo or self.estabilizar or self.imagem_limpa):
+            raise ValueError("A câmera lenta suave não combina com ao contrário, recorte do fundo, estabilizar "
+                             "nem tirar o ruído.")
         if self.inverter and (self.curva_velocidade or self.remover_fundo or self.estabilizar or self.imagem_limpa
                               or self.voz_limpa or self.tom):
             raise ValueError("O clipe ao contrário não combina com curva de velocidade, recorte do fundo, "
@@ -1077,6 +1096,9 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                            for chave, item in (doc.get("estabilizacoes") or {}).items()},
         "invertido": {"status": doc["invertido"]["status"], "erro": doc["invertido"].get("erro")}
         if doc.get("invertido") else None,
+        "fluidos": {chave: {"status": item["status"], "erro": item.get("erro"), "de": item.get("de"),
+                            "ate": item.get("ate"), "zero": item.get("zero")}
+                    for chave, item in (doc.get("fluidos") or {}).items()},
     })
 
 

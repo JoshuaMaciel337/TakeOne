@@ -20,6 +20,7 @@ import {
   colarAjustes,
   congelarQuadro,
   inverterClipes,
+  fluidoNoClipe,
   colarClipes,
   virarClipes,
   chaveLumaClipes,
@@ -63,7 +64,7 @@ import { transformacaoNoTempo, volumeNoTempo } from "./keyframes.ts";
 import { CURVAS_PRONTAS } from "./velocidade.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
-import { completarProjeto, fatorDosFades, fimDoClipe, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { completarProjeto, fatorDosFades, fimDoClipe, zeroDoFluido, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
 const TAXA = { num: 30, den: 1 };
@@ -1210,4 +1211,22 @@ test("ao contrário: tira o que é do original, e ligar o que é do original des
   // Foto não toca ao contrário
   const comFoto = adicionarClipe(projeto, ctx, "foto").projeto;
   assert.throws(() => inverterClipes(comFoto, ctx, [principal(comFoto)[1].id], true), ErroEdicao);
+});
+
+test("câmera lenta suave: tira o que não combina e só vale dentro do trecho pronto", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  projeto = inverterClipes(projeto, ctx, [id], true);
+  projeto = fluidoNoClipe(projeto, ctx, id, { de: 0, ate: 3 });
+  let clipe = principal(projeto)[0];
+  assert.deepEqual([clipe.fluido, clipe.inverter], [{ de: 0, ate: 3 }, false]);
+  projeto = estabilizarClipes(projeto, ctx, [id], true);
+  clipe = principal(projeto)[0];
+  assert.equal(clipe.fluido, null, "estabilizar desliga a câmera lenta suave");
+  // O trecho pronto: o clipe de 10 s não cabe em 0–3 s; um de 2 s, a meia velocidade (1 s de mídia), cabe
+  const midia = { arquivos: ["fluido_0_3000_proxy.mp4"], fluidos: { fluido_0_3000: { status: "pronta", de: 0, ate: 3, zero: 0 } } };
+  assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 } }, midia), null);
+  assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 }, entrada: S, duracao: 2 * S, velocidade: 0.5 }, midia), 0);
+  assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 }, entrada: S, duracao: 2 * S, velocidade: 0.5 }, { ...midia, arquivos: [] }), null);
 });

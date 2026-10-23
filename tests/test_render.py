@@ -687,3 +687,18 @@ def test_clipe_ao_contrario_le_o_video_invertido_com_a_entrada_espelhada():
     sem = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}
     with pytest.raises(ErroRender, match="ao contrário"):
         planejar_render(projeto([faixa("principal", [video])], duracao=3), sem, 720, 1280)
+
+
+def test_camera_lenta_suave_le_os_quadros_novos_a_partir_do_zero():
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10,
+                                                  fluidos=(("fluido_1000_4000", "/m/fluido.mp4", 1.0),))}
+    video = clipe("c1", "deitado", 0, 4, entrada=2, velocidade=0.5, fluido={"de": 1.0, "ate": 4.0})
+    plano = planejar_render(projeto([faixa("principal", [video])], duracao=4), midias, 720, 1280)
+    # A imagem vem do arquivo novo (aberto 0,1 s antes, contado do zero dele); o som, do original
+    assert plano.entradas[0].caminho == "/m/deitado.mp4"
+    assert plano.entradas[1].caminho == "/m/fluido.mp4" and plano.entradas[1].argumentos()[:2] == ["-ss", "0.900000"]
+    assert "[1:v]" in plano.filtro and "[0:a]" in plano.filtro_som
+    # Fora do trecho pronto, a exportação para com o aviso
+    longe = clipe("c1", "deitado", 0, 4, entrada=5, velocidade=0.5, fluido={"de": 1.0, "ate": 4.0})
+    with pytest.raises(ErroRender, match="passou do trecho"):
+        planejar_render(projeto([faixa("principal", [longe])], duracao=4), midias, 720, 1280)

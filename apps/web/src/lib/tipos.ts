@@ -80,6 +80,8 @@ export type Midia = {
   estabilizacoes?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** O vídeo ao contrário (tarefa "inversao"), quando foi pedido. */
   invertido?: { status: "processando" | "pronta" | "erro"; erro: string | null } | null;
+  /** As câmeras lentas suaves pedidas, por chave do trecho; `zero`: o instante da mídia em que o arquivo começa. */
+  fluidos?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null; de: number; ate: number; zero?: number | null }>;
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Forma desenhada (lib/elementos.ts): o pedido que a gerou. Não aparece na biblioteca. */

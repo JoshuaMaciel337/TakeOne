@@ -51,6 +51,7 @@ _ARQUIVO_ESTAVEL_PROXY = re.compile(r"estavel(_limpo)?_proxy\.mp4")
 # A voz em outro tom (tarefa "tom"), uma por tom pedido: tom_p3.m4a, tom_m2_limpa.m4a (sobre a voz limpa)
 TOM_LIMITE = 12
 _ARQUIVO_DO_TOM = re.compile(r"tom_[mp]\d{1,2}(_limpa)?\.m4a")
+_ARQUIVO_FLUIDO_PROXY = re.compile(r"fluido_\d{1,8}_\d{1,8}_proxy\.mp4")
 # A máscara de uma seleção com um clique (tarefa "selecao"), pela chave dos pontos; o embedding do MobileSAM,
 # guardado para os cliques seguintes, é só do worker
 _ARQUIVO_DA_SELECAO = re.compile(r"selecao_[0-9a-f]{12}\.png")
@@ -64,6 +65,17 @@ def arquivo_da_selecao(pontos: list[list[float]]) -> str:
 
     chave = json.dumps([[round(x, 3), round(y, 3), bool(incluir)] for x, y, incluir in pontos])
     return f"selecao_{hashlib.sha1(chave.encode()).hexdigest()[:12]}.png"
+
+
+def chave_do_fluido(de: float, ate: float) -> str:
+    """A câmera lenta suave de um trecho (segundos da mídia, em milésimos no nome): chaveDoFluido no editor."""
+    return f"fluido_{round(de * 1000)}_{round(ate * 1000)}"
+
+
+def arquivos_do_fluido(de: float, ate: float) -> tuple[str, str]:
+    """(o do render, o da prévia)."""
+    chave = chave_do_fluido(de, ate)
+    return f"{chave}.mp4", f"{chave}_proxy.mp4"
 
 
 def chave_do_tom(semitons: int, limpa: bool) -> str:
@@ -87,6 +99,7 @@ def arquivos_da_estabilizacao(limpa: bool) -> tuple[str, str]:
 def arquivo_publico(nome: str) -> bool:
     """Os arquivos da mídia que a API serve: os fixos, as vozes em outro tom e as cópias leves estáveis."""
     return (nome in ARQUIVOS_PUBLICOS or bool(_ARQUIVO_DO_TOM.fullmatch(nome))
+            or bool(_ARQUIVO_FLUIDO_PROXY.fullmatch(nome))
             or bool(_ARQUIVO_ESTAVEL_PROXY.fullmatch(nome)) or bool(_ARQUIVO_DA_SELECAO.fullmatch(nome)))
 
 

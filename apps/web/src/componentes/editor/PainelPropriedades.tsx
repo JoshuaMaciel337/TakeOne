@@ -8,7 +8,7 @@ import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
-import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
+import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, chaveDoFluido, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, zeroDoFluido } from "@/lib/projeto/modelo";
 import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar, volumeNoTempo } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
@@ -642,6 +642,47 @@ const FADE_MAXIMO_S = 10;
 const VELOCIDADES_RAPIDAS = [0.5, 1, 1.5, 2, 3];
 
 /** Velocidade do clipe de mídia: o trecho da mídia fica o mesmo e a duração muda; o som mantém o tom. */
+/**
+ * Câmera lenta suave: o worker inventa os quadros do meio (4 vezes os da fonte) só no trecho do clipe, com 1 s de
+ * folga para cada lado, alinhado aos quadros. Aparar além da folga pede para ligar de novo.
+ */
+function CameraLentaSuave({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+  const [erro, setErro] = useState("");
+  const chave = clipe.fluido ? chaveDoFluido(clipe.fluido.de, clipe.fluido.ate) : null;
+  const estado = chave ? midia.fluidos?.[chave] : undefined;
+  const coberto = zeroDoFluido(clipe, midia) !== null;
+  function ligar() {
+    const fps = midia.video?.fps ?? 30;
+    const de = Math.max(0, Math.floor((clipe.entrada / TICKS_POR_SEGUNDO - 1) * fps) / fps);
+    const ate = Math.min(midia.duracao ?? Infinity, Math.ceil(((clipe.entrada + clipe.duracao * clipe.velocidade) / TICKS_POR_SEGUNDO + 1) * fps) / fps);
+    const trecho = { de: Math.round(de * 1000) / 1000, ate: Math.round(ate * 1000) / 1000 };
+    aoExecutar({ comando: "clipe.fluido", parametros: { clipeId: clipe.id, fluido: trecho } });
+    setErro("");
+    chamarApi(`/midias/${midia.id}/fluido`, { metodo: "POST", corpo: trecho }).catch((e: unknown) => setErro(e instanceof Error ? e.message : "Não foi possível pedir a câmera lenta suave agora."));
+  }
+  return (
+    <div className="mt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={Boolean(clipe.fluido)}
+          disabled={travada}
+          onChange={(evento) => (evento.currentTarget.checked ? ligar() : aoExecutar({ comando: "clipe.fluido", parametros: { clipeId: clipe.id, fluido: null } }))}
+        />
+        <span className="flex-1">Câmera lenta suave (inventa os quadros do meio)</span>
+      </label>
+      {clipe.fluido && estado?.status === "processando" ? <p className="text-[11px] text-suave">Criando os quadros do meio… pode levar alguns minutos; a prévia mostra o vídeo de sempre até lá.</p> : null}
+      {clipe.fluido && estado?.status === "erro" ? <p className="text-[11px] text-red-400">{estado.erro ?? "A câmera lenta suave não ficou pronta."}</p> : null}
+      {clipe.fluido && estado?.status === "pronta" && !coberto ? (
+        <button type="button" className="botao-secundario mt-1 px-2 py-1 text-[11px]" disabled={travada} onClick={ligar}>
+          O clipe passou do trecho: refazer
+        </button>
+      ) : null}
+      {erro ? <p className="text-[11px] text-red-400">{erro}</p> : null}
+    </div>
+  );
+}
+
 /** "Ao contrário": liga no clipe e pede ao worker o vídeo invertido, se ele ainda não existe. */
 function AoContrario({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
   const [erro, setErro] = useState("");
@@ -709,6 +750,7 @@ function AbaVelocidade({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba &
           Duração: {duracaoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
         </p>
         {midia?.video && !midia.imagem ? <AoContrario clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
+        {midia?.video?.fps && !midia.imagem && (clipe.velocidade < 1 || clipe.fluido) ? <CameraLentaSuave clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
       </Secao>
       <Secao titulo="Curva">
         <p className="mb-1 text-[11px] text-suave">Muda a velocidade ao longo do clipe, sem mudar a duração dele.</p>
