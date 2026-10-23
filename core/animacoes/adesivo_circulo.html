@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Círculo de destaque",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um círculo à mão, como de caneta marca-texto, se desenha em volta do que você quer destacar.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Traço",
+   "tipo": "cor",
+   "padrao": "#ff3b5c"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Segundo traço",
+   "tipo": "cor",
+   "padrao": "#ff3b5c"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.adesivo svg{filter:none}.traco{stroke-dasharray:102;stroke-dashoffset:102}.um{animation:desenhar .9s cubic-bezier(.6,0,.3,1) .2s forwards}.dois{animation:desenhar .6s cubic-bezier(.6,0,.3,1) .9s forwards}@keyframes desenhar{to{stroke-dashoffset:0}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><path class="traco um" pathLength="100" d="M16 54 C12 30 38 14 62 16 C86 18 98 36 94 56 C90 78 62 90 40 86 C18 82 8 64 16 46 C22 34 34 28 48 27" fill="none" stroke="var(--cor-1)" stroke-width="5" stroke-linecap="round"/><path class="traco dois" pathLength="100" d="M20 50 C18 34 40 22 62 23 C82 24 92 40 88 56" fill="none" stroke="var(--cor-2)" stroke-width="3" stroke-linecap="round" opacity=".6"/></svg></div>

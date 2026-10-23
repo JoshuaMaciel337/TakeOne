@@ -1,0 +1,49 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Selo estourado",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um selo de muitas pontas gira devagar com a palavra no meio, que pulsa.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Cor principal",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor de destaque",
+   "tipo": "cor",
+   "padrao": "#ffd23f"
+  },
+  {
+   "id": "texto",
+   "rotulo": "Palavra",
+   "tipo": "texto",
+   "padrao": "NOVO",
+   "maximo": 8
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor da palavra",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.gira{animation:girar 8s linear infinite}@keyframes girar{to{transform:rotate(360deg)}}.pulsa{animation:pulsar 1s ease-in-out infinite}@keyframes pulsar{50%{transform:scale(1.08)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><polygon class="c1 gira" points="50.0,2.0 56.9,10.6 66.4,4.9 70.0,15.4 80.9,13.2 80.6,24.3 91.6,26.0 87.6,36.3 97.3,41.7 90.0,50.0 97.3,58.3 87.6,63.7 91.6,74.0 80.6,75.7 80.9,86.8 70.0,84.6 66.4,95.1 56.9,89.4 50.0,98.0 43.1,89.4 33.6,95.1 30.0,84.6 19.1,86.8 19.4,75.7 8.4,74.0 12.4,63.7 2.7,58.3 10.0,50.0 2.7,41.7 12.4,36.3 8.4,26.0 19.4,24.3 19.1,13.2 30.0,15.4 33.6,4.9 43.1,10.6"/><circle class="c2" cx="50" cy="50" r="33" opacity=".25"/><text class="tx ct pulsa" x="50" y="51" font-size="19" textLength="58" lengthAdjust="spacingAndGlyphs">{{texto}}</text></svg></div>

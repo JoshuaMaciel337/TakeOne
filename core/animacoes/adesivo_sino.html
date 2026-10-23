@@ -1,0 +1,49 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Sino de aviso",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um sino balança de um lado para o outro com um número de avisos no canto.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Sino",
+   "tipo": "cor",
+   "padrao": "#ffd23f"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Bolinha",
+   "tipo": "cor",
+   "padrao": "#ff3b5c"
+  },
+  {
+   "id": "numero",
+   "rotulo": "Número",
+   "tipo": "texto",
+   "padrao": "3",
+   "maximo": 3
+  },
+  {
+   "id": "cor_texto",
+   "rotulo": "Cor do número",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.balanca{transform-origin:50% 0%;animation:balancar 1.6s ease-in-out infinite}@keyframes balancar{0%,55%,100%{transform:rotate(0)}10%{transform:rotate(18deg)}20%{transform:rotate(-14deg)}30%{transform:rotate(10deg)}40%{transform:rotate(-5deg)}}.bolinha{animation:pulsar 1.6s ease-in-out infinite}@keyframes pulsar{0%,100%{transform:scale(1)}10%{transform:scale(1.18)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><g class="balanca"><circle class="c1" cx="50" cy="12" r="5"/><path class="c1" d="M50 14 C33 14 26 28 26 44 V60 L16 74 H84 L74 60 V44 C74 28 67 14 50 14Z"/><circle class="c1 badalo" cx="50" cy="82" r="8"/></g><circle class="c2 bolinha" cx="80" cy="22" r="15"/><text class="tx ct" x="80" y="23" font-size="17">{{numero}}</text></svg></div>

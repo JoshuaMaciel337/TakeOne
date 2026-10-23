@@ -53,6 +53,7 @@ CATEGORIAS = {
     "logos": "Logos e marca",
     "transicoes": "Vinhetas e transições",
     "fundos": "Fundos e partículas",
+    "adesivos": "Adesivos",
 }
 MOTORES = {"css", "canvas"}
 TIPOS = {"texto", "linhas", "cor", "numero"}

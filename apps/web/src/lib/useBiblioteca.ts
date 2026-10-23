@@ -19,7 +19,7 @@ type Resposta = { do_espaco: ModeloDoEspaco[]; salvos: string[]; usos: Record<st
 
 /**
  * A biblioteca do hub: os modelos (prontos e do espaço), os salvos de quem abriu e os usos. Com
- * `comAnimacoes`, também as 1000 animações (a lista é grande; a página inicial não pede).
+ * `comAnimacoes`, também as mais de mil animações (a lista é grande; a página inicial não pede).
  */
 export function useBiblioteca({ comAnimacoes = false } = {}) {
   const [resposta, setResposta] = useState<Resposta | null>(null);

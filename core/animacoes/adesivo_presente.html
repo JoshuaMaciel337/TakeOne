@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Presente",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Uma caixa de presente pula e a tampa ameaça abrir.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Caixa",
+   "tipo": "cor",
+   "padrao": "#ff3b5c"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Fita",
+   "tipo": "cor",
+   "padrao": "#ffd23f"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.pula{animation:pular 1.4s ease-in-out infinite}@keyframes pular{0%,60%,100%{transform:translateY(0)}20%{transform:translateY(-6%)}40%{transform:translateY(-2%)}}.tampa{animation:tampa 1.4s ease-in-out infinite}@keyframes tampa{0%,60%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-12%) rotate(-8deg)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><g class="pula"><rect class="c1" x="18" y="48" width="64" height="44" rx="3"/><rect class="c2" x="45" y="48" width="10" height="44"/><g class="tampa"><rect class="c1" x="12" y="34" width="76" height="15" rx="3" stroke="#00000022"/><rect class="c2" x="45" y="34" width="10" height="15"/><ellipse class="c2" cx="38" cy="28" rx="12" ry="7" transform="rotate(-20 38 28)"/><ellipse class="c2" cx="62" cy="28" rx="12" ry="7" transform="rotate(20 62 28)"/><circle class="c2" cx="50" cy="31" r="5"/></g></g></svg></div>

@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Confirmado",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um círculo se desenha, o sinal de certo aparece dentro e os dois se apagam para começar de novo.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Cor do círculo",
+   "tipo": "cor",
+   "padrao": "#2bd576"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Cor do certo",
+   "tipo": "cor",
+   "padrao": "#ffffff"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.adesivo svg{filter:none}.traco{stroke-dasharray:102;stroke-dashoffset:102}.aro{animation:aro 2.4s ease-in-out infinite}.certo{animation:certo 2.4s ease-out infinite}@keyframes aro{0%{stroke-dashoffset:102}30%,80%{stroke-dashoffset:0}100%{stroke-dashoffset:-102}}@keyframes certo{0%,25%{stroke-dashoffset:102}45%,80%{stroke-dashoffset:0}100%{stroke-dashoffset:102}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><circle class="c1" cx="50" cy="50" r="40" opacity=".25"/><circle class="traco aro" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="var(--cor-1)" stroke-width="7" stroke-linecap="round" transform="rotate(-90 50 50)"/><path class="traco certo" d="M30 52 L44 66 L71 36" pathLength="100" fill="none" stroke="var(--cor-2)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>

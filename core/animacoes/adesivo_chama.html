@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chama",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Uma chama de duas cores tremula, mais alta e mais baixa, como fogo de verdade.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Fogo",
+   "tipo": "cor",
+   "padrao": "#ff5a1f"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Miolo",
+   "tipo": "cor",
+   "padrao": "#ffd23f"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.fora{transform-origin:50% 100%;animation:tremer .45s ease-in-out infinite alternate}.dentro{transform-origin:50% 100%;animation:tremer .35s ease-in-out infinite alternate-reverse}@keyframes tremer{from{transform:scale(1.04,.94) skewX(-3deg)}to{transform:scale(.96,1.06) skewX(3deg)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><path class="c1 fora" d="M50 95 C25 95 15 75 22 58 C27 46 36 40 34 24 C46 32 50 44 49 52 C55 44 56 34 52 18 C70 30 85 50 82 68 C80 85 68 95 50 95Z"/><path class="c2 dentro" d="M50 92 C38 92 33 82 36 72 C39 64 46 60 46 52 C54 58 58 66 57 72 C61 69 62 64 61 60 C67 66 68 76 65 83 C62 89 57 92 50 92Z"/></svg></div>

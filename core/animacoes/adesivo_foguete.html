@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Foguete",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um foguete flutua no lugar com o fogo tremendo embaixo.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Asas e fogo",
+   "tipo": "cor",
+   "padrao": "#ff624a"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Janela e contorno",
+   "tipo": "cor",
+   "padrao": "#3d8bff"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.flutua{animation:flutuar 1.6s ease-in-out infinite}@keyframes flutuar{0%,100%{transform:translateY(3%) rotate(-3deg)}50%{transform:translateY(-4%) rotate(3deg)}}.fogo{transform-origin:50% 0%;animation:fogo .18s linear infinite alternate}@keyframes fogo{from{transform:scaleY(.8)}to{transform:scaleY(1.15)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><g class="flutua"><path class="c1 fogo" d="M40 64 Q50 98 60 64Z"/><path class="c1" d="M34 48 L18 70 L34 66Z"/><path class="c1" d="M66 48 L82 70 L66 66Z"/><path class="br" d="M50 4 C65 16 69 38 66 64 H34 C31 38 35 16 50 4Z" stroke="var(--cor-2)" stroke-width="3"/><circle class="c2" cx="50" cy="34" r="8.5" stroke="#fff" stroke-width="2.5"/></g></svg></div>

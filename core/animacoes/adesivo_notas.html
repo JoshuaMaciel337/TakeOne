@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Notas musicais",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Duas notas musicais balançam e flutuam como se a música estivesse tocando.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Primeira nota",
+   "tipo": "cor",
+   "padrao": "#7c4dff"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Segunda nota",
+   "tipo": "cor",
+   "padrao": "#ff3478"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.nota{animation:flutuar 1.8s ease-in-out infinite}.dois{animation-delay:-.9s}@keyframes flutuar{0%,100%{transform:translateY(4%) rotate(-8deg)}50%{transform:translateY(-6%) rotate(8deg)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><g class="nota um"><ellipse class="c1" cx="28" cy="74" rx="12" ry="9" transform="rotate(-20 28 74)"/><rect class="c1" x="35" y="20" width="5" height="56"/><path class="c1" d="M40 20 C52 26 56 34 52 46 C52 36 46 32 40 32Z"/></g><g class="nota dois"><ellipse class="c2" cx="66" cy="66" rx="10" ry="7.5" transform="rotate(-20 66 66)"/><rect class="c2" x="72" y="22" width="4.5" height="46"/><path class="c2" d="M76.5 22 C86 28 89 34 86 44 C86 36 82 33 76.5 33Z"/></g></svg></div>

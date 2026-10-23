@@ -1,0 +1,36 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Raio",
+ "categoria": "adesivos",
+ "motor": "css",
+ "duracao": 3,
+ "descricao": "Um raio pisca forte, como num flash, e fica tremendo de energia.",
+ "campos": [
+  {
+   "id": "cor_1",
+   "rotulo": "Raio",
+   "tipo": "cor",
+   "padrao": "#ffe14d"
+  },
+  {
+   "id": "cor_2",
+   "rotulo": "Contorno",
+   "tipo": "cor",
+   "padrao": "#ff9f1c"
+  }
+ ]
+}
+</script>
+<!-- Adesivo: o invólucro entra com mola e sai no fim; o desenho fica em laço pelo tempo que a pessoa escolher. -->
+<style>
+.adesivo{position:absolute;left:50%;top:50%;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);
+  animation:entrar .55s cubic-bezier(.3,1.6,.5,1) both,sair .35s ease-in calc(var(--dur) - .35s) forwards}
+.adesivo svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 calc(var(--u)*.8) calc(var(--u)*1.2) rgba(0,0,0,.35))}
+:where(.adesivo svg *:not([transform])){transform-box:fill-box;transform-origin:center}
+.c1{fill:var(--cor-1)}.c2{fill:var(--cor-2)}.ct{fill:var(--cor-texto)}.br{fill:#fff}
+.tx{font-family:Montserrat;font-weight:900;text-anchor:middle;dominant-baseline:central}
+@keyframes entrar{from{transform:scale(0) rotate(-25deg);opacity:0}}
+@keyframes sair{to{transform:scale(0);opacity:0}}
+.corpo{animation:flash 1.7s steps(1) infinite,vibrar .12s linear infinite alternate}@keyframes flash{0%,100%{opacity:1}6%{opacity:.6}12%{opacity:1}18%{opacity:.7}24%{opacity:1}}@keyframes vibrar{from{transform:translateX(-1.5%) rotate(-2deg)}to{transform:translateX(1.5%) rotate(2deg)}}
+</style>
+<div class="adesivo"><svg viewBox="0 0 100 100"><path class="c1 corpo" d="M60 4 L22 56 H46 L36 96 L80 38 H55Z" stroke="var(--cor-2)" stroke-width="4" stroke-linejoin="round"/></svg></div>
