@@ -209,7 +209,7 @@ export function PainelConteudo({
         ) : ferramenta.id === "efeitos" ? (
           <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "filtros" ? (
-          <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
+          <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} tempo={legendas.tempo} />
         ) : ferramenta.id === "modelos" ? (
           <PainelModelos
             projeto={legendas.projeto}

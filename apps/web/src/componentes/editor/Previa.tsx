@@ -4,7 +4,7 @@ import { Maximize, Pause, Play, SquareDashed, TriangleAlert } from "lucide-react
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
-import { Compositor } from "@/lib/previa/compositor";
+import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
@@ -132,6 +132,10 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
       const prontas = [];
       let faltando = false;
       for (const camada of estado.camadas) {
+        if (camada.clipe.ajuste) {
+          prontas.push(camadaDoCompositor(camada, FUNDO, null));
+          continue;
+        }
         const quadro = camada.imagem ?? fontes.current.get(camada.chave)?.quadro(camada.segundos);
         // Recorte do fundo: a máscara do mesmo instante; sem ela ainda, espera como espera o quadro
         const fonteDaMascara = camada.clipe.remover_fundo && !camada.imagem ? fontes.current.get(`${camada.chave}:mascara`) : undefined;

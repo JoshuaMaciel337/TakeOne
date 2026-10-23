@@ -27,7 +27,7 @@ import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTrans
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
-import type { Camada } from "./compositor";
+import { type Camada, FUNDO } from "./compositor";
 import type { ImagemDeTexto } from "./imagensDeTexto";
 
 /** Um clipe de mídia que precisa de uma fonte de quadros agora (o atual ou o próximo da faixa). */
@@ -168,6 +168,18 @@ function luzEGrao(clipe: Clipe, caixa: Caixa, tempo: Tick, taxa: Taxa): Pick<Cam
   };
 }
 
+/**
+ * A camada de ajuste: cobre o quadro inteiro, sem mídia, com a opacidade do instante (fades e keyframes como os
+ * outros clipes). O compositor desenha nela o que já está embaixo, com a cor dela.
+ */
+function camadaDeAjuste(clipe: Clipe, faixa: Faixa, tempo: Tick, quadro: Tamanho): CamadaNaTela {
+  const opacidade = transformacaoAnimada(clipe, tempo).opacidade;
+  const caixa = { cx: quadro.largura / 2, cy: quadro.altura / 2, largura: quadro.largura, altura: quadro.altura, rotacao: 0, opacidade };
+  return { chave: `ajuste:${clipe.id}`, clipe, faixa, recorte: RECORTE_INTEIRO, caixa, caixaBase: caixa, ...corDoClipe(clipe), segundos: 0 };
+}
+
+const RECORTE_INTEIRO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
+
 /** Os textos que precisam de imagem: por id do clipe, e o destaque da fala com ":destaque". */
 export function textosParaImagens(projeto: Projeto): { id: string; texto: Texto }[] {
   return projeto.faixas
@@ -214,6 +226,14 @@ export function camadasNoTempo(
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
   }
+  // As camadas de ajuste entram na ordem das faixas (as de baixo primeiro), entre os vídeos
+  const deBaixo = projeto.faixas.filter((faixa) => faixa.tipo !== "audio" && !faixaDeTexto(faixa.tipo) && !faixa.oculta).reverse();
+  const ordem = new Map(deBaixo.map((faixa, i) => [faixa.id, i]));
+  for (const faixa of deBaixo) {
+    const ajuste = faixa.clipes.find((clipe) => clipe.ajuste && clipe.inicio <= tempo && tempo < fimDoClipe(clipe));
+    if (ajuste) camadas.push(camadaDeAjuste(ajuste, faixa, tempo, quadro));
+  }
+  camadas.sort((a, b) => (ordem.get(a.faixa.id) ?? 0) - (ordem.get(b.faixa.id) ?? 0));
   // Os textos ficam por cima de todas as faixas de vídeo (a faixa de texto é sempre a de cima)
   const faixasDeTexto = projeto.faixas.filter((faixa) => faixaDeTexto(faixa.tipo) && !faixa.oculta);
   for (const faixa of [...faixasDeTexto].reverse()) {
@@ -257,6 +277,10 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
     if (faixa.tipo === "principal" || faixa.oculta) continue;
     const clipe = faixa.clipes[0];
     if (!clipe) continue;
+    if (clipe.ajuste) {
+      camadas.push(camadaDeAjuste(clipe, faixa, 0, quadro));
+      continue;
+    }
     const comum = { clipe, faixa, recorte: clipe.recorte, ...corDoClipe(clipe), desvio: desvioDeCor(clipe.efeito, 0), segundos: 0 };
     if (clipe.texto) {
       const imagem = imagensDeTexto.get(clipe.id);
@@ -275,11 +299,12 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
 }
 
 /** A camada no formato do compositor, com o quadro da fonte e a máscara do fundo deste instante. */
-export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource, mascaraDoFundo: TexImageSource | null): Camada {
+export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource | typeof FUNDO, mascaraDoFundo: TexImageSource | null): Camada {
   return {
     fonte,
     recorte: camada.recorte,
-    virar: camada.clipe.virar,
+    // A cópia do canvas da camada de ajuste vem com as linhas de baixo para cima
+    virar: fonte === FUNDO ? { horizontal: false, vertical: true } : camada.clipe.virar,
     cantos: camada.clipe.cantos,
     mascaraDeForma: camada.clipe.mascara,
     caixa: camada.caixa,

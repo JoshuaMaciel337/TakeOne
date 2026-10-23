@@ -77,6 +77,11 @@ const ABAS_DESENHO_TEXTO = [
   { id: "basico", nome: "Básico", fase: "" },
   { id: "cor", nome: "Cor", fase: "" },
 ] as const;
+// A camada de ajuste: a cor (o que ela muda) e o básico (opacidade e máscara)
+const ABAS_AJUSTE = [
+  { id: "cor", nome: "Cor", fase: "" },
+  { id: "basico", nome: "Básico", fase: "" },
+] as const;
 const ABAS_DESENHO = [
   { id: "basico", nome: "Básico", fase: "" },
   { id: "cor", nome: "Cor", fase: "" },
@@ -137,8 +142,13 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
   const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
   const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
   const ehAudio = selecionado?.faixa.tipo === "audio";
-  const abas: readonly { id: IdAba; nome: string; fase: string }[] =
-    modo === "imagem" ? (ehTexto ? ABAS_DESENHO_TEXTO : ABAS_DESENHO) : ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
+  const abas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.ajuste
+    ? ABAS_AJUSTE
+    : modo === "imagem"
+      ? ehTexto
+        ? ABAS_DESENHO_TEXTO
+        : ABAS_DESENHO
+      : ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
   // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
   // Num clipe de áudio, a aba que não existe vira a do som
   const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio ? "audio" : abas[0].id;
@@ -350,6 +360,32 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
+  }
+  if (clipe.ajuste) {
+    const opacidade = clipe.transformacao.opacidade;
+    const comando = (valor: number): Comando => ({ comando: "clipe.transformar", parametros: { clipeIds: [clipe.id], transformacao: { opacidade: valor } } });
+    return (
+      <div>
+        {faixa.travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+        <Secao titulo="Camada de ajuste">
+          <p className="text-[11px] text-suave">A cor, o filtro e as curvas desta camada (aba Cor) valem para tudo o que está embaixo dela. A máscara limita a uma parte do quadro.</p>
+          <ControleNumerico
+            rotulo="Opacidade"
+            valor={opacidade * 100}
+            minimo={0}
+            maximo={100}
+            sufixo="%"
+            desativado={faixa.travada}
+            aoPrever={(valor) => aoPrever(comando(valor / 100))}
+            aoConfirmar={(valor) => {
+              if (Math.abs(valor / 100 - opacidade) < PERTO) aoPrever(null);
+              else aoExecutar(comando(valor / 100));
+            }}
+          />
+          <MascaraDoClipe clipe={clipe} travada={faixa.travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        </Secao>
+      </div>
+    );
   }
   // Os valores do instante do cursor: com keyframes, mexer grava um ponto ali
   const t = transformacaoParaEditar(clipe, tempo);

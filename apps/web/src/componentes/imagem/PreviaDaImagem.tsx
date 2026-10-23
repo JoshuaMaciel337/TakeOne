@@ -7,7 +7,7 @@ import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaMascaraDaImagem } from "@/lib/exportacao/imagem";
 import { useBitmaps } from "@/lib/previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, textosParaImagens } from "@/lib/previa/camadas";
-import { Compositor } from "@/lib/previa/compositor";
+import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
@@ -65,7 +65,7 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
   const fonteDa = (midiaId: string) => arquivoDaMidia(midiaId, "proxy.webp");
   const enderecos = camadas.flatMap((camada) => {
-    if (camada.imagem || !camada.clipe.midia_id) return [];
+    if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste) return [];
     const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id)) : null;
     return mascara ? [fonteDa(camada.clipe.midia_id), mascara] : [fonteDa(camada.clipe.midia_id)];
   });
@@ -93,6 +93,7 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
     if (!atual || tamanho.largura <= 0) return;
     const prontas = camadas.flatMap((camada) => {
       if (camada.imagem) return [camadaDoCompositor(camada, camada.imagem, null)];
+      if (camada.clipe.ajuste) return [camadaDoCompositor(camada, FUNDO, null)];
       const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
       if (!fonte) return [];
       const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;

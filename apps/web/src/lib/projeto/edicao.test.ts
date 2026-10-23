@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { duracaoDoQuadro, segundosParaTicks } from "../tempo.ts";
 import {
+  adicionarAjuste,
   adicionarClipe,
   adicionarLegenda,
   adicionarTexto,
@@ -1028,4 +1029,23 @@ test("mover o corte: um clipe cresce o que o vizinho encolhe, e nada mais anda",
   conferir(projeto);
   // Sem vizinho encostado não há corte
   assert.throws(() => moverCorte(projeto, ctx, principal(projeto)[2].id, 20 * S), /encostados/);
+});
+
+test("camada de ajuste: entra numa faixa de sobreposição nova, apara como imagem e não vai para a principal", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const r = adicionarAjuste(projeto, ctx, 2 * S);
+  projeto = r.projeto;
+  const faixa = projeto.faixas.find((f) => f.clipes.some((c) => c.id === r.clipeId))!;
+  assert.equal(faixa.tipo, "video");
+  const ajuste = faixa.clipes[0];
+  assert.equal(ajuste.ajuste, true);
+  assert.equal(ajuste.midia_id, null);
+  assert.equal(ajuste.inicio, 2 * S);
+  // Estica sem limite de mídia
+  projeto = apararClipe(projeto, ctx, ajuste.id, "fim", 30 * S);
+  assert.equal(projeto.faixas.find((f) => f.id === faixa.id)!.clipes[0].duracao, 28 * S);
+  // Na principal não entra
+  assert.throws(() => moverClipe(projeto, ctx, ajuste.id, { faixaId: "principal", inicio: 0 }), ErroEdicao);
+  conferir(projeto);
 });

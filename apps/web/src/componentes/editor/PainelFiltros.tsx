@@ -1,10 +1,11 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, SlidersHorizontal } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
 import { AJUSTES_NEUTROS, aplicarCor, FILTROS } from "@/lib/projeto/cor";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import type { Tick } from "@/lib/tempo";
 
 /** Cores de amostra para mostrar o que cada filtro faz: pele, céu, folha, sombra e claro. */
 const AMOSTRAS: [number, number, number][] = [
@@ -34,10 +35,12 @@ function Amostras({ ajustes }: { ajustes: (typeof FILTROS)[number]["ajustes"] })
 type Props = {
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   aoExecutar: (comando: Comando) => void;
+  /** O cursor: a camada de ajuste nova começa nele. Sem ele (editor de imagem), o botão não aparece. */
+  tempo?: Tick;
 };
 
 /** Ferramenta Filtros: aplica um filtro pronto ao clipe selecionado. A intensidade fica na aba Cor. */
-export function PainelFiltros({ selecionado, aoExecutar }: Props) {
+export function PainelFiltros({ selecionado, aoExecutar, tempo }: Props) {
   const podeAplicar = selecionado !== null && selecionado.faixa.tipo !== "audio";
   const atual = podeAplicar ? (selecionado.clipe.cor?.filtro ?? null) : null;
   const aplicar = (filtro: string | null) => {
@@ -46,6 +49,17 @@ export function PainelFiltros({ selecionado, aoExecutar }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      {tempo !== undefined ? (
+        <button
+          type="button"
+          className="botao-secundario w-full px-3 py-1.5 text-xs"
+          onClick={() => aoExecutar({ comando: "clipe.adicionarAjuste", parametros: { inicio: tempo } })}
+          title="Uma camada sem mídia: o filtro e a cor dela valem para tudo o que está embaixo, enquanto ela dura"
+        >
+          <SlidersHorizontal className="size-3.5" aria-hidden />
+          Pôr uma camada de ajuste no cursor
+        </button>
+      ) : null}
       <p className="text-xs text-suave">
         {podeAplicar ? "Escolha um filtro para o clipe selecionado. A intensidade e os ajustes finos ficam na aba Cor." : "Selecione um clipe de imagem na prévia ou na linha do tempo."}
       </p>

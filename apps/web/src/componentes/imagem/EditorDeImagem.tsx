@@ -453,7 +453,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
         <div className="flex shrink-0 flex-col border-borda bg-painel md:min-h-0 md:w-80 md:border-l">
           <section aria-label="Camadas" className="max-h-[40%] shrink-0 overflow-y-auto border-b border-borda">
-            <h2 className="px-3 pt-2.5 text-sm font-semibold">Camadas</h2>
+            <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+              <h2 className="text-sm font-semibold">Camadas</h2>
+              <button
+                type="button"
+                className="botao-secundario px-2 py-0.5 text-[11px]"
+                onClick={() => executar({ comando: "imagem.adicionarAjuste", parametros: {} })}
+                title="Uma camada sem imagem: a cor dela (aba Cor) vale para tudo o que está embaixo"
+              >
+                + Camada de ajuste
+              </button>
+            </div>
             <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} />
           </section>
           <PainelPropriedades

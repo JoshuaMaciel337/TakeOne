@@ -142,6 +142,8 @@ function mensagemDeTipo(info: InfoMidia): string {
 }
 
 function infoDoClipe(ctx: Contexto, clipe: Clipe, faixa: Faixa): InfoMidia {
+  // A camada de ajuste é imagem sem mídia: fica nas faixas de vídeo e dura o quanto a pessoa quiser
+  if (clipe.ajuste) return { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, imagem: true };
   // Texto não tem mídia: dura o quanto a pessoa quiser
   if (clipe.texto || !clipe.midia_id) return { duracao: Number.POSITIVE_INFINITY, video: false, audio: false };
   return ctx.midia(clipe.midia_id) ?? { duracao: Number.POSITIVE_INFINITY, video: faixa.tipo !== "audio", audio: faixa.tipo === "audio" };
@@ -156,6 +158,8 @@ function tipoLivreDoClipe(clipe: Clipe, info: InfoMidia, origem: TipoFaixa): Tip
 
 function aceitaNaFaixa(tipo: TipoFaixa, clipe: Clipe, info: InfoMidia): boolean {
   if (clipe.texto) return faixaDeTexto(tipo);
+  // A camada de ajuste muda o que está embaixo: nunca na principal, que fica embaixo de tudo
+  if (clipe.ajuste) return tipo === "video";
   return combina(tipo, info);
 }
 
@@ -1414,6 +1418,25 @@ export function adicionarTexto(projeto: Projeto, ctx: Contexto, inicio: Tick, te
     recorte: RECORTE_PADRAO,
   };
   return { projeto: finalizar(colocarLivre(projeto, ctx, "texto", clipe)), clipeId: clipe.id };
+}
+
+/** Uma camada de ajuste nova, numa faixa por cima das outras de vídeo, no instante dado. */
+export function adicionarAjuste(projeto: Projeto, ctx: Contexto, inicio: Tick): { projeto: Projeto; clipeId: string } {
+  const clipe: Clipe = {
+    id: ctx.novoId(),
+    midia_id: null,
+    ajuste: true,
+    inicio: Math.max(0, quadroMaisProximo(projeto.taxa, inicio)),
+    duracao: ajustarAoQuadro(projeto.taxa, DURACAO_IMAGEM_S * TICKS_POR_SEGUNDO),
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: TRANSFORMACAO_PADRAO,
+    recorte: RECORTE_PADRAO,
+  };
+  return { projeto: finalizar(colocarLivre(projeto, ctx, "video", clipe, undefined, true)), clipeId: clipe.id };
 }
 
 /** Duração de uma legenda nova, e a menor que uma legenda importada pode ter. */

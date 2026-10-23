@@ -10,7 +10,7 @@ import type { Midia } from "@/lib/tipos";
 
 import { carregarBitmap } from "../previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, textosParaImagens } from "../previa/camadas";
-import { Compositor } from "../previa/compositor";
+import { Compositor, FUNDO } from "../previa/compositor";
 import { type ImagemDeTexto, imagemDeTextoNoLado } from "../previa/imagensDeTexto";
 
 export type FormatoDaImagem = "png" | "jpeg" | "webp";
@@ -54,6 +54,7 @@ export async function exportarImagem(
   const prontas = await Promise.all(
     camadas.map(async (camada) => {
       if (camada.imagem) return camadaDoCompositor(camada, camada.imagem, null);
+      if (camada.clipe.ajuste) return camadaDoCompositor(camada, FUNDO, null);
       const midia = midias.get(camada.clipe.midia_id!)!;
       const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;

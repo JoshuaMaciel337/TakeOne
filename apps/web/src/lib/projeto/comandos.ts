@@ -6,6 +6,7 @@
 // recebido, desfazer é só voltar para a versão anterior.
 import type { Tick } from "../tempo.ts";
 import {
+  adicionarAjuste,
   adicionarClipe,
   adicionarLegenda,
   definirTransicao,
@@ -71,6 +72,7 @@ import {
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
 import {
+  adicionarCamadaDeAjuste,
   adicionarCamadaDeMidia,
   adicionarCamadaDeTexto,
   apagarCamada,
@@ -104,6 +106,8 @@ export type Comando =
   | { comando: "clipe.mover"; parametros: { clipeId: string; inicio: Tick } & DestinoClipe }
   | { comando: "clipe.aparar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
+  | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
+  | { comando: "imagem.adicionarAjuste"; parametros: Record<string, never> }
   | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
@@ -171,6 +175,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mover": "mover clipe",
   "clipe.aparar": "aparar clipe",
   "clipe.deslizar": "deslizar o conteúdo",
+  "clipe.adicionarAjuste": "pôr a camada de ajuste",
+  "imagem.adicionarAjuste": "pôr a camada de ajuste",
   "clipe.moverCorte": "mover o corte",
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
@@ -248,6 +254,14 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "clipe.aparar":
       return { projeto: apararClipe(projeto, ctx, parametros.clipeId, parametros.borda, parametros.tempo) };
+    case "clipe.adicionarAjuste": {
+      const resultado = adicionarAjuste(projeto, ctx, parametros.inicio);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.adicionarAjuste": {
+      const resultado = adicionarCamadaDeAjuste(projeto, ctx);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
     case "clipe.deslizar":
       return { projeto: deslizarConteudo(projeto, ctx, parametros.clipeId, parametros.deslocamento) };
     case "clipe.moverCorte":

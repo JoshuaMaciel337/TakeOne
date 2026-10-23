@@ -11,7 +11,7 @@ import { arquivoDaMidia } from "@/lib/api";
 import { ajustarCadeia, criarCadeia } from "@/lib/previa/audio";
 import { arquivoDaImagemDoClipe, arquivoDoSom } from "@/lib/previa/arquivos";
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, type ItemDaPrevia, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
-import { type Camada, Compositor } from "@/lib/previa/compositor";
+import { type Camada, Compositor, FUNDO } from "@/lib/previa/compositor";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { imagemDeTexto, type ImagemDeTexto } from "@/lib/previa/imagensDeTexto";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
@@ -288,6 +288,10 @@ export async function exportarNoNavegador(projeto: Projeto, midias: ReadonlyMap<
         const coletadas: Camada[] = [];
         let faltou = false;
         for (const camada of camadas) {
+          if (camada.clipe.ajuste) {
+            coletadas.push(camadaDoCompositor(camada, FUNDO, null));
+            continue;
+          }
           const pedido = pedidos.find((p) => p.camada === camada);
           if (!pedido) {
             coletadas.push(camadaDoCompositor(camada, camada.imagem!, null));

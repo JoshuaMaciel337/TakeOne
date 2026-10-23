@@ -102,6 +102,12 @@ export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId:
   };
 }
 
+/** Uma camada de ajuste por cima de todas: muda a cor do que está embaixo dela. */
+export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto): { projeto: Projeto; clipeId: string } {
+  const clipe = clipeDaCamada(ctx.novoId(), { ajuste: true });
+  return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe)), clipeId: clipe.id };
+}
+
 export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { texto });
   return {

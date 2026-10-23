@@ -683,9 +683,11 @@ function BlocoDoClipe({
   const audio = faixa.tipo === "audio";
   const texto = clipe.texto ?? null;
   const alturaInterna = altura - 6;
-  const nome = texto ? resumoDoTexto(texto) : (midia?.nome ?? "Mídia não encontrada");
+  const nome = texto ? resumoDoTexto(texto) : clipe.ajuste ? "Camada de ajuste" : (midia?.nome ?? "Mídia não encontrada");
   const cores = faixa.tipo === "legenda"
     ? "border-violet-400/50 bg-violet-900/60 text-violet-100"
+    : clipe.ajuste
+    ? "border-fuchsia-400/50 bg-fuchsia-900/50 text-fuchsia-100"
     : texto
     ? "border-amber-400/50 bg-amber-900/60 text-amber-100"
     : audio

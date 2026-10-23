@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Lock, LockOpen, Shapes, Trash2, Type } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Lock, LockOpen, Shapes, SlidersHorizontal, Trash2, Type } from "lucide-react";
 
 import { arquivoDaMidia } from "@/lib/api";
 import type { Comando } from "@/lib/projeto/comandos";
@@ -24,7 +24,7 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
     <ol className="flex flex-col gap-1 p-2" aria-label="Camadas, de cima para baixo">
       {camadas.map(({ faixa, clipe }, indice) => {
         const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
-        const nome = clipe.texto ? clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto" : (midia?.nome ?? "Imagem");
+        const nome = clipe.texto ? clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto" : clipe.ajuste ? "Camada de ajuste" : (midia?.nome ?? "Imagem");
         const marcada = selecao.includes(clipe.id);
         const botao = "botao-icone size-6";
         return (
@@ -34,6 +34,8 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
                 <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-painel-3">
                   {clipe.texto ? (
                     <Type className="size-4 text-suave" aria-hidden />
+                  ) : clipe.ajuste ? (
+                    <SlidersHorizontal className="size-4 text-suave" aria-hidden />
                   ) : midia?.elemento ? (
                     <Shapes className="size-4 text-suave" aria-hidden />
                   ) : midia ? (

@@ -11,9 +11,12 @@ import type { Cortes } from "../projeto/letras.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
+/** A fonte da camada de ajuste: o que já foi desenhado embaixo dela (uma cópia do canvas). */
+export const FUNDO = "fundo" as const;
+
 export type Camada = {
-  /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs ou uma imagem. */
-  fonte: TexImageSource;
+  /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs, uma imagem ou o que já foi desenhado (FUNDO). */
+  fonte: TexImageSource | typeof FUNDO;
   /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
   virar?: Virar | null;
@@ -410,6 +413,9 @@ export function corParaRgb(hex: string): [number, number, number] {
 
 type Alvo = { buffer: WebGLFramebuffer; textura: WebGLTexture; largura: number; altura: number };
 
+/** O framebuffer da cópia do que já foi desenhado, para a camada de ajuste (os de 0 a 4 são dos desfoques e do recorte). */
+const ALVO_DO_FUNDO = 6;
+
 type Recursos = {
   programa: WebGLProgram;
   desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
@@ -598,7 +604,7 @@ export class Compositor {
   }
 
   /** O framebuffer `indice` com uma textura do tamanho pedido. */
-  private alvo(indice: number, largura: number, altura: number): Alvo {
+  private alvo(indice: number, largura: number, altura: number, semAlfa = false): Alvo {
     const gl = this.gl;
     const recursos = this.recursos!;
     let alvo = recursos.alvos[indice];
@@ -608,7 +614,8 @@ export class Compositor {
     }
     if (alvo.largura !== largura || alvo.altura !== altura) {
       gl.bindTexture(gl.TEXTURE_2D, alvo.textura);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, largura, altura, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      if (semAlfa) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, largura, altura, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, largura, altura, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -742,8 +749,24 @@ export class Compositor {
       const recorte = recorteNaFonte(camada.recorte, camada.virar);
       if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
       gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
-      const { largura, altura } = tamanhoDaFonte(camada.fonte);
+      let largura: number;
+      let altura: number;
+      if (camada.fonte === FUNDO) {
+        // A camada de ajuste lê o que já foi desenhado. O canvas tem antialias (várias amostras por pixel), que o
+        // copyTexImage2D não lê (a cópia saía preta): o blit resolve as amostras numa textura comum. As linhas vêm
+        // de baixo para cima, e quem monta a camada a vira na vertical. O blit de várias amostras pede o mesmo
+        // formato dos dois lados: o canvas sem alfa é RGB, e a cópia também
+        [largura, altura] = [this.canvas.width, this.canvas.height];
+        const copia = this.alvo(ALVO_DO_FUNDO, largura, altura, !gl.getContextAttributes()?.alpha);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
+        gl.blitFramebuffer(0, 0, largura, altura, 0, 0, largura, altura, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, copia.textura);
+      } else {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
+        ({ largura, altura } = tamanhoDaFonte(camada.fonte));
+      }
       // Imagem ou texto bem maior que o lugar dele na tela: lido do mipmap, senão cada pixel da tela pega
       // um ponto só da textura e as bordas finas saem em escada (o render reduz com média)
       const reducao = (largura * recorte.largura) / Math.max(1, (caixa.largura * this.canvas.width) / quadro.largura);

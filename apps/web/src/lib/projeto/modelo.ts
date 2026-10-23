@@ -136,6 +136,11 @@ export type Clipe = {
   cantos?: Cantos | null;
   /** Máscara de forma (retângulo ou elipse); sem ela, o clipe inteiro aparece. */
   mascara?: MascaraDeForma | null;
+  /**
+   * Camada de ajuste: sem mídia nem texto, cobre o quadro e muda a cor (com a vinheta, a máscara e a opacidade) de
+   * tudo o que está embaixo dela, durante o clipe.
+   */
+  ajuste?: boolean;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
