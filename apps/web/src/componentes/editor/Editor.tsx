@@ -6,6 +6,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { ErroApi } from "@/lib/api";
+import { useEnvios } from "@/lib/envios";
 import { enderecoDoProjeto } from "@/lib/hub";
 import { clipeParaAparar, corteVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
@@ -95,6 +96,7 @@ type PropsDoEditor = { projetoId: string; ferramentaInicial?: string; modeloInic
 /** `ferramentaInicial`, `modeloInicial` e `animacaoInicial` vêm do endereço, quando o hub abre o editor numa ferramenta. */
 export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoInicial }: PropsDoEditor) {
   const biblioteca = useMidias();
+  const { iniciar: iniciarEnvio } = useEnvios();
   const [ferramenta, setFerramenta] = useState<IdFerramenta>(() => FERRAMENTAS.find((item) => item.id === ferramentaInicial && !item.emBreve)?.id ?? "midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
   const [midiaId, setMidiaId] = useState<string | null>(null);
@@ -399,6 +401,16 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           aoAdicionarMidia={adicionarNoCursor}
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
           aoPedirAnimacao={pedirAnimacao}
+          gravacao={{
+            tempo,
+            taxa: projeto.taxa,
+            tocando: reproducao.tocando,
+            aoAlternar: alternar,
+            aoGravar: (arquivo, inicio) => {
+              iniciarEnvio([arquivo], (id) => pedirAnimacao({ id }, inicio));
+              mostrarAviso("Narração gravada: ela entra na faixa de áudio quando terminar de subir.");
+            },
+          }}
           aoExecutarQuandoProntas={executarQuandoProntas}
           modeloInicial={modeloInicial}
           animacaoInicial={animacaoInicial}

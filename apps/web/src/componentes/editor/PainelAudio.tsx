@@ -7,6 +7,8 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { chamarApi, ErroApi } from "@/lib/api";
 import type { Midia } from "@/lib/tipos";
 
+import { GravarNarracao, type PropsGravacao } from "./GravarNarracao";
+
 // As vozes pt-BR do Kokoro (core/utils/fala.py)
 const VOZES = [
   { id: "pf_dora", nome: "Dora (feminina)" },
@@ -22,10 +24,12 @@ type Props = {
   aoPedir: (midia: Midia) => void;
   /** Fora do editor (no hub): a fala só entra na biblioteca. */
   soNaBiblioteca?: boolean;
+  /** No editor: gravar narração no cursor. */
+  gravacao?: PropsGravacao;
 };
 
 /** Ferramenta Áudio: texto em fala com as vozes abertas do Kokoro, geradas no worker de CPU. */
-export function PainelAudio({ aoPedir, soNaBiblioteca = false }: Props) {
+export function PainelAudio({ aoPedir, soNaBiblioteca = false, gravacao }: Props) {
   const [texto, setTexto] = useState("");
   const [voz, setVoz] = useState<string>(VOZES[0].id);
   const [velocidade, setVelocidade] = useState(1);
@@ -49,6 +53,7 @@ export function PainelAudio({ aoPedir, soNaBiblioteca = false }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      {gravacao ? <GravarNarracao {...gravacao} /> : null}
       <form onSubmit={pedir} className="flex flex-col gap-2 rounded-lg border border-borda bg-painel-2 p-3">
         <p className="flex items-center gap-1.5 text-xs font-semibold">
           <Mic className="size-4 text-destaque" aria-hidden /> Texto em fala

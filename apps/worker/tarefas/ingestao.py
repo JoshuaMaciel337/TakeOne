@@ -159,6 +159,18 @@ def ingerir_imagem(db, midia: dict, original: Path, reportar: Callable[[int, str
     return {"midia_id": str(midia_id), "imagem": True, "arquivos": campos["arquivos"]}
 
 
+def _remontar_sem_duracao(original: Path) -> dict:
+    """Remonta o arquivo no mesmo lugar, sem recodificar (-c copy), e devolve a sondagem nova."""
+    remontado = original.with_name(f"remontado{original.suffix}")
+    try:
+        executar_ffmpeg(["-i", str(original), "-map", "0", "-c", "copy", str(remontado)])
+    except ErroFFmpeg as e:
+        remontado.unlink(missing_ok=True)
+        raise ErroDefinitivo("O arquivo não tem vídeo nem áudio que dê para usar.") from e
+    remontado.replace(original)
+    return resumir_sondagem(sondar(original))
+
+
 def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     midia_id = ObjectId(job["entrada"]["midia_id"])
     midia = db.midias.find_one({"_id": midia_id})
@@ -186,6 +198,11 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     except ErroFFmpeg as e:
         raise ErroDefinitivo("O arquivo não é um vídeo ou áudio válido. Confira se ele abre no computador.") from e
     duracao, tem_video, tem_audio = resumo["duracao"], resumo["video"] is not None, resumo["audio"] is not None
+    if not duracao and (tem_video or tem_audio):
+        # Gravado no navegador (a narração, pelo MediaRecorder): o WebM sai sem a duração e sem o índice.
+        # Remontado sem recodificar, ele ganha os dois, e o render consegue pular para o trecho de cada clipe
+        resumo = _remontar_sem_duracao(original)
+        duracao = resumo["duracao"]
     if not duracao or not (tem_video or tem_audio):
         raise ErroDefinitivo("O arquivo não tem vídeo nem áudio que dê para usar.")
     logging.info(f"{rotulo} {duracao:.0f}s, vídeo={resumo['video']}, áudio={resumo['audio']}")

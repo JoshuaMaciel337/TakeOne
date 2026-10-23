@@ -58,7 +58,8 @@ type ContextoEnvios = {
   envios: Envio[];
   /** Muda sempre que uma mídia é criada ou termina de chegar, para as listas recarregarem. */
   versao: number;
-  iniciar: (arquivos: File[]) => void;
+  /** `aoCriar`: chamado com o id da mídia assim que a API cria o envio (a gravação de narração entra no instante dela). */
+  iniciar: (arquivos: File[], aoCriar?: (midiaId: string) => void) => void;
   pausar: (chave: string) => void;
   retomar: (chave: string) => void;
   cancelar: (chave: string) => void;
@@ -82,7 +83,7 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
   }, []);
 
   const iniciar = useCallback(
-    async (arquivos: File[]) => {
+    async (arquivos: File[], aoCriar?: (midiaId: string) => void) => {
       const { Upload: ClasseUpload } = await import("tus-js-client");
       for (const arquivo of arquivos) {
         const chave = `${arquivo.name}-${arquivo.size}-${arquivo.lastModified}`;
@@ -104,8 +105,10 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
           removeFingerprintOnSuccess: true,
           onShouldRetry: deveTentarDeNovo,
           onUploadUrlAvailable: () => {
-            atualizar(chave, { estado: "enviando", midiaId: upload.url?.split("/").pop() });
+            const midiaId = upload.url?.split("/").pop();
+            atualizar(chave, { estado: "enviando", midiaId });
             setVersao((valor) => valor + 1);
+            if (midiaId) aoCriar?.(midiaId);
           },
           onProgress: (enviado, total) => atualizar(chave, { enviado, tamanho: total, estado: "enviando" }),
           onSuccess: () => {
@@ -167,7 +170,7 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
       value={{
         envios,
         versao,
-        iniciar: (arquivos) => void iniciar(arquivos),
+        iniciar: (arquivos, aoCriar) => void iniciar(arquivos, aoCriar),
         pausar,
         retomar,
         cancelar,

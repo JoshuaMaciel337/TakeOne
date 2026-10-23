@@ -16,6 +16,7 @@ import type { Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { type Ferramenta } from "./ferramentas";
+import type { PropsGravacao } from "./GravarNarracao";
 import { PainelAudio } from "./PainelAudio";
 import { PainelAnimacoes } from "./PainelAnimacoes";
 import { PainelEfeitos } from "./PainelEfeitos";
@@ -44,6 +45,8 @@ type Props = {
   aoAdicionarTexto: (texto: Texto) => void;
   /** Uma animação foi pedida: entra no cursor (ou no instante dado) quando ficar pronta. */
   aoPedirAnimacao: (midia: Midia, inicio?: Tick) => void;
+  /** Gravar narração, na ferramenta Áudio. */
+  gravacao: PropsGravacao;
   /** O comando roda quando as mídias dadas (as formas de um modelo) aparecem prontas na biblioteca. */
   aoExecutarQuandoProntas: (midiaIds: string[], comando: Comando) => void;
   legendas: PropsLegendas;
@@ -154,6 +157,7 @@ export function PainelConteudo({
   aoAdicionarMidia,
   aoAdicionarTexto,
   aoPedirAnimacao,
+  gravacao,
   aoExecutarQuandoProntas,
   legendas,
   selecionado,
@@ -188,7 +192,7 @@ export function PainelConteudo({
             aoAvisar={legendas.aoAvisar}
           />
         ) : ferramenta.id === "audio" ? (
-          <PainelAudio aoPedir={aoPedirAnimacao} />
+          <PainelAudio aoPedir={aoPedirAnimacao} gravacao={gravacao} />
         ) : ferramenta.id === "elementos" ? (
           <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} animacaoInicial={animacaoInicial} />
         ) : ferramenta.id === "texto" ? (

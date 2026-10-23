@@ -125,6 +125,25 @@ def test_ingestao_de_audio(db_limpo):
     assert midia["audio"]["lufs"] == pytest.approx(-22, abs=0.5)
 
 
+def test_ingestao_de_narracao_gravada_no_navegador_sem_duracao(db_limpo):
+    # O MediaRecorder grava WebM sem a duração e sem o índice, como o FFmpeg escrevendo num tubo
+    def gravar(caminho):
+        with open(caminho, "wb") as saida:
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+                            "sine=frequency=440:duration=3", "-c:a", "libopus", "-f", "webm", "pipe:1"],
+                           stdout=saida, check=True, timeout=120)
+
+    midia_id = preparar_midia(db_limpo, "Narração 1.webm", gravar)
+    _, midia, job = processar(db_limpo, midia_id)
+    assert job["status"] == "concluido", job.get("erro")
+    assert midia["status"] == "pronta" and midia["video"] is None
+    assert midia["duracao"] == pytest.approx(3, abs=0.05)
+    # O original foi remontado no lugar: agora ele tem a duração (o render pula para o trecho de cada clipe)
+    saida = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                            str(arquivo_da(midia, midia["original"]))], capture_output=True, text=True).stdout
+    assert float(saida) == pytest.approx(3, abs=0.05)
+
+
 def test_arquivo_invalido_falha_na_hora_sem_novas_tentativas(db_limpo):
     # Conteúdo fixo: com bytes aleatórios, às vezes o ffprobe achava um formato e o erro mudava
     midia_id = preparar_midia(db_limpo, "Corrompido.mp4", lambda c: c.write_bytes(b"isto nao e um video\n" * 200))
