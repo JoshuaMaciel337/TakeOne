@@ -23,6 +23,7 @@ from api.rotas import (
     exportacoes,
     intercambio,
     jobs,
+    luts,
     marca,
     midias,
     modelos,
@@ -146,3 +147,4 @@ app.include_router(elementos.router)
 app.include_router(objetos.router)
 app.include_router(quadros.router)
 app.include_router(intercambio.router)
+app.include_router(luts.router)

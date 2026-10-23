@@ -1946,6 +1946,11 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
         (pontos ?? CURVA_NEUTRA).slice(0, PONTOS_MAXIMOS_DA_CURVA).map(([x, y]) => [limitar(x, 0, 1), limitar(y, 0, 1)] as PontoDaCurva).sort((a, b) => a[0] - b[0]);
       cor.curvas = { rgb: ajustar(cor.curvas!.rgb), r: ajustar(cor.curvas!.r), g: ajustar(cor.curvas!.g), b: ajustar(cor.curvas!.b) };
     }
+    // LUT importada: o id da API e a intensidade de 0 a 1
+    if (cor.lut) {
+      if (!/^[0-9a-f]{24}$/.test(cor.lut.id)) throw new ErroEdicao("Esta LUT não existe.");
+      cor.lut = { id: cor.lut.id, intensidade: limitar(cor.lut.intensidade, 0, 1) };
+    } else cor.lut = null;
     // Cor por matiz: só as faixas mexidas, cada valor de -1 a 1; tudo neutro não fica guardado
     if (hslNeutro(cor.hsl)) cor.hsl = null;
     else {

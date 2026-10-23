@@ -4,7 +4,9 @@
 //
 // Ordem: níveis (na tela); exposição e balanço de branco em luz linear; contraste, realces, sombras, brancos,
 // pretos, as rodas de cor, a saturação e a vibração nos valores de tela (sRGB); depois a cor por matiz e as
-// curvas. A vinheta depende da posição do pixel e fica à parte.
+// curvas. A vinheta depende da posição do pixel e fica à parte. A LUT importada (.cube) vem antes de tudo.
+
+import { aplicarLutImportada, type LutDoClipe, type LutImportada } from "./lutImportada.ts";
 
 export type AjustesCor = {
   /** -1 (frio, azulado) a 1 (quente, alaranjado). */
@@ -58,6 +60,8 @@ export type Cor = AjustesCor & {
   curvas?: Curvas | null;
   /** Cor por matiz, entre os ajustes e as curvas; só as faixas mexidas. */
   hsl?: Hsl | null;
+  /** LUT importada (.cube), antes de tudo, misturada ao original pela intensidade. */
+  lut?: LutDoClipe | null;
 };
 
 export const AJUSTES_NEUTROS: AjustesCor = {
@@ -83,7 +87,7 @@ export const AJUSTES_NEUTROS: AjustesCor = {
   niveis_gama: 0,
   nevoa: 0,
 };
-export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null, hsl: null };
+export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null, hsl: null, lut: null };
 
 export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: number }> = {
   temperatura: { minimo: -1, maximo: 1 },
@@ -427,7 +431,12 @@ export type LutDaCor = { chave: string; dados: Float32Array };
  * A LUT 3D dos ajustes e das curvas, a mesma do .cube do render (gerar_cube): o vermelho varia mais rápido,
  * depois o verde e o azul, que é a ordem de uma textura 3D (x, y, z). A vinheta fica fora, porque depende do lugar.
  */
-export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | undefined, hsl: Hsl | null = null): Float32Array {
+export function lutDaCor(
+  ajustes: AjustesCor,
+  curvas: Partial<Curvas> | null | undefined,
+  hsl: Hsl | null = null,
+  importada: { lut: LutImportada; intensidade: number } | null = null,
+): Float32Array {
   const n = PONTOS_DA_LUT;
   const passo = n - 1;
   const dados = new Float32Array(n * n * n * 4);
@@ -435,7 +444,10 @@ export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | u
   for (let b = 0; b < n; b++) {
     for (let g = 0; g < n; g++) {
       for (let r = 0; r < n; r++) {
-        const saida = aplicarCurvas(aplicarHsl(aplicarCor([r / passo, g / passo, b / passo], ajustes), hsl), curvas);
+        let cor: [number, number, number] = [r / passo, g / passo, b / passo];
+        // A LUT importada vem antes dos ajustes (gerar_cube)
+        if (importada) cor = aplicarLutImportada(cor, importada.lut, importada.intensidade);
+        const saida = aplicarCurvas(aplicarHsl(aplicarCor(cor, ajustes), hsl), curvas);
         dados[i] = saida[0];
         dados[i + 1] = saida[1];
         dados[i + 2] = saida[2];

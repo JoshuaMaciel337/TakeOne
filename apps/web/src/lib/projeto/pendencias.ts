@@ -3,6 +3,7 @@
 // de sempre enquanto isso; a exportação no navegador, sem esta conferência, baixava um MP4 "pronto" sem o
 // recorte, o tom ou a estabilização pedidos, e sem aviso.
 import type { Midia } from "../tipos.ts";
+import { lutGuardada } from "./lutImportada.ts";
 import { chaveDaEstabilizacao, type Projeto, zeroDoFluido } from "./modelo.ts";
 import { chaveDoTom } from "./som.ts";
 
@@ -16,6 +17,7 @@ export const FONTE_DE_SOM_MAXIMA_S = 15 * 60;
 export function pendenciaParaONavegador(projeto: Projeto, midias: ReadonlyMap<string, Midia>): string | null {
   for (const faixa of projeto.faixas) {
     for (const clipe of faixa.clipes) {
+      if (clipe.cor?.lut && clipe.cor.lut.intensidade > 0 && !lutGuardada(clipe.cor.lut.id)) return "A LUT de um clipe ainda está carregando (ou foi excluída). Espere um instante.";
       if (!clipe.midia_id) continue;
       const midia = midias.get(clipe.midia_id);
       if (!midia || midia.status !== "pronta") return "Uma mídia do projeto ainda está sendo preparada (ou foi excluída). Espere terminar.";

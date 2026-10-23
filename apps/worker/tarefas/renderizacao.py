@@ -45,6 +45,7 @@ from core.utils.efeitos import LINHAS_POR_ALTURA, imagem_do_grao, tira_de_luz
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
+from core.utils.lut import chave_da_lut, de_bytes
 from core.utils.mongo import agora
 from core.utils.render import (
     ErroRender,
@@ -137,6 +138,19 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
                                                                  ARQUIVO_INVERTIDO))).is_file() else None,
         )
     return preparadas
+
+
+def preparar_luts(db, organizacao_id, faixas: list[dict]) -> dict:
+    """As LUTs importadas que os clipes usam (as que sumiram ficam de fora, e o plano recusa o clipe)."""
+    ids = {(c.get("cor") or {}).get("lut", {}).get("id") for f in faixas for c in f["clipes"]
+           if ((c.get("cor") or {}).get("lut") or {}).get("id")}
+    luts = {}
+    validos = [ObjectId(i) for i in ids if ObjectId.is_valid(i)]
+    for doc in db.luts.find({"_id": {"$in": validos}, "organizacao_id": organizacao_id}):
+        caminho = storage.caminho_local(chave_da_lut(organizacao_id, doc["_id"]))
+        if caminho.is_file():
+            luts[str(doc["_id"])] = de_bytes(caminho.read_bytes(), doc["tamanho"], doc["minimo"], doc["maximo"])
+    return luts
 
 
 def preparar_textos(faixas: list[dict], largura: int, altura: int, pasta: Path) -> dict[str, ImagemDoTexto]:
@@ -233,6 +247,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
 
     reportar(2, "Preparando as mídias e os textos")
     midias = preparar_midias(db, organizacao_id, projeto["faixas"])
+    luts = preparar_luts(db, organizacao_id, projeto["faixas"])
     largura, altura = exportacao["largura"], exportacao["altura"]
     pasta = caminho(ARQUIVO_FILTRO).parent
     pasta.mkdir(parents=True, exist_ok=True)
@@ -252,7 +267,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
             textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
         try:
             plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), imagem_rgb=imagem_rgb,
-                                    sem_imagem=so_som)
+                                    sem_imagem=so_som, luts=luts)
         except ErroRender as e:
             raise ErroDefinitivo(str(e)) from e
         logging.info(f"{rotulo} {formato} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
@@ -278,7 +293,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         else:
             if plano.tem_som:
                 ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 12), "Misturando o som"), rotulo)
-                plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho)
+                plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho,
+                                        luts=luts)
             filtro.write_text(plano.filtro, encoding="utf-8")
             argumentos = argumentos_do_video(plano, str(filtro))
             argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))

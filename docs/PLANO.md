@@ -524,7 +524,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Marcadores na régua (tecla M, nome e cor, Shift+↑/↓), o ímã nos marcadores e nos keyframes, capítulos na janela Exportar e no XML.
   - [x] Exportar o quadro, outra taxa de quadros, só o som e GIF (e o quadro certo em vídeos de celular no render).
   - [x] Mais modos de mesclagem (escurecer, clarear, sobrepor, luz forte, diferença e exclusão).
-  - [ ] Importar LUT (.cube) e igualar a cor de outro clipe.
+  - [x] Importar LUT (.cube), antes dos ajustes, na mesma LUT 3D da prévia e do render.
+  - [ ] Igualar a cor de outro clipe.
   - [ ] Contorno e sombra em recortes (vídeo sem fundo, logos e formas).
   - [ ] Adesivos SVG.
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.

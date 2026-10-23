@@ -822,19 +822,39 @@ def _leitura_do_clipe(clipe: dict, janela: dict | None, midia: MidiaDoRender) ->
     return Leitura(janela_inicio, janela_fim, pausa_inicio, pausa_fim, sobra_antes, efeitos, congelar)
 
 
+def _ajustes_da_lut(clipe: dict, ajustes: dict, luts: dict | None) -> dict | None:
+    """
+    O que vai para a LUT 3D do clipe: os ajustes, a LUT importada (antes deles), a cor por matiz e as curvas.
+    None quando nada disso muda a cor (a vinheta fica fora: depende do lugar).
+    """
+    cor = clipe.get("cor") or {}
+    curvas, hsl = cor.get("curvas"), cor.get("hsl")
+    importada = cor.get("lut")
+    if importada and importada.get("intensidade", 1) <= 0:
+        importada = None
+    dados = None
+    if importada:
+        dados = (luts or {}).get(importada["id"])
+        if dados is None:
+            raise ErroRender("A LUT de um clipe foi excluída. Tire a LUT dele (aba Cor) para exportar.")
+    if cor_neutra({**ajustes, "vinheta": 0}) and curvas_neutras(curvas) and hsl_neutro(hsl) and not importada:
+        return None
+    return {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas, "hsl": None if hsl_neutro(hsl) else hsl,
+            "lut": {"id": importada["id"], "intensidade": importada.get("intensidade", 1), "dados": dados}
+            if importada else None}
+
+
 def _camada_de_ajuste(clipe: dict, anterior: str, numero: int, largura: int, altura: int, taxa: str, pasta: str,
-                      quadro: tuple[int, int], entradas: list, auxiliares: dict, linhas: list[str]) -> str:
+                      quadro: tuple[int, int], entradas: list, auxiliares: dict, linhas: list[str],
+                      luts: dict | None = None) -> str:
     """
     Camada de ajuste: o que já está embaixo passa pela LUT da cor dela (e pela vinheta), e volta por cima do
     original com a opacidade e a máscara de forma como alfa, só enquanto o clipe dura. Devolve o nome da base nova.
     """
     ajustes = ajustes_efetivos(clipe.get("cor"))
-    curvas = (clipe.get("cor") or {}).get("curvas")
-    hsl = (clipe.get("cor") or {}).get("hsl")
     filtros = []
-    if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas) or not hsl_neutro(hsl):
-        com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas,
-                      "hsl": None if hsl_neutro(hsl) else hsl}
+    com_curvas = _ajustes_da_lut(clipe, ajustes, luts)
+    if com_curvas:
         lut = f"{pasta}/{nome_da_lut(com_curvas)}"
         auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
@@ -907,7 +927,8 @@ def _com_os_invertidos(projeto: dict, midias: dict[str, MidiaDoRender]) -> tuple
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
                     textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".",
-                    ganho_db: float = 0.0, imagem_rgb: bool = False, sem_imagem: bool = False) -> PlanoDeRender:
+                    ganho_db: float = 0.0, imagem_rgb: bool = False, sem_imagem: bool = False,
+                    luts: dict | None = None) -> PlanoDeRender:
     """
     projeto: a cópia guardada na exportação (proporcao, taxa, fundo, faixas, duracao).
     midias: id → arquivo e tamanho da imagem de cada mídia usada.
@@ -916,6 +937,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     ganho_db: o ganho da mistura, medido na primeira passada (veja ganho_para_o_alvo).
     imagem_rgb: a imagem sai em RGB, sem a conversão para o vídeo e sem o som no grafo (o quadro em PNG e o GIF).
     sem_imagem: só o som interessa (exportar só o som): os textos não são desenhados nem entram no grafo.
+    luts: id → LutImportada (core/utils/lut.py) das LUTs que os clipes usam.
     """
     textos = textos or {}
     duracao = segundos(projeto["duracao"])
@@ -996,7 +1018,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     for numero, (clipe, destaque) in enumerate(camadas, start=1):
         if clipe.get("ajuste"):
             anterior = _camada_de_ajuste(clipe, anterior, numero, largura, altura, taxa, pasta, quadro, entradas,
-                                         auxiliares, linhas)
+                                         auxiliares, linhas, luts)
             continue
         if clipe.get("texto"):
             imagem = textos[clipe["id"]]
@@ -1015,14 +1037,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                              f"numa resolução menor.")
         # O efeito (VHS) soma aos ajustes de cor do clipe
         ajustes = somar_ajustes(ajustes_efetivos(clipe.get("cor")), ajustes_do_efeito(clipe))
-        curvas = (clipe.get("cor") or {}).get("curvas")
-        hsl = (clipe.get("cor") or {}).get("hsl")
         linhas_vhs = linhas_do_efeito(clipe)
         lut = vinheta = None
-        if not cor_neutra({**ajustes, "vinheta": 0}) or not curvas_neutras(curvas) or not hsl_neutro(hsl):
-            # A cor por matiz e as curvas entram na mesma LUT, depois dos ajustes
-            com_curvas = {**ajustes, "curvas": None if curvas_neutras(curvas) else curvas,
-                          "hsl": None if hsl_neutro(hsl) else hsl}
+        # A LUT importada, a cor por matiz e as curvas entram na mesma LUT dos ajustes
+        com_curvas = _ajustes_da_lut(clipe, ajustes, luts)
+        if com_curvas:
             lut = f"{pasta}/{nome_da_lut(com_curvas)}"
             auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
         if ajustes["vinheta"] > 0 or linhas_vhs > 0:

@@ -1,9 +1,9 @@
 "use client";
 
-import { LoaderCircle, RotateCcw, WandSparkles } from "lucide-react";
-import { useState } from "react";
+import { FileUp, LoaderCircle, RotateCcw, Trash2, WandSparkles } from "lucide-react";
+import { useRef, useState } from "react";
 
-import { arquivoDaMidia, chamarApi } from "@/lib/api";
+import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
 import { amostraDaImagem } from "@/lib/previa/amostra";
 import type { Comando } from "@/lib/projeto/comandos";
 import {
@@ -25,6 +25,7 @@ import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
+import { useLuts } from "@/lib/useLuts";
 
 import { ControleNumerico } from "./ControleNumerico";
 import { EditorDeCurva } from "./EditorDeCurva";
@@ -53,6 +54,109 @@ function Melhorar({ midia, travada, aoAplicar }: { midia: Midia; travada: boolea
       </button>
       {erro ? <p className="mt-1 text-[11px] text-erro">{erro}</p> : null}
     </div>
+  );
+}
+
+/**
+ * LUT importada (.cube): escolher uma do espaço ou enviar outra, e a intensidade. Ela entra antes dos ajustes,
+ * na mesma LUT 3D da prévia e do render.
+ */
+function LutDoClipe({
+  cor,
+  travada,
+  aoPrever,
+  aoExecutar,
+  aoMudar,
+}: {
+  cor: Cor;
+  travada: boolean;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+  aoMudar: (mudanca: Partial<Cor>) => Comando;
+}) {
+  const { luts, erro, importar, excluir } = useLuts();
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const arquivo = useRef<HTMLInputElement>(null);
+  const atual = cor.lut ?? null;
+  const conhecida = atual && luts ? luts.some((lut) => lut.id === atual.id) : true;
+
+  function enviar(lista: FileList | null) {
+    const escolhido = lista?.[0];
+    if (!escolhido) return;
+    setEnviando(true);
+    setAviso("");
+    importar(escolhido)
+      .then((nova) => aoExecutar(aoMudar({ lut: { id: nova.id, intensidade: atual?.intensidade ?? 1 } })))
+      .catch((e) => setAviso(e instanceof ErroApi ? e.message : "Não foi possível importar a LUT."))
+      .finally(() => {
+        setEnviando(false);
+        if (arquivo.current) arquivo.current.value = "";
+      });
+  }
+
+  return (
+    <section className="border-b border-borda/60 pb-2 pt-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">LUT</h3>
+      <div className="mt-1 flex items-center gap-1">
+        <select
+          value={atual?.id ?? ""}
+          disabled={travada}
+          aria-label="LUT"
+          onChange={(evento) => {
+            const id = evento.currentTarget.value;
+            aoExecutar(aoMudar({ lut: id ? { id, intensidade: atual?.intensidade ?? 1 } : null }));
+          }}
+          className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+        >
+          <option value="">Nenhuma</option>
+          {atual && !conhecida ? <option value={atual.id}>(excluída)</option> : null}
+          {(luts ?? []).map((lut) => (
+            <option key={lut.id} value={lut.id}>
+              {lut.nome}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="botao-icone size-7" disabled={travada || enviando} onClick={() => arquivo.current?.click()} aria-label="Importar uma LUT (.cube)" title="Importar uma LUT (.cube)">
+          {enviando ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> : <FileUp className="size-3.5" aria-hidden />}
+        </button>
+        {atual && conhecida ? (
+          <button
+            type="button"
+            className="botao-icone size-7"
+            disabled={travada}
+            onClick={() => {
+              setAviso("");
+              excluir(atual.id).catch((e) => setAviso(e instanceof ErroApi ? e.message : "Não foi possível excluir a LUT."));
+            }}
+            aria-label="Excluir a LUT do espaço"
+            title="Excluir a LUT do espaço"
+          >
+            <Trash2 className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+        <input ref={arquivo} type="file" accept=".cube" className="hidden" onChange={(evento) => enviar(evento.currentTarget.files)} />
+      </div>
+      {atual ? (
+        <ControleNumerico
+          rotulo="Intensidade"
+          valor={atual.intensidade * 100}
+          minimo={0}
+          maximo={100}
+          sufixo="%"
+          desativado={travada}
+          aoPrever={(valor) => aoPrever(aoMudar({ lut: { ...atual, intensidade: valor / 100 } }))}
+          aoConfirmar={(valor) => {
+            if (Math.abs(valor / 100 - atual.intensidade) < PERTO) aoPrever(null);
+            else aoExecutar(aoMudar({ lut: { ...atual, intensidade: valor / 100 } }));
+          }}
+        />
+      ) : (
+        <p className="mt-1 text-[11px] text-suave">Um arquivo .cube 3D, de câmera ou de cor pronta. Ela entra antes dos ajustes.</p>
+      )}
+      {atual && !conhecida ? <p className="mt-1 text-[11px] text-erro">A LUT deste clipe foi excluída. Escolha outra ou tire a LUT para exportar.</p> : null}
+      {aviso || erro ? <p className="mt-1 text-[11px] text-erro">{aviso || erro}</p> : null}
+    </section>
   );
 }
 
@@ -188,7 +292,11 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
   /** Os ajustes aparecem de -100 a 100 (a exposição, em pontos de luz, de -2 a 2). */
   const fator = (chave: keyof AjustesCor) => (chave === "exposicao" ? 1 : 100);
   const mudou =
-    (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null || !curvasNeutras(cor.curvas) || !hslNeutro(cor.hsl);
+    (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) ||
+    cor.filtro !== null ||
+    !curvasNeutras(cor.curvas) ||
+    !hslNeutro(cor.hsl) ||
+    Boolean(cor.lut);
 
   const controle = (chave: keyof AjustesCor) => ({
     valor: cor[chave] * fator(chave),
@@ -261,6 +369,7 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
         ) : null}
         {midia?.video && !midia.elemento && !midia.animacao ? <Melhorar midia={midia} travada={travada} aoAplicar={(ajustes) => aoExecutar(comando(ajustes))} /> : null}
       </section>
+      <LutDoClipe cor={cor} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} aoMudar={comando} />
       {GRUPOS.filter((grupo) => grupo.id !== "efeito").map(secao)}
       <section className="border-b border-borda/60 pb-3 pt-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Rodas de cor</h3>

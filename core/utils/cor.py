@@ -12,6 +12,8 @@ import math
 import numpy as np
 from PIL import Image
 
+from core.utils.lut import aplicar_lut
+
 AJUSTES_NEUTROS = {"temperatura": 0, "tom": 0, "exposicao": 0, "contraste": 0, "realces": 0, "sombras": 0,
                    "saturacao": 0, "vinheta": 0, "matiz_escuros": 0, "forca_escuros": 0, "matiz_medios": 0,
                    "forca_medios": 0, "matiz_claros": 0, "forca_claros": 0, "vibracao": 0, "brancos": 0, "pretos": 0,
@@ -219,15 +221,20 @@ def aplicar_hsl(rgb: tuple[float, float, float], hsl: dict | None) -> tuple[floa
 
 def gerar_cube(ajustes: dict, pontos: int = PONTOS_LUT) -> str:
     """
-    LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede). A cor por matiz
-    (ajustes["hsl"]) e as curvas (ajustes["curvas"]), se houver, entram depois dos ajustes, nesta ordem.
+    LUT 3D no formato .cube (o vermelho varia mais rápido, como o formato pede). A LUT importada
+    (ajustes["lut"]: {"dados", "intensidade"}) entra antes de tudo; a cor por matiz (ajustes["hsl"]) e as curvas
+    (ajustes["curvas"]), se houver, depois dos ajustes, nesta ordem.
     """
     linhas = ["# TakeOne: ajustes de cor", f"LUT_3D_SIZE {pontos}"]
     passo = pontos - 1
+    importada = ajustes.get("lut")
     for b in range(pontos):
         for g in range(pontos):
             for r in range(pontos):
-                cor = aplicar_hsl(aplicar_cor((r / passo, g / passo, b / passo), ajustes), ajustes.get("hsl"))
+                cor = (r / passo, g / passo, b / passo)
+                if importada:
+                    cor = aplicar_lut(cor, importada["dados"], importada["intensidade"])
+                cor = aplicar_hsl(aplicar_cor(cor, ajustes), ajustes.get("hsl"))
                 saida = aplicar_curvas(cor, ajustes.get("curvas"))
                 linhas.append(" ".join(f"{v:.6f}" for v in saida))
     return "\n".join(linhas) + "\n"
@@ -240,6 +247,8 @@ def nome_da_lut(ajustes: dict) -> str:
         chave += repr(sorted(ajustes["curvas"].items()))
     if not hsl_neutro(ajustes.get("hsl")):
         chave += repr(sorted((nome, sorted(faixa.items())) for nome, faixa in ajustes["hsl"].items()))
+    if ajustes.get("lut"):
+        chave += f"lut:{ajustes['lut']['id']}:{ajustes['lut']['intensidade']:.6f}"
     return f"cor_{hashlib.sha1(chave.encode()).hexdigest()[:12]}.cube"
 
 

@@ -14,6 +14,8 @@ import { duracaoDoQuadro, formatarTimecode, type Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
+import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
+import { useTabelasDasLuts } from "@/lib/useLuts";
 import { GuiasDaPrevia } from "./GuiasDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { MedidorDeLoudness } from "./MedidorDeLoudness";
@@ -112,6 +114,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
   ).filter((item) => item.midia.audio && !item.clipe.som_separado);
   // O texto com destaque pede também a imagem na cor do destaque, que vai por cima
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
+  // As tabelas das LUTs importadas: quando uma chega, a prévia volta a montar as camadas com ela
+  useTabelasDasLuts(lutsDoProjeto(projeto));
   const camadas = camadasNoTempo(projeto, visuais, tempo, tamanho, imagensDeTexto);
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;

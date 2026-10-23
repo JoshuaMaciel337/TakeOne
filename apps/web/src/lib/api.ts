@@ -16,7 +16,7 @@ type Opcoes = {
   corpo?: unknown;
 };
 
-function mensagemPadrao(status: number): string {
+export function mensagemPadrao(status: number): string {
   if (status >= 500) {
     return "O servidor do TakeOne está fora do ar no momento. Tente de novo em alguns minutos.";
   }

@@ -483,6 +483,21 @@ class FaixaDeMatizEntrada(BaseModel):
     luminancia: float = Field(default=0, ge=-1, le=1)
 
 
+class LutDoClipeEntrada(BaseModel):
+    """Uma LUT importada (/api/luts), antes dos ajustes, misturada ao original pela intensidade."""
+    id: str = Field(min_length=24, max_length=24)
+    intensidade: float = Field(default=1, ge=0, le=1)
+
+
+class LutSaida(BaseModel):
+    id: str
+    nome: str
+    tamanho: int
+    minimo: list[float]
+    maximo: list[float]
+    criado_em: datetime
+
+
 class CorEntrada(BaseModel):
     """Os limites são os de apps/web/src/lib/projeto/cor.ts."""
     temperatura: float = Field(default=0, ge=-1, le=1)
@@ -513,6 +528,7 @@ class CorEntrada(BaseModel):
     filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama", "cinema"] | None = None
     intensidade: float = Field(default=1, ge=0, le=2)
     curvas: CurvasEntrada | None = None
+    lut: LutDoClipeEntrada | None = None
 
 
 class MascaraEntrada(BaseModel):

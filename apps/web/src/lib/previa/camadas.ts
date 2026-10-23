@@ -21,6 +21,7 @@ import {
   posicaoDaLuz,
 } from "@/lib/projeto/efeitos";
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
+import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
@@ -148,11 +149,16 @@ function corDoClipe(clipe: Clipe): Pick<CamadaNaTela, "lut" | "vinheta"> {
   const semVinheta = { ...ajustes, vinheta: 0 };
   const curvas = curvasNeutras(clipe.cor?.curvas) ? null : clipe.cor!.curvas!;
   const hsl = hslNeutro(clipe.cor?.hsl) ? null : clipe.cor!.hsl!;
-  if (corNeutra(semVinheta) && !curvas && !hsl) return { lut: null, vinheta };
-  const chave = JSON.stringify([semVinheta, curvas, hsl]);
+  // A LUT importada só entra quando a tabela já chegou da API (lib/projeto/lutImportada.ts); até lá, a prévia
+  // mostra sem ela, e a exportação no navegador espera (pendencias.ts)
+  const doClipe = clipe.cor?.lut && clipe.cor.lut.intensidade > 0 ? clipe.cor.lut : null;
+  const tabela = doClipe ? lutGuardada(doClipe.id) : null;
+  const importada = doClipe && tabela ? { lut: tabela, intensidade: doClipe.intensidade } : null;
+  if (corNeutra(semVinheta) && !curvas && !hsl && !importada) return { lut: null, vinheta };
+  const chave = JSON.stringify([semVinheta, curvas, hsl, importada ? [doClipe!.id, doClipe!.intensidade] : null]);
   let lut = luts.get(chave);
   if (!lut) {
-    lut = { chave, dados: lutDaCor(semVinheta, curvas, hsl) };
+    lut = { chave, dados: lutDaCor(semVinheta, curvas, hsl, importada) };
     if (luts.size > 40) luts.clear();
     luts.set(chave, lut);
   }
