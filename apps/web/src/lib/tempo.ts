@@ -117,6 +117,13 @@ export function baseDoTimecode(taxa: Taxa): number {
 }
 
 /** "MM:SS:QQ", ou "H:MM:SS:QQ" a partir de uma hora. Timecode sem drop-frame. */
+/** O código de tempo sempre com as horas ("00:00:05:12"), como no monitor e na linha do tempo dos editores profissionais. */
+export function formatarTimecodeLongo(t: Tick, taxa: Taxa): string {
+  const curto = formatarTimecode(t, taxa);
+  const partes = curto.split(":");
+  return partes.length === 3 ? `00:${curto}` : `${partes[0].padStart(2, "0")}:${partes.slice(1).join(":")}`;
+}
+
 export function formatarTimecode(t: Tick, taxa: Taxa): string {
   const base = baseDoTimecode(taxa);
   const quadro = quadroEm(taxa, Math.max(0, t));

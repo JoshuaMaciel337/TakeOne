@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize, Pause, Play, SquareDashed, TriangleAlert } from "lucide-react";
+import { Bookmark, Camera, ChevronFirst, ChevronLast, Maximize, Pause, Play, SkipBack, SkipForward, SquareDashed, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
@@ -10,7 +10,7 @@ import { contemPonto, type Guias, pontoNaCaixa, type Tamanho } from "@/lib/proje
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
-import { duracaoDoQuadro, formatarTimecode, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { duracaoDoQuadro, formatarTimecode, formatarTimecodeLongo, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
@@ -41,6 +41,11 @@ type Props = {
   desenhoDaMascara?: { clipeId: string; aoConcluir: (pontos: [number, number][]) => void; aoCancelar: () => void } | null;
   /** `proprio`: o objeto é marcado no próprio clipe (esconder uma placa), não num vídeo embaixo dele. */
   marcacao?: { seguidorId: string; proprio?: boolean; aoConfirmar: (marcado: ObjetoMarcado) => void; aoCancelar: () => void } | null;
+  /**
+   * O monitor Programa dos editores profissionais: código de tempo azul, os botões de sempre embaixo (marcador,
+   * ir ao começo, quadro anterior, reproduzir, quadro seguinte, ir ao fim, exportar quadro) e a duração à direita.
+   */
+  programa?: { aoQuadro: (passo: -1 | 1) => void; aoIr: (onde: "inicio" | "fim") => void; aoMarcador: () => void; aoExportarQuadro: () => void };
   className?: string;
 };
 
@@ -99,7 +104,7 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, className = "" }: Props) {
+export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, className = "" }: Props) {
   // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
   const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao), [projetoDaEdicao]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
@@ -333,6 +338,63 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
         </div>
       </div>
 
+      {programa ? (
+        <div className="flex h-10 shrink-0 items-center gap-2 border-t border-borda px-2">
+          <span className="w-32 font-mono text-base tabular-nums text-codigo" aria-label="Código de tempo do cursor">
+            {formatarTimecodeLongo(tempo, projeto.taxa)}
+          </span>
+          <div className="flex flex-1 items-center justify-center gap-0.5">
+            <button type="button" className="botao-icone size-7" onClick={programa.aoMarcador} aria-label="Adicionar marcador" title="Adicionar marcador (M)">
+              <Bookmark className="size-4" aria-hidden />
+            </button>
+            <span className="mx-1 h-4 w-px bg-borda" aria-hidden />
+            <button type="button" className="botao-icone size-7" onClick={() => programa.aoIr("inicio")} aria-label="Ir para o começo" title="Ir para o começo (Home)">
+              <ChevronFirst className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-7" onClick={() => programa.aoQuadro(-1)} aria-label="Voltar um quadro" title="Voltar um quadro (seta para a esquerda)">
+              <SkipBack className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-8" disabled={vazio} onClick={aoAlternar} aria-label={tocando ? "Pausar" : "Reproduzir"} title={tocando ? "Parar (espaço)" : "Reproduzir (espaço)"}>
+              {tocando ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
+            </button>
+            <button type="button" className="botao-icone size-7" onClick={() => programa.aoQuadro(1)} aria-label="Avançar um quadro" title="Avançar um quadro (seta para a direita)">
+              <SkipForward className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-7" onClick={() => programa.aoIr("fim")} aria-label="Ir para o fim" title="Ir para o fim (End)">
+              <ChevronLast className="size-4" aria-hidden />
+            </button>
+            <span className="mx-1 h-4 w-px bg-borda" aria-hidden />
+            <button type="button" className="botao-icone size-7" disabled={vazio} onClick={programa.aoExportarQuadro} aria-label="Exportar quadro" title="Exportar quadro (Ctrl+Shift+E)">
+              <Camera className="size-4" aria-hidden />
+            </button>
+          </div>
+          <div className="flex w-32 items-center justify-end gap-0.5">
+            <button
+              type="button"
+              className={`botao-icone size-7 ${modoDasGuias === "desligadas" ? "" : "text-destaque"}`}
+              onClick={() => {
+                const proximo = proximoModo(modoDasGuias);
+                setModoDasGuias(proximo);
+                try {
+                  localStorage.setItem(CHAVE_GUIAS, proximo);
+                } catch {
+                  // Sem armazenamento (janela anônima), a escolha vale só até recarregar
+                }
+              }}
+              aria-label={`Guias: ${MODOS_DAS_GUIAS.find((modo) => modo.id === modoDasGuias)?.nome}`}
+              title={`Guias: ${MODOS_DAS_GUIAS.find((modo) => modo.id === modoDasGuias)?.nome} (clique para trocar)`}
+            >
+              <SquareDashed className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-7" disabled={!suportado} onClick={() => void canvasRef.current?.requestFullscreen()} aria-label="Tela cheia" title="Tela cheia">
+              <Maximize className="size-4" aria-hidden />
+            </button>
+            <span className="font-mono text-xs tabular-nums text-suave" title="Duração da sequência">
+              {formatarTimecodeLongo(projeto.duracao, projeto.taxa)}
+            </span>
+          </div>
+        </div>
+      ) : (
       <div className="flex h-11 shrink-0 items-center gap-3 border-t border-borda px-3">
         <span className="w-40 text-xs tabular-nums text-suave">
           <span className="text-texto">{formatarTimecode(tempo, projeto.taxa)}</span> / {formatarTimecode(projeto.duracao, projeto.taxa)}
@@ -380,6 +442,7 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
           </button>
         </div>
       </div>
+      )}
     </section>
   );
 }

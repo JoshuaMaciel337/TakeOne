@@ -157,13 +157,15 @@ type Props = {
   aoFechar?: () => void;
   /** Abre uma aba de fora (os menus e os painéis do editor de imagem); `vez` muda a cada pedido. */
   pedidoDeAba?: { aba: IdAba; vez: number };
+  /** Só estas abas (os painéis do layout profissional dividem as propriedades: Controles de efeito, Cor, Metadados). */
+  somenteAbas?: readonly IdAba[];
   /** Sem nada escolhido, no lugar do aviso (as propriedades do documento, no editor de imagem). */
   semSelecao?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, semSelecao, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, semSelecao, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -177,7 +179,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
     setAba(pedidoDeAba.aba);
   }
   const ehAudio = selecionado?.faixa.tipo === "audio";
-  const abas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.ajuste
+  const todasAsAbas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.ajuste
     ? ABAS_AJUSTE
     : modo === "imagem"
       ? ehTexto
@@ -186,8 +188,18 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
       : ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
   // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
   // Num clipe de áudio, a aba que não existe vira a do som
-  const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio ? "audio" : abas[0].id;
-  const atual = abas.find((item) => item.id === aba)!;
+  const abas = somenteAbas ? todasAsAbas.filter((item) => somenteAbas.includes(item.id)) : todasAsAbas;
+  const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio && abas.some((item) => item.id === "audio") ? "audio" : (abas[0]?.id ?? "info");
+  const atual = abas.find((item) => item.id === aba) ?? { id: aba, nome: "", fase: "" };
+  // O painel não tem o que mostrar para esta escolha (a Cor de um som, os Controles de efeito sem clipe)
+  if ((selecionado && !abas.length) || (!selecionado && midia && somenteAbas && !somenteAbas.includes("info"))) {
+    return (
+      <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col items-center justify-center gap-2 bg-painel p-6 text-center ${className}`}>
+        <MousePointerClick className="size-6 text-suave" aria-hidden />
+        <p className="text-xs text-suave">{selecionado ? "Este clipe não tem nada para ajustar aqui." : "Selecione um clipe na linha do tempo."}</p>
+      </aside>
+    );
+  }
 
   if (!midia && !selecionado) {
     if (semSelecao) {
@@ -199,7 +211,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
     }
     return (
       <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
-        {modo === "imagem" ? null : (
+        {modo === "imagem" || somenteAbas ? null : (
           <div className="border-b border-borda p-3">
             <h3 className="text-sm font-semibold">Projeto</h3>
             <div className="mt-1">
@@ -235,7 +247,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
         </div>
       ) : null}
       {/* As abas quebram em linhas: com rolagem para o lado, Animação e Cor ficavam escondidas num painel estreito */}
-      <div role="tablist" aria-label="Propriedades" className="flex shrink-0 flex-wrap gap-1 border-b border-borda px-2 py-1.5">
+      <div role="tablist" aria-label="Propriedades" hidden={Boolean(somenteAbas) && abas.length < 2} className="flex shrink-0 flex-wrap gap-1 border-b border-borda px-2 py-1.5">
         {abas.map((item) => (
           <button
             key={item.id}

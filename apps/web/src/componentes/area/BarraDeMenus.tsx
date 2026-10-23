@@ -70,6 +70,8 @@ export function useAtalhosDosMenus(menus: Menu[], ativo = true) {
     const ouvir = (evento: KeyboardEvent) => {
       const alvo = evento.target as HTMLElement | null;
       if (alvo?.closest("input, textarea, select, [contenteditable='true'], [role='menu']")) return;
+      // Já atendido por outro ouvinte do editor (as teclas de sempre): não roda duas vezes
+      if (evento.defaultPrevented) return;
       const tecla = teclaDoEvento(evento);
       if (!tecla) return;
       for (const menu of menusRef.current) {

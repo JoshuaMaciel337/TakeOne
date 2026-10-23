@@ -7,6 +7,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 
 import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
 import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
+import { PainelHistorico } from "@/componentes/area/PainelHistorico";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 import { contextoDasMidias } from "@/componentes/editor/contexto";
@@ -40,7 +41,7 @@ import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
 import { PainelFotoIA } from "./PainelFotoIA";
-import { PainelAjustes, PainelAmostras, PainelBiblioteca, PainelCor, PainelHistorico, PainelModelosDaImagem } from "./PaineisDaImagem";
+import { PainelAjustes, PainelAmostras, PainelBiblioteca, PainelCor, PainelModelosDaImagem } from "./PaineisDaImagem";
 import { PreviaDaImagem, proximoZoom } from "./PreviaDaImagem";
 import { PropriedadesDoDocumento } from "./PropriedadesDoDocumento";
 import { useObjeto } from "./useObjeto";
@@ -347,7 +348,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
-    if (!projeto || janelaAberta) return;
+    if (!projeto || janelaAberta || evento.defaultPrevented) return;
     const alvo = evento.target as HTMLElement;
     if (alvo.closest("input, textarea, select, [contenteditable='true'], [role='menu']")) return;
     if (evento.ctrlKey || evento.metaKey || evento.altKey) return;

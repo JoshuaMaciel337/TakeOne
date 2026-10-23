@@ -544,7 +544,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 12.1 Fundação: barra de menus, grupos de painéis com abas, áreas de trabalho guardadas e barra de status.
   - [x] 12.2 Editor de imagem: layout "Essenciais", ferramentas, barra de opções, Camadas, Propriedades e Ajustes, Histórico, Cor e Amostras.
   - [ ] Depois da 12.2, no editor de imagem: escrever direto na tela com a ferramenta Texto (hoje o texto nasce com "Texto" e muda na aba Texto), as formigas andando em volta da seleção (hoje uma área cinza) e Selecionar > Tudo e Inverter.
-  - [ ] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
+  - [x] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
   - [ ] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
   - [ ] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
   - [ ] 12.6 Monitor de origem, com Inserir e Sobrescrever.

@@ -162,7 +162,9 @@ export function GrupoDePaineis({ grupo, paineis, area, className = "", style }: 
   ];
   return (
     <section aria-label={ativo?.nome ?? grupo.id} className={`flex min-h-0 flex-col overflow-hidden bg-painel ${className}`} style={style}>
-      <div role="tablist" className="flex h-7 shrink-0 items-stretch bg-painel-2/60 pr-1" onDoubleClick={(evento) => evento.target === evento.currentTarget && area.recolher(grupo.id)}>
+      <div className="flex h-7 shrink-0 items-stretch bg-painel-2/60 pr-1">
+        {/* As abas rolam para o lado quando não cabem (sem encolher o nome até sumir) */}
+        <div role="tablist" className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none]" onDoubleClick={(evento) => evento.target === evento.currentTarget && area.recolher(grupo.id)}>
         {grupo.abas.map((id) => (
           <button
             key={id}
@@ -171,11 +173,12 @@ export function GrupoDePaineis({ grupo, paineis, area, className = "", style }: 
             aria-selected={id === grupo.ativa}
             onClick={() => (id === grupo.ativa && grupo.recolhido ? area.recolher(grupo.id) : area.ativar(grupo.id, id))}
             onDoubleClick={() => area.recolher(grupo.id)}
-            className={`max-w-40 truncate border-r border-borda/60 px-3 text-[11px] transition ${id === grupo.ativa && !grupo.recolhido ? "bg-painel font-semibold text-texto" : "text-suave hover:text-texto"}`}
+            className={`max-w-40 shrink-0 truncate border-r border-borda/60 px-3 text-[11px] transition ${id === grupo.ativa && !grupo.recolhido ? "bg-painel font-semibold text-texto" : "text-suave hover:text-texto"}`}
           >
             {paineis[id]?.nome ?? id}
           </button>
         ))}
+        </div>
         <MenuDoGrupo itens={menu} />
       </div>
       {grupo.recolhido ? null : <div className="min-h-0 flex-1 overflow-y-auto">{ativo?.conteudo}</div>}

@@ -17,6 +17,8 @@
   --to-sucesso: #35d3a1;
   --to-aviso: #fbbf24;
   --to-erro: #f43f5e;
+  /* O código de tempo do editor de vídeo, no azul que os editores profissionais usam */
+  --to-codigo: #4aa3ff;
   --to-gradiente: linear-gradient(120deg, var(--to-destaque) 0%, var(--to-destaque-2) 100%);
   color-scheme: dark;
 }
@@ -34,6 +36,7 @@
   --to-sucesso: #0f9f75;
   --to-aviso: #c2780a;
   --to-erro: #e11d48;
+  --to-codigo: #1565c0;
   color-scheme: light;
 }
 
@@ -52,6 +55,7 @@
   --color-sucesso: var(--to-sucesso);
   --color-aviso: var(--to-aviso);
   --color-erro: var(--to-erro);
+  --color-codigo: var(--to-codigo);
 
   --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-inter), system-ui, sans-serif;

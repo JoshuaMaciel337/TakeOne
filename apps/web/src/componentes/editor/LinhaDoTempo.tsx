@@ -35,7 +35,7 @@ import { CHAVES_DE_KEYFRAME } from "@/lib/projeto/keyframes";
 import { acharClipe, type Clipe, CORES_DOS_MARCADORES, type Faixa, faixaDeTexto, fimDoClipe, type Marcador, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
-import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { formatarTimecodeLongo, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { MarcasDoRitmo } from "./NoRitmo";
@@ -55,6 +55,10 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
   /** Congela o quadro do cursor no vídeo escolhido da principal (sem ele, o botão fica desligado). */
   aoCongelar?: () => void;
+  /** O layout dos editores profissionais: o código de tempo azul na barra e as faixas V1, V2… e A1, A2… */
+  profissional?: boolean;
+  /** O zoom pedido de fora (os menus): multiplica o atual; `vez` muda a cada pedido. */
+  pedidoDeZoom?: { fator: number; vez: number };
   className?: string;
   style?: React.CSSProperties;
 };
@@ -119,6 +123,13 @@ type Arrasto =
   | { tipo: "corte"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "soltar"; comando: Comando; guia: Tick | null };
 
+/** O código da faixa nos editores profissionais: as de imagem são V1 (a principal), V2… de baixo para cima; as de som, A1, A2… */
+export function codigoDaFaixa(faixa: Faixa, projeto: Projeto): string {
+  if (faixa.tipo === "audio") return `A${projeto.faixas.filter((item) => item.tipo === "audio").indexOf(faixa) + 1}`;
+  const imagem = projeto.faixas.filter((item) => item.tipo !== "audio");
+  return `V${imagem.length - imagem.indexOf(faixa)}`;
+}
+
 export function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
   if (faixa.tipo === "principal") return "Principal";
   const iguais = projeto.faixas.filter((item) => item.tipo === faixa.tipo);
@@ -141,10 +152,18 @@ export function LinhaDoTempo({
   aoSelecionar,
   aoExecutar,
   aoCongelar,
+  profissional = false,
+  pedidoDeZoom,
   className = "",
   style,
 }: Props) {
   const [zoom, setZoom] = useState(40);
+  // O pedido de fora vale uma vez (o estado muda durante a renderização, sem efeito)
+  const [zoomVisto, setZoomVisto] = useState(0);
+  if (pedidoDeZoom && pedidoDeZoom.vez !== zoomVisto) {
+    setZoomVisto(pedidoDeZoom.vez);
+    setZoom((valor) => Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, valor * pedidoDeZoom.fator)));
+  }
   const rolagem = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
   const [larguraVisivel, setLarguraVisivel] = useState(0);
@@ -412,6 +431,11 @@ export function LinhaDoTempo({
   return (
     <section aria-label="Linha do tempo" style={style} className={`isolate flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-borda px-2">
+        {profissional ? (
+          <span className="mr-2 font-mono text-lg font-medium tabular-nums text-codigo" title="O cursor da linha do tempo" aria-label="Código de tempo do cursor">
+            {formatarTimecodeLongo(tempo, exibido.taxa)}
+          </span>
+        ) : null}
         <button
           type="button"
           className="botao-icone"
@@ -533,6 +557,7 @@ export function LinhaDoTempo({
                   key={faixa.id}
                   faixa={faixa}
                   nome={nomeDaFaixa(faixa, exibido)}
+                  codigo={profissional ? codigoDaFaixa(faixa, exibido) : undefined}
                   compacto={compacto}
                   topo={topo}
                   altura={altura}
@@ -685,6 +710,7 @@ export function LinhaDoTempo({
 function CabecalhoDaFaixa({
   faixa,
   nome,
+  codigo,
   compacto,
   topo,
   altura,
@@ -692,6 +718,7 @@ function CabecalhoDaFaixa({
 }: {
   faixa: Faixa;
   nome: string;
+  codigo?: string;
   compacto: boolean;
   topo: number;
   altura: number;
@@ -703,9 +730,20 @@ function CabecalhoDaFaixa({
     <div
       className={`absolute inset-x-0 flex items-center gap-1 border-b border-borda/60 px-2 text-[11px] text-suave ${compacto ? "justify-end" : ""}`}
       style={{ top: topo, height: altura }}
-      title={nome}
+      title={codigo ? `${codigo} · ${nome}` : nome}
     >
-      {compacto ? null : (
+      {codigo ? (
+        // Como nos editores profissionais: o cadeado primeiro, o código da faixa e depois os botões
+        <>
+          <button type="button" className={botao} onClick={() => aoAlternar("travada")} aria-pressed={faixa.travada} aria-label={faixa.travada ? `Destravar ${nome}` : `Travar ${nome}`} title={faixa.travada ? "Destravar a faixa" : "Travar a faixa"}>
+            {faixa.travada ? <Lock className="size-3.5" aria-hidden /> : <LockOpen className="size-3.5" aria-hidden />}
+          </button>
+          <span className={`grid h-5 min-w-7 place-items-center rounded px-1 text-[11px] font-semibold ${faixa.tipo === "audio" ? "bg-sucesso/20 text-texto" : "bg-codigo/25 text-texto"}`}>{codigo}</span>
+          {/* O nome fica na dica: a coluna estreita só mostra o tipo da faixa */}
+          <Icone className="size-3 shrink-0 opacity-70" aria-hidden />
+          <span className="flex-1" />
+        </>
+      ) : compacto ? null : (
         <>
           <Icone className="size-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1 truncate">{nome}</span>
@@ -722,9 +760,11 @@ function CabecalhoDaFaixa({
           {faixa.muda ? <VolumeX className="size-3.5" aria-hidden /> : <Volume2 className="size-3.5" aria-hidden />}
         </button>
       ) : null}
-      <button type="button" className={botao} onClick={() => aoAlternar("travada")} aria-pressed={faixa.travada} aria-label={faixa.travada ? `Destravar ${nome}` : `Travar ${nome}`} title={faixa.travada ? "Destravar" : "Travar"}>
-        {faixa.travada ? <Lock className="size-3.5" aria-hidden /> : <LockOpen className="size-3.5" aria-hidden />}
-      </button>
+      {codigo ? null : (
+        <button type="button" className={botao} onClick={() => aoAlternar("travada")} aria-pressed={faixa.travada} aria-label={faixa.travada ? `Destravar ${nome}` : `Travar ${nome}`} title={faixa.travada ? "Destravar" : "Travar"}>
+          {faixa.travada ? <Lock className="size-3.5" aria-hidden /> : <LockOpen className="size-3.5" aria-hidden />}
+        </button>
+      )}
     </div>
   );
 }

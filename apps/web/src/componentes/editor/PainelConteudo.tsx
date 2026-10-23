@@ -151,7 +151,8 @@ function EmBreve({ ferramenta }: { ferramenta: Ferramenta }) {
   );
 }
 
-export function PainelConteudo({
+/** O conteúdo de uma ferramenta, sem o invólucro: os painéis do layout profissional (Projeto, Efeitos, Texto…) usam os mesmos. */
+export function ConteudoDaFerramenta({
   ferramenta,
   biblioteca,
   midiaSelecionadaId,
@@ -164,12 +165,65 @@ export function PainelConteudo({
   legendas,
   selecionado,
   aoPrever,
-  aoFechar,
   modeloInicial,
   animacaoInicial,
-  className = "",
-  style,
-}: Props) {
+}: Omit<Props, "aoFechar" | "className" | "style">) {
+  return (
+    <>
+    {ferramenta.id === "midia" ? (
+      <PainelMidia
+        biblioteca={biblioteca}
+        midiaSelecionadaId={midiaSelecionadaId}
+        aoSelecionarMidia={aoSelecionarMidia}
+        aoAdicionarMidia={aoAdicionarMidia}
+        proporcao={legendas.projeto.proporcao}
+        aoExecutar={legendas.aoExecutar}
+        aoAvisar={legendas.aoAvisar}
+      />
+    ) : ferramenta.id === "audio" ? (
+      <PainelAudio aoPedir={aoPedirAnimacao} gravacao={gravacao} />
+    ) : ferramenta.id === "elementos" ? (
+      <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} animacaoInicial={animacaoInicial} />
+    ) : ferramenta.id === "texto" ? (
+      <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} animacaoInicial={animacaoInicial} />
+    ) : ferramenta.id === "legendas" ? (
+      <PainelLegendas {...legendas} />
+    ) : ferramenta.id === "transcricao" ? (
+      <PainelTranscricao
+        projeto={legendas.projeto}
+        tempo={legendas.tempo}
+        aoExecutar={legendas.aoExecutar}
+        aoBuscar={legendas.aoBuscar}
+        aoAvisar={legendas.aoAvisar}
+        aoPedirAnimacao={aoPedirAnimacao}
+      />
+    ) : ferramenta.id === "transicoes" ? (
+      <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
+    ) : ferramenta.id === "efeitos" ? (
+      <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
+    ) : ferramenta.id === "filtros" ? (
+      <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} tempo={legendas.tempo} />
+    ) : ferramenta.id === "modelos" ? (
+      <PainelModelos
+        projeto={legendas.projeto}
+        modeloInicial={modeloInicial}
+        midias={biblioteca.midias ?? []}
+        proporcao={legendas.projeto.proporcao}
+        aoExecutar={legendas.aoExecutar}
+        aoExecutarQuandoProntas={aoExecutarQuandoProntas}
+        aoAvisar={legendas.aoAvisar}
+      />
+    ) : ferramenta.id === "marca" ? (
+      <PainelMarca midias={biblioteca.midias ?? []} projeto={{ proporcao: legendas.projeto.proporcao, aoExecutar: legendas.aoExecutar }} aoAvisar={legendas.aoAvisar} />
+    ) : (
+      <EmBreve ferramenta={ferramenta} />
+    )}
+    </>
+  );
+}
+
+export function PainelConteudo({ aoFechar, className = "", style, ...props }: Props) {
+  const { ferramenta } = props;
   return (
     <aside
       aria-label={ferramenta.nome}
@@ -183,54 +237,7 @@ export function PainelConteudo({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {ferramenta.id === "midia" ? (
-          <PainelMidia
-            biblioteca={biblioteca}
-            midiaSelecionadaId={midiaSelecionadaId}
-            aoSelecionarMidia={aoSelecionarMidia}
-            aoAdicionarMidia={aoAdicionarMidia}
-            proporcao={legendas.projeto.proporcao}
-            aoExecutar={legendas.aoExecutar}
-            aoAvisar={legendas.aoAvisar}
-          />
-        ) : ferramenta.id === "audio" ? (
-          <PainelAudio aoPedir={aoPedirAnimacao} gravacao={gravacao} />
-        ) : ferramenta.id === "elementos" ? (
-          <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} animacaoInicial={animacaoInicial} />
-        ) : ferramenta.id === "texto" ? (
-          <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} animacaoInicial={animacaoInicial} />
-        ) : ferramenta.id === "legendas" ? (
-          <PainelLegendas {...legendas} />
-        ) : ferramenta.id === "transcricao" ? (
-          <PainelTranscricao
-            projeto={legendas.projeto}
-            tempo={legendas.tempo}
-            aoExecutar={legendas.aoExecutar}
-            aoBuscar={legendas.aoBuscar}
-            aoAvisar={legendas.aoAvisar}
-            aoPedirAnimacao={aoPedirAnimacao}
-          />
-        ) : ferramenta.id === "transicoes" ? (
-          <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
-        ) : ferramenta.id === "efeitos" ? (
-          <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
-        ) : ferramenta.id === "filtros" ? (
-          <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} tempo={legendas.tempo} />
-        ) : ferramenta.id === "modelos" ? (
-          <PainelModelos
-            projeto={legendas.projeto}
-            modeloInicial={modeloInicial}
-            midias={biblioteca.midias ?? []}
-            proporcao={legendas.projeto.proporcao}
-            aoExecutar={legendas.aoExecutar}
-            aoExecutarQuandoProntas={aoExecutarQuandoProntas}
-            aoAvisar={legendas.aoAvisar}
-          />
-        ) : ferramenta.id === "marca" ? (
-          <PainelMarca midias={biblioteca.midias ?? []} projeto={{ proporcao: legendas.projeto.proporcao, aoExecutar: legendas.aoExecutar }} aoAvisar={legendas.aoAvisar} />
-        ) : (
-          <EmBreve ferramenta={ferramenta} />
-        )}
+        <ConteudoDaFerramenta {...props} />
       </div>
     </aside>
   );

@@ -56,12 +56,14 @@ type Props = {
   /** O cursor: o instante do quadro em PNG. */
   tempo: Tick;
   aoFechar: () => void;
+  /** A escolha que já vem marcada (o "Exportar quadro" do monitor abre em Quadro). */
+  inicial?: Escolha;
 };
 
 /** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular), ou levar a edição para outro editor. */
-export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, tempo, aoFechar }: Props) {
+export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, tempo, aoFechar, inicial = "video" }: Props) {
   const { exportacoes, erro, exportar, excluir } = useExportacoes(projetoId, true);
-  const [escolha, setEscolha] = useState<Escolha>("video");
+  const [escolha, setEscolha] = useState<Escolha>(inicial);
   const [resolucao, setResolucao] = useState<Resolucao>("1080p");
   const [taxa, setTaxa] = useState<number | null>(null);
   const [taxaDoGif, setTaxaDoGif] = useState(TAXA_PADRAO_DO_GIF);

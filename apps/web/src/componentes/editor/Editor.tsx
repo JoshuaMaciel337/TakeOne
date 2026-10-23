@@ -1,18 +1,28 @@
 "use client";
 
-import { LoaderCircle, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Check, ChevronLeft, Download, Film, LoaderCircle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
+
+import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
+import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
+import { PainelHistorico } from "@/componentes/area/PainelHistorico";
+import { BotaoTema } from "@/componentes/BotaoTema";
+import { Simbolo } from "@/componentes/Logo";
 
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { chamarApi, ErroApi } from "@/lib/api";
-import { useEnvios } from "@/lib/envios";
+import { ACEITAR_ARQUIVOS, useEnvios } from "@/lib/envios";
+import type { EstadoDaArea } from "@/lib/areaDeTrabalho";
 import { enderecoDoProjeto } from "@/lib/hub";
 import { clipeParaAparar, corteVizinho, marcadorVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
+import type { Texto } from "@/lib/projeto/texto";
 import { retomarAudio } from "@/lib/previa/audio";
 import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S } from "@/lib/projeto/edicao";
-import { acharClipe, fimDoClipe, tempoNaMidia } from "@/lib/projeto/modelo";
+import { acharClipe, fimDoClipe, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
+import { TEXTO_PADRAO } from "@/lib/projeto/texto";
 import { duracaoDoQuadro, quadroMaisProximo, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
@@ -29,8 +39,13 @@ import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
 import { IniciarDesenhoDaMascara } from "./DesenhoDaMascara";
 import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
-import { PainelConteudo } from "./PainelConteudo";
-import { PainelPropriedades } from "./PainelPropriedades";
+import { JanelaSequencia } from "./JanelaSequencia";
+import { MedidoresDeAudio } from "./MedidoresDeAudio";
+import { type AcoesDoVideo, AREAS_DO_VIDEO, type IdPainelDoVideo, menusDoVideo, PAINEIS_DO_VIDEO } from "./menusDoVideo";
+import { ConteudoDaFerramenta, PainelConteudo } from "./PainelConteudo";
+import { PainelComRolagem, PainelEfeitosDoVideo, PainelGraficosEssenciais, PainelTextoDoVideo } from "./PaineisDoVideo";
+import { PainelMarcadores } from "./PainelMarcadores";
+import { type IdAba, PainelPropriedades } from "./PainelPropriedades";
 import { Previa } from "./Previa";
 import { useSeguirObjeto } from "./SeguirObjeto";
 import { useProjeto } from "./useProjeto";
@@ -38,6 +53,50 @@ import { useProjeto } from "./useProjeto";
 const CONTEUDO = { padrao: 320, minimo: 240, maximo: 520 };
 const PROPRIEDADES = { padrao: 300, minimo: 240, maximo: 440 };
 const LINHA_DO_TEMPO = { padrao: 260, minimo: 150, maximo: 560 };
+// O layout dos programas profissionais (tela larga): as colunas de painéis e a altura da metade de cima
+const ESQUERDA_CIMA = { padrao: 380, minimo: 240, maximo: 640 };
+const DIREITA_CIMA = { padrao: 320, minimo: 240, maximo: 560 };
+const ESQUERDA_BAIXO = { padrao: 380, minimo: 220, maximo: 640 };
+const METADE_DE_CIMA = { padrao: 470, minimo: 240, maximo: 900 };
+
+/** A área "Edição" dos editores de vídeo profissionais (ADR 0002). */
+const AREAS: Record<string, EstadoDaArea> = {
+  edicao: {
+    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "cor", "metadados"], ativa: "controles" }],
+    cimaDireita: [{ id: "g-propriedades", abas: ["propriedades", "graficos", "texto"], ativa: "propriedades" }],
+    baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "marcadores", "historico"], ativa: "projeto" }],
+  },
+};
+const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DO_VIDEO);
+/** As ferramentas de antes (o endereço do hub ainda usa os ids delas) e o painel novo de cada uma. */
+const PAINEL_DA_FERRAMENTA: Record<IdFerramenta, { painel: IdPainelDoVideo; aba?: string }> = {
+  midia: { painel: "projeto" },
+  modelos: { painel: "graficos", aba: "modelos" },
+  elementos: { painel: "graficos", aba: "elementos" },
+  audio: { painel: "som" },
+  texto: { painel: "texto", aba: "graficos" },
+  legendas: { painel: "texto", aba: "legendas" },
+  transcricao: { painel: "texto", aba: "transcricao" },
+  efeitos: { painel: "efeitos" },
+  transicoes: { painel: "efeitos" },
+  filtros: { painel: "efeitos" },
+  marca: { painel: "marca" },
+  plugins: { painel: "projeto" },
+};
+
+/** Tela larga o bastante para o layout dos programas profissionais; abaixo dela, a tela simplificada. */
+const CONSULTA_LARGA = "(min-width: 1024px)";
+function useTelaLarga(): boolean {
+  return useSyncExternalStore(
+    (avisar) => {
+      const consulta = window.matchMedia(CONSULTA_LARGA);
+      consulta.addEventListener("change", avisar);
+      return () => consulta.removeEventListener("change", avisar);
+    },
+    () => window.matchMedia(CONSULTA_LARGA).matches,
+    () => true,
+  );
+}
 
 /** Relógio da reprodução. O tempo anda pelo relógio do navegador; os vídeos da prévia seguem ele. */
 function useReproducao(duracao: Tick, taxa: Taxa) {
@@ -169,6 +228,39 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     PROPRIEDADES.maximo,
   );
   const [alturaLinha, setAlturaLinha] = useTamanhoSalvo("altura-linha", LINHA_DO_TEMPO.padrao, LINHA_DO_TEMPO.minimo, LINHA_DO_TEMPO.maximo);
+
+  // O layout dos programas profissionais (tela larga)
+  const router = useRouter();
+  const telaLarga = useTelaLarga();
+  const area = useAreaDeTrabalho("video", AREAS, "edicao", IDS_DOS_PAINEIS);
+  const [larguraEsquerdaCima, setLarguraEsquerdaCima] = useTamanhoSalvo("video-esquerda-cima", ESQUERDA_CIMA.padrao, ESQUERDA_CIMA.minimo, ESQUERDA_CIMA.maximo);
+  const [larguraDireitaCima, setLarguraDireitaCima] = useTamanhoSalvo("video-direita-cima", DIREITA_CIMA.padrao, DIREITA_CIMA.minimo, DIREITA_CIMA.maximo);
+  const [larguraEsquerdaBaixo, setLarguraEsquerdaBaixo] = useTamanhoSalvo("video-esquerda-baixo", ESQUERDA_BAIXO.padrao, ESQUERDA_BAIXO.minimo, ESQUERDA_BAIXO.maximo);
+  const [alturaDeCima, setAlturaDeCima] = useTamanhoSalvo("video-metade-de-cima", METADE_DE_CIMA.padrao, METADE_DE_CIMA.minimo, METADE_DE_CIMA.maximo);
+  const [configurando, setConfigurando] = useState(false);
+  const [exportandoQuadro, setExportandoQuadro] = useState(false);
+  const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
+  const [pedidoDeZoom, setPedidoDeZoom] = useState<{ fator: number; vez: number } | undefined>(undefined);
+  // A aba dos painéis Texto e Gráficos essenciais (o hub abre o editor numa ferramenta de antes)
+  const doEndereco = ferramentaInicial ? PAINEL_DA_FERRAMENTA[ferramentaInicial as IdFerramenta] : undefined;
+  const [pedidoTexto, setPedidoTexto] = useState(doEndereco?.painel === "texto" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
+  const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
+  const importarRef = useRef<HTMLInputElement>(null);
+  // O painel da ferramenta do endereço fica à vista (depois de ler a área guardada no navegador)
+  const abrirDoEndereco = useEffectEvent(() => {
+    if (doEndereco) area.abrir(doEndereco.painel);
+  });
+  useEffect(() => {
+    void Promise.resolve().then(abrirDoEndereco);
+  }, []);
+  /** Abre (ou põe à frente) um painel, na aba pedida. */
+  function abrirPainel(painel: IdPainelDoVideo, aba?: string) {
+    area.abrir(painel);
+    if (!aba) return;
+    if (painel === "texto") setPedidoTexto((atual) => ({ aba, vez: (atual?.vez ?? 0) + 1 }));
+    else if (painel === "graficos") setPedidoGraficos((atual) => ({ aba, vez: (atual?.vez ?? 0) + 1 }));
+    else setPedidoDeAba((atual) => ({ aba: aba as IdAba, vez: (atual?.vez ?? 0) + 1 }));
+  }
 
   // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
@@ -338,7 +430,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     const deslizante = alvo instanceof HTMLInputElement && alvo.type === "range";
     const doDeslizante = deslizante && (tecla.startsWith("arrow") || tecla === "home" || tecla === "end" || tecla === "pageup" || tecla === "pagedown");
     const campo = alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]");
-    if (!projeto || exportando || vendoAtalhos || colandoAjustes || salvandoModelo || doDeslizante || (campo && !deslizante)) return;
+    if (!projeto || exportando || vendoAtalhos || colandoAjustes || salvandoModelo || configurando || evento.defaultPrevented || doDeslizante || (campo && !deslizante)) return;
     if (deslizante && evento.code === "Space") alvo.blur();
     const quadro = duracaoDoQuadro(projeto.taxa);
 
@@ -349,7 +441,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if (ctrl && (tecla === "y" || (tecla === "z" && evento.shiftKey))) refazer();
     else if (ctrl && tecla === "s") mostrarAviso("O TakeOne salva sozinho a cada alteração.");
     else if ((tecla === "s" && !ctrl) || (ctrl && tecla === "b")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
-    else if ((tecla === "delete" || tecla === "backspace") && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
+    else if ((tecla === "delete" || tecla === "backspace") && !evento.shiftKey && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
     else if (ctrl && tecla === "d" && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
     else if (ctrl && tecla === "c" && selecaoValida.length) copiar();
     else if (ctrl && evento.altKey && tecla === "v") {
@@ -410,6 +502,365 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
 
   if (projeto.tipo === "imagem") return <Redirecionar para={enderecoDoProjeto({ id: projetoId, tipo: "imagem" })} />;
 
+  const aoSelecionarClipes = (ids: string[]) => {
+    setSelecao(ids);
+    if (ids.length) setMidiaId(null);
+  };
+  const propsDoConteudo = {
+    biblioteca: bibliotecaDoEditor,
+    midiaSelecionadaId: midiaId,
+    aoSelecionarMidia: (id: string | null) => {
+      setMidiaId(id);
+      setSelecao([]);
+    },
+    aoAdicionarMidia: adicionarNoCursor,
+    aoAdicionarTexto: (texto: Texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } }),
+    aoPedirAnimacao: pedirAnimacao,
+    gravacao: {
+      tempo,
+      taxa: projeto.taxa,
+      tocando: reproducao.tocando,
+      aoAlternar: alternar,
+      aoGravar: (arquivo: File, inicio: Tick) => {
+        iniciarEnvio([arquivo], (id) => pedirAnimacao({ id }, inicio));
+        mostrarAviso("Narração gravada: ela entra na faixa de áudio quando terminar de subir.");
+      },
+    },
+    aoExecutarQuandoProntas: executarQuandoProntas,
+    modeloInicial,
+    animacaoInicial,
+    selecionado,
+    aoPrever: preverDoPainel,
+    legendas: {
+      projeto,
+      nome: edicao.nome,
+      tempo,
+      selecao: selecaoValida,
+      aoExecutar: executar,
+      aoBuscar: buscar,
+      aoSelecionar: aoSelecionarClipes,
+      aoAvisar: mostrarAviso,
+    },
+  };
+  const propsDasPropriedades = {
+    midias,
+    taxa: projeto.taxa,
+    tempo,
+    aoBuscar: buscar,
+    proporcao: projeto.proporcao,
+    faixas: projeto.faixas,
+    aoAvisar: mostrarAviso,
+    aoTrocarMidia: trocarMidiaQuandoPronta,
+    aoTrocarPorVideo: (clipeId: string, midia: Midia) => {
+      pendentes.current.set(midia.id, { preencher: clipeId });
+      void biblioteca.recarregar();
+    },
+    seguirObjeto: {
+      marcando: objeto.marcando,
+      andamento: objeto.andamento,
+      aoIniciar: (clipeId: string) => {
+        if (reproducao.tocando) alternar();
+        objeto.iniciar(clipeId);
+      },
+      aoEsconder: (clipeId: string) => {
+        if (reproducao.tocando) alternar();
+        objeto.iniciar(clipeId, "esconder");
+      },
+    },
+    fundo: (projetoNaTela ?? projeto).fundo.cor,
+    aoPrever: preverDoPainel,
+    aoExecutar: (comando: Comando) => {
+      setProvisorio(null);
+      executar(comando);
+    },
+  };
+  const propsDaPrevia = {
+    projeto: projetoNaTela ?? projeto,
+    midias,
+    tempo,
+    tocando: reproducao.tocando,
+    aoAlternar: alternar,
+    selecao: selecaoValida,
+    aoSelecionar: aoSelecionarClipes,
+    aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) =>
+      setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null),
+    aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } }),
+    desenhoDaMascara: desenhandoMascara ? { clipeId: desenhandoMascara, aoConcluir: concluirDesenho, aoCancelar: () => setDesenhandoMascara(null) } : null,
+    marcacao: objeto.marcando ? { seguidorId: objeto.marcando, proprio: objeto.modo === "esconder", aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null,
+  };
+  const propsDaLinha = {
+    projeto,
+    midias,
+    ctx,
+    tempo,
+    tocando: reproducao.tocando,
+    selecao: selecaoValida,
+    ima,
+    aoAlternarIma: () => setIma((atual) => !atual),
+    aoBuscar: buscar,
+    aoSelecionar: aoSelecionarClipes,
+    aoExecutar: executar,
+    aoCongelar: congelavel ? congelar : undefined,
+  };
+  const janelas = (
+    <>
+      {vendoAtalhos ? <JanelaAtalhos aoFechar={() => setVendoAtalhos(false)} /> : null}
+      {configurando ? <JanelaSequencia projeto={projetoNaTela ?? projeto} aoPrever={preverDoPainel} aoExecutar={executar} aoFechar={() => setConfigurando(false)} /> : null}
+      {salvandoModelo ? (
+        <JanelaSalvarModelo
+          projetoId={projetoId}
+          projeto={projeto}
+          nome={edicao.nome}
+          midias={bibliotecaDoEditor.midias ?? []}
+          salvamento={edicao.salvamento}
+          aoFechar={() => setSalvandoModelo(false)}
+          aoSalvo={mostrarAviso}
+        />
+      ) : null}
+      {colandoAjustes ? (
+        <JanelaColarAjustes
+          quantos={selecaoValida.filter((id) => id !== colandoAjustes.clipe.id).length}
+          aoFechar={() => setColandoAjustes(null)}
+          aoColar={(grupos) => {
+            setColandoAjustes(null);
+            if (executar({ comando: "clipe.colarAjustes", parametros: { origem: colandoAjustes.clipe, clipeIds: selecaoValida, grupos } })) mostrarAviso("Ajustes colados. Ctrl+Z desfaz.");
+          }}
+        />
+      ) : null}
+      {exportando ? (
+        <JanelaExportar
+          projetoId={projetoId}
+          projeto={projeto}
+          midias={midias}
+          proporcao={projeto.proporcao}
+          salvamento={edicao.salvamento}
+          tempo={tempo}
+          inicial={exportandoQuadro ? "quadro" : "video"}
+          aoFechar={() => {
+            setExportando(false);
+            setExportandoQuadro(false);
+          }}
+        />
+      ) : null}
+      {edicao.aviso ? (
+        <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <p className="rounded-lg border border-borda bg-painel-3 px-4 py-2 text-sm shadow-xl shadow-black/40">{edicao.aviso}</p>
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (telaLarga) {
+    const conteudo = (id: IdFerramenta) => <ConteudoDaFerramenta ferramenta={FERRAMENTAS.find((item) => item.id === id)!} {...propsDoConteudo} />;
+    const acoes: AcoesDoVideo = {
+      temSelecao: selecaoValida.length > 0,
+      podeDesfazer: edicao.nomeDesfazer,
+      podeRefazer: edicao.nomeRefazer,
+      ima,
+      temMarcadores: (projeto.marcadores ?? []).length > 0,
+      podeSepararSom: selecaoValida.some((id) => {
+        const achado = acharClipe(projeto, id);
+        const midia = achado?.clipe.midia_id ? midias.get(achado.clipe.midia_id) : undefined;
+        return Boolean(achado && achado.faixa.tipo !== "audio" && !achado.clipe.som_separado && midia?.audio && midia.video && !midia.imagem);
+      }),
+      podeCongelar: congelavel,
+      area: area.area,
+      painelAberto: (painel) => area.aberto(painel),
+      novo: () => router.push("/app/projetos"),
+      abrir: () => router.push("/app/projetos"),
+      importar: () => importarRef.current?.click(),
+      salvar: () => mostrarAviso("O TakeOne salva sozinho a cada alteração."),
+      salvarModelo: () => setSalvandoModelo(true),
+      exportar: () => setExportando(true),
+      exportarQuadro: () => {
+        setExportandoQuadro(true);
+        setExportando(true);
+      },
+      desfazer,
+      refazer,
+      recortar: () => {
+        copiar();
+        executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
+      },
+      copiar,
+      colar: () => {
+        if (copiados.current.length) executar({ comando: "clipe.colar", parametros: { copiados: copiados.current, inicio: tempo } });
+        else mostrarAviso("Copie um clipe antes (Ctrl+C).");
+      },
+      colarAtributos: () => {
+        if (!copiados.current.length) mostrarAviso("Copie um clipe antes (Ctrl+C).");
+        else setColandoAjustes(copiados.current[0]);
+      },
+      limpar: () => executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } }),
+      excluirEmOndulacao: () => executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida, fecharEspaco: true } }),
+      duplicar: () => executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } }),
+      selecionarTudo: () => setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id))),
+      desmarcarTudo: () => setSelecao([]),
+      atalhos: () => setVendoAtalhos(true),
+      velocidade: () => abrirPainel("controles", "velocidade"),
+      separarSom: () =>
+        executar({
+          comando: "clipe.separarSom",
+          parametros: {
+            clipeIds: selecaoValida.filter((id) => {
+              const achado = acharClipe(projeto, id);
+              return achado && achado.faixa.tipo !== "audio";
+            }),
+          },
+        }),
+      congelar,
+      dividir: () => executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } }),
+      alternarIma: () => setIma((atual) => !atual),
+      criarAutomaticamente: () => abrirPainel("texto", "transcricao"),
+      configuracoes: () => setConfigurando(true),
+      marcador: () => executar({ comando: "marcador.adicionar", parametros: { tempo } }),
+      marcadorVizinho: (sentido) => {
+        const marcador = marcadorVizinho(projeto, tempo, sentido, duracaoDoQuadro(projeto.taxa) / 2);
+        if (marcador !== null) buscar(marcador);
+      },
+      limparMarcadores: () => {
+        for (const marcador of projeto.marcadores ?? []) executar({ comando: "marcador.apagar", parametros: { id: marcador.id } });
+      },
+      novoTexto: () => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto: TEXTO_PADRAO } }),
+      legendas: () => abrirPainel("texto", "legendas"),
+      zoomDaLinha: (fator) => setPedidoDeZoom((atual) => ({ fator, vez: (atual?.vez ?? 0) + 1 })),
+      painel: (painel) => abrirPainel(painel),
+      alternarPainel: (painel) => area.alternar(painel),
+      escolherArea: area.escolherArea,
+      restaurarArea: area.restaurar,
+    };
+    const paineis: Record<IdPainelDoVideo, Painel> = {
+      controles: {
+        nome: PAINEIS_DO_VIDEO.controles,
+        conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["basico", "texto", "animacao", "velocidade", "audio"]} pedidoDeAba={pedidoDeAba} className="h-full" />,
+      },
+      cor: { nome: PAINEIS_DO_VIDEO.cor, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["cor"]} className="h-full" /> },
+      metadados: { nome: PAINEIS_DO_VIDEO.metadados, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} somenteAbas={["info"]} className="h-full" /> },
+      propriedades: { nome: PAINEIS_DO_VIDEO.propriedades, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} pedidoDeAba={pedidoDeAba} className="h-full" /> },
+      graficos: { nome: PAINEIS_DO_VIDEO.graficos, conteudo: <PainelGraficosEssenciais conteudo={conteudo} pedido={pedidoGraficos} /> },
+      texto: { nome: PAINEIS_DO_VIDEO.texto, conteudo: <PainelTextoDoVideo conteudo={conteudo} pedido={pedidoTexto} /> },
+      projeto: { nome: PAINEIS_DO_VIDEO.projeto, conteudo: <PainelComRolagem>{conteudo("midia")}</PainelComRolagem> },
+      efeitos: { nome: PAINEIS_DO_VIDEO.efeitos, conteudo: <PainelEfeitosDoVideo conteudo={conteudo} /> },
+      marcadores: { nome: PAINEIS_DO_VIDEO.marcadores, conteudo: <PainelMarcadores projeto={projeto} tempo={tempo} aoBuscar={buscar} aoExecutar={executar} /> },
+      historico: { nome: PAINEIS_DO_VIDEO.historico, conteudo: <PainelHistorico nome={edicao.nome} feitos={edicao.passos.feitos} desfeitos={edicao.passos.desfeitos} aoIr={edicao.irParaPasso} Icone={Film} /> },
+      som: { nome: PAINEIS_DO_VIDEO.som, conteudo: <PainelComRolagem>{conteudo("audio")}</PainelComRolagem> },
+      marca: { nome: PAINEIS_DO_VIDEO.marca, conteudo: <PainelComRolagem>{conteudo("marca")}</PainelComRolagem> },
+    };
+    const colunas = { cimaEsquerda: area.estado.cimaEsquerda ?? [], cimaDireita: area.estado.cimaDireita ?? [], baixoEsquerda: area.estado.baixoEsquerda ?? [] };
+    const janelaAberta = exportando || vendoAtalhos || Boolean(colandoAjustes) || salvandoModelo || configurando;
+    const salvamento =
+      edicao.salvamento === "salvo"
+        ? "Salvo"
+        : edicao.salvamento === "conflito"
+          ? "Alterado em outra aba"
+          : edicao.salvamento === "erro"
+            ? "Não foi possível salvar"
+            : edicao.salvamento === "sem-conexao"
+              ? "Sem conexão"
+              : "Salvando…";
+    return (
+      <IniciarDesenhoDaMascara.Provider value={iniciarDesenho}>
+        <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto">
+          <header className="flex h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5">
+            <Link href="/app" className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-suave transition hover:text-texto" title="Voltar ao início">
+              <ChevronLeft className="size-3.5" aria-hidden />
+              <Simbolo tamanho={18} />
+            </Link>
+            <MenusDoVideo acoes={acoes} ativo={!janelaAberta} />
+            <input
+              id="nome-projeto"
+              value={edicao.nome}
+              onChange={(evento) => edicao.renomear(evento.currentTarget.value)}
+              aria-label="Nome do projeto"
+              maxLength={120}
+              className="mx-auto w-56 min-w-0 rounded bg-transparent px-2 py-0.5 text-center text-xs font-medium outline-none hover:bg-painel-2 focus:bg-painel-2"
+            />
+            <span className="flex items-center gap-1 text-[11px] text-suave" role="status">
+              {edicao.salvamento === "salvo" ? <Check className="size-3" aria-hidden /> : <LoaderCircle className="size-3 animate-spin" aria-hidden />}
+              {salvamento}
+            </span>
+            <select
+              aria-label="Área de trabalho"
+              title="Área de trabalho"
+              value={area.area}
+              onChange={(evento) => area.escolherArea(evento.currentTarget.value)}
+              className="ml-2 rounded border border-borda bg-painel-2 px-1 py-0.5 text-[11px]"
+            >
+              {Object.entries(AREAS_DO_VIDEO).map(([id, nome]) => (
+                <option key={id} value={id}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+            <BotaoTema />
+            <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando(true)} title="Exportar mídia (Ctrl+M)">
+              <Download className="size-3.5" aria-hidden />
+              Exportar
+            </button>
+          </header>
+          <input
+            ref={importarRef}
+            type="file"
+            multiple
+            hidden
+            accept={ACEITAR_ARQUIVOS}
+            onChange={(evento) => {
+              const arquivos = [...(evento.currentTarget.files ?? [])];
+              evento.currentTarget.value = "";
+              if (arquivos.length) {
+                iniciarEnvio(arquivos);
+                abrirPainel("projeto");
+              }
+            }}
+          />
+
+          <div className="flex shrink-0 gap-px bg-borda" style={{ height: alturaDeCima }}>
+            {colunas.cimaEsquerda.length ? (
+              <>
+                <ColunaDePaineis grupos={colunas.cimaEsquerda} paineis={paineis} area={area} className="shrink-0" style={{ width: larguraEsquerdaCima }} />
+                <Divisor direcao="coluna" valor={larguraEsquerdaCima} minimo={ESQUERDA_CIMA.minimo} maximo={ESQUERDA_CIMA.maximo} aoMudar={setLarguraEsquerdaCima} rotulo="Largura dos painéis de cima à esquerda" />
+              </>
+            ) : null}
+            <section aria-label="Programa" className="flex min-w-0 flex-1 flex-col bg-painel">
+              <div className="flex h-7 shrink-0 items-center gap-1 border-b border-borda bg-painel-2/60 px-3 text-[11px]">
+                <span className="font-semibold">Programa:</span>
+                <span className="truncate text-suave">{edicao.nome || "Sequência"}</span>
+              </div>
+              <Previa
+                {...propsDaPrevia}
+                programa={{
+                  aoQuadro: (passo) => buscar(quadroMaisProximo(projeto.taxa, tempo) + passo * duracaoDoQuadro(projeto.taxa)),
+                  aoIr: (onde) => buscar(onde === "inicio" ? 0 : projeto.duracao),
+                  aoMarcador: acoes.marcador,
+                  aoExportarQuadro: acoes.exportarQuadro,
+                }}
+                className="min-h-0 flex-1"
+              />
+            </section>
+            {colunas.cimaDireita.length ? (
+              <>
+                <Divisor direcao="coluna" valor={larguraDireitaCima} minimo={DIREITA_CIMA.minimo} maximo={DIREITA_CIMA.maximo} aoMudar={setLarguraDireitaCima} sentido={-1} rotulo="Largura dos painéis de cima à direita" />
+                <ColunaDePaineis grupos={colunas.cimaDireita} paineis={paineis} area={area} className="shrink-0" style={{ width: larguraDireitaCima }} />
+              </>
+            ) : null}
+          </div>
+          <Divisor direcao="linha" valor={alturaDeCima} minimo={METADE_DE_CIMA.minimo} maximo={METADE_DE_CIMA.maximo} aoMudar={setAlturaDeCima} rotulo="Altura da metade de cima" />
+          <div className="flex min-h-0 flex-1 gap-px bg-borda">
+            {colunas.baixoEsquerda.length ? (
+              <>
+                <ColunaDePaineis grupos={colunas.baixoEsquerda} paineis={paineis} area={area} className="shrink-0" style={{ width: larguraEsquerdaBaixo }} />
+                <Divisor direcao="coluna" valor={larguraEsquerdaBaixo} minimo={ESQUERDA_BAIXO.minimo} maximo={ESQUERDA_BAIXO.maximo} aoMudar={setLarguraEsquerdaBaixo} rotulo="Largura dos painéis de baixo à esquerda" />
+              </>
+            ) : null}
+            <LinhaDoTempo {...propsDaLinha} profissional pedidoDeZoom={pedidoDeZoom} className="min-w-0 flex-1" />
+            <MedidoresDeAudio tocando={reproducao.tocando} className="w-12" />
+          </div>
+          {janelas}
+        </div>
+      </IniciarDesenhoDaMascara.Provider>
+    );
+  }
+
   const tamanhos = {
     "--largura-conteudo": `${larguraConteudo}px`,
     "--largura-propriedades": `${larguraPropriedades}px`,
@@ -446,43 +897,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
 
         <PainelConteudo
           ferramenta={ferramentaAtual}
-          biblioteca={bibliotecaDoEditor}
-          midiaSelecionadaId={midiaId}
-          aoSelecionarMidia={(id) => {
-            setMidiaId(id);
-            setSelecao([]);
-          }}
-          aoAdicionarMidia={adicionarNoCursor}
-          aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
-          aoPedirAnimacao={pedirAnimacao}
-          gravacao={{
-            tempo,
-            taxa: projeto.taxa,
-            tocando: reproducao.tocando,
-            aoAlternar: alternar,
-            aoGravar: (arquivo, inicio) => {
-              iniciarEnvio([arquivo], (id) => pedirAnimacao({ id }, inicio));
-              mostrarAviso("Narração gravada: ela entra na faixa de áudio quando terminar de subir.");
-            },
-          }}
-          aoExecutarQuandoProntas={executarQuandoProntas}
-          modeloInicial={modeloInicial}
-          animacaoInicial={animacaoInicial}
-          selecionado={selecionado}
-          aoPrever={preverDoPainel}
-          legendas={{
-            projeto,
-            nome: edicao.nome,
-            tempo,
-            selecao: selecaoValida,
-            aoExecutar: executar,
-            aoBuscar: buscar,
-            aoSelecionar: (ids) => {
-              setSelecao(ids);
-              if (ids.length) setMidiaId(null);
-            },
-            aoAvisar: mostrarAviso,
-          }}
+          {...propsDoConteudo}
           aoFechar={() => setPainelNoCelular(false)}
           className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-40 max-md:h-[55dvh] ${
             painelNoCelular ? "" : "max-md:hidden"
@@ -514,22 +929,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
               </button>
             ) : null}
             <Previa
-              projeto={projetoNaTela ?? projeto}
-              midias={midias}
-              tempo={tempo}
-              tocando={reproducao.tocando}
-              aoAlternar={alternar}
-              selecao={selecaoValida}
-              aoSelecionar={(ids) => {
-                setSelecao(ids);
-                if (ids.length) setMidiaId(null);
-              }}
-              aoPrever={(clipeId, mudanca) =>
-                setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null)
-              }
-              aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } })}
-              desenhoDaMascara={desenhandoMascara ? { clipeId: desenhandoMascara, aoConcluir: concluirDesenho, aoCancelar: () => setDesenhandoMascara(null) } : null}
-              marcacao={objeto.marcando ? { seguidorId: objeto.marcando, proprio: objeto.modo === "esconder", aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null}
+              {...propsDaPrevia}
               className="flex-1"
             />
             <Divisor
@@ -543,38 +943,9 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
               className="max-lg:hidden"
             />
             <PainelPropriedades
+              {...propsDasPropriedades}
               midia={midiaDasPropriedades}
-              midias={midias}
               selecionado={selecionado}
-              taxa={projeto.taxa}
-              tempo={tempo}
-              aoBuscar={buscar}
-              proporcao={projeto.proporcao}
-              faixas={projeto.faixas}
-              aoAvisar={mostrarAviso}
-              aoTrocarMidia={trocarMidiaQuandoPronta}
-              aoTrocarPorVideo={(clipeId, midia) => {
-                pendentes.current.set(midia.id, { preencher: clipeId });
-                void biblioteca.recarregar();
-              }}
-              seguirObjeto={{
-                marcando: objeto.marcando,
-                andamento: objeto.andamento,
-                aoIniciar: (clipeId) => {
-                  if (reproducao.tocando) alternar();
-                  objeto.iniciar(clipeId);
-                },
-                aoEsconder: (clipeId) => {
-                  if (reproducao.tocando) alternar();
-                  objeto.iniciar(clipeId, "esconder");
-                },
-              }}
-              fundo={(projetoNaTela ?? projeto).fundo.cor}
-              aoPrever={preverDoPainel}
-              aoExecutar={(comando) => {
-                setProvisorio(null);
-                executar(comando);
-              }}
               aoFechar={() => setPropriedadesNoCelular(false)}
               className={`w-[var(--largura-propriedades)] ${
                 propriedadesNoCelular && selecionado
@@ -594,58 +965,21 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             className="max-md:hidden"
           />
           <LinhaDoTempo
-            projeto={projeto}
-            midias={midias}
-            ctx={ctx}
-            tempo={tempo}
-            tocando={reproducao.tocando}
-            selecao={selecaoValida}
-            ima={ima}
-            aoAlternarIma={() => setIma((atual) => !atual)}
-            aoBuscar={buscar}
-            aoSelecionar={(ids) => {
-              setSelecao(ids);
-              if (ids.length) setMidiaId(null);
-            }}
-            aoExecutar={executar}
-            aoCongelar={congelavel ? congelar : undefined}
+            {...propsDaLinha}
             className="h-48 md:h-[var(--altura-linha)]"
           />
         </div>
       </div>
 
-      {vendoAtalhos ? <JanelaAtalhos aoFechar={() => setVendoAtalhos(false)} /> : null}
-      {salvandoModelo ? (
-        <JanelaSalvarModelo
-          projetoId={projetoId}
-          projeto={projeto}
-          nome={edicao.nome}
-          midias={bibliotecaDoEditor.midias ?? []}
-          salvamento={edicao.salvamento}
-          aoFechar={() => setSalvandoModelo(false)}
-          aoSalvo={mostrarAviso}
-        />
-      ) : null}
-      {colandoAjustes ? (
-        <JanelaColarAjustes
-          quantos={selecaoValida.filter((id) => id !== colandoAjustes.clipe.id).length}
-          aoFechar={() => setColandoAjustes(null)}
-          aoColar={(grupos) => {
-            setColandoAjustes(null);
-            if (executar({ comando: "clipe.colarAjustes", parametros: { origem: colandoAjustes.clipe, clipeIds: selecaoValida, grupos } })) mostrarAviso("Ajustes colados. Ctrl+Z desfaz.");
-          }}
-        />
-      ) : null}
-      {exportando ? (
-        <JanelaExportar projetoId={projetoId} projeto={projeto} midias={midias} proporcao={projeto.proporcao} salvamento={edicao.salvamento} tempo={tempo} aoFechar={() => setExportando(false)} />
-      ) : null}
-
-      {edicao.aviso ? (
-        <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <p className="rounded-lg border border-borda bg-painel-3 px-4 py-2 text-sm shadow-xl shadow-black/40">{edicao.aviso}</p>
-        </div>
-      ) : null}
+      {janelas}
     </div>
     </IniciarDesenhoDaMascara.Provider>
   );
+}
+
+/** A barra de menus e os atalhos dela (os menus são montados aqui, com o estado da vez). */
+function MenusDoVideo({ acoes, ativo }: { acoes: AcoesDoVideo; ativo: boolean }) {
+  const menus = menusDoVideo(acoes);
+  useAtalhosDosMenus(menus, ativo);
+  return <BarraDeMenus menus={menus} className="min-w-0" />;
 }

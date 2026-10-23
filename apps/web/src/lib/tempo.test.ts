@@ -6,6 +6,7 @@ import {
   ajustarAoQuadro,
   duracaoDoQuadro,
   formatarTimecode,
+  formatarTimecodeLongo,
   quadroEm,
   quadroMaisProximo,
   segundosParaTicks,
@@ -66,4 +67,6 @@ test("timecode", () => {
   assert.equal(formatarTimecode(tickDoQuadro(taxa, 1799), taxa), "00:59:29");
   assert.equal(formatarTimecode(tickDoQuadro(taxa, 30 * 3600 + 31), taxa), "1:00:01:01");
   assert.equal(formatarTimecode(segundosParaTicks(1.5), { num: 30000, den: 1001 }), "00:01:14");
+  assert.equal(formatarTimecodeLongo(tickDoQuadro(taxa, 1799), taxa), "00:00:59:29");
+  assert.equal(formatarTimecodeLongo(tickDoQuadro(taxa, 30 * 3600 + 31), taxa), "01:00:01:01");
 });

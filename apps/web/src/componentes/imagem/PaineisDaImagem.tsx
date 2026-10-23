@@ -2,7 +2,7 @@
 
 // Os painéis pequenos do editor de imagem (ADR 0002): Cor, Amostras, Ajustes, Histórico, Biblioteca e Modelos. Os
 // grandes (Camadas e Propriedades) ficam nos arquivos deles.
-import { History, ImageIcon, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { MiniaturaDeImagem } from "@/componentes/hub/CartaoModelo";
@@ -120,37 +120,6 @@ export function PainelAjustes({ aoCriar }: { aoCriar: (ajuste: Ajuste) => void }
       </div>
       <p className="text-[11px] text-suave">O ajuste vale para todas as camadas embaixo dele; mude a ordem no painel Camadas.</p>
     </div>
-  );
-}
-
-/** Histórico: o estado de abertura e os passos; clicar volta (ou avança) até ele. Os desfeitos ficam apagados. */
-export function PainelHistorico({ nome, feitos, desfeitos, aoIr }: { nome: string; feitos: string[]; desfeitos: string[]; aoIr: (desfazer: number, refazer: number) => void }) {
-  const linha = "flex w-full items-center gap-2 px-3 py-1 text-left text-xs hover:bg-painel-2";
-  return (
-    <ol aria-label="Histórico" className="flex flex-col py-1">
-      <li>
-        <button type="button" className={`${linha} ${feitos.length ? "" : "bg-destaque/25"}`} onClick={() => aoIr(feitos.length, 0)}>
-          <ImageIcon className="size-3.5 text-suave" aria-hidden />
-          <span className="truncate font-medium">{nome || "Imagem"}</span>
-        </button>
-      </li>
-      {feitos.map((passo, i) => (
-        <li key={`f${i}`}>
-          <button type="button" className={`${linha} ${i === feitos.length - 1 ? "bg-destaque/25" : ""}`} onClick={() => aoIr(feitos.length - 1 - i, 0)}>
-            <History className="size-3.5 text-suave" aria-hidden />
-            <span className="truncate first-letter:uppercase">{passo}</span>
-          </button>
-        </li>
-      ))}
-      {desfeitos.map((passo, i) => (
-        <li key={`d${i}`}>
-          <button type="button" className={`${linha} text-apagado`} onClick={() => aoIr(0, i + 1)}>
-            <History className="size-3.5" aria-hidden />
-            <span className="truncate first-letter:uppercase">{passo}</span>
-          </button>
-        </li>
-      ))}
-    </ol>
   );
 }
 
