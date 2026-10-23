@@ -71,16 +71,21 @@ import {
   adicionarCamadaDeMidia,
   adicionarCamadaDeTexto,
   apagarCamada,
-  desfocarFundo, duplicarCamada,
+  aplicarModeloDeImagem,
+  desfocarFundo,
+  duplicarCamada,
   moverCamada,
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
   type TamanhoDaImagem,
+  trocarImagemDaCamada,
 } from "./imagem.ts";
 import type { Cor } from "./cor.ts";
 import type { Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import type { PlanoDoModelo } from "./modelos.ts";
+import type { CamadaPronta } from "./modelosDeImagem.ts";
+import type { Tamanho } from "./geometria.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
@@ -119,6 +124,8 @@ export type Comando =
   | { comando: "imagem.apagar"; parametros: { faixaId: string } }
   | { comando: "imagem.duplicar"; parametros: { faixaId: string } }
   | { comando: "imagem.desfocarFundo"; parametros: { faixaId: string } }
+  | { comando: "imagem.aplicarModelo"; parametros: { camadas: CamadaPronta[]; tamanho: TamanhoDaImagem; fundo: string } }
+  | { comando: "imagem.trocarImagem"; parametros: { clipeId: string; midiaId: string; tamanhoAtual: Tamanho; tamanhoNovo: Tamanho } }
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
@@ -181,6 +188,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.apagar": "apagar a camada",
   "imagem.duplicar": "duplicar a camada",
   "imagem.desfocarFundo": "desfocar o fundo",
+  "imagem.aplicarModelo": "aplicar o modelo",
+  "imagem.trocarImagem": "trocar a imagem",
   "imagem.fundo": "mudar o fundo",
   "imagem.tamanho": "mudar o tamanho",
   "clipe.efeito": "mudar o efeito",
@@ -290,6 +299,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = duplicarCamada(projeto, ctx, parametros.faixaId);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.aplicarModelo":
+      return { projeto: aplicarModeloDeImagem(projeto, ctx, parametros), selecao: [] };
+    case "imagem.trocarImagem":
+      return { projeto: trocarImagemDaCamada(projeto, ctx, parametros.clipeId, parametros.midiaId, parametros.tamanhoAtual, parametros.tamanhoNovo), selecao: [parametros.clipeId] };
     case "imagem.desfocarFundo": {
       const resultado = desfocarFundo(projeto, ctx, parametros.faixaId);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };

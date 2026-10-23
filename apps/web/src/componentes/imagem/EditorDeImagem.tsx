@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, ChevronLeft, Download, Image as ImageIcon, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2 } from "lucide-react";
+import { Check, ChevronLeft, Download, Image as ImageIcon, LayoutTemplate, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
@@ -13,25 +14,31 @@ import { PainelFormas } from "@/componentes/editor/PainelFormas";
 import { PainelPropriedades } from "@/componentes/editor/PainelPropriedades";
 import { MiniaturaDoEstilo } from "@/componentes/editor/PainelTexto";
 import { useProjeto } from "@/componentes/editor/useProjeto";
+import { MiniaturaDeImagem } from "@/componentes/hub/CartaoModelo";
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import { arquivoDaMidia } from "@/lib/api";
+import { criarForma } from "@/lib/elementos";
 import { enderecoDoProjeto } from "@/lib/hub";
+import { useMarca } from "@/lib/marca";
 import type { Comando } from "@/lib/projeto/comandos";
 import { executarComando } from "@/lib/projeto/comandos";
 import { camadasDaImagem, problemaNoTamanho, TAMANHOS_PRONTOS, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, type Transformacao } from "@/lib/projeto/modelo";
+import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, MODELOS_DE_IMAGEM, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 import { useMidias } from "@/lib/useMidias";
 
+import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { PainelCamadas } from "./PainelCamadas";
 import { PreviaDaImagem } from "./PreviaDaImagem";
 
-type Ferramenta = "imagens" | "texto" | "elementos" | "fundo";
+type Ferramenta = "modelos" | "imagens" | "texto" | "elementos" | "fundo";
 const FERRAMENTAS: { id: Ferramenta; nome: string; icone: typeof ImageIcon }[] = [
+  { id: "modelos", nome: "Modelos", icone: LayoutTemplate },
   { id: "imagens", nome: "Imagens", icone: ImageIcon },
   { id: "texto", nome: "Texto", icone: Type },
   { id: "elementos", nome: "Elementos", icone: Shapes },
@@ -45,18 +52,25 @@ const SEM_SEGUIR = {
 const NADA = () => undefined;
 
 /** O editor de imagem: o mesmo projeto, desfazer e salvamento do editor de vídeo, com camadas no lugar da linha do tempo. */
-export function EditorDeImagem({ projetoId }: { projetoId: string }) {
+export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string; modeloInicial?: string }) {
+  const router = useRouter();
+  const marca = useMarca();
   const biblioteca = useMidias();
   const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
   const ctx = useMemo(() => contextoDasMidias(midias), [midias]);
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
-  const [ferramenta, setFerramenta] = useState<Ferramenta>("imagens");
+  const [ferramenta, setFerramenta] = useState<Ferramenta>(modeloInicial ? "modelos" : "imagens");
   const [selecao, definirSelecao] = useState<string[]>([]);
   const [exportando, setExportando] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // As mídias pedidas (as formas) entram como camada quando ficam prontas; a troca de cor de uma forma também espera
   const pendentes = useRef(new Map<string, { trocar?: string[] }>());
+  // O modelo escolhido espera as formas dele aparecerem na biblioteca, como as formas avulsas
+  const modeloPendente = useRef<{ modelo: ModeloDeImagem; cores: string[]; midias: Record<string, Midia> } | null>(null);
+  const [aplicando, setAplicando] = useState<string | null>(null);
+  const [trocando, setTrocando] = useState<string | null>(null);
+  const modeloDoEndereco = useRef(false);
 
   const setSelecao = useCallback((ids: string[]) => {
     const ativo = document.activeElement;
@@ -88,7 +102,33 @@ export function EditorDeImagem({ projetoId }: { projetoId: string }) {
     if (JSON.stringify(projetoNaTela) !== JSON.stringify(projeto)) executar(provisorio);
   };
 
+  /** Pede as formas do modelo (e o lugar das fotos); o modelo entra quando todas aparecem na biblioteca. */
+  const aplicarModelo = (modelo: ModeloDeImagem) => {
+    setAplicando(modelo.id);
+    const cores = marca.cores;
+    Promise.all(pedidosDoModelo(modelo, cores, new Set()).map(({ chave, forma }) => criarForma(forma).then((midia) => [chave, midia] as const)))
+      .then((lista) => {
+        modeloPendente.current = { modelo, cores, midias: Object.fromEntries(lista) };
+        void biblioteca.recarregar();
+      })
+      .catch((e: unknown) => {
+        mostrarAviso(e instanceof Error ? e.message : "Não foi possível aplicar o modelo agora.");
+        setAplicando(null);
+      });
+  };
+
   const resolverPendentes = useEffectEvent(() => {
+    const pendente = modeloPendente.current;
+    if (pendente && Object.values(pendente.midias).every((midia) => midias.get(midia.id)?.status === "pronta")) {
+      modeloPendente.current = null;
+      setAplicando(null);
+      const doModelo: MidiasDoModelo = {};
+      for (const [chave, midia] of Object.entries(pendente.midias)) doModelo[chave] = { id: midia.id, largura: midia.video?.largura ?? 1, altura: midia.video?.altura ?? 1 };
+      executar({
+        comando: "imagem.aplicarModelo",
+        parametros: { camadas: camadasDoModelo(pendente.modelo, pendente.cores, doModelo), tamanho: pendente.modelo.tamanho, fundo: fundoDoModelo(pendente.modelo, pendente.cores) },
+      });
+    }
     for (const [id, acao] of pendentes.current) {
       const midia = midias.get(id);
       if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
@@ -107,8 +147,21 @@ export function EditorDeImagem({ projetoId }: { projetoId: string }) {
     }
   });
   useEffect(() => {
-    if (pendentes.current.size) resolverPendentes();
+    if (pendentes.current.size || modeloPendente.current) resolverPendentes();
   }, [midias]);
+
+  // O modelo escolhido na biblioteca (?modelo=): entra uma vez, na imagem ainda vazia, e sai do endereço
+  const aplicarDoEndereco = useEffectEvent(() => {
+    if (modeloDoEndereco.current || !projeto || !modeloInicial) return;
+    modeloDoEndereco.current = true;
+    router.replace(`/app/imagem/${projetoId}`);
+    const modelo = modeloDeImagem(modeloInicial);
+    // Depois do efeito: aplicar muda o estado (o modelo sendo aplicado)
+    if (modelo && camadasDaImagem(projeto).length === 0) void Promise.resolve().then(() => aplicarModelo(modelo));
+  });
+  useEffect(() => {
+    if (projeto) aplicarDoEndereco();
+  }, [projeto]);
 
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
   const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
@@ -266,7 +319,33 @@ export function EditorDeImagem({ projetoId }: { projetoId: string }) {
         >
           <h2 className="border-b border-borda px-3 py-2.5 text-sm font-semibold">{FERRAMENTAS.find((item) => item.id === ferramenta)!.nome}</h2>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {ferramenta === "imagens" ? (
+            {ferramenta === "modelos" ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-[11px] text-suave">O modelo entra por cima do que já existe, com o tamanho e o fundo dele, nas cores do kit de marca. Depois, troque as fotos e os textos.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODELOS_DE_IMAGEM.map((modelo) => (
+                    <button
+                      key={modelo.id}
+                      type="button"
+                      disabled={aplicando !== null}
+                      onClick={() => aplicarModelo(modelo)}
+                      title={modelo.descricao}
+                      className="flex flex-col gap-1 rounded-lg border border-borda bg-painel-2 p-1.5 text-left transition hover:border-destaque disabled:opacity-60"
+                    >
+                      <span className="relative flex h-24 items-center justify-center">
+                        <MiniaturaDeImagem modeloId={modelo.id} />
+                        {aplicando === modelo.id ? (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <LoaderCircle className="size-5 animate-spin text-white" aria-label="Aplicando" />
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="truncate text-[11px] font-medium">{modelo.nome}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : ferramenta === "imagens" ? (
               <div className="flex flex-col gap-3">
                 <ZonaDeEnvio compacta />
                 <ListaEnvios />
@@ -392,6 +471,7 @@ export function EditorDeImagem({ projetoId }: { projetoId: string }) {
               void biblioteca.recarregar();
             }}
             seguirObjeto={SEM_SEGUIR}
+            aoTrocarImagem={setTrocando}
             fundo={projeto.fundo.cor}
             aoPrever={preverDoPainel}
             aoExecutar={executar}
@@ -400,6 +480,27 @@ export function EditorDeImagem({ projetoId }: { projetoId: string }) {
         </div>
       </div>
 
+      {trocando ? (
+        <JanelaEscolherImagem
+          imagens={imagensProntas}
+          aoFechar={() => setTrocando(null)}
+          aoEscolher={(nova) => {
+            const clipe = acharClipe(projeto, trocando)?.clipe;
+            const atual = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
+            setTrocando(null);
+            if (!clipe || !atual?.video || !nova.video) return;
+            executar({
+              comando: "imagem.trocarImagem",
+              parametros: {
+                clipeId: clipe.id,
+                midiaId: nova.id,
+                tamanhoAtual: { largura: atual.video.largura, altura: atual.video.altura },
+                tamanhoNovo: { largura: nova.video.largura, altura: nova.video.altura },
+              },
+            });
+          }}
+        />
+      ) : null}
       {exportando ? <JanelaExportarImagem projeto={projeto} nome={edicao.nome} midias={midias} aoFechar={() => setExportando(false)} aoAvisar={mostrarAviso} /> : null}
       {edicao.aviso ? (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

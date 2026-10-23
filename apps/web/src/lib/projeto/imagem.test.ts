@@ -4,7 +4,9 @@ import { test } from "node:test";
 import { executarComando } from "./comandos.ts";
 import type { Contexto } from "./edicao.ts";
 import { camadasDaImagem, DESFOQUE_DO_FUNDO, DURACAO_DA_CAMADA, ESCALA_DO_RECORTADO, problemaNoTamanho, TAMANHOS_PRONTOS } from "./imagem.ts";
+import { caixaDoClipe } from "./geometria.ts";
 import type { Projeto } from "./modelo.ts";
+import type { CamadaPronta } from "./modelosDeImagem.ts";
 import { TEXTO_PADRAO } from "./texto.ts";
 
 function contexto(): Contexto {
@@ -110,4 +112,36 @@ test("desfocar o fundo: a foto recortada por cima e uma cópia desfocada embaixo
   r = executarComando(r.projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "logo" } }, ctx);
   const [logo] = camadasDaImagem(r.projeto);
   assert.throws(() => executarComando(r.projeto, { comando: "imagem.desfocarFundo", parametros: { faixaId: logo.faixa.id } }, ctx), /fotos/);
+});
+
+test("modelo de imagem: camadas por cima, tamanho e fundo do modelo, num passo", () => {
+  const ctx = contexto();
+  const camadas: CamadaPronta[] = [
+    { tipo: "midia", midiaId: "foto", transformacao: { x: 0, y: -0.1, escala: 0.8, rotacao: 0, opacidade: 1 }, recorte: { x: 0.1, y: 0, largura: 0.8, altura: 1 }, cantos: { raio: 0.1, borda: 0, cor: "#ffffff" }, filtro: "cinema" },
+    { tipo: "texto", texto: { ...TEXTO_PADRAO, conteudo: "Oferta" }, transformacao: { x: 0, y: 0.3, escala: 1, rotacao: 0, opacidade: 1 } },
+  ];
+  const r = executarComando(vazio(), { comando: "imagem.aplicarModelo", parametros: { camadas, tamanho: { largura: 1080, altura: 1920 }, fundo: "#123456" } }, ctx);
+  assert.deepEqual(r.projeto.tamanho, { largura: 1080, altura: 1920 });
+  assert.deepEqual(r.projeto.fundo, { cor: "#123456", transparente: false });
+  const [texto, foto] = camadasDaImagem(r.projeto);
+  assert.equal(texto.clipe.texto?.conteudo, "Oferta");
+  assert.equal(foto.clipe.midia_id, "foto");
+  assert.equal(foto.clipe.cor?.filtro, "cinema");
+  assert.deepEqual(foto.clipe.cantos, { raio: 0.1, borda: 0, cor: "#ffffff" });
+  assert.equal(r.projeto.faixas.at(-1)?.tipo, "principal");
+});
+
+test("trocar a imagem: a nova cobre a mesma caixa, cortada no meio", () => {
+  const ctx = contexto();
+  let projeto = executarComando(vazio(), { comando: "imagem.adicionarMidia", parametros: { midiaId: "logo" } }, ctx).projeto;
+  const [camada] = camadasDaImagem(projeto);
+  const quadro = { largura: 1080, altura: 1080 };
+  // O logo (2:1) ocupa metade do quadro de largura; a foto (1:1) entra no mesmo lugar, cortada para 2:1
+  const antes = caixaDoClipe(camada.clipe.transformacao, camada.clipe.recorte, { largura: 2000, altura: 1000 }, quadro);
+  projeto = executarComando(projeto, { comando: "imagem.trocarImagem", parametros: { clipeId: camada.clipe.id, midiaId: "foto", tamanhoAtual: { largura: 2000, altura: 1000 }, tamanhoNovo: { largura: 800, altura: 800 } } }, ctx).projeto;
+  const [depois] = camadasDaImagem(projeto);
+  assert.equal(depois.clipe.midia_id, "foto");
+  assert.deepEqual(depois.clipe.recorte, { x: 0, y: 0.25, largura: 1, altura: 0.5 });
+  const caixa = caixaDoClipe(depois.clipe.transformacao, depois.clipe.recorte, { largura: 800, altura: 800 }, quadro);
+  assert.ok(Math.abs(caixa.largura - antes.largura) < 1e-6 && Math.abs(caixa.altura - antes.altura) < 1e-6);
 });

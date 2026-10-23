@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, LayoutTemplate } from "lucide-react";
+import { Bookmark, LayoutTemplate, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -10,7 +10,10 @@ import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
 import { type ItemDaBiblioteca, textoDeUsos } from "@/lib/biblioteca";
 import { formatarTempo } from "@/lib/formatar";
 import { enderecoNoEditor } from "@/lib/hub";
+import { useMarca } from "@/lib/marca";
+import { miniaturaDoModeloDeImagem } from "@/lib/previa/miniaturaDoModeloDeImagem";
 import { MODELOS_DE_PROJETO } from "@/lib/projeto/modelos";
+import { modeloDeImagem } from "@/lib/projeto/modelosDeImagem";
 
 import { useAbrirNoEditor } from "./AbrirNoEditor";
 
@@ -31,6 +34,18 @@ export function useUsarDaBiblioteca(contarUso: (item: ItemDaBiblioteca) => void)
         return null;
       } catch (e) {
         return e instanceof ErroApi ? e.message : "Não foi possível usar o modelo agora.";
+      }
+    }
+    if (item.tipo === "imagem") {
+      const modelo = modeloDeImagem(item.id);
+      if (!modelo) return "Este modelo não existe mais.";
+      try {
+        const projeto = await chamarApi<{ id: string }>("/projetos", { metodo: "POST", corpo: { tamanho: modelo.tamanho, nome: modelo.nome } });
+        contarUso(item);
+        router.push(`/app/imagem/${projeto.id}?${new URLSearchParams({ modelo: item.id })}`);
+        return null;
+      } catch (e) {
+        return e instanceof ErroApi ? e.message : "Não foi possível criar a imagem agora.";
       }
     }
     contarUso(item);
@@ -68,8 +83,47 @@ export function DesenhoDoModelo({ item, grande = false }: { item: ItemDaBibliote
   );
 }
 
+/**
+ * A miniatura de um modelo de imagem, desenhada no navegador como ele vai sair, com as cores do kit de marca.
+ * Enquanto não fica pronta, o lugar dela na proporção do modelo.
+ */
+export function MiniaturaDeImagem({ modeloId }: { modeloId: string }) {
+  const { cores } = useMarca();
+  const modelo = modeloDeImagem(modeloId);
+  const [url, setUrl] = useState<{ chave: string; url: string } | null>(null);
+  const chave = `${modeloId}|${cores.join(",")}`;
+  useEffect(() => {
+    if (!modelo) return;
+    let ativo = true;
+    miniaturaDoModeloDeImagem(modelo, cores)
+      .then((pronta) => {
+        if (ativo) setUrl({ chave, url: pronta });
+      })
+      .catch(() => undefined);
+    return () => {
+      ativo = false;
+    };
+  }, [modelo, cores, chave]);
+  if (!modelo) return null;
+  const { largura, altura } = modelo.tamanho;
+  return (
+    <span
+      className="relative flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-md bg-painel-2 shadow-md shadow-black/30"
+      style={{ aspectRatio: `${largura} / ${altura}`, height: largura >= altura ? "auto" : "100%", width: largura >= altura ? "100%" : "auto" }}
+    >
+      {url?.chave === chave ? (
+        // eslint-disable-next-line @next/next/no-img-element -- desenhada no navegador (blob:)
+        <img src={url.url} alt="" className="absolute inset-0 size-full" />
+      ) : (
+        <LoaderCircle className="size-5 animate-spin text-suave" aria-label="Desenhando a prévia" />
+      )}
+    </span>
+  );
+}
+
 /** A linha de baixo do cartão: o que é, quanto dura e quantas vezes foi usado. */
 export function resumoDoItem(item: ItemDaBiblioteca): string {
+  if (item.tipo === "imagem") return [item.categoria, item.proporcao, ...(item.usos ? [textoDeUsos(item.usos)] : [])].join(" · ");
   const partes = [item.categoria];
   if (item.tipo === "espaco") partes.push(item.vagas ? `${item.vagas} para trocar` : "do espaço");
   if (item.cenas) partes.push(`${item.cenas} ${item.cenas === 1 ? "cena" : "cenas"}`);
@@ -110,6 +164,8 @@ export function CartaoModelo({ item, aoAbrir, aoSalvar }: { item: ItemDaBibliote
                 </span>
               ) : null}
             </>
+          ) : item.tipo === "imagem" ? (
+            <MiniaturaDeImagem modeloId={item.id} />
           ) : (
             <DesenhoDoModelo item={item} />
           )}

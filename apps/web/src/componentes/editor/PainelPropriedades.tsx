@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Diamond, MousePointerClick, RotateCcw, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, MousePointerClick, RotateCcw, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
 import { useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -123,11 +123,13 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
   /** "imagem" no editor de imagem: sem as abas e as seções que dependem do tempo (keyframes, animação, som). */
   modo?: "video" | "imagem";
+  /** No editor de imagem: abre a escolha de outra imagem para a camada, no mesmo lugar. */
+  aoTrocarImagem?: (clipeId: string) => void;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -249,6 +251,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
             modo={modo}
+            aoTrocarImagem={aoTrocarImagem}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
@@ -343,7 +346,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoPrever, aoExecutar, modo = "video" }: PropsBasico & { modo?: "video" | "imagem" }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -408,6 +411,12 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
   return (
     <div>
       {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
+      {aoTrocarImagem && clipe.midia_id ? (
+        <button type="button" className="botao-secundario mb-2 w-full px-3 py-1.5 text-xs" disabled={travada} onClick={() => aoTrocarImagem(clipe.id)} title="Outra imagem no mesmo lugar e tamanho">
+          <ImageIcon className="size-3.5" aria-hidden />
+          Trocar a imagem
+        </button>
+      ) : null}
       <Secao
         titulo="Posição e tamanho"
         acao={

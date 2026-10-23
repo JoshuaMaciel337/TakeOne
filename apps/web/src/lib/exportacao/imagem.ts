@@ -26,14 +26,20 @@ export function arquivoDaMascaraDaImagem(midia: Midia | undefined): string | nul
   return midia?.arquivos.includes("mascara.png") ? arquivoDaMidia(midia.id, "mascara.png") : null;
 }
 
+/** A foto em resolução cheia; a cópia leve só se ela não existir (mídia antiga). */
+function fonteDaMidia(midia: Midia): Promise<ImageBitmap> {
+  return carregarBitmap(arquivoDaMidia(midia.id, "imagem.png")).catch(() => carregarBitmap(arquivoDaMidia(midia.id, "proxy.webp")));
+}
+
 /**
  * O arquivo da imagem. `escala` multiplica o tamanho do projeto (0,5 a 2); `qualidade` vale no JPG e no WebP.
- * Sem fundo, o JPG (que não tem transparência) sai com fundo branco.
+ * Sem fundo, o JPG (que não tem transparência) sai com fundo branco. `fonteDa` troca de onde vem cada imagem
+ * (a miniatura de um modelo, que ainda não tem mídias, usa as formas desenhadas na hora).
  */
 export async function exportarImagem(
   projeto: Projeto,
   midias: ReadonlyMap<string, Midia>,
-  { formato, qualidade = 0.92, escala = 1 }: { formato: FormatoDaImagem; qualidade?: number; escala?: number },
+  { formato, qualidade = 0.92, escala = 1, fonteDa = fonteDaMidia }: { formato: FormatoDaImagem; qualidade?: number; escala?: number; fonteDa?: (midia: Midia) => Promise<ImageBitmap> },
 ): Promise<Blob> {
   const base = tamanhoDaImagem(projeto);
   const tamanho = { largura: Math.round(base.largura * escala), altura: Math.round(base.altura * escala) };
@@ -49,8 +55,7 @@ export async function exportarImagem(
     camadas.map(async (camada) => {
       if (camada.imagem) return camadaDoCompositor(camada, camada.imagem, null);
       const midia = midias.get(camada.clipe.midia_id!)!;
-      // A de resolução cheia; a cópia leve só se ela não existir (mídia antiga)
-      const fonte = await carregarBitmap(arquivoDaMidia(midia.id, "imagem.png")).catch(() => carregarBitmap(arquivoDaMidia(midia.id, "proxy.webp")));
+      const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
       // Como o render do vídeo: sem a máscara pronta, o arquivo sairia com o fundo que a pessoa pediu para tirar
       if (camada.clipe.remover_fundo && !mascara) throw new Error(`O fundo de "${midia.nome}" ainda está sendo recortado. Espere terminar ou desligue "Remover o fundo".`);

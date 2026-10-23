@@ -4,7 +4,10 @@
 // tudo (a API exige uma). As camadas ficam em qualquer ordem: um texto pode ficar embaixo de uma foto.
 import { segundosParaTicks } from "../tempo.ts";
 import { type Contexto, ErroEdicao } from "./edicao.ts";
+import { COR_PADRAO } from "./cor.ts";
+import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { type Clipe, type Faixa, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -174,6 +177,55 @@ export function desfocarFundo(projeto: Projeto, ctx: Contexto, faixaId: string):
   const faixas = [...projeto.faixas];
   faixas.splice(indice, 1, { ...original, clipes: [recortada] }, { ...original, id: ctx.novoId(), clipes: [desfocada] });
   return { projeto: { ...projeto, faixas }, clipeId: recortada.id };
+}
+
+/**
+ * Põe as camadas de um modelo de imagem por cima do que já existe, num passo, e muda o tamanho e o fundo para os
+ * do modelo (as camadas que já estavam ficam no mesmo lugar em frações do quadro).
+ */
+export function aplicarModeloDeImagem(projeto: Projeto, ctx: Contexto, modelo: { camadas: CamadaPronta[]; tamanho: TamanhoDaImagem; fundo: string }): Projeto {
+  let novo = mudarFundoDaImagem(mudarTamanhoDaImagem(projeto, modelo.tamanho), { cor: modelo.fundo, transparente: false });
+  for (const camada of modelo.camadas) {
+    if (camada.tipo === "texto") {
+      novo = porNoTopo(novo, faixaNova(ctx, "texto", clipeDaCamada(ctx.novoId(), { texto: camada.texto, transformacao: camada.transformacao })));
+      continue;
+    }
+    if (!ctx.midia(camada.midiaId)) throw new ErroEdicao("Uma imagem do modelo ainda não está pronta.");
+    const clipe = clipeDaCamada(ctx.novoId(), {
+      midia_id: camada.midiaId,
+      transformacao: camada.transformacao,
+      recorte: camada.recorte,
+      ...(camada.cantos ? { cantos: camada.cantos } : {}),
+      ...(camada.filtro ? { cor: { ...COR_PADRAO, filtro: camada.filtro } } : {}),
+    });
+    novo = porNoTopo(novo, faixaNova(ctx, "video", clipe));
+  }
+  return novo;
+}
+
+/**
+ * Troca a imagem de uma camada mantendo o lugar dela: a nova cobre a mesma caixa (cortada no meio). Os tamanhos
+ * em pixels das duas vêm de quem chama, porque o contexto da edição não sabe o tamanho das mídias.
+ */
+export function trocarImagemDaCamada(projeto: Projeto, ctx: Contexto, clipeId: string, midiaId: string, tamanhoAtual: Tamanho, tamanhoNovo: Tamanho): Projeto {
+  const info = ctx.midia(midiaId);
+  if (!info?.imagem) throw new ErroEdicao("Escolha uma imagem pronta da biblioteca.");
+  const quadro = tamanhoDaImagem(projeto);
+  const faixas = projeto.faixas.map((faixa) => {
+    const clipe = faixa.clipes[0];
+    if (faixa.tipo === "principal" || !clipe || clipe.id !== clipeId) return faixa;
+    if (faixa.travada) throw new ErroEdicao("A camada está travada.");
+    if (!clipe.midia_id) throw new ErroEdicao("Só camadas de imagem trocam de imagem.");
+    const caixa = caixaDoClipe({ ...clipe.transformacao, rotacao: 0 }, clipe.recorte, tamanhoAtual, quadro);
+    const noQuadro = { cx: caixa.cx / quadro.largura, cy: caixa.cy / quadro.altura, largura: caixa.largura / quadro.largura, altura: caixa.altura / quadro.altura };
+    const { transformacao, recorte } = encaixarNaCaixa(tamanhoNovo, noQuadro, quadro, "cobrir");
+    const t = clipe.transformacao;
+    return {
+      ...faixa,
+      clipes: [{ ...clipe, midia_id: midiaId, recorte, remover_fundo: false, transformacao: { ...t, escala: transformacao.escala } }],
+    };
+  });
+  return { ...projeto, faixas };
 }
 
 export function mudarFundoDaImagem(projeto: Projeto, fundo: { cor?: string; transparente?: boolean }): Projeto {

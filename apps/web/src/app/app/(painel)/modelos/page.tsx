@@ -9,6 +9,7 @@ import { CartaoModelo, useUsarDaBiblioteca } from "@/componentes/hub/CartaoModel
 import { JanelaDoModelo } from "@/componentes/hub/JanelaDoModelo";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { ABAS, type Aba, categoriasDos, filtrarItens, type ItemDaBiblioteca, type Ordem, ORDENS } from "@/lib/biblioteca";
+import { TAMANHOS_PRONTOS } from "@/lib/projeto/imagem";
 import { useBiblioteca } from "@/lib/useBiblioteca";
 
 const POR_PAGINA = 48;
@@ -24,7 +25,7 @@ const VAZIOS: Record<Aba, string> = {
 export default function PaginaModelos() {
   const biblioteca = useBiblioteca({ comAnimacoes: true });
   const usar = useUsarDaBiblioteca(biblioteca.contarUso);
-  const [tipo, setTipo] = useState<"projetos" | "animacoes">("projetos");
+  const [tipo, setTipo] = useState<"projetos" | "imagens" | "animacoes">("projetos");
   const [aba, setAba] = useState<Aba>("todos");
   const [busca, setBusca] = useState("");
   const [formato, setFormato] = useState("");
@@ -33,10 +34,10 @@ export default function PaginaModelos() {
   const [mostrando, setMostrando] = useState(POR_PAGINA);
   const [aberto, setAberto] = useState<string | null>(null);
 
-  const todos = tipo === "projetos" ? biblioteca.projetos : biblioteca.animacoes;
+  const todos = tipo === "projetos" ? biblioteca.projetos : tipo === "imagens" ? biblioteca.imagens : biblioteca.animacoes;
   const categorias = useMemo(() => categoriasDos(todos ?? []), [todos]);
   const itens = useMemo(
-    () => (todos ? filtrarItens(todos, { aba, busca, formato: tipo === "projetos" ? formato : "", categoria, ordem }) : null),
+    () => (todos ? filtrarItens(todos, { aba, busca, formato: tipo === "animacoes" ? "" : formato, categoria, ordem }) : null),
     [todos, aba, busca, formato, categoria, ordem, tipo],
   );
   // O item aberto acompanha a lista (o marcador de salvo muda o item)
@@ -48,12 +49,13 @@ export default function PaginaModelos() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-8">
-      <TituloDaPagina titulo="Modelos" descricao="Projetos prontos e animações. Passe o mouse numa animação para ver ela tocando." />
+      <TituloDaPagina titulo="Modelos" descricao="Projetos de vídeo prontos, designs de imagem e animações. Passe o mouse numa animação para ver ela tocando." />
 
       <div className="flex gap-1 border-b border-borda" role="tablist" aria-label="Tipo de modelo">
         {(
           [
-            ["projetos", "Modelos de projeto", biblioteca.projetos?.length],
+            ["projetos", "Modelos de vídeo", biblioteca.projetos?.length],
+            ["imagens", "Modelos de imagem", biblioteca.imagens?.length],
             ["animacoes", "Animações", biblioteca.animacoes?.length],
           ] as const
         ).map(([id, nome, quantos]) => (
@@ -65,6 +67,7 @@ export default function PaginaModelos() {
             onClick={() => {
               setTipo(id);
               setCategoria("");
+              setFormato("");
               setMostrando(POR_PAGINA);
             }}
             className={`border-b-2 px-3 py-2 text-sm transition ${tipo === id ? "border-destaque font-medium text-texto" : "border-transparent text-suave hover:text-texto"}`}
@@ -96,7 +99,7 @@ export default function PaginaModelos() {
           <input
             value={busca}
             onChange={(evento) => trocar(setBusca)(evento.currentTarget.value)}
-            placeholder={tipo === "projetos" ? "Buscar modelos…" : "Buscar animações ou temas…"}
+            placeholder={tipo === "animacoes" ? "Buscar animações ou temas…" : "Buscar modelos…"}
             aria-label="Buscar"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none"
           />
@@ -108,6 +111,15 @@ export default function PaginaModelos() {
               {PROPORCOES.map((item) => (
                 <option key={item} value={item}>
                   {NOMES_PROPORCAO[item]}
+                </option>
+              ))}
+            </select>
+          ) : tipo === "imagens" ? (
+            <select value={formato} onChange={(evento) => trocar(setFormato)(evento.currentTarget.value)} aria-label="Tamanho" className={SELETOR}>
+              <option value="">Qualquer tamanho</option>
+              {TAMANHOS_PRONTOS.map((item) => (
+                <option key={item.id} value={item.nome}>
+                  {item.nome}
                 </option>
               ))}
             </select>

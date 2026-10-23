@@ -8,7 +8,7 @@ import { PreviaDaAnimacao } from "@/componentes/editor/PainelAnimacoes";
 import { ErroApi } from "@/lib/api";
 import type { ItemDaBiblioteca } from "@/lib/biblioteca";
 
-import { DesenhoDoModelo, enderecoDaPrevia, resumoDoItem } from "./CartaoModelo";
+import { DesenhoDoModelo, enderecoDaPrevia, MiniaturaDeImagem, resumoDoItem } from "./CartaoModelo";
 
 type Props = {
   item: ItemDaBiblioteca;
@@ -20,6 +20,7 @@ type Props = {
 
 const COMO_USA: Record<ItemDaBiblioteca["tipo"], string> = {
   projeto: "Escolha um projeto (ou crie um no formato do modelo): no editor, você põe as mídias de cada cena e os textos, e o modelo entra no fim da linha do tempo.",
+  imagem: "Cria uma imagem no tamanho do modelo, com as cores do seu kit de marca. No editor de imagem, troque as fotos (o lugar delas aparece em cinza) e os textos.",
   espaco: "Cria um projeto igual a este. No editor, a ferramenta Modelos mostra o que trocar: as mídias e os textos marcados por quem criou.",
   animacao: "Abre o editor com a animação escolhida: você muda os textos e as cores, e ela entra no cursor, com fundo transparente.",
 };
@@ -62,7 +63,13 @@ export function JanelaDoModelo({ item, aoUsar, aoSalvar, aoExcluir, aoFechar }: 
           </button>
         </div>
         <div className="flex h-72 items-center justify-center bg-painel-3 p-4 sm:h-80">
-          {item.tipo === "animacao" ? <PreviaDaAnimacao endereco={enderecoDaPrevia(item)} proporcao="16:9" alturaMaxima={288} /> : <DesenhoDoModelo item={item} grande />}
+          {item.tipo === "animacao" ? (
+            <PreviaDaAnimacao endereco={enderecoDaPrevia(item)} proporcao="16:9" alturaMaxima={288} />
+          ) : item.tipo === "imagem" ? (
+            <MiniaturaDeImagem modeloId={item.id} />
+          ) : (
+            <DesenhoDoModelo item={item} grande />
+          )}
         </div>
         <div className="flex flex-col gap-3 p-4">
           <div>

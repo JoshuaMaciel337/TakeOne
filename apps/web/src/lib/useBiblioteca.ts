@@ -8,10 +8,12 @@ import {
   type AnimacaoDaBiblioteca,
   type ItemDaBiblioteca,
   itensDeAnimacao,
+  itensDeImagem,
   itensDeProjeto,
   type ModeloDoEspaco,
 } from "@/lib/biblioteca";
 import { MODELOS_DE_PROJETO } from "@/lib/projeto/modelos";
+import { MODELOS_DE_IMAGEM } from "@/lib/projeto/modelosDeImagem";
 
 type Resposta = { do_espaco: ModeloDoEspaco[]; salvos: string[]; usos: Record<string, number> };
 
@@ -49,6 +51,7 @@ export function useBiblioteca({ comAnimacoes = false } = {}) {
 
   const base = useMemo(() => ({ salvos: resposta?.salvos ?? [], usos: resposta?.usos ?? {} }), [resposta]);
   const projetos = useMemo(() => (resposta ? itensDeProjeto(MODELOS_DE_PROJETO, resposta.do_espaco, base) : null), [resposta, base]);
+  const imagens = useMemo(() => (resposta ? itensDeImagem(MODELOS_DE_IMAGEM, base) : null), [resposta, base]);
   const deAnimacao = useMemo(() => (resposta && animacoes ? itensDeAnimacao(animacoes, base) : null), [resposta, animacoes, base]);
 
   /** Guarda ou tira dos salvos, já na tela; se a API recusar, volta. */
@@ -78,5 +81,5 @@ export function useBiblioteca({ comAnimacoes = false } = {}) {
     );
   }, []);
 
-  return { projetos, animacoes: deAnimacao, erro, salvar, contarUso, excluirDoEspaco };
+  return { projetos, imagens, animacoes: deAnimacao, erro, salvar, contarUso, excluirDoEspaco };
 }

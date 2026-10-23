@@ -1,9 +1,11 @@
 // A biblioteca de modelos do hub: os modelos de projeto prontos (lib/projeto/modelos.ts), os do espaço (o
-// projeto de alguém salvo como modelo, na API) e as animações. Tudo vira um item só, que as abas, a busca,
+// projeto de alguém salvo como modelo, na API), os modelos de imagem (lib/projeto/modelosDeImagem.ts) e as animações. Tudo vira um item só, que as abas, a busca,
 // os filtros e a ordem tratam igual. Função pura; quem carrega e mostra é a página Modelos.
+import { TAMANHOS_PRONTOS } from "./projeto/imagem.ts";
 import type { ModeloDeProjeto } from "./projeto/modelos.ts";
+import type { ModeloDeImagem } from "./projeto/modelosDeImagem.ts";
 
-export type TipoDeItem = "projeto" | "espaco" | "animacao";
+export type TipoDeItem = "projeto" | "espaco" | "imagem" | "animacao";
 
 /** Um modelo do espaço, como a API devolve (sem a linha do tempo). */
 export type ModeloDoEspaco = {
@@ -30,7 +32,7 @@ export type ItemDaBiblioteca = {
   nome: string;
   descricao: string;
   categoria: string;
-  /** null nas animações, que se ajustam a qualquer formato. */
+  /** null nas animações, que se ajustam a qualquer formato. Nos modelos de imagem, o nome do tamanho. */
   proporcao: string | null;
   duracaoS: number;
   usos: number;
@@ -111,6 +113,31 @@ export function itensDeProjeto(prontos: ModeloDeProjeto[], doEspaco: ModeloDoEsp
     vagas: modelo.vagas.length,
   }));
   return [...doEspacoItens, ...dePronto];
+}
+
+/** O nome do tamanho pronto ("Post quadrado"), ou a largura e a altura. */
+export function nomeDoTamanho({ largura, altura }: { largura: number; altura: number }): string {
+  return TAMANHOS_PRONTOS.find((item) => item.largura === largura && item.altura === altura)?.nome ?? `${largura} × ${altura}`;
+}
+
+/** Os modelos de imagem como itens; o formato é o nome do tamanho. */
+export function itensDeImagem(modelos: ModeloDeImagem[], { salvos, usos }: Base): ItemDaBiblioteca[] {
+  const salvo = new Set(salvos);
+  return modelos.map((modelo, i) => ({
+    chave: modelo.id,
+    tipo: "imagem",
+    id: modelo.id,
+    nome: modelo.nome,
+    descricao: modelo.descricao,
+    categoria: modelo.categoria,
+    proporcao: nomeDoTamanho(modelo.tamanho),
+    duracaoS: 0,
+    usos: usos[modelo.id] ?? 0,
+    salvo: salvo.has(modelo.id),
+    destaque: Boolean(modelo.destaque),
+    ordemDeEntrada: i,
+    palavras: "",
+  }));
 }
 
 /** As animações como itens; os desenhos (sem tema) entram como destaque. */
