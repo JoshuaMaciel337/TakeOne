@@ -5,7 +5,7 @@ import { segundosParaTicks } from "../tempo.ts";
 import { valorNoTempo } from "./keyframes.ts";
 import { type Clipe, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 import { caixaDoClipe } from "./geometria.ts";
-import { caminhoDoSeguidor, objetoNoInstante, type PontoDoObjeto, pontoNoQuadro, retanguloNaImagem } from "./seguirObjeto.ts";
+import { caminhoConfiavel, caminhoDoSeguidor, objetoNoInstante, type PontoDoObjeto, pontoNoQuadro, retanguloNaImagem } from "./seguirObjeto.ts";
 import { seguirObjetoClipe } from "./edicao.ts";
 
 const S = segundosParaTicks(1);
@@ -152,4 +152,20 @@ test("o retângulo desenhado na prévia vira frações da imagem do clipe, com z
   // Fora da imagem (nas faixas pretas de um vídeo deitado num quadro em pé): nada
   const emPe = { largura: 360, altura: 640 };
   assert.equal(retanguloNaImagem(caixaDoClipe(TRANSFORMACAO_PADRAO, RECORTE_PADRAO, MIDIA, emPe), RECORTE_PADRAO, { esquerda: 10, topo: 10, largura: 50, altura: 50 }), null);
+});
+
+test("a suavização segue uma parábola sem atraso e tira o tremido do rastreador", () => {
+  const quadros = Array.from({ length: 90 }, (_, i) => i / 30);
+  const verdade = (t: number) => ({ x: 0.2 + 0.3 * t - 0.12 * t * t, y: 0.5 + 0.1 * t * t });
+  // Sem ruído: a parábola da janela é a própria parábola (menos nas duas pontas, onde a janela de 1 é a média)
+  const limpo = caminhoConfiavel(quadros.map((t): PontoDoObjeto => [t, verdade(t).x, verdade(t).y, 0.1, 0.1, 1]));
+  for (const p of limpo.slice(2, -2)) {
+    assert.ok(Math.abs(p[1] - verdade(p[0]).x) < 1e-9 && Math.abs(p[2] - verdade(p[0]).y) < 1e-9);
+  }
+  // Com o ruído do rastreador (2 px em 1280), o erro cai a menos da metade
+  let semente = 11;
+  const ruido = () => ((semente = (semente * 16807) % 2147483647) / 2147483647 - 0.5) * (4 / 1280) * Math.sqrt(3);
+  const medidos = quadros.map((t): PontoDoObjeto => [t, verdade(t).x + ruido(), verdade(t).y + ruido(), 0.1, 0.1, 1]);
+  const erro = (lista: PontoDoObjeto[]) => Math.sqrt(lista.reduce((s, p) => s + (p[1] - verdade(p[0]).x) ** 2 + (p[2] - verdade(p[0]).y) ** 2, 0) / lista.length);
+  assert.ok(erro(caminhoConfiavel(medidos)) < 0.5 * erro(medidos), `${erro(caminhoConfiavel(medidos))} contra ${erro(medidos)}`);
 });

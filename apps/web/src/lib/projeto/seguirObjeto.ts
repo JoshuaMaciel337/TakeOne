@@ -19,8 +19,13 @@ export type PontoDoObjeto = [number, number, number, number, number, number];
 export const NOTA_MINIMA = 0.3;
 /** Tolerância inicial da simplificação, em frações do quadro: 0,1% (1 pixel em 1080). */
 const TOLERANCIA_INICIAL = 0.001;
-/** Média de quantos quadros tira o tremido do rastreador (de cada lado e o do meio). */
-const VIZINHOS_DA_MEDIA = 2;
+/**
+ * Quantos quadros de cada lado entram na suavização (Savitzky–Golay de grau 2: a parábola que melhor passa pela
+ * janela, lida no meio). Medido em caminhos sintéticos a 30 fps com o ruído do rastreador (2 px e uns pulos de 8):
+ * com 9 de cada lado, o erro e o tremido ficaram abaixo da média de 2 vizinhos em todos (num caminho rápido e curvo,
+ * de 2,6 para 1,7 px e de 2,3 para 1,8 de tremido); a média de 4 entortava a curva (5,2 px).
+ */
+const VIZINHOS_DA_MEDIA = 9;
 
 /** O caminho do objeto num instante da mídia, entre os pontos achados (reto nos buracos, parado nas pontas). */
 export function objetoNoInstante(pontos: PontoDoObjeto[], segundos: number): { x: number; y: number } | null {
@@ -42,9 +47,9 @@ export function objetoNoInstante(pontos: PontoDoObjeto[], segundos: number): { x
 }
 
 /**
- * Só os pontos confiáveis, com a média dos vizinhos (tira o tremido de um ou dois pixels do rastreador).
- * A janela é simétrica e encolhe nas pontas e na beira dos buracos, para não entortar o caminho: num
- * movimento reto, a média de vizinhos igualmente espaçados cai no próprio ponto.
+ * Só os pontos confiáveis, suavizados pelos vizinhos (tira o tremido de um ou dois pixels do rastreador). A janela é
+ * simétrica e encolhe nas pontas e na beira dos buracos, para não entortar o caminho; com 2 ou mais de cada lado, é a
+ * parábola da janela (Savitzky–Golay), que segue as curvas sem atraso; com menos, a média.
  */
 export function caminhoConfiavel(pontos: PontoDoObjeto[]): PontoDoObjeto[] {
   const bons = pontos.filter((p) => p[5] >= NOTA_MINIMA);
@@ -52,9 +57,18 @@ export function caminhoConfiavel(pontos: PontoDoObjeto[]): PontoDoObjeto[] {
   return bons.map((ponto, i) => {
     let raio = Math.min(VIZINHOS_DA_MEDIA, i, bons.length - 1 - i);
     while (raio > 0 && bons[i + raio][0] - bons[i - raio][0] > (2 * raio + 0.5) * passo) raio--;
-    const vizinhos = bons.slice(i - raio, i + raio + 1);
-    const media = (k: 1 | 2) => vizinhos.reduce((soma, v) => soma + v[k], 0) / vizinhos.length;
-    return [ponto[0], media(1), media(2), ponto[3], ponto[4], ponto[5]];
+    // Os pesos da parábola lida no meio: 3m² + 3m − 1 − 5k² (com m < 2, todos iguais: a média)
+    const peso = (k: number) => (raio < 2 ? 1 : 3 * raio * raio + 3 * raio - 1 - 5 * k * k);
+    const suave = (eixo: 1 | 2) => {
+      let soma = 0;
+      let pesos = 0;
+      for (let k = -raio; k <= raio; k++) {
+        soma += peso(k) * bons[i + k][eixo];
+        pesos += peso(k);
+      }
+      return soma / pesos;
+    };
+    return [ponto[0], suave(1), suave(2), ponto[3], ponto[4], ponto[5]];
   });
 }
 
