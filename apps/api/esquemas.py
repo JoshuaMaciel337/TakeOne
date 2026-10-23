@@ -676,6 +676,18 @@ class PixelsDoClipe(BaseModel):
     versao: int = Field(ge=0, le=9_999_999)
 
 
+class MascaraDePixelsEntrada(BaseModel):
+    """A máscara de camada pintável do editor de imagem (apps/web/src/lib/projeto/mascaraDePixels.ts)."""
+    midia_id: str
+    versao: int = Field(ge=1, le=9_999_999)
+    ligada: bool = True
+    vinculada: bool = True
+    densidade: float = Field(default=1, ge=0, le=1)
+    difusao: float = Field(default=0, ge=0, le=1000)
+    # A posição na camada (0 a 1) → o ponto na máscara (0 a 1)
+    matriz: list[float] = Field(min_length=6, max_length=6)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -734,6 +746,7 @@ class ClipeEntrada(BaseModel):
     preenchimento: float | None = Field(default=None, ge=0, le=1)
     # Camada de pixels: a versão do PNG da mídia que o clipe mostra (0 é a camada vazia)
     pixels: PixelsDoClipe | None = None
+    mascara_pixels: MascaraDePixelsEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)

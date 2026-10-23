@@ -152,3 +152,26 @@ def test_limpeza_das_versoes_sem_uso(cliente, db_limpo):
     assert not caminho("v1.png").exists() and caminho("v2.png").exists() and not caminho("v3.png").exists()
     assert db_limpo.midias.find_one({"_id": ObjectId(camada["id"])})["arquivos"] == ["v2.png"]
     assert db_limpo.midias.find_one({"_id": ObjectId(sobra["id"])}) is None
+
+
+def test_mascara_de_camada(cliente, db_limpo):
+    cadastrar(cliente)
+    camada = cliente.post("/api/camadas-pixels", json={"largura": 100, "altura": 100}).json()
+    mascara = cliente.post("/api/camadas-pixels", json={"largura": 100, "altura": 100, "nome": "Máscara"}).json()
+    assert enviar(cliente, mascara["id"], png(100, 100, (255, 255, 255, 255))).json() == {"versao": 1}
+    clipe = {"id": "p1", "midia_id": camada["id"], "inicio": 0, "duracao": 5 * SEGUNDO, "entrada": 0, "velocidade": 1,
+             "volume": 1, "pixels": {"versao": 0},
+             "mascara_pixels": {"midia_id": mascara["id"], "versao": 1, "matriz": [1, 0, 0, 1, 0, 0]}}
+    faixa = {"id": "fp", "tipo": "video", "oculta": False, "muda": False, "travada": False, "clipes": [clipe]}
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 100, "altura": 100}}).json()
+    resposta = salvar(cliente, imagem, [faixa] + imagem["faixas"])
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["faixas"][0]["clipes"][0]["mascara_pixels"]["densidade"] == 1
+    # A máscara conta como usada: não sai da biblioteca enquanto o projeto existir
+    assert cliente.delete(f"/api/midias/{mascara['id']}").status_code == 409
+    # Uma máscara que não é camada de pixels é recusada
+    foto = cliente.post("/api/elementos/formas", json={"tipo": "elipse", "cor": "#ff0000"}).json()
+    imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
+    errada = {**clipe, "mascara_pixels": {**clipe["mascara_pixels"], "midia_id": foto["id"]}}
+    resposta = salvar(cliente, imagem, [{**faixa, "clipes": [errada]}] + imagem["faixas"][1:])
+    assert resposta.status_code == 422 and "máscara" in resposta.json()["detail"]

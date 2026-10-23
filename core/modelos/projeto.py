@@ -93,7 +93,9 @@ def duracao_do_projeto(faixas: list[dict]) -> int:
 def midias_usadas(faixas: list[dict]) -> list[str]:
     # A gravação de uma câmera conta mesmo sem clipe na faixa: a troca de câmera volta a usar
     cameras = {f["multicamera"]["midia_id"] for f in faixas if f.get("multicamera")}
-    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")} | cameras)
+    # A máscara de camada do editor de imagem é uma camada de pixels: conta como usada, para não ser excluída
+    mascaras = {c["mascara_pixels"]["midia_id"] for f in faixas for c in f["clipes"] if c.get("mascara_pixels")}
+    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")} | cameras | mascaras)
 
 
 def capa_do_projeto(faixas: list[dict], tipo: str = "video") -> str | None:
@@ -102,7 +104,9 @@ def capa_do_projeto(faixas: list[dict], tipo: str = "video") -> str | None:
     principal), a mídia da camada mais de baixo.
     """
     if tipo == "imagem":
-        return next((c["midia_id"] for f in reversed(faixas) for c in f["clipes"] if c.get("midia_id")), None)
+        # As camadas de pixels não têm capa: a de baixo que for foto
+        return next((c["midia_id"] for f in reversed(faixas) for c in f["clipes"]
+                     if c.get("midia_id") and not c.get("pixels")), None)
     principal = next((f for f in faixas if f["tipo"] == FAIXA_PRINCIPAL), None)
     return principal["clipes"][0]["midia_id"] if principal and principal["clipes"] else None
 
@@ -152,6 +156,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
         da_imagem = any(faixa.get(campo) for campo in CAMPOS_DA_IMAGEM)
         if not imagem:
             if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None or c.get("pixels")
+                                or c.get("mascara_pixels")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels e os modos de mesclagem novos só existem"
                         " no editor de imagem.")
@@ -211,6 +216,9 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem:
             return problema
         anterior_fim = 0
         for clipe in clipes:
+            mascara = clipe.get("mascara_pixels")
+            if mascara and not (midias.get(mascara["midia_id"]) or {}).get("camada_pixels"):
+                return "A máscara de uma camada não existe mais."
             if clipe.get("ajuste") or clipe.get("pasta"):
                 # A camada de ajuste e a pasta não têm mídia nem texto: só nas sobreposições
                 if faixa["tipo"] != FAIXA_VIDEO or clipe.get("texto") or clipe.get("midia_id"):

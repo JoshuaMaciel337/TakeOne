@@ -55,7 +55,7 @@ async def midias_do_espaco(db, ids: list[str], organizacao_id) -> dict[str, dict
         return {}
     cursor = db.midias.find(
         {"_id": {"$in": validos}, "organizacao_id": organizacao_id, "status": STATUS_PRONTA},
-        {"nome": 1, "duracao": 1, "video": 1, "audio": 1, "imagem": 1, "animacao": 1},
+        {"nome": 1, "duracao": 1, "video": 1, "audio": 1, "imagem": 1, "animacao": 1, "camada_pixels": 1},
     )
     return {str(m["_id"]): m async for m in cursor}
 
