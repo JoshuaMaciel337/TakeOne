@@ -341,6 +341,14 @@ class MarcaSaida(BaseModel):
     logo_midia_id: str | None = None
 
 
+class DegradeEntrada(BaseModel):
+    """Degradê de preenchimento (core/utils/gradiente.py): de 2 a 5 cores, linear no ângulo ou radial."""
+    tipo: Literal["linear", "radial"] = "linear"
+    cores: list[Annotated[str, Field(pattern=COR)]] = Field(min_length=2, max_length=5)
+    angulo: float = Field(default=0, ge=-360, le=360)
+    meio: float = Field(default=0.5, ge=0.05, le=0.95)
+
+
 class FormaEntrada(BaseModel):
     """Uma forma desenhada (core/utils/forma.py). Sem `cor`, ela é vazada e precisa de contorno."""
     tipo: Literal["retangulo", "arredondado", "elipse", "triangulo", "estrela", "seta", "linha", "balao", "coracao"]
@@ -348,6 +356,8 @@ class FormaEntrada(BaseModel):
     contorno_cor: str = Field(default="#000000", pattern=COR)
     contorno: float = Field(default=0.0, ge=0, le=0.25, description="Espessura, em fração do lado menor da forma")
     proporcao: float | None = Field(default=None, ge=0.05, le=20, description="Largura sobre altura")
+    # O preenchimento em degradê (core/utils/gradiente.py), no lugar da cor; a forma vazada não tem
+    degrade: DegradeEntrada | None = None
 
     @field_validator("cor", "contorno_cor")
     @classmethod
@@ -400,6 +410,7 @@ class TextoEntrada(BaseModel):
     brilho_tamanho: float = Field(default=1, ge=0.3, le=3)
     contornos: list[ContornoExtraEntrada] | None = Field(default=None, max_length=2)
     preenchimento: float = Field(default=1, ge=0, le=1)
+    degrade: DegradeEntrada | None = None
 
     @model_validator(mode="after")
     def cabe_no_teto(self):

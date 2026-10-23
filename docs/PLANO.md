@@ -510,7 +510,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [ ] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
   - [x] Espaçamento entre letras, entrelinha, sublinhado e tachado.
   - [x] Efeitos: sombra com cor, direção, distância, desfoque e espalhar; até dois contornos por fora; tamanho do brilho; texto vazado.
-  - [ ] Degradê em textos e formas e estilos prontos novos.
+  - [x] Degradê em textos e formas e estilos prontos novos (Dourado, Cromado, Quadrinhos, Baixo relevo, Vazado e Pôr do sol).
   - [ ] Texto em arco.
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

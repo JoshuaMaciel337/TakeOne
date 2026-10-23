@@ -16,6 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
+from core.utils.gradiente import imagem_do_degrade
 from core.utils.letras import palavras_das_letras
 
 PASTA_FONTES = Path(__file__).resolve().parent.parent / "fontes"
@@ -82,6 +83,8 @@ TEXTO_PADRAO = {
     "contornos": None,
     # A opacidade das letras (0 deixa só o contorno: texto vazado)
     "preenchimento": 1.0,
+    # As letras em degradê no lugar da cor (core/utils/gradiente.py), sobre o bloco do texto
+    "degrade": None,
 }
 
 
@@ -279,6 +282,13 @@ def _camada_das_letras(texto: dict, medidas: dict) -> Image.Image:
 
     def preenchidas(largura_contorno: int) -> Image.Image:
         camada = _letras(texto, medidas, texto["cor"], largura_contorno)
+        if texto["degrade"]:
+            # O degradê cobre o bloco das letras (sem a folga) e entra só no miolo delas, por cima da cor
+            folga = medidas["folga"]
+            caixa = (folga, folga, medidas["largura"] - folga, medidas["altura"] - folga)
+            degrade = imagem_do_degrade(texto["degrade"], camada.width, camada.height, caixa).convert("RGBA")
+            degrade.putalpha(_letras(texto, medidas, "#ffffff", 0).getchannel("A"))
+            camada.alpha_composite(degrade)
         mascara = _mascara_das_chaves(texto, medidas)
         if mascara is not None:
             camada.paste(_letras(texto, medidas, texto["cor_chave"], largura_contorno), (0, 0), mascara)

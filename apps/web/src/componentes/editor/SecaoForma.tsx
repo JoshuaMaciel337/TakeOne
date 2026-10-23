@@ -4,10 +4,12 @@ import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 
 import { criarForma, FORMAS, type PedidoDeForma } from "@/lib/elementos";
+import type { Degrade } from "@/lib/projeto/gradiente";
 import type { Clipe } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 import { CampoCor } from "./CampoCor";
+import { EditorDeDegrade } from "./EditorDeDegrade";
 
 type Props = {
   clipe: Clipe;
@@ -29,11 +31,16 @@ export function SecaoForma({ clipe, midia, travada, aoTrocarMidia, aoAvisar }: P
   // A cor escolhida enquanto o seletor está aberto: o campo é controlado e voltaria para a cor antiga
   const [cores, setCores] = useState<{ cor?: string; contorno_cor?: string }>({});
   const [pedindo, setPedindo] = useState(false);
+  // O degradê enquanto um controle é arrastado: a forma só é pedida de novo ao soltar
+  const [degradePrevisto, setDegradeNaTela] = useState<Degrade | null | undefined>(undefined);
+  const degradeNaTela = degradePrevisto === undefined ? (forma.degrade ?? null) : degradePrevisto;
   const estica = FORMAS.find((item) => item.tipo === forma.tipo)?.estica ?? false;
   const proporcaoAtual = midia.video ? midia.video.largura / midia.video.altura : 1;
 
   function pedir(mudanca: Partial<PedidoDeForma>) {
     const pedido = { ...forma, ...mudanca };
+    // Sem degradê, o pedido fica como antes (a mesma forma já desenhada é reaproveitada)
+    if (!pedido.degrade || !pedido.cor) delete pedido.degrade;
     if (!pedido.cor && pedido.contorno <= 0) {
       aoAvisar("Uma forma sem preenchimento precisa de contorno.");
       return;
@@ -70,6 +77,19 @@ export function SecaoForma({ clipe, midia, travada, aoTrocarMidia, aoAvisar }: P
           desativado={travada || pedindo}
           aoPrever={(cor) => setCores({ ...cores, cor })}
           aoConfirmar={(cor) => cor !== forma.cor && pedir({ cor })}
+        />
+      ) : null}
+      {forma.cor ? (
+        <EditorDeDegrade
+          degrade={degradeNaTela}
+          corSolida={forma.cor}
+          desativado={travada || pedindo}
+          aoPrever={setDegradeNaTela}
+          aoCancelar={() => setDegradeNaTela(undefined)}
+          aoConfirmar={(degrade) => {
+            setDegradeNaTela(undefined);
+            pedir({ degrade });
+          }}
         />
       ) : null}
       <CampoCor

@@ -14,6 +14,8 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw
 
+from core.utils.gradiente import imagem_do_degrade
+
 TIPOS = ("retangulo", "arredondado", "elipse", "triangulo", "estrela", "seta", "linha", "balao", "coracao")
 # As formas que esticam com a proporção (as outras ficam com a proporção do desenho)
 ESTICAM = {"retangulo", "arredondado", "elipse", "seta", "linha", "balao"}
@@ -116,7 +118,8 @@ def _desenhar_simples(desenho: ImageDraw.ImageDraw, tipo: str, caixa: tuple[floa
 def desenhar_forma(forma: dict) -> Image.Image:
     """
     forma: {tipo, cor (ou None, vazada), contorno_cor, contorno (espessura em fração do lado menor),
-    proporcao (largura/altura, só nas que esticam)}. Devolve a imagem RGBA com o lado maior em LADO_MAIOR.
+    proporcao (largura/altura, só nas que esticam), degrade (o preenchimento em degradê, sobre a caixa da forma,
+    no lugar da cor)}. Devolve a imagem RGBA com o lado maior em LADO_MAIOR.
     """
     tipo = forma["tipo"]
     if tipo not in TIPOS:
@@ -141,6 +144,7 @@ def desenhar_forma(forma: dict) -> Image.Image:
     imagem = Image.new("RGBA", grande, base)
     caixa = (folga, folga, grande[0] - folga, grande[1] - folga)
     poligono = _poligono_da_forma(tipo, caixa)
+    degrade = imagem_do_degrade(forma["degrade"], grande[0], grande[1], caixa) if cor and forma.get("degrade") else None
     if poligono is None:
         desenho = ImageDraw.Draw(imagem)
         if espessura > 0:
@@ -149,13 +153,18 @@ def desenhar_forma(forma: dict) -> Image.Image:
             _desenhar_simples(desenho, tipo, caixa, _cor(cor) if cor else base, espessura)
         else:
             _desenhar_simples(desenho, tipo, caixa, _cor(cor), 0)
+        if degrade is not None:
+            # O degradê só no preenchimento (a forma recuada pelo contorno)
+            miolo = Image.new("L", grande, 0)
+            _desenhar_simples(ImageDraw.Draw(miolo), tipo, caixa, 255, espessura)
+            imagem.paste(degrade, mask=miolo)
     else:
         # A forma é a máscara; o contorno é uma linha com o dobro da espessura sobre a borda, cortada pela
         # máscara: sobra a metade de dentro, igual em toda a volta, até nas pontas
         mascara = Image.new("L", grande, 0)
         ImageDraw.Draw(mascara).polygon(poligono, fill=255)
         if cor:
-            imagem.paste(_cor(cor), mask=mascara)
+            imagem.paste(degrade if degrade is not None else _cor(cor), mask=mascara)
         if espessura > 0:
             linha = Image.new("L", grande, 0)
             # Fecha o contorno passando de novo pelo segundo ponto, para a primeira quina também ser redonda

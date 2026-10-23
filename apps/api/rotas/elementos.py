@@ -43,6 +43,9 @@ def _desenhar(forma: dict, original) -> dict:
 @router.post("/formas", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
 async def criar_forma(dados: FormaEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     forma = dados.model_dump()
+    # Sem degradê, o pedido fica como antes dele existir: a mesma chave acha as formas já desenhadas
+    if forma.get("degrade") is None:
+        forma.pop("degrade", None)
     chave = hashlib.sha1(json.dumps(forma, sort_keys=True).encode()).hexdigest()[:16]
     existente = await db.midias.find_one({"organizacao_id": usuario["organizacao_id"], "elemento.chave": chave,
                                           "status": STATUS_PRONTA})

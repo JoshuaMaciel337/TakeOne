@@ -22,6 +22,7 @@ import {
 
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
+import { EditorDeDegrade } from "./EditorDeDegrade";
 
 type Props = {
   clipe: Clipe;
@@ -172,6 +173,14 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
           {...controle("tamanho", 100)}
         />
         <CampoCor rotulo="Cor" {...cor("cor")} />
+        <EditorDeDegrade
+          degrade={texto.degrade ?? null}
+          corSolida={texto.cor}
+          desativado={travada}
+          aoPrever={(degrade) => aoPrever(mudar({ degrade }))}
+          aoCancelar={() => aoPrever(null)}
+          aoConfirmar={(degrade) => aoExecutar(mudar({ degrade }))}
+        />
         <ControleNumerico rotulo="Opacidade das letras" minimo={0} maximo={100} sufixo="%" {...opcional("preenchimento", 1, 100)} />
       </Secao>
       <Secao titulo="Letras e linhas">
