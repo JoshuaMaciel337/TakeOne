@@ -76,3 +76,62 @@ test("o traço junta à camada pela opacidade, trava a transparência, apaga e m
   // Os não separáveis: a luminosidade do branco sobre vermelho é branca
   assert.deepEqual(misturar("luminosidade", [1, 0, 0], [1, 1, 1]), [1, 1, 1]);
 });
+
+test("as marcas de um ponto: dispersão, tremor, controles e o desvanecer", async () => {
+  const { marcasDoPonto, PINCEL_PADRAO, PASSOS_DO_DESVANECER } = await import("./traco.ts");
+  let n = 0;
+  const fixo = (valor: number) => () => valor;
+  const sequencia = () => [0.9, 0.1, 0.5, 0.3, 0.7][n++ % 5];
+  // Sem seções: uma marca, no ponto, com a pressão no tamanho
+  const simples = marcasDoPonto(PINCEL_PADRAO, { x: 10, y: 20, pressao: 0.5 }, 40, 0, fixo(0.5));
+  assert.equal(simples.length, 1);
+  assert.deepEqual([simples[0].x, simples[0].y, simples[0].diametro, simples[0].alfa], [10, 20, 20, 1]);
+  // Dispersão de 1 diâmetro na perpendicular de um traço para a direita: a marca anda só no y
+  const disperso = { ...PINCEL_PADRAO, dispersao: { ligado: true, quanto: 1, ambosEixos: false, contagem: 3, tremorDaContagem: 0 } };
+  const marcas = marcasDoPonto(disperso, { x: 0, y: 0, pressao: 1, direcao: 0 }, 10, 0, sequencia);
+  assert.equal(marcas.length, 3);
+  for (const marca of marcas) {
+    perto(marca.x, 0, 1e-9);
+    assert.ok(Math.abs(marca.y) <= 10);
+  }
+  // Tremor do tamanho de 100% com sorteio 0,5 dá metade; o desvanecer leva o fluxo ao mínimo
+  const forma = { ...PINCEL_PADRAO, dinamicaDeForma: { ...PINCEL_PADRAO.dinamicaDeForma, ligado: true, tamanho: { tremor: 1, controle: "nenhum" as const, minimo: 0 } } };
+  perto(marcasDoPonto(forma, { x: 0, y: 0, pressao: 1 }, 40, 0, fixo(0.5))[0].diametro, 20);
+  const desvanece = { ...PINCEL_PADRAO, transferencia: { ligado: true, opacidade: { tremor: 0, controle: "nenhum" as const, minimo: 0 }, fluxo: { tremor: 0, controle: "desvanecer" as const, minimo: 0.2 } } };
+  perto(marcasDoPonto(desvanece, { x: 0, y: 0, pressao: 1 }, 10, 0, fixo(0))[0].alfa, 1);
+  perto(marcasDoPonto(desvanece, { x: 0, y: 0, pressao: 1 }, 10, PASSOS_DO_DESVANECER, fixo(0))[0].alfa, 0.2);
+  // O ângulo pela direção do traço
+  const direcao = { ...PINCEL_PADRAO, dinamicaDeForma: { ...PINCEL_PADRAO.dinamicaDeForma, ligado: true, angulo: { tremor: 0, controle: "direcao" as const, minimo: 0 } } };
+  perto(marcasDoPonto(direcao, { x: 0, y: 0, pressao: 1, direcao: Math.PI / 2 }, 10, 0, fixo(0.5))[0].angulo, Math.PI / 2);
+});
+
+test("as cópias da simetria em volta do meio", async () => {
+  const { copiasDaSimetria } = await import("./traco.ts");
+  const centro = { x: 100, y: 50 };
+  const ponto = { x: 120, y: 40, pressao: 1 };
+  const xy = (lista: { x: number; y: number }[]) => lista.map((p) => [Math.round(p.x * 1000) / 1000, Math.round(p.y * 1000) / 1000]);
+  assert.deepEqual(xy(copiasDaSimetria(ponto, null, centro)), [[120, 40]]);
+  assert.deepEqual(xy(copiasDaSimetria(ponto, { tipo: "vertical", segmentos: 2 }, centro)), [[120, 40], [80, 40]]);
+  assert.deepEqual(xy(copiasDaSimetria(ponto, { tipo: "doisEixos", segmentos: 2 }, centro)), [[120, 40], [80, 40], [120, 60], [80, 60]]);
+  assert.deepEqual(xy(copiasDaSimetria(ponto, { tipo: "diagonal", segmentos: 2 }, centro)), [[120, 40], [90, 70]]);
+  assert.deepEqual(xy(copiasDaSimetria(ponto, { tipo: "radial", segmentos: 4 }, centro)), [[120, 40], [110, 70], [80, 60], [90, 30]]);
+  assert.equal(copiasDaSimetria(ponto, { tipo: "mandala", segmentos: 6 }, centro).length, 12);
+});
+
+test("a predefinição troca o pincel, menos as seções travadas e a textura protegida", async () => {
+  const { comPredefinicao, PREDEFINICOES } = await import("./predefinicoes.ts");
+  const { PINCEL_PADRAO } = await import("./traco.ts");
+  const giz = PREDEFINICOES.find((p) => p.id === "giz")!;
+  const atual = { ...PINCEL_PADRAO, opacidade: 0.4, modo: "multiplicar" as const, dispersao: { ...PINCEL_PADRAO.dispersao, ligado: true, quanto: 2 } };
+  const novo = comPredefinicao(atual, giz);
+  assert.equal(novo.ponta, "giz");
+  assert.equal(novo.textura.ligado, true);
+  assert.deepEqual([novo.opacidade, novo.modo], [0.4, "multiplicar"]);
+  assert.equal(novo.dispersao.ligado, false);
+  const travado = comPredefinicao(atual, giz, new Set(["dispersao"]));
+  assert.equal(travado.dispersao.quanto, 2);
+  const protegido = comPredefinicao({ ...atual, protegerTextura: true, textura: { ...PINCEL_PADRAO.textura, ligado: true, id: "linhas" } }, giz);
+  assert.equal(protegido.textura.id, "linhas");
+  // Toda predefinição tem nome e pasta, e os ids não se repetem
+  assert.equal(new Set(PREDEFINICOES.map((p) => p.id)).size, PREDEFINICOES.length);
+});

@@ -14,6 +14,7 @@ export const PAINEIS_DA_IMAGEM = {
   amostras: "Amostras",
   biblioteca: "Biblioteca",
   camadas: "Camadas",
+  configuracoesDoPincel: "Configurações do pincel",
   cor: "Cor",
   estilos: "Estilos de texto",
   filtros: "Filtros",
@@ -21,6 +22,7 @@ export const PAINEIS_DA_IMAGEM = {
   formas: "Formas",
   historico: "Histórico",
   modelos: "Modelos",
+  pinceis: "Pincéis",
   propriedades: "Propriedades",
 } as const;
 export type IdPainelDaImagem = keyof typeof PAINEIS_DA_IMAGEM;
@@ -282,7 +284,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           ],
         },
         "-",
-        ...(Object.entries(PAINEIS_DA_IMAGEM) as [IdPainelDaImagem, string][]).map(([id, nome]): ItemDeMenu => ({ nome, marcado: a.painelAberto(id), aoEscolher: () => a.alternarPainel(id) })),
+        ...(Object.entries(PAINEIS_DA_IMAGEM) as [IdPainelDaImagem, string][]).map(
+          (([id, nome]): ItemDeMenu => ({ nome, marcado: a.painelAberto(id), atalho: id === "configuracoesDoPincel" ? "F5" : undefined, aoEscolher: () => a.alternarPainel(id) })),
+        ),
       ],
     },
     { nome: "Ajuda", itens: [{ nome: "Atalhos do teclado…", aoEscolher: a.atalhos }] },

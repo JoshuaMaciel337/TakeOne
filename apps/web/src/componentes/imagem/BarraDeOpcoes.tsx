@@ -3,7 +3,7 @@
 import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, X } from "lucide-react";
 import { Fragment } from "react";
 
-import { LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel } from "@/lib/pintura/traco";
+import { LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel, type Simetria, TIPOS_DE_SIMETRIA } from "@/lib/pintura/traco";
 import type { Comando } from "@/lib/projeto/comandos";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
@@ -48,6 +48,8 @@ type Props = {
   /** As opções do pincel, do lápis ou da borracha (a ferramenta escolhida). */
   pincel?: OpcoesDoPincel;
   aoMudarPincel?: (mudanca: Partial<OpcoesDoPincel>) => void;
+  simetria?: Simetria | null;
+  aoMudarSimetria?: (simetria: Simetria | null) => void;
 };
 
 /** Um número da barra (o valor digitado só vale ao sair ou no Enter). */
@@ -278,6 +280,33 @@ export function BarraDeOpcoes(props: Props) {
             <input type="checkbox" checked={pincel.apagarAutomaticamente} onChange={(evento) => mudar({ apagarAutomaticamente: evento.currentTarget.checked })} />
             Apagar automaticamente
           </label>
+        ) : null}
+        {props.aoMudarSimetria ? (
+          <>
+            {SEPARADOR}
+            <label className="flex items-center gap-1 text-suave">
+              Simetria:
+              <select
+                aria-label="Simetria da pintura"
+                className={campo}
+                value={props.simetria?.tipo ?? ""}
+                onChange={(evento) => {
+                  const tipo = evento.currentTarget.value as Simetria["tipo"] | "";
+                  props.aoMudarSimetria!(tipo ? { tipo, segmentos: props.simetria?.segmentos ?? 6 } : null);
+                }}
+              >
+                <option value="">Desligada</option>
+                {TIPOS_DE_SIMETRIA.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>
+                    {tipo.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {props.simetria && (props.simetria.tipo === "radial" || props.simetria.tipo === "mandala") ? (
+              <Numero rotulo="Segmentos" valor={props.simetria.segmentos} minimo={2} maximo={12} largura="w-9" aoMudar={(segmentos) => props.aoMudarSimetria!({ ...props.simetria!, segmentos: Math.round(segmentos) })} />
+            ) : null}
+          </>
         ) : null}
       </>
     );

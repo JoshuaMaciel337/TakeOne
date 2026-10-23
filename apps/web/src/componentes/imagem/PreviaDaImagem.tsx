@@ -15,7 +15,7 @@ import { posicaoTravada } from "@/lib/projeto/arvore";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
-import type { FerramentaDePintura, OpcoesDoPincel } from "@/lib/pintura/traco";
+import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
@@ -80,6 +80,7 @@ type Props = {
     aoQuadro: () => void;
     aoSoltar: (clipeId: string) => void;
     aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
+    simetria: Simetria | null;
   } | null;
   /** O canvas de uma camada de pixels sendo pintada; sem ele, a versão do servidor. */
   fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
@@ -500,6 +501,7 @@ export function PreviaDaImagem({
                 aoQuadro={pintura.aoQuadro}
                 aoSoltar={pintura.aoSoltar}
                 aoAjustar={pintura.aoAjustar}
+                simetria={pintura.simetria}
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}

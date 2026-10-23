@@ -5,7 +5,8 @@
 // pela opacidade do traço, só no retângulo que mudou. Ao soltar, a tela vira a camada. A opacidade é o teto do
 // traço (passar de novo no mesmo traço não escurece além dela) e o fluxo é quanto cada marca deposita.
 import { juntarTraco } from "./mesclar.ts";
-import type { FerramentaDePintura, OpcoesDoPincel, PontoDoTraco } from "./traco.ts";
+import { amostraDaPonta, type IdDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
+import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, type PontoDoTraco } from "./traco.ts";
 
 export type Retangulo = { x0: number; y0: number; x1: number; y1: number };
 type Rgb = [number, number, number];
@@ -84,6 +85,74 @@ function ponta(diametro: number, dureza: number, dura: boolean): HTMLCanvasEleme
   return canvas;
 }
 
+/** A ponta de amostra com a borda molhada (a tinta junta na beira) e o ruído, quando pedidos, guardada. */
+const AMOSTRAS_MUDADAS = new Map<string, HTMLCanvasElement>();
+function pontaMudada(base: HTMLCanvasElement, chave: string, molhada: boolean, ruido: boolean): HTMLCanvasElement {
+  if (!molhada && !ruido) return base;
+  const guardada = AMOSTRAS_MUDADAS.get(chave);
+  if (guardada) return guardada;
+  const canvas = canvasNovo(base.width, base.height);
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(base, 0, 0);
+  const dados = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let semente = 12345;
+  const aleatorio = () => ((semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let i = 3; i < dados.data.length; i += 4) {
+    let a = dados.data[i] / 255;
+    // Molhada: o miolo cai pela metade e a beira (onde o alfa passa de 0 a 1) fica forte
+    if (molhada) a = Math.min(1, 0.5 * a + 2 * a * (1 - a));
+    // Ruído: grão só na parte macia da borda
+    if (ruido) a = Math.min(1, Math.max(0, a + (aleatorio() - 0.5) * 2.4 * a * (1 - a)));
+    dados.data[i] = Math.round(a * 255);
+  }
+  ctx.putImageData(dados, 0, 0);
+  if (AMOSTRAS_MUDADAS.size >= MAXIMO_DE_PONTAS) AMOSTRAS_MUDADAS.delete(AMOSTRAS_MUDADAS.keys().next().value!);
+  AMOSTRAS_MUDADAS.set(chave, canvas);
+  return canvas;
+}
+
+/** A textura como alfa: o claro deixa passar; a profundidade é quanto o escuro tira. */
+const TEXTURAS_EM_ALFA = new Map<string, HTMLCanvasElement>();
+function texturaEmAlfa(id: IdDaTextura, profundidade: number, inverter: boolean): HTMLCanvasElement {
+  const chave = `${id}|${profundidade.toFixed(2)}|${inverter}`;
+  const guardada = TEXTURAS_EM_ALFA.get(chave);
+  if (guardada) return guardada;
+  const ladrilho = ladrilhoDaTextura(id);
+  const canvas = canvasNovo(ladrilho.width, ladrilho.height);
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(ladrilho, 0, 0);
+  const dados = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < dados.data.length; i += 4) {
+    const v = dados.data[i] / 255;
+    dados.data[i + 3] = Math.round((1 - profundidade * (1 - (inverter ? 1 - v : v))) * 255);
+  }
+  ctx.putImageData(dados, 0, 0);
+  TEXTURAS_EM_ALFA.set(chave, canvas);
+  return canvas;
+}
+
+function rgbParaHsv([r, g, b]: Rgb): Rgb {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  const h = d === 0 ? 0 : max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, max === 0 ? 0 : d / max, max];
+}
+function hsvParaRgb([h, s, v]: Rgb): Rgb {
+  const f = (n: number) => {
+    const k = (n + h * 6) % 6;
+    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+  };
+  return [f(5), f(3), f(1)];
+}
+
+/** A cor de uma marca com a dinâmica de cor: entre o primeiro plano e o fundo, e o matiz, a saturação e o brilho. */
+function corDaMarca(primeiro: Rgb, fundo: Rgb, variacao: NonNullable<Marca["cor"]>): string {
+  const base: Rgb = [0, 1, 2].map((c) => primeiro[c] + (fundo[c] - primeiro[c]) * variacao.fundo) as Rgb;
+  const [h, s, v] = rgbParaHsv(base);
+  const [r, g, b] = hsvParaRgb([(((h + variacao.matiz) % 1) + 1) % 1, Math.min(1, Math.max(0, s + variacao.saturacao)), Math.min(1, Math.max(0, v + variacao.brilho))]);
+  return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
+}
+
 export type InicioDoTraco = {
   ferramenta: FerramentaDePintura;
   opcoes: OpcoesDoPincel;
@@ -104,7 +173,13 @@ export class Pintura {
   private readonly ctxCamada: CanvasRenderingContext2D;
   private readonly ctxTela: CanvasRenderingContext2D;
   private readonly ctxTraco: CanvasRenderingContext2D;
-  private atual: (InicioDoTraco & { tinta: Rgb; apagar: boolean; dura: boolean }) | null = null;
+  private atual: (InicioDoTraco & { tinta: Rgb; corDoFundo: Rgb; apagar: boolean; dura: boolean; colorido: boolean }) | null = null;
+  /** Quantas marcas o traço já tem (o desvanecer) e a variação de cor do começo (sem "por ponta"). */
+  private indice = 0;
+  private corDoTraco: Marca["cor"] = null;
+  /** Rascunhos de uma marca com textura, pincel duplo ou cor. */
+  private readonly rascunho = canvasNovo(1, 1);
+  private readonly rascunhoDuplo = canvasNovo(1, 1);
   /** O que o traço já tocou (para gravar na camada ao soltar) e o que mudou desde a última tela. */
   private area: Retangulo | null = null;
   private sujo: Retangulo | null = null;
@@ -149,7 +224,10 @@ export class Pintura {
     // A borracha numa camada de transparência travada pinta a cor de fundo, como no fundo dos editores de imagem
     const apagar = borracha && !inicio.travarTransparencia;
     if (borracha && inicio.travarTransparencia) cor = inicio.fundo;
-    this.atual = { ...inicio, tinta: corParaRgb(cor), apagar, dura };
+    const colorido = inicio.opcoes.dinamicaDeCor.ligado && !borracha;
+    this.atual = { ...inicio, tinta: corParaRgb(cor), corDoFundo: corParaRgb(inicio.fundo), apagar, dura, colorido };
+    this.indice = 0;
+    this.corDoTraco = null;
     this.area = null;
     this.sujo = null;
     this.ctxTraco.clearRect(0, 0, this.largura, this.altura);
@@ -184,14 +262,106 @@ export class Pintura {
       this.ctxTraco.fillRect(x, y, Math.round(diametro), Math.round(diametro));
       retangulo = { x0: x, y0: y, x1: x + Math.round(diametro), y1: y + Math.round(diametro) };
     } else {
-      const imagem = ponta(diametro, opcoes.dureza, atual.dura);
-      // A dura vai para o pixel inteiro (sem borda misturada); a macia fica no ponto exato
-      const x = atual.dura ? Math.round(ponto.x - imagem.width / 2) : ponto.x - imagem.width / 2;
-      const y = atual.dura ? Math.round(ponto.y - imagem.height / 2) : ponto.y - imagem.height / 2;
-      this.ctxTraco.drawImage(imagem, x, y);
-      retangulo = { x0: Math.floor(x), y0: Math.floor(y), x1: Math.ceil(x + imagem.width), y1: Math.ceil(y + imagem.height) };
+      this.ctxTraco.globalAlpha = 1;
+      for (const marca of marcasDoPonto(opcoes, { ...ponto, pressao: ponto.pressao }, atual.diametro, this.indice++, Math.random)) {
+        if (atual.colorido && marca.cor && !opcoes.dinamicaDeCor.porPonta) marca.cor = this.corDoTraco ??= marca.cor;
+        this.desenharMarca(marca);
+      }
+      return;
     }
     this.ctxTraco.globalAlpha = 1;
+    this.area = unir(this.area, retangulo);
+    this.sujo = unir(this.sujo, retangulo);
+  }
+
+  /** A ponta da marca: a redonda (com a dureza, ou dura no lápis) ou a amostra, com borda molhada e ruído. */
+  private pontaDa(marca: Marca): HTMLCanvasElement {
+    const { opcoes, dura } = this.atual!;
+    if (opcoes.ponta === "redonda") {
+      const base = ponta(marca.diametro, opcoes.dureza, dura);
+      return pontaMudada(base, `r|${base.width}|${opcoes.dureza.toFixed(2)}|${dura}|${opcoes.bordasMolhadas}|${opcoes.ruido}`, opcoes.bordasMolhadas, opcoes.ruido);
+    }
+    return pontaMudada(amostraDaPonta(opcoes.ponta), `a|${opcoes.ponta}|${opcoes.bordasMolhadas}|${opcoes.ruido}`, opcoes.bordasMolhadas, opcoes.ruido);
+  }
+
+  /** Uma marca no canvas do traço, com o giro, o achatamento, as viradas, a textura, o pincel duplo e a cor. */
+  private desenharMarca(marca: Marca) {
+    const atual = this.atual!;
+    const { opcoes } = atual;
+    if (marca.alfa <= 0) return;
+    const imagem = this.pontaDa(marca);
+    const d = marca.diametro;
+    const simples = opcoes.ponta === "redonda" && marca.arredondamento >= 0.999 && !marca.virarX && !marca.virarY;
+    const comRascunho = opcoes.textura.ligado || opcoes.duplo.ligado || (atual.colorido && marca.cor);
+    // A caixa da marca: o diâmetro, que cobre a ponta girada e achatada
+    const lado = Math.ceil(d) + 2;
+    const x0 = atual.dura && simples ? Math.round(marca.x - imagem.width / 2) : marca.x - lado / 2;
+    const y0 = atual.dura && simples ? Math.round(marca.y - imagem.height / 2) : marca.y - lado / 2;
+    const desenharPonta = (ctx: CanvasRenderingContext2D, cx: number, cy: number) => {
+      if (simples && !comRascunho && atual.dura) {
+        ctx.drawImage(imagem, x0, y0);
+        return;
+      }
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(marca.angulo);
+      ctx.scale(marca.virarX ? -1 : 1, (marca.virarY ? -1 : 1) * marca.arredondamento);
+      // A redonda já vem desenhada no diâmetro (com a margem); a amostra é esticada até ele
+      if (opcoes.ponta === "redonda") ctx.drawImage(imagem, -imagem.width / 2, -imagem.height / 2);
+      else ctx.drawImage(imagem, -d / 2, -d / 2, d, d);
+      ctx.restore();
+    };
+    if (!comRascunho) {
+      this.ctxTraco.globalAlpha = marca.alfa;
+      desenharPonta(this.ctxTraco, marca.x, marca.y);
+      this.ctxTraco.globalAlpha = 1;
+    } else {
+      const rascunho = this.rascunho;
+      if (rascunho.width < lado || rascunho.height < lado) {
+        rascunho.width = Math.max(rascunho.width, lado);
+        rascunho.height = Math.max(rascunho.height, lado);
+      }
+      const ctx = rascunho.getContext("2d")!;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, lado, lado);
+      desenharPonta(ctx, lado / 2, lado / 2);
+      if (opcoes.textura.ligado) {
+        // A textura presa à camada (não à marca): o desenho do papel não anda com o pincel
+        const padrao = ctx.createPattern(texturaEmAlfa(opcoes.textura.id, opcoes.textura.profundidade, opcoes.textura.inverter), "repeat")!;
+        padrao.setTransform(new DOMMatrix().translate(-x0, -y0).scale(Math.max(0.05, opcoes.textura.escala)));
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.fillStyle = padrao;
+        ctx.fillRect(0, 0, lado, lado);
+      }
+      if (opcoes.duplo.ligado) {
+        // O pincel duplo: só fica onde a segunda ponta também marcou
+        const duplo = this.rascunhoDuplo;
+        if (duplo.width < lado || duplo.height < lado) {
+          duplo.width = Math.max(duplo.width, lado);
+          duplo.height = Math.max(duplo.height, lado);
+        }
+        const ctxDuplo = duplo.getContext("2d")!;
+        ctxDuplo.clearRect(0, 0, lado, lado);
+        const pontaDupla = opcoes.duplo.ponta === "redonda" ? ponta(d * opcoes.duplo.tamanho, 1, false) : amostraDaPonta(opcoes.duplo.ponta as IdDaPonta);
+        const dd = Math.max(1, d * opcoes.duplo.tamanho);
+        for (let i = 0; i < Math.max(1, opcoes.duplo.contagem); i++) {
+          const espalhar = opcoes.duplo.dispersao * d;
+          ctxDuplo.drawImage(pontaDupla, lado / 2 - dd / 2 + (Math.random() - 0.5) * 2 * espalhar, lado / 2 - dd / 2 + (Math.random() - 0.5) * 2 * espalhar, dd, dd);
+        }
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.drawImage(duplo, 0, 0, lado, lado, 0, 0, lado, lado);
+      }
+      if (atual.colorido && marca.cor) {
+        ctx.globalCompositeOperation = "source-in";
+        ctx.fillStyle = corDaMarca(atual.tinta, atual.corDoFundo, marca.cor);
+        ctx.fillRect(0, 0, lado, lado);
+      }
+      ctx.globalCompositeOperation = "source-over";
+      this.ctxTraco.globalAlpha = marca.alfa;
+      this.ctxTraco.drawImage(rascunho, 0, 0, lado, lado, x0, y0, lado, lado);
+      this.ctxTraco.globalAlpha = 1;
+    }
+    const retangulo = { x0: Math.floor(x0) - 1, y0: Math.floor(y0) - 1, x1: Math.ceil(x0 + Math.max(lado, imagem.width)) + 1, y1: Math.ceil(y0 + Math.max(lado, imagem.height)) + 1 };
     this.area = unir(this.area, retangulo);
     this.sujo = unir(this.sujo, retangulo);
   }
@@ -211,12 +381,14 @@ export class Pintura {
     const altura = y1 - y0;
     const fundo = this.ctxCamada.getImageData(x0, y0, largura, altura).data;
     const traco = this.ctxTraco.getImageData(x0, y0, largura, altura).data;
-    // A cor da tinta no lugar do branco das pontas
-    const [r, g, b] = atual.tinta.map((v) => Math.round(v * 255));
-    for (let i = 0; i < traco.length; i += 4) {
-      traco[i] = r;
-      traco[i + 1] = g;
-      traco[i + 2] = b;
+    // A cor da tinta no lugar do branco das pontas (com a dinâmica de cor, cada marca já veio com a dela)
+    if (!atual.colorido) {
+      const [r, g, b] = atual.tinta.map((v) => Math.round(v * 255));
+      for (let i = 0; i < traco.length; i += 4) {
+        traco[i] = r;
+        traco[i + 1] = g;
+        traco[i + 2] = b;
+      }
     }
     const saida = this.ctxTela.createImageData(largura, altura);
     juntarTraco(fundo, traco, saida.data, {

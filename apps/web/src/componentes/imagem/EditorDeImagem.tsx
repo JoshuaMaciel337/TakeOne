@@ -49,7 +49,8 @@ import { PropriedadesDoDocumento } from "./PropriedadesDoDocumento";
 import { useObjeto } from "./useObjeto";
 import { usePinturas } from "./usePinturas";
 import type { AlvoDaPintura } from "./PinturaNaPrevia";
-import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO } from "@/lib/pintura/traco";
+import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
+import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
 import { criarCamadaDePixels } from "@/lib/pixels";
 
 const SEM_SEGUIR = {
@@ -124,6 +125,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     lapis: { ...PINCEL_PADRAO, tamanho: 4, dureza: 1, espacamento: 0.1, suavizacao: 0 },
     borracha: { ...PINCEL_PADRAO, tamanho: 40 },
   });
+  const [simetria, setSimetria] = useState<Simetria | null>(null);
+  // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
+  const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const [selecao, definirSelecao] = useState<string[]>([]);
   const [exportando, setExportando] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
@@ -374,7 +378,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
   };
   const ferramentaDePintura = FERRAMENTAS_DE_PINTURA.has(ferramenta) ? (ferramenta as FerramentaDePintura) : null;
-  const mudarPincel = (mudanca: Partial<OpcoesDoPincel>) => ferramentaDePintura && setPinceis((atual) => ({ ...atual, [ferramentaDePintura]: { ...atual[ferramentaDePintura], ...mudanca } }));
+  // Fora das ferramentas de pintura, os painéis do pincel mostram o Pincel (como lá, o último pincel usado)
+  const pincelDosPaineis: FerramentaDePintura = ferramentaDePintura ?? "pincel";
+  const mudarPincel = (mudanca: Partial<OpcoesDoPincel>) => setPinceis((atual) => ({ ...atual, [pincelDosPaineis]: { ...atual[pincelDosPaineis], ...mudanca } }));
   const ordenar = (para: "topo" | "cima" | "baixo" | "fundo") => {
     // Várias: cada uma anda entre as irmãs dela; para cima, a de cima anda primeiro (e o contrário para baixo)
     const ordem = para === "cima" || para === "fundo" ? escolhidas : [...escolhidas].reverse();
@@ -670,6 +676,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       nome: PAINEIS_DA_IMAGEM.camadas,
       conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} />,
     },
+    pinceis: {
+      nome: PAINEIS_DA_IMAGEM.pinceis,
+      conteudo: (
+        <PainelPinceis
+          opcoes={pinceis[pincelDosPaineis]}
+          cor={cores.primeiroPlano}
+          aoEscolher={(predefinicao) => {
+            setPinceis((atual) => ({ ...atual, [pincelDosPaineis]: comPredefinicao(atual[pincelDosPaineis], predefinicao, secoesTravadas) }));
+            if (!ferramentaDePintura) escolherFerramenta("pincel");
+          }}
+          aoAbrirConfiguracoes={() => area.abrir("configuracoesDoPincel")}
+        />
+      ),
+    },
+    configuracoesDoPincel: {
+      nome: PAINEIS_DA_IMAGEM.configuracoesDoPincel,
+      conteudo: (
+        <PainelConfiguracoesDoPincel
+          opcoes={pinceis[pincelDosPaineis]}
+          cor={cores.primeiroPlano}
+          aoMudar={mudarPincel}
+          travadas={secoesTravadas}
+          aoTravar={(secao) =>
+            setSecoesTravadas((atual) => {
+              const novas = new Set(atual);
+              if (novas.has(secao)) novas.delete(secao);
+              else novas.add(secao);
+              return novas;
+            })
+          }
+          aoAbrirPredefinicoes={() => area.abrir("pinceis")}
+        />
+      ),
+    },
     historico: { nome: PAINEIS_DA_IMAGEM.historico, conteudo: <PainelHistorico nome={edicao.nome} feitos={edicao.passos.feitos} desfeitos={edicao.passos.desfeitos} aoIr={edicao.irParaPasso} /> },
   };
 
@@ -740,6 +780,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoAlinhar={(eixo) => camadaEscolhida && executar({ comando: "clipe.transformar", parametros: { clipeIds: [camadaEscolhida.clipe.id], transformacao: { [eixo]: 0 } } })}
         pincel={ferramentaDePintura ? pinceis[ferramentaDePintura] : undefined}
         aoMudarPincel={mudarPincel}
+        simetria={simetria}
+        aoMudarSimetria={setSimetria}
       />
 
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
@@ -795,6 +837,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     aoQuadro: pinturas.avisarQuadro,
                     aoSoltar: pinturas.soltar,
                     aoAjustar: mudarPincel,
+                    simetria,
                   }
                 : null
             }

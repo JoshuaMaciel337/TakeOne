@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Pintura } from "@/lib/pintura/motor";
-import { comprimentoDaCorda, Corda, Espacador, type FerramentaDePintura, type OpcoesDoPincel, pontoNaCamada, type PontoDoTraco } from "@/lib/pintura/traco";
+import { comprimentoDaCorda, copiasDaSimetria, Corda, Espacador, type FerramentaDePintura, type OpcoesDoPincel, pontoNaCamada, type PontoDoTraco, type Simetria } from "@/lib/pintura/traco";
 import type { Caixa, Tamanho } from "@/lib/projeto/geometria";
 import type { Recorte, Virar } from "@/lib/projeto/modelo";
 
@@ -33,6 +33,8 @@ type Props = {
   aoSoltar: (clipeId: string) => void;
   /** Alt + botão direito arrastando: para os lados muda o tamanho, para cima e para baixo a dureza. */
   aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
+  /** A simetria da pintura, em volta do meio do quadro; null sem ela. */
+  simetria: Simetria | null;
 };
 
 type Traco = {
@@ -42,19 +44,22 @@ type Traco = {
   alvo?: AlvoDaPintura;
   mapear?: (ponto: PontoDoTraco) => PontoDoTraco;
   corda: Corda;
-  espacador: Espacador;
+  /** Um espaçador por cópia da simetria (cada cópia anda o próprio caminho). */
+  espacadores: Espacador[];
   ultimoNaTela?: PontoDoTraco;
-  ultimaMarca?: PontoDoTraco;
+  ultimasMarcas: PontoDoTraco[];
   animacao?: number;
   aerografo?: number;
 };
 
-function pressaoDe(evento: PointerEvent | React.PointerEvent): number {
-  // O mouse pinta com tudo; a caneta, com a pressão (0,5 é o que o navegador dá sem sensor)
-  return evento.pointerType === "pen" && evento.pressure > 0 ? evento.pressure : 1;
+/** A pressão, a inclinação e o giro da caneta; o mouse pinta com tudo (0,5 é o que o navegador dá sem sensor). */
+function daCaneta(evento: PointerEvent | React.PointerEvent): Omit<PontoDoTraco, "x" | "y"> {
+  if (evento.pointerType !== "pen") return { pressao: 1 };
+  return { pressao: evento.pressure > 0 ? evento.pressure : 1, inclinacaoX: (evento.tiltX ?? 0) / 90, inclinacaoY: (evento.tiltY ?? 0) / 90, giro: evento.twist ?? 0 };
 }
 
-export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar }: Props) {
+export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria }: Props) {
+  const centro = { x: quadro.largura / 2, y: quadro.altura / 2 };
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const tracoRef = useRef<Traco | null>(null);
   // O ajuste do Alt + botão direito: de onde o arrasto começou e as opções de antes (o círculo fica parado ali)
@@ -82,11 +87,15 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
     traco.ultimoNaTela = ponto;
     const pincel = ultimo ? traco.corda.soltar(ponto) : traco.corda.puxar(ponto);
     if (!pincel) return;
-    const naCamada = mapear(pincel);
-    for (const marca of traco.espacador.ate(naCamada, (pressao) => alvo.pintura.diametroEm(pressao) * opcoes.espacamento)) {
-      alvo.pintura.marcar(marca);
-      traco.ultimaMarca = marca;
-    }
+    // A corda vale para o traço; cada cópia da simetria espaça as marcas no caminho dela
+    copiasDaSimetria(pincel, simetria, centro).forEach((copia, i) => {
+      const espacador = traco.espacadores[i];
+      if (!espacador) return;
+      for (const marca of espacador.ate(mapear(copia), (pressao) => alvo.pintura.diametroEm(pressao) * opcoes.espacamento)) {
+        alvo.pintura.marcar(marca);
+        traco.ultimasMarcas[i] = marca;
+      }
+    });
   }
 
   function desenharQuadro(traco: Traco) {
@@ -116,10 +125,17 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
     if (evento.button !== 0) return;
     evento.stopPropagation();
     evento.currentTarget.setPointerCapture(evento.pointerId);
-    const ponto = { ...noQuadro(evento, evento.currentTarget), pressao: pressaoDe(evento) };
+    const ponto = { ...noQuadro(evento, evento.currentTarget), ...daCaneta(evento) };
     // A lápis e a borracha de lápis não suavizam: o pixel vai onde o mouse está
     const semCorda = ferramenta === "lapis" || (ferramenta === "borracha" && opcoes.borracha !== "pincel");
-    const traco: Traco = { pendentes: [ponto], pronto: false, soltou: false, corda: new Corda(semCorda ? 0 : comprimentoDaCorda(opcoes.suavizacao)), espacador: new Espacador() };
+    const traco: Traco = {
+      pendentes: [ponto],
+      pronto: false,
+      soltou: false,
+      corda: new Corda(semCorda ? 0 : comprimentoDaCorda(opcoes.suavizacao)),
+      espacadores: copiasDaSimetria(ponto, simetria, centro).map(() => new Espacador()),
+      ultimasMarcas: [],
+    };
     tracoRef.current = traco;
     void aoPedirAlvo().then((alvo) => {
       if (tracoRef.current !== traco && !traco.soltou) return;
@@ -135,16 +151,18 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       // O tamanho do pincel é em pixels da imagem; a camada pode estar ampliada ou reduzida
       const diametro = Math.max(1, opcoes.tamanho * escalaDaImagem * escala);
       const [primeiro, ...resto] = traco.pendentes;
-      alvo.pintura.iniciar({ ferramenta, opcoes, diametro, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, travarTransparencia: alvo.travarTransparencia }, traco.mapear(primeiro));
+      const copias = copiasDaSimetria(primeiro, simetria, centro).map(traco.mapear);
+      alvo.pintura.iniciar({ ferramenta, opcoes, diametro, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, travarTransparencia: alvo.travarTransparencia }, copias[0]);
+      for (const copia of copias.slice(1)) alvo.pintura.marcar(copia);
       traco.corda.puxar(primeiro);
-      traco.espacador.ate(traco.mapear(primeiro), () => diametro * opcoes.espacamento);
+      copias.forEach((copia, i) => traco.espacadores[i].ate(copia, () => diametro * opcoes.espacamento));
       traco.ultimoNaTela = primeiro;
-      traco.ultimaMarca = traco.mapear(primeiro);
+      traco.ultimasMarcas = copias;
       for (const item of resto) andar(traco, item);
       traco.pronto = true;
       if (opcoes.aerografo && ferramenta === "pincel") {
         // Parado, o aerógrafo continua depositando tinta no lugar do pincel
-        traco.aerografo = window.setInterval(() => traco.ultimaMarca && alvo.pintura.marcar(traco.ultimaMarca), 60);
+        traco.aerografo = window.setInterval(() => traco.ultimasMarcas.forEach((marca) => alvo.pintura.marcar(marca)), 60);
       }
       if (traco.soltou) terminar(traco);
       else desenharQuadro(traco);
@@ -166,7 +184,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
     // Os movimentos que o navegador juntou num evento só: o traço fica liso mesmo com o mouse rápido
     const eventos = evento.nativeEvent.getCoalescedEvents?.() ?? [evento.nativeEvent];
     for (const item of eventos.length ? eventos : [evento.nativeEvent]) {
-      const p = { ...noQuadro(item, evento.currentTarget), pressao: pressaoDe(item) };
+      const p = { ...noQuadro(item, evento.currentTarget), ...daCaneta(item) };
       if (traco.pronto) andar(traco, p);
       else traco.pendentes.push(p);
     }
@@ -197,6 +215,19 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       onContextMenu={(evento) => evento.preventDefault()}
       aria-label="Área de pintura"
     >
+      {simetria ? (
+        // Os eixos da simetria, tracejados, como lá
+        <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden>
+          {copiasDaSimetria({ x: centro.x, y: centro.y - Math.hypot(quadro.largura, quadro.altura), pressao: 1 }, simetria.tipo === "radial" || simetria.tipo === "mandala" ? simetria : null, centro).flatMap((ponta, i) =>
+            simetria.tipo === "radial" || simetria.tipo === "mandala" ? [<line key={i} x1={centro.x} y1={centro.y} x2={ponta.x} y2={ponta.y} stroke="#38bdf8" strokeDasharray="6 4" strokeWidth={1} />] : [],
+          )}
+          {simetria.tipo === "vertical" || simetria.tipo === "doisEixos" ? <line x1={centro.x} y1={0} x2={centro.x} y2={quadro.altura} stroke="#38bdf8" strokeDasharray="6 4" strokeWidth={1} /> : null}
+          {simetria.tipo === "horizontal" || simetria.tipo === "doisEixos" ? <line x1={0} y1={centro.y} x2={quadro.largura} y2={centro.y} stroke="#38bdf8" strokeDasharray="6 4" strokeWidth={1} /> : null}
+          {simetria.tipo === "diagonal" ? (
+            <line x1={centro.x - quadro.altura} y1={centro.y - quadro.altura} x2={centro.x + quadro.altura} y2={centro.y + quadro.altura} stroke="#38bdf8" strokeDasharray="6 4" strokeWidth={1} />
+          ) : null}
+        </svg>
+      ) : null}
       {(ajuste ?? cursor) && (comCirculo || ajuste) ? (
         <span
           className="pointer-events-none absolute rounded-full border border-white outline outline-1 outline-black/60"

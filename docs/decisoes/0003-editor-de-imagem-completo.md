@@ -96,8 +96,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Lápis (B), com "Apagar automaticamente"
 - [x] Borracha (E): pincel, lápis e bloco; com a transparência travada, pinta a cor de fundo (a camada de fundo vem com o item dela)
 - [ ] Painel Pincéis: predefinições em pastas (gerais, materiais secos, molhados e efeitos especiais), busca, tamanho da miniatura, Definir predefinição de pincel a partir da seleção, importar .abr
-- [ ] Painel Configurações do pincel (F5): forma da ponta (ângulo, arredondamento, espaçamento, virar), dinâmica de forma, dispersão, textura, pincel duplo, dinâmica de cor, transferência, pose, ruído, bordas molhadas, acúmulo, suavização, proteger textura, travas das seções, prévia do traço
-- [ ] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
+- [x] Painel Configurações do pincel (F5): forma da ponta (ângulo, arredondamento, espaçamento, virar), dinâmica de forma, dispersão, textura, pincel duplo, dinâmica de cor, transferência, pose, ruído, bordas molhadas, acúmulo, suavização, proteger textura, travas das seções, prévia do traço
+- [x] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
 - [x] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois
 - [ ] Máscara de camada pintável: Adicionar (revelar tudo, ocultar tudo, revelar seleção, ocultar seleção, a partir da transparência), pintar em preto e branco, Densidade e Difusão, Aplicar, Excluir, Ativar e desativar, Vincular, Ctrl+\ mira a máscara, Alt + clique mostra só a máscara
 - [ ] Rasterizar (texto, forma, preenchimento, máscara vetorial, objeto, estilo, camada, todas)
