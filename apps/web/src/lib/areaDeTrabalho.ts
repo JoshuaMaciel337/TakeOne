@@ -50,6 +50,9 @@ export function fecharGrupo(estado: EstadoDaArea, grupoId: string): EstadoDaArea
  * Abre o painel e deixa a aba dele ativa. Fechado, ele volta ao grupo onde fica no desenho padrão (se o grupo ainda
  * existe) ou num grupo próprio, no lugar do padrão na coluna.
  */
+/** A altura de um grupo aberto pelo menu para um painel que não está no desenho padrão. */
+export const ALTURA_DO_GRUPO_AVULSO = 380;
+
 export function abrirPainel(estado: EstadoDaArea, painel: string, padrao: EstadoDaArea): EstadoDaArea {
   const lugar = ondeEsta(estado, painel);
   const novo = copia(estado);
@@ -59,7 +62,15 @@ export function abrirPainel(estado: EstadoDaArea, painel: string, padrao: Estado
     grupo.recolhido = false;
     return novo;
   }
-  const doPadrao = ondeEsta(padrao, painel) ?? { coluna: Object.keys(padrao)[0], indice: 0 };
+  const noPadrao = ondeEsta(padrao, painel);
+  if (!noPadrao) {
+    // Fora do desenho padrão (os painéis que só abrem pelo menu Janela): um grupo só dele, em cima da primeira coluna,
+    // com altura para os controles (como aba de um grupo pequeno, ficava espremido)
+    const coluna = Object.keys(padrao)[0];
+    (novo[coluna] ??= []).unshift({ id: `grupo-${painel}`, abas: [painel], ativa: painel, altura: ALTURA_DO_GRUPO_AVULSO });
+    return novo;
+  }
+  const doPadrao = noPadrao;
   const grupoPadrao = padrao[doPadrao.coluna]?.[doPadrao.indice];
   const grupos = (novo[doPadrao.coluna] ??= []);
   const existente = grupoPadrao ? grupos.find((grupo) => grupo.id === grupoPadrao.id) : undefined;

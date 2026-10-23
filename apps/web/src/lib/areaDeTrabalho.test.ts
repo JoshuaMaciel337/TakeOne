@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { abrirPainel, alternarPainel, ativarAba, estadoValido, type EstadoDaArea, fecharGrupo, fecharPainel, moverGrupo, ondeEsta } from "./areaDeTrabalho.ts";
+import { abrirPainel, ALTURA_DO_GRUPO_AVULSO, alternarPainel, ativarAba, estadoValido, type EstadoDaArea, fecharGrupo, fecharPainel, moverGrupo, ondeEsta } from "./areaDeTrabalho.ts";
 
 const PADRAO: EstadoDaArea = {
   direita: [
@@ -43,4 +43,11 @@ test("ativar aba, mover grupo e conferir o estado guardado", () => {
   assert.ok(!estadoValido({ direita: [{ id: "x", abas: ["cor", "cor"], ativa: "cor" }] }, paineis), "repetido");
   assert.ok(!estadoValido({ direita: [{ id: "x", abas: ["sumiu"], ativa: "sumiu" }] }, paineis), "painel que não existe mais");
   assert.ok(!estadoValido(null, paineis));
+});
+
+test("o painel que não está no padrão abre num grupo só dele, em cima", () => {
+  const estado = abrirPainel(structuredClone(PADRAO), "pinceis", PADRAO);
+  const [coluna] = Object.keys(PADRAO);
+  assert.deepEqual(estado[coluna][0], { id: "grupo-pinceis", abas: ["pinceis"], ativa: "pinceis", altura: ALTURA_DO_GRUPO_AVULSO });
+  assert.equal(estado[coluna].length, PADRAO[coluna].length + 1);
 });
