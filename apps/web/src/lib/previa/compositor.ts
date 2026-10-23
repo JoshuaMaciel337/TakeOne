@@ -6,7 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
-import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
+import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, NITIDEZ_SIGMA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
 import type { Cantos, ChaveLuma, Chroma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
@@ -33,6 +33,8 @@ export type Camada = {
   mesclagem?: Mesclagem;
   /** Efeito brilho: quanto da cópia desfocada soma em "tela" (lib/projeto/efeitos.ts). */
   brilho?: number;
+  /** Efeito nitidez: quanto da diferença entre a camada e a cópia pouco desfocada soma a ela. */
+  nitidez?: number;
   /** Efeito olho de peixe: o k1 da lente. */
   lente?: number;
   /** VHS e glitch: quanto o vermelho anda para a direita (e o azul para a esquerda), em frações da largura. */
@@ -184,6 +186,8 @@ uniform vec3 u_corteAte;
 uniform int u_mesclagem;
 // Brilho: a cópia desfocada (unidade 2) somada em "tela", na força u_brilho
 uniform float u_brilho;
+// Nitidez: a diferença entre a camada e a cópia pouco desfocada (a mesma unidade 2), na força u_nitidez
+uniform float u_nitidez;
 uniform sampler2D u_desfocada;
 // Olho de peixe: o k1 da lente e o tamanho do clipe (só a proporção conta), como o lenscorrection
 uniform float u_lente;
@@ -292,6 +296,11 @@ void main() {
     texel = texel * k;
   }
   if (u_luma > 0 && texel.a > 0.0) texel *= alfaDaLuma(texel.rgb / texel.a);
+  if (u_nitidez > 0.0) {
+    // Como o lut2 do render: no alfa pré-multiplicado, cada canal preso entre 0 e 1
+    vec3 borrada = texture(u_desfocada, uv).rgb;
+    texel.rgb = clamp(texel.rgb + u_nitidez * (texel.rgb - borrada), 0.0, 1.0);
+  }
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
     texel = texel + luz - texel * luz;
@@ -390,7 +399,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -502,6 +511,7 @@ export class Compositor {
         corteDe: local("u_corteDe"),
         mesclagem: local("u_mesclagem"),
         brilho: local("u_brilho"),
+        nitidez: local("u_nitidez"),
         desfocada: local("u_desfocada"),
         lente: local("u_lente"),
         desvio: local("u_desvio"),
@@ -741,9 +751,13 @@ export class Compositor {
         gl.activeTexture(gl.TEXTURE0);
       }
       const brilho = camada.brilho ?? 0;
+      const nitidez = camada.nitidez ?? 0;
       gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
-      // Com brilho, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
-      const recortadaAntes = brilho > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
+      gl.uniform1f(uniformes.nitidez, nitidez > 0 && largura > 0 ? nitidez : 0);
+      // A cópia desfocada do brilho ou da nitidez (um efeito por clipe: nunca os dois)
+      const sigmaDaCopia = brilho > 0 ? SIGMA_DO_BRILHO : nitidez > 0 ? NITIDEZ_SIGMA : 0;
+      // Com brilho ou nitidez, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
+      const recortadaAntes = sigmaDaCopia > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
       if (recortadaAntes) {
         this.recortarCamada(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture, camada, largura, altura);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -754,10 +768,10 @@ export class Compositor {
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         }
       }
-      if (brilho > 0 && largura > 0) {
-        // A cópia desfocada do brilho, nos framebuffers 2 e 3, na unidade 2
+      if (sigmaDaCopia > 0 && largura > 0) {
+        // A cópia desfocada do brilho ou da nitidez, nos framebuffers 2 e 3, na unidade 2
         const atual = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
-        const luz = this.desfocar(atual, largura, altura, SIGMA_DO_BRILHO * recorte.altura * altura, recorte, 2);
+        const luz = this.desfocar(atual, largura, altura, sigmaDaCopia * recorte.altura * altura, recorte, 2);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, luz);

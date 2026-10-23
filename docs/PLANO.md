@@ -489,7 +489,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [ ] Onda 4, lote C (imagem e cor): HDR do celular para SDR, vibração, brancos, pretos e níveis, a LUT 3D também na prévia, cor por matiz, nitidez, slip e roll.
   - [x] A LUT 3D também na prévia: a mesma grade de 33 pontos do render, lida com a interpolação tetraédrica do FFmpeg (o fim da diferença nas curvas íngremes).
   - [x] Brancos, pretos, vibração, níveis (preto, branco e gama) e cor por matiz (oito faixas) na aba Cor, na mesma LUT.
-  - [ ] Nitidez, slip e roll, HDR do celular para SDR.
+  - [x] Nitidez (efeito, com a cópia desfocada do brilho).
+  - [ ] Slip e roll, HDR do celular para SDR.
 - [ ] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.
 - [ ] Onda 6, lote D (som). Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
