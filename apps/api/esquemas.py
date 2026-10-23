@@ -281,6 +281,20 @@ class AbaixamentoEntrada(BaseModel):
         return self
 
 
+class NivelamentoEntrada(BaseModel):
+    """Nivelar a voz (apps/web/src/lib/projeto/nivelar.ts): o fator do volume, até 12 dB para cima ou para baixo."""
+    forca: float = Field(ge=0, le=1)
+    pontos: list[KeyframeEntrada] = Field(min_length=1, max_length=4000)
+
+    @model_validator(mode="after")
+    def em_ordem_e_nos_limites(self):
+        if any(b.t <= a.t for a, b in zip(self.pontos, self.pontos[1:], strict=False)):
+            raise ValueError("Os pontos do nivelamento precisam estar em ordem.")
+        if any(not 0.25 <= ponto.valor <= 4 for ponto in self.pontos):
+            raise ValueError("Um ponto do nivelamento passa de 12 dB.")
+        return self
+
+
 class RecorteEntrada(BaseModel):
     x: float = Field(default=0, ge=0, lt=1)
     y: float = Field(default=0, ge=0, lt=1)
@@ -499,6 +513,7 @@ class ClipeEntrada(BaseModel):
     # Usa a voz sem ruído da mídia (DeepFilterNet) no lugar do som original
     voz_limpa: bool = False
     abaixamento: AbaixamentoEntrada | None = None
+    nivelamento: NivelamentoEntrada | None = None
     # Leva a mídia a -14 LUFS pelo loudness medido na ingestão
     igualar_volume: bool = False
     # O som foi para um clipe de áudio próprio ("Separar o som"): este clipe não soa

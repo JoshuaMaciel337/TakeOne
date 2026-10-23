@@ -27,6 +27,7 @@ import type { Midia } from "@/lib/tipos";
 
 import { AbaAnimacao } from "./AbaAnimacao";
 import { AbaixarNaFala } from "./AbaixarNaFala";
+import { NivelarVoz } from "./NivelarVoz";
 import { AbaCor } from "./AbaCor";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
@@ -1206,6 +1207,9 @@ function AbaAudio({
         <ControleNumerico rotulo="Agudos" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.agudo, (valor) => ({ efeitos_voz: { ...efeitos, agudo: valor } }))} />
         <ControleNumerico rotulo="Eco" minimo={0} maximo={ECO_MAXIMO * 100} sufixo="%" {...controle(efeitos.eco * 100, (valor) => ({ efeitos_voz: { ...efeitos, eco: valor / 100 } }))} />
         <ControleNumerico rotulo="Reverb" minimo={0} maximo={100} sufixo="%" {...controle(efeitos.reverb * 100, (valor) => ({ efeitos_voz: { ...efeitos, reverb: valor / 100 } }))} />
+      </Secao>
+      <Secao titulo="Nivelar a voz">
+        <NivelarVoz clipe={clipe} faixa={faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       </Secao>
       <Secao titulo="Abaixar na fala">
         <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />

@@ -21,13 +21,13 @@ ARQUIVO_AUDIO_ANALISE = "audio.wav"
 ARQUIVO_FORMA_DE_ONDA = "forma_de_onda.json"
 ARQUIVO_MINIATURAS = "miniaturas.jpg"
 ARQUIVO_CAPA = "capa.jpg"
-# Nível do áudio em dB a cada 10 ms (int8). Base do corte de silêncios. Uso interno.
+# Nível do áudio em dB a cada 10 ms (int8). Base do corte de silêncios e do nivelar a voz (no editor).
 ARQUIVO_NIVEIS = "niveis.bin"
 NIVEIS_POR_SEGUNDO = 100
 # A voz sem ruído (DeepFilterNet), gerada sob pedido, no mesmo tempo do original. Serve a prévia e o render.
 ARQUIVO_VOZ_LIMPA = "voz_limpa.m4a"
 ARQUIVOS_PUBLICOS = {ARQUIVO_PROXY_VIDEO, ARQUIVO_PROXY_AUDIO, ARQUIVO_FORMA_DE_ONDA, ARQUIVO_MINIATURAS, ARQUIVO_CAPA,
-                     ARQUIVO_VOZ_LIMPA}
+                     ARQUIVO_VOZ_LIMPA, ARQUIVO_NIVEIS}
 # A máscara da pessoa em cada quadro (tarefa "recorte_fundo"), no tempo da cópia leve
 ARQUIVO_MASCARA = "mascara.mp4"
 # A imagem sem ruído (tarefa "limpeza_imagem"): a de resolução cheia é só do render; a cópia leve, da prévia

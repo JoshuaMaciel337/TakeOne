@@ -48,6 +48,7 @@ import {
   seguirObjetoClipe,
   zoomNosTrechos,
   abaixarClipe,
+  nivelarClipe,
   mesclarClipes,
   virarClipes,
   arredondarClipes,
@@ -92,6 +93,7 @@ import {
   trocarImagemDaCamada,
 } from "./imagem.ts";
 import type { Cor } from "./cor.ts";
+import type { Nivelamento } from "./nivelar.ts";
 import type { ChaveDeKeyframe, Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import type { PlanoDoModelo } from "./modelos.ts";
@@ -131,6 +133,7 @@ export type Comando =
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
   | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
   | { comando: "clipe.abaixar"; parametros: { clipeId: string; abaixamento: Abaixamento | null } }
+  | { comando: "clipe.nivelar"; parametros: { clipeId: string; nivelamento: Nivelamento | null } }
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
@@ -205,6 +208,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.reenquadrar": "seguir o rosto",
   "clipe.seguirObjeto": "seguir o objeto",
   "clipe.abaixar": "abaixar na fala",
+  "clipe.nivelar": "nivelar a voz",
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.virar": "virar o clipe",
   "clipe.cantos": "mudar os cantos",
@@ -370,6 +374,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: mudarTamanhoDaImagem(projeto, parametros) };
     case "clipe.preencher":
       return { projeto: preencherVaga(projeto, ctx, parametros.clipeId, parametros.midiaId), selecao: [parametros.clipeId] };
+    case "clipe.nivelar":
+      return { projeto: nivelarClipe(projeto, parametros.clipeId, parametros.nivelamento) };
     case "clipe.abaixar":
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":

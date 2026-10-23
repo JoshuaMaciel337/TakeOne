@@ -11,6 +11,7 @@ import { arquivoDaImagemDoClipe, arquivoDoSom, arquivoDoTom, usaVozLimpa } from 
 import type { ItemDaPrevia } from "@/lib/previa/camadas";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
+import { fatorDoNivelamento } from "@/lib/projeto/nivelar";
 import { volumeNoTempo } from "@/lib/projeto/keyframes";
 import { fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import { fatorDaMistura } from "@/lib/projeto/transicao";
@@ -228,7 +229,7 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
   const temSom = naMidia >= 0 && naMidia <= (item.midia.video?.duracao || item.midia.duracao || Infinity);
   const ganho =
     item.ativo && temSom
-      ? volumeNoTempo(item.clipe, tempo) * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) * fatorDaMistura(item.efeitos, tempo)
+      ? volumeNoTempo(item.clipe, tempo) * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) * fatorDoNivelamento(item.clipe, tempo) * fatorDaMistura(item.efeitos, tempo)
       : 0;
   useEffect(() => {
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);

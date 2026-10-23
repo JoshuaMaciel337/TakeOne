@@ -38,13 +38,14 @@ PASSO_DA_CURVA = 0.01
 
 
 def comandos_de_volume(pontos: list[dict] | None, duracao: float, alvo: str, volume: list[dict] | None = None,
-                       antes: float = 0) -> str:
+                       antes: float = 0, nivelamento: list[dict] | None = None) -> str:
     """
     O roteiro do asendcmd com o fator da curva (pontos em ticks desde o começo do clipe) a cada
     PASSO_DA_CURVA, só quando ele muda. Tempos em segundos desde o começo do clipe. `volume`: os
     keyframes de volume do clipe, multiplicados ao abaixar na fala no mesmo roteiro (como a prévia
     multiplica os dois no ganho). `antes`: segundos que o som começa antes do clipe (a mistura de uma
-    transição); o roteiro conta do começo do som, e a curva continua no tempo do clipe.
+    transição); o roteiro conta do começo do som, e a curva continua no tempo do clipe. `nivelamento`: a curva
+    do nivelar a voz, também multiplicada.
     """
     linhas, anterior = [], None
     for n in range(int(duracao / PASSO_DA_CURVA) + 1):
@@ -53,6 +54,8 @@ def comandos_de_volume(pontos: list[dict] | None, duracao: float, alvo: str, vol
         valor = max(0.0, valor_no_tempo(pontos, local * TICKS_POR_SEGUNDO)) if pontos else 1.0
         if volume:
             valor *= max(0.0, valor_no_tempo(volume, local * TICKS_POR_SEGUNDO))
+        if nivelamento:
+            valor *= max(0.0, valor_no_tempo(nivelamento, local * TICKS_POR_SEGUNDO))
         if anterior is None or abs(valor - anterior) > 1e-4:
             linhas.append(f"{roteiro:.2f} {alvo} volume {valor:.6f};")
             anterior = valor

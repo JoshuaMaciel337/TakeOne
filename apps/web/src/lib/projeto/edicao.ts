@@ -73,6 +73,7 @@ import {
   type Virar,
 } from "./modelo.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import type { Nivelamento } from "./nivelar.ts";
 import { planoDaMusica } from "./ajustarMusica.ts";
 import { LIMITES_DA_CURVA, pedacoComCurva, type PontoDeVelocidade, velocidadeNaCurva } from "./velocidade.ts";
 import { type Efeito, EFEITOS, SO_EM_MIDIA } from "./efeitos.ts";
@@ -655,6 +656,8 @@ export function mudarVelocidade(projeto: Projeto, clipeId: string, velocidade: n
     velocidade: nova,
     duracao,
     keyframes,
+    // O nivelamento segue o som do próprio clipe: estica junto
+    nivelamento: clipe.nivelamento ? { ...clipe.nivelamento, pontos: escalar(clipe.nivelamento.pontos)! } : clipe.nivelamento,
     // O abaixar na fala segue a fala das outras faixas, no tempo da linha do tempo: fica onde está
   };
   const clipes = [...faixa.clipes];
@@ -703,7 +706,8 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
       keyframes: deslocarKeyframes(clipe.keyframes, delta),
       expressoes: deslocarExpressoes(clipe.expressoes, delta),
       texto: deslocarTempos(clipe.texto, delta),
-      abaixamento: deslocarAbaixamento(clipe.abaixamento, delta),
+      abaixamento: deslocarCurva(clipe.abaixamento, delta),
+      nivelamento: deslocarCurva(clipe.nivelamento, delta),
     };
     // A imagem não usa o ponto de entrada (é a mesma em todo instante): fica em zero, que a API aceita
     if (info.imagem) novo.entrada = 0;
@@ -767,7 +771,8 @@ export function moverCorte(projeto: Projeto, ctx: Contexto, clipeId: string, tem
     keyframes: deslocarKeyframes(direita.keyframes, delta),
     expressoes: deslocarExpressoes(direita.expressoes, delta),
     texto: deslocarTempos(direita.texto, delta),
-    abaixamento: deslocarAbaixamento(direita.abaixamento, delta),
+    abaixamento: deslocarCurva(direita.abaixamento, delta),
+    nivelamento: deslocarCurva(direita.nivelamento, delta),
   };
   if (infoDireita.imagem) novaDireita.entrada = 0;
   const clipes = [...faixa.clipes];
@@ -807,7 +812,8 @@ export function dividirClipes(projeto: Projeto, ctx: Contexto, tempo: Tick, clip
         keyframes: deslocarKeyframes(clipe.keyframes, t - clipe.inicio),
         expressoes: deslocarExpressoes(clipe.expressoes, t - clipe.inicio),
         texto: deslocarTempos(clipe.texto, t - clipe.inicio),
-        abaixamento: deslocarAbaixamento(clipe.abaixamento, t - clipe.inicio),
+        abaixamento: deslocarCurva(clipe.abaixamento, t - clipe.inicio),
+        nivelamento: deslocarCurva(clipe.nivelamento, t - clipe.inicio),
         animacao: clipe.animacao ? { ...clipe.animacao, entrada: SEM_ANIMACAO.entrada } : clipe.animacao,
       };
       // A transição é de saída: fica só com a metade da direita (na esquerda, ela apareceria no meio da tomada)
@@ -924,7 +930,8 @@ export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: I
                 keyframes: deslocarKeyframes(clipe.keyframes, pedaco.inicio - clipe.inicio),
                 expressoes: deslocarExpressoes(clipe.expressoes, pedaco.inicio - clipe.inicio),
                 texto: deslocarTempos(clipe.texto, pedaco.inicio - clipe.inicio),
-                abaixamento: deslocarAbaixamento(clipe.abaixamento, pedaco.inicio - clipe.inicio),
+                abaixamento: deslocarCurva(clipe.abaixamento, pedaco.inicio - clipe.inicio),
+                nivelamento: deslocarCurva(clipe.nivelamento, pedaco.inicio - clipe.inicio),
                 transicao: ultimo ? clipe.transicao : null,
                 animacao: clipe.animacao
                   ? { ...clipe.animacao, entrada: primeiro ? clipe.animacao.entrada : SEM_ANIMACAO.entrada, saida: ultimo ? clipe.animacao.saida : SEM_ANIMACAO.saida }
@@ -993,6 +1000,7 @@ export function separarSom(projeto: Projeto, ctx: Contexto, clipeIds: string[]):
       tom: clipe.tom,
       igualar_volume: clipe.igualar_volume,
       abaixamento: clipe.abaixamento,
+      nivelamento: clipe.nivelamento,
       keyframes: clipe.keyframes?.volume?.length ? { volume: clipe.keyframes.volume } : null,
       transformacao: TRANSFORMACAO_PADRAO,
       recorte: RECORTE_PADRAO,
@@ -1674,9 +1682,15 @@ function deslocarTempos(texto: Texto | null | undefined, delta: Tick): Texto | n
 }
 
 /** A curva do abaixar na fala continua no mesmo instante da linha do tempo. */
-function deslocarAbaixamento(abaixamento: Abaixamento | null | undefined, delta: Tick): Abaixamento | null | undefined {
-  if (!abaixamento || delta === 0) return abaixamento;
-  return { ...abaixamento, pontos: abaixamento.pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta })) };
+/** Uma curva de volume gravada no clipe (abaixar na fala, nivelamento) continua no mesmo instante da linha do tempo. */
+function deslocarCurva<T extends { pontos: Keyframe[] }>(curva: T | null | undefined, delta: Tick): T | null | undefined {
+  if (!curva || delta === 0) return curva;
+  return { ...curva, pontos: curva.pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta })) };
+}
+
+/** Grava (ou tira, com null) o nivelamento da voz de um clipe com som (lib/projeto/nivelar.ts). */
+export function nivelarClipe(projeto: Projeto, clipeId: string, nivelamento: Nivelamento | null): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => ({ ...clipe, nivelamento }), { comAudio: true });
 }
 
 /** As junções da música ajustada: um fade curtinho dos dois lados, para o corte não estalar. */
@@ -1724,7 +1738,8 @@ export function ajustarMusicaAoVideo(projeto: Projeto, ctx: Contexto, clipeId: s
       fade_entrada: fadeEntrada,
       fade_saida: Math.min(fadeSaida, duracao - fadeEntrada),
       keyframes: deslocarKeyframes(clipe.keyframes, inicio - clipe.inicio),
-      abaixamento: deslocarAbaixamento(clipe.abaixamento, inicio - clipe.inicio),
+      abaixamento: deslocarCurva(clipe.abaixamento, inicio - clipe.inicio),
+      nivelamento: deslocarCurva(clipe.nivelamento, inicio - clipe.inicio),
     };
   });
   const total = andado * TICKS_POR_SEGUNDO;

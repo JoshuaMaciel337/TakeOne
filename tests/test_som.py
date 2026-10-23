@@ -150,3 +150,12 @@ def test_keyframes_de_volume_multiplicam_o_abaixar_no_mesmo_roteiro():
     # Sem abaixar, só os keyframes
     sozinho = comandos_de_volume(None, 3, "volume@ab0", volume).splitlines()
     assert sozinho[0] == "0.00 volume@ab0 volume 2.000000;" and "1.00 volume@ab0 volume 1.000000;" in sozinho
+
+
+def test_nivelamento_multiplica_no_mesmo_roteiro():
+    nivelar = [{"t": 0, "valor": 2, "curva": "linear"}, {"t": S, "valor": 2, "curva": "linear"},
+               {"t": 2 * S, "valor": 0.5, "curva": "linear"}]
+    linhas = comandos_de_volume(CURVA, 3, "volume@ab0", nivelamento=nivelar).splitlines()
+    valores = {linha.split(" ")[0]: float(linha.split(" ")[3].rstrip(";")) for linha in linhas}
+    # Em 0,5 s só o nivelamento (2); em 1,5 s, o abaixar (0,25) vezes o nivelamento no meio da reta (1,25)
+    assert valores["0.00"] == 2 and valores["1.50"] == pytest.approx(0.3125, abs=1e-6)

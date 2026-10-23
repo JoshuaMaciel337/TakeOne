@@ -505,7 +505,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Misturar o som nas transições (seno e cosseno na janela).
   - [x] Ajustar a música à duração do vídeo (compassos do meio, cortes nos tempos fortes).
   - [x] Gravar narração (microfone do navegador, no cursor, com o vídeo tocando junto).
-  - [ ] Nivelar a voz e o medidor de loudness na prévia.
+  - [x] Nivelar a voz (curva pelos níveis da ingestão, gravada no clipe).
+  - [ ] O medidor de loudness na prévia.
 - [ ] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

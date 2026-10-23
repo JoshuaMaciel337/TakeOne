@@ -2,6 +2,7 @@
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Taxa, Tick } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
+import type { Nivelamento } from "./nivelar.ts";
 import type { Animacoes } from "./animacao.ts";
 import type { Cor } from "./cor.ts";
 import type { Efeito } from "./efeitos.ts";
@@ -126,6 +127,8 @@ export type Clipe = {
   som_separado?: boolean;
   /** Curva que abaixa o som durante a fala das outras faixas (lib/projeto/abaixar.ts). */
   abaixamento?: Abaixamento | null;
+  /** Curva que deixa a fala num volume só (lib/projeto/nivelar.ts). */
+  nivelamento?: Nivelamento | null;
   transformacao: Transformacao;
   /** Posição, escala, rotação e opacidade mudando ao longo do clipe (lib/projeto/keyframes.ts). */
   keyframes?: Keyframes | null;

@@ -1114,10 +1114,11 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 abaixar = None
                 curva_do_abaixar = (clipe.get("abaixamento") or {}).get("pontos")
                 volume_animado = (clipe.get("keyframes") or {}).get("volume")
-                if curva_do_abaixar or volume_animado:
+                nivelamento = (clipe.get("nivelamento") or {}).get("pontos")
+                if curva_do_abaixar or volume_animado or nivelamento:
                     abaixar = (f"{pasta}/volume_{clipe['id']}.txt", f"ab{len(sons)}")
                     conteudo = comandos_de_volume(curva_do_abaixar, antes + segundos(clipe["duracao"]) + depois,
-                                                  f"volume@{abaixar[1]}", volume_animado, antes)
+                                                  f"volume@{abaixar[1]}", volume_animado, antes, nivelamento)
                     auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
                 igualar = ganho_para_igualar(midias[clipe["midia_id"]].lufs) if clipe.get("igualar_volume") else 0
                 reverb = None

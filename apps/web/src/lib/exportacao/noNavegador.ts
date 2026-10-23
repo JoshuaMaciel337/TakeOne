@@ -15,6 +15,7 @@ import { type Camada, Compositor, FUNDO } from "@/lib/previa/compositor";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { imagemDeTexto, type ImagemDeTexto } from "@/lib/previa/imagensDeTexto";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
+import { fatorDoNivelamento } from "@/lib/projeto/nivelar";
 import { volumeNoTempo } from "@/lib/projeto/keyframes";
 import { fatorDosFades, fimDoClipe, type Projeto } from "@/lib/projeto/modelo";
 import { pendenciaParaONavegador } from "@/lib/projeto/pendencias";
@@ -128,6 +129,7 @@ async function misturarSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>,
         igualar *
         fatorDosFades(clipe, Math.min(t, clipe.inicio + clipe.duracao - 1)) *
         fatorDoAbaixamento(clipe, t) *
+        fatorDoNivelamento(clipe, t) *
         fatorDaMistura(janela?.efeitos, t)
       );
     });
