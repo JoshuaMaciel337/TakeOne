@@ -361,6 +361,11 @@ class FormaEntrada(BaseModel):
         return self
 
 
+class ContornoExtraEntrada(BaseModel):
+    cor: str = Field(pattern=COR)
+    espessura: float = Field(ge=0, le=0.25, description="Fração do tamanho da letra")
+
+
 class TextoEntrada(BaseModel):
     conteudo: str = Field(max_length=500)
     fonte: FonteTexto = "display"
@@ -381,6 +386,20 @@ class TextoEntrada(BaseModel):
     # Palavras pintadas na cor_chave (números contados como em core/modelos/palavras_chave.py)
     palavras_chave: list[Annotated[int, Field(ge=0, le=500)]] | None = Field(default=None, max_length=60)
     cor_chave: str = Field(default="#ffd400", pattern=COR)
+    # Espaço a mais entre as letras (fração do tamanho), altura da linha (vezes a letra), sublinhado e tachado
+    espacamento: float = Field(default=0, ge=-0.1, le=1)
+    entrelinha: float = Field(default=1.15, ge=0.7, le=3)
+    sublinhado: bool = False
+    tachado: bool = False
+    # Sombra completa (core/utils/texto.py): cor, ângulo em graus e medidas em frações do tamanho da letra
+    sombra_cor: str = Field(default="#000000", pattern=COR)
+    sombra_angulo: float = Field(default=45, ge=-180, le=360)
+    sombra_distancia: float = Field(default=0.06 * 2 ** 0.5, ge=0, le=0.5)
+    sombra_desfoque: float = Field(default=0.08, ge=0, le=0.5)
+    sombra_espalhar: float = Field(default=0, ge=0, le=1)
+    brilho_tamanho: float = Field(default=1, ge=0.3, le=3)
+    contornos: list[ContornoExtraEntrada] | None = Field(default=None, max_length=2)
+    preenchimento: float = Field(default=1, ge=0, le=1)
 
     @model_validator(mode="after")
     def cabe_no_teto(self):

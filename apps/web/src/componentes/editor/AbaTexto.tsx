@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper, Plus, Strikethrough, Underline, X } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
@@ -8,11 +8,15 @@ import {
   type Alinhamento,
   alternarPalavraChave,
   COR_CHAVE,
+  type ContornoExtra,
+  CONTORNOS_EXTRAS,
   type Destaque,
   FONTES_TEXTO,
   type FonteTexto,
+  ENTRELINHA_PADRAO,
   LIMITES_TEXTO,
   palavrasDoTexto,
+  SOMBRA_PADRAO,
   type Texto,
 } from "@/lib/projeto/texto";
 
@@ -82,8 +86,25 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
       else aoExecutar(mudar({ [chave]: valor / fator }));
     },
   });
-  const cor = (chave: "cor" | "contorno_cor" | "fundo_cor" | "brilho_cor") => ({
-    cor: texto[chave],
+  /** Os campos que textos antigos não têm: `padrao` quando faltam. */
+  const opcional = (
+    chave: "espacamento" | "entrelinha" | "sombra_angulo" | "sombra_distancia" | "sombra_desfoque" | "sombra_espalhar" | "brilho_tamanho" | "preenchimento",
+    padrao: number,
+    fator: number,
+  ) => {
+    const atual = texto[chave] ?? padrao;
+    return {
+      valor: atual * fator,
+      desativado: travada,
+      aoPrever: (valor: number) => aoPrever(mudar({ [chave]: valor / fator })),
+      aoConfirmar: (valor: number) => {
+        if (Math.abs(valor / fator - atual) < PERTO) aoPrever(null);
+        else aoExecutar(mudar({ [chave]: valor / fator }));
+      },
+    };
+  };
+  const cor = (chave: "cor" | "contorno_cor" | "fundo_cor" | "brilho_cor" | "sombra_cor") => ({
+    cor: texto[chave] ?? SOMBRA_PADRAO.cor,
     desativado: travada,
     aoPrever: (valor: string) => aoPrever(mudar({ [chave]: valor })),
     aoConfirmar: (valor: string) => aoExecutar(mudar({ [chave]: valor })),
@@ -151,19 +172,135 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
           {...controle("tamanho", 100)}
         />
         <CampoCor rotulo="Cor" {...cor("cor")} />
+        <ControleNumerico rotulo="Opacidade das letras" minimo={0} maximo={100} sufixo="%" {...opcional("preenchimento", 1, 100)} />
+      </Secao>
+      <Secao titulo="Letras e linhas">
+        <ControleNumerico
+          rotulo="Espaçamento"
+          minimo={LIMITES_TEXTO.espacamento.minimo * 100}
+          maximo={50}
+          maximoDigitado={LIMITES_TEXTO.espacamento.maximo * 100}
+          passo={0.5}
+          sufixo="%"
+          {...opcional("espacamento", 0, 100)}
+        />
+        <ControleNumerico
+          rotulo="Entrelinha"
+          minimo={LIMITES_TEXTO.entrelinha.minimo * 100}
+          maximo={LIMITES_TEXTO.entrelinha.maximo * 100}
+          passo={5}
+          sufixo="%"
+          {...opcional("entrelinha", ENTRELINHA_PADRAO, 100)}
+        />
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-suave">Riscos</span>
+          <span className="flex gap-1">
+            <BotaoAlternar ativo={Boolean(texto.sublinhado)} rotulo="Sublinhado" desativado={travada} aoClicar={() => aoExecutar(mudar({ sublinhado: !texto.sublinhado }))}>
+              <Underline className="size-4" aria-hidden />
+            </BotaoAlternar>
+            <BotaoAlternar ativo={Boolean(texto.tachado)} rotulo="Tachado" desativado={travada} aoClicar={() => aoExecutar(mudar({ tachado: !texto.tachado }))}>
+              <Strikethrough className="size-4" aria-hidden />
+            </BotaoAlternar>
+          </span>
+        </div>
       </Secao>
       <Secao titulo="Contorno">
         <ControleNumerico rotulo="Espessura" minimo={0} maximo={LIMITES_TEXTO.contorno.maximo * 100} passo={0.5} sufixo="%" {...controle("contorno_espessura", 100)} />
         <CampoCor rotulo="Cor do contorno" {...cor("contorno_cor")} />
+        {(texto.contornos ?? []).map((extra, i) => {
+          const trocar = (mudanca: Partial<ContornoExtra>) => (texto.contornos ?? []).map((item, j) => (j === i ? { ...item, ...mudanca } : item));
+          return (
+            <div key={i} className="mt-2 rounded-md border border-borda/60 p-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-suave">Contorno por fora {i + 1}</span>
+                <button
+                  type="button"
+                  className="botao-icone size-6"
+                  disabled={travada}
+                  aria-label={`Tirar o contorno por fora ${i + 1}`}
+                  onClick={() => aoExecutar(mudar({ contornos: (texto.contornos ?? []).filter((_, j) => j !== i) }))}
+                >
+                  <X className="size-3.5" aria-hidden />
+                </button>
+              </div>
+              <ControleNumerico
+                rotulo="Espessura"
+                valor={extra.espessura * 100}
+                minimo={0}
+                maximo={LIMITES_TEXTO.contorno.maximo * 100}
+                passo={0.5}
+                sufixo="%"
+                desativado={travada}
+                aoPrever={(valor) => aoPrever(mudar({ contornos: trocar({ espessura: valor / 100 }) }))}
+                aoConfirmar={(valor) => {
+                  if (Math.abs(valor / 100 - extra.espessura) < PERTO) aoPrever(null);
+                  else aoExecutar(mudar({ contornos: trocar({ espessura: valor / 100 }) }));
+                }}
+              />
+              <CampoCor
+                rotulo="Cor"
+                cor={extra.cor}
+                desativado={travada}
+                aoPrever={(valor) => aoPrever(mudar({ contornos: trocar({ cor: valor }) }))}
+                aoConfirmar={(valor) => aoExecutar(mudar({ contornos: trocar({ cor: valor }) }))}
+              />
+            </div>
+          );
+        })}
+        {(texto.contornos?.length ?? 0) < CONTORNOS_EXTRAS ? (
+          <button
+            type="button"
+            className="botao-secundario mt-2 w-full px-3 py-1 text-xs"
+            disabled={travada}
+            onClick={() => aoExecutar(mudar({ contornos: [...(texto.contornos ?? []), { cor: texto.contornos?.length ? "#ffffff" : "#000000", espessura: 0.06 }] }))}
+          >
+            <Plus className="size-3.5" aria-hidden /> Contorno por fora
+          </button>
+        ) : null}
       </Secao>
-      <Secao titulo="Sombra e fundo">
+      <Secao titulo="Sombra">
         <ControleNumerico rotulo="Sombra" minimo={0} maximo={100} sufixo="%" {...controle("sombra", 100)} />
+        {texto.sombra > 0 ? (
+          <>
+            <CampoCor rotulo="Cor da sombra" {...cor("sombra_cor")} />
+            <ControleNumerico rotulo="Direção" minimo={-180} maximo={180} passo={5} sufixo="°" {...opcional("sombra_angulo", SOMBRA_PADRAO.angulo, 1)} />
+            <ControleNumerico
+              rotulo="Distância"
+              minimo={0}
+              maximo={LIMITES_TEXTO.sombraDistancia.maximo * 100}
+              passo={0.5}
+              sufixo="%"
+              {...opcional("sombra_distancia", SOMBRA_PADRAO.distancia, 100)}
+            />
+            <ControleNumerico
+              rotulo="Desfoque"
+              minimo={0}
+              maximo={LIMITES_TEXTO.sombraDesfoque.maximo * 100}
+              passo={0.5}
+              sufixo="%"
+              {...opcional("sombra_desfoque", SOMBRA_PADRAO.desfoque, 100)}
+            />
+            <ControleNumerico rotulo="Espalhar" minimo={0} maximo={100} sufixo="%" {...opcional("sombra_espalhar", 0, 100)} />
+          </>
+        ) : null}
+      </Secao>
+      <Secao titulo="Fundo">
         <ControleNumerico rotulo="Fundo" minimo={0} maximo={100} sufixo="%" {...controle("fundo_opacidade", 100)} />
         <CampoCor rotulo="Cor do fundo" {...cor("fundo_cor")} />
       </Secao>
       <Secao titulo="Brilho">
         <ControleNumerico rotulo="Brilho" minimo={0} maximo={100} sufixo="%" {...controle("brilho", 100)} />
         <CampoCor rotulo="Cor do brilho" {...cor("brilho_cor")} />
+        {texto.brilho > 0 ? (
+          <ControleNumerico
+            rotulo="Tamanho do brilho"
+            minimo={LIMITES_TEXTO.brilhoTamanho.minimo * 100}
+            maximo={LIMITES_TEXTO.brilhoTamanho.maximo * 100}
+            passo={5}
+            sufixo="%"
+            {...opcional("brilho_tamanho", 1, 100)}
+          />
+        ) : null}
       </Secao>
       <Secao titulo="Palavras-chave">
         <div className="flex flex-wrap gap-1" role="group" aria-label="Palavras-chave">

@@ -36,7 +36,31 @@ export type Texto = {
   /** Números das palavras pintadas na cor_chave (contadas por palavrasDoTexto), desenhadas no próprio PNG. */
   palavras_chave?: number[] | null;
   cor_chave?: string;
+  /** Espaço a mais entre as letras, em fração do tamanho (negativo aperta). */
+  espacamento?: number;
+  /** Altura de cada linha, em vezes o tamanho da letra (1,15 é o normal). */
+  entrelinha?: number;
+  sublinhado?: boolean;
+  tachado?: boolean;
+  /** Sombra completa: cor, direção em graus (0 para a direita, 90 para baixo) e medidas em fração do tamanho. */
+  sombra_cor?: string;
+  sombra_angulo?: number;
+  sombra_distancia?: number;
+  sombra_desfoque?: number;
+  /** De 0 a 1: engrossa a sombra antes do desfoque. */
+  sombra_espalhar?: number;
+  /** O raio do brilho, em vezes o de sempre. */
+  brilho_tamanho?: number;
+  /** Até dois contornos por fora do principal. */
+  contornos?: ContornoExtra[] | null;
+  /** A opacidade das letras: 0 deixa só o contorno (texto vazado). */
+  preenchimento?: number;
 };
+
+export type ContornoExtra = { cor: string; espessura: number };
+/** Os padrões da sombra e do brilho, os de core/utils/texto.py: a sombra de sempre, para baixo e para a direita. */
+export const SOMBRA_PADRAO = { cor: "#000000", angulo: 45, distancia: 0.06 * Math.SQRT2, desfoque: 0.08, espalhar: 0 };
+export const CONTORNOS_EXTRAS = 2;
 
 export const FONTES_TEXTO: { id: FonteTexto; nome: string }[] = [
   { id: "display", nome: "Montserrat" },
@@ -48,7 +72,15 @@ export const LIMITES_TEXTO = {
   conteudo: 500,
   tamanho: { minimo: 0.02, maximo: 0.3 },
   contorno: { minimo: 0, maximo: 0.25 },
+  espacamento: { minimo: -0.1, maximo: 1 },
+  entrelinha: { minimo: 0.7, maximo: 3 },
+  sombraDistancia: { minimo: 0, maximo: 0.5 },
+  sombraDesfoque: { minimo: 0, maximo: 0.5 },
+  brilhoTamanho: { minimo: 0.3, maximo: 3 },
 } as const;
+
+/** A entrelinha de sempre (core/utils/texto.py, ENTRELINHA). */
+export const ENTRELINHA_PADRAO = 1.15;
 
 export const TEXTO_PADRAO: Texto = {
   conteudo: "Texto",
@@ -103,6 +135,20 @@ export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
     sombra: limitar(texto.sombra, 0, 1),
     fundo_opacidade: limitar(texto.fundo_opacidade, 0, 1),
     brilho: limitar(texto.brilho, 0, 1),
+    espacamento: limitar(texto.espacamento ?? 0, LIMITES_TEXTO.espacamento.minimo, LIMITES_TEXTO.espacamento.maximo),
+    entrelinha: limitar(texto.entrelinha ?? ENTRELINHA_PADRAO, LIMITES_TEXTO.entrelinha.minimo, LIMITES_TEXTO.entrelinha.maximo),
+    sublinhado: Boolean(texto.sublinhado),
+    tachado: Boolean(texto.tachado),
+    sombra_cor: cor(texto.sombra_cor ?? SOMBRA_PADRAO.cor, atual.sombra_cor ?? SOMBRA_PADRAO.cor),
+    sombra_angulo: limitar(texto.sombra_angulo ?? SOMBRA_PADRAO.angulo, -180, 360),
+    sombra_distancia: limitar(texto.sombra_distancia ?? SOMBRA_PADRAO.distancia, LIMITES_TEXTO.sombraDistancia.minimo, LIMITES_TEXTO.sombraDistancia.maximo),
+    sombra_desfoque: limitar(texto.sombra_desfoque ?? SOMBRA_PADRAO.desfoque, LIMITES_TEXTO.sombraDesfoque.minimo, LIMITES_TEXTO.sombraDesfoque.maximo),
+    sombra_espalhar: limitar(texto.sombra_espalhar ?? 0, 0, 1),
+    brilho_tamanho: limitar(texto.brilho_tamanho ?? 1, LIMITES_TEXTO.brilhoTamanho.minimo, LIMITES_TEXTO.brilhoTamanho.maximo),
+    contornos: texto.contornos?.length
+      ? texto.contornos.slice(0, CONTORNOS_EXTRAS).map((extra) => ({ cor: cor(extra.cor, "#000000"), espessura: limitar(extra.espessura, 0, LIMITES_TEXTO.contorno.maximo) }))
+      : null,
+    preenchimento: limitar(texto.preenchimento ?? 1, 0, 1),
     brilho_cor: cor(texto.brilho_cor, atual.brilho_cor ?? TEXTO_PADRAO.brilho_cor),
     cor: cor(texto.cor, atual.cor),
     contorno_cor: cor(texto.contorno_cor, atual.contorno_cor),
