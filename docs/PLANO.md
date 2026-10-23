@@ -469,7 +469,7 @@ Cada fase termina com algo que dá para usar e testar.
   - [x] Lote A (edição do dia a dia): legendas em qualquer codificação (UTF-8, UTF-16 e Windows-1252), juntar, dividir pelas palavras e localizar e substituir; atalhos Q, W, Alt+setas e ↑ ↓ de corte em corte, com a janela "?"; copiar e colar clipes e "Colar ajustes" (Ctrl+Alt+V); guias na prévia (margens seguras, terços e as áreas cobertas no celular).
   - [x] Lote B (com a prévia igual ao render): virar o clipe na horizontal e na vertical, as curvas Acelerando, Freando e Parado nos keyframes, a chave de luminância (tirar o fundo preto ou branco) e os cantos arredondados com borda.
   - [x] Deslizar conteúdo (slip) e mover o corte (roll).
-  - [ ] O resto das 42, nos lotes D a H (ondas 6 a 10).
+  - [x] O resto das 42, nos lotes D a H (ondas 6 a 10).
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).
 - [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.
 - Servidor MCP, para agentes editarem pelos comandos.
@@ -536,10 +536,10 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Máscaras desenhadas (um polígono clicado na prévia, a mesma distância com sinal no shader e no render).
   - [x] Servidor MCP (chaves de acesso na API; apps/servidor_mcp pelo stdio; docs/mcp.md).
   - [x] Multicâmera (as gravações encaixam pelo som; cada câmera numa faixa, e a troca no cursor vai até a próxima troca).
-- [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
+- [x] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
   - [x] Ampliar (Real-ESRGAN geral x4v3, na CPU) e expandir até outra proporção (LaMa, a parte nova ampliada pelo Real-ESRGAN), na ferramenta Foto com IA do editor de imagem.
   - [x] Profundidade (Depth Anything V2 Small, na CPU) e a foto em 3D, na aba Básico de uma foto no editor de vídeo.
-  - [ ] Gerar imagem por texto (na placa).
+  - [x] Gerar imagem por texto (o Wan 2.2 com um quadro só, na placa).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 
 **Estimativa:**

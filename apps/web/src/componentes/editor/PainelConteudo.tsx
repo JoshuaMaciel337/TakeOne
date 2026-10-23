@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
+import { formatoMaisPerto, GerarImagem } from "@/componentes/midia/GerarImagem";
 import { GerarVideo } from "@/componentes/midia/GerarVideo";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { MontarClipes } from "@/componentes/midia/MontarClipes";
@@ -87,6 +88,7 @@ function PainelMidia({
         imagens={biblioteca.filter((midia) => midia.imagem && midia.status === "pronta")}
         aoPedir={() => void recarregar()}
       />
+      <GerarImagem formato={formatoMaisPerto(...(proporcao.split(":").map(Number) as [number, number]))} aoPedir={() => void recarregar()} />
       <MontarClipes midias={biblioteca} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {biblioteca.length > 0 ? (

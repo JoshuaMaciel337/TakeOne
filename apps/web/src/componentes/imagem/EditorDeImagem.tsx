@@ -16,6 +16,7 @@ import { MiniaturaDoEstilo } from "@/componentes/editor/PainelTexto";
 import { useProjeto } from "@/componentes/editor/useProjeto";
 import { MiniaturaDeImagem } from "@/componentes/hub/CartaoModelo";
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
+import { formatoMaisPerto, GerarImagem } from "@/componentes/midia/GerarImagem";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import { arquivoDaMidia } from "@/lib/api";
@@ -384,6 +385,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               <div className="flex flex-col gap-3">
                 <ZonaDeEnvio compacta />
                 <ListaEnvios />
+                <GerarImagem
+                  formato={formatoMaisPerto(tamanhoDaImagem(projetoNaTela).largura, tamanhoDaImagem(projetoNaTela).altura)}
+                  aoPedir={(midia) => {
+                    // A imagem gerada entra como camada quando ficar pronta
+                    pendentes.current.set(midia.id, {});
+                    void biblioteca.recarregar();
+                    mostrarAviso("Gerando a imagem: ela entra como camada quando ficar pronta (uns 3 min).");
+                  }}
+                />
                 {biblioteca.erro ? <AvisoErro>{biblioteca.erro}</AvisoErro> : null}
                 {imagensProntas.length ? (
                   <p className="text-[11px] text-suave">Clique numa imagem para pôr como camada.</p>

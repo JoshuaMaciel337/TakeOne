@@ -16,6 +16,7 @@ from api.esquemas import (
     EstabilizacaoEntrada,
     FalaEntrada,
     FluidoEntrada,
+    GerarImagemEntrada,
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
@@ -164,6 +165,24 @@ async def gerar_video(dados: GerarVideoEntrada, usuario=Depends(usuario_atual), 
     # O progresso da geração aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
     await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
     logging.info(f"[{usuario['organizacao_id']}] Vídeo com IA pedido: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
+
+
+@router.post("/gerar-imagem", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def gerar_imagem(dados: GerarImagemEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila uma imagem gerada com o Wan 2.2 (um quadro só, em 720p). Como o vídeo gerado: a mídia já entra
+    na biblioteca, processando, e a imagem passa pela ingestão como um envio."""
+    midia = montar_midia(usuario["organizacao_id"], usuario["_id"], "gerada.png", 0, "image/png")
+    midia["nome"] = midia["nome_original"] = nome_da_midia(dados.descricao)
+    midia["status"] = STATUS_PROCESSANDO
+    midia["gerada"] = {"descricao": dados.descricao, "formato": dados.formato}
+    midia_id = (await db.midias.insert_one(midia)).inserted_id
+    job = montar_job("geracao_imagem", usuario["organizacao_id"],
+                     {"midia_id": str(midia_id), **midia["gerada"], "semente": secrets.randbelow(2**31)},
+                     criado_por=usuario["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
+    logging.info(f"[{usuario['organizacao_id']}] Imagem com IA pedida: {midia['nome']}")
     return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
 
 

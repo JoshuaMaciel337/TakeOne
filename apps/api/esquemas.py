@@ -864,6 +864,11 @@ class FalaEntrada(BaseModel):
         return valor.strip() if isinstance(valor, str) else valor
 
 
+class GerarImagemEntrada(BaseModel):
+    descricao: str = Field(min_length=3, max_length=800)
+    formato: Literal["16:9", "9:16", "1:1", "4:5"] = "1:1"
+
+
 class GerarVideoEntrada(BaseModel):
     descricao: str = Field(min_length=DESCRICAO_MINIMA, max_length=DESCRICAO_MAXIMA)
     formato: Literal["16:9", "9:16", "1:1"] = "16:9"
@@ -1246,7 +1251,7 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                          if (limpa := doc.get("imagem_limpa")) else None),
         "elemento": ({k: v for k, v in elemento.items() if k != "chave"}
                      if (elemento := doc.get("elemento")) else None),
-        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada["duracao"],
+        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada.get("duracao"),
                     "imagem_id": gerada.get("imagem_id")}
                    if (gerada := doc.get("gerada")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}

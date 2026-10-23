@@ -92,7 +92,7 @@ export type Midia = {
   /** Forma desenhada (lib/elementos.ts): o pedido que a gerou. Não aparece na biblioteca. */
   elemento?: PedidoDeForma | null;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
-  gerada?: { descricao: string; formato: string; duracao: number; imagem_id?: string | null } | null;
+  gerada?: { descricao: string; formato: string; duracao?: number | null; imagem_id?: string | null } | null;
   /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */
   animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
   criado_em: string;

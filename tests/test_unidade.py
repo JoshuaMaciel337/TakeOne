@@ -39,7 +39,7 @@ def test_tipos_por_recursos():
                                                 "quadro", "inversao", "fluido", "esconder_rostos",
                                                 "esconder_objeto", "ampliar", "expandir", "foto_3d"}
     assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video", "direcao", "palavras_chave",
-                                           "animacao_descrita"]
+                                           "animacao_descrita", "geracao_imagem"]
 
 
 def test_extensao_e_nome_da_midia():

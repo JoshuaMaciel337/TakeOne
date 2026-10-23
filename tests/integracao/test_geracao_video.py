@@ -119,3 +119,36 @@ def test_video_a_partir_de_uma_imagem_comeca_nela(cliente, db_limpo):
     job = pegar_proximo_job(db_limpo, ["geracao_video"], "w-teste")
     assert processar_job(db_limpo, job, "w-teste") == "erro"
     assert "imagem escolhida foi excluída" in cliente.get(f"/api/midias/{outro['id']}").json()["erro"]
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_imagem_gerada_entra_na_biblioteca_como_foto(cliente, db_limpo):
+    cadastrar(cliente)
+    assert cliente.post("/api/midias/gerar-imagem", json={"descricao": "Mar", "formato": "3:2"}).status_code == 422
+    resposta = cliente.post("/api/midias/gerar-imagem", json={"descricao": "Um farol na neblina, fotografia",
+                                                               "formato": "4:5"})
+    assert resposta.status_code == 201, resposta.text
+    midia = resposta.json()
+    assert midia["nome"] == "IA · Um farol na neblina" and midia["gerada"]["duracao"] is None
+    job = pegar_proximo_job(db_limpo, ["geracao_imagem"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    ingestao = pegar_proximo_job(db_limpo, ["ingestao"], "w-teste")
+    assert processar_job(db_limpo, ingestao, "w-teste") == "concluido"
+    vista = cliente.get(f"/api/midias/{midia['id']}").json()
+    assert vista["status"] == "pronta" and vista["imagem"]
+    assert (vista["video"]["largura"], vista["video"]["altura"]) == (896, 1120)
+
+
+def test_fluxo_da_imagem_e_o_do_video_com_um_quadro():
+    from core.modelos.geracao import PASSOS_DA_IMAGEM, arquivo_gerado, montar_fluxo_da_imagem
+
+    fluxo = montar_fluxo_da_imagem("Um farol", "9:16", 7, "takeone_x")
+    assert fluxo["7"]["inputs"] | {"vae": None} == {"vae": None, "width": 704, "height": 1280, "length": 1,
+                                                    "batch_size": 1}
+    assert fluxo["8"]["inputs"]["steps"] == PASSOS_DA_IMAGEM and fluxo["8"]["inputs"]["seed"] == 7
+    assert fluxo["11"] == {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": "takeone_x"}}
+    assert "10" not in fluxo
+    salvo = {"filename": "takeone_x_00001_.png", "subfolder": "", "type": "output"}
+    historico = {"outputs": {"11": {"images": [salvo]}}}
+    assert arquivo_gerado(historico, ".png")["filename"] == "takeone_x_00001_.png"
+    assert arquivo_gerado(historico) is None

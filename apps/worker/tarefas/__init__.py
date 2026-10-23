@@ -13,7 +13,7 @@ from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabili
 from worker.tarefas.fala import executar_fala
 from worker.tarefas.fluido import executar_fluido, marcar_fluido_com_erro
 from worker.tarefas.foto_ia import executar_ampliar, executar_expandir, executar_foto_3d
-from worker.tarefas.geracao_video import executar_geracao_video, marcar_geracao_com_erro
+from worker.tarefas.geracao_video import executar_geracao_imagem, executar_geracao_video, marcar_geracao_com_erro
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
@@ -70,4 +70,5 @@ REGISTRO = {
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),
     "geracao_video": Tarefa(executar_geracao_video, ao_falhar=marcar_geracao_com_erro),
+    "geracao_imagem": Tarefa(executar_geracao_imagem, ao_falhar=marcar_geracao_com_erro),
 }

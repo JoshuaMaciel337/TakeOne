@@ -21,6 +21,8 @@ async function todasAsMidias(): Promise<Midia[]> {
     if (pagina.length < POR_PAGINA || lista.length >= MAXIMO_DE_MIDIAS) return lista;
   }
 }
+/** Jobs que criam uma mídia nova (processando): o fim de cada um recarrega a biblioteca. */
+const JOBS_QUE_CRIAM_MIDIA = ["ingestao", "geracao_video", "geracao_imagem", "animacao_html", "animacao_descrita", "fala", "objeto", "quadro", "ampliar", "expandir", "foto_3d"];
 // Jobs que geram um arquivo a mais para uma mídia pronta, e o campo da mídia que mostra o andamento.
 // null: o andamento fica num dicionário (um por tom ou por versão); só o fim recarrega.
 const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | "esconder_rostos" | null> = {
@@ -79,8 +81,9 @@ export function useMidias() {
     }
     // A geração com IA mostra o progresso na própria mídia, como a ingestão que vem depois dela
     // "fala": o texto em fala nasce como mídia processando; sem ele, uma falha deixava o cartão parado para sempre
-    // "objeto" e "quadro" também: a foto editada e o quadro congelado nascem processando, como a fala
-    if (!["ingestao", "geracao_video", "animacao_html", "animacao_descrita", "fala", "objeto", "quadro"].includes(job.tipo)) return;
+    // "objeto" e "quadro" também: a foto editada e o quadro congelado nascem processando, como a fala; e as fotos
+    // com IA (ampliar, expandir, foto em 3D) e a imagem gerada
+    if (!JOBS_QUE_CRIAM_MIDIA.includes(job.tipo)) return;
     if (job.status === "concluido" || job.status === "erro") {
       void recarregar();
       return;

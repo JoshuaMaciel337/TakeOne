@@ -23,7 +23,16 @@ from pathlib import Path
 from bson import ObjectId
 
 from core.config import COMFYUI_URL, MODO_IA
-from core.modelos.geracao import FORMATOS, FPS, arquivo_gerado, montar_fluxo, segundos_estimados
+from core.modelos.geracao import (
+    FORMATOS,
+    FORMATOS_DA_IMAGEM,
+    FPS,
+    SEGUNDOS_DA_IMAGEM,
+    arquivo_gerado,
+    montar_fluxo,
+    montar_fluxo_da_imagem,
+    segundos_estimados,
+)
 from core.modelos.job import ErroDefinitivo, montar_job
 from core.modelos.midia import ARQUIVO_IMAGEM, PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo, e_imagem
 from core.utils import storage
@@ -134,11 +143,17 @@ def _gerar_no_comfyui(entrada: dict, destino: Path, quadro: Path | None, midia_e
     imagem = _enviar_imagem(quadro) if quadro else None
     fluxo = montar_fluxo(entrada["descricao"], entrada["formato"], entrada["duracao"], entrada["semente"], prefixo,
                          imagem)
+    _rodar_no_comfyui(fluxo, segundos_estimados(entrada["duracao"], entrada["formato"]), ".mp4", "o vídeo", destino,
+                      midia_existe, reportar)
+
+
+def _rodar_no_comfyui(fluxo: dict, estimado: int, extensao: str, oque: str, destino: Path,
+                      midia_existe: Callable[[], bool], reportar: Callable[[int, str], None]):
+    """Manda o fluxo, acompanha pelo /history e baixa o arquivo salvo (`oque`: "o vídeo", "a imagem")."""
     try:
-        pedido_id = _pedir("/prompt", {"prompt": fluxo, "client_id": prefixo})["prompt_id"]
+        pedido_id = _pedir("/prompt", {"prompt": fluxo, "client_id": fluxo_id(fluxo)})["prompt_id"]
     except urllib.error.HTTPError as e:
         raise ErroDefinitivo(f"O ComfyUI recusou o pedido: {e.read().decode(errors='replace')[:500]}") from e
-    estimado = segundos_estimados(entrada["duracao"], entrada["formato"])
     minutos = max(1, round(estimado / 60))
     inicio = time.monotonic()
     try:
@@ -150,18 +165,18 @@ def _gerar_no_comfyui(entrada: dict, destino: Path, quadro: Path | None, midia_e
                     erros = [m[1].get("exception_message", "") for m in estado.get("messages", [])
                              if m[0] == "execution_error"]
                     raise ErroDefinitivo(f"O ComfyUI falhou ao gerar: {(erros or ['sem detalhe'])[0][:500]}")
-                arquivo = arquivo_gerado(historico)
+                arquivo = arquivo_gerado(historico, extensao)
                 if arquivo is None:
-                    raise ErroDefinitivo("O ComfyUI terminou sem salvar o vídeo.")
+                    raise ErroDefinitivo(f"O ComfyUI terminou sem salvar {oque}.")
                 break
             if not midia_existe():
                 _pedir("/interrupt", {})
-                raise ErroDefinitivo("A mídia foi excluída enquanto o vídeo era gerado.")
+                raise ErroDefinitivo("A mídia foi excluída durante a geração.")
             passado = time.monotonic() - inicio
             if passado > 3 * estimado:
                 _pedir("/interrupt", {})
                 raise ErroDefinitivo(f"A geração passou de {3 * minutos} minutos e foi interrompida.")
-            reportar(min(95, 2 + int(93 * passado / estimado)), f"Gerando o vídeo (uns {minutos} min)")
+            reportar(min(95, 2 + int(93 * passado / estimado)), f"Gerando {oque} (uns {minutos} min)")
             time.sleep(INTERVALO_S)
         consulta = urllib.parse.urlencode({k: arquivo.get(k, "") for k in ("filename", "subfolder", "type")})
         with urllib.request.urlopen(f"{COMFYUI_URL}/view?{consulta}", timeout=120) as resposta:
@@ -172,7 +187,16 @@ def _gerar_no_comfyui(entrada: dict, destino: Path, quadro: Path | None, midia_e
             _pedir("/free", {"unload_models": True, "free_memory": True})
         except (urllib.error.URLError, OSError) as e:
             logging.warning(f"Não foi possível soltar o modelo do ComfyUI: {e}")
-    logging.info(f"Vídeo gerado em {time.monotonic() - inicio:.0f} s (estimado {estimado} s).")
+    logging.info(f"Gerado em {time.monotonic() - inicio:.0f} s (estimado {estimado} s).")
+
+
+def fluxo_id(fluxo: dict) -> str:
+    """O prefixo dos arquivos do fluxo, que também identifica o cliente no ComfyUI."""
+    for no in fluxo.values():
+        prefixo = no.get("inputs", {}).get("filename_prefix")
+        if prefixo:
+            return prefixo
+    return f"takeone_{uuid.uuid4().hex}"
 
 
 def _gerar_simulado(entrada: dict, destino: Path, quadro: Path | None):
@@ -226,12 +250,19 @@ def executar_geracao_video(db, job: dict, reportar: Callable[[int, str], None]) 
         if quadro:
             quadro.unlink(missing_ok=True)
     parcial.replace(original)
-    # Daqui em diante é uma mídia enviada como outra qualquer: a ingestão faz a cópia leve, a capa e o resto
-    ingestao = montar_job("ingestao", organizacao_id, {"midia_id": str(midia_id)},
+    _entregar(db, job, midia, original)
+    logging.info(f"[{organizacao_id}] [midia {midia_id}] Vídeo gerado; ingestão na fila.")
+    reportar(100, "Vídeo gerado")
+    return {"midia_id": str(midia_id)}
+
+
+def _entregar(db, job: dict, midia: dict, original: Path):
+    """Daqui em diante é uma mídia enviada como outra qualquer: a ingestão faz a cópia leve, a capa e o resto."""
+    ingestao = montar_job("ingestao", midia["organizacao_id"], {"midia_id": str(midia["_id"])},
                           prioridade=PRIORIDADE_INGESTAO, criado_por=job.get("criado_por"))
     ingestao_id = db.jobs.insert_one(ingestao).inserted_id
     momento = agora()
-    resultado = db.midias.update_one({"_id": midia_id}, {"$set": {
+    resultado = db.midias.update_one({"_id": midia["_id"]}, {"$set": {
         "tamanho_total": original.stat().st_size,
         "bytes_recebidos": original.stat().st_size,
         "job_ingestao_id": ingestao_id,
@@ -240,7 +271,40 @@ def executar_geracao_video(db, job: dict, reportar: Callable[[int, str], None]) 
     }})
     if resultado.matched_count == 0:
         db.jobs.delete_one({"_id": ingestao_id})
-        raise ErroDefinitivo("A mídia foi excluída enquanto o vídeo era gerado.")
-    logging.info(f"[{organizacao_id}] [midia {midia_id}] Vídeo gerado; ingestão na fila.")
-    reportar(100, "Vídeo gerado")
+        raise ErroDefinitivo("A mídia foi excluída enquanto era gerada.")
+
+
+def _imagem_simulada(entrada: dict, destino: Path):
+    largura, altura = FORMATOS_DA_IMAGEM[entrada["formato"]]
+    executar_ffmpeg(["-f", "lavfi", "-i", f"testsrc2=size={largura}x{altura}:rate=1:duration=1", "-frames:v", "1",
+                     "-f", "image2", "-c:v", "png", str(destino)])
+
+
+def executar_geracao_imagem(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
+    """Uma imagem gerada a partir de um texto: o Wan 2.2 com um quadro só (montar_fluxo_da_imagem)."""
+    entrada = job["entrada"]
+    midia_id = ObjectId(entrada["midia_id"])
+    midia = db.midias.find_one({"_id": midia_id})
+    if midia is None:
+        raise ErroDefinitivo("A mídia foi excluída antes de a imagem ser gerada.")
+    original = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia_id, midia["original"]))
+    original.parent.mkdir(parents=True, exist_ok=True)
+    parcial = original.with_name("gerada.parcial.png")
+    reportar(1, "Preparando a geração")
+    existe = lambda: db.midias.count_documents({"_id": midia_id}, limit=1) > 0  # noqa: E731
+    try:
+        if MODO_IA == "real":
+            _esperar_a_placa(existe, reportar)
+            prefixo = f"takeone_{uuid.uuid4().hex}"
+            fluxo = montar_fluxo_da_imagem(entrada["descricao"], entrada["formato"], entrada["semente"], prefixo)
+            _rodar_no_comfyui(fluxo, SEGUNDOS_DA_IMAGEM, ".png", "a imagem", parcial, existe, reportar)
+        else:
+            _imagem_simulada(entrada, parcial)
+        parcial.replace(original)
+    except BaseException:
+        parcial.unlink(missing_ok=True)
+        raise
+    _entregar(db, job, midia, original)
+    logging.info(f"[{midia['organizacao_id']}] [midia {midia_id}] Imagem gerada; ingestão na fila.")
+    reportar(100, "Imagem gerada")
     return {"midia_id": str(midia_id)}

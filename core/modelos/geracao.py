@@ -1,7 +1,8 @@
 # -----------------------------------------------
-# TakeOne — geração de vídeo com o Wan 2.2 TI2V-5B (pelo ComfyUI)
+# TakeOne — geração de vídeo e de imagem com o Wan 2.2 TI2V-5B (pelo ComfyUI)
 # Funções puras: os formatos, o fluxo que vai para o ComfyUI e quanto tempo ele deve levar.
 # Com uma imagem, ela é o primeiro quadro e o texto descreve o movimento (o mesmo modelo faz os dois).
+# A imagem é um vídeo de um quadro só, em 720p: sem os outros quadros, cabe na placa e sai em uns 3 min.
 # -----------------------------------------------
 import math
 import re
@@ -19,6 +20,17 @@ DESCRICAO_MINIMA = 3
 DESCRICAO_MAXIMA = 800
 # O que o modelo deve evitar (texto fixo, a pessoa só escreve o que quer ver)
 NEGATIVO = "borrado, baixa qualidade, distorcido, deformado, texto, legenda, marca d'água, quadros estáticos, piscando"
+
+# A imagem: um quadro em 720p (lados múltiplos de 32), com mais passos que o vídeo
+FORMATOS_DA_IMAGEM = {
+    "16:9": (1280, 704),
+    "9:16": (704, 1280),
+    "1:1": (960, 960),
+    "4:5": (896, 1120),
+}
+PASSOS_DA_IMAGEM = 30
+# Medido no Nitro 5 (23/10/2026): 1280 × 704 em 194 s, quase tudo carregando os pesos
+SEGUNDOS_DA_IMAGEM = 200
 
 # Medido no Nitro 5 pelo serviço comfyui (15/10/2026), com 20 passos em 480p: 73 quadros em 314 s e
 # 121 quadros em 541 s, uns 4,5 s por quadro (com o carregamento dos pesos e a decodificação).
@@ -82,13 +94,24 @@ def montar_fluxo(descricao: str, formato: str, duracao: int, semente: int, prefi
     return fluxo
 
 
-def arquivo_gerado(historico: dict) -> dict | None:
-    """O vídeo salvo, no registro do ComfyUI: {filename, subfolder, type}."""
+def montar_fluxo_da_imagem(descricao: str, formato: str, semente: int, prefixo: str) -> dict:
+    """O grafo da imagem: o mesmo do vídeo com um quadro só, mais passos e um PNG no fim."""
+    largura, altura = FORMATOS_DA_IMAGEM[formato]
+    fluxo = montar_fluxo(descricao, "16:9", 1, semente, prefixo)
+    fluxo["7"]["inputs"].update({"width": largura, "height": altura, "length": 1})
+    fluxo["8"]["inputs"]["steps"] = PASSOS_DA_IMAGEM
+    del fluxo["10"]
+    fluxo["11"] = {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": prefixo}}
+    return fluxo
+
+
+def arquivo_gerado(historico: dict, extensao: str = ".mp4") -> dict | None:
+    """O arquivo salvo, no registro do ComfyUI: {filename, subfolder, type}."""
     for saida in (historico.get("outputs") or {}).values():
         for itens in saida.values():
             if not isinstance(itens, list):
                 continue
             for item in itens:
-                if isinstance(item, dict) and str(item.get("filename", "")).endswith(".mp4"):
+                if isinstance(item, dict) and str(item.get("filename", "")).endswith(extensao):
                     return item
     return None

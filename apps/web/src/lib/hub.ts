@@ -73,6 +73,13 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
     destino: { tipo: "pagina", href: "/app/ferramentas/gerar-video" },
   },
   {
+    id: "gerar-imagem",
+    nome: "Gerar imagem com IA",
+    descricao: "Descreva a imagem e ela entra na biblioteca, pronta para o vídeo ou para o editor de imagem.",
+    categorias: ["imagem", "ia"],
+    destino: { tipo: "pagina", href: "/app/ferramentas/gerar-imagem" },
+  },
+  {
     id: "texto-em-fala",
     nome: "Texto em fala",
     descricao: "Escreva o texto, escolha a voz e o áudio entra na biblioteca.",
@@ -263,6 +270,7 @@ export const SECOES_DO_MENU: { titulo: string | null; itens: ItemDoMenu[] }[] = 
       { nome: "Editor de vídeo", acao: "editor-video", icone: "editor-video" },
       { nome: "Editor de imagem", href: "/app/ferramentas/editor-de-imagem", icone: "editor-imagem" },
       { nome: "Gerar vídeo com IA", href: "/app/ferramentas/gerar-video", icone: "gerar-video" },
+      { nome: "Gerar imagem com IA", href: "/app/ferramentas/gerar-imagem", icone: "gerar-imagem" },
       { nome: "Texto em fala", href: "/app/ferramentas/texto-em-fala", icone: "texto-em-fala" },
       { nome: "Todas as ferramentas", href: "/app/ferramentas", icone: "ferramentas" },
     ],

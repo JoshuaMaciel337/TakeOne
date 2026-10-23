@@ -35,6 +35,7 @@ import {
   Type,
   Volume1,
   WandSparkles,
+  ImageUp,
 } from "lucide-react";
 import { createElement } from "react";
 
@@ -46,6 +47,7 @@ const ICONES: Record<string, LucideIcon> = {
   "criar-automaticamente": WandSparkles,
   legendas: Captions,
   "gerar-video": Sparkles,
+  "gerar-imagem": ImageUp,
   "texto-em-fala": AudioLines,
   montar: Combine,
   modelos: LayoutTemplate,
