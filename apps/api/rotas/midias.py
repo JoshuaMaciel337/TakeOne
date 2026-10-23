@@ -42,6 +42,7 @@ from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
     ARQUIVO_IMAGEM_LIMPA_PROXY,
     ARQUIVO_MASCARA,
+    ARQUIVO_MASCARA_IMAGEM,
     ARQUIVO_VOZ_LIMPA,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
@@ -359,11 +360,12 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA:
         raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
-    if not midia.get("video") or e_imagem(midia):
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            f'Por enquanto o fundo só sai de vídeos ("{midia["nome"]}" não é).')
+    if not midia.get("video"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'O fundo só sai de vídeos e imagens ("{midia["nome"]}" não é).')
     atual = midia.get("recorte_fundo") or {}
-    pronto = atual.get("status") == "pronta" and ARQUIVO_MASCARA in midia.get("arquivos", [])
+    # A imagem parada ganha um PNG; o vídeo, um vídeo da máscara
+    arquivo = ARQUIVO_MASCARA_IMAGEM if e_imagem(midia) else ARQUIVO_MASCARA
+    pronto = atual.get("status") == "pronta" and arquivo in midia.get("arquivos", [])
     andando = atual.get("status") == "processando" and await db.jobs.find_one(
         {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
     if not (pronto or andando):

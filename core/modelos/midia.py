@@ -37,8 +37,10 @@ ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_P
 # Imagem parada (core/utils/imagem.py): a de resolução cheia é do render; a cópia leve, da prévia
 ARQUIVO_IMAGEM = "imagem.png"
 ARQUIVO_PROXY_IMAGEM = "proxy.webp"
+# O recorte do fundo de uma imagem parada (tarefa "recorte_fundo"): a máscara cinza, no lugar do mascara.mp4
+ARQUIVO_MASCARA_IMAGEM = "mascara.png"
 # A de resolução cheia também: o editor de imagem exporta no navegador, no tamanho de verdade
-ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM, ARQUIVO_IMAGEM}
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM, ARQUIVO_IMAGEM, ARQUIVO_MASCARA_IMAGEM}
 # A imagem estável (tarefa "estabilizacao"): estavel.mp4 só do render, estavel_proxy.mp4 da prévia;
 # sobre a imagem sem ruído, estavel_limpo.mp4 e estavel_limpo_proxy.mp4
 _ARQUIVO_ESTAVEL_PROXY = re.compile(r"estavel(_limpo)?_proxy\.mp4")
