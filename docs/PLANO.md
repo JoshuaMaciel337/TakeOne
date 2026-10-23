@@ -548,7 +548,9 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
   - [x] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
   - [x] 12.6 Monitor de origem, com Inserir e Sobrescrever.
-  - [ ] 12.7 As outras áreas de trabalho e os ajustes finais.
+  - [x] 12.7 As outras áreas de trabalho e os ajustes finais.
+  - [ ] Para o dono decidir: o tema padrão dos editores (o escuro de hoje, com o destaque do TakeOne, ou o cinza médio dos programas) e a área de trabalho padrão do vídeo (Edição, como está, ou Montagem).
+  - [ ] Depois da onda 12, no editor de vídeo: tocar para trás e mais rápido com J e L (hoje J volta um segundo), o painel de escopos de cor e a seleção de faixa para trás (Shift+A).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 
 **Estimativa:**

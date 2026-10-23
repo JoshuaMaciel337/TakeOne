@@ -71,6 +71,36 @@ const AREAS: Record<string, EstadoDaArea> = {
     cimaDireita: [{ id: "g-propriedades", abas: ["propriedades", "graficos", "texto"], ativa: "propriedades" }],
     baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "marcadores", "historico"], ativa: "projeto" }],
   },
+  // Montagem: o Projeto grande em cima, para escolher e juntar as mídias
+  montagem: {
+    cimaEsquerda: [{ id: "g-projeto", abas: ["projeto", "fonte"], ativa: "projeto" }],
+    cimaDireita: [],
+    baixoEsquerda: [{ id: "g-efeitos", abas: ["efeitos", "marcadores", "historico"], ativa: "marcadores" }],
+  },
+  // Cor: o painel de cor à direita, os controles de efeito e a fonte à esquerda
+  cor: {
+    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "fonte"], ativa: "controles" }],
+    cimaDireita: [{ id: "g-cor", abas: ["cor", "propriedades"], ativa: "cor" }],
+    baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "historico"], ativa: "projeto" }],
+  },
+  // Efeitos: a lista de efeitos à direita, ao lado das propriedades
+  efeitos: {
+    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "fonte"], ativa: "controles" }],
+    cimaDireita: [{ id: "g-efeitos", abas: ["efeitos", "propriedades"], ativa: "efeitos" }],
+    baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "marcadores", "historico"], ativa: "projeto" }],
+  },
+  // Áudio: o Som essencial à direita
+  audio: {
+    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "fonte", "metadados"], ativa: "controles" }],
+    cimaDireita: [{ id: "g-som", abas: ["som", "propriedades"], ativa: "som" }],
+    baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "marcadores", "historico"], ativa: "projeto" }],
+  },
+  // Legendas e gráficos: o painel Texto à esquerda e os gráficos à direita
+  legendas: {
+    cimaEsquerda: [{ id: "g-texto", abas: ["texto", "controles"], ativa: "texto" }],
+    cimaDireita: [{ id: "g-graficos", abas: ["graficos", "propriedades", "marca"], ativa: "graficos" }],
+    baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "marcadores", "historico"], ativa: "projeto" }],
+  },
 };
 const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DO_VIDEO);
 /** As ferramentas de antes (o endereço do hub ainda usa os ids delas) e o painel novo de cada uma. */

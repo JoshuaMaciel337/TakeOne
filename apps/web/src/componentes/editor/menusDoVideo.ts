@@ -20,7 +20,7 @@ export const PAINEIS_DO_VIDEO = {
 } as const;
 export type IdPainelDoVideo = keyof typeof PAINEIS_DO_VIDEO;
 
-export const AREAS_DO_VIDEO = { edicao: "Edição" } as const;
+export const AREAS_DO_VIDEO = { edicao: "Edição", montagem: "Montagem", cor: "Cor", efeitos: "Efeitos", audio: "Áudio", legendas: "Legendas e gráficos" } as const;
 
 export type AcoesDoVideo = {
   temSelecao: boolean;
