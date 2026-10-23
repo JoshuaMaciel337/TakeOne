@@ -837,6 +837,44 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: 
         <input type="checkbox" checked={Boolean(clipe.remover_fundo)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
         <span className="flex-1">{animacao ? "Fundo transparente (só a animação aparece)" : "Remover o fundo (fica a pessoa)"}</span>
       </label>
+      {!desfocar && !foto && !animacao ? (
+        <>
+          <label className="mt-1 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={Boolean(clipe.fundo_desfocado)}
+              disabled={travada}
+              onChange={(evento) => {
+                const ligar = evento.currentTarget.checked;
+                aoExecutar({ comando: "clipe.fundoDesfocado", parametros: { clipeIds: [clipe.id], intensidade: ligar ? 0.5 : null } });
+                if (ligar) pedirMascara();
+              }}
+            />
+            <span className="flex-1">Desfocar o fundo (a pessoa fica nítida)</span>
+          </label>
+          {clipe.fundo_desfocado ? (
+            <>
+              <ControleNumerico
+                rotulo="Desfoque do fundo"
+                valor={clipe.fundo_desfocado * 100}
+                minimo={5}
+                maximo={100}
+                sufixo="%"
+                desativado={travada}
+                aoPrever={() => undefined}
+                aoConfirmar={(valor) => aoExecutar({ comando: "clipe.fundoDesfocado", parametros: { clipeIds: [clipe.id], intensidade: valor / 100 } })}
+              />
+              <p className="mt-1 text-[11px] text-suave" role="status">
+                {recorte?.status === "pronta"
+                  ? "Pronto. A pessoa fica nítida sobre o próprio vídeo desfocado."
+                  : recorte?.status === "erro" || erroDoPedido
+                    ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
+                    : `Achando a pessoa em cada quadro${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}.`}
+              </p>
+            </>
+          ) : null}
+        </>
+      ) : null}
       {desfocar && !clipe.remover_fundo ? (
         <button
           type="button"

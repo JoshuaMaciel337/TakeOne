@@ -638,6 +638,8 @@ class ClipeEntrada(BaseModel):
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
     chave_luma: ChaveLumaEntrada | None = None
+    # Fundo desfocado (0 a 1): a pessoa nítida sobre uma cópia desfocada do clipe (core/utils/fundo_desfocado.py)
+    fundo_desfocado: float | None = Field(default=None, ge=0, le=1)
     # Contorno e sombra em volta do que aparece (recortes, logos, formas, adesivos)
     contorno: ContornoEntrada | None = None
     sombra: SombraEntrada | None = None

@@ -43,6 +43,7 @@ from core.utils.cantos import desenhar_cantos
 from core.utils.cor import desenhar_vinheta, gerar_cube
 from core.utils.efeitos import LINHAS_POR_ALTURA, imagem_do_grao, tira_de_luz
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
+from core.utils.fundo_desfocado import expandir_fundo_desfocado
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
 from core.utils.lut import chave_da_lut, de_bytes
@@ -234,6 +235,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     if exportacao.get("taxa"):
         # Outra taxa de quadros: a montagem inteira passa a ser nessa grade (as transições, os cortes)
         projeto = {**projeto, "taxa": {"num": exportacao["taxa"], "den": 1}}
+    # O fundo desfocado vira duas cópias do clipe, como na prévia
+    projeto = expandir_fundo_desfocado(projeto)
     indice = None
     if formato == "png":
         projeto, indice = projeto_do_quadro(projeto, exportacao.get("tempo") or 0)

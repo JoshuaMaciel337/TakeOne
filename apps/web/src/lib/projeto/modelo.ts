@@ -166,6 +166,8 @@ export type Clipe = {
   imagem_limpa?: boolean;
   /** Recorta o fundo pela máscara da pessoa que o worker gera (só em vídeos). */
   remover_fundo?: boolean;
+  /** Fundo desfocado (0 a 1): a pessoa nítida sobre uma cópia desfocada do clipe (lib/projeto/fundoDesfocado.ts). */
+  fundo_desfocado?: number | null;
   /** Usa a imagem estável que o worker gera (sobre a sem ruído, se ela está ligada); não combina com o recorte do fundo. */
   estabilizar?: boolean;
   /** Tela verde: a cor que some (só em vídeos e imagens). */

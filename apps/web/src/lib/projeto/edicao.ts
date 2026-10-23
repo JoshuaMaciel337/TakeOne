@@ -2008,11 +2008,20 @@ export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
   );
 }
 
+/** O fundo desfocado dos clipes de vídeo (null tira). Usa a máscara do recorte do fundo: liga sem ele e sem a estabilização. */
+export function desfocarOFundo(projeto: Projeto, clipeIds: string[], intensidade: number | null): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto || clipe.ajuste) throw new ErroEdicao("O fundo desfocado vale só em vídeos.");
+    if (intensidade === null || intensidade <= 0) return { ...clipe, fundo_desfocado: null };
+    return { ...clipe, fundo_desfocado: limitar(intensidade, 0.05, 1), remover_fundo: false, estabilizar: false, inverter: false, fluido: null };
+  });
+}
+
 /** Liga ou desliga o recorte do fundo dos clipes de vídeo. A máscara é do vídeo original: liga sem a estabilização. */
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
-    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false, fluido: null } : {}) };
+    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false, fluido: null, fundo_desfocado: null } : {}) };
   });
 }
 
@@ -2021,7 +2030,7 @@ export function estabilizarClipes(projeto: Projeto, ctx: Contexto, clipeIds: str
   return mudarClipes(projeto, clipeIds, (clipe) => {
     const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
     if (ligar && (clipe.texto || !info?.video || info.imagem || info.transparente)) throw new ErroEdicao("Só vídeos gravados podem ser estabilizados.");
-    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false, inverter: false, fluido: null } : {}) };
+    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false, inverter: false, fluido: null, fundo_desfocado: null } : {}) };
   });
 }
 

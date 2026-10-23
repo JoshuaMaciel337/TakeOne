@@ -5,6 +5,7 @@
 // pelo mp4-muxer (MIT). Lê as mesmas cópias leves da prévia, por isso só 720p.
 //
 // O som com velocidade mudada fica para o servidor: o navegador não muda a velocidade sem mudar o tom.
+import { expandirFundoDesfocado } from "../projeto/fundoDesfocado.ts";
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 import { arquivoDaMidia } from "@/lib/api";
@@ -234,7 +235,9 @@ async function configuracaoDoVideo(largura: number, altura: number, fps: number)
 }
 
 /** O MP4 do projeto em 720p. Lança erro com a mensagem para a pessoa (ou "Exportação cancelada."). */
-export async function exportarNoNavegador(projeto: Projeto, midias: ReadonlyMap<string, Midia>, aoProgresso: Progresso, sinal: AbortSignal): Promise<Blob> {
+export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: ReadonlyMap<string, Midia>, aoProgresso: Progresso, sinal: AbortSignal): Promise<Blob> {
+  // Como a prévia: o fundo desfocado vira duas cópias do clipe
+  const projeto = expandirFundoDesfocado(projetoDaEdicao);
   const motivo = motivoParaOServidor(projeto, midias);
   if (motivo) throw new Error(motivo);
   const { largura, altura } = tamanhoNoNavegador(projeto.proporcao);

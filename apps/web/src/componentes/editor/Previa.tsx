@@ -1,7 +1,7 @@
 "use client";
 
 import { Maximize, Pause, Play, SquareDashed, TriangleAlert } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { Compositor, FUNDO } from "@/lib/previa/compositor";
@@ -14,6 +14,7 @@ import { duracaoDoQuadro, formatarTimecode, type Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
+import { expandirFundoDesfocado, SUFIXO_DO_RECORTE } from "@/lib/projeto/fundoDesfocado";
 import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
 import { useTabelasDasLuts } from "@/lib/useLuts";
 import { GuiasDaPrevia } from "./GuiasDaPrevia";
@@ -92,7 +93,9 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, className = "" }: Props) {
+export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, className = "" }: Props) {
+  // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
+  const projeto = useMemo(() => expandirFundoDesfocado(projetoDaEdicao), [projetoDaEdicao]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [suportado] = useState(webgl2Disponivel);
@@ -186,7 +189,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     const meio = { x: retangulo.esquerda + retangulo.largura / 2, y: retangulo.topo + retangulo.altura / 2 };
     const alvo = [...camadas].reverse().find((camada) => {
       const midia = camada.clipe.midia_id ? midias.get(camada.clipe.midia_id) : undefined;
-      return camada.clipe.id !== marcacao.seguidorId && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
+      return camada.clipe.id !== marcacao.seguidorId && !camada.clipe.id.endsWith(SUFIXO_DO_RECORTE) && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
     });
     if (!alvo) return "Marque em cima de um vídeo (não do próprio clipe que vai seguir).";
     const caixa = retanguloNaImagem(alvo.caixa, alvo.recorte, retangulo, alvo.clipe.virar);
@@ -200,7 +203,7 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
     if (evento.button !== 0) return;
     const retangulo = evento.currentTarget.getBoundingClientRect();
     const ponto = { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
-    const acima = [...camadas].reverse().find((camada) => camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
+    const acima = [...camadas].reverse().find((camada) => !camada.clipe.id.endsWith(SUFIXO_DO_RECORTE) && camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
     aoSelecionar(acima ? [acima.clipe.id] : []);
   }
 
