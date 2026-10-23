@@ -320,11 +320,6 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros.insert(filtros.index(fps) + 1, f"tpad=start_mode=clone:start_duration={_numero(leitura.pausa_inicio)}"
                                               f":stop_mode=clone:stop_duration={_numero(parar)}")
     cabeca = f"[{entrada}:v]"
-    if mascara:
-        # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram)
-        roteiro, alvo = mascara
-        filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro)}'")
-        filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
     filtros += desfoque or []
     if mascara_do_fundo is not None:
         # Recorte do fundo: o alfa vem do vídeo da máscara, lido, cortado e redimensionado como o clipe
@@ -448,7 +443,14 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         filtros = []
     if lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
-    # Virar: o que veio antes (recorte, letras, desfoque, lente, cores separadas, tela verde, brilho) é da imagem
+    if mascara:
+        # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram). Depois dos efeitos,
+        # como o shader, que descarta o pixel no fim: antes, o desfoque, o brilho e o zoom do clipe espalhavam as
+        # letras visíveis por cima do corte no render, e na prévia o corte ficava nítido
+        roteiro, alvo = mascara
+        filtros += ["format=rgba", f"sendcmd=f='{_escapar_caminho(roteiro)}'"]
+        filtros += [f"drawbox@{alvo}{i}=x=-2:y=-2:w=1:h=1:color=black@0:t=fill:replace=1" for i in range(4)]
+    # Virar: o que veio antes (recorte, desfoque, lente, cores separadas, tela verde, brilho, letras) é da imagem
     # como ela é; a cortina, a vinheta, a luz e o grão ficam no clipe como aparece. O shader faz a mesma divisão
     virar = clipe.get("virar") or {}
     if virar.get("horizontal"):
