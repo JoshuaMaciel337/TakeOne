@@ -71,6 +71,17 @@ const ABAS_IMAGEM = [
   { id: "cor", nome: "Cor", fase: "" },
 ] as const;
 
+// No editor de imagem não há tempo: sem animação, som nem velocidade
+const ABAS_DESENHO_TEXTO = [
+  { id: "texto", nome: "Texto", fase: "" },
+  { id: "basico", nome: "Básico", fase: "" },
+  { id: "cor", nome: "Cor", fase: "" },
+] as const;
+const ABAS_DESENHO = [
+  { id: "basico", nome: "Básico", fase: "" },
+  { id: "cor", nome: "Cor", fase: "" },
+] as const;
+
 type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
@@ -110,11 +121,13 @@ type Props = {
   /** Mudança provisória enquanto um controle é arrastado; `null` para desistir dela. */
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
+  /** "imagem" no editor de imagem: sem as abas e as seções que dependem do tempo (keyframes, animação, som). */
+  modo?: "video" | "imagem";
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -122,7 +135,8 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
   const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
   const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
   const ehAudio = selecionado?.faixa.tipo === "audio";
-  const abas: readonly { id: IdAba; nome: string; fase: string }[] = ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
+  const abas: readonly { id: IdAba; nome: string; fase: string }[] =
+    modo === "imagem" ? (ehTexto ? ABAS_DESENHO_TEXTO : ABAS_DESENHO) : ehTexto ? ABAS_TEXTO : ehAudio ? ABAS_AUDIO : selecionado && midia?.imagem ? ABAS_IMAGEM : ABAS;
   // Mídia da biblioteca, sem clipe, só tem informações; num texto, a aba que não existe vira a do texto
   // Num clipe de áudio, a aba que não existe vira a do som
   const aba: IdAba = !selecionado ? "info" : abas.some((item) => item.id === abaEscolhida) ? abaEscolhida : ehAudio ? "audio" : abas[0].id;
@@ -131,20 +145,26 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
   if (!midia && !selecionado) {
     return (
       <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
-        <div className="border-b border-borda p-3">
-          <h3 className="text-sm font-semibold">Projeto</h3>
-          <div className="mt-1">
-            <CampoCor
-              rotulo="Cor de fundo"
-              cor={fundo}
-              aoPrever={(cor) => aoPrever({ comando: "projeto.fundo", parametros: { cor } })}
-              aoConfirmar={(cor) => aoExecutar({ comando: "projeto.fundo", parametros: { cor } })}
-            />
+        {modo === "imagem" ? null : (
+          <div className="border-b border-borda p-3">
+            <h3 className="text-sm font-semibold">Projeto</h3>
+            <div className="mt-1">
+              <CampoCor
+                rotulo="Cor de fundo"
+                cor={fundo}
+                aoPrever={(cor) => aoPrever({ comando: "projeto.fundo", parametros: { cor } })}
+                aoConfirmar={(cor) => aoExecutar({ comando: "projeto.fundo", parametros: { cor } })}
+              />
+            </div>
           </div>
-        </div>
+        )}
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
           <MousePointerClick className="size-6 text-suave" aria-hidden />
-          <p className="text-xs text-suave">Selecione um clipe na prévia ou na linha do tempo para ajustar posição, tamanho e recorte.</p>
+          <p className="text-xs text-suave">
+            {modo === "imagem"
+              ? "Selecione uma camada na prévia ou na lista para ajustar posição, cor, efeitos e recorte."
+              : "Selecione um clipe na prévia ou na linha do tempo para ajustar posição, tamanho e recorte."}
+          </p>
         </div>
       </aside>
     );
@@ -172,7 +192,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
       </div>
       <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-3">
         {aba === "texto" && selecionado?.clipe.texto ? (
-          <AbaTexto clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaTexto clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} semTempo={modo === "imagem"} />
         ) : aba === "info" && midia ? (
           <>
             {selecionado ? (
@@ -228,6 +248,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             aoTrocarMidia={aoTrocarMidia}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
+            modo={modo}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
@@ -322,7 +343,8 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoPrever, aoExecutar }: PropsBasico) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoPrever, aoExecutar, modo = "video" }: PropsBasico & { modo?: "video" | "imagem" }) {
+  const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
@@ -348,14 +370,14 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
       if (Math.abs(valor / fator - t[chave]) < PERTO) aoPrever(null);
       else aoExecutar(transformar({ [chave]: valor / fator }));
     },
-    acao: (
+    acao: comTempo ? (
       <BotaoKeyframe
         pontos={clipe.keyframes?.[chave] ?? undefined}
         noInstante={noInstante.includes(chave)}
         desativado={travada || !dentro}
         aoClicar={() => aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade: chave, tempo, acao: "alternar" } })}
       />
-    ),
+    ) : undefined,
   });
   const curvaAtual = noInstante.map((p) => keyframeEm(clipe.keyframes?.[p], noClipe, meioQuadro)?.curva)[0];
 
@@ -527,7 +549,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           <SeguirRosto clipe={clipe} faixa={faixa} midia={midia} proporcao={proporcao} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
         ) : null}
         {/* Quem segue fica por cima do vídeo: textos e sobreposições (a legenda tem lugar fixo) */}
-        {faixa.tipo === "texto" || faixa.tipo === "video" ? (
+        {comTempo && (faixa.tipo === "texto" || faixa.tipo === "video") ? (
           <BotaoSeguirObjeto
             clipe={clipe}
             travada={travada}
@@ -537,9 +559,11 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           />
         ) : null}
       </Secao>
-      <Secao titulo="Expressões">
-        <SecaoExpressoes clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
-      </Secao>
+      {comTempo ? (
+        <Secao titulo="Expressões">
+          <SecaoExpressoes clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        </Secao>
+      ) : null}
       {clipe.texto ? null : (
         <Secao titulo="Recorte">
           <ControleNumerico rotulo="Esquerda" {...controleDeBorda("esquerda")} />

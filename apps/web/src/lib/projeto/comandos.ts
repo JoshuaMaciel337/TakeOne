@@ -67,6 +67,16 @@ import {
   transformarClipes,
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
+import {
+  adicionarCamadaDeMidia,
+  adicionarCamadaDeTexto,
+  apagarCamada,
+  duplicarCamada,
+  moverCamada,
+  mudarFundoDaImagem,
+  mudarTamanhoDaImagem,
+  type TamanhoDaImagem,
+} from "./imagem.ts";
 import type { Cor } from "./cor.ts";
 import type { Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -103,6 +113,13 @@ export type Comando =
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
+  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string } }
+  | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto } }
+  | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" } }
+  | { comando: "imagem.apagar"; parametros: { faixaId: string } }
+  | { comando: "imagem.duplicar"; parametros: { faixaId: string } }
+  | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
+  | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
   | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
@@ -157,6 +174,13 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.virar": "virar o clipe",
   "clipe.cantos": "mudar os cantos",
   "clipe.preencher": "trocar a mídia do modelo",
+  "imagem.adicionarMidia": "pôr a imagem",
+  "imagem.adicionarTexto": "pôr o texto",
+  "imagem.mover": "mudar a ordem das camadas",
+  "imagem.apagar": "apagar a camada",
+  "imagem.duplicar": "duplicar a camada",
+  "imagem.fundo": "mudar o fundo",
+  "imagem.tamanho": "mudar o tamanho",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
   "clipe.chaveLuma": "mudar a chave de luminância",
@@ -248,6 +272,26 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
     case "clipe.cantos":
       return { projeto: arredondarClipes(projeto, parametros.clipeIds, parametros.cantos) };
+    case "imagem.adicionarMidia": {
+      const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.adicionarTexto": {
+      const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.mover":
+      return { projeto: moverCamada(projeto, parametros.faixaId, parametros.para) };
+    case "imagem.apagar":
+      return { projeto: apagarCamada(projeto, parametros.faixaId), selecao: [] };
+    case "imagem.duplicar": {
+      const resultado = duplicarCamada(projeto, ctx, parametros.faixaId);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.fundo":
+      return { projeto: mudarFundoDaImagem(projeto, parametros) };
+    case "imagem.tamanho":
+      return { projeto: mudarTamanhoDaImagem(projeto, parametros) };
     case "clipe.preencher":
       return { projeto: preencherVaga(projeto, ctx, parametros.clipeId, parametros.midiaId), selecao: [parametros.clipeId] };
     case "clipe.abaixar":

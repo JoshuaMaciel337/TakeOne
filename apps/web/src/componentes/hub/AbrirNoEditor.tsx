@@ -48,7 +48,8 @@ function JanelaAbrirNoEditor({ pedido, aoFechar }: { pedido: PedidoDoEditor; aoF
   const [proporcao, setProporcao] = useState<Proporcao>(pedido.modelo?.proporcao ?? "9:16");
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState("");
-  const recentes = useMemo(() => (projetos ?? []).slice(0, 6), [projetos]);
+  // Só os de vídeo: as ferramentas daqui são do editor de vídeo
+  const recentes = useMemo(() => (projetos ?? []).filter((projeto) => projeto.tipo !== "imagem").slice(0, 6), [projetos]);
   const abrir = useCallback(
     (id: string) => router.push(enderecoNoEditor(id, pedido.ferramenta, { modelo: pedido.modelo?.id, animacao: pedido.animacao })),
     [router, pedido],

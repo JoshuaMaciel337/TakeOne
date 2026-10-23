@@ -1,0 +1,516 @@
+"use client";
+
+import { Check, ChevronLeft, Download, Image as ImageIcon, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+
+import { AvisoErro } from "@/componentes/AvisoErro";
+import { BotaoTema } from "@/componentes/BotaoTema";
+import { Simbolo } from "@/componentes/Logo";
+import { CampoCor } from "@/componentes/editor/CampoCor";
+import { contextoDasMidias } from "@/componentes/editor/contexto";
+import { PainelFormas } from "@/componentes/editor/PainelFormas";
+import { PainelPropriedades } from "@/componentes/editor/PainelPropriedades";
+import { MiniaturaDoEstilo } from "@/componentes/editor/PainelTexto";
+import { useProjeto } from "@/componentes/editor/useProjeto";
+import { Redirecionar } from "@/componentes/projeto/Redirecionar";
+import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
+import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
+import { arquivoDaMidia } from "@/lib/api";
+import { enderecoDoProjeto } from "@/lib/hub";
+import type { Comando } from "@/lib/projeto/comandos";
+import { executarComando } from "@/lib/projeto/comandos";
+import { camadasDaImagem, problemaNoTamanho, TAMANHOS_PRONTOS, tamanhoDaImagem } from "@/lib/projeto/imagem";
+import { acharClipe, type Transformacao } from "@/lib/projeto/modelo";
+import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "@/lib/projeto/texto";
+import type { Midia } from "@/lib/tipos";
+import { useMidias } from "@/lib/useMidias";
+
+import { JanelaExportarImagem } from "./JanelaExportarImagem";
+import { PainelCamadas } from "./PainelCamadas";
+import { PreviaDaImagem } from "./PreviaDaImagem";
+
+type Ferramenta = "imagens" | "texto" | "elementos" | "fundo";
+const FERRAMENTAS: { id: Ferramenta; nome: string; icone: typeof ImageIcon }[] = [
+  { id: "imagens", nome: "Imagens", icone: ImageIcon },
+  { id: "texto", nome: "Texto", icone: Type },
+  { id: "elementos", nome: "Elementos", icone: Shapes },
+  { id: "fundo", nome: "Fundo e tamanho", icone: PaintBucket },
+];
+const SEM_SEGUIR = {
+  marcando: null,
+  andamento: null,
+  aoIniciar: () => undefined,
+};
+const NADA = () => undefined;
+
+/** O editor de imagem: o mesmo projeto, desfazer e salvamento do editor de vídeo, com camadas no lugar da linha do tempo. */
+export function EditorDeImagem({ projetoId }: { projetoId: string }) {
+  const biblioteca = useMidias();
+  const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
+  const ctx = useMemo(() => contextoDasMidias(midias), [midias]);
+  const edicao = useProjeto(projetoId, ctx);
+  const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
+  const [ferramenta, setFerramenta] = useState<Ferramenta>("imagens");
+  const [selecao, definirSelecao] = useState<string[]>([]);
+  const [exportando, setExportando] = useState(false);
+  const [provisorio, setProvisorio] = useState<Comando | null>(null);
+  // As mídias pedidas (as formas) entram como camada quando ficam prontas; a troca de cor de uma forma também espera
+  const pendentes = useRef(new Map<string, { trocar?: string[] }>());
+
+  const setSelecao = useCallback((ids: string[]) => {
+    const ativo = document.activeElement;
+    if (ativo instanceof HTMLElement && ativo.matches("input, textarea, select")) ativo.blur();
+    definirSelecao(ids);
+  }, []);
+  const executar = useCallback(
+    (comando: Comando) => {
+      const resultado = executarNoProjeto(comando);
+      if (resultado?.selecao) setSelecao(resultado.selecao);
+      return resultado;
+    },
+    [executarNoProjeto, setSelecao],
+  );
+  const projetoNaTela = useMemo(() => {
+    if (!projeto || !provisorio) return projeto;
+    try {
+      return executarComando(projeto, provisorio, ctx).projeto;
+    } catch {
+      return projeto;
+    }
+  }, [projeto, provisorio, ctx]);
+  const preverDoPainel = (comando: Comando | null) => {
+    if (comando !== null || !provisorio) {
+      setProvisorio(comando);
+      return;
+    }
+    setProvisorio(null);
+    if (JSON.stringify(projetoNaTela) !== JSON.stringify(projeto)) executar(provisorio);
+  };
+
+  const resolverPendentes = useEffectEvent(() => {
+    for (const [id, acao] of pendentes.current) {
+      const midia = midias.get(id);
+      if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
+      pendentes.current.delete(id);
+      if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
+      else if (acao.trocar)
+        executar({
+          comando: "clipe.trocarMidia",
+          parametros: { clipeIds: acao.trocar, midiaId: id },
+        });
+      else
+        executar({
+          comando: "imagem.adicionarMidia",
+          parametros: { midiaId: id },
+        });
+    }
+  });
+  useEffect(() => {
+    if (pendentes.current.size) resolverPendentes();
+  }, [midias]);
+
+  const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
+  const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
+  const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
+
+  const teclas = useEffectEvent((evento: KeyboardEvent) => {
+    if (!projeto || exportando) return;
+    const alvo = evento.target as HTMLElement;
+    if (alvo.matches("input, textarea, select, [contenteditable]")) return;
+    const ctrl = evento.ctrlKey || evento.metaKey;
+    const tecla = evento.key.toLowerCase();
+    const camada = selecionado ? camadasDaImagem(projeto).find(({ clipe }) => clipe.id === selecionado.clipe.id) : undefined;
+    if (ctrl && tecla === "z" && !evento.shiftKey) desfazer();
+    else if (ctrl && (tecla === "y" || (tecla === "z" && evento.shiftKey))) refazer();
+    else if (ctrl && tecla === "d" && camada)
+      executar({
+        comando: "imagem.duplicar",
+        parametros: { faixaId: camada.faixa.id },
+      });
+    else if ((tecla === "delete" || tecla === "backspace") && camada)
+      executar({
+        comando: "imagem.apagar",
+        parametros: { faixaId: camada.faixa.id },
+      });
+    else if (tecla === "escape") setSelecao([]);
+    else if (camada && evento.key.startsWith("Arrow")) {
+      // Um pixel da imagem por toque (dez com Shift), em frações do quadro
+      const { largura, altura } = tamanhoDaImagem(projeto);
+      const passo = evento.shiftKey ? 10 : 1;
+      const t = camada.clipe.transformacao;
+      const mudanca: Partial<Transformacao> =
+        evento.key === "ArrowLeft"
+          ? { x: t.x - passo / largura }
+          : evento.key === "ArrowRight"
+            ? { x: t.x + passo / largura }
+            : evento.key === "ArrowUp"
+              ? { y: t.y - passo / altura }
+              : { y: t.y + passo / altura };
+      executar({
+        comando: "clipe.transformar",
+        parametros: { clipeIds: [camada.clipe.id], transformacao: mudanca },
+      });
+    } else return;
+    evento.preventDefault();
+  });
+  useEffect(() => {
+    const ouvir = (evento: KeyboardEvent) => teclas(evento);
+    window.addEventListener("keydown", ouvir);
+    return () => window.removeEventListener("keydown", ouvir);
+  }, []);
+
+  if (edicao.erroCarga) {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-3 bg-fundo p-6 text-center">
+        <p className="text-sm">{edicao.erroCarga}</p>
+        <Link href="/app" className="botao-secundario px-3 py-1.5">
+          Voltar ao início
+        </Link>
+      </div>
+    );
+  }
+  if (!projeto || !projetoNaTela) {
+    return (
+      <div className="flex h-dvh items-center justify-center gap-2 bg-fundo text-sm text-suave">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+        Abrindo a imagem…
+      </div>
+    );
+  }
+  if (projeto.tipo !== "imagem") return <Redirecionar para={enderecoDoProjeto({ id: projetoId, tipo: projeto.tipo })} />;
+
+  const imagensProntas = (biblioteca.midias ?? []).filter((midia) => midia.imagem && !midia.elemento && !midia.animacao);
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-borda bg-painel px-2 sm:px-3">
+        <Link href="/app" className="flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-suave transition hover:text-texto" title="Voltar ao início">
+          <ChevronLeft className="size-4" aria-hidden />
+          <Simbolo tamanho={22} />
+        </Link>
+        <input
+          id="nome-projeto"
+          value={edicao.nome}
+          onChange={(evento) => edicao.renomear(evento.currentTarget.value)}
+          aria-label="Nome da imagem"
+          maxLength={120}
+          className="min-w-0 max-w-64 flex-1 rounded-md bg-transparent px-2 py-1 text-sm font-medium outline-none hover:bg-painel-2 focus:bg-painel-2"
+        />
+        <span className="hidden items-center gap-1 text-xs text-suave sm:flex">
+          {edicao.salvamento === "salvo" ? <Check className="size-3.5" aria-hidden /> : <LoaderCircle className="size-3.5 animate-spin" aria-hidden />}
+          {edicao.salvamento === "salvo"
+            ? "Salvo"
+            : edicao.salvamento === "conflito"
+              ? "Alterado em outra aba"
+              : edicao.salvamento === "erro"
+                ? "Não foi possível salvar"
+                : edicao.salvamento === "sem-conexao"
+                  ? "Sem conexão"
+                  : "Salvando…"}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            className="botao-icone"
+            onClick={desfazer}
+            disabled={!edicao.nomeDesfazer}
+            aria-label="Desfazer"
+            title={edicao.nomeDesfazer ? `Desfazer: ${edicao.nomeDesfazer} (Ctrl+Z)` : "Nada para desfazer"}
+          >
+            <Undo2 className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="botao-icone"
+            onClick={refazer}
+            disabled={!edicao.nomeRefazer}
+            aria-label="Refazer"
+            title={edicao.nomeRefazer ? `Refazer: ${edicao.nomeRefazer}` : "Nada para refazer"}
+          >
+            <Redo2 className="size-4" aria-hidden />
+          </button>
+          <BotaoTema />
+          <button type="button" className="botao-principal shrink-0 px-3 py-1.5" onClick={() => setExportando(true)} title="Exportar em PNG, JPG ou WebP">
+            <Download className="size-4" aria-hidden />
+            <span className="hidden sm:inline">Exportar</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 max-md:flex-col max-md:overflow-y-auto">
+        <nav
+          aria-label="Ferramentas"
+          className="z-10 flex shrink-0 gap-1 border-borda bg-painel p-1.5 max-md:sticky max-md:bottom-0 max-md:order-last max-md:border-t md:w-[72px] md:flex-col md:border-r"
+        >
+          {FERRAMENTAS.map((item) => {
+            const Icone = item.icone;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setFerramenta(item.id)}
+                aria-pressed={ferramenta === item.id}
+                className={`flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[11px] transition md:flex-none ${ferramenta === item.id ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`}
+              >
+                <Icone className="size-5" aria-hidden />
+                {item.nome}
+              </button>
+            );
+          })}
+        </nav>
+
+        <aside
+          aria-label={FERRAMENTAS.find((item) => item.id === ferramenta)!.nome}
+          className="flex shrink-0 flex-col border-borda bg-painel max-md:border-b md:min-h-0 md:w-72 md:border-r"
+        >
+          <h2 className="border-b border-borda px-3 py-2.5 text-sm font-semibold">{FERRAMENTAS.find((item) => item.id === ferramenta)!.nome}</h2>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {ferramenta === "imagens" ? (
+              <div className="flex flex-col gap-3">
+                <ZonaDeEnvio compacta />
+                <ListaEnvios />
+                {biblioteca.erro ? <AvisoErro>{biblioteca.erro}</AvisoErro> : null}
+                {imagensProntas.length ? (
+                  <p className="text-[11px] text-suave">Clique numa imagem para pôr como camada.</p>
+                ) : (
+                  <p className="text-[11px] text-suave">Envie fotos, logos e PNGs com fundo transparente.</p>
+                )}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {imagensProntas.map((midia: Midia) => (
+                    <button
+                      key={midia.id}
+                      type="button"
+                      disabled={midia.status !== "pronta"}
+                      onClick={() =>
+                        executar({
+                          comando: "imagem.adicionarMidia",
+                          parametros: { midiaId: midia.id },
+                        })
+                      }
+                      title={midia.nome}
+                      className="aspect-square overflow-hidden rounded-md border border-borda bg-painel-3 transition hover:border-destaque disabled:opacity-50"
+                    >
+                      {midia.status === "pronta" ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- capa da API com a sessão do cookie
+                        <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt={midia.nome} className="size-full object-cover" loading="lazy" />
+                      ) : (
+                        <LoaderCircle className="m-auto size-4 animate-spin text-suave" aria-label="Preparando" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : ferramenta === "texto" ? (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  className="botao-principal px-3 py-1.5"
+                  onClick={() =>
+                    executar({
+                      comando: "imagem.adicionarTexto",
+                      parametros: { texto: TEXTO_PADRAO },
+                    })
+                  }
+                >
+                  <Type className="size-4" aria-hidden /> Texto em branco
+                </button>
+                <p className="text-[11px] text-suave">Estilos prontos</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {ESTILOS_DE_TEXTO.map((estilo) => (
+                    <button
+                      key={estilo.id}
+                      type="button"
+                      onClick={() =>
+                        executar({
+                          comando: "imagem.adicionarTexto",
+                          parametros: { texto: estilo.texto },
+                        })
+                      }
+                      className="flex h-16 items-center justify-center rounded-md border border-borda bg-painel-3 p-1 transition hover:border-destaque"
+                      title={estilo.nome}
+                    >
+                      <MiniaturaDoEstilo texto={estilo.texto} nome={estilo.nome} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : ferramenta === "elementos" ? (
+              <PainelFormas
+                aoPedir={(midia) => {
+                  pendentes.current.set(midia.id, {});
+                  void biblioteca.recarregar();
+                }}
+                aoAvisar={mostrarAviso}
+              />
+            ) : (
+              <FundoETamanho projeto={projetoNaTela} aoPrever={preverDoPainel} aoExecutar={executar} />
+            )}
+          </div>
+        </aside>
+
+        <PreviaDaImagem
+          projeto={projetoNaTela}
+          midias={midias}
+          selecao={selecaoValida}
+          aoSelecionar={setSelecao}
+          aoPrever={(clipeId, mudanca) =>
+            setProvisorio(
+              mudanca
+                ? {
+                    comando: "clipe.transformar",
+                    parametros: { clipeIds: [clipeId], transformacao: mudanca },
+                  }
+                : null,
+            )
+          }
+          aoTransformar={(clipeId, mudanca) =>
+            executar({
+              comando: "clipe.transformar",
+              parametros: { clipeIds: [clipeId], transformacao: mudanca },
+            })
+          }
+        />
+
+        <div className="flex shrink-0 flex-col border-borda bg-painel md:min-h-0 md:w-80 md:border-l">
+          <section aria-label="Camadas" className="max-h-[40%] shrink-0 overflow-y-auto border-b border-borda">
+            <h2 className="px-3 pt-2.5 text-sm font-semibold">Camadas</h2>
+            <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} />
+          </section>
+          <PainelPropriedades
+            modo="imagem"
+            midia={midiaDoClipe}
+            selecionado={selecionado}
+            taxa={projeto.taxa}
+            tempo={0}
+            aoBuscar={NADA}
+            proporcao={projeto.proporcao}
+            faixas={projeto.faixas}
+            aoAvisar={mostrarAviso}
+            aoTrocarMidia={(clipeIds, midia) => {
+              pendentes.current.set(midia.id, { trocar: clipeIds });
+              void biblioteca.recarregar();
+            }}
+            seguirObjeto={SEM_SEGUIR}
+            fundo={projeto.fundo.cor}
+            aoPrever={preverDoPainel}
+            aoExecutar={executar}
+            className="min-h-0 flex-1"
+          />
+        </div>
+      </div>
+
+      {exportando ? <JanelaExportarImagem projeto={projeto} nome={edicao.nome} midias={midias} aoFechar={() => setExportando(false)} aoAvisar={mostrarAviso} /> : null}
+      {edicao.aviso ? (
+        <div role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <p className="rounded-lg border border-borda bg-painel-3 px-4 py-2 text-sm shadow-xl shadow-black/40">{edicao.aviso}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A cor do fundo (ou sem fundo) e o tamanho, com os tamanhos prontos. */
+function FundoETamanho({
+  projeto,
+  aoPrever,
+  aoExecutar,
+}: {
+  projeto: NonNullable<ReturnType<typeof useProjeto>["projeto"]>;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+}) {
+  const atual = tamanhoDaImagem(projeto);
+  const [largura, setLargura] = useState(String(atual.largura));
+  const [altura, setAltura] = useState(String(atual.altura));
+  const [erro, setErro] = useState("");
+  function aplicar(evento: React.FormEvent) {
+    evento.preventDefault();
+    const tamanho = { largura: Number(largura), altura: Number(altura) };
+    const problema = problemaNoTamanho(tamanho);
+    setErro(problema ?? "");
+    if (!problema) aoExecutar({ comando: "imagem.tamanho", parametros: tamanho });
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Fundo</h3>
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={Boolean(projeto.fundo.transparente)}
+            onChange={(evento) =>
+              aoExecutar({
+                comando: "imagem.fundo",
+                parametros: { transparente: evento.currentTarget.checked },
+              })
+            }
+          />
+          Sem fundo (transparente no PNG e no WebP)
+        </label>
+        {projeto.fundo.transparente ? null : (
+          <CampoCor
+            rotulo="Cor do fundo"
+            cor={projeto.fundo.cor}
+            aoPrever={(cor) => aoPrever({ comando: "imagem.fundo", parametros: { cor } })}
+            aoConfirmar={(cor) => aoExecutar({ comando: "imagem.fundo", parametros: { cor } })}
+          />
+        )}
+      </section>
+      <section className="flex flex-col gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Tamanho</h3>
+        <div className="flex flex-col gap-1">
+          {TAMANHOS_PRONTOS.map((item) => {
+            const marcado = item.largura === atual.largura && item.altura === atual.altura;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={marcado}
+                onClick={() => {
+                  setLargura(String(item.largura));
+                  setAltura(String(item.altura));
+                  aoExecutar({
+                    comando: "imagem.tamanho",
+                    parametros: { largura: item.largura, altura: item.altura },
+                  });
+                }}
+                className={`flex items-center justify-between rounded-md border px-2 py-1.5 text-xs ${marcado ? "border-destaque bg-destaque/10" : "border-borda hover:bg-painel-2"}`}
+              >
+                <span>{item.nome}</span>
+                <span className="text-apagado tabular-nums">
+                  {item.largura} × {item.altura}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <form onSubmit={aplicar} className="flex items-end gap-1.5">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] text-suave">
+            Largura
+            <input
+              value={largura}
+              onChange={(evento) => setLargura(evento.currentTarget.value)}
+              inputMode="numeric"
+              className="min-w-0 rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto outline-none focus:border-destaque"
+            />
+          </label>
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] text-suave">
+            Altura
+            <input
+              value={altura}
+              onChange={(evento) => setAltura(evento.currentTarget.value)}
+              inputMode="numeric"
+              className="min-w-0 rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto outline-none focus:border-destaque"
+            />
+          </label>
+          <button type="submit" className="botao-secundario px-2.5 py-1 text-xs">
+            Aplicar
+          </button>
+        </form>
+        {erro ? <AvisoErro>{erro}</AvisoErro> : null}
+        <p className="text-[11px] text-suave">As camadas ficam no mesmo lugar em relação ao quadro.</p>
+      </section>
+    </div>
+  );
+}

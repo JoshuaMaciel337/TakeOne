@@ -67,7 +67,8 @@ function BotaoAlternar({ ativo, rotulo, desativado, aoClicar, children }: { ativ
 const PERTO = 1e-6;
 
 /** Conteúdo, fonte, cor, contorno, sombra e fundo de um clipe de texto. */
-export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
+/** `semTempo`: no editor de imagem, sem o destaque da fala (que anda com o tempo). */
+export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false }: Props & { semTempo?: boolean }) {
   const texto = clipe.texto!;
   const travada = faixa.travada;
   const mudar = (mudanca: Partial<Texto>): Comando => ({ comando: "texto.mudar", parametros: { clipeIds: [clipe.id], texto: mudanca } });
@@ -195,34 +196,36 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar }: Props) {
           <p className="mt-1 text-[11px] text-suave">Toque numa palavra para pintá-la de outra cor.</p>
         )}
       </Secao>
-      <Secao titulo="Destaque da fala">
-        <select
-          aria-label="Destaque da fala"
-          className="w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
-          disabled={travada}
-          value={texto.destaque?.modo ?? "nenhum"}
-          onChange={(evento) => {
-            const modo = evento.currentTarget.value as Destaque["modo"] | "nenhum";
-            aoExecutar(mudar({ destaque: modo === "nenhum" ? null : { modo, cor: texto.destaque?.cor ?? COR_DESTAQUE } }));
-          }}
-        >
-          {MODOS_DESTAQUE.map(({ id, nome }) => (
-            <option key={id} value={id}>
-              {nome}
-            </option>
-          ))}
-        </select>
-        {texto.destaque ? (
-          <CampoCor
-            rotulo="Cor da palavra"
-            cor={texto.destaque.cor}
-            desativado={travada}
-            aoPrever={(valor) => aoPrever(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
-            aoConfirmar={(valor) => aoExecutar(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
-          />
-        ) : null}
-        {texto.destaque && !texto.tempos ? <p className="mt-1 text-[11px] text-suave">Sem os tempos da fala, as palavras dividem a duração da legenda.</p> : null}
-      </Secao>
+      {semTempo ? null : (
+        <Secao titulo="Destaque da fala">
+          <select
+            aria-label="Destaque da fala"
+            className="w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+            disabled={travada}
+            value={texto.destaque?.modo ?? "nenhum"}
+            onChange={(evento) => {
+              const modo = evento.currentTarget.value as Destaque["modo"] | "nenhum";
+              aoExecutar(mudar({ destaque: modo === "nenhum" ? null : { modo, cor: texto.destaque?.cor ?? COR_DESTAQUE } }));
+            }}
+          >
+            {MODOS_DESTAQUE.map(({ id, nome }) => (
+              <option key={id} value={id}>
+                {nome}
+              </option>
+            ))}
+          </select>
+          {texto.destaque ? (
+            <CampoCor
+              rotulo="Cor da palavra"
+              cor={texto.destaque.cor}
+              desativado={travada}
+              aoPrever={(valor) => aoPrever(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
+              aoConfirmar={(valor) => aoExecutar(mudar({ destaque: { ...texto.destaque!, cor: valor } }))}
+            />
+          ) : null}
+          {texto.destaque && !texto.tempos ? <p className="mt-1 text-[11px] text-suave">Sem os tempos da fala, as palavras dividem a duração da legenda.</p> : null}
+        </Secao>
+      )}
     </div>
   );
 }

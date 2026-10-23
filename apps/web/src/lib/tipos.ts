@@ -93,6 +93,8 @@ export type Midia = {
 export type ProjetoResumo = {
   id: string;
   nome: string;
+  tipo?: "video" | "imagem";
+  tamanho?: { largura: number; altura: number } | null;
   proporcao: string;
   /** Em ticks (lib/tempo.ts). */
   duracao: number;

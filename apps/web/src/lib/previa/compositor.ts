@@ -411,9 +411,9 @@ export class Compositor {
   private readonly gl: WebGL2RenderingContext;
   private recursos: Recursos | null;
 
-  /** Lança erro quando o navegador não tem WebGL2. */
-  constructor(canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext("webgl2", { alpha: false, antialias: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
+  /** Lança erro quando o navegador não tem WebGL2. `comAlfa`: o canvas guarda a transparência (o editor de imagem sem fundo). */
+  constructor(canvas: HTMLCanvasElement, { comAlfa = false } = {}) {
+    const gl = canvas.getContext("webgl2", { alpha: comAlfa, antialias: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
     if (!gl) throw new Error("Este navegador não tem WebGL2, que a prévia usa para desenhar o vídeo.");
     this.canvas = canvas;
     this.gl = gl;
@@ -687,7 +687,7 @@ export class Compositor {
    * Desenha um quadro. `quadro` é o tamanho em que as caixas foram calculadas; o canvas pode ter
    * outra resolução (a da tela, com a densidade de pixels), e a imagem é esticada para ele.
    */
-  desenhar(camadas: Camada[], fundo: string, quadro: Tamanho, resolucao: Tamanho) {
+  desenhar(camadas: Camada[], fundo: string | null, quadro: Tamanho, resolucao: Tamanho) {
     const gl = this.gl;
     const recursos = this.recursos;
     if (!recursos || gl.isContextLost()) return;
@@ -696,8 +696,9 @@ export class Compositor {
       this.canvas.height = resolucao.altura;
     }
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    const [r, g, b] = corParaRgb(fundo);
-    gl.clearColor(r, g, b, 1);
+    // Sem fundo (imagem transparente), o canvas começa transparente; as camadas somam o alfa em cima
+    const [r, g, b] = fundo ? corParaRgb(fundo) : [0, 0, 0];
+    gl.clearColor(r, g, b, fundo ? 1 : 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const { uniformes } = recursos;

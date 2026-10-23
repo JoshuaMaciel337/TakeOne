@@ -147,7 +147,15 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
       setSituacao("salvando");
       chamarApi<Projeto>(`/projetos/${projetoId}`, {
         metodo: "PUT",
-        corpo: { versao, nome: nome.trim() || "Projeto sem título", proporcao: projeto.proporcao, taxa: projeto.taxa, fundo: projeto.fundo, faixas: projeto.faixas },
+        corpo: {
+          versao,
+          nome: nome.trim() || (projeto.tipo === "imagem" ? "Imagem sem título" : "Projeto sem título"),
+          proporcao: projeto.proporcao,
+          taxa: projeto.taxa,
+          fundo: projeto.fundo,
+          faixas: projeto.faixas,
+          tamanho: projeto.tamanho ?? undefined,
+        },
       })
         .then((salvo) => {
           despachar({ tipo: "salvou", projeto, nome, versao: salvo.versao });

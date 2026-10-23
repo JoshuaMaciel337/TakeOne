@@ -96,6 +96,19 @@ export async function imagemDeTexto(texto: Texto): Promise<ImagemDeTexto> {
   return imagem;
 }
 
+/**
+ * A imagem de um texto desenhada para um quadro com outro lado menor (a exportação do editor de imagem, nítida
+ * no tamanho final). O tamanho volta medido em LADO_REFERENCIA_TEXTO, como a prévia mede: a caixa sai igual e o
+ * bitmap maior só deixa as letras mais nítidas (o render do vídeo faz o mesmo).
+ */
+export async function imagemDeTextoNoLado(texto: Texto, ladoMenor: number): Promise<ImagemDeTexto> {
+  const lado = Math.round(Math.min(Math.max(ladoMenor, 100), 2160));
+  if (lado === LADO_REFERENCIA_TEXTO) return imagemDeTexto(texto);
+  const imagem = await pedirImagem(chaveDoTexto(texto), lado);
+  const fator = LADO_REFERENCIA_TEXTO / lado;
+  return { ...imagem, largura: imagem.bitmap.width * fator, altura: imagem.bitmap.height * fator };
+}
+
 /** URL de uma imagem de texto pequena, para as miniaturas dos estilos prontos. */
 export async function urlDaImagemDeTexto(texto: Texto, ladoMenor: number): Promise<string> {
   const resposta = await fetch("/api/textos/imagem", {

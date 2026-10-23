@@ -4,13 +4,15 @@ import { LoaderCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
+import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { ErroApi } from "@/lib/api";
+import { enderecoDoProjeto } from "@/lib/hub";
 import { clipeParaAparar, corteVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import { retomarAudio } from "@/lib/previa/audio";
 import type { ClipeCopiado, Contexto } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
-import { duracaoDoQuadro, quadroMaisProximo, segundosParaTicks, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { duracaoDoQuadro, quadroMaisProximo, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
 
@@ -18,6 +20,7 @@ import { BarraFerramentas } from "./BarraFerramentas";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
+import { contextoDasMidias } from "./contexto";
 import { JanelaAtalhos } from "./JanelaAtalhos";
 import { JanelaColarAjustes } from "./JanelaColarAjustes";
 import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
@@ -82,10 +85,6 @@ function useReproducao(duracao: Tick, taxa: Taxa) {
   return { tempo: atual, tocando, buscar, alternar };
 }
 
-function novoId(): string {
-  return crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-}
-
 /**
  * As quatro áreas: ferramentas e painel de conteúdo à esquerda, prévia no centro,
  * propriedades à direita e linha do tempo embaixo. No celular, a prévia ocupa o
@@ -120,27 +119,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const copiados = useRef<ClipeCopiado[]>([]);
 
   const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
-  const ctx = useMemo<Contexto>(
-    () => ({
-      novoId,
-      midia: (id) => {
-        const midia = midias.get(id);
-        if (!midia || midia.status !== "pronta") return null;
-        if (midia.imagem && midia.video) {
-          // Imagem parada: sem fim, sem som; com transparência, entra numa faixa por cima
-          return { duracao: Number.POSITIVE_INFINITY, video: true, audio: false, transparente: Boolean(midia.video.transparente), imagem: true };
-        }
-        if (!midia.duracao) return null;
-        return {
-          duracao: segundosParaTicks(midia.duracao),
-          video: Boolean(midia.video),
-          audio: Boolean(midia.audio),
-          transparente: Boolean(midia.animacao) && midia.arquivos.includes("mascara.mp4"),
-        };
-      },
-    }),
-    [midias],
-  );
+  const ctx = useMemo<Contexto>(() => contextoDasMidias(midias), [midias]);
 
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
@@ -374,6 +353,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       </div>
     );
   }
+
+  if (projeto.tipo === "imagem") return <Redirecionar para={enderecoDoProjeto({ id: projetoId, tipo: "imagem" })} />;
 
   const tamanhos = {
     "--largura-conteudo": `${larguraConteudo}px`,

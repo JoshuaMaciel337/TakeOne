@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { CATEGORIAS, enderecoNoEditor, FERRAMENTAS_DO_HUB, ferramentaDoHub, ferramentasDaCategoria, itemAtivo, NO_INICIO, saudacao, SECOES_DO_MENU } from "./hub.ts";
+import { CATEGORIAS, enderecoDoProjeto, enderecoNoEditor, FERRAMENTAS_DO_HUB, ferramentaDoHub, ferramentasDaCategoria, itemAtivo, NO_INICIO, saudacao, SECOES_DO_MENU } from "./hub.ts";
 
 // As páginas do painel ficam em app/app/(painel)/<caminho>/page.tsx
 const pagina = (href: string) => new URL(`../app/app/(painel)${href.replace(/^\/app/, "")}/page.tsx`, import.meta.url);
@@ -39,4 +39,10 @@ test("endereço do editor e saudação", () => {
   assert.equal(enderecoNoEditor("p1", "modelos", { modelo: "tres-dicas" }), "/app/editor/p1?ferramenta=modelos&modelo=tres-dicas");
   assert.equal(enderecoNoEditor("p1", "texto", { animacao: "tarja-nome" }), "/app/editor/p1?ferramenta=texto&animacao=tarja-nome");
   assert.deepEqual([saudacao(4), saudacao(9), saudacao(13), saudacao(20)], ["Boa noite", "Bom dia", "Boa tarde", "Boa noite"]);
+});
+
+test("o projeto de imagem abre no editor de imagem", () => {
+  assert.equal(enderecoDoProjeto({ id: "p1", tipo: "imagem" }), "/app/imagem/p1");
+  assert.equal(enderecoDoProjeto({ id: "p1", tipo: "video" }), "/app/editor/p1");
+  assert.equal(enderecoDoProjeto({ id: "p1" }), "/app/editor/p1");
 });

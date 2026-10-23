@@ -13,7 +13,7 @@ import { PainelAnimacoes } from "./PainelAnimacoes";
 const LADO_MINIATURA = 360;
 
 /** A miniatura é a imagem que a API desenha, a mesma da prévia e do vídeo. */
-function MiniaturaDoEstilo({ texto, nome }: { texto: Texto; nome: string }) {
+export function MiniaturaDoEstilo({ texto, nome }: { texto: Texto; nome: string }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let ativo = true;

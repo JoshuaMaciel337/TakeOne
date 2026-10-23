@@ -166,8 +166,13 @@ export type Projeto = {
   nome: string;
   proporcao: Proporcao;
   taxa: Taxa;
-  fundo: { cor: string };
+  /** `transparente` só no projeto de imagem: sem fundo, o PNG e o WebP saem com transparência. */
+  fundo: { cor: string; transparente?: boolean };
   faixas: Faixa[];
+  /** "imagem" no editor de imagem (lib/projeto/imagem.ts); sem ele, vídeo. */
+  tipo?: "video" | "imagem";
+  /** O tamanho em pixels do projeto de imagem. */
+  tamanho?: { largura: number; altura: number } | null;
   versao: number;
   duracao: Tick;
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */

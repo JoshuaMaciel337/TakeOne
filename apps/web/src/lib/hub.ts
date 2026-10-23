@@ -46,7 +46,8 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
     nome: "Editor de imagem",
     descricao: "Posts, capas e stories em camadas, com cor, texto, formas e fundo removido.",
     categorias: ["imagem"],
-    destino: { tipo: "em-breve", quando: "Na próxima etapa" },
+    destino: { tipo: "pagina", href: "/app/ferramentas/editor-de-imagem" },
+    selo: "novo",
   },
   {
     id: "criar-automaticamente",
@@ -243,6 +244,11 @@ export function enderecoNoEditor(projetoId: string, ferramenta: IdFerramenta, es
   return `/app/editor/${projetoId}?${busca}`;
 }
 
+/** Onde o projeto abre: o de imagem no editor de imagem, o resto no de vídeo. */
+export function enderecoDoProjeto(projeto: { id: string; tipo?: string | null }): string {
+  return projeto.tipo === "imagem" ? `/app/imagem/${projeto.id}` : `/app/editor/${projeto.id}`;
+}
+
 export type ItemDoMenu =
   | { nome: string; href: string; icone: string }
   | { nome: string; acao: "editor-video"; icone: string }
@@ -255,7 +261,7 @@ export const SECOES_DO_MENU: { titulo: string | null; itens: ItemDoMenu[] }[] = 
     titulo: "Criar",
     itens: [
       { nome: "Editor de vídeo", acao: "editor-video", icone: "editor-video" },
-      { nome: "Editor de imagem", emBreve: true, icone: "editor-imagem" },
+      { nome: "Editor de imagem", href: "/app/ferramentas/editor-de-imagem", icone: "editor-imagem" },
       { nome: "Gerar vídeo com IA", href: "/app/ferramentas/gerar-video", icone: "gerar-video" },
       { nome: "Texto em fala", href: "/app/ferramentas/texto-em-fala", icone: "texto-em-fala" },
       { nome: "Todas as ferramentas", href: "/app/ferramentas", icone: "ferramentas" },

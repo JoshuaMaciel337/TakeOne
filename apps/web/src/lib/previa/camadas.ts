@@ -244,6 +244,35 @@ export function camadasNoTempo(
   return camadas;
 }
 
+/**
+ * As camadas do projeto de imagem (lib/projeto/imagem.ts), de baixo para cima e na ordem das faixas: aqui um
+ * texto pode ficar embaixo de uma foto. Não há tempo (as animações ficam de fora); a mídia de cada camada é
+ * uma imagem, que quem desenha pega pela chave ("imagem:<id do clipe>").
+ */
+export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Midia>, quadro: Tamanho, imagensDeTexto: ReadonlyMap<string, ImagemDeTexto>): CamadaNaTela[] {
+  const camadas: CamadaNaTela[] = [];
+  if (quadro.largura <= 0) return camadas;
+  for (const faixa of [...projeto.faixas].reverse()) {
+    if (faixa.tipo === "principal" || faixa.oculta) continue;
+    const clipe = faixa.clipes[0];
+    if (!clipe) continue;
+    const comum = { clipe, faixa, recorte: clipe.recorte, cor: corDoClipe(clipe), curvas: tabelaDoClipe(clipe), desvio: desvioDeCor(clipe.efeito, 0), segundos: 0 };
+    if (clipe.texto) {
+      const imagem = imagensDeTexto.get(clipe.id);
+      if (!imagem) continue;
+      const caixa = caixaDoTexto(clipe.transformacao, imagem, quadro);
+      camadas.push({ ...comum, chave: `texto:${clipe.id}`, caixa, caixaBase: caixa, imagem: imagem.bitmap });
+      continue;
+    }
+    const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
+    const tamanhoMidia = midia?.status === "pronta" ? tamanhoDaMidia(midia) : null;
+    if (!tamanhoMidia) continue;
+    const caixa = caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhoMidia, quadro);
+    camadas.push({ ...comum, chave: `imagem:${clipe.id}`, caixa, caixaBase: caixa, ...luzEGrao(clipe, caixa, 0, projeto.taxa) });
+  }
+  return camadas;
+}
+
 /** A camada no formato do compositor, com o quadro da fonte e a máscara do fundo deste instante. */
 export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource, mascaraDoFundo: TexImageSource | null): Camada {
   return {
