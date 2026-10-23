@@ -206,6 +206,12 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
         quantos = "1 projeto" if em_projetos == 1 else f"{em_projetos} projetos"
         raise HTTPException(status.HTTP_409_CONFLICT,
                             f"Esta mídia está em {quantos}. Tire os clipes dela da linha do tempo antes de excluir.")
+    em_modelos = await db.modelos.count_documents(
+        {"organizacao_id": usuario["organizacao_id"], "midias_usadas": str(midia["_id"])})
+    if em_modelos:
+        quantos = "1 modelo" if em_modelos == 1 else f"{em_modelos} modelos"
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"Esta mídia está em {quantos} do espaço. Exclua o modelo antes de excluir a mídia.")
     # A exportação guarda uma cópia do projeto: tirada da linha do tempo, a mídia ainda é usada pelo vídeo
     # que está sendo gerado, e excluí-la derrubava a exportação
     exportando = await db.exportacoes.count_documents({

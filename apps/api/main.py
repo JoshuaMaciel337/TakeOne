@@ -25,6 +25,7 @@ from api.rotas import (
     jobs,
     marca,
     midias,
+    modelos,
     projetos,
     sistema,
     som,
@@ -131,6 +132,7 @@ app.include_router(eventos.router)
 app.include_router(uploads.router)
 app.include_router(midias.router)
 app.include_router(projetos.router)
+app.include_router(modelos.router)
 app.include_router(exportacoes.router)
 app.include_router(celular.router)
 app.include_router(textos.router)

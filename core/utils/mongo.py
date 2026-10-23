@@ -36,6 +36,14 @@ INDICES = {
         # Para recusar a exclusão de uma mídia que ainda está em algum projeto
         ([("organizacao_id", 1), ("midias_usadas", 1)], {}),
     ],
+    "modelos": [
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
+        # Como nos projetos: a mídia de um modelo não pode sair da biblioteca
+        ([("organizacao_id", 1), ("midias_usadas", 1)], {}),
+    ],
+    "usos_de_modelos": [
+        ([("organizacao_id", 1), ("modelo_id", 1)], {"unique": True}),
+    ],
     "transcricoes": [
         ([("midia_id", 1)], {"unique": True}),
     ],

@@ -601,6 +601,24 @@ class ProjetoSalvarEntrada(BaseModel):
         return _limpar_espacos(valor)
 
 
+class VagaDoModelo(BaseModel):
+    """Um clipe do modelo que quem usa troca: a mídia dele ou o texto dele."""
+    clipe_id: str = Field(min_length=1, max_length=64)
+    tipo: Literal["midia", "texto"]
+    rotulo: str = Field(min_length=1, max_length=60)
+
+    @field_validator("rotulo", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class OrigemDoModeloSaida(BaseModel):
+    id: str
+    nome: str
+    vagas: list[VagaDoModelo]
+
+
 class ProjetoSaida(BaseModel):
     id: str
     nome: str
@@ -610,8 +628,55 @@ class ProjetoSaida(BaseModel):
     faixas: list[FaixaEntrada]
     versao: int
     duracao: int
+    # O projeto criado de um modelo do espaço: as vagas que o editor oferece para preencher
+    modelo_origem: OrigemDoModeloSaida | None = None
     criado_em: datetime
     atualizado_em: datetime
+
+
+class ModeloCriarEntrada(BaseModel):
+    projeto_id: str = Field(min_length=24, max_length=24)
+    nome: str = Field(min_length=1, max_length=80)
+    descricao: str = Field(default="", max_length=300)
+    categoria: str = Field(default="Do espaço", min_length=1, max_length=40)
+    vagas: list[VagaDoModelo] = Field(default_factory=list, max_length=40)
+
+    @field_validator("nome", "descricao", "categoria", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class ModeloSaida(BaseModel):
+    id: str
+    nome: str
+    descricao: str
+    categoria: str
+    proporcao: str
+    duracao: int
+    capa_midia_id: str | None = None
+    vagas: list[VagaDoModelo]
+    criado_por_nome: str = ""
+    criado_em: datetime
+
+
+class BibliotecaDeModelosSaida(BaseModel):
+    """Os modelos do espaço, os salvos de quem pede e os usos de cada modelo (prontos e do espaço)."""
+    do_espaco: list[ModeloSaida]
+    salvos: list[str]
+    usos: dict[str, int]
+
+
+# Id de modelo pronto (do editor), de modelo do espaço (ObjectId) ou "animacao-<id>" (com sublinhado: "ao_vivo")
+ID_DE_MODELO = r"^[a-z0-9][a-z0-9_-]{0,99}$"
+
+
+class SalvosEntrada(BaseModel):
+    ids: list[Annotated[str, Field(pattern=ID_DE_MODELO)]] = Field(max_length=500)
+
+
+class UsoDeModeloEntrada(BaseModel):
+    modelo_id: str = Field(pattern=ID_DE_MODELO)
 
 
 class ProjetoResumoSaida(BaseModel):
@@ -837,6 +902,10 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
 
 def projeto_para_saida(doc: dict) -> ProjetoSaida:
     return ProjetoSaida.model_validate({**doc, "id": str(doc["_id"])})
+
+
+def modelo_para_saida(doc: dict) -> ModeloSaida:
+    return ModeloSaida.model_validate({**doc, "id": str(doc["_id"])})
 
 
 def projeto_para_resumo(doc: dict) -> ProjetoResumoSaida:
