@@ -154,6 +154,33 @@ def test_limpeza_das_versoes_sem_uso(cliente, db_limpo):
     assert db_limpo.midias.find_one({"_id": ObjectId(sobra["id"])}) is None
 
 
+def test_canais_da_imagem(cliente, db_limpo):
+    from core.utils.limpeza_pixels import versoes_em_uso
+
+    cadastrar(cliente)
+    canal = cliente.post("/api/camadas-pixels", json={"largura": 100, "altura": 100, "nome": "Alfa 1"}).json()
+    assert enviar(cliente, canal["id"], png(100, 100, (255, 255, 255, 255))).json() == {"versao": 1}
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 100, "altura": 100}}).json()
+    alfa = {"id": "c1", "nome": "  Alfa 1 ", "midia_id": canal["id"], "versao": 1}
+    resposta = salvar(cliente, imagem, imagem["faixas"], canais=[alfa])
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["canais"] == [{**alfa, "nome": "Alfa 1"}]
+    # Conta como usado (não sai da biblioteca) e a versão dele não é limpa
+    assert cliente.delete(f"/api/midias/{canal['id']}").status_code == 409
+    organizacao = db_limpo.projetos.find_one({})["organizacao_id"]
+    assert versoes_em_uso(db_limpo, organizacao)[canal["id"]] == {1}
+    # Um canal que não é camada de pixels, e dois com o mesmo id, são recusados
+    forma = cliente.post("/api/elementos/formas", json={"tipo": "elipse", "cor": "#ff0000"}).json()
+    imagem = resposta.json()
+    errado = salvar(cliente, imagem, imagem["faixas"], canais=[{**alfa, "midia_id": forma["id"]}])
+    assert errado.status_code == 422 and "canal" in errado.json()["detail"]
+    repetido = salvar(cliente, imagem, imagem["faixas"], canais=[alfa, {**alfa, "nome": "Outro"}])
+    assert repetido.status_code == 422
+    # No vídeo os canais são ignorados
+    video = cliente.post("/api/projetos", json={}).json()
+    assert salvar(cliente, video, video["faixas"], canais=[alfa]).json()["canais"] == []
+
+
 def test_mascara_de_camada(cliente, db_limpo):
     cadastrar(cliente)
     camada = cliente.post("/api/camadas-pixels", json={"largura": 100, "altura": 100}).json()

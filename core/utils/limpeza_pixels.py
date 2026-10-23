@@ -19,10 +19,14 @@ def versoes_em_uso(db, organizacao_id) -> dict[str, set[int]]:
     """As versões que cada camada de pixels mostra em algum projeto ou modelo do espaço."""
     usadas: dict[str, set[int]] = {}
     for colecao in (db.projetos, db.modelos):
-        com_pixels = [{"faixas.clipes.pixels": {"$exists": True}}, {"faixas.clipes.mascara_pixels": {"$exists": True}}]
+        com_pixels = [{"faixas.clipes.pixels": {"$exists": True}}, {"faixas.clipes.mascara_pixels": {"$exists": True}},
+                      {"canais.0": {"$exists": True}}]
         filtro = {"organizacao_id": organizacao_id, "$or": com_pixels}
         for doc in colecao.find(filtro, {"faixas.clipes.midia_id": 1, "faixas.clipes.pixels": 1,
-                                         "faixas.clipes.mascara_pixels": 1}):
+                                         "faixas.clipes.mascara_pixels": 1, "canais": 1}):
+            # Os canais alfa (as seleções guardadas) também são camadas de pixels
+            for canal in doc.get("canais") or []:
+                usadas.setdefault(str(canal["midia_id"]), set()).add(int(canal["versao"]))
             for faixa in doc.get("faixas", []):
                 for clipe in faixa.get("clipes", []):
                     if clipe.get("pixels") and clipe.get("midia_id"):

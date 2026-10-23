@@ -105,9 +105,15 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
 
     imagem = atual.get("tipo") == "imagem"
     faixas = [f.model_dump() for f in dados.faixas]
-    usadas = midias_usadas(faixas)
+    # Os canais alfa (as seleções guardadas) só existem na imagem; contam como usados, como as máscaras
+    canais = [c.model_dump() for c in dados.canais] if imagem else []
+    usadas = sorted(set(midias_usadas(faixas)) | {c["midia_id"] for c in canais})
     midias = await midias_do_espaco(db, usadas, usuario["organizacao_id"])
     problema = conferir_linha_do_tempo(faixas, midias, imagem=imagem)
+    if not problema and len({c["id"] for c in canais}) != len(canais):
+        problema = "Dois canais têm o mesmo id."
+    if not problema and any(not midias.get(c["midia_id"], {}).get("camada_pixels") for c in canais):
+        problema = "O canal precisa ser uma camada de pixels deste espaço."
     if problema:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problema)
 
@@ -120,6 +126,7 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "fundo": dados.fundo.model_dump(),
         "faixas": faixas,
         "marcadores": sorted((m.model_dump() for m in dados.marcadores), key=lambda m: m["t"]),
+        "canais": canais,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
         "capa_midia_id": capa_do_projeto(faixas, "imagem" if imagem else "video"),

@@ -1009,6 +1009,19 @@ class MarcadorEntrada(BaseModel):
     cor: str = Field(pattern=COR)
 
 
+class CanalEntrada(BaseModel):
+    """Um canal alfa do editor de imagem (uma seleção guardada): uma camada de pixels cinza do tamanho da imagem."""
+    id: str = Field(min_length=1, max_length=40)
+    nome: str = Field(min_length=1, max_length=60)
+    midia_id: str = Field(min_length=24, max_length=24)
+    versao: int = Field(ge=1)
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
 class ProjetoSalvarEntrada(BaseModel):
     versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
     nome: str = Field(min_length=1, max_length=120)
@@ -1022,6 +1035,7 @@ class ProjetoSalvarEntrada(BaseModel):
     marcadores: list[MarcadorEntrada] = Field(default=[], max_length=200)
     # Só no projeto de imagem (no de vídeo é ignorado)
     tamanho: TamanhoEntrada | None = None
+    canais: list[CanalEntrada] = Field(default=[], max_length=50)
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1055,6 +1069,7 @@ class ProjetoSaida(BaseModel):
     fundo: FundoEntrada
     faixas: list[FaixaEntrada]
     marcadores: list[MarcadorEntrada] = []
+    canais: list[CanalEntrada] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
