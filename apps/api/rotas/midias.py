@@ -19,6 +19,7 @@ from api.esquemas import (
     GerarVideoEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
+    ObjetoEscondidoEntrada,
     QualidadeSaida,
     RastreioEntrada,
     RastreioSaida,
@@ -49,6 +50,7 @@ from core.modelos.midia import (
     ARQUIVO_VOZ_LIMPA,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
+    arquivo_da_mascara_do_objeto,
     arquivo_do_tom,
     arquivo_publico,
     arquivos_da_estabilizacao,
@@ -404,6 +406,31 @@ async def pedir_esconder_rostos(midia_id: str, usuario=Depends(usuario_atual), d
                                                                      "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Rostos pedidos: {midia['nome']}")
     return (await para_saida(db, [{**midia, "esconder_rostos": atual}]))[0]
+
+
+@router.post("/{midia_id}/objetos-escondidos", response_model=MidiaSaida)
+async def pedir_objeto_escondido(midia_id: str, dados: ObjetoEscondidoEntrada, usuario=Depends(usuario_atual),
+                                 db=Depends(obter_db)):
+    """Põe na fila a máscara de um objeto já seguido (o rastreio pronto). Se já está pronta ou andando, só devolve."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    rastreio = await db.rastreios.find_one({"_id": ObjectId(dados.rastreio_id), "midia_id": midia["_id"],
+                                            "organizacao_id": usuario["organizacao_id"]})
+    if rastreio is None or rastreio.get("status") != "pronto":
+        raise HTTPException(status.HTTP_409_CONFLICT, "O objeto ainda não foi seguido.")
+    atual = (midia.get("objetos_escondidos") or {}).get(dados.rastreio_id) or {}
+    arquivo = arquivo_da_mascara_do_objeto(dados.rastreio_id)
+    pronto = atual.get("status") == "pronta" and arquivo in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronto or andando):
+        job = montar_job("esconder_objeto", usuario["organizacao_id"],
+                         {"midia_id": str(midia["_id"]), "rastreio_id": dados.rastreio_id}, criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {f"objetos_escondidos.{dados.rastreio_id}": atual,
+                                                                     "atualizado_em": agora()}})
+    objetos = {**(midia.get("objetos_escondidos") or {}), dados.rastreio_id: atual}
+    return (await para_saida(db, [{**midia, "objetos_escondidos": objetos}]))[0]
 
 
 @router.post("/{midia_id}/fluido", response_model=MidiaSaida)

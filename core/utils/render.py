@@ -119,6 +119,7 @@ class MidiaDoRender:
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
     mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
     mascara_rostos: str | None = None  # a dos rostos (esconder os rostos), no mesmo tempo
+    mascaras_objetos: tuple = ()       # as dos objetos escondidos: (id do rastreio, caminho)
     imagem_limpa: str | None = None  # a imagem sem ruído, em resolução cheia e já em BT.709
     # As imagens estáveis prontas, (chave, caminho): "estavel" e "estavel_limpo" (sobre a sem ruído)
     estaveis: tuple[tuple[str, str], ...] = ()
@@ -1180,7 +1181,10 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         mascara_do_fundo = None
         if clipe.get("remover_fundo") and not clipe.get("texto") and not e_imagem_parada:
             midia = midias[clipe["midia_id"]]
-            arquivo_da_mascara = midia.mascara_rostos if clipe.get("mascara_do_recorte") == "rostos" else midia.mascara
+            qual = clipe.get("mascara_do_recorte") or ""
+            arquivo_da_mascara = (midia.mascara_rostos if qual == "rostos"
+                                  else dict(midia.mascaras_objetos).get(qual[len("objeto:"):])
+                                  if qual.startswith("objeto:") else midia.mascara)
             if not arquivo_da_mascara:
                 raise ErroRender("O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar "
                                  "ou desligue \"Remover o fundo\" para exportar.")

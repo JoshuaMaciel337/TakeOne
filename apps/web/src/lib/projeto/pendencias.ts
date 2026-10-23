@@ -26,7 +26,11 @@ export function pendenciaParaONavegador(projetoDaEdicao: Projeto, midias: Readon
       if (!midia || midia.status !== "pronta") return "Uma mídia do projeto ainda está sendo preparada (ou foi excluída). Espere terminar.";
       const tem = (arquivo: string) => midia.arquivos.includes(arquivo);
       if (clipe.remover_fundo && !midia.imagem && !tem(arquivoDaMascara(clipe)))
-        return clipe.mascara_do_recorte === "rostos" ? "Os rostos de um clipe ainda estão sendo procurados. Espere terminar." : "O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar.";
+        return clipe.mascara_do_recorte === "rostos"
+          ? "Os rostos de um clipe ainda estão sendo procurados. Espere terminar."
+          : clipe.mascara_do_recorte?.startsWith("objeto:")
+            ? "A máscara de um objeto escondido ainda está sendo gravada. Espere terminar."
+            : "O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar.";
       if (clipe.estabilizar && !tem(`${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`)) return "A estabilização de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.imagem_limpa && !clipe.estabilizar && !tem("limpo_proxy.mp4")) return "A imagem sem ruído de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.inverter && !midia.imagem && !tem("invertido_proxy.mp4")) return "O vídeo ao contrário de um clipe ainda está sendo preparado. Espere terminar.";

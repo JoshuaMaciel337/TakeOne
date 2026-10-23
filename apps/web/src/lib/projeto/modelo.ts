@@ -170,8 +170,10 @@ export type Clipe = {
   fundo_desfocado?: number | null;
   /** Esconder os rostos: uma cópia pixelizada ou desfocada por cima, só nos rostos (lib/projeto/fundoDesfocado.ts). */
   esconder_rostos?: { modo: "pixelizar" | "desfocar"; forca: number } | null;
-  /** Só nas cópias desenhadas: a máscara que recorta o clipe é a dos rostos, não a da pessoa. */
-  mascara_do_recorte?: "rostos" | null;
+  /** Esconder objetos seguidos (uma placa, um logo): a máscara de cada um vem do rastreio dele. */
+  esconder_objetos?: { rastreio: string; modo: "pixelizar" | "desfocar"; forca: number }[] | null;
+  /** Só nas cópias desenhadas: a máscara que recorta o clipe ("rostos", "objeto:<rastreio>"); sem ela, a da pessoa. */
+  mascara_do_recorte?: string | null;
   /** Usa a imagem estável que o worker gera (sobre a sem ruído, se ela está ligada); não combina com o recorte do fundo. */
   estabilizar?: boolean;
   /** Tela verde: a cor que some (só em vídeos e imagens). */

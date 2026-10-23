@@ -2008,6 +2008,19 @@ export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
   );
 }
 
+/** Os objetos escondidos de um clipe de vídeo (a lista inteira; vazia tira), no máximo 4. */
+export function esconderObjetos(projeto: Projeto, clipeId: string, objetos: { rastreio: string; modo: "pixelizar" | "desfocar"; forca: number }[]): Projeto {
+  if (objetos.length > 4) throw new ErroEdicao("Dá para esconder até 4 objetos por clipe.");
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    if (clipe.texto || clipe.ajuste) throw new ErroEdicao("Esconder um objeto vale só em vídeos.");
+    const limpos = objetos.map((objeto) => {
+      if (!/^[0-9a-f]{24}$/.test(objeto.rastreio)) throw new ErroEdicao("Este objeto não existe.");
+      return { rastreio: objeto.rastreio, modo: objeto.modo === "desfocar" ? ("desfocar" as const) : ("pixelizar" as const), forca: limitar(objeto.forca, 0.05, 1) };
+    });
+    return { ...clipe, esconder_objetos: limpos.length ? limpos : null };
+  });
+}
+
 /** Esconder os rostos dos clipes de vídeo (null tira): pixelizados ou desfocados, na força dada. */
 export function esconderRostos(projeto: Projeto, clipeIds: string[], valor: { modo: "pixelizar" | "desfocar"; forca: number } | null): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {

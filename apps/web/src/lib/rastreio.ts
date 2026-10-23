@@ -16,8 +16,13 @@ export type PedidoDeRastreio = { arquivo: string; t: number; caixa: CaixaNaImage
 
 const INTERVALO_MS = 1000;
 
-/** Os pontos do objeto, ou null se `ativo()` virar falso no meio. Lança erro com a mensagem para a pessoa. */
-export async function seguirObjetoNoWorker(midiaId: string, pedido: PedidoDeRastreio, aoAndamento: (texto: string) => void, ativo: () => boolean): Promise<PontoDoObjeto[] | null> {
+/** O id do rastreio e os pontos do objeto, ou null se `ativo()` virar falso no meio. Lança erro com a mensagem para a pessoa. */
+export async function seguirObjetoNoWorker(
+  midiaId: string,
+  pedido: PedidoDeRastreio,
+  aoAndamento: (texto: string) => void,
+  ativo: () => boolean,
+): Promise<{ id: string; pontos: PontoDoObjeto[] } | null> {
   aoAndamento("Seguindo o objeto");
   let rastreio = await chamarApi<Rastreio>(`/midias/${midiaId}/rastreios`, { metodo: "POST", corpo: pedido });
   while (ativo() && rastreio.status === "processando") {
@@ -28,5 +33,5 @@ export async function seguirObjetoNoWorker(midiaId: string, pedido: PedidoDeRast
   }
   if (!ativo()) return null;
   if (rastreio.status === "erro") throw new Error(`Não foi possível seguir o objeto: ${rastreio.erro ?? "erro desconhecido"}`);
-  return rastreio.pontos;
+  return { id: rastreio.id, pontos: rastreio.pontos };
 }

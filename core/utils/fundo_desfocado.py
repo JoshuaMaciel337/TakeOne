@@ -7,10 +7,17 @@
 # -----------------------------------------------
 SUFIXO_DO_RECORTE = "~recorte"
 SUFIXO_DOS_ROSTOS = "~rostos"
+SUFIXO_DOS_OBJETOS = "~objeto"
 
 
 def tem_fundo_desfocado(clipe: dict) -> bool:
     return bool((clipe.get("fundo_desfocado") or 0) > 0 and not clipe.get("texto") and not clipe.get("ajuste"))
+
+
+def objetos_escondidos(clipe: dict) -> list[dict]:
+    if clipe.get("texto") or clipe.get("ajuste"):
+        return []
+    return [o for o in clipe.get("esconder_objetos") or [] if (o.get("forca") or 0) > 0]
 
 
 def tem_rostos_escondidos(clipe: dict) -> bool:
@@ -20,22 +27,32 @@ def tem_rostos_escondidos(clipe: dict) -> bool:
 
 def _copia(clipe: dict, sufixo: str) -> dict:
     return {**clipe, "id": f"{clipe['id']}{sufixo}", "fundo_desfocado": None, "esconder_rostos": None,
+            "esconder_objetos": None,
             "som_separado": True, "transicao": None, "contorno": None, "sombra": None}
 
 
 def expandir_para_desenhar(projeto: dict) -> dict:
     """O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele."""
-    if not any(tem_fundo_desfocado(c) or tem_rostos_escondidos(c) for f in projeto["faixas"] for c in f["clipes"]):
+    if not any(tem_fundo_desfocado(c) or tem_rostos_escondidos(c) or objetos_escondidos(c)
+               for f in projeto["faixas"] for c in f["clipes"]):
         return projeto
     faixas = []
     for faixa in projeto["faixas"]:
         com_fundo = [c for c in faixa["clipes"] if tem_fundo_desfocado(c)]
         com_rostos = [c for c in faixa["clipes"] if tem_rostos_escondidos(c)]
-        if not com_fundo and not com_rostos:
+        com_objetos = [c for c in faixa["clipes"] if objetos_escondidos(c)]
+        if not com_fundo and not com_rostos and not com_objetos:
             faixas.append(faixa)
             continue
         tipo = "video" if faixa["tipo"] == "principal" else faixa["tipo"]
-        # A lista vai de cima para baixo: os rostos por cima de tudo, depois a pessoa recortada, depois a original
+        # A lista vai de cima para baixo: os objetos e os rostos por cima, depois a pessoa recortada e a original
+        for ordem in range(max((len(objetos_escondidos(c)) for c in com_objetos), default=0)):
+            faixas.append({**faixa, "id": f"{faixa['id']}{SUFIXO_DOS_OBJETOS}{ordem}", "tipo": tipo, "clipes": [
+                {**_copia(c, f"{SUFIXO_DOS_OBJETOS}{ordem}"), "remover_fundo": True,
+                 "mascara_do_recorte": f"objeto:{o['rastreio']}",
+                 "efeito": {"tipo": "desfoque" if o["modo"] == "desfocar" else "pixelizar", "intensidade": o["forca"]}}
+                for c in com_objetos if len(objetos_escondidos(c)) > ordem
+                for o in [objetos_escondidos(c)[ordem]]]})
         if com_rostos:
             faixas.append({**faixa, "id": f"{faixa['id']}{SUFIXO_DOS_ROSTOS}", "tipo": tipo, "clipes": [
                 {**_copia(c, SUFIXO_DOS_ROSTOS), "remover_fundo": True, "mascara_do_recorte": "rostos",
@@ -48,11 +65,11 @@ def expandir_para_desenhar(projeto: dict) -> dict:
                                        "contorno": c.get("contorno"), "sombra": c.get("sombra")} for c in com_fundo]})
 
         def original(c: dict) -> dict:
-            sem_intencao = {**c, "fundo_desfocado": None, "esconder_rostos": None}
+            sem_intencao = {**c, "fundo_desfocado": None, "esconder_rostos": None, "esconder_objetos": None}
             if tem_fundo_desfocado(c):
                 return {**sem_intencao, "remover_fundo": False, "contorno": None, "sombra": None,
                         "efeito": {"tipo": "desfoque", "intensidade": c["fundo_desfocado"]}}
-            return sem_intencao if tem_rostos_escondidos(c) else c
+            return sem_intencao if tem_rostos_escondidos(c) or objetos_escondidos(c) else c
 
         faixas.append({**faixa, "clipes": [original(c) for c in faixa["clipes"]]})
     return {**projeto, "faixas": faixas}

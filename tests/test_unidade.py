@@ -36,7 +36,8 @@ def test_tipos_por_recursos():
     assert set(tipos_por_recursos(["cpu"])) == {"teste", "ingestao", "renderizacao", "limpeza_voz", "rosto", "tom",
                                                 "recorte_fundo", "limpeza_imagem", "animacao_html", "batidas", "fala",
                                                 "estabilizacao", "rastreio", "qualidade", "selecao", "objeto",
-                                                "quadro", "inversao", "fluido", "esconder_rostos"}
+                                                "quadro", "inversao", "fluido", "esconder_rostos",
+                                                "esconder_objeto"}
     assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video", "direcao", "palavras_chave",
                                            "animacao_descrita"]
 

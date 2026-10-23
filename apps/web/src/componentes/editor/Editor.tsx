@@ -492,7 +492,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null)
               }
               aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } })}
-              marcacao={objeto.marcando ? { seguidorId: objeto.marcando, aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null}
+              marcacao={objeto.marcando ? { seguidorId: objeto.marcando, proprio: objeto.modo === "esconder", aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null}
               className="flex-1"
             />
             <Divisor
@@ -522,6 +522,10 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 aoIniciar: (clipeId) => {
                   if (reproducao.tocando) alternar();
                   objeto.iniciar(clipeId);
+                },
+                aoEsconder: (clipeId) => {
+                  if (reproducao.tocando) alternar();
+                  objeto.iniciar(clipeId, "esconder");
                 },
               }}
               fundo={(projetoNaTela ?? projeto).fundo.cor}

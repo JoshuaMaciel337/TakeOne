@@ -36,7 +36,8 @@ type Props = {
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
   /** Marcando o objeto que um clipe vai seguir: a prévia mostra o marcador no lugar das alças. */
-  marcacao?: { seguidorId: string; aoConfirmar: (marcado: ObjetoMarcado) => void; aoCancelar: () => void } | null;
+  /** `proprio`: o objeto é marcado no próprio clipe (esconder uma placa), não num vídeo embaixo dele. */
+  marcacao?: { seguidorId: string; proprio?: boolean; aoConfirmar: (marcado: ObjetoMarcado) => void; aoCancelar: () => void } | null;
   className?: string;
 };
 
@@ -189,9 +190,10 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
     const meio = { x: retangulo.esquerda + retangulo.largura / 2, y: retangulo.topo + retangulo.altura / 2 };
     const alvo = [...camadas].reverse().find((camada) => {
       const midia = camada.clipe.midia_id ? midias.get(camada.clipe.midia_id) : undefined;
-      return camada.clipe.id !== marcacao.seguidorId && !ehCopiaDesenhada(camada.clipe.id) && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
+      const certo = marcacao.proprio ? camada.clipe.id === marcacao.seguidorId : camada.clipe.id !== marcacao.seguidorId;
+      return certo && !ehCopiaDesenhada(camada.clipe.id) && midia?.video && !midia.imagem && !midia.animacao && contemPonto(camada.caixa, meio);
     });
-    if (!alvo) return "Marque em cima de um vídeo (não do próprio clipe que vai seguir).";
+    if (!alvo) return marcacao.proprio ? "Marque em cima do vídeo do clipe escolhido." : "Marque em cima de um vídeo (não do próprio clipe que vai seguir).";
     const caixa = retanguloNaImagem(alvo.caixa, alvo.recorte, retangulo, alvo.clipe.virar);
     if (!caixa) return "O retângulo ficou fora da imagem do vídeo.";
     marcacao.aoConfirmar({ alvoId: alvo.clipe.id, caixa });

@@ -9,7 +9,7 @@ import {
   type Sombra,
   SOMBRA_PADRAO,
 } from "@/lib/projeto/silhueta";
-import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, MousePointerClick, RotateCcw, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
 import { useState } from "react";
 
 import { chamarApi } from "@/lib/api";
@@ -112,7 +112,13 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 const NOMES_FAIXA: Record<Faixa["tipo"], string> = { principal: "Principal", video: "Sobreposição", audio: "Áudio", texto: "Texto", legenda: "Legendas" };
 
-type EstadoSeguirObjeto = { marcando: string | null; andamento: { seguidorId: string; texto: string } | null; aoIniciar: (clipeId: string) => void };
+type EstadoSeguirObjeto = {
+  marcando: string | null;
+  andamento: { seguidorId: string; texto: string } | null;
+  aoIniciar: (clipeId: string) => void;
+  /** Esconder um objeto do próprio clipe (uma placa): marcar na prévia, seguir e pixelizar. */
+  aoEsconder?: (clipeId: string) => void;
+};
 
 type Props = {
   midia: Midia | null;
@@ -566,7 +572,10 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           />
         ) : null}
         {!clipe.texto && midia?.video && !midia.imagem && !midia.elemento && !midia.animacao && comTempo ? (
-          <EsconderRostos clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
+          <>
+            <EsconderRostos clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
+            <EsconderObjetos clipe={clipe} midia={midia} travada={travada} estado={seguirObjeto} aoExecutar={aoExecutar} />
+          </>
         ) : null}
         {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
@@ -976,6 +985,76 @@ function EsconderRostos({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; m
           </p>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** Esconder objetos que se movem (uma placa, um logo): a pessoa marca, o VitTrack segue e uma cópia pixelizada cobre. */
+function EsconderObjetos({
+  clipe,
+  midia,
+  travada,
+  estado,
+  aoExecutar,
+}: {
+  clipe: Clipe;
+  midia: Midia;
+  travada: boolean;
+  estado: EstadoSeguirObjeto;
+  aoExecutar: (comando: Comando) => void;
+}) {
+  const objetos = clipe.esconder_objetos ?? [];
+  const mudar = (lista: typeof objetos) => aoExecutar({ comando: "clipe.esconderObjetos", parametros: { clipeId: clipe.id, objetos: lista } });
+  const marcando = estado.marcando === clipe.id;
+  const andamento = estado.andamento?.seguidorId === clipe.id ? estado.andamento.texto : null;
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <button
+        type="button"
+        className="botao-secundario w-full px-3 py-1.5 text-xs"
+        disabled={travada || marcando || andamento !== null || objetos.length >= 4 || !estado.aoEsconder}
+        onClick={() => estado.aoEsconder?.(clipe.id)}
+      >
+        {andamento ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : null}
+        {andamento ?? (marcando ? "Marque o objeto na prévia" : "Esconder um objeto (placa, logo)")}
+      </button>
+      {objetos.map((objeto, indice) => {
+        const situacao = midia.objetos_escondidos?.[objeto.rastreio];
+        return (
+          <div key={objeto.rastreio} className="mt-1.5 rounded-md border border-borda/60 p-1.5">
+            <div className="flex items-center gap-1">
+              <span className="flex-1 text-xs">Objeto {indice + 1}</span>
+              <select
+                value={objeto.modo}
+                disabled={travada}
+                aria-label={`Jeito de esconder o objeto ${indice + 1}`}
+                onChange={(evento) => mudar(objetos.map((o, i) => (i === indice ? { ...o, modo: evento.currentTarget.value as "pixelizar" | "desfocar" } : o)))}
+                className="rounded-md border border-borda bg-painel-2 px-1.5 py-0.5 text-xs"
+              >
+                <option value="pixelizar">Pixelizar</option>
+                <option value="desfocar">Desfocar</option>
+              </select>
+              <button type="button" className="botao-icone size-6" disabled={travada} onClick={() => mudar(objetos.filter((_, i) => i !== indice))} aria-label={`Mostrar o objeto ${indice + 1} de novo`} title="Mostrar de novo">
+                <Trash2 className="size-3.5" aria-hidden />
+              </button>
+            </div>
+            <ControleNumerico
+              rotulo="Força"
+              valor={objeto.forca * 100}
+              minimo={5}
+              maximo={100}
+              sufixo="%"
+              desativado={travada}
+              aoPrever={() => undefined}
+              aoConfirmar={(forca) => mudar(objetos.map((o, i) => (i === indice ? { ...o, forca: forca / 100 } : o)))}
+            />
+            <p className="text-[11px] text-suave" role="status">
+              {situacao?.status === "pronta" ? "Escondido na prévia e no vídeo exportado." : situacao?.status === "erro" ? `Não deu certo: ${situacao.erro}` : "Gravando a máscara do objeto…"}
+            </p>
+          </div>
+        );
+      })}
+      {!objetos.length && !marcando && !andamento ? <p className="mt-1 text-[11px] text-suave">Marque uma placa ou um logo: ele é seguido pelo vídeo e fica pixelizado.</p> : null}
     </div>
   );
 }

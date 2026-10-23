@@ -29,6 +29,7 @@ TAREFAS = {
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,
     "esconder_rostos": RECURSO_CPU,
+    "esconder_objeto": RECURSO_CPU,
     "limpeza_imagem": RECURSO_CPU,
     "estabilizacao": RECURSO_CPU,
     "rosto": RECURSO_CPU,

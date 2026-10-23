@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Comando } from "@/lib/projeto/comandos";
 import { type Clipe, acharClipe, fimDoClipe, type Projeto, tempoNaMidia } from "@/lib/projeto/modelo";
 import { type CaixaNaImagem, caminhoDoSeguidor } from "@/lib/projeto/seguirObjeto";
+import { chamarApi } from "@/lib/api";
 import { seguirObjetoNoWorker } from "@/lib/rastreio";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -29,6 +30,8 @@ type Opcoes = {
  */
 export function useSeguirObjeto({ projeto, midias, tempo, executar, aoAvisar }: Opcoes) {
   const [marcando, setMarcando] = useState<string | null>(null);
+  // "esconder": o objeto é marcado no próprio clipe e vira uma máscara pixelizada; "seguir": o clipe anda junto
+  const [modo, setModo] = useState<"seguir" | "esconder">("seguir");
   const [andamento, setAndamento] = useState<{ seguidorId: string; texto: string } | null>(null);
   const ativo = useRef(true);
   useEffect(() => {
@@ -38,15 +41,39 @@ export function useSeguirObjeto({ projeto, midias, tempo, executar, aoAvisar }: 
     };
   }, []);
 
-  function iniciar(seguidorId: string) {
+  function iniciar(seguidorId: string, novoModo: "seguir" | "esconder" = "seguir") {
+    setModo(novoModo);
     setMarcando(seguidorId);
-    aoAvisar("Desenhe na prévia um retângulo em volta do objeto. Esc cancela.");
+    aoAvisar(novoModo === "esconder" ? "Desenhe na prévia um retângulo em volta do que vai ficar escondido (uma placa, um logo). Esc cancela." : "Desenhe na prévia um retângulo em volta do objeto. Esc cancela.");
+  }
+
+  /** Esconder: segue o objeto no próprio clipe e pede a máscara; o clipe ganha o objeto escondido. */
+  async function esconder(clipeId: string, caixa: CaixaNaImagem) {
+    if (!projeto) return;
+    const clipe = acharClipe(projeto, clipeId)?.clipe;
+    const midia = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
+    if (!clipe || !midia?.video) return;
+    const segundos = (instante: Tick) => tempoNaMidia(clipe, instante) / TICKS_POR_SEGUNDO;
+    const pedido = { arquivo: arquivoDaImagemDoClipe(clipe, midia), t: segundos(tempo), caixa, de: segundos(clipe.inicio), ate: segundos(fimDoClipe(clipe)) };
+    try {
+      const rastreio = await seguirObjetoNoWorker(midia.id, pedido, (texto) => ativo.current && setAndamento({ seguidorId: clipeId, texto }), () => ativo.current);
+      if (!rastreio) return;
+      await chamarApi(`/midias/${midia.id}/objetos-escondidos`, { metodo: "POST", corpo: { rastreio_id: rastreio.id } });
+      const objetos = [...(clipe.esconder_objetos ?? []), { rastreio: rastreio.id, modo: "pixelizar" as const, forca: 0.7 }];
+      executar({ comando: "clipe.esconderObjetos", parametros: { clipeId, objetos } });
+      aoAvisar("O objeto vai ficar escondido assim que a máscara for gravada. Ctrl+Z desfaz.");
+    } catch (erro) {
+      if (ativo.current) aoAvisar(erro instanceof Error ? erro.message : "Não foi possível esconder o objeto agora.");
+    } finally {
+      if (ativo.current) setAndamento(null);
+    }
   }
 
   async function confirmar({ alvoId, caixa }: ObjetoMarcado) {
     const seguidorId = marcando;
     setMarcando(null);
     if (!projeto || !seguidorId) return;
+    if (modo === "esconder") return esconder(alvoId, caixa);
     const seguidor = acharClipe(projeto, seguidorId)?.clipe;
     const alvo = acharClipe(projeto, alvoId)?.clipe;
     const midia = alvo?.midia_id ? midias.get(alvo.midia_id) : undefined;
@@ -63,8 +90,9 @@ export function useSeguirObjeto({ projeto, midias, tempo, executar, aoAvisar }: 
     const tamanho = { largura: midia.video.largura, altura: midia.video.altura };
     const [largura, altura] = projeto.proporcao.split(":").map(Number);
     try {
-      const pontos = await seguirObjetoNoWorker(midia.id, pedido, (texto) => ativo.current && setAndamento({ seguidorId, texto }), () => ativo.current);
-      if (!pontos) return;
+      const rastreio = await seguirObjetoNoWorker(midia.id, pedido, (texto) => ativo.current && setAndamento({ seguidorId, texto }), () => ativo.current);
+      if (!rastreio) return;
+      const { pontos } = rastreio;
       const caminho = caminhoDoSeguidor(seguidor, alvo as Clipe, pontos, tamanho, { largura, altura }, projeto.taxa, tempo);
       if (!caminho) {
         aoAvisar("O objeto não foi achado no trecho em que os dois clipes aparecem.");
@@ -79,7 +107,7 @@ export function useSeguirObjeto({ projeto, midias, tempo, executar, aoAvisar }: 
     }
   }
 
-  return { marcando, andamento, iniciar, confirmar: (marcado: ObjetoMarcado) => void confirmar(marcado), cancelar: () => setMarcando(null) };
+  return { marcando, modo, andamento, iniciar, confirmar: (marcado: ObjetoMarcado) => void confirmar(marcado), cancelar: () => setMarcando(null) };
 }
 
 /** O botão da aba Básico, nos clipes que ficam por cima (textos, imagens e vídeos de sobreposição). */

@@ -5,6 +5,8 @@ from worker.tarefas.animacao_descrita import executar_animacao_descrita
 from worker.tarefas.animacao_html import executar_animacao_html, marcar_animacao_com_erro
 from worker.tarefas.batidas import executar_batidas, marcar_batidas_com_erro
 from worker.tarefas.direcao import executar_direcao
+from worker.tarefas.esconder_objeto import executar_esconder_objeto
+from worker.tarefas.esconder_objeto import marcar_com_erro as marcar_objeto_escondido_com_erro
 from worker.tarefas.esconder_rostos import executar_esconder_rostos
 from worker.tarefas.esconder_rostos import marcar_com_erro as marcar_rostos_com_erro
 from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabilizacao_com_erro
@@ -46,6 +48,7 @@ REGISTRO = {
     "tom": Tarefa(executar_tom, ao_falhar=marcar_tom_com_erro),
     "recorte_fundo": Tarefa(executar_recorte_fundo, ao_falhar=marcar_recorte_com_erro),
     "esconder_rostos": Tarefa(executar_esconder_rostos, ao_falhar=marcar_rostos_com_erro),
+    "esconder_objeto": Tarefa(executar_esconder_objeto, ao_falhar=marcar_objeto_escondido_com_erro),
     "limpeza_imagem": Tarefa(executar_limpeza_imagem, ao_falhar=marcar_imagem_com_erro),
     "estabilizacao": Tarefa(executar_estabilizacao, ao_falhar=marcar_estabilizacao_com_erro),
     "rosto": Tarefa(executar_rosto, ao_falhar=marcar_rosto_com_erro),
