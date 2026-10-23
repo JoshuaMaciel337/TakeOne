@@ -8,7 +8,7 @@ import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEnvios } from "@/lib/envios";
 import { enderecoDoProjeto } from "@/lib/hub";
-import { clipeParaAparar, corteVizinho } from "@/lib/projeto/atalhos";
+import { clipeParaAparar, corteVizinho, marcadorVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import { retomarAudio } from "@/lib/previa/audio";
 import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S } from "@/lib/projeto/edicao";
@@ -342,7 +342,11 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if (ctrl && tecla === "a") setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id)));
     else if (evento.altKey && (tecla === "arrowleft" || tecla === "arrowright")) empurrar(tecla === "arrowleft" ? -1 : 1, evento.shiftKey ? 5 : 1);
     else if ((tecla === "q" || tecla === "w") && !ctrl && !evento.altKey) aparaAteOCursor(tecla === "q" ? "inicio" : "fim");
-    else if ((tecla === "arrowup" || tecla === "arrowdown") && !ctrl && !evento.altKey) {
+    else if (tecla === "m" && !ctrl && !evento.altKey) executar({ comando: "marcador.adicionar", parametros: { tempo } });
+    else if ((tecla === "arrowup" || tecla === "arrowdown") && evento.shiftKey && !ctrl && !evento.altKey) {
+      const marcador = marcadorVizinho(projeto, tempo, tecla === "arrowup" ? -1 : 1, quadro / 2);
+      if (marcador !== null) buscar(marcador);
+    } else if ((tecla === "arrowup" || tecla === "arrowdown") && !ctrl && !evento.altKey) {
       const corte = corteVizinho(projeto, tempo, tecla === "arrowup" ? -1 : 1, quadro / 2);
       if (corte !== null) buscar(corte);
     } else if (evento.key === "?") setVendoAtalhos(true);

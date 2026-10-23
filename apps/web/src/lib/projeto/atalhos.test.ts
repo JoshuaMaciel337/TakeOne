@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { clipeParaAparar, corteVizinho } from "./atalhos.ts";
+import { clipeParaAparar, corteVizinho, marcadorVizinho } from "./atalhos.ts";
 import type { Projeto } from "./modelo.ts";
 
 const S = TICKS_POR_SEGUNDO;
@@ -28,4 +28,11 @@ test("↑ e ↓ andam de corte em corte da principal", () => {
   assert.equal(corteVizinho(projeto, 4 * S, 1, meio), 10 * S, "parado num corte, vai ao seguinte");
   assert.equal(corteVizinho(projeto, 5 * S, -1, meio), 4 * S);
   assert.equal(corteVizinho(projeto, 0, -1, meio), null);
+});
+
+test("marcador vizinho: o anterior e o seguinte, sem o do cursor", () => {
+  const projeto = { faixas: [], duracao: 0, marcadores: [{ id: "a", t: 100, nome: "A", cor: "#ffffff" }, { id: "b", t: 300, nome: "B", cor: "#ffffff" }] } as unknown as Parameters<typeof marcadorVizinho>[0];
+  assert.equal(marcadorVizinho(projeto, 100, 1, 5), 300);
+  assert.equal(marcadorVizinho(projeto, 300, -1, 5), 100);
+  assert.equal(marcadorVizinho(projeto, 50, -1, 5), null);
 });

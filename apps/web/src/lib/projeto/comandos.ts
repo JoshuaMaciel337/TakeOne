@@ -62,7 +62,10 @@ import {
   limparImagem,
   mudarVelocidade,
   curvarVelocidade,
+  adicionarMarcador,
   ajustarMusicaAoVideo,
+  apagarMarcador,
+  mudarMarcador,
   congelarQuadro,
   inverterClipes,
   fluidoNoClipe,
@@ -129,6 +132,9 @@ export type Comando =
   | { comando: "clipe.congelar"; parametros: { clipeId: string; tempo: Tick; midiaId: string; duracao: Tick } }
   | { comando: "clipe.inverter"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.fluido"; parametros: { clipeId: string; fluido: { de: number; ate: number } | null } }
+  | { comando: "marcador.adicionar"; parametros: { tempo: Tick } }
+  | { comando: "marcador.mudar"; parametros: { id: string; nome?: string; cor?: string; t?: Tick } }
+  | { comando: "marcador.apagar"; parametros: { id: string } }
   | { comando: "clipe.devolverSom"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
@@ -207,6 +213,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.congelar": "congelar o quadro",
   "clipe.inverter": "tocar ao contrário",
   "clipe.fluido": "câmera lenta suave",
+  "marcador.adicionar": "pôr um marcador",
+  "marcador.mudar": "mudar o marcador",
+  "marcador.apagar": "apagar o marcador",
   "clipe.devolverSom": "devolver o som",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
@@ -317,6 +326,14 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = congelarQuadro(projeto, ctx, parametros.clipeId, parametros.tempo, parametros.midiaId, parametros.duracao);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "marcador.adicionar":
+      return { projeto: adicionarMarcador(projeto, ctx, parametros.tempo).projeto };
+    case "marcador.mudar": {
+      const { id, ...mudanca } = parametros;
+      return { projeto: mudarMarcador(projeto, id, mudanca) };
+    }
+    case "marcador.apagar":
+      return { projeto: apagarMarcador(projeto, parametros.id) };
     case "clipe.fluido":
       return { projeto: fluidoNoClipe(projeto, ctx, parametros.clipeId, parametros.fluido) };
     case "clipe.inverter":

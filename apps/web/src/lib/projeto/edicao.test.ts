@@ -7,7 +7,10 @@ import {
   adicionarClipe,
   adicionarLegenda,
   adicionarTexto,
+  adicionarMarcador,
   ajustarAudio,
+  apagarMarcador,
+  mudarMarcador,
   ajustarMusicaAoVideo,
   animarClipes,
   definirTransicao,
@@ -64,7 +67,7 @@ import { transformacaoNoTempo, volumeNoTempo } from "./keyframes.ts";
 import { CURVAS_PRONTAS } from "./velocidade.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
-import { completarProjeto, fatorDosFades, fimDoClipe, zeroDoFluido, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { completarProjeto, fatorDosFades, fimDoClipe, textoDosCapitulos, zeroDoFluido, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 
 const S = segundosParaTicks(1);
 const TAXA = { num: 30, den: 1 };
@@ -1229,4 +1232,21 @@ test("câmera lenta suave: tira o que não combina e só vale dentro do trecho p
   assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 } }, midia), null);
   assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 }, entrada: S, duracao: 2 * S, velocidade: 0.5 }, midia), 0);
   assert.equal(zeroDoFluido({ ...clipe, fluido: { de: 0, ate: 3 }, entrada: S, duracao: 2 * S, velocidade: 0.5 }, { ...midia, arquivos: [] }), null);
+});
+
+test("marcadores: pôr no quadro do cursor, mudar, apagar e virar capítulos", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const um = adicionarMarcador(projeto, ctx, 61 * S + 3);
+  projeto = um.projeto;
+  // No mesmo quadro, devolve o que já existe
+  assert.equal(adicionarMarcador(projeto, ctx, 61 * S).id, um.id);
+  projeto = adicionarMarcador(projeto, ctx, 0).projeto;
+  assert.deepEqual(projeto.marcadores?.map((m) => [m.t, m.nome]), [[0, "Marcador 2"], [61 * S, "Marcador 1"]]);
+  projeto = mudarMarcador(projeto, um.id, { nome: "  Dicas finais  ", cor: "#3D8BFF" });
+  assert.equal(textoDosCapitulos(projeto.marcadores ?? []), "00:00 Marcador 2\n01:01 Dicas finais");
+  assert.equal(projeto.marcadores?.[1].cor, "#3d8bff");
+  projeto = apagarMarcador(projeto, um.id);
+  assert.equal(projeto.marcadores?.length, 1);
+  assert.throws(() => mudarMarcador(projeto, um.id, { nome: "x" }), ErroEdicao);
 });

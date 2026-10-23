@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
 import { formatarBytes, formatarQuando, formatarTempo } from "@/lib/formatar";
-import type { Projeto, Proporcao } from "@/lib/projeto/modelo";
+import { type Projeto, type Proporcao, textoDosCapitulos } from "@/lib/projeto/modelo";
 import type { Exportacao, Midia } from "@/lib/tipos";
 import { useExportacoes } from "@/lib/useExportacoes";
 
@@ -135,6 +135,8 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
             </div>
           </div>
 
+          {projeto.marcadores?.length ? <Capitulos projeto={projeto} /> : null}
+
           <div className="p-4">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-suave">Exportações deste projeto</h3>
             {erro ? <p className="text-xs text-erro">{erro}</p> : null}
@@ -208,5 +210,27 @@ function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoE
         </p>
       ) : null}
     </li>
+  );
+}
+
+/** Os marcadores como capítulos ("00:00 Nome", um por linha), para colar na descrição do vídeo. */
+function Capitulos({ projeto }: { projeto: Projeto }) {
+  const [copiado, setCopiado] = useState(false);
+  const texto = textoDosCapitulos(projeto.marcadores ?? []);
+  return (
+    <div className="space-y-2 border-b border-borda p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Capítulos</h3>
+      <p className="text-[11px] text-suave">Os marcadores da régua, para colar na descrição do vídeo. As redes pedem que o primeiro comece em 00:00.</p>
+      <textarea
+        readOnly
+        value={texto}
+        rows={Math.min(8, texto.split("\n").length)}
+        className="w-full resize-none rounded-md border border-borda bg-painel-2 px-2 py-1.5 font-mono text-xs"
+        aria-label="Capítulos"
+      />
+      <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => void navigator.clipboard.writeText(texto).then(() => setCopiado(true))}>
+        {copiado ? "Copiado" : "Copiar"}
+      </button>
+    </div>
   );
 }

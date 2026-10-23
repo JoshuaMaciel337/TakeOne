@@ -203,5 +203,12 @@ def montar_xmeml(projeto: dict, midias: dict[str, dict]) -> str:
             _texto(marcador, "comment", ("Legenda: " if faixa["tipo"] == "legenda" else "Texto: ") + conteudo_do_texto)
             _texto(marcador, "in", _quadros(clipe["inicio"], num, den))
             _texto(marcador, "out", _quadros(clipe["inicio"] + clipe["duracao"], num, den))
+    # Os marcadores da régua, num instante só (out = -1, como os editores marcam um ponto)
+    for marcador in sorted(projeto.get("marcadores") or [], key=lambda m: m["t"]):
+        ponto = ET.SubElement(sequencia, "marker")
+        _texto(ponto, "name", marcador["nome"])
+        _texto(ponto, "comment", "")
+        _texto(ponto, "in", _quadros(marcador["t"], num, den))
+        _texto(ponto, "out", "-1")
     ET.indent(raiz, "  ")
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n' + ET.tostring(raiz, encoding="unicode") + "\n"

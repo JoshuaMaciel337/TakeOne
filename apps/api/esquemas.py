@@ -778,6 +778,13 @@ class ProjetoCriarEntrada(BaseModel):
         return _limpar_espacos(valor)
 
 
+class MarcadorEntrada(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    t: int = Field(ge=0, description="Em ticks")
+    nome: str = Field(min_length=1, max_length=60)
+    cor: str = Field(pattern=COR)
+
+
 class ProjetoSalvarEntrada(BaseModel):
     versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
     nome: str = Field(min_length=1, max_length=120)
@@ -785,6 +792,8 @@ class ProjetoSalvarEntrada(BaseModel):
     taxa: TaxaEntrada
     fundo: FundoEntrada
     faixas: list[FaixaEntrada] = Field(min_length=1, max_length=30)
+    # Marcadores da régua (viram capítulos e marcadores do XML)
+    marcadores: list[MarcadorEntrada] = Field(default=[], max_length=200)
     # Só no projeto de imagem (no de vídeo é ignorado)
     tamanho: TamanhoEntrada | None = None
 
@@ -819,6 +828,7 @@ class ProjetoSaida(BaseModel):
     taxa: TaxaEntrada
     fundo: FundoEntrada
     faixas: list[FaixaEntrada]
+    marcadores: list[MarcadorEntrada] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"

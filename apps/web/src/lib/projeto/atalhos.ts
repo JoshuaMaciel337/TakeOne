@@ -10,6 +10,8 @@ export const ATALHOS: Atalho[] = [
   { teclas: "Espaço", acao: "Tocar e parar" },
   { teclas: "← →", acao: "Um quadro para trás ou para a frente (Shift: um segundo)" },
   { teclas: "↑ ↓", acao: "Corte anterior ou seguinte da principal" },
+  { teclas: "M", acao: "Pôr um marcador no cursor" },
+  { teclas: "Shift+↑ Shift+↓", acao: "Marcador anterior ou seguinte" },
   { teclas: "Home End", acao: "Começo ou fim do projeto" },
   { teclas: "S  ou  Ctrl+B", acao: "Dividir no cursor" },
   { teclas: "Q", acao: "Apagar do começo do clipe até o cursor" },
@@ -37,6 +39,13 @@ export function clipeParaAparar(projeto: Projeto, selecao: string[], tempo: Tick
   const marcados = projeto.faixas.flatMap((faixa) => faixa.clipes.filter((clipe) => selecao.includes(clipe.id) && dentro(clipe)));
   if (marcados.length === 1) return marcados[0];
   return projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes.find(dentro) ?? null;
+}
+
+/** O marcador antes (`sentido` -1) ou depois (1) de `tempo`; null quando não há. */
+export function marcadorVizinho(projeto: Projeto, tempo: Tick, sentido: -1 | 1, meioQuadro: Tick): Tick | null {
+  const tempos = (projeto.marcadores ?? []).map((m) => m.t).sort((a, b) => a - b);
+  if (sentido > 0) return tempos.find((t) => t > tempo + meioQuadro) ?? null;
+  return tempos.reverse().find((t) => t < tempo - meioQuadro) ?? null;
 }
 
 /**

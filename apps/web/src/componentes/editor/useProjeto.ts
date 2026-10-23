@@ -154,6 +154,7 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
           taxa: projeto.taxa,
           fundo: projeto.fundo,
           faixas: projeto.faixas,
+          marcadores: projeto.marcadores ?? [],
           tamanho: projeto.tamanho ?? undefined,
         },
       })

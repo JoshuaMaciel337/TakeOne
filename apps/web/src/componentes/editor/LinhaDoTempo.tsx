@@ -2,6 +2,7 @@
 
 import {
   ArrowLeftRight,
+  Bookmark,
   Captions,
   Copy,
   Diamond,
@@ -31,7 +32,7 @@ import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
 import { CHAVES_DE_KEYFRAME } from "@/lib/projeto/keyframes";
-import { acharClipe, type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
+import { acharClipe, type Clipe, CORES_DOS_MARCADORES, type Faixa, faixaDeTexto, fimDoClipe, type Marcador, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -150,6 +151,7 @@ export function LinhaDoTempo({
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
   const arrastoAtual = useRef<Arrasto | null>(null);
   const buscandoNaRegua = useRef(false);
+  const [marcadorAberto, setMarcadorAberto] = useState<string | null>(null);
 
   function trocarArrasto(novo: Arrasto | null) {
     arrastoAtual.current = novo;
@@ -398,6 +400,7 @@ export function LinhaDoTempo({
     faixa.clipes.some((clipe) => (selecao.length ? selecao.includes(clipe.id) : faixa.tipo === "principal") && tempo > clipe.inicio && tempo < fimDoClipe(clipe)),
   );
   const algumSelecionado = selecao.some((id) => acharClipe(exibido, id));
+  const marcadorEditado = (exibido.marcadores ?? []).find((m) => m.id === marcadorAberto) ?? null;
   // Os vídeos escolhidos com som ainda junto da imagem
   const separaveis = selecao.filter((id) => {
     const achado = acharClipe(exibido, id);
@@ -459,6 +462,27 @@ export function LinhaDoTempo({
         >
           <Snowflake className="size-4" aria-hidden />
         </button>
+        <button
+          type="button"
+          className="botao-icone"
+          onClick={() => aoExecutar({ comando: "marcador.adicionar", parametros: { tempo } })}
+          title="Pôr um marcador no cursor (M)"
+          aria-label="Pôr um marcador"
+        >
+          <Bookmark className="size-4" aria-hidden />
+        </button>
+        {marcadorEditado ? (
+          <EditorDeMarcador
+            key={marcadorEditado.id}
+            marcador={marcadorEditado}
+            aoMudar={(mudanca) => aoExecutar({ comando: "marcador.mudar", parametros: { id: marcadorEditado.id, ...mudanca } })}
+            aoApagar={() => {
+              aoExecutar({ comando: "marcador.apagar", parametros: { id: marcadorEditado.id } });
+              setMarcadorAberto(null);
+            }}
+            aoFechar={() => setMarcadorAberto(null)}
+          />
+        ) : null}
         <button
           type="button"
           className={`botao-icone ${ima ? "text-destaque" : ""}`}
@@ -543,6 +567,21 @@ export function LinhaDoTempo({
                 >
                   {formatarTempo(segundo)}
                 </span>
+              ))}
+              {(exibido.marcadores ?? []).map((marcador) => (
+                <button
+                  key={marcador.id}
+                  type="button"
+                  className="absolute top-0 z-20 -ml-[5px] h-3 w-[11px] rounded-b-sm"
+                  style={{ left: px(marcador.t), backgroundColor: marcador.cor }}
+                  title={`${marcador.nome} (clique para editar)`}
+                  aria-label={`Marcador ${marcador.nome}`}
+                  onPointerDown={(evento) => evento.stopPropagation()}
+                  onClick={() => {
+                    aoBuscar(marcador.t);
+                    setMarcadorAberto(marcador.id);
+                  }}
+                />
               ))}
               <span className="absolute top-0 z-10 h-full w-px bg-texto" style={{ left: xCursor }} aria-hidden>
                 <span className="absolute -left-[5px] top-0 size-[11px] rounded-sm bg-texto" />
@@ -762,6 +801,55 @@ function BlocoDoClipe({
           />
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** O nome e a cor de um marcador, na barra da linha do tempo. */
+function EditorDeMarcador({
+  marcador,
+  aoMudar,
+  aoApagar,
+  aoFechar,
+}: {
+  marcador: Marcador;
+  aoMudar: (mudanca: { nome?: string; cor?: string }) => void;
+  aoApagar: () => void;
+  aoFechar: () => void;
+}) {
+  const [nome, setNome] = useState(marcador.nome);
+  return (
+    <div className="flex items-center gap-1 rounded-md border border-borda bg-painel-2 px-1.5 py-0.5" role="group" aria-label="Marcador">
+      <input
+        value={nome}
+        maxLength={60}
+        onChange={(evento) => setNome(evento.currentTarget.value)}
+        onBlur={() => nome.trim() !== marcador.nome && aoMudar({ nome })}
+        onKeyDown={(evento) => {
+          evento.stopPropagation();
+          if (evento.key === "Enter") evento.currentTarget.blur();
+          if (evento.key === "Escape") aoFechar();
+        }}
+        aria-label="Nome do marcador"
+        className="w-28 rounded border border-borda bg-painel px-1.5 py-0.5 text-xs outline-none focus:border-destaque"
+      />
+      {CORES_DOS_MARCADORES.map((cor) => (
+        <button
+          key={cor}
+          type="button"
+          className={`size-3.5 rounded-full ${marcador.cor === cor ? "ring-2 ring-texto" : ""}`}
+          style={{ backgroundColor: cor }}
+          onClick={() => aoMudar({ cor })}
+          aria-label={`Cor ${cor}`}
+          aria-pressed={marcador.cor === cor}
+        />
+      ))}
+      <button type="button" className="botao-icone size-6" onClick={aoApagar} aria-label="Apagar o marcador" title="Apagar o marcador">
+        <Trash2 className="size-3.5" aria-hidden />
+      </button>
+      <button type="button" className="botao-icone size-6 text-xs" onClick={aoFechar} aria-label="Fechar">
+        ✓
+      </button>
     </div>
   );
 }

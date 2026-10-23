@@ -1,5 +1,5 @@
-// Ímã da linha do tempo: ao arrastar, a borda do clipe gruda no começo e no fim dos outros clipes,
-// no cursor e no zero, quando chega perto deles.
+// Ímã da linha do tempo: ao arrastar, a borda do clipe gruda no começo e no fim dos outros clipes, no cursor, no
+// zero, nos marcadores e nos keyframes dos outros clipes, quando chega perto deles.
 import type { Tick } from "../tempo.ts";
 import { fimDoClipe, type Projeto } from "./modelo.ts";
 
@@ -10,8 +10,12 @@ export function pontosDeEncaixe(projeto: Projeto, cursor: Tick, ignorar: Readonl
       if (ignorar.has(clipe.id)) continue;
       pontos.add(clipe.inicio);
       pontos.add(fimDoClipe(clipe));
+      for (const lista of Object.values(clipe.keyframes ?? {})) {
+        for (const ponto of lista ?? []) if (ponto.t > 0 && ponto.t < clipe.duracao) pontos.add(clipe.inicio + ponto.t);
+      }
     }
   }
+  for (const marcador of projeto.marcadores ?? []) pontos.add(marcador.t);
   return [...pontos];
 }
 

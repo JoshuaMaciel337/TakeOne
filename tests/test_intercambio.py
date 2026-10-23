@@ -81,6 +81,13 @@ def test_transicao_volume_e_marcadores():
     assert (marcador.findtext("name"), marcador.findtext("in"), marcador.findtext("out")) == ("Olá mundo", "30", "90")
 
 
+def test_marcadores_da_regua_viram_pontos():
+    projeto = {**_projeto(), "marcadores": [{"id": "b", "t": 5 * S, "nome": "Final", "cor": "#ffd400"},
+                                           {"id": "a", "t": round(1.5 * S), "nome": "Meio", "cor": "#ff624a"}]}
+    pontos = [m for m in _arvore(projeto).find("sequence").findall("marker") if m.findtext("out") == "-1"]
+    assert [(m.findtext("name"), m.findtext("in")) for m in pontos] == [("Meio", "45"), ("Final", "150")]
+
+
 def test_faixa_muda_sai_desligada_e_taxa_ntsc_e_marcada():
     projeto = _projeto((30000, 1001))
     projeto["faixas"][3]["muda"] = True

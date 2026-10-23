@@ -74,6 +74,25 @@ def test_salvar_sobe_a_versao_e_recusa_versao_velha(cliente, db_limpo):
     assert velho.status_code == 409
 
 
+def test_marcadores_saem_em_ordem_e_tem_limites(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={}).json()
+    assert projeto["marcadores"] == []
+    marcadores = [{"id": "b", "t": 3 * SEGUNDO, "nome": "Dicas", "cor": "#3d8bff"},
+                  {"id": "a", "t": 0, "nome": "Abertura", "cor": "#ff624a"}]
+    salvo = salvar(cliente, projeto, principal_com(projeto, []), marcadores=marcadores)
+    assert salvo.status_code == 200, salvo.json()
+    assert [m["id"] for m in salvo.json()["marcadores"]] == ["a", "b"]
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["marcadores"][1] == marcadores[0]
+
+    atual = {**projeto, "versao": salvo.json()["versao"]}
+    cor_ruim = salvar(cliente, atual, principal_com(projeto, []), marcadores=[{**marcadores[0], "cor": "azul"}])
+    assert cor_ruim.status_code == 422
+    demais = [{"id": f"m{i}", "t": i, "nome": "M", "cor": "#ffffff"} for i in range(201)]
+    assert salvar(cliente, atual, principal_com(projeto, []), marcadores=demais).status_code == 422
+
+
 def test_linha_do_tempo_invalida_nao_salva(cliente, db_limpo):
     cadastrar(cliente)
     midia_id = criar_midia(db_limpo, cliente, duracao=5.0)

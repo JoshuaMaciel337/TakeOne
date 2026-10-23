@@ -186,6 +186,26 @@ export type Faixa = {
 /** Um clipe do modelo do espaço que quem usa troca: a mídia dele ou o texto dele. */
 export type VagaDoModelo = { clipe_id: string; tipo: "midia" | "texto"; rotulo: string };
 
+/** Um marcador na régua: o instante, o nome e a cor (as cores de CORES_DOS_MARCADORES). */
+export type Marcador = { id: string; t: Tick; nome: string; cor: string };
+export const CORES_DOS_MARCADORES = ["#ff624a", "#ffd400", "#3ddc84", "#3d8bff", "#b36bff", "#ff3478"] as const;
+export const MARCADORES_MAXIMOS = 200;
+
+/** Os marcadores como capítulos: "mm:ss Nome" (ou "h:mm:ss" depois de uma hora), um por linha, em ordem. */
+export function textoDosCapitulos(marcadores: Marcador[]): string {
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return [...marcadores]
+    .sort((a, b) => a.t - b.t)
+    .map((m) => {
+      const total = Math.floor(m.t / TICKS_POR_SEGUNDO_MODELO);
+      const horas = Math.floor(total / 3600);
+      const minutos = Math.floor((total % 3600) / 60);
+      const tempo = horas ? `${horas}:${dois(minutos)}:${dois(total % 60)}` : `${dois(minutos)}:${dois(total % 60)}`;
+      return `${tempo} ${m.nome}`;
+    })
+    .join("\n");
+}
+
 export type Projeto = {
   id: string;
   nome: string;
@@ -200,6 +220,8 @@ export type Projeto = {
   tamanho?: { largura: number; altura: number } | null;
   versao: number;
   duracao: Tick;
+  /** Marcadores na régua (tecla M); viram capítulos na janela Exportar. */
+  marcadores?: Marcador[];
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

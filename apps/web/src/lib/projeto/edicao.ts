@@ -62,6 +62,9 @@ import {
   type Chroma,
   LIMITES_DA_MASCARA,
   type MascaraDeForma,
+  type Marcador,
+  MARCADORES_MAXIMOS,
+  CORES_DOS_MARCADORES,
   MESCLAGENS,
   type Mesclagem,
   type Projeto,
@@ -1017,6 +1020,39 @@ export function separarSom(projeto: Projeto, ctx: Contexto, clipeIds: string[]):
 /** Devolve o som ao vídeo (o clipe de áudio separado, se ainda existe, continua: apague-o para não dobrar o som). */
 export function devolverSom(projeto: Projeto, clipeIds: string[]): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, som_separado: false }));
+}
+
+// -----------------------------------------------
+// Marcadores
+// -----------------------------------------------
+/** Põe um marcador no quadro do cursor (com o próximo nome e a próxima cor), ou devolve o que já está nele. */
+export function adicionarMarcador(projeto: Projeto, ctx: Contexto, tempo: Tick): { projeto: Projeto; id: string } {
+  const marcadores = projeto.marcadores ?? [];
+  const t = Math.max(0, quadroMaisProximo(projeto.taxa, tempo));
+  const existente = marcadores.find((m) => Math.abs(m.t - t) < duracaoDoQuadro(projeto.taxa) / 2);
+  if (existente) return { projeto, id: existente.id };
+  if (marcadores.length >= MARCADORES_MAXIMOS) throw new ErroEdicao(`O projeto pode ter no máximo ${MARCADORES_MAXIMOS} marcadores.`);
+  const marcador: Marcador = { id: ctx.novoId(), t, nome: `Marcador ${marcadores.length + 1}`, cor: CORES_DOS_MARCADORES[marcadores.length % CORES_DOS_MARCADORES.length] };
+  return { projeto: { ...projeto, marcadores: [...marcadores, marcador].sort((a, b) => a.t - b.t) }, id: marcador.id };
+}
+
+/** Muda o nome, a cor ou o instante de um marcador. */
+export function mudarMarcador(projeto: Projeto, id: string, mudanca: Partial<Omit<Marcador, "id">>): Projeto {
+  const marcadores = projeto.marcadores ?? [];
+  if (!marcadores.some((m) => m.id === id)) throw new ErroEdicao("Este marcador não existe mais.");
+  const nome = mudanca.nome === undefined ? undefined : mudanca.nome.trim().slice(0, 60) || "Marcador";
+  const cor = mudanca.cor && /^#[0-9a-f]{6}$/i.test(mudanca.cor) ? mudanca.cor.toLowerCase() : undefined;
+  const t = mudanca.t === undefined ? undefined : Math.max(0, quadroMaisProximo(projeto.taxa, mudanca.t));
+  return {
+    ...projeto,
+    marcadores: marcadores
+      .map((m) => (m.id === id ? { ...m, ...(nome !== undefined ? { nome } : {}), ...(cor ? { cor } : {}), ...(t !== undefined ? { t } : {}) } : m))
+      .sort((a, b) => a.t - b.t),
+  };
+}
+
+export function apagarMarcador(projeto: Projeto, id: string): Projeto {
+  return { ...projeto, marcadores: (projeto.marcadores ?? []).filter((m) => m.id !== id) };
 }
 
 /** Quanto o quadro congelado dura ao entrar. */
