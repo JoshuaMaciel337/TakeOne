@@ -99,5 +99,6 @@ def test_contas_do_objeto():
     assert x0 <= 300 and y0 <= 200 and x1 >= 500 and y1 >= 400 and (x1 - x0) == (y1 - y0)
     foto = Image.new("RGB", (800, 600), (10, 20, 30))
     recortado = recortar(foto, mascara)
-    assert recortado.mode == "RGBA" and recortado.size == (208, 208)
+    assert recortado.mode == "RGBA" and recortado.size == (800, 600)
+    assert recortado.getpixel((10, 10))[3] == 0 and recortado.getpixel((400, 300))[3] == 255
     assert np.asarray(apagar(foto, np.zeros((600, 800), dtype=bool))).shape == (600, 800, 3)

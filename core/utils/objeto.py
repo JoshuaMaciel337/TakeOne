@@ -121,15 +121,13 @@ def apagar(imagem: Image.Image, mascara: np.ndarray, sessao=None) -> Image.Image
 
 
 def recortar(imagem: Image.Image, mascara: np.ndarray) -> Image.Image | None:
-    """O objeto com o fundo transparente, cortado no tamanho dele (com uma margem); None sem máscara."""
-    linhas, colunas = np.nonzero(mascara)
-    if not len(linhas):
+    """
+    O objeto com o fundo transparente, no tamanho da foto (assim a camada nova cai em cima da original, no mesmo
+    lugar); None sem máscara.
+    """
+    if not mascara.any():
         return None
     rgba = imagem.convert("RGBA")
     alfa = np.asarray(rgba.getchannel("A"), dtype=np.float32) / 255 * _borda_suave(mascara, 0, 1)
     rgba.putalpha(Image.fromarray(np.round(alfa * 255).astype(np.uint8), "L"))
-    margem = 4
-    altura, largura = mascara.shape
-    caixa = (max(0, colunas.min() - margem), max(0, linhas.min() - margem),
-             min(largura, colunas.max() + 1 + margem), min(altura, linhas.max() + 1 + margem))
-    return rgba.crop(caixa)
+    return rgba
