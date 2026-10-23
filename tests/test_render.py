@@ -337,6 +337,14 @@ def test_nitidez_soma_a_diferenca_da_copia_pouco_desfocada_por_um_lut2():
     assert "[na1][nc1]lut2=c0='clip(x+(x-y)*0.75,0,255)'" in plano.filtro and ":c3=x,unpremultiply" in plano.filtro
 
 
+def test_clareza_e_a_nitidez_com_a_copia_bem_desfocada_e_o_peso_nos_meios_tons():
+    principal = clipe("c1", "deitado", 0, 4, efeito={"tipo": "clareza", "intensidade": 0.5})
+    plano = planejar_render(projeto([faixa("principal", [principal])]), MIDIAS, 1080, 1920)
+    # Sigma de 2% da altura do clipe (608) e força de 1 × 0,5, pesada por 4·x·(1 − x)
+    assert "gblur=sigma=12.1600:steps=6" in plano.filtro
+    assert "lut2=c0='clip(x+(x-y)*0.5*4*x/255*(1-x/255),0,255)'" in plano.filtro
+
+
 def test_tela_verde_vira_colorkey_so_na_midia():
     verde = {"cor": "#00ff00", "semelhanca": 0.3, "suavidade": 0.1}
     sobre = clipe("s1", "empe", 0, 4, chroma=verde)
@@ -568,3 +576,19 @@ def test_glitch_num_clipe_ampliado_fica_no_limite_do_rgbashift():
     valores = [int(v.rstrip(";,")) for r in roteiros for v in r.conteudo.split()
                if v.rstrip(";,").lstrip("-").isdigit()]
     assert valores and max(abs(v) for v in valores) <= 255
+
+
+def test_mascara_de_forma_entra_na_imagem_dos_cantos():
+    from core.utils.cantos import coberturas
+
+    mascara = {"forma": "elipse", "x": 0.5, "y": 0.5, "largura": 0.5, "altura": 0.5, "suavidade": 0, "inverter": False}
+    sobre = clipe("s1", "empe", 0, 4, mascara=mascara)
+    plano = planejar_render(projeto([faixa("video", [sobre]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 720, 1280)
+    auxiliar = next(a for a in plano.auxiliares if a.tipo == "cantos")
+    assert auxiliar.ajustes["mascara"] == mascara and "alphamerge" in plano.filtro
+    # Dentro da elipse aparece, fora some; invertida, o contrário
+    dentro, _ = coberturas(200, 100, {"mascara": mascara})
+    assert dentro[50, 100] == 1 and dentro[5, 5] == 0
+    invertida, _ = coberturas(200, 100, {"mascara": {**mascara, "inverter": True}})
+    assert invertida[50, 100] == 0 and invertida[5, 5] == 1

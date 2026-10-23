@@ -7,12 +7,13 @@
 #   - brilho: o clipe desfocado somado a ele mesmo em "tela" (a luz se espalha em volta dos claros);
 #   - distorção: lente de olho de peixe (lenscorrection do FFmpeg) com zoom para não sobrar canto vazio;
 #   - nitidez: o clipe mais a diferença entre ele e uma cópia pouco desfocada (máscara de nitidez);
+#   - clareza: a mesma conta com uma cópia bem desfocada, pesada nos meios-tons (contraste local);
 #   - VHS, glitch, luz e granulação: veja abaixo.
 # -----------------------------------------------
 import numpy as np
 from PIL import Image
 
-TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez")
+TIPOS = ("desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez", "clareza")
 # Com intensidade 1
 DESFOQUE_MAXIMO = 0.025
 BRILHO_SIGMA = 0.02
@@ -20,6 +21,8 @@ DISTORCAO_MAXIMA = 0.5
 # Nitidez: o sigma da cópia desfocada (frações da altura do clipe) e quanto da diferença soma, com intensidade 1
 NITIDEZ_SIGMA = 0.0025
 NITIDEZ_MAXIMA = 1.5
+CLAREZA_SIGMA = 0.02
+CLAREZA_MAXIMA = 1.0
 
 
 def efeito_do_clipe(clipe: dict) -> dict | None:
@@ -45,6 +48,19 @@ def nitidez_do_efeito(clipe: dict) -> float:
     """Quanto da diferença entre o clipe e a cópia desfocada soma a ele (0 sem nitidez)."""
     efeito = efeito_do_clipe(clipe)
     return NITIDEZ_MAXIMA * efeito["intensidade"] if efeito and efeito["tipo"] == "nitidez" else 0.0
+
+
+def contraste_local_do_efeito(clipe: dict) -> tuple[float, float, bool] | None:
+    """
+    Nitidez ou clareza: (sigma da cópia desfocada em frações da altura do clipe, força, só nos meios-tons), ou None.
+    A conta é a mesma; a clareza usa uma cópia bem mais desfocada e pesa pelos meios-tons (4·x·(1 − x)).
+    """
+    efeito = efeito_do_clipe(clipe)
+    if efeito and efeito["tipo"] == "nitidez":
+        return NITIDEZ_SIGMA, NITIDEZ_MAXIMA * efeito["intensidade"], False
+    if efeito and efeito["tipo"] == "clareza":
+        return CLAREZA_SIGMA, CLAREZA_MAXIMA * efeito["intensidade"], True
+    return None
 
 
 def distorcao_do_efeito(clipe: dict) -> float:

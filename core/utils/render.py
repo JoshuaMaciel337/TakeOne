@@ -32,10 +32,10 @@ from core.utils.efeitos import (
     BRILHO_SIGMA,
     GRAO_LINHAS,
     LUZ_PERIODO,
-    NITIDEZ_SIGMA,
     ajustes_do_efeito,
     brilho_do_efeito,
     colunas_do_grao,
+    contraste_local_do_efeito,
     desfoque_do_efeito,
     deslocamento_do_grao,
     desvio_de_cor,
@@ -44,7 +44,6 @@ from core.utils.efeitos import (
     grao_do_efeito,
     linhas_do_efeito,
     luz_do_efeito,
-    nitidez_do_efeito,
 )
 from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, recorte_na_fonte
@@ -367,12 +366,15 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                   f"[bb{numero}]{','.join(desfocar)},colorchannelmixer=rr={k}:gg={k}:bb={k}:aa={k}[bc{numero}];\n"
                   f"[ba{numero}][bc{numero}]blend=all_mode=screen,unpremultiply=inplace=1")
         filtros = []
-    nitidez = nitidez_do_efeito(clipe)
-    if nitidez:
-        # Nitidez: o clipe mais (clipe - cópia pouco desfocada) vezes a força, no alfa pré-multiplicado como o
-        # brilho. A conta vai por um lut2 (uma tabela de 256 × 256 por plano, não uma expressão por pixel)
-        sigma = NITIDEZ_SIGMA * altura
-        conta = f"clip(x+(x-y)*{_numero(nitidez)},0,255)"
+    contraste_local = contraste_local_do_efeito(clipe)
+    if contraste_local:
+        # Nitidez e clareza: o clipe mais (clipe - cópia desfocada) vezes a força, no alfa pré-multiplicado como o
+        # brilho (a clareza pesa pelos meios-tons). A conta vai por um lut2 (uma tabela de 256 × 256 por plano, não
+        # uma expressão por pixel)
+        fracao, forca, meios_tons = contraste_local
+        sigma = fracao * altura
+        peso = "*4*x/255*(1-x/255)" if meios_tons else ""
+        conta = f"clip(x+(x-y)*{_numero(forca)}{peso},0,255)"
         desfocar = _filtros_do_gblur(f"gblur=sigma={sigma:.4f}:steps=6", sigma, False)
         cabeca = (f"{_continuar(cabeca, [*filtros, 'premultiply=inplace=1', 'format=gbrap', 'split'])}"
                   f"[na{numero}][nb{numero}];\n"
@@ -876,14 +878,16 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(imagem_vinheta, 0, janela, imagem=True, taxa=taxa))
         cantos = None
         if tem_cantos(clipe):
-            # A máscara dos cantos e, com borda, o anel na cor dela: imagens do tamanho do clipe, como a vinheta
+            # A máscara dos cantos (com a máscara de forma, se houver) e, com borda, o anel na cor dela: imagens do
+            # tamanho do clipe, como a vinheta
             tamanho = (max(1, round(caixa.largura)), max(1, round(caixa.altura)))
             leitura = leituras.get(clipe["id"])
             janela = (leitura.fim - leitura.inicio) if leitura else segundos(clipe["duracao"])
             imagens = []
-            for parte in ("cantos", "anel") if clipe["cantos"].get("borda") else ("cantos",):
+            com_mascara = {**(clipe.get("cantos") or {}), "mascara": clipe.get("mascara")}
+            for parte in ("cantos", "anel") if com_mascara.get("borda") else ("cantos",):
                 caminho = f"{pasta}/{parte}_{clipe['id']}.png"
-                auxiliares[caminho] = ArquivoAuxiliar(caminho, parte, dict(clipe["cantos"]), *tamanho)
+                auxiliares[caminho] = ArquivoAuxiliar(caminho, parte, com_mascara, *tamanho)
                 imagens.append(len(entradas))
                 entradas.append(Entrada(caminho, 0, janela, imagem=True, taxa=taxa))
             cantos = (imagens[0], imagens[1] if len(imagens) > 1 else None)

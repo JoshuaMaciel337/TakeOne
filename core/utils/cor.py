@@ -15,13 +15,15 @@ from PIL import Image
 AJUSTES_NEUTROS = {"temperatura": 0, "tom": 0, "exposicao": 0, "contraste": 0, "realces": 0, "sombras": 0,
                    "saturacao": 0, "vinheta": 0, "matiz_escuros": 0, "forca_escuros": 0, "matiz_medios": 0,
                    "forca_medios": 0, "matiz_claros": 0, "forca_claros": 0, "vibracao": 0, "brancos": 0, "pretos": 0,
-                   "niveis_preto": 0, "niveis_branco": 0, "niveis_gama": 0}
+                   "niveis_preto": 0, "niveis_branco": 0, "niveis_gama": 0, "nevoa": 0}
 LIMITES = {"temperatura": (-1, 1), "tom": (-1, 1), "exposicao": (-2, 2), "contraste": (-1, 1), "realces": (-1, 1),
            "sombras": (-1, 1), "saturacao": (-1, 1), "vinheta": (0, 1), "matiz_escuros": (0, 360),
            "forca_escuros": (0, 1), "matiz_medios": (0, 360), "forca_medios": (0, 1), "matiz_claros": (0, 360),
            "forca_claros": (0, 1), "vibracao": (-1, 1), "brancos": (-1, 1), "pretos": (-1, 1),
            # Níveis: o preto e o branco de entrada (o branco conta de 1 para baixo) e a gama em potência de 2
-           "niveis_preto": (0, 0.45), "niveis_branco": (0, 0.45), "niveis_gama": (-1, 1)}
+           "niveis_preto": (0, 0.45), "niveis_branco": (0, 0.45), "niveis_gama": (-1, 1),
+           # Névoa: de -1 (põe névoa) a 1 (tira)
+           "nevoa": (-1, 1)}
 # Rodas de cor: (matiz, força) de escuros, meios-tons e claros. O matiz sozinho não muda nada.
 RODAS = (("matiz_escuros", "forca_escuros"), ("matiz_medios", "forca_medios"), ("matiz_claros", "forca_claros"))
 MATIZES = {matiz for matiz, _ in RODAS}
@@ -42,6 +44,11 @@ FORCA_TOM = 0.1
 FORCA_REALCES_SOMBRAS = 0.25
 # Brancos e pretos: como realces e sombras, mas só nas pontas (a quarta potência da luminância)
 FORCA_BRANCOS_PRETOS = 0.25
+# Névoa: tirar puxa o preto (até 12%) e satura (até 25%); pôr mistura com um cinza claro (até 35%)
+NEVOA_PRETO = 0.12
+NEVOA_SATURACAO = 0.25
+NEVOA_MISTURA = 0.35
+NEVOA_CINZA = 0.82
 FORCA_RODAS = 0.3
 LUMA = (0.2126, 0.7152, 0.0722)
 PONTOS_LUT = 33
@@ -101,6 +108,14 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
     branco = 1 - a.get("niveis_branco", 0)
     expoente = 1 / 2 ** a.get("niveis_gama", 0)
     rgb = tuple(_limitar((v - preto) / (branco - preto)) ** expoente for v in rgb)
+    # Névoa, logo depois: tirar abre o preto (a névoa clareia os escuros); pôr mistura com o cinza claro dela
+    nevoa = a.get("nevoa", 0)
+    if nevoa > 0:
+        k = NEVOA_PRETO * nevoa
+        rgb = tuple(_limitar((v - k) / (1 - k)) for v in rgb)
+    elif nevoa < 0:
+        m = NEVOA_MISTURA * -nevoa
+        rgb = tuple(v * (1 - m) + NEVOA_CINZA * m for v in rgb)
 
     ganho = 2 ** a["exposicao"]
     r = _tela(_linear(rgb[0]) * ganho * (1 + FORCA_TEMPERATURA * a["temperatura"]))
@@ -124,7 +139,7 @@ def aplicar_cor(rgb: tuple[float, float, float], a: dict) -> tuple[float, float,
     # Saturação e vibração: a vibração pesa mais nas cores apagadas (pela distância entre o maior e o menor canal)
     y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     croma = max(c) - min(c)
-    fator = 1 + a["saturacao"] + a.get("vibracao", 0) * (1 - croma)
+    fator = 1 + a["saturacao"] + a.get("vibracao", 0) * (1 - croma) + NEVOA_SATURACAO * max(a.get("nevoa", 0), 0)
     c = [_limitar(y2 + (v - y2) * fator) for v in c]
     return c[0], c[1], c[2]
 

@@ -257,7 +257,8 @@ class EfeitosVozEntrada(BaseModel):
 
 class EfeitoEntrada(BaseModel):
     """Os tipos são os de apps/web/src/lib/projeto/efeitos.ts."""
-    tipo: Literal["desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez"]
+    tipo: Literal["desfoque", "brilho", "distorcao", "vhs", "glitch", "luz", "granulacao", "nitidez",
+                  "clareza"]
     intensidade: float = Field(default=0.6, ge=0, le=1)
 
 
@@ -443,11 +444,23 @@ class CorEntrada(BaseModel):
     niveis_preto: float = Field(default=0, ge=0, le=0.45)
     niveis_branco: float = Field(default=0, ge=0, le=0.45)
     niveis_gama: float = Field(default=0, ge=-1, le=1)
+    nevoa: float = Field(default=0, ge=-1, le=1)
     # Cor por matiz (core/utils/cor.py, aplicar_hsl): só as faixas mexidas
     hsl: dict[FaixaDeMatiz, FaixaDeMatizEntrada] | None = None
     filtro: Literal["quente", "frio", "vivido", "suave", "pb", "noite", "antigo", "drama", "cinema"] | None = None
     intensidade: float = Field(default=1, ge=0, le=2)
     curvas: CurvasEntrada | None = None
+
+
+class MascaraEntrada(BaseModel):
+    """Máscara de forma: os limites são os de apps/web/src/lib/projeto/modelo.ts (LIMITES_DA_MASCARA)."""
+    forma: Literal["retangulo", "elipse"]
+    x: float = Field(default=0.5, ge=-0.5, le=1.5)
+    y: float = Field(default=0.5, ge=-0.5, le=1.5)
+    largura: float = Field(default=0.7, ge=0.02, le=2)
+    altura: float = Field(default=0.7, ge=0.02, le=2)
+    suavidade: float = Field(default=0.08, ge=0, le=0.5)
+    inverter: bool = False
 
 
 class ChromaEntrada(BaseModel):
@@ -501,6 +514,7 @@ class ClipeEntrada(BaseModel):
     # A imagem espelhada; o recorte é do que aparece (core/utils/geometria.py, recorte_na_fonte)
     virar: VirarEntrada | None = None
     cantos: CantosEntrada | None = None
+    mascara: MascaraEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
