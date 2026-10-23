@@ -67,7 +67,7 @@ def executar_estabilizacao(db, job: dict, reportar: Callable[[int, str], None]) 
     if not fonte.is_file():
         raise ErroDefinitivo("A imagem sem ruído ainda não está pronta." if limpa
                              else "O arquivo original desta mídia não foi encontrado no servidor.")
-    leitura = [] if limpa else ler_como_bt709(video.get("matriz"))
+    leitura = [] if limpa else ler_como_bt709(video.get("matriz"), video.get("hdr"))
     duracao = float(midia.get("duracao") or 0) or None
     nome, nome_proxy = arquivos_da_estabilizacao(limpa)
     estavel = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, nome))

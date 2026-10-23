@@ -194,7 +194,7 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     arquivos = []
     argumentos = ["-i", str(original)]
     if tem_video:
-        filtro = ",".join([*ler_como_bt709(resumo["video"]["matriz"]), FILTRO_PROXY,
+        filtro = ",".join([*ler_como_bt709(resumo["video"]["matriz"], resumo["video"].get("hdr")), FILTRO_PROXY,
                            *reduzir_quadros(resumo["video"].get("fps"))])
         argumentos += ["-map", "0:v:0", "-map", "0:a:0?", "-vf", filtro, "-fpsmax", str(FPS_MAXIMO_PROXY),
                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", *MARCAS_BT709,

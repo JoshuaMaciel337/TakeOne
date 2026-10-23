@@ -68,6 +68,8 @@ def resumir_sondagem(sondagem: dict) -> dict:
             "rotacao": rotacao,
             # Matriz de cor marcada no arquivo (bt709, smpte170m...), ou None sem marcação
             "matriz": video.get("color_space") if video.get("color_space") not in (None, "unknown") else None,
+            # HDR do celular (PQ ou HLG): a leitura converte para SDR (ler_como_bt709)
+            "hdr": HDR_POR_TRANSFERENCIA.get(video.get("color_transfer") or ""),
             # A imagem pode acabar antes do contêiner (o som do celular passa uns quadros): o render repete o
             # último quadro até o fim, como a prévia, em vez de mostrar o fundo
             "duracao": float(video["duration"]) if video.get("duration") not in (None, "N/A") else None,
@@ -81,8 +83,28 @@ def resumir_sondagem(sondagem: dict) -> dict:
     return resumo
 
 
-def ler_como_bt709(matriz: str | None) -> list[str]:
-    """Filtro para o começo da cadeia de um vídeo: sem marcação de cor, ele é lido como BT.709."""
+HDR_POR_TRANSFERENCIA = {"smpte2084": "pq", "arib-std-b67": "hlg"}
+TRANSFERENCIA_DO_HDR = {"pq": "smpte2084", "hlg": "arib-std-b67"}
+
+
+def filtros_de_hdr_para_sdr(hdr: str) -> list[str]:
+    """
+    HDR (BT.2020, PQ ou HLG) para SDR BT.709: luz linear com 100 nits em 1, primárias BT.709 e o tonemap
+    hable (sem dessaturar), de volta a BT.709 em faixa de TV. A cópia leve e o render passam pelo mesmo
+    filtro, então a prévia e o vídeo exportado saem iguais.
+    """
+    return [f"zscale=tin={TRANSFERENCIA_DO_HDR[hdr]}:min=bt2020nc:pin=bt2020:rin=tv:t=linear:npl=100",
+            "format=gbrpf32le", "zscale=p=bt709", "tonemap=tonemap=hable:desat=0",
+            "zscale=t=bt709:m=bt709:r=tv", "format=yuv420p"]
+
+
+def ler_como_bt709(matriz: str | None, hdr: str | None = None) -> list[str]:
+    """
+    Filtros para o começo da cadeia de um vídeo: o HDR do celular vira SDR, e o vídeo sem marcação de cor é
+    lido como BT.709.
+    """
+    if hdr in TRANSFERENCIA_DO_HDR:
+        return filtros_de_hdr_para_sdr(hdr)
     return [] if matriz else ["setparams=colorspace=bt709"]
 
 

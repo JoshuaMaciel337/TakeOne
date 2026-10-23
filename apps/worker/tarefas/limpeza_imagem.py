@@ -51,7 +51,7 @@ def executar_limpeza_imagem(db, job: dict, reportar: Callable[[int, str], None])
     parciais = [limpo.with_name("limpo.parcial.mp4"), proxy.with_name("limpo_proxy.parcial.mp4")]
     try:
         # Resolução cheia, sem ruído e já em BT.709 marcado, no tempo do original (para o render)
-        filtro = ",".join([*ler_como_bt709(video.get("matriz")), FILTRO_DE_RUIDO,
+        filtro = ",".join([*ler_como_bt709(video.get("matriz"), video.get("hdr")), FILTRO_DE_RUIDO,
                            "scale=out_color_matrix=bt709:out_range=tv", FILTRO_MARCAS_BT709])
         executar_ffmpeg(["-i", str(original), "-map", "0:v:0", "-an", "-vf", filtro, "-fps_mode", "passthrough",
                          "-c:v", "libx264", "-preset", "medium", "-crf", "14", "-pix_fmt", "yuv420p", *MARCAS_BT709,

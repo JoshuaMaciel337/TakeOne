@@ -100,6 +100,7 @@ class MidiaDoRender:
     audio: bool
     duracao: float = 0     # segundos; 0 quando não se sabe (aí não há limite no fim)
     matriz: str | None = None   # matriz de cor marcada no arquivo; sem ela, o vídeo é lido como BT.709
+    hdr: str | None = None      # "pq" ou "hlg": o HDR do celular, convertido para SDR na leitura
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
     mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
@@ -890,7 +891,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         # Texto e imagem parada são PNG em RGB: entram como estão, como a prévia desenha
         entrada_de_cor = None
         if not clipe.get("texto") and not e_imagem_parada:
-            entrada_de_cor = ler_como_bt709(midias[clipe["midia_id"]].matriz)
+            entrada_de_cor = ler_como_bt709(midias[clipe["midia_id"]].matriz, midias[clipe["midia_id"]].hdr)
         roteiro = None
         if "opacidade" in animadas(clipe):
             # A opacidade por quadro, contando do começo da janela do clipe (com a sobra das transições)

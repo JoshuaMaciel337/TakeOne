@@ -97,6 +97,9 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             audio=bool(midia.get("audio")),
             duracao=0 if e_imagem(midia) else float(midia.get("duracao") or 0),
             matriz=matriz,
+            # Só o que a ingestão marcou: uma mídia HDR antiga tem a cópia leve sem a conversão, e o render
+            # fica igual a ela até ser ingerida de novo
+            hdr=None if e_imagem(midia) else video.get("hdr"),
             voz_limpa=str(voz) if voz.is_file() else None,
             imagem_limpa=str(limpa) if (limpa := storage.caminho_local(chave_arquivo(
                 midia["organizacao_id"], midia["_id"], ARQUIVO_IMAGEM_LIMPA))).is_file() else None,
