@@ -210,6 +210,7 @@ export type Comando =
   | { comando: "imagem.camadaDeFundo"; parametros: { faixaId: string; ligar: boolean } }
   | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
   | { comando: "mascara.definir"; parametros: { clipeId: string; mascara: MascaraDePixels | null } }
+  | { comando: "projeto.restaurar"; parametros: { projeto: Projeto } }
   | { comando: "mascara.mudar"; parametros: { clipeId: string; mudanca: Partial<Omit<MascaraDePixels, "midia_id">> } }
   | { comando: "imagem.apagarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.duplicarVarias"; parametros: { faixaIds: string[] } }
@@ -321,6 +322,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.camadaDeFundo": "mudar a camada de fundo",
   "camada.pixels": "pintar",
   "mascara.definir": "mudar a máscara de camada",
+  "projeto.restaurar": "restaurar o instantâneo",
   "mascara.mudar": "mudar a máscara de camada",
   "imagem.apagarVarias": "apagar as camadas",
   "imagem.duplicarVarias": "duplicar as camadas",
@@ -555,6 +557,9 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     }
     case "imagem.camadaDeFundo":
       return { projeto: camadaDeFundo(projeto, parametros.faixaId, parametros.ligar) };
+    case "projeto.restaurar":
+      // Um instantâneo do Histórico: as camadas, o fundo e o tamanho de então, num passo novo (que se desfaz)
+      return { projeto: { ...projeto, faixas: parametros.projeto.faixas, fundo: parametros.projeto.fundo, tamanho: parametros.projeto.tamanho, proporcao: parametros.projeto.proporcao, marcadores: parametros.projeto.marcadores }, selecao: [] };
     case "mascara.definir":
       return { projeto: definirMascaraDePixels(projeto, parametros.clipeId, parametros.mascara) };
     case "mascara.mudar":

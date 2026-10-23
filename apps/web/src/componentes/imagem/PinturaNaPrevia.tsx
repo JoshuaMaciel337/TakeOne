@@ -19,6 +19,8 @@ export type AlvoDaPintura = {
   pintura: Pintura;
   /** Pintando a máscara de camada: o ponto vai para o documento pela matriz dela (lib/projeto/mascaraDePixels.ts). */
   mascara?: Pick<MascaraDePixels, "vinculada" | "matriz">;
+  /** Os pincéis do histórico: a camada como estava na fonte. */
+  fonteDaTinta?: HTMLCanvasElement | null;
   caixa: Caixa | null;
   recorte: Recorte;
   virar: Virar | null | undefined;
@@ -173,7 +175,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       const [primeiro, ...resto] = traco.pendentes;
       const copias = copiasDaSimetria(primeiro, simetria, centro).map(traco.mapear);
       const tinta = emCinza || mascara ? { primeiroPlano: emTomDeCinza(cores.primeiroPlano), fundo: emTomDeCinza(cores.fundo) } : cores;
-      alvo.pintura.iniciar({ ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia }, copias[0]);
+      alvo.pintura.iniciar({ ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia, fonteDaTinta: alvo.fonteDaTinta }, copias[0]);
       for (const copia of copias.slice(1)) alvo.pintura.marcar(copia);
       traco.corda.puxar(primeiro);
       copias.forEach((copia, i) => traco.espacadores[i].ate(copia, () => diametro * opcoes.espacamento));

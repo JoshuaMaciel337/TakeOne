@@ -97,7 +97,26 @@ export function juntarTraco(
   fundo: Uint8ClampedArray,
   traco: Uint8ClampedArray,
   saida: Uint8ClampedArray,
-  { modo, opacidade, travarTransparencia, apagar, largura, x0, y0 }: { modo: ModoDaPintura; opacidade: number; travarTransparencia: boolean; apagar: boolean; largura: number; x0: number; y0: number },
+  {
+    modo,
+    opacidade,
+    travarTransparencia,
+    apagar,
+    largura,
+    x0,
+    y0,
+    substituirPor,
+  }: {
+    modo: ModoDaPintura;
+    opacidade: number;
+    travarTransparencia: boolean;
+    apagar: boolean;
+    largura: number;
+    x0: number;
+    y0: number;
+    /** Pincel do histórico: a camada vai em direção a estes pixels (a transparência deles também), pela força do traço. */
+    substituirPor?: Uint8ClampedArray;
+  },
 ): void {
   for (let i = 0; i < fundo.length; i += 4) {
     const as = (traco[i + 3] / 255) * opacidade;
@@ -107,6 +126,17 @@ export function juntarTraco(
       saida[i + 1] = fundo[i + 1];
       saida[i + 2] = fundo[i + 2];
       saida[i + 3] = fundo[i + 3];
+      continue;
+    }
+    if (substituirPor) {
+      // A mistura no alfa pré-multiplicado entre o que está na camada e o pixel da fonte
+      const af = substituirPor[i + 3] / 255;
+      const ao = travarTransparencia ? ab : ab * (1 - as) + af * as;
+      for (let c = 0; c < 3; c++) {
+        const pre = (fundo[i + c] / 255) * ab * (1 - as) + (substituirPor[i + c] / 255) * af * as;
+        saida[i + c] = ao > 0 ? Math.round(Math.min(1, pre / ao) * 255) : 0;
+      }
+      saida[i + 3] = Math.round(ao * 255);
       continue;
     }
     if (apagar || modo === "limpar") {

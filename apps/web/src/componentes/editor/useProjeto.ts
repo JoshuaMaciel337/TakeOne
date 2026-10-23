@@ -244,6 +244,19 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
     nomeRefazer: estado?.historico.futuro[0]?.nome ?? null,
     /** Os nomes dos passos, para o painel Histórico: os feitos (o mais antigo primeiro) e os que dá para refazer. */
     passos: { feitos: estado?.historico.passado.map((passo) => passo.nome) ?? [], desfeitos: estado?.historico.futuro.map((passo) => passo.nome) ?? [] },
+    /**
+     * O projeto como estava num passo do Histórico: 0 é o de abertura, n o depois do n-ésimo passo feito (o último
+     * é o de agora). Os pincéis do histórico pintam com ele.
+     */
+    projetoDoPasso: useCallback(
+      (indice: number): Projeto | null => {
+        if (!estado) return null;
+        const { passado, presente } = estado.historico;
+        if (indice < 0 || indice > passado.length) return null;
+        return indice === passado.length ? presente : passado[indice].projeto;
+      },
+      [estado],
+    ),
     /** Volta ou avança até o passo: desfaz ou refaz um de cada vez, como os botões. */
     irParaPasso: useCallback((desfazer: number, refazer: number) => {
       for (let i = 0; i < desfazer; i++) despachar({ tipo: "desfazer" });

@@ -6,7 +6,7 @@
 // traço (passar de novo no mesmo traço não escurece além dela) e o fluxo é quanto cada marca deposita.
 import { juntarTraco } from "./mesclar.ts";
 import { amostraDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
-import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, type PontoDoTraco } from "./traco.ts";
+import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, type PontoDoTraco, tracosArtisticos } from "./traco.ts";
 
 export type Retangulo = { x0: number; y0: number; x1: number; y1: number };
 type Rgb = [number, number, number];
@@ -164,6 +164,8 @@ export type InicioDoTraco = {
   fundo: string;
   /** Trava de pixels transparentes: o alfa da camada não muda. */
   travarTransparencia: boolean;
+  /** Os pincéis do histórico: a camada como estava no estado escolhido (do tamanho da camada). */
+  fonteDaTinta?: HTMLCanvasElement | null;
 };
 
 export class Pintura {
@@ -175,7 +177,7 @@ export class Pintura {
   private readonly ctxCamada: CanvasRenderingContext2D;
   private readonly ctxTela: CanvasRenderingContext2D;
   private readonly ctxTraco: CanvasRenderingContext2D;
-  private atual: (InicioDoTraco & { tinta: Rgb; corDoFundo: Rgb; apagar: boolean; dura: boolean; colorido: boolean }) | null = null;
+  private atual: (InicioDoTraco & { tinta: Rgb; corDoFundo: Rgb; apagar: boolean; dura: boolean; colorido: boolean; fonte: Uint8ClampedArray | null }) | null = null;
   /** Quantas marcas o traço já tem (o desvanecer) e a variação de cor do começo (sem "por ponta"). */
   private indice = 0;
   private corDoTraco: Marca["cor"] = null;
@@ -226,8 +228,15 @@ export class Pintura {
     // A borracha numa camada de transparência travada pinta a cor de fundo, como no fundo dos editores de imagem
     const apagar = borracha && !inicio.travarTransparencia;
     if (borracha && inicio.travarTransparencia) cor = inicio.fundo;
-    const colorido = inicio.opcoes.dinamicaDeCor.ligado && !borracha;
-    this.atual = { ...inicio, tinta: corParaRgb(cor), corDoFundo: corParaRgb(inicio.fundo), apagar, dura, colorido };
+    const artistico = ferramenta === "historicoArtistico";
+    const colorido = (inicio.opcoes.dinamicaDeCor.ligado && !borracha) || artistico;
+    // A fonte dos pincéis do histórico, lida uma vez por traço
+    let fonte: Uint8ClampedArray | null = null;
+    if (inicio.fonteDaTinta && (ferramenta === "historico" || artistico)) {
+      const ctxFonte = inicio.fonteDaTinta.getContext("2d", { willReadFrequently: true })!;
+      fonte = ctxFonte.getImageData(0, 0, this.largura, this.altura).data;
+    }
+    this.atual = { ...inicio, tinta: corParaRgb(cor), corDoFundo: corParaRgb(inicio.fundo), apagar, dura, colorido, fonte };
     this.indice = 0;
     this.corDoTraco = null;
     this.area = null;
@@ -263,6 +272,9 @@ export class Pintura {
       this.ctxTraco.fillStyle = "#ffffff";
       this.ctxTraco.fillRect(x, y, Math.round(diametro), Math.round(diametro));
       retangulo = { x0: x, y0: y, x1: x + Math.round(diametro), y1: y + Math.round(diametro) };
+    } else if (atual.ferramenta === "historicoArtistico") {
+      this.marcarArtistico(ponto);
+      return;
     } else {
       this.ctxTraco.globalAlpha = 1;
       for (const marca of marcasDoPonto(opcoes, { ...ponto, pressao: ponto.pressao }, atual.diametro, this.indice++, Math.random)) {
@@ -274,6 +286,32 @@ export class Pintura {
     this.ctxTraco.globalAlpha = 1;
     this.area = unir(this.area, retangulo);
     this.sujo = unir(this.sujo, retangulo);
+  }
+
+  /** A cor da fonte no pixel (null onde ela é transparente). */
+  private corDaFonte(x: number, y: number): string | null {
+    const fonte = this.atual?.fonte;
+    if (!fonte) return null;
+    const xi = Math.min(this.largura - 1, Math.max(0, Math.round(x)));
+    const yi = Math.min(this.altura - 1, Math.max(0, Math.round(y)));
+    const i = (yi * this.largura + xi) * 4;
+    if (fonte[i + 3] < 8) return null;
+    return `rgb(${fonte[i]},${fonte[i + 1]},${fonte[i + 2]})`;
+  }
+
+  /** Histórico artístico: traços pequenos em volta do ponto, cada um na cor da fonte onde começa. */
+  private marcarArtistico(ponto: PontoDoTraco) {
+    const atual = this.atual!;
+    const { opcoes } = atual;
+    const escala = atual.diametro / Math.max(1, opcoes.tamanho);
+    const tracos = tracosArtisticos(ponto, opcoes.artistico.area * escala, atual.diametro, opcoes.artistico.estilo, opcoes.artistico.quantos, Math.random);
+    for (const traco of tracos) {
+      const cor = this.corDaFonte(traco[0].x, traco[0].y);
+      if (!cor) continue;
+      for (const passo of traco) {
+        this.desenharMarca({ x: passo.x, y: passo.y, diametro: atual.diametro, angulo: 0, arredondamento: 1, virarX: false, virarY: false, alfa: opcoes.fluxo, cor: null, corDireta: cor });
+      }
+    }
   }
 
   /** A ponta da marca: a redonda (com a dureza, ou dura no lápis) ou a amostra, com borda molhada e ruído. */
@@ -297,7 +335,7 @@ export class Pintura {
     const imagem = this.pontaDa(marca);
     const d = marca.diametro;
     const simples = opcoes.ponta === "redonda" && marca.arredondamento >= 0.999 && !marca.virarX && !marca.virarY;
-    const comRascunho = opcoes.textura.ligado || opcoes.duplo.ligado || (atual.colorido && marca.cor);
+    const comRascunho = opcoes.textura.ligado || opcoes.duplo.ligado || (atual.colorido && (marca.cor || marca.corDireta));
     // A caixa da marca: o diâmetro, que cobre a ponta girada e achatada
     const lado = Math.ceil(d) + 2;
     const x0 = atual.dura && simples ? Math.round(marca.x - imagem.width / 2) : marca.x - lado / 2;
@@ -356,9 +394,9 @@ export class Pintura {
         ctx.globalCompositeOperation = "destination-in";
         ctx.drawImage(duplo, 0, 0, lado, lado, 0, 0, lado, lado);
       }
-      if (atual.colorido && marca.cor) {
+      if (atual.colorido && (marca.cor || marca.corDireta)) {
         ctx.globalCompositeOperation = "source-in";
-        ctx.fillStyle = corDaMarca(atual.tinta, atual.corDoFundo, marca.cor);
+        ctx.fillStyle = marca.corDireta ?? corDaMarca(atual.tinta, atual.corDoFundo, marca.cor!);
         ctx.fillRect(0, 0, lado, lado);
       }
       ctx.globalCompositeOperation = "source-over";
@@ -396,7 +434,17 @@ export class Pintura {
       }
     }
     const saida = this.ctxTela.createImageData(largura, altura);
+    // O pincel do histórico vai em direção à fonte (o retângulo dela)
+    let substituirPor: Uint8ClampedArray | undefined;
+    if (atual.ferramenta === "historico" && atual.fonte) {
+      substituirPor = new Uint8ClampedArray(largura * altura * 4);
+      for (let y = 0; y < altura; y++) {
+        const inicio = ((y0 + y) * this.largura + x0) * 4;
+        substituirPor.set(atual.fonte.subarray(inicio, inicio + largura * 4), y * largura * 4);
+      }
+    }
     juntarTraco(fundo, traco, saida.data, {
+      substituirPor,
       modo: atual.ferramenta === "borracha" ? "normal" : atual.opcoes.modo,
       opacidade: atual.opcoes.opacidade,
       travarTransparencia: atual.travarTransparencia,

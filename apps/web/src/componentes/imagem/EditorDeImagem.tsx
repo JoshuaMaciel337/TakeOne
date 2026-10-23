@@ -27,7 +27,7 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, type Faixa, MASCARA_PADRAO, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
@@ -132,7 +132,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     pincel: PINCEL_PADRAO,
     lapis: { ...PINCEL_PADRAO, tamanho: 4, dureza: 1, espacamento: 0.1, suavizacao: 0 },
     borracha: { ...PINCEL_PADRAO, tamanho: 40 },
+    historico: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+    historicoArtistico: { ...PINCEL_PADRAO, tamanho: 6, dureza: 0.6, fluxo: 0.85 },
   });
+  // Os instantâneos do Histórico (da sessão, como nos editores de imagem) e a fonte dos pincéis do histórico
+  const [instantaneos, setInstantaneos] = useState<{ id: string; nome: string; projeto: Projeto }[]>([]);
+  const [fonteDoHistorico, setFonteDoHistorico] = useState("passo:0");
+  // O último passo do Ctrl+Alt+Z (alternar o último estado): desfeito, para refazer na próxima
+  const ultimoFoiDesfazer = useRef(false);
   const [simetria, setSimetria] = useState<Simetria | null>(null);
   const [gerandoPixels, setGerandoPixels] = useState(false);
   // A máscara de camada em foco (o pincel pinta nela) e a máscara à vista (Alt + clique na miniatura dela)
@@ -365,9 +372,67 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * A camada do traço: a de pixels escolhida, ou uma nova acima da escolhida (como pintar numa foto ou num texto não
    * muda a foto nem o texto). As travas de tudo e de pixels recusam; a de transparência só segura o alfa.
    */
+  /** O projeto do estado marcado como fonte no Histórico (o de abertura, se o passo marcado não existe mais). */
+  const projetoDaFonte = (): Projeto | null => {
+    if (fonteDoHistorico.startsWith("instantaneo:")) {
+      const instantaneo = instantaneos.find((item) => `instantaneo:${item.id}` === fonteDoHistorico);
+      if (instantaneo) return instantaneo.projeto;
+    }
+    const passo = Number(fonteDoHistorico.replace("passo:", ""));
+    return edicao.projetoDoPasso(Number.isFinite(passo) ? passo : 0) ?? edicao.projetoDoPasso(0);
+  };
+  /**
+   * A camada como estava na fonte do pincel do histórico, do tamanho dela: a versão de então (a mesma mídia), ou a
+   * camada de então desenhada sozinha (um texto antes de rasterizar), quando a camada de agora cobre o quadro.
+   */
+  const fonteDoHistoricoPara = async (clipe: Clipe, tamanhoDaCamada: { largura: number; altura: number }): Promise<HTMLCanvasElement | null> => {
+    const origem = projetoDaFonte();
+    const naFonte = origem ? acharClipe(origem, clipe.id) : null;
+    const canvas = document.createElement("canvas");
+    canvas.width = tamanhoDaCamada.largura;
+    canvas.height = tamanhoDaCamada.altura;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    if (!naFonte) return canvas;
+    if (naFonte.clipe.pixels && naFonte.clipe.midia_id === clipe.midia_id) {
+      if (naFonte.clipe.pixels.versao > 0) ctx2d.drawImage(await carregarBitmap(arquivoDaMidia(clipe.midia_id!, arquivoDaVersao(naFonte.clipe.pixels.versao))), 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+    const t = clipe.transformacao;
+    if (Math.abs(t.x) > 1e-6 || Math.abs(t.y) > 1e-6 || Math.abs(t.escala - 1) > 1e-6 || Math.abs(t.rotacao) > 1e-6) {
+      mostrarAviso("A camada mudou de lugar desde aquele estado: o pincel do histórico não acha o que estava lá.");
+      return null;
+    }
+    const sozinha = projetoSoCom(origem!, [naFonte.faixa.id], { neutras: new Set([naFonte.faixa.id]), semEstilo: true, semMascara: true });
+    const imagem = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png" }));
+    ctx2d.drawImage(imagem, 0, 0, canvas.width, canvas.height);
+    imagem.close();
+    return canvas;
+  };
   const alvoDaPintura = async (): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
+    // Os pincéis do histórico pintam na camada de pixels escolhida, com ela como estava na fonte
+    if (ferramenta === "historico" || ferramenta === "historicoArtistico") {
+      const achado = selecionado?.clipe.pixels ? acharClipe(atual, selecionado.clipe.id) : null;
+      if (!achado?.clipe.midia_id || !achado.clipe.pixels) {
+        mostrarAviso("Escolha uma camada de pixels para pintar com o histórico.");
+        return null;
+      }
+      if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) {
+        mostrarAviso("A camada está travada.");
+        return null;
+      }
+      const alvo = alvoDosPixels(achado.clipe)!;
+      const tamanhoDaCamada = midias.get(achado.clipe.midia_id)?.camada_pixels ?? tamanhoDaImagem(atual);
+      try {
+        const [pintura, fonteDaTinta] = await Promise.all([pinturas.preparar(alvo, tamanhoDaCamada), fonteDoHistoricoPara(achado.clipe, tamanhoDaCamada)]);
+        if (!fonteDaTinta) return null;
+        return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia), fonteDaTinta };
+      } catch {
+        mostrarAviso("Não foi possível abrir a camada para pintar. Tente de novo.");
+        return null;
+      }
+    }
     // A máscara em foco (Ctrl+\ ou o clique na miniatura dela): o pincel pinta a máscara em tons de cinza
     if (selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels) {
       const achado = acharClipe(atual, selecionado.clipe.id);
@@ -644,8 +709,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     abrir: () => router.push("/app/ferramentas/editor-de-imagem"),
     exportar: () => setExportando(true),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
-    desfazer: () => depoisDaPintura(desfazer),
-    refazer: () => depoisDaPintura(refazer),
+    desfazer: () =>
+      depoisDaPintura(() => {
+        ultimoFoiDesfazer.current = true;
+        desfazer();
+      }),
+    refazer: () =>
+      depoisDaPintura(() => {
+        ultimoFoiDesfazer.current = false;
+        refazer();
+      }),
+    alternarUltimoEstado: () =>
+      depoisDaPintura(() => {
+        // Ctrl+Alt+Z: o último passo vai e volta (desfeito agora, refeito na próxima)
+        if (ultimoFoiDesfazer.current && edicao.nomeRefazer) {
+          ultimoFoiDesfazer.current = false;
+          refazer();
+        } else if (edicao.nomeDesfazer) {
+          ultimoFoiDesfazer.current = true;
+          desfazer();
+        }
+      }),
     novaCamada: () => void novaCamada(),
     rasterizar: (tipo) => void (tipo === "todas" ? rasterizarTodas() : mesclarEmPixels(tipo)),
     mesclar: (tipo) => void mesclarEmPixels(tipo),
@@ -987,7 +1071,31 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ),
     },
-    historico: { nome: PAINEIS_DA_IMAGEM.historico, conteudo: <PainelHistorico nome={edicao.nome} feitos={edicao.passos.feitos} desfeitos={edicao.passos.desfeitos} aoIr={edicao.irParaPasso} /> },
+    historico: {
+      nome: PAINEIS_DA_IMAGEM.historico,
+      conteudo: (
+        <PainelHistorico
+          nome={edicao.nome}
+          feitos={edicao.passos.feitos}
+          desfeitos={edicao.passos.desfeitos}
+          aoIr={edicao.irParaPasso}
+          extras={{
+            instantaneos,
+            aoCriarInstantaneo: () => {
+              if (!projeto) return;
+              const id = crypto.randomUUID().slice(0, 8);
+              setInstantaneos((atual) => [...atual, { id, nome: `Instantâneo ${atual.length + 1}`, projeto }]);
+            },
+            aoRestaurarInstantaneo: (id) => {
+              const instantaneo = instantaneos.find((item) => item.id === id);
+              if (instantaneo) depoisDaPintura(() => executar({ comando: "projeto.restaurar", parametros: { projeto: instantaneo.projeto } }));
+            },
+            fonte: fonteDoHistorico,
+            aoEscolherFonte: setFonteDoHistorico,
+          }}
+        />
+      ),
+    },
   };
 
   const salvamento =

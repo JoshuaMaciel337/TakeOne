@@ -3,7 +3,7 @@
 import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, X } from "lucide-react";
 import { Fragment } from "react";
 
-import { LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel, type Simetria, TIPOS_DE_SIMETRIA } from "@/lib/pintura/traco";
+import { ESTILOS_ARTISTICOS, LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel, type Simetria, TIPOS_DE_SIMETRIA } from "@/lib/pintura/traco";
 import type { Comando } from "@/lib/projeto/comandos";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
@@ -219,7 +219,7 @@ export function BarraDeOpcoes(props: Props) {
     ) : (
       <span className="text-suave">Clique na imagem para escrever; o texto sai na cor de primeiro plano. Clique num texto para mudar a fonte, o tamanho e a cor.</span>
     );
-  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha") && props.pincel && props.aoMudarPincel) {
+  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha" || ferramenta === "historico" || ferramenta === "historicoArtistico") && props.pincel && props.aoMudarPincel) {
     const pincel = props.pincel;
     const mudar = props.aoMudarPincel;
     const porcento = (valor: number) => Math.round(valor * 100);
@@ -232,10 +232,27 @@ export function BarraDeOpcoes(props: Props) {
     opcoes = (
       <>
         <Numero rotulo="Tamanho" valor={Math.round(pincel.tamanho)} minimo={LIMITES_DO_PINCEL.tamanho[0]} maximo={LIMITES_DO_PINCEL.tamanho[1]} sufixo="px" aoMudar={(tamanho) => mudar({ tamanho })} />
-        {ferramenta === "pincel" || (ferramenta === "borracha" && pincel.borracha === "pincel") ? (
+        {ferramenta === "pincel" || ferramenta === "historico" || ferramenta === "historicoArtistico" || (ferramenta === "borracha" && pincel.borracha === "pincel") ? (
           <Numero rotulo="Dureza" valor={porcento(pincel.dureza)} minimo={0} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ dureza: valor / 100 })} />
         ) : null}
-        {ferramenta === "borracha" ? (
+        {ferramenta === "historicoArtistico" ? (
+          <>
+            <label className="flex items-center gap-1 text-suave">
+              Estilo:
+              <select aria-label="Estilo dos traços" className={campo} value={pincel.artistico.estilo} onChange={(evento) => mudar({ artistico: { ...pincel.artistico, estilo: evento.currentTarget.value as OpcoesDoPincel["artistico"]["estilo"] } })}>
+                {ESTILOS_ARTISTICOS.map((estilo) => (
+                  <option key={estilo.id} value={estilo.id}>
+                    {estilo.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Numero rotulo="Área" valor={pincel.artistico.area} minimo={1} maximo={500} sufixo="px" aoMudar={(area) => mudar({ artistico: { ...pincel.artistico, area } })} />
+            <Numero rotulo="Traços" valor={pincel.artistico.quantos} minimo={1} maximo={20} largura="w-9" aoMudar={(quantos) => mudar({ artistico: { ...pincel.artistico, quantos: Math.round(quantos) } })} />
+          </>
+        ) : ferramenta === "historico" ? (
+          <span className="text-suave">Fonte: a marcada no painel Histórico</span>
+        ) : ferramenta === "borracha" ? (
           <label className="flex items-center gap-1 text-suave">
             Modo:
             <select aria-label="Modo da borracha" className={campo} value={pincel.borracha} onChange={(evento) => mudar({ borracha: evento.currentTarget.value as OpcoesDoPincel["borracha"] })}>

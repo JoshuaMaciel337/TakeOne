@@ -14,8 +14,47 @@ export type PontaDoPincel = "redonda" | IdDaPonta | IdDaPontaPersonalizada;
  */
 export type PontoDoTraco = { x: number; y: number; pressao: number; inclinacaoX?: number; inclinacaoY?: number; giro?: number; direcao?: number };
 
-/** As ferramentas que pintam numa camada de pixels. */
-export type FerramentaDePintura = "pincel" | "lapis" | "borracha";
+/** As ferramentas que pintam numa camada de pixels (os dois pincéis do histórico pintam com um estado anterior). */
+export type FerramentaDePintura = "pincel" | "lapis" | "borracha" | "historico" | "historicoArtistico";
+
+/** Os estilos do pincel do histórico artístico: o comprimento e a curva dos traços pequenos. */
+export const ESTILOS_ARTISTICOS = [
+  { id: "tensoCurto", nome: "Tenso curto", comprimento: 0.6, curva: 0.1 },
+  { id: "tensoMedio", nome: "Tenso médio", comprimento: 1.2, curva: 0.1 },
+  { id: "tensoLongo", nome: "Tenso longo", comprimento: 2.2, curva: 0.1 },
+  { id: "soltoMedio", nome: "Solto médio", comprimento: 1.2, curva: 0.6 },
+  { id: "soltoLongo", nome: "Solto longo", comprimento: 2.2, curva: 0.6 },
+  { id: "pontilhado", nome: "Pontilhado", comprimento: 0, curva: 0 },
+  { id: "enrolado", nome: "Enrolado curto", comprimento: 0.9, curva: 1.4 },
+] as const;
+export type EstiloArtistico = (typeof ESTILOS_ARTISTICOS)[number]["id"];
+
+/**
+ * Os traços pequenos de uma marca do histórico artístico: a partir de pontos sorteados na área, cada um anda o
+ * comprimento do estilo (em diâmetros da ponta) virando a curva, e devolve as marcas de cada traço. `aleatorio` dá
+ * números de 0 a 1.
+ */
+export function tracosArtisticos(centro: { x: number; y: number }, area: number, diametro: number, estilo: EstiloArtistico, quantos: number, aleatorio: () => number): { x: number; y: number }[][] {
+  const dados = ESTILOS_ARTISTICOS.find((item) => item.id === estilo) ?? ESTILOS_ARTISTICOS[0];
+  const tracos: { x: number; y: number }[][] = [];
+  for (let n = 0; n < quantos; n++) {
+    const angulo0 = aleatorio() * Math.PI * 2;
+    const raio = Math.sqrt(aleatorio()) * area / 2;
+    let x = centro.x + Math.cos(angulo0) * raio;
+    let y = centro.y + Math.sin(angulo0) * raio;
+    let direcao = aleatorio() * Math.PI * 2;
+    const passos = Math.max(1, Math.round((dados.comprimento * diametro) / Math.max(1, diametro * 0.3)));
+    const traco = [{ x, y }];
+    for (let i = 1; i < passos; i++) {
+      direcao += (aleatorio() - 0.5) * dados.curva;
+      x += Math.cos(direcao) * diametro * 0.3;
+      y += Math.sin(direcao) * diametro * 0.3;
+      traco.push({ x, y });
+    }
+    tracos.push(traco);
+  }
+  return tracos;
+}
 
 /** O modo da pintura: os da camada (lib/projeto/modelo.ts) e Limpar, que apaga com o pincel. */
 export type ModoDaPintura =
@@ -70,6 +109,8 @@ export type OpcoesDoPincel = {
   apagarAutomaticamente: boolean;
   /** Borracha: pincel, lápis (borda dura, sem suavizar) ou bloco (quadrado fixo). */
   borracha: "pincel" | "lapis" | "bloco";
+  /** Pincel do histórico artístico: o estilo, a área em que os traços caem (pixels) e quantos por marca. */
+  artistico: { estilo: EstiloArtistico; area: number; quantos: number };
   // As seções do painel Configurações do pincel (F5), como nos editores de imagem
   /** A ponta: redonda (com a dureza) ou uma amostra (lib/pintura/pontas.ts). */
   ponta: PontaDoPincel;
@@ -126,6 +167,7 @@ export const PINCEL_PADRAO: OpcoesDoPincel = {
   modo: "normal",
   apagarAutomaticamente: false,
   borracha: "pincel",
+  artistico: { estilo: "tensoMedio", area: 50, quantos: 3 },
   ponta: "redonda",
   angulo: 0,
   arredondamento: 1,
@@ -159,6 +201,8 @@ export type Marca = {
   alfa: number;
   /** A mistura com a cor de fundo (0 é a de primeiro plano) e as variações de matiz, saturação e brilho. */
   cor: { fundo: number; matiz: number; saturacao: number; brilho: number } | null;
+  /** Uma cor pronta (o histórico artístico pinta com a cor da fonte). */
+  corDireta?: string;
 };
 
 /** O valor (0 a 1) que um controle dá neste ponto: a pressão, a inclinação, o giro, a direção ou o desvanecer. */

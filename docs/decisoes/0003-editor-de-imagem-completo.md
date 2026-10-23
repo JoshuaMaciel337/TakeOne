@@ -96,16 +96,14 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Lápis (B), com "Apagar automaticamente"
 - [x] Borracha (E): pincel, lápis e bloco; com a transparência travada, pinta a cor de fundo (a camada de fundo vem com o item dela)
 - [x] Painel Pincéis: predefinições em pastas (gerais, materiais secos, molhados e efeitos especiais), busca, tamanho da miniatura, importar .abr, Novo pincel predefinido
-- [ ] Definir predefinição de pincel a partir da seleção (precisa da seleção do documento, 13.3)
 - [x] Painel Configurações do pincel (F5): forma da ponta (ângulo, arredondamento, espaçamento, virar), dinâmica de forma, dispersão, textura, pincel duplo, dinâmica de cor, transferência, pose, ruído, bordas molhadas, acúmulo, suavização, proteger textura, travas das seções, prévia do traço
 - [x] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
 - [x] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois
 - [x] Máscara de camada pintável: Adicionar (revelar tudo, ocultar tudo, a partir da transparência), pintar em preto e branco, Densidade e Difusão, Inverter, Aplicar, Excluir, Ativar e desativar (Shift + clique), Vincular, Ctrl+\ mira a máscara, Alt + clique mostra só a máscara
-- [ ] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (precisa da seleção do documento, 13.3)
 - [x] Rasterizar (camada, que vale para texto, forma, imagem e objeto; estilo; todas). O preenchimento e a máscara vetorial entram com as camadas deles (13.5 e 13.6)
 - [x] Mesclar para baixo (Ctrl+E), Mesclar visíveis (Ctrl+Shift+E), Achatar imagem, Carimbar para baixo (Ctrl+Alt+E), Carimbar visíveis (Ctrl+Alt+Shift+E), Mesclar grupo
-- [ ] Pincel do histórico (Y) e Pincel do histórico artístico, com a fonte escolhida no Histórico
-- [ ] Instantâneos no Histórico; Alternar o último estado (Ctrl+Alt+Z)
+- [x] Pincel do histórico (Y) e Pincel do histórico artístico, com a fonte escolhida no Histórico
+- [x] Instantâneos no Histórico; Alternar o último estado (Ctrl+Alt+Z)
 - [x] Limpeza das versões antigas no servidor
 
 ### Onda 13.3 — Seleção
@@ -128,6 +126,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2; transparência da camada com Ctrl + clique na miniatura); painel Canais
 - [ ] Selecionar e mascarar (Ctrl+Alt+R): vistas (casca de cebola, formigas, sobreposição, no preto, no branco, preto e branco, nas camadas), pincel de refinar borda, raio e raio inteligente, suavizar, difusão, contraste, deslocar borda, descontaminar cores, saída (seleção, máscara, camada nova, com máscara, documento novo)
 - [ ] Encontrar camadas (Ctrl+Alt+Shift+F) e Isolar camadas
+- [ ] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (vindo da 13.2)
+- [ ] Definir predefinição de pincel a partir da seleção (vindo da 13.2)
 
 ### Onda 13.4 — Seleção em uso e área de transferência
 

@@ -93,6 +93,8 @@ export type AcoesDosMenus = {
   salvar: () => void;
   desfazer: () => void;
   refazer: () => void;
+  /** Ctrl+Alt+Z: o último passo vai e volta. */
+  alternarUltimoEstado: () => void;
   ferramenta: (id: IdFerramentaDaImagem) => void;
   ajuste: (ajuste: Ajuste) => void;
   documento: () => void;
@@ -171,6 +173,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       itens: [
         { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
         { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z ou Ctrl+Y", desativado: !a.podeRefazer, aoEscolher: a.refazer },
+        { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
         "-",
         { nome: "Preencher sensível ao conteúdo", atalho: "Shift+F5", desativado: !a.temSelecao, aoEscolher: a.preencher },
         { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.ferramenta("mover") },

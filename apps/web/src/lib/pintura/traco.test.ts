@@ -135,3 +135,26 @@ test("a predefinição troca o pincel, menos as seções travadas e a textura pr
   // Toda predefinição tem nome e pasta, e os ids não se repetem
   assert.equal(new Set(PREDEFINICOES.map((p) => p.id)).size, PREDEFINICOES.length);
 });
+
+test("pincel do histórico: vai em direção à fonte (até a transparência); o artístico espalha traços na área", async () => {
+  const { tracosArtisticos } = await import("./traco.ts");
+  const saida = new Uint8ClampedArray(4);
+  const base = { largura: 1, x0: 0, y0: 0, travarTransparencia: false, apagar: false, modo: "normal" as const };
+  // A camada é azul opaca; a fonte é vermelha opaca: com força 1, vira vermelha; com 0,5, meio a meio
+  juntarTraco(new Uint8ClampedArray([0, 0, 255, 255]), new Uint8ClampedArray([255, 255, 255, 255]), saida, { ...base, opacidade: 1, substituirPor: new Uint8ClampedArray([255, 0, 0, 255]) });
+  assert.deepEqual([...saida], [255, 0, 0, 255]);
+  juntarTraco(new Uint8ClampedArray([0, 0, 255, 255]), new Uint8ClampedArray([255, 255, 255, 255]), saida, { ...base, opacidade: 0.5, substituirPor: new Uint8ClampedArray([255, 0, 0, 255]) });
+  assert.deepEqual([...saida], [128, 0, 128, 255]);
+  // A fonte transparente devolve a transparência (o que foi pintado depois some)
+  juntarTraco(new Uint8ClampedArray([0, 0, 255, 255]), new Uint8ClampedArray([255, 255, 255, 255]), saida, { ...base, opacidade: 1, substituirPor: new Uint8ClampedArray([0, 0, 0, 0]) });
+  assert.equal(saida[3], 0);
+  let n = 0;
+  const sorteio = () => ((n = (n * 9301 + 49297) % 233280) / 233280);
+  const tracos = tracosArtisticos({ x: 100, y: 100 }, 40, 10, "tensoLongo", 5, sorteio);
+  assert.equal(tracos.length, 5);
+  for (const traco of tracos) {
+    assert.ok(Math.hypot(traco[0].x - 100, traco[0].y - 100) <= 20 + 1e-9);
+    assert.ok(traco.length >= 2);
+  }
+  assert.equal(tracosArtisticos({ x: 0, y: 0 }, 10, 10, "pontilhado", 3, sorteio).every((traco) => traco.length === 1), true);
+});

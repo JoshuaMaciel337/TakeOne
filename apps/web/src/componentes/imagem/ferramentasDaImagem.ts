@@ -6,7 +6,9 @@ import {
   Circle,
   Crop,
   Eraser,
+  Feather,
   Hand,
+  History,
   Lasso,
   type LucideIcon,
   Minus,
@@ -40,6 +42,8 @@ export type IdFerramentaDaImagem =
   | "pincel"
   | "lapis"
   | "borracha"
+  | "historico"
+  | "historicoArtistico"
   | "texto"
   | "retangulo"
   | "elipse"
@@ -79,6 +83,10 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
     F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
+  ],
+  [
+    F("historico", "Ferramenta Pincel do histórico", "Y", History, "Pinte para voltar a camada ao estado marcado como fonte no Histórico."),
+    F("historicoArtistico", "Ferramenta Pincel do histórico artístico", "Y", Feather, "Pinte traços soltos com as cores do estado marcado como fonte no Histórico."),
   ],
   [F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo.")],
   [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
@@ -127,7 +135,7 @@ export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "retangulo" |
 };
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
-export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha"]);
+export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico"]);
 
 /** O grupo de uma ferramenta (as do mesmo grupo dividem a tecla; Shift + tecla passa à seguinte). */
 export function grupoDa(id: IdFerramentaDaImagem): FerramentaDaImagem[] {
