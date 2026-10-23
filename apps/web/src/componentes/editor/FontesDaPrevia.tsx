@@ -11,6 +11,7 @@ import { arquivoDaImagemDoClipe, arquivoDoSom, arquivoDoTom, usaVozLimpa } from 
 import type { ItemDaPrevia } from "@/lib/previa/camadas";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
+import { volumeNoTempo } from "@/lib/projeto/keyframes";
 import { fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
 import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
@@ -220,7 +221,7 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
 
   // Os fades e o abaixar na fala mudam o ganho a cada quadro da tela enquanto toca, como no render
   const igualar = item.clipe.igualar_volume ? 10 ** (ganhoParaIgualar(item.midia.audio?.lufs) / 20) : 1;
-  const ganho = item.ativo ? item.clipe.volume * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) : 0;
+  const ganho = item.ativo ? volumeNoTempo(item.clipe, tempo) * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) : 0;
   useEffect(() => {
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);
   }, [ganho, tocando]);

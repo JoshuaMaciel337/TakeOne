@@ -9,7 +9,7 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
-import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
+import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar, volumeNoTempo } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
   CURVAS_DO_FADE,
@@ -216,7 +216,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
                   <Linha rotulo="Duração" valor={formatarTimecode(selecionado.clipe.duracao, taxa)} />
                   <Linha rotulo="Trecho da mídia a partir de" valor={formatarTimecode(selecionado.clipe.entrada, taxa)} />
                   <Linha rotulo="Velocidade" valor={`${selecionado.clipe.velocidade.toLocaleString("pt-BR")}×`} />
-                  <Linha rotulo="Volume" valor={`${Math.round(selecionado.clipe.volume * 100)}%`} />
+                  <Linha rotulo="Volume" valor={selecionado.clipe.keyframes?.volume?.length ? "Com keyframes" : `${Math.round(selecionado.clipe.volume * 100)}%`} />
                 </dl>
               </>
             ) : null}
@@ -275,6 +275,9 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             faixa={selecionado.faixa}
             midia={midia}
             faixas={faixas}
+            tempo={tempo}
+            taxa={taxa}
+            aoBuscar={aoBuscar}
             aoAvisar={aoAvisar}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
@@ -953,7 +956,18 @@ function ChaveDeLuma({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; t
   );
 }
 
-function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null; faixas: Faixa[]; aoAvisar: (mensagem: string) => void }) {
+function AbaAudio({
+  clipe,
+  faixa,
+  midia,
+  faixas,
+  tempo,
+  taxa,
+  aoBuscar,
+  aoAvisar,
+  aoPrever,
+  aoExecutar,
+}: PropsAba & { midia: Midia | null; faixas: Faixa[]; tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void; aoAvisar: (mensagem: string) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
   const travada = faixa.travada;
@@ -1002,6 +1016,15 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
     );
   }
   const tom = clipe.tom ?? 0;
+  // Keyframes de volume: com pontos, o volume mostrado é o do cursor e mexer grava um ponto ali
+  const pontosDeVolume = clipe.keyframes?.volume ?? [];
+  const dentro = tempo >= clipe.inicio && tempo <= clipe.inicio + clipe.duracao;
+  const meioQuadro = duracaoDoQuadro(taxa) / 2;
+  const noClipe = tempo - clipe.inicio;
+  const volumeNoInstante = keyframeEm(pontosDeVolume, noClipe, meioQuadro);
+  const volumeAgora = volumeNoTempo(clipe, tempo);
+  const volumeAnterior = Math.max(...pontosDeVolume.map((p) => p.t).filter((x) => x >= 0 && x < noClipe - meioQuadro));
+  const volumeSeguinte = Math.min(...pontosDeVolume.map((p) => p.t).filter((x) => x <= clipe.duracao && x > noClipe + meioQuadro));
   const estadoDoTom = tom ? midia.tons?.[chaveDoTom(tom, Boolean(clipe.voz_limpa) && voz?.status === "pronta")] : undefined;
 
   return (
@@ -1014,8 +1037,61 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
           minimo={0}
           maximo={VOLUME_MAXIMO * 100}
           sufixo="%"
-          {...controle(clipe.volume * 100, (valor) => ({ volume: valor / 100 }))}
+          {...controle(volumeAgora * 100, (valor) => ({ volume: valor / 100, tempo }))}
+          acao={
+            <BotaoKeyframe
+              pontos={pontosDeVolume}
+              noInstante={Boolean(volumeNoInstante)}
+              desativado={travada || !dentro}
+              aoClicar={() => aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade: "volume", tempo, acao: "alternar" } })}
+            />
+          }
         />
+        {pontosDeVolume.length ? (
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes de volume">
+            <button
+              type="button"
+              className="botao-icone size-6"
+              disabled={!Number.isFinite(volumeAnterior)}
+              onClick={() => aoBuscar(clipe.inicio + volumeAnterior)}
+              aria-label="Keyframe de volume anterior"
+              title="Keyframe de volume anterior"
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="botao-icone size-6"
+              disabled={!Number.isFinite(volumeSeguinte)}
+              onClick={() => aoBuscar(clipe.inicio + volumeSeguinte)}
+              aria-label="Keyframe de volume seguinte"
+              title="Keyframe de volume seguinte"
+            >
+              <ChevronRight className="size-3.5" aria-hidden />
+            </button>
+            {volumeNoInstante ? (
+              <label className="ml-auto flex items-center gap-1">
+                Até o próximo
+                <select
+                  value={volumeNoInstante.curva}
+                  disabled={travada}
+                  onChange={(evento) =>
+                    aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade: "volume", tempo, acao: evento.currentTarget.value as Curva } })
+                  }
+                  className="rounded-md border border-borda bg-painel-2 px-1 py-0.5 text-[11px] text-texto outline-none focus:border-destaque"
+                >
+                  {CURVAS_DE_KEYFRAME.map(({ id, nome }) => (
+                    <option key={id} value={id}>
+                      {nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="ml-auto">{pontosDeVolume.length} keyframes de volume</span>
+            )}
+          </div>
+        ) : null}
         <label className="mt-1 flex items-center gap-2 text-xs">
           <input
             type="checkbox"

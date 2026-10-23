@@ -138,3 +138,15 @@ def test_tirar_o_ronco_e_o_passa_altas_de_80_hz_antes_do_equalizador():
     filtros = filtros_de_voz({"ronco": 1, "grave": 3})
     assert filtros[0] == "highpass=f=80:t=q:w=0.7071" and filtros[1].startswith("lowshelf=")
     assert filtros_de_voz({"ronco": 0}) == []
+
+
+def test_keyframes_de_volume_multiplicam_o_abaixar_no_mesmo_roteiro():
+    volume = [{"t": 0, "valor": 2, "curva": "linear"}, {"t": 2 * S, "valor": 0, "curva": "linear"}]
+    linhas = comandos_de_volume(CURVA, 3, "volume@ab0", volume).splitlines()
+    valores = {linha.split(" ")[0]: float(linha.split(" ")[3].rstrip(";")) for linha in linhas}
+    # Em 1,5 s: o abaixar em 0,25 e o volume em 0,5
+    assert valores["1.50"] == pytest.approx(0.125, abs=1e-6)
+    assert valores["0.00"] == 2 and valores["2.00"] == 0
+    # Sem abaixar, só os keyframes
+    sozinho = comandos_de_volume(None, 3, "volume@ab0", volume).splitlines()
+    assert sozinho[0] == "0.00 volume@ab0 volume 2.000000;" and "1.00 volume@ab0 volume 1.000000;" in sozinho

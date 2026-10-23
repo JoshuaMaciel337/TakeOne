@@ -28,7 +28,7 @@ import { formatarTempo } from "@/lib/formatar";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
-import { PROPRIEDADES_ANIMAVEIS } from "@/lib/projeto/keyframes";
+import { CHAVES_DE_KEYFRAME } from "@/lib/projeto/keyframes";
 import { acharClipe, type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
@@ -560,7 +560,7 @@ export function LinhaDoTempo({
                   {faixa.tipo === "audio" ? faixa.clipes.map((clipe) => <MarcasDoRitmo key={`r-${clipe.id}`} clipe={clipe} px={px} />) : null}
                   {/* Keyframes do clipe (de qualquer propriedade): clicar leva o cursor até o ponto */}
                   {faixa.clipes.flatMap((clipe) =>
-                    [...new Set(PROPRIEDADES_ANIMAVEIS.flatMap((p) => clipe.keyframes?.[p] ?? []).map((k) => k.t))]
+                    [...new Set(CHAVES_DE_KEYFRAME.flatMap((p) => clipe.keyframes?.[p] ?? []).map((k) => k.t))]
                       .filter((t) => t >= 0 && t <= clipe.duracao)
                       .map((t) => (
                         <button

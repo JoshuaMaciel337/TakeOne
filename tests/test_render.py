@@ -605,3 +605,17 @@ def test_camada_de_ajuste_passa_o_que_esta_embaixo_pela_lut_e_volta_por_cima_no_
     assert "[ja2][jg2]overlay=format=rgb:eof_action=pass:enable='gte(t,0.983333)*lt(t,2.983333)'[base2]" in plano.filtro
     alfa = next(a for a in plano.auxiliares if a.tipo == "cantos")
     assert alfa.ajustes["opacidade"] == 0.5 and (alfa.largura, alfa.altura) == (720, 1280)
+
+
+def test_keyframes_de_volume_entram_no_roteiro_no_lugar_do_volume_fixo():
+    # Sobe de 0 a 2 (200%) no primeiro segundo e fica; o volume fixo (0,5) não vale mais
+    pontos = [{"t": 0, "valor": 0, "curva": "linear"}, {"t": S, "valor": 2, "curva": "linear"}]
+    musica = clipe("m1", "deitado", 0, 4, volume=0.5, keyframes={"volume": pontos})
+    plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4)]), faixa("audio", [musica])]),
+                            MIDIAS, 720, 1280, pasta="/trabalho")
+    roteiro = next(a for a in plano.auxiliares if a.caminho == "/trabalho/volume_m1.txt").conteudo.splitlines()
+    assert roteiro[0] == "0.00 volume@ab2 volume 0.000000;"
+    assert next(linha for linha in roteiro if linha.startswith("0.50 ")) == "0.50 volume@ab2 volume 1.000000;"
+    assert roteiro[-1] == "1.00 volume@ab2 volume 2.000000;"
+    cadeia = next(parte for parte in plano.filtro_som.split(";") if "volume_m1" in parte)
+    assert "volume=0.5" not in cadeia and "volume@ab2=volume=1" in cadeia

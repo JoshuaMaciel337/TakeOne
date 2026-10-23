@@ -54,7 +54,7 @@ import {
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
-import { transformacaoNoTempo } from "./keyframes.ts";
+import { transformacaoNoTempo, volumeNoTempo } from "./keyframes.ts";
 import { CURVAS_PRONTAS } from "./velocidade.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
@@ -1048,4 +1048,54 @@ test("camada de ajuste: entra numa faixa de sobreposição nova, apara como imag
   // Na principal não entra
   assert.throws(() => moverClipe(projeto, ctx, ajuste.id, { faixaId: "principal", inicio: 0 }), ErroEdicao);
   conferir(projeto);
+});
+
+test("keyframes de volume: pôr, mexer no instante, aparar, restaurar a imagem e colar o som", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  // Sem keyframes, o volume do cursor é o fixo
+  projeto = ajustarAudio(projeto, [id], { volume: 0.5, tempo: 2 * S });
+  assert.equal(principal(projeto)[0].volume, 0.5);
+
+  // Dois pontos: 50% em 1 s e 200% em 3 s
+  projeto = mudarKeyframe(projeto, id, "volume", 1 * S, "alternar");
+  projeto = mudarKeyframe(projeto, id, "volume", 3 * S, "alternar");
+  projeto = ajustarAudio(projeto, [id], { volume: 2, tempo: 3 * S });
+  let clipe = principal(projeto)[0];
+  assert.deepEqual(clipe.keyframes?.volume?.map((k) => [k.t / S, k.valor]), [[1, 0.5], [3, 2]]);
+  assert.equal(clipe.volume, 0.5, "com keyframes, o fixo não muda");
+  assert.ok(Math.abs(volumeNoTempo(clipe, 2 * S) - 1.25) < 1e-9);
+  assert.equal(volumeNoTempo(clipe, 0), 0.5);
+  assert.equal(volumeNoTempo(clipe, 9 * S), 2);
+
+  // Aparar o começo: o volume segue o mesmo trecho da mídia
+  const aparado = principal(apararClipe(projeto, ctx, id, "inicio", 1 * S))[0];
+  assert.ok(Math.abs(volumeNoTempo(aparado, 1 * S) - 1.25) < 1e-9);
+
+  // Restaurar a imagem não tira os keyframes do som
+  const restaurado = principal(restaurarClipes(projeto, [id]))[0];
+  assert.deepEqual(restaurado.keyframes, { volume: clipe.keyframes?.volume });
+
+  // Colar a imagem de outro clipe mantém o volume; colar o som leva os pontos
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  const outro = principal(projeto)[1];
+  const comImagem = principal(colarAjustes(projeto, ctx, outro, [id], ["imagem"]).projeto)[0];
+  assert.deepEqual(comImagem.keyframes?.volume, clipe.keyframes?.volume);
+  const comSom = principal(colarAjustes(projeto, ctx, clipe, [outro.id], ["audio"]).projeto)[1];
+  assert.deepEqual(comSom.keyframes?.volume, clipe.keyframes?.volume);
+
+  // Tirar os dois: o volume fica no do último ponto tirado
+  projeto = mudarKeyframe(projeto, id, "volume", 1 * S, "alternar");
+  projeto = mudarKeyframe(projeto, id, "volume", 3 * S, "alternar");
+  clipe = principal(projeto)[0];
+  assert.equal(clipe.keyframes, null);
+  assert.equal(clipe.volume, 2);
+
+  // Nas faixas de áudio também (as outras propriedades não valem lá)
+  const comMusica = adicionarClipe(projeto, ctx, "musica");
+  const musica = comMusica.clipeId;
+  const comPonto = mudarKeyframe(comMusica.projeto, musica, "volume", 1 * S, "alternar");
+  assert.equal(comPonto.faixas.find((f) => f.tipo === "audio")?.clipes[0].keyframes?.volume?.length, 1);
+  assert.throws(() => mudarKeyframe(comMusica.projeto, musica, "x", 1 * S, "alternar"), ErroEdicao);
 });

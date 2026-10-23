@@ -30,6 +30,8 @@ import {
   deslocarExpressoes,
   type Expressao,
   type Expressoes,
+  CHAVES_DE_KEYFRAME,
+  type ChaveDeKeyframe,
   deslocarKeyframes,
   type Keyframe,
   type Keyframes,
@@ -38,6 +40,7 @@ import {
   type PropriedadeAnimavel,
   PROPRIEDADES_ANIMAVEIS,
   transformacaoParaEditar,
+  volumeNoTempo,
 } from "./keyframes.ts";
 import { type Legenda, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -1008,6 +1011,14 @@ const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
   audio: ["volume", "fade_entrada", "fade_saida", "curva_fade", "efeitos_voz", "igualar_volume"],
 };
 
+/** Os keyframes com os de volume trocados por `volume` (null quando não sobra nenhum). */
+function comOVolume(keyframes: Keyframes | null | undefined, volume: Keyframe[] | undefined): Keyframes | null {
+  const resultado: Keyframes = { ...keyframes };
+  if (volume?.length) resultado.volume = volume;
+  else delete resultado.volume;
+  return CHAVES_DE_KEYFRAME.some((p) => resultado[p]?.length) ? resultado : null;
+}
+
 /**
  * Leva os ajustes dos `grupos` do clipe `origem` para os clipes marcados. Cada grupo só vale onde faz sentido:
  * o áudio só em clipe com som, a tela verde só em mídia, a luz e a granulação só em vídeo e imagem. Devolve
@@ -1047,6 +1058,8 @@ export function colarAjustes(
         if ((campo === "chroma" || campo === "chave_luma") && !ehMidia) continue;
         (novo as Record<string, unknown>)[campo] = structuredClone(origem[campo]);
       }
+      if (grupo === "imagem") novo.keyframes = comOVolume(novo.keyframes, clipe.keyframes?.volume);
+      if (grupo === "audio") novo.keyframes = comOVolume(novo.keyframes, structuredClone(origem.keyframes?.volume));
       mudou = true;
     }
     if (!mudou) return clipe;
@@ -1205,7 +1218,7 @@ export function mudarExpressao(projeto: Projeto, clipeId: string, propriedade: P
  * já estava. Tirar o último deixa o clipe parado no valor dele. Uma curva (lib/projeto/keyframes.ts,
  * CURVAS_DE_KEYFRAME): muda a curva do ponto do instante até o seguinte.
  */
-export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: PropriedadeAnimavel, tempo: Tick, acao: AcaoDeKeyframe): Projeto {
+export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: ChaveDeKeyframe, tempo: Tick, acao: AcaoDeKeyframe): Projeto {
   return mudarClipes(projeto, [clipeId], (clipe) => {
     if (tempo < clipe.inicio || tempo > clipe.inicio + clipe.duracao) throw new ErroEdicao("Leve o cursor para dentro do clipe.");
     const t = quadroDoClipe(projeto, clipe, tempo);
@@ -1221,12 +1234,14 @@ export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: Pr
       const keyframes: Keyframes = { ...clipe.keyframes, [propriedade]: restantes };
       if (restantes.length) return { ...clipe, keyframes };
       delete keyframes[propriedade];
-      const vazios = PROPRIEDADES_ANIMAVEIS.every((p) => !keyframes[p]?.length);
+      const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
+      if (propriedade === "volume") return { ...clipe, keyframes: vazios ? null : keyframes, volume: existente.valor };
       return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: existente.valor } };
     }
-    const valor = transformacaoParaEditar(clipe, tempo)[propriedade];
+    const valor = propriedade === "volume" ? volumeNoTempo(clipe, tempo) : transformacaoParaEditar(clipe, tempo)[propriedade];
     return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: comPonto(pontos, { t, valor, curva: curvaEm(pontos, t) }, projeto) } };
-  });
+    // O volume também vale nos clipes das faixas de áudio
+  }, { comAudio: propriedade === "volume" });
 }
 
 /** Quanto o zoom do "Criar automaticamente" aproxima, e quanto tempo leva para entrar e sair. */
@@ -1340,7 +1355,8 @@ export function pulsarNoRitmo(projeto: Projeto, batidas: Tick[], escala: number 
 
 /** Volta posição, escala, giro, opacidade e recorte ao padrão, sem keyframes. */
 export function restaurarClipes(projeto: Projeto, clipeIds: string[]): Projeto {
-  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: null, expressoes: null }));
+  // Os keyframes de volume são do som: ficam
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO, keyframes: comOVolume(null, clipe.keyframes?.volume), expressoes: null }));
 }
 
 export function recortarClipes(projeto: Projeto, clipeIds: string[], recorte: Recorte): Projeto {
@@ -1360,6 +1376,8 @@ export type MudancaDeAudio = {
   efeitos_voz?: EfeitosVoz | null;
   /** Semitons, de -12 a 12. */
   tom?: number;
+  /** O instante do cursor: com keyframes de volume, o volume novo vira (ou muda) o ponto dali. */
+  tempo?: Tick;
 };
 
 /** Volume, fades e voz limpa. Vale para os clipes com som: os de áudio e os vídeos que têm áudio. */
@@ -1373,7 +1391,18 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
     exigirDestravada(faixa);
     const clipes = faixa.clipes.map((clipe) => {
       if (!alvos.has(clipe.id)) return clipe;
-      const volume = mudanca.volume === undefined ? clipe.volume : limitar(mudanca.volume, 0, VOLUME_MAXIMO);
+      let volume = clipe.volume;
+      let keyframes = clipe.keyframes;
+      if (mudanca.volume !== undefined) {
+        const novo = limitar(mudanca.volume, 0, VOLUME_MAXIMO);
+        const pontos = clipe.keyframes?.volume;
+        if (mudanca.tempo !== undefined && pontos?.length) {
+          const t = quadroDoClipe(projeto, clipe, mudanca.tempo);
+          keyframes = { ...keyframes, volume: comPonto(pontos, { t, valor: novo, curva: curvaEm(pontos, t) }, projeto) };
+        } else {
+          volume = novo;
+        }
+      }
       const fadeEntrada = Math.round(limitar(mudanca.fade_entrada ?? clipe.fade_entrada, 0, clipe.duracao));
       const fadeSaida = Math.round(limitar(mudanca.fade_saida ?? clipe.fade_saida, 0, clipe.duracao - fadeEntrada));
       const vozLimpa = mudanca.voz_limpa ?? clipe.voz_limpa ?? false;
@@ -1383,6 +1412,7 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
       return {
         ...clipe,
         volume,
+        keyframes,
         fade_entrada: fadeEntrada,
         fade_saida: fadeSaida,
         curva_fade: curva,
@@ -1857,8 +1887,8 @@ export function reenquadrarClipe(projeto: Projeto, clipeId: string, r: Reenquadr
       }
       return alinhados.length > 1 ? alinhados : undefined;
     };
-    const keyframes: Keyframes = { opacidade: clipe.keyframes?.opacidade, x: noQuadro(r.keyframes.x), y: noQuadro(r.keyframes.y) };
-    const vazios = PROPRIEDADES_ANIMAVEIS.every((p) => !keyframes[p]?.length);
+    const keyframes: Keyframes = { opacidade: clipe.keyframes?.opacidade, volume: clipe.keyframes?.volume, x: noQuadro(r.keyframes.x), y: noQuadro(r.keyframes.y) };
+    const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
     return {
       ...clipe,
       transformacao: limitarTransformacao({ ...clipe.transformacao, escala: r.escala, x: r.x, y: r.y, rotacao: 0 }),

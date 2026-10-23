@@ -26,7 +26,9 @@ export const CURVAS_DE_KEYFRAME: { id: Curva; nome: string }[] = [
 /** `t`: tempo desde o começo do clipe, na linha do tempo. `curva`: como o valor vai até o ponto seguinte. */
 export type Keyframe = { t: Tick; valor: number; curva: Curva };
 export type PropriedadeAnimavel = "x" | "y" | "escala" | "rotacao" | "opacidade";
-export type Keyframes = Partial<Record<PropriedadeAnimavel, Keyframe[]>>;
+/** O que pode ter pontos: as propriedades da imagem e o volume (o fator de 0 a 4, como `clipe.volume`). */
+export type ChaveDeKeyframe = PropriedadeAnimavel | "volume";
+export type Keyframes = Partial<Record<ChaveDeKeyframe, Keyframe[]>>;
 
 export type Repeticao = "ciclo" | "vaivem";
 /**
@@ -39,6 +41,7 @@ export type Expressao = { repetir?: Repeticao | null; tremer?: Tremor | null };
 export type Expressoes = Partial<Record<PropriedadeAnimavel, Expressao>>;
 
 export const PROPRIEDADES_ANIMAVEIS: PropriedadeAnimavel[] = ["x", "y", "escala", "rotacao", "opacidade"];
+export const CHAVES_DE_KEYFRAME: ChaveDeKeyframe[] = [...PROPRIEDADES_ANIMAVEIS, "volume"];
 /** Fase do tremido de cada propriedade, para x e y não tremerem juntos. */
 export const FASE_DO_TREMOR: Record<PropriedadeAnimavel, number> = { x: 0, y: 7.3, escala: 13.1, rotacao: 19.7, opacidade: 29.3 };
 /** A menor escala que a expressão deixa sair (o tremido não vira o clipe do avesso). */
@@ -109,6 +112,15 @@ export function valorComExpressao(
   return valor;
 }
 
+/**
+ * O volume do clipe no instante `t` da linha do tempo: o dos keyframes de volume ou o fixo. Os pontos vão
+ * em linha (ou na curva escolhida) no fator, como os outros; no render, `comandos_de_volume` faz a mesma conta.
+ */
+export function volumeNoTempo(clipe: Pick<Clipe, "inicio" | "volume" | "keyframes">, t: Tick): number {
+  const pontos = clipe.keyframes?.volume;
+  return pontos?.length ? Math.max(0, valorNoTempo(pontos, t - clipe.inicio)) : clipe.volume;
+}
+
 /** As propriedades que mudam com o tempo: as que têm pontos ou tremido. */
 export function propriedadesAnimadas(clipe: Pick<Clipe, "keyframes" | "expressoes">): PropriedadeAnimavel[] {
   return PROPRIEDADES_ANIMAVEIS.filter((p) => !!clipe.keyframes?.[p]?.length || !!clipe.expressoes?.[p]?.tremer);
@@ -163,7 +175,7 @@ export function keyframeEm(pontos: Keyframe[] | undefined, t: Tick, meioQuadro: 
 export function deslocarKeyframes(keyframes: Keyframes | null | undefined, delta: Tick): Keyframes | null | undefined {
   if (!keyframes || delta === 0) return keyframes;
   const resultado: Keyframes = {};
-  for (const propriedade of PROPRIEDADES_ANIMAVEIS) {
+  for (const propriedade of CHAVES_DE_KEYFRAME) {
     const pontos = keyframes[propriedade];
     if (pontos) resultado[propriedade] = pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta }));
   }

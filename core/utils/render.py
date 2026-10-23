@@ -678,7 +678,7 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
                   andamento: tuple[str, list[str]] | None = None) -> str:
     """
     pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
-    abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala.
+    abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala e dos keyframes de volume.
     igualar_db: o ganho que leva a mídia a -14 LUFS, com o "Igualar o volume" ligado.
     reverb: (entrada do FFmpeg com a resposta ao impulso, nome único) quando o clipe tem reverb.
     andamento: (roteiro do asendcmd, nomes dos atempo) da velocidade com curva.
@@ -708,7 +708,9 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
                    f"[{nome}c][{entrada_ir}:a]{afir_sem_normalizar()}[{nome}r];\n"
                    f"[{nome}s][{nome}r]{mistura}")
         filtros = []
-    filtros.append(f"volume={_numero(clipe['volume'])}")
+    # Com keyframes, o volume vai inteiro no roteiro do abaixar (o fixo não vale)
+    if not (clipe.get("keyframes") or {}).get("volume"):
+        filtros.append(f"volume={_numero(clipe['volume'])}")
     if igualar_db:
         filtros.append(f"volume={_numero(igualar_db)}dB")
     if abaixar:
@@ -1080,10 +1082,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                     entrada_do_som = len(entradas)
                     entradas.append(Entrada(midia.voz_limpa, lida.inicio, lida.duracao))
                 abaixar = None
-                if (clipe.get("abaixamento") or {}).get("pontos"):
+                curva_do_abaixar = (clipe.get("abaixamento") or {}).get("pontos")
+                volume_animado = (clipe.get("keyframes") or {}).get("volume")
+                if curva_do_abaixar or volume_animado:
                     abaixar = (f"{pasta}/volume_{clipe['id']}.txt", f"ab{len(sons)}")
-                    conteudo = comandos_de_volume(clipe["abaixamento"]["pontos"], segundos(clipe["duracao"]),
-                                                  f"volume@{abaixar[1]}")
+                    conteudo = comandos_de_volume(curva_do_abaixar, segundos(clipe["duracao"]),
+                                                  f"volume@{abaixar[1]}", volume_animado)
                     auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
                 igualar = ganho_para_igualar(midias[clipe["midia_id"]].lufs) if clipe.get("igualar_volume") else 0
                 reverb = None

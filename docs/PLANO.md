@@ -500,7 +500,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Seleção com um clique (MobileSAM) e com o pincel, apagar objeto (LaMa) e recortar objeto (camada nova), no editor de imagem.
 - [ ] Onda 6, lote D (som).
   - [x] Tirar o ronco (passa-altas de 80 Hz) nos efeitos de voz.
-  - [ ] Keyframes de volume, separar o som e cortes J/L, misturar o som nas transições, ajustar a música à duração, gravar narração, nivelar a voz e o medidor de loudness na prévia.
+  - [x] Keyframes de volume (aba Áudio), na prévia, na exportação no navegador e no render.
+  - [ ] Separar o som e cortes J/L, misturar o som nas transições, ajustar a música à duração, gravar narração, nivelar a voz e o medidor de loudness na prévia.
 - [ ] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

@@ -89,7 +89,7 @@ import {
   trocarImagemDaCamada,
 } from "./imagem.ts";
 import type { Cor } from "./cor.ts";
-import type { Expressao, PropriedadeAnimavel } from "./keyframes.ts";
+import type { ChaveDeKeyframe, Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
 import type { PlanoDoModelo } from "./modelos.ts";
 import type { CamadaPronta } from "./modelosDeImagem.ts";
@@ -121,7 +121,7 @@ export type Comando =
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
   | { comando: "projeto.fundo"; parametros: { cor: string } }
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
-  | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; tempo: Tick; acao: AcaoDeKeyframe } }
+  | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: ChaveDeKeyframe; tempo: Tick; acao: AcaoDeKeyframe } }
   | { comando: "clipe.expressao"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; expressao: Expressao | null } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
   | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
