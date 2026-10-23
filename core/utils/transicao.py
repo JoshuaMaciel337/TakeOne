@@ -150,7 +150,9 @@ def filtros_de_transicao(efeitos: list[dict], var_tempo: str = "t") -> dict:
         elif tipo == "deslizar" and entra:
             dx.append(falta)
         elif tipo == "empurrar":
-            dx.append(falta if entra else f"-(1-{falta})")
+            # Na saída, -(1 - falta) escrito como (falta - 1): o avaliador do FFmpeg não aceita "-(" depois de outro
+            # termo, e o clipe do meio de dois empurrões ("a+-(...)") derrubava a exportação
+            dx.append(falta if entra else f"({falta}-1)")
         elif tipo == "desfoque" and entra:
             fades.append(f"fade=t=in:st={_n(inicio)}:d={_n(duracao)}:alpha=1")
         elif tipo == "zoom" and entra:

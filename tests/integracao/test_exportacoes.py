@@ -212,6 +212,27 @@ def test_render_segue_a_geometria_da_previa(cliente, db_limpo):
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_render_com_empurroes_seguidos_sai_inteiro(cliente, db_limpo):
+    # O clipe do meio recebe um empurrão e sai com outro: a expressão do x soma os dois
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    empurrar = {"tipo": "empurrar", "duracao": SEGUNDO // 3}
+    base = {"midia_id": midia_id, "duracao": SEGUNDO, "entrada": 0, "velocidade": 1, "volume": 1}
+    clipes = [{**base, "id": "a", "inicio": 0, "transicao": empurrar},
+              {**base, "id": "b", "inicio": SEGUNDO, "transicao": empurrar},
+              {**base, "id": "c", "inicio": 2 * SEGUNDO}]
+    corpo = {"versao": projeto["versao"], "nome": "Empurrões", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"})
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    doc = db_limpo.exportacoes.find_one({"organizacao_id": organizacao_de(cliente)})
+    assert 2.9 < doc["duracao"] < 3.1
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
 def test_render_arredonda_os_cantos_com_borda(cliente, db_limpo):
     cadastrar(cliente)
     midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)

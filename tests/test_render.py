@@ -488,8 +488,21 @@ def test_transicao_sem_sobra_na_midia_repete_o_quadro():
     assert "tpad=start_mode=clone:start_duration=0:stop_mode=clone:stop_duration=0.5" in linhas[1]
     # O segundo começa no zero da mídia: o primeiro quadro fica meio segundo antes
     assert "tpad=start_mode=clone:start_duration=0.5:stop_mode=clone:stop_duration=0" in linhas[3]
-    assert "x='540+1080*(-(1-pow(1-clip((t-3.5)/1,0,1),3)))-overlay_w/2'" in linhas[2]
+    assert "x='540+1080*((pow(1-clip((t-3.5)/1,0,1),3)-1))-overlay_w/2'" in linhas[2]
     assert "x='540+1080*(pow(1-clip((t-3.5)/1,0,1),3))-overlay_w/2'" in linhas[4]
+
+
+def test_clipe_entre_dois_empurroes_soma_os_dois_sem_menos_antes_do_parentese():
+    # O avaliador do FFmpeg recusa "+-(": o clipe do meio de dois empurrões derrubava a exportação inteira
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}
+    empurrar = {"tipo": "empurrar", "duracao": S // 2}
+    clipes = [clipe("a", "deitado", 0, 2, transicao=empurrar),
+              clipe("b", "deitado", 2, 2, entrada=2, transicao=empurrar),
+              clipe("c", "deitado", 4, 2, entrada=4)]
+    plano = planejar_render(projeto([faixa("principal", clipes)], duracao=6), midias, 720, 1280)
+    assert "+-(" not in plano.filtro and "*(-(" not in plano.filtro
+    meio = next(linha for linha in plano.filtro.split(";\n") if linha.count("pow(1-clip(") == 2)
+    assert "+(pow(1-clip(" in meio
 
 
 def test_ganho_ate_o_alvo_de_loudness():
