@@ -7,9 +7,12 @@ import pytest
 
 from core.utils.transicao import (
     desfoque_na_transicao,
+    expressao_da_mistura,
+    fator_da_mistura,
     filtro_de_cortina,
     filtros_de_transicao,
     janelas_da_principal,
+    janelas_do_som,
     revelado_na_transicao,
     transformacao_na_transicao,
 )
@@ -108,3 +111,42 @@ def test_janela_com_numero_impar_de_quadros_comeca_num_quadro():
     janelas = janelas_da_principal(clipes, 1)
     assert (janelas["b"]["inicio"], janelas["a"]["fim"]) == (53, 68)
     assert janelas["a"]["efeitos"][0]["duracao"] == 15
+
+
+# -----------------------------------------------
+# Mistura do som: os mesmos números de transicao.test.ts
+# -----------------------------------------------
+def test_mistura_do_som_so_nas_transicoes_marcadas_e_em_potencia_constante():
+    mistura = {"tipo": "fusao", "duracao": 20, "misturar_som": True}
+    clipes = [{"id": "a", "inicio": 0, "duracao": 60, "transicao": mistura},
+              {"id": "b", "inicio": 60, "duracao": 60, "transicao": {"tipo": "fusao", "duracao": 20}},
+              {"id": "c", "inicio": 120, "duracao": 60}]
+    janelas = janelas_do_som(clipes, 1)
+    limites = (janelas["a"]["fim"], janelas["b"]["inicio"], janelas["b"]["fim"], janelas["c"]["inicio"])
+    assert limites == (70, 50, 120, 120), "a segunda transição não mistura: o som fica no corte"
+    sai, entra = janelas["a"]["efeitos"], janelas["b"]["efeitos"]
+    assert fator_da_mistura(sai, 50) == 1 and fator_da_mistura(sai, 70) == pytest.approx(0, abs=1e-12)
+    assert fator_da_mistura(entra, 50) == 0 and fator_da_mistura(entra, 70) == 1
+    for t in (55, 60, 63.3):
+        assert fator_da_mistura(sai, t) ** 2 + fator_da_mistura(entra, t) ** 2 == pytest.approx(1)
+    assert fator_da_mistura(entra, 60) == pytest.approx(math.sqrt(0.5))
+    assert expressao_da_mistura([], 0) == "1"
+
+
+@pytest.mark.skipif(not __import__("shutil").which("ffmpeg"), reason="FFmpeg não instalado")
+def test_expressao_da_mistura_no_volume_do_ffmpeg():
+    import subprocess
+    from array import array
+
+    from core.config import FFMPEG
+
+    efeitos = [{"papel": "entra", "inicio": 1.0, "duracao": 0.5}, {"papel": "sai", "inicio": 2.0, "duracao": 1.0}]
+    comeco = 0.75
+    volume = f"asetnsamples=n=480:p=0,volume='{expressao_da_mistura(efeitos, comeco)}':eval=frame"
+    saida = subprocess.run([FFMPEG, "-loglevel", "error", "-f", "lavfi", "-i", "aevalsrc=1:s=48000:d=3",
+                            "-af", volume, "-f", "f32le", "-"], capture_output=True, check=True, timeout=60).stdout
+    amostras = array("f", saida)
+    for local in (0.1, 0.3, 0.5, 0.8, 1.4, 1.9, 2.2):
+        # O ganho muda a cada bloco de 10 ms: no máximo um passo da curva
+        esperado = fator_da_mistura(efeitos, comeco + local)
+        assert amostras[round(local * 48000) + 240] == pytest.approx(esperado, abs=0.035), local

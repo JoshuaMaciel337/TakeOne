@@ -60,7 +60,8 @@ export type Midia = {
   bytes_recebidos: number;
   duracao: number | null;
   /** transparente: só nas imagens paradas (PNG ou WebP com fundo transparente). */
-  video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number; transparente?: boolean } | null;
+  /** `duracao`: a da imagem, quando acaba antes do contêiner (celular: o som vai além). */
+  video: { codec: string; largura: number; altura: number; fps: number | null; rotacao: number; transparente?: boolean; duracao?: number | null } | null;
   /** lufs: loudness medido na ingestão (falta nas mídias enviadas antes da medição). */
   audio: { codec: string; canais: number; taxa: number; lufs?: number | null } | null;
   miniaturas: Miniaturas | null;

@@ -23,7 +23,7 @@ import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/key
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
-import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -79,14 +79,16 @@ export const ANTECEDENCIA = 2 * TICKS_POR_SEGUNDO;
  * duas metades usam o mesmo elemento e o vídeo segue sem engasgar.
  *
  * Na principal, com `quadroDasTransicoes` (a duração de um quadro do projeto), uma transição deixa dois clipes na tela ao mesmo tempo (o que
- * sai e o que entra). Se os dois são da mesma mídia, o que entra ganha uma chave própria. O som não
- * usa as janelas das transições: cada clipe soa só entre o começo e o fim dele.
+ * sai e o que entra). Se os dois são da mesma mídia, o que entra ganha uma chave própria. Com `som`, valem
+ * só as janelas das transições que misturam o som (janelasDoSom): nas outras, cada clipe soa só entre o
+ * começo e o fim dele.
  */
-export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, quadroDasTransicoes?: Tick): ItemDaPrevia[] {
+export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>, tempo: Tick, quadroDasTransicoes?: Tick, som = false): ItemDaPrevia[] {
   const itens: ItemDaPrevia[] = [];
   for (const faixa of faixas) {
     const chaves = new Set<string>();
-    const janelas = quadroDasTransicoes && faixa.tipo === "principal" ? janelasDaPrincipal(faixa.clipes, quadroDasTransicoes) : null;
+    const janelas =
+      quadroDasTransicoes && faixa.tipo === "principal" ? (som ? janelasDoSom : janelasDaPrincipal)(faixa.clipes, quadroDasTransicoes) : null;
     const dentro = (clipe: Clipe) => {
       const janela = janelas?.get(clipe.id);
       return janela ? janela.inicio <= tempo && tempo < janela.fim : clipe.inicio <= tempo && tempo < fimDoClipe(clipe);

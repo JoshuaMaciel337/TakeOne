@@ -37,21 +37,24 @@ def ganho_do_fade(curva: str, p: float) -> float:
 PASSO_DA_CURVA = 0.01
 
 
-def comandos_de_volume(pontos: list[dict] | None, duracao: float, alvo: str, volume: list[dict] | None = None) -> str:
+def comandos_de_volume(pontos: list[dict] | None, duracao: float, alvo: str, volume: list[dict] | None = None,
+                       antes: float = 0) -> str:
     """
     O roteiro do asendcmd com o fator da curva (pontos em ticks desde o começo do clipe) a cada
     PASSO_DA_CURVA, só quando ele muda. Tempos em segundos desde o começo do clipe. `volume`: os
     keyframes de volume do clipe, multiplicados ao abaixar na fala no mesmo roteiro (como a prévia
-    multiplica os dois no ganho).
+    multiplica os dois no ganho). `antes`: segundos que o som começa antes do clipe (a mistura de uma
+    transição); o roteiro conta do começo do som, e a curva continua no tempo do clipe.
     """
     linhas, anterior = [], None
     for n in range(int(duracao / PASSO_DA_CURVA) + 1):
-        local = n * PASSO_DA_CURVA
+        roteiro = n * PASSO_DA_CURVA
+        local = roteiro - antes
         valor = max(0.0, valor_no_tempo(pontos, local * TICKS_POR_SEGUNDO)) if pontos else 1.0
         if volume:
             valor *= max(0.0, valor_no_tempo(volume, local * TICKS_POR_SEGUNDO))
         if anterior is None or abs(valor - anterior) > 1e-4:
-            linhas.append(f"{local:.2f} {alvo} volume {valor:.6f};")
+            linhas.append(f"{roteiro:.2f} {alvo} volume {valor:.6f};")
             anterior = valor
     return "\n".join(linhas) + "\n"
 

@@ -38,7 +38,10 @@ export function PainelTransicoes({ selecionado, aoPrever, aoExecutar }: Props) {
   const maximoS = duracaoMaximaDaTransicao(clipe, proximo) / TICKS_POR_SEGUNDO;
   const definir = (tipo: TipoTransicao | null, duracaoS = atual ? atual.duracao / TICKS_POR_SEGUNDO : DURACAO_TRANSICAO_S): Comando => ({
     comando: "clipe.transicao",
-    parametros: { clipeId: clipe.id, transicao: tipo ? { tipo, duracao: Math.round(Math.min(duracaoS, maximoS) * TICKS_POR_SEGUNDO) } : null },
+    parametros: {
+      clipeId: clipe.id,
+      transicao: tipo ? { tipo, duracao: Math.round(Math.min(duracaoS, maximoS) * TICKS_POR_SEGUNDO), misturar_som: Boolean(atual?.misturar_som) } : null,
+    },
   });
 
   return (
@@ -91,6 +94,21 @@ export function PainelTransicoes({ selecionado, aoPrever, aoExecutar }: Props) {
             else aoExecutar(definir(atual.tipo, valor));
           }}
         />
+      ) : null}
+      {atual ? (
+        <label className="flex items-start gap-2 text-xs">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={Boolean(atual.misturar_som)}
+            disabled={faixa.travada}
+            onChange={(evento) => aoExecutar({ comando: "clipe.transicao", parametros: { clipeId: clipe.id, transicao: { ...atual, misturar_som: evento.currentTarget.checked } } })}
+          />
+          <span>
+            Misturar o som
+            <span className="block text-[11px] text-suave">O som de um some enquanto o do outro aparece, na mesma duração. Sem isso, o som troca no corte.</span>
+          </span>
+        </label>
       ) : null}
     </div>
   );

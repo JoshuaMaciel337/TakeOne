@@ -10,7 +10,7 @@ import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
-import { formatarTimecode, type Tick } from "@/lib/tempo";
+import { duracaoDoQuadro, formatarTimecode, type Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
@@ -101,11 +101,13 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
 
   // A primeira faixa da lista é a de cima; no quadro ela tem que ser desenhada por último
   const visuais = visuaisNoTempo(projeto, midias, tempo);
-  // O som vem de todas as faixas com áudio: as de áudio e as de vídeo visíveis
+  // O som vem de todas as faixas com áudio: as de áudio e as de vídeo visíveis (na principal, com as transições que misturam o som)
   const sons = itensNoTempo(
     projeto.faixas.filter((faixa) => !faixa.muda && (faixa.tipo === "audio" || !faixa.oculta)),
     midias,
     tempo,
+    duracaoDoQuadro(projeto.taxa),
+    true,
   ).filter((item) => item.midia.audio && !item.clipe.som_separado);
   // O texto com destaque pede também a imagem na cor do destaque, que vai por cima
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));

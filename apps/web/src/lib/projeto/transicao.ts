@@ -21,7 +21,8 @@ export type TipoTransicao =
   | "cortina_baixo"
   | "cortina_cima"
   | "desfoque";
-export type Transicao = { tipo: TipoTransicao; duracao: Tick };
+/** `misturar_som`: os dois sons se cruzam na janela (janelasDoSom); sem ela, cada clipe soa só entre o começo e o fim dele. */
+export type Transicao = { tipo: TipoTransicao; duracao: Tick; misturar_som?: boolean };
 
 export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: string }[] = [
   { id: "fusao", nome: "Fusão", descricao: "Um clipe se mistura no outro" },
@@ -80,6 +81,31 @@ export function janelasDaPrincipal(clipes: Clipe[], quadro: Tick): Map<string, J
     entra.efeitos.push({ tipo: transicao.tipo, papel: "entra", inicio, duracao });
   });
   return janelas;
+}
+
+/**
+ * As janelas do som dos clipes da principal: só as transições com `misturar_som` estendem o som, na mesma
+ * janela da imagem (com a sobra da mídia). Os efeitos dizem onde o som sai e onde entra (fatorDaMistura).
+ */
+export function janelasDoSom(clipes: Clipe[], quadro: Tick): Map<string, JanelaDoClipe> {
+  return janelasDaPrincipal(
+    clipes.map((clipe) => (clipe.transicao?.misturar_som ? clipe : { ...clipe, transicao: null })),
+    quadro,
+  );
+}
+
+/**
+ * O ganho do som na mistura das transições no instante `t`: na janela, o que sai desce pelo cosseno e o que
+ * entra sobe pelo seno (potência constante: a soma dos quadrados é 1). Fora das janelas, 1. A mesma conta em
+ * core/utils/transicao.py (fator_da_mistura) e numa expressão do volume do FFmpeg.
+ */
+export function fatorDaMistura(efeitos: EfeitoDeTransicao[] | undefined, t: Tick): number {
+  let fator = 1;
+  for (const efeito of efeitos ?? []) {
+    const p = Math.min(1, Math.max(0, (t - efeito.inicio) / efeito.duracao));
+    fator *= efeito.papel === "entra" ? Math.sin((p * Math.PI) / 2) : Math.cos((p * Math.PI) / 2);
+  }
+  return fator;
 }
 
 /** A transformação com os efeitos das transições no instante `t`. */

@@ -628,3 +628,29 @@ def test_video_com_o_som_separado_nao_soa():
                             pasta="/trabalho")
     # Um som só: o do clipe de áudio
     assert plano.filtro_som.count("adelay=") == 1
+
+
+def test_transicao_que_mistura_o_som_estende_os_dois_sons_com_seno_e_cosseno():
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}
+    primeiro = clipe("a", "deitado", 0, 4, transicao={"tipo": "fusao", "duracao": S, "misturar_som": True},
+                     fade_saida=S)
+    segundo = clipe("b", "deitado", 4, 3, entrada=5)
+    plano = planejar_render(projeto([faixa("principal", [primeiro, segundo])], duracao=7), midias, 1080, 1920)
+    # O primeiro soa meio segundo além do corte, descendo pelo cosseno; o fade dele continua no tempo do clipe
+    assert "[0:a]asetpts=PTS-STARTPTS,atrim=start=0:duration=4.5,asetpts=PTS-STARTPTS" in plano.filtro_som
+    assert "afade=t=out:st=3:d=1" in plano.filtro_som
+    assert "volume='cos(PI/2*clip((t+-3.500000)/1.000000,0,1))':eval=frame" in plano.filtro_som
+    # O segundo começa meio segundo antes do corte (lê a sobra que a imagem já lia), subindo pelo seno
+    assert "[1:a]asetpts=PTS-STARTPTS,atrim=start=0.1:duration=3.5,asetpts=PTS-STARTPTS" in plano.filtro_som
+    assert "volume='sin(PI/2*clip((t+0.000000)/1.000000,0,1))':eval=frame" in plano.filtro_som
+    assert f"adelay={round(3.5 * 48000)}S:all=1" in plano.filtro_som
+
+
+def test_mistura_sem_sobra_na_midia_soa_so_o_que_existe():
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=4)}
+    primeiro = clipe("a", "deitado", 0, 4, transicao={"tipo": "fusao", "duracao": S, "misturar_som": True})
+    segundo = clipe("b", "deitado", 4, 3)
+    plano = planejar_render(projeto([faixa("principal", [primeiro, segundo])], duracao=7), midias, 1080, 1920)
+    # A mídia acaba no fim do primeiro e o segundo começa no zero dela: nenhum dos dois tem o que tocar a mais
+    assert "atrim=start=0:duration=4," in plano.filtro_som and "atrim=start=0:duration=3," in plano.filtro_som
+    assert "adelay=192000S" in plano.filtro_som

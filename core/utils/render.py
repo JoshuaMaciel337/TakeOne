@@ -65,7 +65,14 @@ from core.utils.som import (
     ganho_para_igualar,
 )
 from core.utils.tempo import TICKS_POR_SEGUNDO
-from core.utils.transicao import desfoque_na_transicao, filtro_de_cortina, filtros_de_transicao, janelas_da_principal
+from core.utils.transicao import (
+    desfoque_na_transicao,
+    expressao_da_mistura,
+    filtro_de_cortina,
+    filtros_de_transicao,
+    janelas_da_principal,
+    janelas_do_som,
+)
 from core.utils.velocidade import atempo_necessarios, comandos_do_andamento, expressao_do_tempo
 
 TAXA_AUDIO = 48000
@@ -675,22 +682,26 @@ def base_do_render(clipe: dict) -> dict:
 
 def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None,
                   igualar_db: float = 0, reverb: tuple[int, str] | None = None,
-                  andamento: tuple[str, list[str]] | None = None) -> str:
+                  andamento: tuple[str, list[str]] | None = None, antes: float = 0, depois: float = 0,
+                  cruzamento: list[dict] | None = None) -> str:
     """
     pular: segundos da mídia lida antes do começo do clipe (a sobra que a transição usa na imagem).
     abaixar: (roteiro do asendcmd, nome do volume) da curva do abaixar na fala e dos keyframes de volume.
     igualar_db: o ganho que leva a mídia a -14 LUFS, com o "Igualar o volume" ligado.
     reverb: (entrada do FFmpeg com a resposta ao impulso, nome único) quando o clipe tem reverb.
     andamento: (roteiro do asendcmd, nomes dos atempo) da velocidade com curva.
+    antes, depois: segundos que o som toca antes do começo e depois do fim do clipe, na janela de uma
+    transição que mistura o som (a sobra que a mídia tem); cruzamento: os efeitos dessas transições, em segundos.
     Os efeitos de voz vêm depois da velocidade e antes do volume, como os nós da prévia, que ficam
     entre o elemento (já na velocidade) e o ganho.
     """
-    atraso = round(segundos(clipe["inicio"]) * TAXA_AUDIO)
+    atraso = round((segundos(clipe["inicio"]) - antes) * TAXA_AUDIO)
     duracao = segundos(clipe["duracao"])
     # Só o trecho do clipe soa: a sobra lida para a transição (antes, `pular`, e depois do fim, no clipe que
     # sai) fica de fora. Sem o corte no fim, o som do clipe que sai continuava pela transição.
     filtros = ["asetpts=PTS-STARTPTS",
-               f"atrim=start={_numero(pular)}:duration={_numero(duracao * clipe['velocidade'])}",
+               f"atrim=start={_numero(pular - antes * clipe['velocidade'])}"
+               f":duration={_numero((antes + duracao + depois) * clipe['velocidade'])}",
                "asetpts=PTS-STARTPTS"]
     filtros += [
         f"aresample={TAXA_AUDIO}",
@@ -720,10 +731,16 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
     # Fades no tempo do próprio clipe (depois da velocidade), antes de ir para o instante dele
     fade_entrada, fade_saida = segundos(clipe.get("fade_entrada", 0)), segundos(clipe.get("fade_saida", 0))
     curva = CURVAS_DO_FADE[clipe.get("curva_fade") or CURVA_PADRAO]
+    # (o som que começa antes do clipe, na mistura de uma transição, empurra os fades)
     if fade_entrada > 0:
-        filtros.append(f"afade=t=in:st=0:d={_numero(fade_entrada)}:curve={curva}")
+        filtros.append(f"afade=t=in:st={_numero(antes)}:d={_numero(fade_entrada)}:curve={curva}")
     if fade_saida > 0:
-        filtros.append(f"afade=t=out:st={_numero(max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}:curve={curva}")
+        filtros.append(f"afade=t=out:st={_numero(antes + max(duracao - fade_saida, 0))}:d={_numero(fade_saida)}"
+                       f":curve={curva}")
+    if cruzamento:
+        # A mistura das transições: seno e cosseno pelo tempo do som, a cada 10 ms
+        expressao = expressao_da_mistura(cruzamento, segundos(clipe["inicio"]) - antes)
+        filtros += ["asetnsamples=n=480:p=0", f"volume='{expressao}':eval=frame"]
     filtros.append(f"adelay={atraso}S:all=1")
     if prefixo:
         return prefixo + "".join(f",{filtro}" for filtro in filtros)
@@ -847,6 +864,9 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     quadro_em_ticks = TICKS_POR_SEGUNDO * projeto["taxa"]["den"] / projeto["taxa"]["num"]
     janelas = (janelas_da_principal(sorted(principal["clipes"], key=lambda c: c["inicio"]), quadro_em_ticks)
                if principal else {})
+    # O som da principal só usa as janelas das transições que misturam o som
+    janelas_som = (janelas_do_som(sorted(principal["clipes"], key=lambda c: c["inicio"]), quadro_em_ticks)
+                   if principal else {})
     leituras: dict[str, Leitura] = {}
 
     entradas: list[Entrada] = []
@@ -1062,6 +1082,15 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 # O som pula a sobra da transição e o que foi aberto antes do trecho
                 leitura = leituras.get(clipe["id"])
                 pular = leitura.pular_audio + leitura.antecipar if leitura else 0
+                # Na mistura de uma transição, o som toca a sobra que a imagem já leu (até onde a mídia tem)
+                janela_som = janelas_som.get(clipe["id"]) if faixa["tipo"] == "principal" else None
+                papeis = {e["papel"] for e in janela_som["efeitos"]} if janela_som else set()
+                antes = (segundos(clipe["inicio"]) - leitura.inicio - leitura.pausa_inicio
+                         if leitura and "entra" in papeis else 0)
+                depois = (leitura.fim - segundos(clipe["inicio"] + clipe["duracao"]) - leitura.pausa_fim
+                          if leitura and "sai" in papeis else 0)
+                mistura = [{**e, "inicio": segundos(e["inicio"]), "duracao": segundos(e["duracao"])}
+                           for e in janela_som["efeitos"]] if janela_som else None
                 entrada_do_som = indice_da_entrada[clipe["id"]]
                 if clipe.get("tom"):
                     # A voz em outro tom (sobre a voz limpa, se ela está ligada) tem o mesmo tempo do original
@@ -1087,8 +1116,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 volume_animado = (clipe.get("keyframes") or {}).get("volume")
                 if curva_do_abaixar or volume_animado:
                     abaixar = (f"{pasta}/volume_{clipe['id']}.txt", f"ab{len(sons)}")
-                    conteudo = comandos_de_volume(curva_do_abaixar, segundos(clipe["duracao"]),
-                                                  f"volume@{abaixar[1]}", volume_animado)
+                    conteudo = comandos_de_volume(curva_do_abaixar, antes + segundos(clipe["duracao"]) + depois,
+                                                  f"volume@{abaixar[1]}", volume_animado, antes)
                     auxiliares[abaixar[0]] = ArquivoAuxiliar(abaixar[0], "comandos", {}, conteudo=conteudo)
                 igualar = ganho_para_igualar(midias[clipe["midia_id"]].lufs) if clipe.get("igualar_volume") else 0
                 reverb = None
@@ -1109,7 +1138,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                         comandos_do_andamento(clipe["curva_velocidade"], clipe["velocidade"],
                                               segundos(clipe["duracao"]), alvos)))
                     andamento = (roteiro_andamento, alvos)
-                cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb, andamento)
+                cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb, andamento,
+                                       antes, max(depois, 0), mistura)
                 linhas_som.append(f"{cadeia}[{sons[-1]}]")
     inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
     fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"

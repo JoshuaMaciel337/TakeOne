@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import type { Clipe, Transformacao } from "./modelo.ts";
-import { desfoqueNaTransicao, janelasDaPrincipal, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
+import { type Clipe, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { desfoqueNaTransicao, fatorDaMistura, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
 
 type Caso = {
   nome: string;
@@ -67,4 +67,22 @@ test("janelas: transição com número ímpar de quadros começa num quadro", ()
   const q25 = S / 25;
   const a25 = janelasDaPrincipal([clipe("a", 0, 50 * q25, { tipo: "fusao", duracao: S / 2 }), clipe("b", 50 * q25, 50 * q25)], q25);
   assert.deepEqual([a25.get("b")!.inicio / q25, a25.get("a")!.fim / q25], [44, 57]);
+});
+
+test("mistura do som: só nas transições marcadas e em potência constante (os números de test_transicao.py)", () => {
+  const base = { midia_id: "m", entrada: 0, velocidade: 1, volume: 1, fade_entrada: 0, fade_saida: 0, transformacao: TRANSFORMACAO_PADRAO, recorte: RECORTE_PADRAO };
+  const clipes: Clipe[] = [
+    { ...base, id: "a", inicio: 0, duracao: 60, transicao: { tipo: "fusao", duracao: 20, misturar_som: true } },
+    { ...base, id: "b", inicio: 60, duracao: 60, transicao: { tipo: "fusao", duracao: 20 } },
+    { ...base, id: "c", inicio: 120, duracao: 60 },
+  ];
+  const janelas = janelasDoSom(clipes, 1);
+  assert.deepEqual([janelas.get("a")!.fim, janelas.get("b")!.inicio, janelas.get("b")!.fim, janelas.get("c")!.inicio], [70, 50, 120, 120]);
+  const sai = janelas.get("a")!.efeitos;
+  const entra = janelas.get("b")!.efeitos;
+  assert.equal(fatorDaMistura(sai, 50), 1);
+  assert.ok(Math.abs(fatorDaMistura(sai, 70)) < 1e-12);
+  assert.deepEqual([fatorDaMistura(entra, 50), fatorDaMistura(entra, 70)], [0, 1]);
+  for (const t of [55, 60, 63.3]) assert.ok(Math.abs(fatorDaMistura(sai, t) ** 2 + fatorDaMistura(entra, t) ** 2 - 1) < 1e-12);
+  assert.ok(Math.abs(fatorDaMistura(entra, 60) - Math.SQRT1_2) < 1e-12);
 });

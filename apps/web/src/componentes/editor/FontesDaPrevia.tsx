@@ -13,6 +13,7 @@ import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodifi
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { volumeNoTempo } from "@/lib/projeto/keyframes";
 import { fatorDosFades, tempoNaMidia } from "@/lib/projeto/modelo";
+import { fatorDaMistura } from "@/lib/projeto/transicao";
 import { type EfeitosVoz, ganhoParaIgualar } from "@/lib/projeto/som";
 import { ANDAMENTO_MINIMO, velocidadeNaCurva } from "@/lib/projeto/velocidade";
 import { type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
@@ -219,9 +220,16 @@ export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo
   const audioRef = useRef<HTMLAudioElement>(null);
   useSeguirRelogio(audioRef, item, tempo, tocando);
 
-  // Os fades e o abaixar na fala mudam o ganho a cada quadro da tela enquanto toca, como no render
+  // Os fades, o abaixar na fala e a mistura das transições mudam o ganho a cada quadro da tela enquanto toca, como
+  // no render. Na janela de uma transição o clipe toca a sobra da mídia; onde ela não tem (antes do começo ou
+  // depois do fim), fica em silêncio, como o render, que só lê o que existe
   const igualar = item.clipe.igualar_volume ? 10 ** (ganhoParaIgualar(item.midia.audio?.lufs) / 20) : 1;
-  const ganho = item.ativo ? volumeNoTempo(item.clipe, tempo) * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) : 0;
+  const naMidia = tempoNaMidia(item.clipe, tempo) / TICKS_POR_SEGUNDO;
+  const temSom = naMidia >= 0 && naMidia <= (item.midia.video?.duracao || item.midia.duracao || Infinity);
+  const ganho =
+    item.ativo && temSom
+      ? volumeNoTempo(item.clipe, tempo) * igualar * fatorDosFades(item.clipe, tempo) * fatorDoAbaixamento(item.clipe, tempo) * fatorDaMistura(item.efeitos, tempo)
+      : 0;
   useEffect(() => {
     if (audioRef.current) aplicarVolume(audioRef.current, ganho);
   }, [ganho, tocando]);

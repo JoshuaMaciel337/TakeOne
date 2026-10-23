@@ -8,6 +8,8 @@
 # As cortinas não mexem na transformação: revelam parte de quem entra. No FFmpeg, um geq zera o alfa
 # fora da parte revelada, ligado só na janela da transição (o geq é lento).
 # -----------------------------------------------
+import math
+
 from core.utils.animacao import suavizar
 
 ZOOM_TRANSICAO = 0.6
@@ -40,6 +42,33 @@ def janelas_da_principal(clipes: list[dict], quadro: float) -> dict[str, dict]:
         janelas[proximo["id"]]["efeitos"].append({"tipo": transicao["tipo"], "papel": "entra", "inicio": inicio,
                                                   "duracao": duracao})
     return janelas
+
+
+def janelas_do_som(clipes: list[dict], quadro: float) -> dict[str, dict]:
+    """As janelas do som: só as transições com `misturar_som` estendem o som dos dois clipes (janelasDoSom)."""
+    return janelas_da_principal([c if (c.get("transicao") or {}).get("misturar_som") else {**c, "transicao": None}
+                                 for c in clipes], quadro)
+
+
+def fator_da_mistura(efeitos: list[dict], t: float) -> float:
+    """O ganho na mistura das transições: o que sai desce pelo cosseno, o que entra sobe pelo seno (fatorDaMistura)."""
+    fator = 1.0
+    for efeito in efeitos:
+        p = min(1.0, max(0.0, (t - efeito["inicio"]) / efeito["duracao"]))
+        fator *= math.sin(p * math.pi / 2) if efeito["papel"] == "entra" else math.cos(p * math.pi / 2)
+    return fator
+
+
+def expressao_da_mistura(efeitos: list[dict], comeco: float) -> str:
+    """
+    fator_da_mistura numa expressão do volume do FFmpeg, no tempo `t` do som do clipe, que começa em `comeco`
+    da linha do tempo (efeitos e comeco em segundos).
+    """
+    partes = []
+    for efeito in efeitos:
+        p = f"clip((t+{comeco - efeito['inicio']:.6f})/{efeito['duracao']:.6f},0,1)"
+        partes.append(f"{'sin' if efeito['papel'] == 'entra' else 'cos'}(PI/2*{p})")
+    return "*".join(partes) or "1"
 
 
 def transformacao_na_transicao(base: dict, efeitos: list[dict], t: float) -> dict:

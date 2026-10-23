@@ -16,9 +16,10 @@ import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodifi
 import { imagemDeTexto, type ImagemDeTexto } from "@/lib/previa/imagensDeTexto";
 import { fatorDoAbaixamento } from "@/lib/projeto/abaixar";
 import { volumeNoTempo } from "@/lib/projeto/keyframes";
-import { fatorDosFades, type Projeto } from "@/lib/projeto/modelo";
+import { fatorDosFades, fimDoClipe, type Projeto } from "@/lib/projeto/modelo";
 import { pendenciaParaONavegador } from "@/lib/projeto/pendencias";
 import { ganhoParaIgualar } from "@/lib/projeto/som";
+import { fatorDaMistura, type JanelaDoClipe, janelasDoSom } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -94,6 +95,9 @@ async function misturarSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>,
   const itens = clipesComSom(projeto, midias);
   const precisaDaSala = itens.some(({ clipe }) => (clipe.efeitos_voz?.reverb ?? 0) > 0);
   const sala = precisaDaSala ? await decodificar("/api/som/reverb.wav") : null;
+  // Na principal, as transições que misturam o som estendem o som dos dois clipes (janelasDoSom)
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  const janelas = principal ? janelasDoSom(principal.clipes, duracaoDoQuadro(projeto.taxa)) : new Map<string, JanelaDoClipe>();
   for (const [i, item] of itens.entries()) {
     conferir(sinal);
     aoProgresso((0.15 * i) / Math.max(1, itens.length), "Preparando o som");
@@ -103,17 +107,32 @@ async function misturarSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>,
     fonte.buffer = buffer;
     const cadeia = criarCadeia(ctx, fonte, ctx.destination);
     ajustarCadeia(ctx, cadeia, clipe.efeitos_voz, sala);
-    // O ganho do clipe a cada 5 ms: volume, igualar, fades e abaixar na fala, como a prévia calcula
-    const inicioS = clipe.inicio / TICKS_POR_SEGUNDO;
+    // A janela da mistura: o som vai além do clipe só até onde a mídia tem (como o render, que lê só o que existe)
+    const janela = janelas.get(clipe.id);
     const duracaoDoClipeS = clipe.duracao / TICKS_POR_SEGUNDO;
+    const entradaS = clipe.entrada / TICKS_POR_SEGUNDO;
+    const limiteS = midia.video?.duracao || midia.duracao || Infinity;
+    const antesS = janela ? Math.min((clipe.inicio - janela.inicio) / TICKS_POR_SEGUNDO, entradaS / clipe.velocidade) : 0;
+    const depoisS = janela
+      ? Math.max(0, Math.min((janela.fim - fimDoClipe(clipe)) / TICKS_POR_SEGUNDO, (limiteS - entradaS - duracaoDoClipeS * clipe.velocidade) / clipe.velocidade))
+      : 0;
+    const comeco = clipe.inicio - Math.round(antesS * TICKS_POR_SEGUNDO);
+    const total = Math.round((antesS + duracaoDoClipeS + depoisS) * TICKS_POR_SEGUNDO);
+    // O ganho do clipe a cada 5 ms: volume, igualar, fades, abaixar na fala e a mistura, como a prévia calcula
     const igualar = clipe.igualar_volume ? 10 ** (ganhoParaIgualar(midia.audio?.lufs) / 20) : 1;
-    const pontos = Math.max(2, Math.ceil(duracaoDoClipeS * PONTOS_DE_GANHO_POR_SEGUNDO) + 1);
+    const pontos = Math.max(2, Math.ceil((total / TICKS_POR_SEGUNDO) * PONTOS_DE_GANHO_POR_SEGUNDO) + 1);
     const curva = Float32Array.from({ length: pontos }, (_, k) => {
-      const t = clipe.inicio + Math.round((clipe.duracao * k) / (pontos - 1));
-      return volumeNoTempo(clipe, t) * igualar * fatorDosFades(clipe, Math.min(t, clipe.inicio + clipe.duracao - 1)) * fatorDoAbaixamento(clipe, t);
+      const t = comeco + Math.round((total * k) / (pontos - 1));
+      return (
+        volumeNoTempo(clipe, t) *
+        igualar *
+        fatorDosFades(clipe, Math.min(t, clipe.inicio + clipe.duracao - 1)) *
+        fatorDoAbaixamento(clipe, t) *
+        fatorDaMistura(janela?.efeitos, t)
+      );
     });
-    cadeia.ganho.gain.setValueCurveAtTime(curva, inicioS, duracaoDoClipeS);
-    fonte.start(inicioS, clipe.entrada / TICKS_POR_SEGUNDO, duracaoDoClipeS);
+    cadeia.ganho.gain.setValueCurveAtTime(curva, comeco / TICKS_POR_SEGUNDO, total / TICKS_POR_SEGUNDO);
+    fonte.start(comeco / TICKS_POR_SEGUNDO, entradaS - antesS * clipe.velocidade, total / TICKS_POR_SEGUNDO);
   }
   conferir(sinal);
   aoProgresso(0.15, "Misturando o som");
