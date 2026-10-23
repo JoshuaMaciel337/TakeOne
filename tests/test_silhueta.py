@@ -28,6 +28,10 @@ def test_a_borda_do_contorno_fica_a_dois_sigmas():
     dentro = 0.5 * math.erfc((2 * sigma - 3) / sigma / math.sqrt(2))
     assert cobertura_do_contorno(fora, sigma) == 0 and cobertura_do_contorno(dentro, sigma) == 1
     assert cobertura_do_contorno(0.9, sigma) == 1
+    # Longe do clipe (alfa 0), nenhum contorno, mesmo o fino
+    for fino in (0.2, 0.5, 1, 1.18):
+        assert cobertura_do_contorno(0, fino) == 0
+        assert cobertura_do_contorno(LIMIAR_DO_CONTORNO, fino) == pytest.approx(0.5)
 
 
 def test_margem_e_deslocamento():

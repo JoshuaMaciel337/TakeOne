@@ -41,10 +41,15 @@ def deslocamento_da_sombra(sombra: dict, altura: float) -> tuple[float, float]:
     return distancia * math.cos(angulo), distancia * math.sin(angulo)
 
 
+def rampa_do_contorno(sigma: float) -> float:
+    """Quanto o alfa desfocado anda em um pixel na borda do contorno; no contorno fino (sigma abaixo de 1,2 px), no
+    máximo o dobro do limiar, para o alfa 0 dar cobertura 0 (senão o contorno tingia a caixa inteira do clipe)."""
+    return min(DENSIDADE_NA_BORDA / max(sigma, 1e-6), 2 * LIMIAR_DO_CONTORNO)
+
+
 def cobertura_do_contorno(alfa_desfocado: float, sigma: float) -> float:
     """Quanto do contorno cobre o pixel, pelo alfa desfocado (0 a 1) e o sigma do desfoque em pixels."""
-    rampa = DENSIDADE_NA_BORDA / max(sigma, 1e-6)
-    return min(max((alfa_desfocado - LIMIAR_DO_CONTORNO) / rampa + 0.5, 0.0), 1.0)
+    return min(max((alfa_desfocado - LIMIAR_DO_CONTORNO) / rampa_do_contorno(sigma) + 0.5, 0.0), 1.0)
 
 
 def _rgb(cor: str) -> tuple[int, int, int]:
@@ -71,7 +76,7 @@ def filtros_da_silhueta(clipe: dict, altura: int, numero: int, cabeca: str) -> t
     if com_contorno:
         r, g, b = _rgb(contorno["cor"])
         sigma = contorno["largura"] * altura / 2
-        rampa = DENSIDADE_NA_BORDA / max(sigma, 1e-6)
+        rampa = rampa_do_contorno(sigma)
         # Em 16 bits: o limiar fica em 2,3% do alfa, e em 8 bits a borda sairia em degraus. O lut de gray16 vai
         # até maxval (65280), que volta a 255 em 8 bits
         linhas += [

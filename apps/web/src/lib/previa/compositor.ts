@@ -11,7 +11,7 @@ import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR
 import type { Cortes } from "../projeto/letras.ts";
 import { type Cantos, type ChaveLuma, type Chroma, type MascaraDeForma, type Mesclagem, PONTOS_MAXIMOS_DO_DESENHO, type Recorte, type Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
-import { type Contorno, DENSIDADE_NA_BORDA, deslocamentoDaSombra, LIMIAR_DO_CONTORNO, margemDaSilhueta, type Sombra } from "../projeto/silhueta.ts";
+import { type Contorno, deslocamentoDaSombra, LIMIAR_DO_CONTORNO, margemDaSilhueta, rampaDoContorno, type Sombra } from "../projeto/silhueta.ts";
 
 /** A fonte da camada de ajuste: o que já foi desenhado embaixo dela (uma cópia do canvas). */
 export const FUNDO = "fundo" as const;
@@ -1448,7 +1448,7 @@ export class Compositor {
       const borrada = this.desfocar(local.textura, w, h, Math.max(sigma, 0.05), RECORTE_INTEIRO, ALVO_DO_CONTORNO, true);
       juntar(borrada, ALVO_COM_CONTORNO, 1, (uniformes) => {
         gl.uniform3f(uniformes.cor, ...corParaRgb(contorno.cor));
-        gl.uniform1f(uniformes.rampa, DENSIDADE_NA_BORDA / Math.max(sigma, 1e-6));
+        gl.uniform1f(uniformes.rampa, rampaDoContorno(sigma));
       });
     }
     if (silhueta.sombra && silhueta.sombra.opacidade > 0) {

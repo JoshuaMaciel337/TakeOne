@@ -37,8 +37,15 @@ export function deslocamentoDaSombra(sombra: Sombra, altura: number): [number, n
   return [distancia * Math.cos(angulo), distancia * Math.sin(angulo)];
 }
 
+/**
+ * Quanto o alfa desfocado anda em um pixel na borda do contorno; no contorno fino (sigma abaixo de 1,2 px), no máximo o
+ * dobro do limiar, para o alfa 0 dar cobertura 0 (senão o contorno tingia a caixa inteira do clipe).
+ */
+export function rampaDoContorno(sigma: number): number {
+  return Math.min(DENSIDADE_NA_BORDA / Math.max(sigma, 1e-6), 2 * LIMIAR_DO_CONTORNO);
+}
+
 /** Quanto do contorno cobre o pixel, pelo alfa desfocado (0 a 1) e o sigma do desfoque em pixels. */
 export function coberturaDoContorno(alfaDesfocado: number, sigma: number): number {
-  const rampa = DENSIDADE_NA_BORDA / Math.max(sigma, 1e-6);
-  return Math.min(Math.max((alfaDesfocado - LIMIAR_DO_CONTORNO) / rampa + 0.5, 0), 1);
+  return Math.min(Math.max((alfaDesfocado - LIMIAR_DO_CONTORNO) / rampaDoContorno(sigma) + 0.5, 0), 1);
 }

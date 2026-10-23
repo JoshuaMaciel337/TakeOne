@@ -3,7 +3,7 @@
   {
    "alfa": 0,
    "sigma": 0.5,
-   "cobertura": 0.289312836
+   "cobertura": 0.0
   },
   {
    "alfa": 0,
@@ -18,7 +18,7 @@
   {
    "alfa": 0.01,
    "sigma": 0.5,
-   "cobertura": 0.381922578
+   "cobertura": 0.21978022
   },
   {
    "alfa": 0.01,
@@ -33,7 +33,7 @@
   {
    "alfa": 0.02,
    "sigma": 0.5,
-   "cobertura": 0.474532321
+   "cobertura": 0.43956044
   },
   {
    "alfa": 0.02,
@@ -63,7 +63,7 @@
   {
    "alfa": 0.03,
    "sigma": 0.5,
-   "cobertura": 0.567142063
+   "cobertura": 0.659340659
   },
   {
    "alfa": 0.03,
