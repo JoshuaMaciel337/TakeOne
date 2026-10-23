@@ -62,3 +62,46 @@ test("quando um clipe acaba, os outros continuam; quando todos acabam, a montage
   // Só ruim: nada
   assert.equal(montar([video("ruim", 30, () => 0.1)], null, 20).trechos.length, 0);
 });
+
+test("num vídeo de uma hora, a montagem continua rápida", () => {
+  const longo = video("longo", 3600, (t) => 0.5 + 0.4 * Math.sin(t / 7), [600, 1800, 2400]);
+  const inicio = performance.now();
+  const { trechos } = montar([longo, video("curto", 30)], null, 120);
+  assert.ok(trechos.length > 10);
+  assert.ok(performance.now() - inicio < 3000, `${Math.round(performance.now() - inicio)} ms`);
+});
+
+test("a busca com somas acumuladas acha o mesmo trecho da conta direta", () => {
+  // A conta de antes, amostra por amostra
+  function direto(clipe: ClipeParaMontar, duracao: number): { entradaS: number; nota: number } | null {
+    const q = clipe.qualidade!;
+    let melhor: { entradaS: number; nota: number } | null = null;
+    for (let de = 0; de + duracao <= clipe.duracaoS + 1e-9; de += 0.25) {
+      let soma = 0;
+      let quantos = 0;
+      let cortado = false;
+      for (let i = 0; i < q.t.length && q.t[i] < de + duracao; i++) {
+        if (q.t[i] < de) continue;
+        if (q.corte[i] && q.t[i] > de + 1e-9) cortado = true;
+        soma += q.nota[i];
+        quantos++;
+      }
+      if (cortado || !quantos) continue;
+      const nota = soma / quantos;
+      if (nota >= NOTA_MINIMA && (!melhor || nota > melhor.nota + 1e-9)) melhor = { entradaS: Math.round(de * 1000) / 1000, nota };
+    }
+    return melhor;
+  }
+  let semente = 3;
+  const sorteio = () => ((semente = (semente * 16807) % 2147483647) / 2147483647);
+  for (let caso = 0; caso < 40; caso++) {
+    const duracaoS = 5 + Math.floor(sorteio() * 40);
+    const cortes = Array.from({ length: Math.floor(sorteio() * 4) }, () => Math.floor(sorteio() * duracaoS * 4) / 4);
+    const clipe = video(`c${caso}`, duracaoS, () => sorteio(), cortes);
+    const duracao = 1 + Math.floor(sorteio() * 12) / 4;
+    const novo = melhorTrecho(clipe, duracao, []);
+    const antigo = direto(clipe, duracao);
+    assert.equal(novo?.entradaS ?? null, antigo?.entradaS ?? null, `caso ${caso}`);
+    if (novo && antigo) assert.ok(Math.abs(novo.nota - antigo.nota) < 1e-9);
+  }
+});

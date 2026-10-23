@@ -58,27 +58,55 @@ export function duracoesDosTrechos(batidas: number[] | null, alvoS: number | nul
 type Usado = { de: number; ate: number };
 
 /** O melhor trecho de `duracao` segundos ainda livre num vídeo, ou null. */
+/** A primeira amostra com t >= valor (ou t > valor, com `estrito`): busca binária nos tempos, que vêm em ordem. */
+function primeiraDesde(t: number[], valor: number, estrito: boolean): number {
+  let baixo = 0;
+  let alto = t.length;
+  while (baixo < alto) {
+    const meio = (baixo + alto) >> 1;
+    if (estrito ? t[meio] > valor : t[meio] >= valor) alto = meio;
+    else baixo = meio + 1;
+  }
+  return baixo;
+}
+
+// As somas acumuladas de cada qualidade, feitas uma vez: num vídeo de uma hora, somar amostra por amostra em cada
+// posição de cada trecho levava minutos
+const acumuladosPorQualidade = new WeakMap<Qualidade, { somas: Float64Array; cortes: Int32Array }>();
+function acumulados(q: Qualidade): { somas: Float64Array; cortes: Int32Array } {
+  let feitos = acumuladosPorQualidade.get(q);
+  if (!feitos) {
+    const somas = new Float64Array(q.t.length + 1);
+    const cortes = new Int32Array(q.t.length + 1);
+    for (let i = 0; i < q.t.length; i++) {
+      somas[i + 1] = somas[i] + q.nota[i];
+      cortes[i + 1] = cortes[i] + (q.corte[i] ? 1 : 0);
+    }
+    feitos = { somas, cortes };
+    acumuladosPorQualidade.set(q, feitos);
+  }
+  return feitos;
+}
+
 export function melhorTrecho(clipe: ClipeParaMontar, duracao: number, usados: Usado[]): { entradaS: number; nota: number } | null {
   if (clipe.duracaoS < duracao) return null;
   const livre = (de: number) => usados.every((u) => de + duracao + FOLGA_S <= u.de || de >= u.ate + FOLGA_S);
   if (clipe.imagem) return usados.length ? null : { entradaS: 0, nota: NOTA_DA_IMAGEM };
   const q = clipe.qualidade;
   if (!q || !q.t.length) return null;
+  const { somas, cortes } = acumulados(q);
   let melhor: { entradaS: number; nota: number } | null = null;
   for (let de = 0; de + duracao <= clipe.duracaoS + 1e-9; de += PASSO_S) {
     if (!livre(de)) continue;
-    let soma = 0;
-    let quantos = 0;
-    let cortado = false;
-    for (let i = 0; i < q.t.length && q.t[i] < de + duracao; i++) {
-      if (q.t[i] < de) continue;
-      // Um corte de cena no meio do trecho mostraria duas cenas num corte só
-      if (q.corte[i] && q.t[i] > de + 1e-9) cortado = true;
-      soma += q.nota[i];
-      quantos++;
-    }
-    if (cortado || !quantos) continue;
-    const nota = soma / quantos;
+    // As amostras com de <= t < de + duracao; um corte de cena no meio do trecho (depois do começo dele)
+    // mostraria duas cenas num corte só
+    const a = primeiraDesde(q.t, de, false);
+    const b = primeiraDesde(q.t, de + duracao, false);
+    const quantos = b - a;
+    if (quantos <= 0) continue;
+    const depoisDoComeco = Math.max(a, primeiraDesde(q.t, de + 1e-9, true));
+    if (depoisDoComeco < b && cortes[b] - cortes[depoisDoComeco] > 0) continue;
+    const nota = (somas[b] - somas[a]) / quantos;
     if (nota >= NOTA_MINIMA && (!melhor || nota > melhor.nota + 1e-9)) melhor = { entradaS: Math.round(de * 1000) / 1000, nota };
   }
   return melhor;
