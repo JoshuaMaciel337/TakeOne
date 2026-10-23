@@ -537,6 +537,9 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Servidor MCP (chaves de acesso na API; apps/servidor_mcp pelo stdio; docs/mcp.md).
   - [x] Multicâmera (as gravações encaixam pelo som; cada câmera numa faixa, e a troca no cursor vai até a próxima troca).
 - [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
+  - [x] Ampliar (Real-ESRGAN geral x4v3, na CPU) e expandir até outra proporção (LaMa, a parte nova ampliada pelo Real-ESRGAN), na ferramenta Foto com IA do editor de imagem.
+  - [x] Profundidade (Depth Anything V2 Small, na CPU) e a foto em 3D, na aba Básico de uma foto no editor de vídeo.
+  - [ ] Gerar imagem por texto (na placa).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 
 **Estimativa:**

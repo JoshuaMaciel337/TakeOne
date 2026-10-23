@@ -34,6 +34,22 @@ RUN chmod -R a+rX /app/modelos/mobilesam
 # LaMa em ONNX (apagar objeto, Apache-2.0; Carve/LaMa-ONNX numa revisão fixa, entrada de 512 × 512)
 ADD --checksum=sha256:1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6     https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx     /app/modelos/lama.onnx
 RUN chmod 644 /app/modelos/lama.onnx
+# Real-ESRGAN geral x4v3 em ONNX (ampliar fotos, BSD-3; a exportação da Qualcomm AI Hub, versão 0.65.0, entrada de
+# 128 × 128): o .onnx e os pesos no .data ao lado, tirados do ZIP
+ADD --checksum=sha256:fc094329b24a00c936ebc1cc4c51bc59633e7dc36f4a553344342171cbd3c7cf \
+    https://qaihub-public-assets.s3.us-west-2.amazonaws.com/qai-hub-models/models/real_esrgan_general_x4v3/releases/v0.65.0/real_esrgan_general_x4v3-onnx-float.zip \
+    /tmp/esrgan.zip
+RUN python -c "import zipfile; zipfile.ZipFile('/tmp/esrgan.zip').extractall('/tmp/esrgan')" \
+ && mkdir -p /app/modelos/esrgan \
+ && mv /tmp/esrgan/real_esrgan_general_x4v3-onnx-float/real_esrgan_general_x4v3.onnx \
+       /tmp/esrgan/real_esrgan_general_x4v3-onnx-float/real_esrgan_general_x4v3.data /app/modelos/esrgan/ \
+ && rm -rf /tmp/esrgan /tmp/esrgan.zip && chmod -R a+rX /app/modelos/esrgan
+# Depth Anything V2 Small em ONNX (profundidade da foto em 3D, Apache-2.0; onnx-community numa revisão fixa).
+# O Base e o Large não servem: a licença deles não permite uso comercial
+ADD --checksum=sha256:afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c \
+    https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/4472b7362082ad9968fee890ca0f1e5aca36b93d/onnx/model.onnx \
+    /app/modelos/profundidade.onnx
+RUN chmod 644 /app/modelos/profundidade.onnx
 # Kokoro-82M v1.0 em ONNX (texto em fala, Apache-2.0; onnx-community numa revisão fixa) e as três vozes pt-BR.
 # O espeak-ng (GPL-3, pelo apt) converte o texto em fonemas, chamado como programa separado.
 ARG KOKORO=https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231

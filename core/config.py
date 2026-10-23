@@ -51,6 +51,10 @@ MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx
 MODELO_SELECAO = Path(os.environ.get("MODELO_SELECAO", "/app/modelos/mobilesam"))
 # LaMa (apagar objeto, Apache-2.0): a entrada fixa de 512 × 512, em ONNX
 MODELO_APAGAR = Path(os.environ.get("MODELO_APAGAR", "/app/modelos/lama.onnx"))
+# Real-ESRGAN geral x4v3 (ampliar fotos, BSD-3; a exportação ONNX da Qualcomm, com os pesos no .data ao lado)
+MODELO_AMPLIAR = Path(os.environ.get("MODELO_AMPLIAR", "/app/modelos/esrgan/real_esrgan_general_x4v3.onnx"))
+# Depth Anything V2 Small (profundidade da foto em 3D, Apache-2.0)
+MODELO_PROFUNDIDADE = Path(os.environ.get("MODELO_PROFUNDIDADE", "/app/modelos/profundidade.onnx"))
 # Kokoro-82M (texto em fala, Apache-2.0): model.onnx, tokenizer.json e uma tabela de estilo por voz
 MODELO_FALA = Path(os.environ.get("MODELO_FALA", "/app/modelos/kokoro"))
 # espeak-ng (GPL-3): só como programa separado, para converter o texto em fonemas

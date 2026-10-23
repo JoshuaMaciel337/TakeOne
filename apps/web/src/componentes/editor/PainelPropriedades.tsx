@@ -44,6 +44,7 @@ import { ControleNumerico } from "./ControleNumerico";
 import { IniciarDesenhoDaMascara } from "./DesenhoDaMascara";
 import { NoRitmo } from "./NoRitmo";
 import { Estabilizar } from "./Estabilizar";
+import { FotoEm3D } from "./FotoEm3D";
 import { Multicamera } from "./Multicamera";
 import { BotaoSeguirObjeto } from "./SeguirObjeto";
 import { SecaoExpressoes } from "./SecaoExpressoes";
@@ -139,6 +140,8 @@ type Props = {
   aoAvisar: (mensagem: string) => void;
   /** A forma nova entra no lugar da imagem dos clipes quando ficar pronta (o Editor espera a biblioteca). */
   aoTrocarMidia: (clipeIds: string[], midia: Midia) => void;
+  /** A foto em 3D entra no lugar da foto do clipe quando ficar pronta (o Editor espera a biblioteca). */
+  aoTrocarPorVideo?: (clipeId: string, midia: Midia) => void;
   /** O "Seguir um objeto" (o fluxo fica no Editor, porque passa pela prévia). */
   seguirObjeto: EstadoSeguirObjeto;
   /** Cor de fundo do projeto, mostrada quando nada está selecionado. */
@@ -154,7 +157,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -278,6 +281,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             aoAvisar={aoAvisar}
             seguirObjeto={seguirObjeto}
             aoTrocarMidia={aoTrocarMidia}
+            aoTrocarPorVideo={aoTrocarPorVideo}
             faixas={faixas}
             midias={midias}
             aoPrever={aoPrever}
@@ -357,6 +361,7 @@ type PropsBasico = PropsAba & {
   aoAvisar: (mensagem: string) => void;
   seguirObjeto: EstadoSeguirObjeto;
   aoTrocarMidia: (clipeIds: string[], midia: Midia) => void;
+  aoTrocarPorVideo?: (clipeId: string, midia: Midia) => void;
   /** Para a multicâmera: as faixas (as câmeras) e as mídias da biblioteca (as gravações). */
   faixas: Faixa[];
   midias?: ReadonlyMap<string, Midia>;
@@ -384,7 +389,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -565,6 +570,9 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         <MascaraDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {midia?.elemento && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
+        ) : null}
+        {comTempo && aoTrocarPorVideo && midia?.imagem && !midia.elemento && !midia.animacao && !midia.video?.transparente && !clipe.texto ? (
+          <FotoEm3D clipe={clipe} midia={midia} travada={travada} aoPedir={aoTrocarPorVideo} aoAvisar={aoAvisar} />
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}

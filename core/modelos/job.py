@@ -43,6 +43,9 @@ TAREFAS = {
     "quadro": RECURSO_CPU,
     "inversao": RECURSO_CPU,
     "fluido": RECURSO_CPU,
+    "ampliar": RECURSO_CPU,
+    "expandir": RECURSO_CPU,
+    "foto_3d": RECURSO_CPU,
 }
 
 

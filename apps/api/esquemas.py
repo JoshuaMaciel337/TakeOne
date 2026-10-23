@@ -818,6 +818,28 @@ class SelecaoSaida(BaseModel):
     job_id: str | None = None
 
 
+class AmpliarEntrada(BaseModel):
+    fator: Literal[2, 4] = 2
+
+
+class ExpandirEntrada(BaseModel):
+    """A proporção da foto expandida, como "9:16" ou o tamanho do quadro ("1080:1350"), de 1:4 a 4:1."""
+    proporcao: str = Field(pattern=r"^[1-9][0-9]{0,4}:[1-9][0-9]{0,4}$")
+
+    @field_validator("proporcao")
+    @classmethod
+    def proporcao_razoavel(cls, valor: str) -> str:
+        largura, altura = (int(lado) for lado in valor.split(":"))
+        if not 0.25 <= largura / altura <= 4:
+            raise ValueError("A proporção vai de 1:4 a 4:1.")
+        return valor
+
+
+class Foto3dEntrada(BaseModel):
+    movimento: Literal["aproximar", "afastar", "lado", "circular"] = "aproximar"
+    duracao: float = Field(default=4.0, ge=2, le=10, description="Em segundos")
+
+
 class ObjetoEntrada(BaseModel):
     acao: Literal["apagar", "recortar"]
     selecao: str | None = Field(default=None, pattern=r"^selecao_[0-9a-f]{12}\.png$")

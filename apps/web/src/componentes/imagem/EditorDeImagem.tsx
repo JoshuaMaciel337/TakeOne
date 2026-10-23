@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, Download, Image as ImageIcon, LayoutTemplate, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2, WandSparkles } from "lucide-react";
+import { Check, ChevronLeft, Download, Image as ImageIcon, LayoutTemplate, LoaderCircle, PaintBucket, Redo2, Shapes, Sparkles, Type, Undo2, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
@@ -34,15 +34,17 @@ import { useMidias } from "@/lib/useMidias";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { PainelCamadas } from "./PainelCamadas";
+import { PainelFotoIA } from "./PainelFotoIA";
 import { PainelObjeto } from "./PainelObjeto";
 import { useObjeto } from "./useObjeto";
 import { PreviaDaImagem } from "./PreviaDaImagem";
 
-type Ferramenta = "modelos" | "imagens" | "objeto" | "texto" | "elementos" | "fundo";
+type Ferramenta = "modelos" | "imagens" | "objeto" | "ia" | "texto" | "elementos" | "fundo";
 const FERRAMENTAS: { id: Ferramenta; nome: string; icone: typeof ImageIcon }[] = [
   { id: "modelos", nome: "Modelos", icone: LayoutTemplate },
   { id: "imagens", nome: "Imagens", icone: ImageIcon },
   { id: "objeto", nome: "Objeto", icone: WandSparkles },
+  { id: "ia", nome: "Foto com IA", icone: Sparkles },
   { id: "texto", nome: "Texto", icone: Type },
   { id: "elementos", nome: "Elementos", icone: Shapes },
   { id: "fundo", nome: "Fundo e tamanho", icone: PaintBucket },
@@ -364,6 +366,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   pendentes.current.set(midia.id, acao === "apagar" ? { trocar: [selecionado.clipe.id] } : { camadaDe: selecionado.faixa.id });
                   void biblioteca.recarregar();
                   mostrarAviso(acao === "apagar" ? "Apagando o objeto: a foto troca quando ficar pronta." : "Recortando o objeto: ele entra numa camada nova quando ficar pronto.");
+                }}
+              />
+            ) : ferramenta === "ia" ? (
+              <PainelFotoIA
+                foto={midiaDoClipe?.imagem && !midiaDoClipe.elemento && !midiaDoClipe.animacao ? midiaDoClipe : null}
+                quadro={tamanhoDaImagem(projetoNaTela)}
+                aoPedir={(acao, midia) => {
+                  if (!selecionado) return;
+                  // Ampliada: a foto da camada é trocada; expandida: entra uma camada nova com tudo da camada
+                  pendentes.current.set(midia.id, acao === "ampliar" ? { trocar: [selecionado.clipe.id] } : { camadaDe: selecionado.faixa.id });
+                  void biblioteca.recarregar();
+                  mostrarAviso(acao === "ampliar" ? "Ampliando a foto: ela troca quando ficar pronta." : "Expandindo a foto: ela entra numa camada nova quando ficar pronta.");
                 }}
               />
             ) : ferramenta === "imagens" ? (

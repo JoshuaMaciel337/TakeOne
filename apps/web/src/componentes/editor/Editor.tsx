@@ -232,7 +232,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
 
   // Mídias pedidas nos painéis (animações, formas): quando ficam prontas, entram no cursor do momento do
   // pedido ou trocam a imagem dos clipes escolhidos. Só saem da lista quando aparecem prontas ou com erro.
-  const pendentes = useRef(new Map<string, { inicio: Tick } | { clipeIds: string[] }>());
+  const pendentes = useRef(new Map<string, { inicio: Tick } | { clipeIds: string[] } | { preencher: string }>());
   function pedirAnimacao(midia: { id: string }, inicio: Tick = tempo) {
     pendentes.current.set(midia.id, { inicio });
     void biblioteca.recarregar();
@@ -269,6 +269,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       pendentes.current.delete(id);
       if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
       else if ("inicio" in acao) executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio: acao.inicio } });
+      // A foto em 3D: o vídeo entra no lugar da foto (o clipe encurta se ele for mais curto)
+      else if ("preencher" in acao) executar({ comando: "clipe.preencher", parametros: { clipeId: acao.preencher, midiaId: id } });
       else executar({ comando: "clipe.trocarMidia", parametros: { clipeIds: acao.clipeIds, midiaId: id } });
     }
   });
@@ -535,6 +537,10 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
               faixas={projeto.faixas}
               aoAvisar={mostrarAviso}
               aoTrocarMidia={trocarMidiaQuandoPronta}
+              aoTrocarPorVideo={(clipeId, midia) => {
+                pendentes.current.set(midia.id, { preencher: clipeId });
+                void biblioteca.recarregar();
+              }}
               seguirObjeto={{
                 marcando: objeto.marcando,
                 andamento: objeto.andamento,

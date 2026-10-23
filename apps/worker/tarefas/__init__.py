@@ -12,6 +12,7 @@ from worker.tarefas.esconder_rostos import marcar_com_erro as marcar_rostos_com_
 from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabilizacao_com_erro
 from worker.tarefas.fala import executar_fala
 from worker.tarefas.fluido import executar_fluido, marcar_fluido_com_erro
+from worker.tarefas.foto_ia import executar_ampliar, executar_expandir, executar_foto_3d
 from worker.tarefas.geracao_video import executar_geracao_video, marcar_geracao_com_erro
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
@@ -62,6 +63,9 @@ REGISTRO = {
     "quadro": Tarefa(executar_quadro, ao_falhar=marcar_geracao_com_erro),
     "inversao": Tarefa(executar_inversao, ao_falhar=marcar_inversao_com_erro),
     "fluido": Tarefa(executar_fluido, ao_falhar=marcar_fluido_com_erro),
+    "ampliar": Tarefa(executar_ampliar, ao_falhar=marcar_geracao_com_erro),
+    "expandir": Tarefa(executar_expandir, ao_falhar=marcar_geracao_com_erro),
+    "foto_3d": Tarefa(executar_foto_3d, ao_falhar=marcar_geracao_com_erro),
     "direcao": Tarefa(executar_direcao),
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),
