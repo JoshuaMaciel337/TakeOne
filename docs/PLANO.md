@@ -549,6 +549,23 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
   - [x] 12.6 Monitor de origem, com Inserir e Sobrescrever.
   - [x] 12.7 As outras áreas de trabalho e os ajustes finais.
+- [ ] Onda 13, o editor de imagem completo ([ADR 0003](decisoes/0003-editor-de-imagem-completo.md)): tudo o que se faz no editor de imagem profissional e no PhotoCraft, em 16 partes, com o inventário item a item no ADR.
+  - [ ] 13.1 Árvore de camadas (grupos, máscara de corte, travas, alinhar, os 27 modos de mesclagem).
+  - [ ] 13.2 Camadas de pixels e o pincel (pincel, lápis, borracha, máscara pintável, mesclar e achatar, pincel do histórico).
+  - [ ] 13.3 Seleção (todas as ferramentas e o menu Selecionar, canais, selecionar e mascarar).
+  - [ ] 13.4 Seleção em uso e área de transferência (copiar e colar, preencher, traçado, cortar, aparar).
+  - [ ] 13.5 Retoque e pintura avançada (carimbo, recuperação, correção, borrar, subexposição, balde, degradê, padrões).
+  - [ ] 13.6 Transformação e geometria (transformação livre completa, marionete, perspectiva, tamanho da imagem e da tela, dissolver).
+  - [ ] 13.7 Vetores, formas, quadros e pranchetas (caneta, caminhos, formas vivas, máscara vetorial).
+  - [ ] 13.8 Texto (no navegador, parágrafo, vertical, caractere e parágrafo completos, deformar, fontes).
+  - [ ] 13.9 Estilos de camada e preenchimentos (os dez estilos, mesclar se, camadas de preenchimento).
+  - [ ] 13.10 Ajustes (as 16 camadas de ajuste, os clássicos, os automáticos, histograma).
+  - [ ] 13.11 Filtros (filtros inteligentes, a galeria com 47, todos os menus de filtro).
+  - [ ] 13.12 IA (preenchimento e expansão generativos, céu, filtros neurais).
+  - [ ] 13.13 Arquivos, documento e automação (abrir e salvar PSD, exportações, modos, lote).
+  - [ ] 13.14 Visualização e medição (réguas e guias, grade, navegador, informações).
+  - [ ] 13.15 Organização e fluxo (histórico, ações, comps, atalhos, preferências, linha do tempo, fatias).
+  - [ ] 13.16 Ferramentas vetoriais da suíte (as do editor vetorial).
   - [ ] Para o dono decidir: o tema padrão dos editores (o escuro de hoje, com o destaque do TakeOne, ou o cinza médio dos programas) e a área de trabalho padrão do vídeo (Edição, como está, ou Montagem).
   - [ ] Depois da onda 12, no editor de vídeo: tocar para trás e mais rápido com J e L (hoje J volta um segundo), o painel de escopos de cor e a seleção de faixa para trás (Shift+A).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
