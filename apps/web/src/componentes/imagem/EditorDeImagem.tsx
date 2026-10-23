@@ -152,6 +152,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomMedido, setZoomMedido] = useState(1);
   const [removerAoSoltar, setRemoverAoSoltar] = useState(true);
+  const [localizador, setLocalizador] = useState(true);
   const [pedindo, setPedindo] = useState(false);
   const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
 
@@ -183,6 +184,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A imagem que a varinha e o laço magnético leem, guardada até o projeto mudar, e as bordas dela para o laço
   const imagemLida = useRef<{ chave: string; projeto: Projeto; imagem: Promise<ImagemRgba> } | null>(null);
   const [bordasDaImagem, setBordasDaImagem] = useState<MapaDeBordas | null>(null);
+  const [imagemDaRapida, setImagemDaRapida] = useState<ImagemRgba | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -405,6 +407,47 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       vivo.atual = false;
     };
   }, [ferramenta, projeto]);
+  // A seleção rápida lê a camada escolhida (ou a imagem inteira) ao ser escolhida e quando o projeto muda
+  const lerParaARapida = useEffectEvent((vivo: { atual: boolean }) => {
+    imagemParaSelecao(opcoesDaSelecao.todasAsCamadas || !selecionado)
+      .then((imagem) => {
+        if (vivo.atual) setImagemDaRapida(imagem);
+      })
+      .catch(() => {
+        if (vivo.atual) mostrarAviso("Não foi possível ler a imagem.");
+      });
+  });
+  const camadaDaRapida = opcoesDaSelecao.todasAsCamadas ? null : (selecionado?.clipe.id ?? null);
+  useEffect(() => {
+    if (ferramenta !== "selecaoRapida" || !projeto) return;
+    const vivo = { atual: true };
+    lerParaARapida(vivo);
+    return () => {
+      vivo.atual = false;
+    };
+  }, [ferramenta, projeto, camadaDaRapida]);
+  // A seleção da IA (na foto) vira a seleção do documento, com as formigas, para as outras ferramentas usarem
+  const arquivoDoObjeto = objeto.selecao?.arquivo ?? null;
+  const levarObjeto = useEffectEvent((arquivo: string) => {
+    const medida = selecionado ? caixasRef.current.get(selecionado.clipe.id) : undefined;
+    const video = foto?.video;
+    if (!selecionado || !foto || !video || !projeto || !medida?.bruta || !medida.quadro) return;
+    const { bruta, quadro } = medida;
+    const clipe = selecionado.clipe;
+    const documento = tamanhoDaImagem(projeto);
+    carregarBitmap(arquivoDaMidia(foto.id, arquivo))
+      .then((mascara) => {
+        // A máscara vem menor que a foto (até 2048 no lado maior): o pixel dela vai para o da foto e daí ao documento
+        const escala: Afim = [video.largura / mascara.width, 0, 0, video.altura / mascara.height, 0, 0];
+        const matriz = compor(matrizDaMidiaNoDocumento(bruta, clipe.recorte, clipe.virar, video, quadro, documento), escala);
+        setSelecaoDoDocumento(imagemNoDocumento(mascara, matriz, documento, "cinza"));
+        setBordasDaSelecao(true);
+      })
+      .catch(() => undefined);
+  });
+  useEffect(() => {
+    if (arquivoDoObjeto) levarObjeto(arquivoDoObjeto);
+  }, [arquivoDoObjeto]);
   /** Ctrl + clique na miniatura: a seleção pela transparência da camada (sozinha) ou pelo cinza da máscara dela. */
   const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => {
     const atual = projetoRef.current;
@@ -1032,7 +1075,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       escolherFerramenta(id);
     } else if (tecla === "D") setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }));
     else if (tecla === "X") setCores((atual) => ({ ...atual, primeiroPlano: atual.fundo, fundo: atual.primeiroPlano }));
-    else if ((tecla === "[" || tecla === "]") && ferramenta === "remover") objeto.setTamanhoDoPincel(Math.min(0.2, Math.max(0.01, objeto.tamanhoDoPincel * (tecla === "]" ? 1.25 : 0.8))));
+    else if ((tecla === "[" || tecla === "]") && ferramenta === "selecaoRapida") {
+      const t = opcoesDaSelecao.tamanhoRapida;
+      const passo = t < 10 ? 1 : t < 100 ? 5 : 25;
+      setOpcoesDaSelecao((atual) => ({ ...atual, tamanhoRapida: Math.min(500, Math.max(1, tecla === "]" ? t + passo : t - passo)) }));
+    } else if ((tecla === "[" || tecla === "]") && ferramenta === "remover") objeto.setTamanhoDoPincel(Math.min(0.2, Math.max(0.01, objeto.tamanhoDoPincel * (tecla === "]" ? 1.25 : 0.8))));
     else if (ferramentaDePintura && (tecla === "[" || tecla === "]" || tecla === "{" || tecla === "}")) {
       const opcoes = pinceis[ferramentaDePintura];
       const maior = tecla === "]" || tecla === "}";
@@ -1335,6 +1382,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         pedindo={pedindo}
         removerAoSoltar={removerAoSoltar}
         aoMudarRemoverAoSoltar={setRemoverAoSoltar}
+        localizador={localizador}
+        aoMudarLocalizador={setLocalizador}
         corte={recorte ? { proporcao: recorte.proporcao, largura: recorte.retangulo.largura, altura: recorte.retangulo.altura } : null}
         aoMudarProporcao={(proporcao) => {
           if (!recorte) return;
@@ -1430,6 +1479,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               opcoes: opcoesDaSelecao,
               aoSelecionar: selecionarNoDocumento,
               mapaDeBordas: ferramenta === "lacoMagnetico" ? bordasDaImagem : null,
+              imagem: ferramenta === "selecaoRapida" ? imagemDaRapida : null,
               aoVarinha: usarVarinha,
             }}
             ferramenta={ferramenta}
@@ -1437,7 +1487,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMudarZoom={setZoom}
             aoMedirZoom={setZoomMedido}
             recorte={recorte ? { ...recorte, aoMudar: (retangulo) => setRecorte({ ...recorte, retangulo }) } : null}
-            objeto={MODO_DA_SELECAO[ferramenta] && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto } : null}
+            objeto={MODO_DA_SELECAO[ferramenta] && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto, localizador } : null}
             aoTerminarTraco={ferramenta === "remover" && removerAoSoltar ? () => window.setTimeout(() => void usarSelecaoRef.current("apagar"), 0) : undefined}
             aoClicarTexto={(x, y) => porTexto(undefined, { x: x / tamanho.largura - 0.5, y: y / tamanho.altura - 0.5 })}
             aoDesenharForma={desenharForma}

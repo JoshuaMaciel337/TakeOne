@@ -55,6 +55,9 @@ type Props = {
   aoMudarSimetria?: (simetria: Simetria | null) => void;
   /** As ferramentas da seleção do documento: as opções, se há seleção (e numa foto) e o Desmarcar. */
   selecaoDoDocumento?: { opcoes: OpcoesDaSelecao; aoMudar: (mudanca: Partial<OpcoesDaSelecao>) => void; temSelecao: boolean; naFoto: boolean; aoDesmarcar: () => void };
+  /** A seleção de objeto: o localizador (o realce com o ponteiro parado) ligado ou não. */
+  localizador?: boolean;
+  aoMudarLocalizador?: (ligado: boolean) => void;
 };
 
 const MODOS_DA_SELECAO: { modo: ModoDaSelecao; nome: string; icone: typeof Square }[] = [
@@ -120,14 +123,26 @@ export function BarraDeOpcoes(props: Props) {
     opcoes = (
       <>
         <span className="flex items-center" role="group" aria-label="Modo da seleção">
-          {MODOS_DA_SELECAO.map(({ modo, nome, icone: IconeDoModo }) => (
+          {MODOS_DA_SELECAO.filter(({ modo }) => ferramenta !== "selecaoRapida" || modo !== "intersectar").map(({ modo, nome, icone: IconeDoModo }) => (
             <button key={modo} type="button" className={`botao-icone size-6 ${o.modo === modo ? "bg-painel-3 text-texto" : ""}`} title={nome} aria-label={nome} aria-pressed={o.modo === modo} onClick={() => aoMudar({ modo })}>
               <IconeDoModo className="size-4" aria-hidden />
             </button>
           ))}
         </span>
         {SEPARADOR}
-        {ferramenta === "varinha" ? (
+        {ferramenta === "selecaoRapida" ? (
+          <>
+            <Numero rotulo="Tamanho" valor={o.tamanhoRapida} minimo={1} maximo={500} sufixo="px" aoMudar={(tamanhoRapida) => aoMudar({ tamanhoRapida: Math.round(tamanhoRapida) })} largura="w-10" />
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={o.todasAsCamadas} onChange={(evento) => aoMudar({ todasAsCamadas: evento.currentTarget.checked })} />
+              Usar todas as camadas
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={o.aprimorar} onChange={(evento) => aoMudar({ aprimorar: evento.currentTarget.checked })} />
+              Aprimorar borda
+            </label>
+          </>
+        ) : ferramenta === "varinha" ? (
           <>
             <label className="flex items-center gap-1 text-suave">
               Tamanho da amostra:
@@ -222,7 +237,13 @@ export function BarraDeOpcoes(props: Props) {
             </label>
           </>
         ) : (
-          <span className="text-suave">Clique no objeto; Shift + clique tira uma parte.</span>
+          <>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={props.localizador ?? true} onChange={(evento) => props.aoMudarLocalizador?.(evento.currentTarget.checked)} />
+              Localizador de objetos
+            </label>
+            <span className="text-suave">Clique ou arraste um retângulo no objeto; Shift + clique soma, Alt + clique tira uma parte.</span>
+          </>
         )}
         {SEPARADOR}
         {objeto.selecionando ? (

@@ -18,6 +18,7 @@ import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
 import type { MapaDeBordas } from "@/lib/selecao/magnetico";
+import type { ImagemRgba } from "@/lib/selecao/varinha";
 import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
@@ -65,7 +66,7 @@ type Props = {
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
   recorte?: { retangulo: RetanguloDaImagem; proporcao: number | null; aoMudar: (retangulo: RetanguloDaImagem) => void } | null;
   /** As ferramentas de seleção: os cliques e os traços vão para a foto escolhida, no lugar das alças. */
-  objeto?: { clipeId: string; ferramenta: FerramentaObjeto } | null;
+  objeto?: { clipeId: string; ferramenta: FerramentaObjeto; localizador?: boolean } | null;
   aoTerminarTraco?: () => void;
   /** Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels). */
   aoClicarTexto?: (x: number, y: number) => void;
@@ -100,6 +101,7 @@ type Props = {
     opcoes: OpcoesDaSelecao;
     aoSelecionar: (selecao: Selecao | null) => void;
     mapaDeBordas: MapaDeBordas | null;
+    imagem: ImagemRgba | null;
     aoVarinha: (ponto: { x: number; y: number }, modo: ModoDaSelecao) => void;
   } | null;
 };
@@ -453,7 +455,7 @@ export function PreviaDaImagem({
             ) : null}
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
-              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} />
+              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} />
             ) : null}
             {selecionada && !recorte && !objeto && mostrarAlcas ? (
               <ManipuladorNaPrevia
@@ -543,6 +545,7 @@ export function PreviaDaImagem({
                 mao={maoAtiva}
                 bordas={selecaoDoDocumento.mapaDeBordas}
                 aoVarinha={selecaoDoDocumento.aoVarinha}
+                imagem={selecaoDoDocumento.imagem}
               />
             ) : null}
             {pintura && !maoAtiva && !recorte && tamanho.largura > 1 ? (

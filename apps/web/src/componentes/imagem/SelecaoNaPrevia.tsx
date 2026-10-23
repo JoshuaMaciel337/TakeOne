@@ -7,12 +7,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { bordaPerto, caminhoMagnetico, distanciaDasAncoras, type MapaDeBordas } from "@/lib/selecao/magnetico";
-import { combinar, difusao, elipse, type ModoDaSelecao, poligono, retangulo, type Selecao, temAlgo } from "@/lib/selecao/mascara";
-import type { TamanhoDaAmostra } from "@/lib/selecao/varinha";
+import { combinar, difusao, elipse, type ModoDaSelecao, poligono, retangulo, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
+import { marcaRapida } from "@/lib/selecao/rapida";
+import type { ImagemRgba, TamanhoDaAmostra } from "@/lib/selecao/varinha";
 import { bordaComoImagem } from "@/lib/selecao/naTela";
 import type { Tamanho } from "@/lib/projeto/geometria";
 
-export type FerramentaDeSelecao = "letreiro" | "letreiroEliptico" | "linhaUnica" | "colunaUnica" | "laco" | "lacoPoligonal" | "lacoMagnetico" | "varinha";
+export type FerramentaDeSelecao = "letreiro" | "letreiroEliptico" | "linhaUnica" | "colunaUnica" | "laco" | "lacoPoligonal" | "lacoMagnetico" | "varinha" | "selecaoRapida";
 
 export type OpcoesDaSelecao = {
   modo: ModoDaSelecao;
@@ -33,6 +34,9 @@ export type OpcoesDaSelecao = {
   larguraDoLaco: number;
   contraste: number;
   frequencia: number;
+  /** A seleção rápida: o diâmetro do pincel (pixels do documento) e o Aprimorar borda (arredonda no fim). */
+  tamanhoRapida: number;
+  aprimorar: boolean;
 };
 
 export const OPCOES_DA_SELECAO: OpcoesDaSelecao = {
@@ -49,6 +53,8 @@ export const OPCOES_DA_SELECAO: OpcoesDaSelecao = {
   larguraDoLaco: 10,
   contraste: 0.1,
   frequencia: 57,
+  tamanhoRapida: 30,
+  aprimorar: false,
 };
 
 type Ponto = { x: number; y: number };
@@ -93,6 +99,7 @@ export function SelecaoNaPrevia({
   mao = false,
   bordas = null,
   aoVarinha,
+  imagem = null,
 }: {
   ferramenta: FerramentaDeSelecao;
   selecao: Selecao | null;
@@ -106,6 +113,8 @@ export function SelecaoNaPrevia({
   bordas?: MapaDeBordas | null;
   /** O clique da varinha, em pixels do documento, com o modo: o editor lê a imagem e seleciona. */
   aoVarinha?: (ponto: Ponto, modo: ModoDaSelecao) => void;
+  /** Os pixels que a seleção rápida lê (null enquanto o editor lê a imagem). */
+  imagem?: ImagemRgba | null;
 }) {
   const escala = documento.largura / Math.max(1, quadro.largura);
   // O arrasto dos letreiros (em pixels do documento) e o laço em andamento
@@ -114,6 +123,9 @@ export function SelecaoNaPrevia({
   const espaco = useRef<{ preso: boolean; ultimo: Ponto | null }>({ preso: false, ultimo: null });
   // O laço magnético: o caminho já preso (pixels inteiros do documento), onde estão as âncoras nele e o trecho vivo
   const [ima, setIma] = useState<{ modo: ModoDaSelecao; pontos: Ponto[]; ancoras: number[]; vivo: Ponto[] } | null>(null);
+  // A seleção rápida: o que o pincel já alcançou neste traço, sobre a seleção de antes; e o ponteiro (o círculo)
+  const rapida = useRef<{ marcado: Uint8Array; modo: ModoDaSelecao; base: Selecao | null; ultimo: Ponto; quadro: number | null } | null>(null);
+  const [ponteiro, setPonteiro] = useState<Ponto | null>(null);
 
   const paraDocumento = (evento: { clientX: number; clientY: number }, elemento: Element): Ponto => {
     const r = elemento.getBoundingClientRect();
@@ -140,6 +152,32 @@ export function SelecaoNaPrevia({
     }
     if (a.doCentro) return { x: a.inicio.x - Math.abs(largura), y: a.inicio.y - Math.abs(altura), largura: Math.abs(largura) * 2, altura: Math.abs(altura) * 2 };
     return { x: Math.min(a.inicio.x, a.inicio.x + largura), y: Math.min(a.inicio.y, a.inicio.y + altura), largura: Math.abs(largura), altura: Math.abs(altura) };
+  };
+
+  /** O traço da seleção rápida junto da seleção de antes (no soltar, com o Aprimorar borda). */
+  const mostrarRapida = (final: boolean) => {
+    const atual = rapida.current;
+    if (!atual) return;
+    const nova: Selecao = { largura: documento.largura, altura: documento.altura, dados: Uint8Array.from(atual.marcado, (v) => v * 255) };
+    let resultado = combinar(atual.base, nova, atual.modo);
+    if (final && resultado && opcoes.aprimorar) resultado = suavizar(resultado, 3);
+    aoSelecionar(resultado && temAlgo(resultado) ? resultado : null);
+  };
+  /** As marcas da seleção rápida de `de` até `ate`, a cada meio raio; a tela muda uma vez por quadro. */
+  const pintarRapida = (de: Ponto, ate: Ponto) => {
+    const atual = rapida.current;
+    if (!atual || !imagem) return;
+    const raio = Math.max(1, opcoes.tamanhoRapida / 2);
+    const passos = Math.max(1, Math.ceil(Math.hypot(ate.x - de.x, ate.y - de.y) / (raio / 2)));
+    let mudou = false;
+    for (let i = 1; i <= passos; i++) if (marcaRapida(imagem, atual.marcado, de.x + ((ate.x - de.x) * i) / passos, de.y + ((ate.y - de.y) * i) / passos, raio)) mudou = true;
+    atual.ultimo = ate;
+    if (mudou && atual.quadro === null) {
+      atual.quadro = requestAnimationFrame(() => {
+        if (rapida.current) rapida.current.quadro = null;
+        mostrarRapida(false);
+      });
+    }
   };
 
   /** O laço magnético fecha: o trecho vivo entra e um último trecho magnético volta ao primeiro ponto. */
@@ -230,6 +268,15 @@ export function SelecaoNaPrevia({
       aoVarinha?.(ponto, modo);
       return;
     }
+    if (ferramenta === "selecaoRapida") {
+      if (!imagem) return;
+      evento.currentTarget.setPointerCapture(evento.pointerId);
+      // Com uma seleção, o pincel soma sozinho (Alt tira), como lá
+      const modoRapido: ModoDaSelecao = evento.altKey ? "subtrair" : modo === "nova" && selecao ? "somar" : modo === "intersectar" ? "somar" : modo;
+      rapida.current = { marcado: new Uint8Array(documento.largura * documento.altura), modo: modoRapido, base: modoRapido === "nova" ? null : selecao, ultimo: ponto, quadro: null };
+      pintarRapida(ponto, ponto);
+      return;
+    }
     if (ferramenta === "lacoMagnetico") {
       if (!bordas) return;
       if (!ima) {
@@ -280,6 +327,11 @@ export function SelecaoNaPrevia({
 
   function aoMover(evento: React.PointerEvent<HTMLDivElement>) {
     const ponto = paraDocumento(evento, evento.currentTarget);
+    if (ferramenta === "selecaoRapida") {
+      setPonteiro(ponto);
+      if (rapida.current) pintarRapida(rapida.current.ultimo, ponto);
+      return;
+    }
     if (arrasto) {
       // Espaço: o retângulo inteiro anda com o mouse
       if (espaco.current.preso) {
@@ -303,6 +355,12 @@ export function SelecaoNaPrevia({
   }
 
   function aoSoltar(evento: React.PointerEvent<HTMLDivElement>) {
+    if (rapida.current) {
+      if (rapida.current.quadro !== null) cancelAnimationFrame(rapida.current.quadro);
+      mostrarRapida(true);
+      rapida.current = null;
+      return;
+    }
     if (arrasto) {
       const r = retanguloDoArrasto(arrasto);
       setArrasto(null);
@@ -353,9 +411,13 @@ export function SelecaoNaPrevia({
       </>
     );
   }
+  if (ferramenta === "selecaoRapida" && ponteiro) {
+    desenho = <circle cx={ponteiro.x / escala} cy={ponteiro.y / escala} r={opcoes.tamanhoRapida / 2 / escala} fill="none" stroke="#fff" strokeWidth={1} />;
+  }
   const ocupado = Boolean(arrasto || laco || ima);
   return (
     <div className={`absolute inset-0 touch-none ${mao && !ocupado ? "pointer-events-none" : ""}`} style={{ cursor: "crosshair" }} onPointerDown={aoApertar} onPointerMove={aoMover} onPointerUp={aoSoltar} aria-label="Área da seleção">
+      {ferramenta === "selecaoRapida" && !imagem ? <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[11px] text-white">Lendo a imagem…</span> : null}
       {ferramenta === "lacoMagnetico" && !bordas ? <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[11px] text-white">Lendo as bordas da imagem…</span> : null}
       {desenho ? (
         <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>

@@ -17,6 +17,7 @@ import {
   Pencil,
   Pentagon,
   Pipette,
+  Sparkles,
   SeparatorHorizontal,
   SeparatorVertical,
   Shapes,
@@ -43,6 +44,7 @@ export type IdFerramentaDaImagem =
   | "lacoPoligonal"
   | "lacoMagnetico"
   | "varinha"
+  | "selecaoRapida"
   | "objeto"
   | "corte"
   | "contaGotas"
@@ -88,7 +90,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("lacoMagnetico", "Ferramenta Laço magnético", "L", Magnet, "Clique na borda e ande junto dela: o laço gruda nas bordas. Clique põe um ponto, Backspace tira, Enter ou clique duplo fecham."),
   ],
   [
-    F("objeto", "Ferramenta Seleção de objeto", "W", SquareDashedMousePointer, "Clique no objeto para a IA achar o contorno; Shift + clique tira uma parte."),
+    F("objeto", "Ferramenta Seleção de objeto", "W", SquareDashedMousePointer, "Clique no objeto (ou arraste um retângulo em volta) para a IA achar o contorno; Shift soma, Alt tira. Parado, o azul mostra o que o clique pega."),
+    F("selecaoRapida", "Ferramenta Seleção rápida", "W", Sparkles, "Pinte sobre o que quer: a seleção cresce até as bordas. Depois da primeira, soma; Alt tira. [ e ] mudam o tamanho."),
     F("varinha", "Ferramenta Varinha mágica", "W", WandSparkles, "Clique numa cor para selecionar os pixels parecidos. Shift soma, Alt subtrai."),
   ],
   [F("corte", "Ferramenta Corte", "C", Crop, "Arraste o retângulo e os cantos; Enter recorta, Esc cancela.")],
@@ -145,7 +148,7 @@ export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "clique" | "p
 };
 
 /** As ferramentas que desenham a seleção do documento (lib/selecao). */
-export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set(["letreiro", "letreiroEliptico", "linhaUnica", "colunaUnica", "laco", "lacoPoligonal", "lacoMagnetico", "varinha"]);
+export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set(["letreiro", "letreiroEliptico", "linhaUnica", "colunaUnica", "laco", "lacoPoligonal", "lacoMagnetico", "varinha", "selecaoRapida"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
 export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico"]);

@@ -1,7 +1,8 @@
 "use client";
 
-// A ferramenta Objeto do editor de imagem: os cliques viram uma seleção (MobileSAM, no worker), o pincel marca à mão,
-// e as duas juntas vão para "apagar" ou "recortar". O estado vale para a camada escolhida e recomeça quando ela muda.
+// A ferramenta Objeto do editor de imagem: os cliques e o retângulo viram uma seleção (MobileSAM, no worker), o pincel
+// marca à mão, e as duas juntas vão para "apagar" ou "recortar". Parado sobre a foto, o localizador mostra o objeto
+// que um clique pegaria. O estado vale para a camada escolhida e recomeça quando ela muda.
 import { useRef, useState } from "react";
 
 import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
@@ -10,6 +11,8 @@ import type { Clipe } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 export type PontoDoObjeto = { u: number; v: number; incluir: boolean };
+/** O retângulo em volta do objeto, em frações da camada como aparece. */
+export type CaixaDoObjeto = { u0: number; v0: number; u1: number; v1: number };
 /** Como a seleção é marcada: o clique da IA ou o pincel (a ferramenta Remover). */
 export type ModoDaSelecao = "clique" | "pincel";
 type Job = { status: string; erro: string | null };
@@ -22,7 +25,7 @@ function esperar(ms: number) {
 }
 
 /** A máscara cinza da seleção vira uma imagem colorida e meio transparente para pintar por cima da camada. */
-async function mascaraParaVer(url: string): Promise<string> {
+async function mascaraParaVer(url: string, cor: [number, number, number] = [255, 40, 170]): Promise<string> {
   const resposta = await fetch(url, { credentials: "same-origin" });
   if (!resposta.ok) throw new Error("A seleção não chegou.");
   const bitmap = await createImageBitmap(await resposta.blob());
@@ -35,7 +38,7 @@ async function mascaraParaVer(url: string): Promise<string> {
   const dados = contexto.getImageData(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < dados.data.length; i += 4) {
     const valor = dados.data[i];
-    dados.data.set([255, 40, 170, Math.round(valor * 0.5)], i);
+    dados.data.set([...cor, Math.round(valor * 0.5)], i);
   }
   contexto.putImageData(dados, 0, 0);
   return canvas.toDataURL("image/png");
@@ -44,7 +47,11 @@ async function mascaraParaVer(url: string): Promise<string> {
 export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
   const [modo, setModo] = useState<ModoDaSelecao>("clique");
   const [pontos, setPontos] = useState<PontoDoObjeto[]>([]);
+  const [caixa, setCaixa] = useState<CaixaDoObjeto | null>(null);
   const [selecao, setSelecao] = useState<{ arquivo: string; ver: string } | null>(null);
+  // O localizador: o objeto que um clique no ponto parado pegaria
+  const [realce, setRealce] = useState<string | null>(null);
+  const pedidoDoRealce = useRef(0);
   const [selecionando, setSelecionando] = useState(false);
   const [erro, setErro] = useState("");
   const [tamanhoDoPincel, setTamanhoDoPincel] = useState(0.05);
@@ -57,41 +64,60 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
   if ((clipe?.id ?? null) !== camadaAtual) {
     setCamadaAtual(clipe?.id ?? null);
     setPontos([]);
+    setCaixa(null);
     setSelecao(null);
+    setRealce(null);
     setErro("");
     setTemPincel(false);
   }
 
   const foto = Boolean(midia?.imagem && !midia.elemento && !midia.camada_pixels && !midia.animacao && midia.status === "pronta");
 
-  async function selecionar(novos: PontoDoObjeto[]) {
+  /** Pede a máscara ao worker (os pontos e o retângulo na foto) e espera ficar pronta. Devolve o nome dela. */
+  async function pedirMascara(novos: PontoDoObjeto[], retangulo: CaixaDoObjeto | null): Promise<string> {
+    if (!clipe || !midia) throw new Error("Escolha uma foto.");
+    const naFoto = (u: number, v: number) => {
+      const ponto = pontoDaCamadaNaFoto(u, v, clipe.recorte, clipe.virar);
+      return { x: Math.min(1, Math.max(0, ponto.x)), y: Math.min(1, Math.max(0, ponto.y)) };
+    };
+    const corpo: { pontos: { x: number; y: number; incluir: boolean }[]; caixa?: { x0: number; y0: number; x1: number; y1: number } } = {
+      pontos: novos.map(({ u, v, incluir }) => ({ ...naFoto(u, v), incluir })),
+    };
+    if (retangulo) {
+      // A camada pode estar virada: os cantos na foto podem trocar de lado (a API ordena)
+      const a = naFoto(retangulo.u0, retangulo.v0);
+      const b = naFoto(retangulo.u1, retangulo.v1);
+      corpo.caixa = { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
+    }
+    const resposta = await chamarApi<{ arquivo: string; job_id: string | null }>(`/midias/${midia.id}/selecao`, { metodo: "POST", corpo });
+    if (resposta.job_id) {
+      for (;;) {
+        const job = await chamarApi<Job>(`/jobs/${resposta.job_id}`);
+        if (job.status === "concluido") break;
+        if (job.status === "erro") throw new Error(job.erro ?? "A seleção falhou.");
+        await esperar(250);
+      }
+    }
+    return resposta.arquivo;
+  }
+
+  async function selecionar(novos: PontoDoObjeto[], retangulo: CaixaDoObjeto | null = caixa) {
     if (!clipe || !midia) return;
     const numero = ++pedido.current;
     setPontos(novos);
-    if (!novos.some((ponto) => ponto.incluir)) {
+    setCaixa(retangulo);
+    setRealce(null);
+    pedidoDoRealce.current++;
+    if (!retangulo && !novos.some((ponto) => ponto.incluir)) {
       setSelecao(null);
       return;
     }
     setSelecionando(true);
     setErro("");
     try {
-      const corpo = {
-        pontos: novos.map(({ u, v, incluir }) => {
-          const ponto = pontoDaCamadaNaFoto(u, v, clipe.recorte, clipe.virar);
-          return { x: Math.min(1, Math.max(0, ponto.x)), y: Math.min(1, Math.max(0, ponto.y)), incluir };
-        }),
-      };
-      const resposta = await chamarApi<{ arquivo: string; job_id: string | null }>(`/midias/${midia.id}/selecao`, { metodo: "POST", corpo });
-      if (resposta.job_id) {
-        for (;;) {
-          const job = await chamarApi<Job>(`/jobs/${resposta.job_id}`);
-          if (job.status === "concluido") break;
-          if (job.status === "erro") throw new Error(job.erro ?? "A seleção falhou.");
-          await esperar(350);
-        }
-      }
-      const ver = await mascaraParaVer(arquivoDaMidia(midia.id, resposta.arquivo));
-      if (numero === pedido.current) setSelecao({ arquivo: resposta.arquivo, ver });
+      const arquivo = await pedirMascara(novos, retangulo);
+      const ver = await mascaraParaVer(arquivoDaMidia(midia.id, arquivo));
+      if (numero === pedido.current) setSelecao({ arquivo, ver });
     } catch (e) {
       if (numero === pedido.current) setErro(e instanceof ErroApi || e instanceof Error ? e.message : "A seleção falhou.");
     } finally {
@@ -138,9 +164,24 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
     }
   }
 
+  /** O localizador: com o ponteiro parado sobre a foto, o objeto daquele ponto aparece em azul (sem selecionar). */
+  function realcar(u: number, v: number) {
+    if (!clipe || !midia || selecionando) return;
+    const numero = ++pedidoDoRealce.current;
+    pedirMascara([{ u, v, incluir: true }], null)
+      .then((arquivo) => mascaraParaVer(arquivoDaMidia(midia.id, arquivo), [40, 150, 255]))
+      .then((ver) => {
+        if (numero === pedidoDoRealce.current) setRealce(ver);
+      })
+      .catch(() => undefined);
+  }
+
   function limpar() {
     pedido.current++;
+    pedidoDoRealce.current++;
     setPontos([]);
+    setCaixa(null);
+    setRealce(null);
     setSelecao(null);
     setSelecionando(false);
     setErro("");
@@ -162,7 +203,18 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
     temPincel,
     marcarPincel: () => setTemPincel(true),
     pincelRef,
-    clicar: (u: number, v: number, incluir: boolean) => void selecionar([...pontos, { u, v, incluir }]),
+    /** Sem tecla, um objeto novo; Shift soma o ponto ao objeto, Alt tira a parte dele. */
+    clicar: (u: number, v: number, modo: "nova" | "somar" | "subtrair") =>
+      void (modo === "nova" || (!pontos.length && !caixa) ? selecionar([{ u, v, incluir: modo !== "subtrair" }], null) : selecionar([...pontos, { u, v, incluir: modo === "somar" }])),
+    /** Um retângulo novo começa outra seleção (os cliques depois dele a refinam). */
+    arrastar: (retangulo: CaixaDoObjeto) => void selecionar([], retangulo),
+    caixa,
+    realce,
+    realcar,
+    esquecerRealce: () => {
+      pedidoDoRealce.current++;
+      setRealce(null);
+    },
     pedir,
     limpar,
   };

@@ -115,8 +115,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Laço e Laço poligonal (Shift trava em 45°)
 - [x] Laço magnético (largura, contraste, frequência)
 - [x] Varinha mágica (tolerância, contígua, todas as camadas)
-- [ ] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
-- [ ] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
+- [x] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
+- [x] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
 - [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
 - [ ] Selecionar › Converter em forma
 - [ ] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)

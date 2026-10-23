@@ -75,3 +75,27 @@ test("o laço magnético segue a borda do quadrado e acha a borda perto do ponte
   const naBorda = caminho.filter((p) => mapa.forca[p.y * 60 + p.x] > 0.5).length;
   assert.ok(naBorda / caminho.length > 0.9, `${naBorda}/${caminho.length}`);
 });
+
+test("a seleção rápida cresce no liso e para na borda", async () => {
+  const { marcaRapida } = await import("./rapida.ts");
+  const img = imagem();
+  // Um gradiente suave dentro do quadrado vermelho (o crescimento não pode parar nele)
+  for (let y = 20; y < 40; y++) for (let x = 20; x < 40; x++) img.dados[(y * 60 + x) * 4 + 1] = 20 + (x - 20) * 2;
+  const marcado = new Uint8Array(60 * 60);
+  const mudou = marcaRapida(img, marcado, 30, 30, 4);
+  assert.ok(mudou);
+  // O quadrado inteiro (três raios = 12 alcançam as bordas a 10) e nada do azul
+  let dentro = 0;
+  let fora = 0;
+  for (let y = 0; y < 60; y++) {
+    for (let x = 0; x < 60; x++) {
+      if (!marcado[y * 60 + x]) continue;
+      if (x >= 20 && x < 40 && y >= 20 && y < 40) dentro++;
+      else fora++;
+    }
+  }
+  assert.equal(fora, 0);
+  assert.ok(dentro >= 380, String(dentro));
+  // De novo no mesmo lugar: nada muda
+  assert.equal(marcaRapida(img, marcado, 30, 30, 4), null);
+});
