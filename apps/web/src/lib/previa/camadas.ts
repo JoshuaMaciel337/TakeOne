@@ -21,6 +21,7 @@ import {
   posicaoDaLuz,
 } from "@/lib/projeto/efeitos";
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
+import { temSilhueta } from "@/lib/projeto/silhueta";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
@@ -321,6 +322,7 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource |
     virar: fonte === FUNDO ? { horizontal: false, vertical: true } : camada.clipe.virar,
     cantos: camada.clipe.cantos,
     mascaraDeForma: camada.clipe.mascara,
+    silhueta: temSilhueta(camada.clipe) && !camada.clipe.ajuste ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra } : undefined,
     caixa: camada.caixa,
     lut: camada.lut,
     vinheta: camada.vinheta,

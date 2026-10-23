@@ -176,6 +176,21 @@ class ChaveLumaEntrada(BaseModel):
     suavidade: float = Field(default=0.1, ge=0, le=1)
 
 
+class ContornoEntrada(BaseModel):
+    """Contorno em volta do que aparece do clipe (core/utils/silhueta.py); a largura é fração da altura do clipe."""
+    cor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
+    largura: float = Field(default=0.02, ge=0, le=0.08)
+
+
+class SombraEntrada(BaseModel):
+    """Sombra do que aparece do clipe: desfoque e distância em frações da altura do clipe, ângulo em graus."""
+    cor: str = Field(default="#000000", pattern=r"^#[0-9a-fA-F]{6}$")
+    opacidade: float = Field(default=0.5, ge=0, le=1)
+    desfoque: float = Field(default=0.02, ge=0, le=0.08)
+    distancia: float = Field(default=0.03, ge=0, le=0.15)
+    angulo: float = Field(default=90, ge=-360, le=360)
+
+
 class CantosEntrada(BaseModel):
     # Frações do lado menor do clipe; os limites são os de core/utils/cantos.py
     raio: float = Field(default=0, ge=0, le=0.5)
@@ -623,6 +638,9 @@ class ClipeEntrada(BaseModel):
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
     chave_luma: ChaveLumaEntrada | None = None
+    # Contorno e sombra em volta do que aparece (recortes, logos, formas, adesivos)
+    contorno: ContornoEntrada | None = None
+    sombra: SombraEntrada | None = None
     # Velocidade com curva: (u, s) do começo (u = 0) ao fim (u = 1) do clipe; s de 0,2 a 5
     curva_velocidade: list[tuple[float, float]] | None = Field(default=None, min_length=2, max_length=16)
 

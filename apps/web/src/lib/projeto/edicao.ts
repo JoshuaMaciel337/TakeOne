@@ -9,6 +9,7 @@
 // em TypeScript e com as regras do CapCut no lugar das do Premiere. A faixa principal é magnética (os
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
+import { type Contorno, DESFOQUE_MAXIMO_DA_SOMBRA, DISTANCIA_MAXIMA_DA_SOMBRA, LARGURA_MAXIMA_DO_CONTORNO, type Sombra } from "./silhueta.ts";
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacao, type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import {
@@ -1137,7 +1138,7 @@ export const GRUPOS_DE_AJUSTES = [
   { id: "cor", nome: "Cor e filtro" },
   { id: "efeito", nome: "Efeito e tela verde" },
   { id: "animacao", nome: "Animações de entrada, saída e loop" },
-  { id: "imagem", nome: "Posição, tamanho, giro, virar, recorte, cantos, keyframes e mesclagem" },
+  { id: "imagem", nome: "Posição, tamanho, giro, virar, recorte, cantos, keyframes, mesclagem, contorno e sombra" },
   { id: "audio", nome: "Volume, fades e efeitos de voz" },
 ] as const;
 export type GrupoDeAjustes = (typeof GRUPOS_DE_AJUSTES)[number]["id"];
@@ -1146,7 +1147,7 @@ const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
   cor: ["cor"],
   efeito: ["efeito", "chroma", "chave_luma"],
   animacao: ["animacao"],
-  imagem: ["transformacao", "recorte", "virar", "cantos", "keyframes", "expressoes", "mesclagem"],
+  imagem: ["transformacao", "recorte", "virar", "cantos", "keyframes", "expressoes", "mesclagem", "contorno", "sombra"],
   audio: ["volume", "fade_entrada", "fade_saida", "curva_fade", "efeitos_voz", "igualar_volume"],
 };
 
@@ -2058,6 +2059,36 @@ export function arredondarClipes(projeto: Projeto, clipeIds: string[], cantos: C
     if (!cantos) return { ...clipe, cantos: null };
     const limpos = { raio: limitar(cantos.raio, 0, RAIO_MAXIMO), borda: limitar(cantos.borda, 0, BORDA_MAXIMA), cor: cantos.cor.toLowerCase() };
     return { ...clipe, cantos: limpos.raio > 0 || limpos.borda > 0 ? limpos : null };
+  });
+}
+
+/** Contorno e sombra dos clipes de imagem (null tira o que vier null; undefined deixa como está). */
+export function silhuetaDosClipes(projeto: Projeto, clipeIds: string[], mudanca: { contorno?: Contorno | null; sombra?: Sombra | null }): Projeto {
+  const cor = (valor: string) => {
+    if (!/^#[0-9a-f]{6}$/i.test(valor)) throw new ErroEdicao("Cor inválida.");
+    return valor.toLowerCase();
+  };
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.ajuste) throw new ErroEdicao("A camada de ajuste não tem contorno nem sombra.");
+    const novo = { ...clipe };
+    if (mudanca.contorno !== undefined) {
+      const c = mudanca.contorno;
+      novo.contorno = c && c.largura > 0 ? { cor: cor(c.cor), largura: limitar(c.largura, 0, LARGURA_MAXIMA_DO_CONTORNO) } : null;
+    }
+    if (mudanca.sombra !== undefined) {
+      const s = mudanca.sombra;
+      novo.sombra =
+        s && s.opacidade > 0
+          ? {
+              cor: cor(s.cor),
+              opacidade: limitar(s.opacidade, 0, 1),
+              desfoque: limitar(s.desfoque, 0, DESFOQUE_MAXIMO_DA_SOMBRA),
+              distancia: limitar(s.distancia, 0, DISTANCIA_MAXIMA_DA_SOMBRA),
+              angulo: limitar(s.angulo, -360, 360),
+            }
+          : null;
+    }
+    return novo;
   });
 }
 

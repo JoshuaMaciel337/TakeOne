@@ -4,6 +4,7 @@
 //
 // O histórico guarda o projeto de antes de cada comando. Como as operações nunca alteram o projeto
 // recebido, desfazer é só voltar para a versão anterior.
+import type { Contorno, Sombra } from "./silhueta.ts";
 import type { Tick } from "../tempo.ts";
 import {
   adicionarAjuste,
@@ -52,6 +53,7 @@ import {
   mesclarClipes,
   virarClipes,
   arredondarClipes,
+  silhuetaDosClipes,
   mascararClipes,
   preencherVaga,
   aplicarEfeito,
@@ -149,6 +151,7 @@ export type Comando =
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
+  | { comando: "clipe.silhueta"; parametros: { clipeIds: string[]; contorno?: Contorno | null; sombra?: Sombra | null } }
   | { comando: "clipe.mascara"; parametros: { clipeIds: string[]; mascara: MascaraDeForma | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
   | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string } }
@@ -230,6 +233,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.virar": "virar o clipe",
   "clipe.cantos": "mudar os cantos",
+  "clipe.silhueta": "mudar o contorno e a sombra",
   "clipe.mascara": "mudar a máscara",
   "clipe.preencher": "trocar a mídia do modelo",
   "imagem.adicionarMidia": "pôr a imagem",
@@ -370,6 +374,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
     case "clipe.cantos":
       return { projeto: arredondarClipes(projeto, parametros.clipeIds, parametros.cantos) };
+    case "clipe.silhueta": {
+      const { clipeIds, ...mudanca } = parametros;
+      return { projeto: silhuetaDosClipes(projeto, clipeIds, mudanca) };
+    }
     case "clipe.mascara":
       return { projeto: mascararClipes(projeto, parametros.clipeIds, parametros.mascara) };
     case "imagem.adicionarMidia": {

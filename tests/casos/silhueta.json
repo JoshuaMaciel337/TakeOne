@@ -1,0 +1,226 @@
+{
+ "cobertura": [
+  {
+   "alfa": 0,
+   "sigma": 0.5,
+   "cobertura": 0.289312836
+  },
+  {
+   "alfa": 0,
+   "sigma": 4,
+   "cobertura": 0.0
+  },
+  {
+   "alfa": 0,
+   "sigma": 25,
+   "cobertura": 0.0
+  },
+  {
+   "alfa": 0.01,
+   "sigma": 0.5,
+   "cobertura": 0.381922578
+  },
+  {
+   "alfa": 0.01,
+   "sigma": 4,
+   "cobertura": 0.0
+  },
+  {
+   "alfa": 0.01,
+   "sigma": 25,
+   "cobertura": 0.0
+  },
+  {
+   "alfa": 0.02,
+   "sigma": 0.5,
+   "cobertura": 0.474532321
+  },
+  {
+   "alfa": 0.02,
+   "sigma": 4,
+   "cobertura": 0.296258566
+  },
+  {
+   "alfa": 0.02,
+   "sigma": 25,
+   "cobertura": 0.0
+  },
+  {
+   "alfa": 0.02275,
+   "sigma": 0.5,
+   "cobertura": 0.5
+  },
+  {
+   "alfa": 0.02275,
+   "sigma": 4,
+   "cobertura": 0.5
+  },
+  {
+   "alfa": 0.02275,
+   "sigma": 25,
+   "cobertura": 0.5
+  },
+  {
+   "alfa": 0.03,
+   "sigma": 0.5,
+   "cobertura": 0.567142063
+  },
+  {
+   "alfa": 0.03,
+   "sigma": 4,
+   "cobertura": 1.0
+  },
+  {
+   "alfa": 0.03,
+   "sigma": 25,
+   "cobertura": 1.0
+  },
+  {
+   "alfa": 0.2,
+   "sigma": 0.5,
+   "cobertura": 1.0
+  },
+  {
+   "alfa": 0.2,
+   "sigma": 4,
+   "cobertura": 1.0
+  },
+  {
+   "alfa": 0.2,
+   "sigma": 25,
+   "cobertura": 1.0
+  }
+ ],
+ "margem": [
+  {
+   "clipe": {
+    "contorno": {
+     "cor": "#ffffff",
+     "largura": 0.05
+    }
+   },
+   "altura": 100,
+   "margem": 7
+  },
+  {
+   "clipe": {
+    "contorno": {
+     "cor": "#ffffff",
+     "largura": 0.05
+    }
+   },
+   "altura": 731.5,
+   "margem": 39
+  },
+  {
+   "clipe": {
+    "sombra": {
+     "cor": "#000000",
+     "opacidade": 0.6,
+     "desfoque": 0.02,
+     "distancia": 0.04,
+     "angulo": 135
+    }
+   },
+   "altura": 100,
+   "margem": 12
+  },
+  {
+   "clipe": {
+    "sombra": {
+     "cor": "#000000",
+     "opacidade": 0.6,
+     "desfoque": 0.02,
+     "distancia": 0.04,
+     "angulo": 135
+    }
+   },
+   "altura": 731.5,
+   "margem": 76
+  },
+  {
+   "clipe": {
+    "contorno": {
+     "cor": "#ffffff",
+     "largura": 0.05
+    },
+    "sombra": {
+     "cor": "#000000",
+     "opacidade": 0.6,
+     "desfoque": 0.02,
+     "distancia": 0.04,
+     "angulo": 135
+    }
+   },
+   "altura": 100,
+   "margem": 12
+  },
+  {
+   "clipe": {
+    "contorno": {
+     "cor": "#ffffff",
+     "largura": 0.05
+    },
+    "sombra": {
+     "cor": "#000000",
+     "opacidade": 0.6,
+     "desfoque": 0.02,
+     "distancia": 0.04,
+     "angulo": 135
+    }
+   },
+   "altura": 731.5,
+   "margem": 76
+  }
+ ],
+ "deslocamento": [
+  {
+   "sombra": {
+    "cor": "#000000",
+    "opacidade": 0.6,
+    "desfoque": 0.02,
+    "distancia": 0.04,
+    "angulo": 0
+   },
+   "altura": 300,
+   "dx": 12.0,
+   "dy": 0.0
+  },
+  {
+   "sombra": {
+    "cor": "#000000",
+    "opacidade": 0.6,
+    "desfoque": 0.02,
+    "distancia": 0.04,
+    "angulo": 45
+   },
+   "altura": 300,
+   "dx": 8.485281374,
+   "dy": 8.485281374
+  },
+  {
+   "sombra": {
+    "cor": "#000000",
+    "opacidade": 0.6,
+    "desfoque": 0.02,
+    "distancia": 0.04,
+    "angulo": 135
+   },
+   "altura": 300,
+   "dx": -8.485281374,
+   "dy": 8.485281374
+  },
+  {
+   "sombra": {
+    "cor": "#000000",
+    "opacidade": 0.6,
+    "desfoque": 0.02,
+    "distancia": 0.04,
+    "angulo": -90
+   },
+   "altura": 300,
+   "dx": 0.0,
+   "dy": -12.0
+  }
+ ]
+}

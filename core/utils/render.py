@@ -58,6 +58,7 @@ from core.utils.keyframes import (
     transformacao_de_base,
 )
 from core.utils.letras import comandos_das_letras, tem_letra_a_letra
+from core.utils.silhueta import filtros_da_silhueta, tem_silhueta
 from core.utils.som import (
     CURVA_PADRAO,
     CURVAS_DO_FADE,
@@ -487,6 +488,13 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                   f"[ga{numero}][gz{numero}]blend=c0_mode=grainmerge:c1_mode=grainmerge:c2_mode=grainmerge"
                   f":c3_mode=normal,format=rgba")
         filtros = []
+    if tem_silhueta(clipe) and not clipe.get("ajuste"):
+        # Contorno e sombra (core/utils/silhueta.py): do alfa final, antes da opacidade e do giro, numa margem
+        # transparente; o centro não muda (o overlay centraliza), e a caixa cresce a margem dos dois lados
+        cabeca, margem = filtros_da_silhueta(clipe, altura, numero, _continuar(cabeca, filtros))
+        filtros = []
+        largura, altura = largura + 2 * margem, altura + 2 * margem
+        com_alfa = True
     if roteiro_de_opacidade:
         # A opacidade com keyframes muda por quadro, pelo roteiro (no tempo da janela do clipe)
         filtros.append(f"sendcmd=f='{_escapar_caminho(roteiro_de_opacidade)}'")

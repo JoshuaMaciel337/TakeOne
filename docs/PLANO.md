@@ -520,13 +520,13 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [ ] A transição zoom com desfoque (a força das 16 cópias muda no tempo; mais pesada no render).
   - [x] Inverter o clipe (o vídeo invertido em blocos no worker; aba Velocidade).
   - [x] Câmera lenta suave (minterpolate no trecho do clipe; aba Velocidade).
-- [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem (falta o contorno e a sombra).
+- [x] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.
   - [x] Marcadores na régua (tecla M, nome e cor, Shift+↑/↓), o ímã nos marcadores e nos keyframes, capítulos na janela Exportar e no XML.
   - [x] Exportar o quadro, outra taxa de quadros, só o som e GIF (e o quadro certo em vídeos de celular no render).
   - [x] Mais modos de mesclagem (escurecer, clarear, sobrepor, luz forte, diferença e exclusão).
   - [x] Importar LUT (.cube), antes dos ajustes, na mesma LUT 3D da prévia e do render.
   - [x] Igualar a cor de outro clipe (vira uma LUT do espaço).
-  - [ ] Contorno e sombra em recortes (vídeo sem fundo, logos e formas).
+  - [x] Contorno e sombra em recortes (vídeo sem fundo, logos, formas e adesivos).
   - [x] SVG na biblioteca (logos vetoriais viram imagem com transparência, pelo Chromium do worker).
   - [x] Adesivos animados próprios (24, na categoria Adesivos da biblioteca de animações).
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.

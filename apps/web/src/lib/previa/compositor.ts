@@ -11,6 +11,7 @@ import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR
 import type { Cortes } from "../projeto/letras.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
+import { type Contorno, DENSIDADE_NA_BORDA, deslocamentoDaSombra, LIMIAR_DO_CONTORNO, margemDaSilhueta, type Sombra } from "../projeto/silhueta.ts";
 
 /** A fonte da camada de ajuste: o que já foi desenhado embaixo dela (uma cópia do canvas). */
 export const FUNDO = "fundo" as const;
@@ -18,6 +19,10 @@ export const FUNDO = "fundo" as const;
 export type Camada = {
   /** Um `<video>` com quadro carregado, um `VideoFrame` do WebCodecs, uma imagem ou o que já foi desenhado (FUNDO). */
   fonte: TexImageSource | typeof FUNDO;
+  /** Uma textura já desenhada pelo compositor (a camada com contorno e sombra), no lugar da fonte. */
+  texturaPronta?: { textura: WebGLTexture; largura: number; altura: number };
+  /** Contorno e sombra em volta do que aparece (lib/projeto/silhueta.ts). */
+  silhueta?: { contorno?: Contorno | null; sombra?: Sombra | null };
   /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
   virar?: Virar | null;
@@ -98,6 +103,27 @@ out vec2 v_pos;
 void main() {
   gl_Position = vec4(a_pos * 2.0, 0.0, 1.0);
   v_pos = a_pos + 0.5;
+}`;
+
+// Junta a camada (unidade 0) com o contorno (modo 1: o alfa desfocado cortado no limiar, por baixo dela) ou com a
+// sombra (modo 2: o alfa desfocado e deslocado, na opacidade dela, por baixo de tudo), no alfa pré-multiplicado
+const FRAGMENTOS_SILHUETA = `#version 300 es
+precision highp float;
+in vec2 v_pos;
+uniform sampler2D u_camada;
+uniform sampler2D u_borrada;
+uniform int u_modo;
+uniform vec3 u_cor;
+uniform float u_rampa;
+uniform float u_opacidade;
+uniform vec2 u_deslocamento;
+out vec4 cor;
+void main() {
+  vec4 deCima = texture(u_camada, v_pos);
+  float a = u_modo == 1
+    ? clamp((texture(u_borrada, v_pos).a - ${LIMIAR_DO_CONTORNO}) / u_rampa + 0.5, 0.0, 1.0)
+    : texture(u_borrada, v_pos + u_deslocamento).a * u_opacidade;
+  cor = deCima + vec4(u_cor * a, a) * (1.0 - deCima.a);
 }`;
 
 const FRAGMENTOS_DESFOQUE = `#version 300 es
@@ -515,10 +541,19 @@ type Alvo = { buffer: WebGLFramebuffer; textura: WebGLTexture; largura: number; 
 const ALVO_DO_FUNDO = 6;
 /** O da cópia do fundo para os modos de mesclagem que leem o fundo (unidade de textura 6). */
 const ALVO_DA_MESCLAGEM = 7;
+/** Os da camada com contorno e sombra: ela sozinha (8), o desfoque do contorno (10 e 11, em ponto flutuante), com o
+ * contorno (9), o desfoque da sombra (12 e 13) e com a sombra (14). */
+const ALVO_DA_SILHUETA = 8;
+const ALVO_COM_CONTORNO = 9;
+const ALVO_DO_CONTORNO = 10;
+const ALVO_DA_SOMBRA = 12;
+const ALVO_COM_SOMBRA = 14;
+const RECORTE_INTEIRO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
 
 type Recursos = {
   programa: WebGLProgram;
   desfoque: { programa: WebGLProgram; uniformes: Record<"fonte" | "passo" | "sigma" | "lod" | "limite", WebGLUniformLocation | null> };
+  silhueta: { programa: WebGLProgram; uniformes: Record<"camada" | "borrada" | "modo" | "cor" | "rampa" | "opacidade" | "deslocamento", WebGLUniformLocation | null> };
   recorte: {
     programa: WebGLProgram;
     uniformes: Record<"fonte" | "mascara" | "comMascara" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade", WebGLUniformLocation | null>;
@@ -545,6 +580,14 @@ export class Compositor {
   private readonly canvas: HTMLCanvasElement;
   private readonly gl: WebGL2RenderingContext;
   private recursos: Recursos | null;
+  private comFlutuante = false;
+  /** Onde as camadas estão sendo desenhadas: o canvas, ou o framebuffer da camada com contorno e sombra. */
+  private destino: { buffer: WebGLFramebuffer | null; largura: number; altura: number; quadro: Tamanho } = {
+    buffer: null,
+    largura: 1,
+    altura: 1,
+    quadro: { largura: 1, altura: 1 },
+  };
 
   /** Lança erro quando o navegador não tem WebGL2. `comAlfa`: o canvas guarda a transparência (o editor de imagem sem fundo). */
   constructor(canvas: HTMLCanvasElement, { comAlfa = false } = {}) {
@@ -552,6 +595,8 @@ export class Compositor {
     if (!gl) throw new Error("Este navegador não tem WebGL2, que a prévia usa para desenhar o vídeo.");
     this.canvas = canvas;
     this.gl = gl;
+    // Para desenhar em ponto flutuante (o desfoque do contorno); sem a extensão, fica em 8 bits
+    this.comFlutuante = Boolean(gl.getExtension("EXT_color_buffer_float"));
     this.recursos = this.criarRecursos();
     canvas.addEventListener("webglcontextlost", this.aoPerder);
     canvas.addEventListener("webglcontextrestored", this.aoRestaurar);
@@ -590,6 +635,25 @@ export class Compositor {
         sigma: localDesfoque("u_sigma"),
         lod: localDesfoque("u_lod"),
         limite: localDesfoque("u_limite"),
+      },
+    };
+    const programaSilhueta = gl.createProgram()!;
+    gl.attachShader(programaSilhueta, compilar(gl, gl.VERTEX_SHADER, VERTICES_DESFOQUE));
+    gl.attachShader(programaSilhueta, compilar(gl, gl.FRAGMENT_SHADER, FRAGMENTOS_SILHUETA));
+    gl.bindAttribLocation(programaSilhueta, 0, "a_pos");
+    gl.linkProgram(programaSilhueta);
+    if (!gl.getProgramParameter(programaSilhueta, gl.LINK_STATUS)) throw new Error(`Silhueta da prévia: ${gl.getProgramInfoLog(programaSilhueta)}`);
+    const localSilhueta = (nome: string) => gl.getUniformLocation(programaSilhueta, nome);
+    const silhueta = {
+      programa: programaSilhueta,
+      uniformes: {
+        camada: localSilhueta("u_camada"),
+        borrada: localSilhueta("u_borrada"),
+        modo: localSilhueta("u_modo"),
+        cor: localSilhueta("u_cor"),
+        rampa: localSilhueta("u_rampa"),
+        opacidade: localSilhueta("u_opacidade"),
+        deslocamento: localSilhueta("u_deslocamento"),
       },
     };
     const programaRecorte = gl.createProgram()!;
@@ -685,6 +749,7 @@ export class Compositor {
       grao: null,
       mascaras: [],
       desfoque,
+      silhueta,
       recorte,
       alvos: [],
     };
@@ -710,7 +775,7 @@ export class Compositor {
   }
 
   /** O framebuffer `indice` com uma textura do tamanho pedido. */
-  private alvo(indice: number, largura: number, altura: number, semAlfa = false): Alvo {
+  private alvo(indice: number, largura: number, altura: number, semAlfa = false, flutuante = false): Alvo {
     const gl = this.gl;
     const recursos = this.recursos!;
     let alvo = recursos.alvos[indice];
@@ -720,7 +785,8 @@ export class Compositor {
     }
     if (alvo.largura !== largura || alvo.altura !== altura) {
       gl.bindTexture(gl.TEXTURE_2D, alvo.textura);
-      if (semAlfa) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, largura, altura, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+      if (flutuante && this.comFlutuante) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, largura, altura, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      else if (semAlfa) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, largura, altura, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
       else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, largura, altura, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -739,15 +805,15 @@ export class Compositor {
    * Desfoca a textura já carregada (largura × altura) e devolve a textura desfocada, do mesmo
    * enquadramento. sigma em pixels da textura; o recorte limita a área lida, como o crop do render.
    */
-  private desfocar(textura: WebGLTexture, largura: number, altura: number, sigma: number, recorte: Recorte, primeiroAlvo = 0): WebGLTexture {
+  private desfocar(textura: WebGLTexture, largura: number, altura: number, sigma: number, recorte: Recorte, primeiroAlvo = 0, flutuante = false): WebGLTexture {
     const gl = this.gl;
     const { desfoque, programa } = this.recursos!;
     const nivel = Math.max(0, Math.floor(Math.log2(sigma / SIGMA_POR_NIVEL)));
     const fator = 2 ** nivel;
     const w = Math.max(1, Math.ceil(largura / fator));
     const h = Math.max(1, Math.ceil(altura / fator));
-    const primeiro = this.alvo(primeiroAlvo, w, h);
-    const segundo = this.alvo(primeiroAlvo + 1, w, h);
+    const primeiro = this.alvo(primeiroAlvo, w, h, false, flutuante);
+    const segundo = this.alvo(primeiroAlvo + 1, w, h, false, flutuante);
     gl.bindTexture(gl.TEXTURE_2D, textura);
     const filtro = gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER) as number;
     if (nivel > 0) {
@@ -849,194 +915,302 @@ export class Compositor {
     gl.uniform2f(uniformes.quadro, quadro.largura, quadro.altura);
     gl.uniform1i(uniformes.textura, 0);
     gl.activeTexture(gl.TEXTURE0);
+    this.destino = { buffer: null, largura: this.canvas.width, altura: this.canvas.height, quadro };
     camadas.forEach((camada, indice) => {
-      const { caixa } = camada;
-      // Daqui em diante, o recorte na textura: o pedaço espelhado quando o clipe está virado
-      const recorte = recorteNaFonte(camada.recorte, camada.virar);
-      if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
-      gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
-      let largura: number;
-      let altura: number;
-      if (camada.fonte === FUNDO) {
-        // A camada de ajuste lê o que já foi desenhado. O canvas tem antialias (várias amostras por pixel), que o
-        // copyTexImage2D não lê (a cópia saía preta): o blit resolve as amostras numa textura comum. As linhas vêm
-        // de baixo para cima, e quem monta a camada a vira na vertical. O blit de várias amostras pede o mesmo
-        // formato dos dois lados: o canvas sem alfa é RGB, e a cópia também
-        [largura, altura] = [this.canvas.width, this.canvas.height];
-        const copia = this.alvo(ALVO_DO_FUNDO, largura, altura, !gl.getContextAttributes()?.alpha);
-        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
-        gl.blitFramebuffer(0, 0, largura, altura, 0, 0, largura, altura, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindTexture(gl.TEXTURE_2D, copia.textura);
-      } else {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
-        ({ largura, altura } = tamanhoDaFonte(camada.fonte));
+      if (camada.silhueta && camada.fonte !== FUNDO) this.desenharComSilhueta(camada, indice);
+      else this.desenharCamada(camada, indice);
+    });
+  }
+
+  /** Liga o framebuffer em que as camadas estão sendo desenhadas (o canvas ou o da silhueta). */
+  private irAoDestino() {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.destino.buffer);
+    gl.viewport(0, 0, this.destino.largura, this.destino.altura);
+  }
+
+  /** Uma camada no destino atual, com todos os efeitos dela. */
+  private desenharCamada(camada: Camada, indice: number) {
+    const gl = this.gl;
+    const recursos = this.recursos!;
+    const { uniformes } = recursos;
+    const quadro = this.destino.quadro;
+    gl.uniform2f(uniformes.quadro, quadro.largura, quadro.altura);
+    const { caixa } = camada;
+    // Daqui em diante, o recorte na textura: o pedaço espelhado quando o clipe está virado
+    const recorte = recorteNaFonte(camada.recorte, camada.virar);
+    if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
+    let largura: number;
+    let altura: number;
+    if (camada.texturaPronta) {
+      // Uma textura já desenhada pelo próprio compositor (a camada com contorno e sombra)
+      ({ largura, altura } = camada.texturaPronta);
+      gl.bindTexture(gl.TEXTURE_2D, camada.texturaPronta.textura);
+    } else if (camada.fonte === FUNDO) {
+      // A camada de ajuste lê o que já foi desenhado. O canvas tem antialias (várias amostras por pixel), que o
+      // copyTexImage2D não lê (a cópia saía preta): o blit resolve as amostras numa textura comum. As linhas vêm
+      // de baixo para cima, e quem monta a camada a vira na vertical. O blit de várias amostras pede o mesmo
+      // formato dos dois lados: o canvas sem alfa é RGB, e a cópia também
+      [largura, altura] = [this.canvas.width, this.canvas.height];
+      const copia = this.alvo(ALVO_DO_FUNDO, largura, altura, !gl.getContextAttributes()?.alpha);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
+      gl.blitFramebuffer(0, 0, largura, altura, 0, 0, largura, altura, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      this.irAoDestino();
+      gl.bindTexture(gl.TEXTURE_2D, copia.textura);
+    } else {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.fonte);
+      ({ largura, altura } = tamanhoDaFonte(camada.fonte));
+    }
+    // Imagem ou texto bem maior que o lugar dele na tela: lido do mipmap, senão cada pixel da tela pega
+    // um ponto só da textura e as bordas finas saem em escada (o render reduz com média)
+    const reducao = (largura * recorte.largura) / Math.max(1, (caixa.largura * this.destino.largura) / quadro.largura);
+    if (reducao > REDUCAO_COM_MIPMAP && largura > 0 && altura > 0) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    } else {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+    if (camada.desfoque && camada.desfoque > 0) {
+      // O sigma é uma fração da altura do clipe; na textura, da altura do recorte
+      const sigma = camada.desfoque * recorte.altura * altura;
+      if (sigma >= 0.05 && largura > 0 && altura > 0) {
+        const desfocada = this.desfocar(this.textura(indice), largura, altura, sigma, recorte);
+        this.irAoDestino();
+        gl.bindTexture(gl.TEXTURE_2D, desfocada);
       }
-      // Imagem ou texto bem maior que o lugar dele na tela: lido do mipmap, senão cada pixel da tela pega
-      // um ponto só da textura e as bordas finas saem em escada (o render reduz com média)
-      const reducao = (largura * recorte.largura) / Math.max(1, (caixa.largura * this.canvas.width) / quadro.largura);
-      if (reducao > REDUCAO_COM_MIPMAP && largura > 0 && altura > 0) {
+    }
+    if (camada.mascaraDoFundo) {
+      // A unidade 4 fica ativa antes de criar e ligar a textura: com a 0 ativa, o quadro do vídeo era trocado
+      // pela máscara e o primeiro quadro da camada saía com a silhueta branca
+      gl.activeTexture(gl.TEXTURE4);
+      let textura = recursos.mascaras[indice];
+      if (!textura) {
+        textura = gl.createTexture()!;
+        gl.bindTexture(gl.TEXTURE_2D, textura);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        recursos.mascaras[indice] = textura;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, textura);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.mascaraDoFundo);
+      gl.uniform1i(uniformes.mascaraDoFundo, 4);
+      gl.activeTexture(gl.TEXTURE0);
+    }
+    const brilho = camada.brilho ?? 0;
+    const realce = camada.contrasteLocal ?? null;
+    gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
+    gl.uniform1f(uniformes.nitidez, realce && largura > 0 ? realce.forca : 0);
+    gl.uniform1i(uniformes.meiosTons, realce?.meiosTons ? 1 : 0);
+    // A cópia desfocada do brilho, da nitidez ou da clareza (um efeito por clipe: nunca dois)
+    const sigmaDaCopia = brilho > 0 ? SIGMA_DO_BRILHO : realce ? realce.sigma : 0;
+    // Com brilho ou nitidez, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
+    const recortadaAntes = sigmaDaCopia > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
+    if (recortadaAntes) {
+      this.recortarCamada(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture, camada, largura, altura);
+      this.irAoDestino();
+      if (reducao > REDUCAO_COM_MIPMAP) {
         gl.generateMipmap(gl.TEXTURE_2D);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       } else {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       }
-      if (camada.desfoque && camada.desfoque > 0) {
-        // O sigma é uma fração da altura do clipe; na textura, da altura do recorte
-        const sigma = camada.desfoque * recorte.altura * altura;
-        if (sigma >= 0.05 && largura > 0 && altura > 0) {
-          const desfocada = this.desfocar(this.textura(indice), largura, altura, sigma, recorte);
-          gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-          gl.bindTexture(gl.TEXTURE_2D, desfocada);
-        }
+    }
+    if (sigmaDaCopia > 0 && largura > 0) {
+      // A cópia desfocada do brilho ou da nitidez, nos framebuffers 2 e 3, na unidade 2
+      const atual = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
+      const luz = this.desfocar(atual, largura, altura, sigmaDaCopia * recorte.altura * altura, recorte, 2);
+      this.irAoDestino();
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, luz);
+      gl.uniform1i(uniformes.desfocada, 2);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, atual);
+    }
+    gl.uniform1f(uniformes.lente, camada.lente ?? 0);
+    const mascaraDaTransicao = camada.mascaraDaTransicao;
+    gl.uniform1i(uniformes.transicao, mascaraDaTransicao ? MASCARAS_DE_TRANSICAO.indexOf(mascaraDaTransicao.tipo) + 1 : 0);
+    gl.uniform1f(uniformes.transicaoLimiar, mascaraDaTransicao?.limiar ?? 0);
+    gl.uniform1i(uniformes.borrao, camada.borrao ? (camada.borrao.tipo === "zoom" ? 1 : 2) : 0);
+    gl.uniform1f(uniformes.borraoForca, camada.borrao?.forca ?? 0);
+    gl.uniform2f(uniformes.celulas, camada.celulas?.[0] ?? 0, camada.celulas?.[1] ?? 0);
+    gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
+    gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
+    gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo && !recortadaAntes ? 1 : 0);
+    gl.uniform1i(uniformes.comChroma, camada.chroma && !recortadaAntes ? 1 : 0);
+    if (camada.chroma) {
+      gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
+      gl.uniform1f(uniformes.semelhanca, camada.chroma.semelhanca);
+      gl.uniform1f(uniformes.suavidade, camada.chroma.suavidade);
+    }
+    definirChaveDeLuma(gl, uniformes, recortadaAntes ? null : camada.chaveLuma);
+    gl.uniform2f(uniformes.cantos, camada.cantos?.raio ?? 0, camada.cantos?.borda ?? 0);
+    const forma = camada.mascaraDeForma;
+    gl.uniform1i(uniformes.mascaraForma, forma ? (forma.forma === "retangulo" ? 1 : 2) : 0);
+    if (forma) {
+      gl.uniform4f(uniformes.mascara, forma.x, forma.y, forma.largura, forma.altura);
+      gl.uniform2f(uniformes.mascaraSuave, forma.suavidade, forma.inverter ? 1 : 0);
+    }
+    if (camada.cantos || forma) {
+      gl.uniform3f(uniformes.corDaBorda, ...corParaRgb(camada.cantos?.cor ?? "#ffffff"));
+      gl.uniform1f(uniformes.pixelsPorUnidade, this.destino.largura / quadro.largura);
+    }
+    gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);
+    gl.uniform1f(uniformes.luzPosicao, camada.luz?.posicao ?? 0);
+    gl.uniform1f(uniformes.grao, camada.grao?.forca ?? 0);
+    if (camada.grao) {
+      gl.uniform1f(uniformes.graoColunas, camada.grao.colunas);
+      gl.uniform2f(uniformes.graoDeslocamento, ...camada.grao.deslocamento);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, this.texturaDoGrao());
+      gl.uniform1i(uniformes.graoTextura, 3);
+      gl.activeTexture(gl.TEXTURE0);
+    }
+    gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
+    gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
+    gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
+    gl.uniform4f(uniformes.recorte, recorte.x, recorte.y, recorte.largura, recorte.altura);
+    gl.uniform2f(uniformes.virar, camada.virar?.horizontal ? 1 : 0, camada.virar?.vertical ? 1 : 0);
+    gl.uniform1f(uniformes.opacidade, caixa.opacidade);
+    const revelado = camada.revelado ?? REVELADO_INTEIRO;
+    gl.uniform4f(uniformes.revelado, revelado.x0, revelado.y0, revelado.x1, revelado.y1);
+    const mascara = camada.mascara ?? SEM_MASCARA;
+    gl.uniform3f(uniformes.corteDe, ...mascara.de);
+    gl.uniform3f(uniformes.corteAte, ...mascara.ate);
+    gl.uniform1i(uniformes.comLut, camada.lut ? 1 : 0);
+    // A unidade 1 é sempre do sampler3D: com o padrão (0), ela dividiria a unidade com a textura 2D
+    gl.uniform1i(uniformes.lut, 1);
+    if (camada.lut) {
+      let lut = recursos.luts[indice];
+      if (!lut) {
+        lut = { textura: gl.createTexture()!, chave: "" };
+        recursos.luts[indice] = lut;
       }
-      if (camada.mascaraDoFundo) {
-        // A unidade 4 fica ativa antes de criar e ligar a textura: com a 0 ativa, o quadro do vídeo era trocado
-        // pela máscara e o primeiro quadro da camada saía com a silhueta branca
-        gl.activeTexture(gl.TEXTURE4);
-        let textura = recursos.mascaras[indice];
-        if (!textura) {
-          textura = gl.createTexture()!;
-          gl.bindTexture(gl.TEXTURE_2D, textura);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          recursos.mascaras[indice] = textura;
-        }
-        gl.bindTexture(gl.TEXTURE_2D, textura);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, camada.mascaraDoFundo);
-        gl.uniform1i(uniformes.mascaraDoFundo, 4);
-        gl.activeTexture(gl.TEXTURE0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_3D, lut.textura);
+      if (lut.chave !== camada.lut.chave) {
+        const n = PONTOS_DA_LUT;
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, n, n, n, 0, gl.RGBA, gl.FLOAT, camada.lut.dados);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        // Lida só com texelFetch; sem filtro, a textura de ponto flutuante fica completa sem extensão
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        lut.chave = camada.lut.chave;
       }
-      const brilho = camada.brilho ?? 0;
-      const realce = camada.contrasteLocal ?? null;
-      gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
-      gl.uniform1f(uniformes.nitidez, realce && largura > 0 ? realce.forca : 0);
-      gl.uniform1i(uniformes.meiosTons, realce?.meiosTons ? 1 : 0);
-      // A cópia desfocada do brilho, da nitidez ou da clareza (um efeito por clipe: nunca dois)
-      const sigmaDaCopia = brilho > 0 ? SIGMA_DO_BRILHO : realce ? realce.sigma : 0;
-      // Com brilho ou nitidez, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
-      const recortadaAntes = sigmaDaCopia > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
-      if (recortadaAntes) {
-        this.recortarCamada(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture, camada, largura, altura);
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        if (reducao > REDUCAO_COM_MIPMAP) {
-          gl.generateMipmap(gl.TEXTURE_2D);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        } else {
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        }
-      }
-      if (sigmaDaCopia > 0 && largura > 0) {
-        // A cópia desfocada do brilho ou da nitidez, nos framebuffers 2 e 3, na unidade 2
-        const atual = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
-        const luz = this.desfocar(atual, largura, altura, sigmaDaCopia * recorte.altura * altura, recorte, 2);
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, luz);
-        gl.uniform1i(uniformes.desfocada, 2);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, atual);
-      }
-      gl.uniform1f(uniformes.lente, camada.lente ?? 0);
-      const mascaraDaTransicao = camada.mascaraDaTransicao;
-      gl.uniform1i(uniformes.transicao, mascaraDaTransicao ? MASCARAS_DE_TRANSICAO.indexOf(mascaraDaTransicao.tipo) + 1 : 0);
-      gl.uniform1f(uniformes.transicaoLimiar, mascaraDaTransicao?.limiar ?? 0);
-      gl.uniform1i(uniformes.borrao, camada.borrao ? (camada.borrao.tipo === "zoom" ? 1 : 2) : 0);
-      gl.uniform1f(uniformes.borraoForca, camada.borrao?.forca ?? 0);
-      gl.uniform2f(uniformes.celulas, camada.celulas?.[0] ?? 0, camada.celulas?.[1] ?? 0);
-      gl.uniform1f(uniformes.desvio, camada.desvio ?? 0);
-      gl.uniform1f(uniformes.linhas, camada.linhas ?? 0);
-      gl.uniform1i(uniformes.comMascaraDoFundo, camada.mascaraDoFundo && !recortadaAntes ? 1 : 0);
-      gl.uniform1i(uniformes.comChroma, camada.chroma && !recortadaAntes ? 1 : 0);
-      if (camada.chroma) {
-        gl.uniform3f(uniformes.chromaCor, ...corParaRgb(camada.chroma.cor));
-        gl.uniform1f(uniformes.semelhanca, camada.chroma.semelhanca);
-        gl.uniform1f(uniformes.suavidade, camada.chroma.suavidade);
-      }
-      definirChaveDeLuma(gl, uniformes, recortadaAntes ? null : camada.chaveLuma);
-      gl.uniform2f(uniformes.cantos, camada.cantos?.raio ?? 0, camada.cantos?.borda ?? 0);
-      const forma = camada.mascaraDeForma;
-      gl.uniform1i(uniformes.mascaraForma, forma ? (forma.forma === "retangulo" ? 1 : 2) : 0);
-      if (forma) {
-        gl.uniform4f(uniformes.mascara, forma.x, forma.y, forma.largura, forma.altura);
-        gl.uniform2f(uniformes.mascaraSuave, forma.suavidade, forma.inverter ? 1 : 0);
-      }
-      if (camada.cantos || forma) {
-        gl.uniform3f(uniformes.corDaBorda, ...corParaRgb(camada.cantos?.cor ?? "#ffffff"));
-        gl.uniform1f(uniformes.pixelsPorUnidade, this.canvas.width / quadro.largura);
-      }
-      gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);
-      gl.uniform1f(uniformes.luzPosicao, camada.luz?.posicao ?? 0);
-      gl.uniform1f(uniformes.grao, camada.grao?.forca ?? 0);
-      if (camada.grao) {
-        gl.uniform1f(uniformes.graoColunas, camada.grao.colunas);
-        gl.uniform2f(uniformes.graoDeslocamento, ...camada.grao.deslocamento);
-        gl.activeTexture(gl.TEXTURE3);
-        gl.bindTexture(gl.TEXTURE_2D, this.texturaDoGrao());
-        gl.uniform1i(uniformes.graoTextura, 3);
-        gl.activeTexture(gl.TEXTURE0);
-      }
-      gl.uniform2f(uniformes.centro, caixa.cx, caixa.cy);
-      gl.uniform2f(uniformes.tamanho, caixa.largura, caixa.altura);
-      gl.uniform1f(uniformes.rotacao, (caixa.rotacao * Math.PI) / 180);
-      gl.uniform4f(uniformes.recorte, recorte.x, recorte.y, recorte.largura, recorte.altura);
-      gl.uniform2f(uniformes.virar, camada.virar?.horizontal ? 1 : 0, camada.virar?.vertical ? 1 : 0);
-      gl.uniform1f(uniformes.opacidade, caixa.opacidade);
-      const revelado = camada.revelado ?? REVELADO_INTEIRO;
-      gl.uniform4f(uniformes.revelado, revelado.x0, revelado.y0, revelado.x1, revelado.y1);
-      const mascara = camada.mascara ?? SEM_MASCARA;
-      gl.uniform3f(uniformes.corteDe, ...mascara.de);
-      gl.uniform3f(uniformes.corteAte, ...mascara.ate);
-      gl.uniform1i(uniformes.comLut, camada.lut ? 1 : 0);
-      // A unidade 1 é sempre do sampler3D: com o padrão (0), ela dividiria a unidade com a textura 2D
-      gl.uniform1i(uniformes.lut, 1);
-      if (camada.lut) {
-        let lut = recursos.luts[indice];
-        if (!lut) {
-          lut = { textura: gl.createTexture()!, chave: "" };
-          recursos.luts[indice] = lut;
-        }
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_3D, lut.textura);
-        if (lut.chave !== camada.lut.chave) {
-          const n = PONTOS_DA_LUT;
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, n, n, n, 0, gl.RGBA, gl.FLOAT, camada.lut.dados);
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-          // Lida só com texelFetch; sem filtro, a textura de ponto flutuante fica completa sem extensão
-          gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-          gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-          lut.chave = camada.lut.chave;
-        }
-        gl.activeTexture(gl.TEXTURE0);
-      }
-      gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
-      const mesclagem = camada.mesclagem ?? "normal";
-      const codigo = CODIGO_DA_MESCLAGEM[mesclagem];
-      gl.uniform1i(uniformes.mesclagem, codigo);
-      if (mesclagem === "multiplicar") gl.blendFunc(gl.DST_COLOR, gl.ZERO);
-      else if (mesclagem === "tela") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
-      else if (mesclagem === "somar") gl.blendFunc(gl.ONE, gl.ONE);
-      else if (codigo >= MESCLAGEM_COM_O_FUNDO) {
-        // O fundo até aqui, copiado do canvas pelo blit (como na camada de ajuste): o shader mistura e escreve
-        // o resultado no lugar
-        const copia = this.alvo(ALVO_DA_MESCLAGEM, this.canvas.width, this.canvas.height, !gl.getContextAttributes()?.alpha);
-        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
-        gl.blitFramebuffer(0, 0, this.canvas.width, this.canvas.height, 0, 0, this.canvas.width, this.canvas.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.activeTexture(gl.TEXTURE6);
-        gl.bindTexture(gl.TEXTURE_2D, copia.textura);
-        gl.uniform1i(uniformes.fundo, 6);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.blendFunc(gl.ONE, gl.ZERO);
-      }
+      gl.activeTexture(gl.TEXTURE0);
+    }
+    gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
+    const mesclagem = camada.mesclagem ?? "normal";
+    const codigo = CODIGO_DA_MESCLAGEM[mesclagem];
+    gl.uniform1i(uniformes.mesclagem, codigo);
+    if (mesclagem === "multiplicar") gl.blendFunc(gl.DST_COLOR, gl.ZERO);
+    else if (mesclagem === "tela") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+    else if (mesclagem === "somar") gl.blendFunc(gl.ONE, gl.ONE);
+    else if (codigo >= MESCLAGEM_COM_O_FUNDO) {
+      // O fundo até aqui, copiado do canvas pelo blit (como na camada de ajuste): o shader mistura e escreve
+      // o resultado no lugar
+      const copia = this.alvo(ALVO_DA_MESCLAGEM, this.canvas.width, this.canvas.height, !gl.getContextAttributes()?.alpha);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
+      gl.blitFramebuffer(0, 0, this.canvas.width, this.canvas.height, 0, 0, this.canvas.width, this.canvas.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      this.irAoDestino();
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_2D, copia.textura);
+      gl.uniform1i(uniformes.fundo, 6);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.blendFunc(gl.ONE, gl.ZERO);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (mesclagem !== "normal") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
+
+  /**
+   * Contorno e sombra (lib/projeto/silhueta.ts): a camada sozinha, sem giro e opaca, num framebuffer com a margem
+   * em volta; o contorno é o alfa desfocado (em ponto flutuante: o limiar fica em 2,3%) cortado no limiar, por baixo
+   * da camada; a sombra é o alfa do conjunto desfocado e deslocado, por baixo de tudo. O resultado volta para o
+   * destino como uma camada com o giro, a opacidade e a mesclagem do clipe (como o render, antes da opacidade).
+   */
+  private desenharComSilhueta(camada: Camada, indice: number) {
+    const gl = this.gl;
+    const recursos = this.recursos!;
+    const tela = this.destino;
+    const { caixa } = camada;
+    const silhueta = camada.silhueta!;
+    if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
+    const escala = tela.largura / tela.quadro.largura;
+    const alturaEmPixels = caixa.altura * escala;
+    const margem = margemDaSilhueta(silhueta, alturaEmPixels);
+    const quadroLocal = { largura: caixa.largura + (2 * margem) / escala, altura: caixa.altura + (2 * margem) / escala };
+    const w = Math.max(1, Math.round(quadroLocal.largura * escala));
+    const h = Math.max(1, Math.round(quadroLocal.altura * escala));
+    const local = this.alvo(ALVO_DA_SILHUETA, w, h);
+    this.destino = { buffer: local.buffer, largura: w, altura: h, quadro: quadroLocal };
+    this.irAoDestino();
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    this.desenharCamada(
+      { ...camada, silhueta: undefined, mesclagem: "normal", caixa: { ...caixa, cx: quadroLocal.largura / 2, cy: quadroLocal.altura / 2, rotacao: 0, opacidade: 1 } },
+      indice,
+    );
+    this.destino = tela;
+    let resultado = local.textura;
+    const juntar = (borrada: WebGLTexture, alvoIndice: number, modo: 1 | 2, ajustar: (uniformes: Recursos["silhueta"]["uniformes"]) => void) => {
+      const alvo = this.alvo(alvoIndice, w, h);
+      gl.useProgram(recursos.silhueta.programa);
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, alvo.buffer);
+      gl.viewport(0, 0, w, h);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, borrada);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, resultado);
+      gl.uniform1i(recursos.silhueta.uniformes.camada, 0);
+      gl.uniform1i(recursos.silhueta.uniformes.borrada, 2);
+      gl.uniform1i(recursos.silhueta.uniformes.modo, modo);
+      ajustar(recursos.silhueta.uniformes);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      if (mesclagem !== "normal") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    });
+      gl.enable(gl.BLEND);
+      gl.useProgram(recursos.programa);
+      resultado = alvo.textura;
+    };
+    if (silhueta.contorno && silhueta.contorno.largura > 0) {
+      const contorno = silhueta.contorno;
+      const sigma = (contorno.largura * alturaEmPixels) / 2;
+      const borrada = this.desfocar(local.textura, w, h, Math.max(sigma, 0.05), RECORTE_INTEIRO, ALVO_DO_CONTORNO, true);
+      juntar(borrada, ALVO_COM_CONTORNO, 1, (uniformes) => {
+        gl.uniform3f(uniformes.cor, ...corParaRgb(contorno.cor));
+        gl.uniform1f(uniformes.rampa, DENSIDADE_NA_BORDA / Math.max(sigma, 1e-6));
+      });
+    }
+    if (silhueta.sombra && silhueta.sombra.opacidade > 0) {
+      const sombra = silhueta.sombra;
+      const sigma = sombra.desfoque * alturaEmPixels;
+      const borrada = sigma >= 0.05 ? this.desfocar(resultado, w, h, sigma, RECORTE_INTEIRO, ALVO_DA_SOMBRA) : resultado;
+      const [dx, dy] = deslocamentoDaSombra(sombra, alturaEmPixels);
+      juntar(borrada, ALVO_COM_SOMBRA, 2, (uniformes) => {
+        gl.uniform3f(uniformes.cor, ...corParaRgb(sombra.cor));
+        gl.uniform1f(uniformes.opacidade, sombra.opacidade);
+        // As linhas do framebuffer vêm de baixo para cima: a sombra para baixo lê mais acima
+        gl.uniform2f(uniformes.deslocamento, -dx / w, dy / h);
+      });
+    }
+    this.irAoDestino();
+    // A textura pronta vem de baixo para cima, como a cópia da camada de ajuste: a camada nova é virada na vertical
+    this.desenharCamada(
+      {
+        fonte: camada.fonte,
+        texturaPronta: { textura: resultado, largura: w, altura: h },
+        recorte: RECORTE_INTEIRO,
+        virar: { horizontal: false, vertical: true },
+        caixa: { ...caixa, largura: quadroLocal.largura, altura: quadroLocal.altura },
+        mesclagem: camada.mesclagem,
+      },
+      indice,
+    );
   }
 
   destruir() {
@@ -1053,6 +1227,7 @@ export class Compositor {
       }
       this.gl.deleteProgram(recursos.programa);
       this.gl.deleteProgram(recursos.desfoque.programa);
+      this.gl.deleteProgram(recursos.silhueta.programa);
       this.gl.deleteProgram(recursos.recorte.programa);
     }
     this.recursos = null;

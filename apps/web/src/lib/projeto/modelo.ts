@@ -1,5 +1,6 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
+import type { Contorno, Sombra } from "./silhueta.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -171,6 +172,9 @@ export type Clipe = {
   chroma?: Chroma | null;
   /** Chave de luminância: some o preto ou o branco (só em vídeos e imagens). */
   chave_luma?: ChaveLuma | null;
+  /** Contorno e sombra em volta do que aparece (lib/projeto/silhueta.ts). */
+  contorno?: Contorno | null;
+  sombra?: Sombra | null;
   /** Velocidade com curva (lib/projeto/velocidade.ts); sem ela, a velocidade é a mesma o clipe todo. */
   curva_velocidade?: PontoDeVelocidade[] | null;
   /** Entrada e saída animadas; sem ela, o clipe só aparece e some. */

@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  CONTORNO_PADRAO,
+  type Contorno,
+  DESFOQUE_MAXIMO_DA_SOMBRA,
+  DISTANCIA_MAXIMA_DA_SOMBRA,
+  LARGURA_MAXIMA_DO_CONTORNO,
+  type Sombra,
+  SOMBRA_PADRAO,
+} from "@/lib/projeto/silhueta";
 import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, MousePointerClick, RotateCcw, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
 import { useState } from "react";
 
@@ -539,6 +548,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           </select>
         </label>
         <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        {!clipe.ajuste ? <SilhuetaDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} /> : null}
         <MascaraDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {midia?.elemento && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
@@ -926,6 +936,70 @@ function CantosDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe;
               aoConfirmar={(cor) => aoExecutar(comando({ ...cantos, cor }))}
             />
           ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Contorno e sombra em volta do que aparece do clipe (recortes, logos, formas, adesivos). */
+function SilhuetaDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
+  const contorno = clipe.contorno ?? null;
+  const sombra = clipe.sombra ?? null;
+  const comando = (mudanca: { contorno?: Contorno | null; sombra?: Sombra | null }): Comando => ({ comando: "clipe.silhueta", parametros: { clipeIds: [clipe.id], ...mudanca } });
+  const doContorno = (campo: "largura") => ({
+    valor: (contorno?.[campo] ?? 0) * 100,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ contorno: { ...contorno!, [campo]: valor / 100 } })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - contorno![campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ contorno: { ...contorno!, [campo]: valor / 100 } }));
+    },
+  });
+  const daSombra = (campo: "opacidade" | "desfoque" | "distancia" | "angulo", fator: number) => ({
+    valor: (sombra?.[campo] ?? 0) * fator,
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ sombra: { ...sombra!, [campo]: valor / fator } })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / fator - sombra![campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ sombra: { ...sombra!, [campo]: valor / fator } }));
+    },
+  });
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={contorno !== null} disabled={travada} onChange={(evento) => aoExecutar(comando({ contorno: evento.currentTarget.checked ? CONTORNO_PADRAO : null }))} />
+        <span className="flex-1">Contorno em volta</span>
+      </label>
+      {contorno ? (
+        <>
+          <ControleNumerico rotulo="Largura" minimo={0.5} maximo={LARGURA_MAXIMA_DO_CONTORNO * 100} passo={0.5} sufixo="%" {...doContorno("largura")} />
+          <CampoCor
+            rotulo="Cor do contorno"
+            cor={contorno.cor}
+            desativado={travada}
+            aoPrever={(cor) => aoPrever(comando({ contorno: { ...contorno, cor } }))}
+            aoConfirmar={(cor) => aoExecutar(comando({ contorno: { ...contorno, cor } }))}
+          />
+        </>
+      ) : null}
+      <label className="mt-1 flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={sombra !== null} disabled={travada} onChange={(evento) => aoExecutar(comando({ sombra: evento.currentTarget.checked ? SOMBRA_PADRAO : null }))} />
+        <span className="flex-1">Sombra</span>
+      </label>
+      {sombra ? (
+        <>
+          <ControleNumerico rotulo="Opacidade" minimo={5} maximo={100} sufixo="%" {...daSombra("opacidade", 100)} />
+          <ControleNumerico rotulo="Desfoque" minimo={0} maximo={DESFOQUE_MAXIMO_DA_SOMBRA * 100} passo={0.5} sufixo="%" {...daSombra("desfoque", 100)} />
+          <ControleNumerico rotulo="Distância" minimo={0} maximo={DISTANCIA_MAXIMA_DA_SOMBRA * 100} passo={0.5} sufixo="%" {...daSombra("distancia", 100)} />
+          <ControleNumerico rotulo="Direção" minimo={-180} maximo={180} sufixo="°" {...daSombra("angulo", 1)} />
+          <CampoCor
+            rotulo="Cor da sombra"
+            cor={sombra.cor}
+            desativado={travada}
+            aoPrever={(cor) => aoPrever(comando({ sombra: { ...sombra, cor } }))}
+            aoConfirmar={(cor) => aoExecutar(comando({ sombra: { ...sombra, cor } }))}
+          />
         </>
       ) : null}
     </div>
