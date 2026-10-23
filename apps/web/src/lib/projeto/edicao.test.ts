@@ -9,6 +9,8 @@ import {
   ajustarAudio,
   animarClipes,
   definirTransicao,
+  deslizarConteudo,
+  moverCorte,
   alternarFaixa,
   apagarClipes,
   apararClipe,
@@ -975,4 +977,55 @@ test("preencher a vaga troca a mídia do começo, encurta se ela for curta e a p
   assert.equal(principal(projeto)[1].duracao, 10 * S);
   assert.throws(() => preencherVaga(projeto, ctx, cena.id, "musica"), /vídeo ou uma imagem/);
   assert.throws(() => preencherVaga(projeto, ctx, "nao-existe", "video4"));
+});
+
+test("deslizar o conteúdo: o clipe fica no lugar e o trecho da mídia anda, preso ao que ela tem", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  const clipe = principal(projeto)[0];
+  projeto = apararClipe(projeto, ctx, clipe.id, "inicio", 2 * S);
+  // A principal encosta o clipe no começo: o fim em 4 s deixa o trecho de 2 a 6 s da mídia
+  projeto = apararClipe(projeto, ctx, clipe.id, "fim", 4 * S);
+  // Agora mostra de 2 a 6 s da mídia, no começo da linha
+  assert.deepEqual([principal(projeto)[0].inicio, principal(projeto)[0].duracao, principal(projeto)[0].entrada], [0, 4 * S, 2 * S]);
+  // Arrastar o conteúdo para a esquerda mostra o que vem depois
+  projeto = deslizarConteudo(projeto, ctx, clipe.id, -3 * S);
+  assert.deepEqual([principal(projeto)[0].inicio, principal(projeto)[0].duracao, principal(projeto)[0].entrada], [0, 4 * S, 5 * S]);
+  // Para no fim da mídia (6 s de entrada, com 4 s de trecho num vídeo de 10 s)
+  projeto = deslizarConteudo(projeto, ctx, clipe.id, -10 * S);
+  assert.equal(principal(projeto)[0].entrada, 6 * S);
+  assert.throws(() => deslizarConteudo(projeto, ctx, clipe.id, -S), /depois deste trecho/);
+  // E no começo
+  projeto = deslizarConteudo(projeto, ctx, clipe.id, 20 * S);
+  assert.equal(principal(projeto)[0].entrada, 0);
+  conferir(projeto);
+  // Imagem não desliza
+  ({ projeto } = adicionarClipe(projeto, ctx, "foto"));
+  assert.throws(() => deslizarConteudo(projeto, ctx, principal(projeto)[1].id, S), ErroEdicao);
+});
+
+test("mover o corte: um clipe cresce o que o vizinho encolhe, e nada mais anda", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "video10"));
+  ({ projeto } = adicionarClipe(projeto, ctx, "video4"));
+  const [a, b] = principal(projeto);
+  // O primeiro só tem a mídia até 10 s; o segundo começa com a entrada em 0: aparo para haver folga
+  projeto = apararClipe(projeto, ctx, a.id, "fim", 6 * S);
+  projeto = apararClipe(projeto, ctx, b.id, "inicio", 9 * S);
+  const antes = principal(projeto);
+  assert.deepEqual(antes.map((c) => [c.inicio / S, c.duracao / S]), [[0, 6], [6, 7], [13, 4]]);
+  assert.equal(antes[1].entrada, 3 * S);
+  // O corte vai de 6 s para 8 s: a passa a mostrar 0 a 8 s; b começa 2 s depois, na mídia também
+  projeto = moverCorte(projeto, ctx, a.id, 8 * S);
+  const depois = principal(projeto);
+  assert.deepEqual(depois.map((c) => [c.inicio / S, c.duracao / S]), [[0, 8], [8, 5], [13, 4]]);
+  assert.equal(depois[1].entrada, 5 * S);
+  // Para trás, b só volta até o começo da mídia dela (3 + 2 = 5 s antes)
+  projeto = moverCorte(projeto, ctx, a.id, 0);
+  assert.deepEqual(principal(projeto).map((c) => [c.inicio / S, c.duracao / S]), [[0, 3], [3, 10], [13, 4]]);
+  assert.equal(principal(projeto)[1].entrada, 0);
+  conferir(projeto);
+  // Sem vizinho encostado não há corte
+  assert.throws(() => moverCorte(projeto, ctx, principal(projeto)[2].id, 20 * S), /encostados/);
 });

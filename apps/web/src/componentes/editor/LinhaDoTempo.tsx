@@ -109,6 +109,9 @@ type Arrasto =
       guia: Tick | null;
     }
   | { tipo: "aparar"; clipe: Clipe; borda: "inicio" | "fim"; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
+  // Alt + arrastar: o conteúdo do clipe (slip) ou o corte entre dois clipes encostados (roll), com o da esquerda
+  | { tipo: "deslizar"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
+  | { tipo: "corte"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "soltar"; comando: Comando; guia: Tick | null };
 
 export function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
@@ -263,6 +266,19 @@ export function LinhaDoTempo({
     if (!selecao.includes(clipe.id) || borda) aoSelecionar([clipe.id]);
     if (faixa.travada) return;
     evento.preventDefault();
+    if (evento.altKey) {
+      // O vizinho encostado do lado da borda: o corte entre os dois anda (o da esquerda guarda o corte)
+      const vizinho = borda === "fim" ? faixa.clipes.find((item) => item.inicio === fimDoClipe(clipe)) : borda === "inicio" ? faixa.clipes.find((item) => fimDoClipe(item) === clipe.inicio) : undefined;
+      if (vizinho) {
+        trocarArrasto({ tipo: "corte", clipe: borda === "fim" ? clipe : vizinho, x0: evento.clientX, ativo: false, comando: null, guia: null });
+        return;
+      }
+      const midia = midiaDoClipe(midias, clipe);
+      if (!borda && midia && !midia.imagem) {
+        trocarArrasto({ tipo: "deslizar", clipe, x0: evento.clientX, ativo: false, comando: null, guia: null });
+        return;
+      }
+    }
     trocarArrasto(
       borda
         ? { tipo: "aparar", clipe, borda, x0: evento.clientX, ativo: false, comando: null, guia: null }
@@ -279,7 +295,17 @@ export function LinhaDoTempo({
     const dy = atual.tipo === "mover" ? evento.clientY - atual.y0 : 0;
     if (!atual.ativo && Math.hypot(dx, dy) < LIMIAR_ARRASTO_PX) return;
 
-    if (atual.tipo === "mover") {
+    if (atual.tipo === "deslizar") {
+      trocarArrasto({ ...atual, ativo: true, comando: { comando: "clipe.deslizar", parametros: { clipeId: atual.clipe.id, deslocamento: ticks(dx) } } });
+    } else if (atual.tipo === "corte") {
+      let alvo = Math.max(0, fimDoClipe(atual.clipe) + ticks(dx));
+      let guia: Tick | null = null;
+      if (ima) {
+        const ponto = pontoMaisProximo(alvo, pontosDeEncaixe(projeto, tempo, new Set([atual.clipe.id])), tolerancia);
+        if (ponto !== null) alvo = guia = ponto;
+      }
+      trocarArrasto({ ...atual, ativo: true, guia, comando: { comando: "clipe.moverCorte", parametros: { clipeId: atual.clipe.id, tempo: alvo } } });
+    } else if (atual.tipo === "mover") {
       const { clipe } = atual;
       const { inicio, guia } = encaixar(clipe.inicio + ticks(dx), clipe.duracao, [clipe.id]);
       const destino = destinoDoClipe(midiaDoClipe(midias, clipe), inicio, tempoNoPonteiro(evento), pontoNaArea(evento).y, atual.faixaId, Boolean(clipe.texto));

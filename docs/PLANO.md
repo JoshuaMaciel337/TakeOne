@@ -468,7 +468,8 @@ Cada fase termina com algo que dá para usar e testar.
 - Estudo dos apps da ArtCraft (FilmCraft, LightCraft, EffectCraft, PhotoCraft, SoundCraft, VectorCraft): 42 funções para trazer do nosso jeito, por lotes. Ficam de fora os pesos do SAM 3, o RawNIND (GPL), o potrace (GPL), o CairoSVG (LGPL), o Depth Anything Base/Large (não comercial) e as animações do LottieFiles.
   - [x] Lote A (edição do dia a dia): legendas em qualquer codificação (UTF-8, UTF-16 e Windows-1252), juntar, dividir pelas palavras e localizar e substituir; atalhos Q, W, Alt+setas e ↑ ↓ de corte em corte, com a janela "?"; copiar e colar clipes e "Colar ajustes" (Ctrl+Alt+V); guias na prévia (margens seguras, terços e as áreas cobertas no celular).
   - [x] Lote B (com a prévia igual ao render): virar o clipe na horizontal e na vertical, as curvas Acelerando, Freando e Parado nos keyframes, a chave de luminância (tirar o fundo preto ou branco) e os cantos arredondados com borda.
-  - [ ] Deslizar conteúdo (slip) e mover o corte (roll), e o resto das 42.
+  - [x] Deslizar conteúdo (slip) e mover o corte (roll).
+  - [ ] O resto das 42, nos lotes D a H (ondas 6 a 10).
 - Máscaras desenhadas (do LightCraft e do EffectCraft) e multicâmera (do FilmCraft).
 - [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.
 - Servidor MCP, para agentes editarem pelos comandos.
@@ -490,7 +491,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] A LUT 3D também na prévia: a mesma grade de 33 pontos do render, lida com a interpolação tetraédrica do FFmpeg (o fim da diferença nas curvas íngremes).
   - [x] Brancos, pretos, vibração, níveis (preto, branco e gama) e cor por matiz (oito faixas) na aba Cor, na mesma LUT.
   - [x] Nitidez (efeito, com a cópia desfocada do brilho).
-  - [ ] Slip e roll, HDR do celular para SDR.
+  - [x] Slip e roll (Alt + arrastar o clipe ou a borda entre dois clipes encostados).
+  - [ ] HDR do celular para SDR.
 - [ ] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.
 - [ ] Onda 6, lote D (som). Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.

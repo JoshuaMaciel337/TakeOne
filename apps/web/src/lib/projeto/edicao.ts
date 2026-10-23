@@ -706,6 +706,67 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
 }
 
 /**
+ * Desliza o conteúdo (slip): o clipe fica no mesmo lugar e com a mesma duração, e o trecho da mídia anda.
+ * `deslocamento` é quanto o conteúdo anda para a direita na linha do tempo (positivo mostra o que vinha antes na
+ * mídia). Para no que a mídia tem dos dois lados; keyframes, fades e animações ficam onde estão.
+ */
+export function deslizarConteudo(projeto: Projeto, ctx: Contexto, clipeId: string, deslocamento: Tick): Projeto {
+  const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  const info = infoDoClipe(ctx, clipe, faixa);
+  if (clipe.texto || !clipe.midia_id || info.imagem) throw new ErroEdicao("Só vídeos e áudios têm um trecho da mídia para deslizar.");
+  // O trecho da mídia que o clipe usa, em ticks da mídia (a curva de velocidade usa o mesmo trecho)
+  const trecho = Math.round(clipe.duracao * clipe.velocidade);
+  const ultimaEntrada = Number.isFinite(info.duracao) ? Math.max(0, info.duracao - trecho) : Number.POSITIVE_INFINITY;
+  const entrada = Math.min(Math.max(0, clipe.entrada - Math.round(deslocamento * clipe.velocidade)), ultimaEntrada);
+  if (entrada === clipe.entrada) throw new ErroEdicao(deslocamento > 0 ? "A mídia não tem mais nada antes deste trecho." : "A mídia não tem mais nada depois deste trecho.");
+  const clipes = [...faixa.clipes];
+  clipes[indice] = { ...clipe, entrada };
+  return finalizar(trocarFaixa(projeto, { ...faixa, clipes }));
+}
+
+/**
+ * Move o corte entre o clipe e o seguinte da mesma faixa (roll): um cresce o que o outro encolhe, e nada mais
+ * na linha do tempo anda. Cada lado para no que a mídia tem e no mínimo de um quadro.
+ */
+export function moverCorte(projeto: Projeto, ctx: Contexto, clipeId: string, tempo: Tick): Projeto {
+  const { faixa, clipe: esquerda, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  const direita = faixa.clipes[indice + 1];
+  if (!direita || direita.inicio !== fimDoClipe(esquerda)) throw new ErroEdicao("O corte só anda entre dois clipes encostados na mesma faixa.");
+  if (esquerda.curva_velocidade || direita.curva_velocidade) throw new ErroEdicao("O corte não anda num clipe com curva de velocidade: apare cada lado.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const corte = fimDoClipe(esquerda);
+  const infoEsquerda = infoDoClipe(ctx, esquerda, faixa);
+  const infoDireita = infoDoClipe(ctx, direita, faixa);
+  // A esquerda cresce até o fim da mídia dela; a direita volta até o começo da dela
+  const maisNaEsquerda = Number.isFinite(infoEsquerda.duracao) ? ajustarAoQuadro(projeto.taxa, (infoEsquerda.duracao - esquerda.entrada) / esquerda.velocidade) - esquerda.duracao : Number.POSITIVE_INFINITY;
+  const maisNaDireita = direita.texto || infoDireita.imagem ? Number.POSITIVE_INFINITY : ajustarAoQuadro(projeto.taxa, direita.entrada / direita.velocidade);
+  const minimo = Math.max(-(esquerda.duracao - quadro), -maisNaDireita);
+  const maximo = Math.min(direita.duracao - quadro, maisNaEsquerda);
+  const delta = Math.min(Math.max(quadroMaisProximo(projeto.taxa, tempo) - corte, minimo), maximo);
+  if (delta === 0) return projeto;
+  const duracaoEsquerda = esquerda.duracao + delta;
+  const novaEsquerda: Clipe = { ...esquerda, duracao: duracaoEsquerda, ...pedacoDoClipe(esquerda, esquerda.inicio, esquerda.inicio + duracaoEsquerda) };
+  const novaDireita: Clipe = {
+    ...direita,
+    inicio: direita.inicio + delta,
+    duracao: direita.duracao - delta,
+    ...pedacoDoClipe(direita, direita.inicio + delta, fimDoClipe(direita)),
+    // Como no aparar do começo: keyframes, palavras e o abaixar ficam no mesmo instante da linha do tempo
+    keyframes: deslocarKeyframes(direita.keyframes, delta),
+    expressoes: deslocarExpressoes(direita.expressoes, delta),
+    texto: deslocarTempos(direita.texto, delta),
+    abaixamento: deslocarAbaixamento(direita.abaixamento, delta),
+  };
+  if (infoDireita.imagem) novaDireita.entrada = 0;
+  const clipes = [...faixa.clipes];
+  clipes[indice] = novaEsquerda;
+  clipes[indice + 1] = novaDireita;
+  return finalizar(trocarFaixa(projeto, { ...faixa, clipes }));
+}
+
+/**
  * Divide no instante `tempo` os clipes escolhidos que passam por ele.
  * Sem nenhum escolhido, divide o clipe da faixa principal que está sob o cursor.
  */

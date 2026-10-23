@@ -15,6 +15,8 @@ export const ATALHOS: Atalho[] = [
   { teclas: "Q", acao: "Apagar do começo do clipe até o cursor" },
   { teclas: "W", acao: "Apagar do cursor até o fim do clipe" },
   { teclas: "Alt+← Alt+→", acao: "Empurrar os clipes marcados um quadro (Shift: cinco)" },
+  { teclas: "Alt + arrastar o clipe", acao: "Deslizar o conteúdo: o clipe fica no lugar e mostra outro trecho da mídia" },
+  { teclas: "Alt + arrastar a borda", acao: "Mover o corte entre dois clipes encostados: um cresce o que o outro encolhe" },
   { teclas: "Delete", acao: "Apagar os clipes marcados" },
   { teclas: "Ctrl+D", acao: "Duplicar os clipes marcados" },
   { teclas: "Ctrl+C  Ctrl+V", acao: "Copiar e colar clipes no cursor" },

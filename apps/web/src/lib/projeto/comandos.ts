@@ -21,6 +21,7 @@ import {
   type DestinoClipe,
   type Intervalo,
   removerIntervalos,
+  deslizarConteudo,
   dividirClipes,
   estiloDasLegendas,
   palavrasChaveDasLegendas,
@@ -60,6 +61,7 @@ import {
   curvarVelocidade,
   duplicarClipes,
   moverClipe,
+  moverCorte,
   mudarFundo,
   mudarTexto,
   recortarClipes,
@@ -100,6 +102,8 @@ export type Comando =
   | { comando: "clipe.adicionar"; parametros: { midiaId: string } & DestinoClipe }
   | { comando: "clipe.mover"; parametros: { clipeId: string; inicio: Tick } & DestinoClipe }
   | { comando: "clipe.aparar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
+  | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
+  | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
   | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
@@ -164,6 +168,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
   "clipe.mover": "mover clipe",
   "clipe.aparar": "aparar clipe",
+  "clipe.deslizar": "deslizar o conteúdo",
+  "clipe.moverCorte": "mover o corte",
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
   "linha.removerIntervalos": "remover trechos",
@@ -239,6 +245,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "clipe.aparar":
       return { projeto: apararClipe(projeto, ctx, parametros.clipeId, parametros.borda, parametros.tempo) };
+    case "clipe.deslizar":
+      return { projeto: deslizarConteudo(projeto, ctx, parametros.clipeId, parametros.deslocamento) };
+    case "clipe.moverCorte":
+      return { projeto: moverCorte(projeto, ctx, parametros.clipeId, parametros.tempo) };
     case "linha.dividir": {
       const resultado = dividirClipes(projeto, ctx, parametros.tempo, parametros.clipeIds);
       return { projeto: resultado.projeto, selecao: resultado.novos };
