@@ -91,7 +91,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.2 — Camadas de pixels e o pincel
 
 - [x] Camada de pixels (Camada › Nova › Camada, Ctrl+Shift+N), com versões no servidor e edição no navegador
-- [ ] Camada de fundo (travada embaixo) e "Camada a partir do fundo"
+- [x] Camada de fundo (travada embaixo) e "Camada a partir do fundo"
 - [x] Pincel (B): tamanho, dureza, opacidade, fluxo, aerógrafo, suavização (corda puxada, recuperar o traço), pressão no tamanho e na opacidade, modo (os 27 e Limpar)
 - [x] Lápis (B), com "Apagar automaticamente"
 - [x] Borracha (E): pincel, lápis e bloco; com a transparência travada, pinta a cor de fundo (a camada de fundo vem com o item dela)
@@ -101,8 +101,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
 - [x] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois
 - [ ] Máscara de camada pintável: Adicionar (revelar tudo, ocultar tudo, revelar seleção, ocultar seleção, a partir da transparência), pintar em preto e branco, Densidade e Difusão, Aplicar, Excluir, Ativar e desativar, Vincular, Ctrl+\ mira a máscara, Alt + clique mostra só a máscara
-- [ ] Rasterizar (texto, forma, preenchimento, máscara vetorial, objeto, estilo, camada, todas)
-- [ ] Mesclar para baixo (Ctrl+E), Mesclar visíveis (Ctrl+Shift+E), Achatar imagem, Carimbar para baixo (Ctrl+Alt+E), Carimbar visíveis (Ctrl+Alt+Shift+E), Mesclar grupo
+- [x] Rasterizar (camada, que vale para texto, forma, imagem e objeto; estilo; todas). O preenchimento e a máscara vetorial entram com as camadas deles (13.5 e 13.6)
+- [x] Mesclar para baixo (Ctrl+E), Mesclar visíveis (Ctrl+Shift+E), Achatar imagem, Carimbar para baixo (Ctrl+Alt+E), Carimbar visíveis (Ctrl+Alt+Shift+E), Mesclar grupo
 - [ ] Pincel do histórico (Y) e Pincel do histórico artístico, com a fonte escolhida no Histórico
 - [ ] Instantâneos no Histórico; Alternar o último estado (Ctrl+Alt+Z)
 - [ ] Limpeza das versões antigas no servidor

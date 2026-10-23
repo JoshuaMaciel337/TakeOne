@@ -26,6 +26,8 @@ type Props = {
   aoAbrirPropriedades: () => void;
   /** Uma camada de pixels vazia acima da escolhida (Ctrl+Shift+N). */
   aoNovaCamada: () => void;
+  /** Camada a partir do fundo (duplo clique na linha do fundo). */
+  aoCamadaDoFundo: () => void;
 };
 
 /** O nome de cada camada: o que a pessoa deu, o do texto, "Camada de ajuste", "Grupo" ou o da mídia. */
@@ -187,7 +189,7 @@ function CampoDePorcentagem({ rotulo, valor, desativado, aoMudar }: { rotulo: st
  * (duplo clique renomeia); arrastar muda a ordem e põe dentro ou fora das pastas; Ctrl e Shift escolhem várias; o
  * botão direito abre o menu da camada. No rodapé: vincular, estilo (fx), máscara, ajuste, pasta, duplicar e apagar.
  */
-export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades, aoNovaCamada }: Props) {
+export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades, aoNovaCamada, aoCamadaDoFundo }: Props) {
   // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [arrastadas, setArrastadas] = useState<string[] | null>(null);
@@ -590,6 +592,20 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
             </li>
           );
         })}
+        {!filtrando && !projeto.fundo.transparente && !todas.some((faixa) => faixa.fundo) ? (
+          // O fundo da imagem (a cor do documento), como a camada de fundo travada dos editores de imagem: o duplo
+          // clique o transforma numa camada comum
+          <li className="flex h-9 items-stretch border-b border-borda/60" title="Duplo clique: Camada a partir do fundo">
+            <span className="grid w-7 shrink-0 place-items-center border-r border-borda/60 text-suave">
+              <Eye className="size-3.5" aria-hidden />
+            </span>
+            <button type="button" onDoubleClick={aoCamadaDoFundo} className="flex min-w-0 flex-1 items-center gap-2 px-1.5 text-left" aria-label="Fundo (duplo clique: camada a partir do fundo)">
+              <span className="size-7 shrink-0 rounded-sm border border-borda" style={{ background: projeto.fundo.cor }} aria-hidden />
+              <span className="min-w-0 flex-1 truncate italic">Fundo</span>
+              <Lock className="size-3 shrink-0 text-suave" aria-label="Travada" />
+            </button>
+          </li>
+        ) : null}
       </ol>
 
       {menu ? (

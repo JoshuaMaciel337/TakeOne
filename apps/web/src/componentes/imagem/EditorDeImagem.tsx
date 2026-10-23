@@ -27,7 +27,7 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, MASCARA_PADRAO, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Faixa, MASCARA_PADRAO, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
@@ -52,7 +52,9 @@ import type { AlvoDaPintura } from "./PinturaNaPrevia";
 import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
 import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
 import { criarPincel, excluirPincel, importarAbr, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
-import { criarCamadaDePixels } from "@/lib/pixels";
+import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
+import { exportarImagem } from "@/lib/exportacao/imagem";
+import { planoDosPixels, type PlanoDosPixels, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 
 const SEM_SEGUIR = {
   marcando: null,
@@ -127,6 +129,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     borracha: { ...PINCEL_PADRAO, tamanho: 40 },
   });
   const [simetria, setSimetria] = useState<Simetria | null>(null);
+  const [gerandoPixels, setGerandoPixels] = useState(false);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -380,6 +383,77 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       return null;
     }
   };
+  /**
+   * Os pixels de um plano (rasterizar, mesclar, achatar, carimbar, a camada a partir do fundo): o projeto do plano é
+   * desenhado como na exportação, sobe como camada de pixels nova e um comando troca as camadas, num passo só.
+   */
+  const gerarPixels = async (plano: PlanoDosPixels | (() => Promise<Blob>), dados: Omit<PlanoDosPixels, "desenhar">) => {
+    if (!projeto) return;
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const blob = typeof plano === "function" ? await plano() : await exportarImagem(plano.desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte });
+      const { largura, altura } = tamanhoDaImagem(projetoRef.current ?? projeto);
+      const midia = await criarCamadaDePixels(largura, altura, dados.nome);
+      setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
+      const versao = await enviarVersao(midia.id, blob);
+      void biblioteca.recarregar();
+      executar({ comando: "imagem.substituirPorPixels", parametros: { ...dados, midiaId: midia.id, versao } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível gerar os pixels.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  const nomeDaFaixa = (faixa: Faixa) => nomeDaCamada(faixa.clipes[0], midias, faixa);
+  const alturaDaCaixa = (faixa: Faixa) => caixasRef.current.get(faixa.clipes[0].id)?.altura ?? null;
+  /** Rasterizar, mesclar, achatar ou carimbar as escolhidas (cada rasterizar é uma camada por vez). */
+  const mesclarEmPixels = async (tipo: TipoDaMesclagem) => {
+    if (!projeto || gerandoPixels) return;
+    const ids = tipo === "rasterizar" && faixaIds.length > 1 ? faixaIds : [faixaIds];
+    for (const grupo of ids) {
+      const atual = projetoRef.current ?? projeto;
+      let plano: PlanoDosPixels;
+      try {
+        plano = planoDosPixels(atual, tipo, Array.isArray(grupo) ? grupo : [grupo], nomeDaFaixa, alturaDaCaixa);
+      } catch (e) {
+        mostrarAviso(e instanceof Error ? e.message : "Não foi possível.");
+        return;
+      }
+      const { desenhar, ...dados } = plano;
+      await gerarPixels({ desenhar, ...dados }, dados);
+    }
+  };
+  /** Rasterizar › Todas as camadas: cada camada que não é de pixels (nem grupo nem ajuste), uma por vez. */
+  const rasterizarTodas = async () => {
+    if (!projeto) return;
+    for (const faixa of faixasEmOrdem(projeto).filter((item) => !item.clipes[0].pixels && !item.clipes[0].pasta && !item.clipes[0].ajuste && !item.travada)) {
+      const atual = projetoRef.current ?? projeto;
+      if (!atual.faixas.some((item) => item.id === faixa.id)) continue;
+      const { desenhar, ...dados } = planoDosPixels(atual, "rasterizar", [faixa.id], nomeDaFaixa, alturaDaCaixa);
+      await gerarPixels({ desenhar, ...dados }, dados);
+    }
+  };
+  /** Camada a partir do fundo: a cor do fundo vira uma camada de pixels embaixo de todas, e a imagem fica sem fundo. */
+  const camadaDoFundoDoDocumento = () => {
+    if (!projeto) return;
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    const cor = projeto.fundo.cor;
+    void gerarPixels(
+      () =>
+        new Promise<Blob>((pronto, falhou) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = largura;
+          canvas.height = altura;
+          const ctx2d = canvas.getContext("2d")!;
+          ctx2d.fillStyle = cor;
+          ctx2d.fillRect(0, 0, largura, altura);
+          canvas.toBlob((blob) => (blob ? pronto(blob) : falhou(new Error("O navegador não conseguiu gerar a camada."))), "image/png");
+        }),
+      { remover: [], lugar: null, nome: "Camada 0", manter: { opacidade: 1, faixa: {} }, doFundoDoDocumento: true },
+    );
+  };
+  const camadaDeFundoAtual = projeto?.faixas.find((faixa) => faixa.fundo) ?? null;
   const ferramentaDePintura = FERRAMENTAS_DE_PINTURA.has(ferramenta) ? (ferramenta as FerramentaDePintura) : null;
   // Fora das ferramentas de pintura, os painéis do pincel mostram o Pincel (como lá, o último pincel usado)
   const pincelDosPaineis: FerramentaDePintura = ferramentaDePintura ?? "pincel";
@@ -437,6 +511,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     desfazer: () => depoisDaPintura(desfazer),
     refazer: () => depoisDaPintura(refazer),
     novaCamada: () => void novaCamada(),
+    rasterizar: (tipo) => void (tipo === "todas" ? rasterizarTodas() : mesclarEmPixels(tipo)),
+    mesclar: (tipo) => void mesclarEmPixels(tipo),
+    camadaDoFundo: () => {
+      if (camadaDeFundoAtual) executar({ comando: "imagem.camadaDeFundo", parametros: { faixaId: camadaDeFundoAtual.id, ligar: false } });
+      else if (projeto && !projeto.fundo.transparente) camadaDoFundoDoDocumento();
+    },
+    fundoDaCamada: () => escolhidas[0] && executar({ comando: "imagem.camadaDeFundo", parametros: { faixaId: escolhidas[0].id, ligar: true } }),
+    temFundo: Boolean(camadaDeFundoAtual) || Boolean(projeto && !projeto.fundo.transparente),
+    podeVirarFundo: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0].pixels) && !camadaDeFundoAtual,
+    gerandoPixels,
     ferramenta: escolherFerramenta,
     ajuste: criarAjuste,
     documento: () => {
@@ -677,7 +761,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} />,
     },
     pinceis: {
       nome: PAINEIS_DA_IMAGEM.pinceis,

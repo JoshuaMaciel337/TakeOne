@@ -4,8 +4,11 @@
 import { ancestrais, comDescendentes, posicaoTravada } from "./arvore.ts";
 import type { Clipe, Projeto, Transformacao } from "./modelo.ts";
 
-/** Uma caixa em frações do quadro (0 a 1), sem giro: o retângulo que a camada ocupa na tela. */
-export type CaixaNoQuadro = { x0: number; y0: number; x1: number; y1: number };
+/**
+ * Uma caixa em frações do quadro (0 a 1), sem giro: o retângulo que a camada ocupa na tela. `altura` é a altura da
+ * própria caixa (antes do giro), em frações da altura do quadro: os estilos (contorno, sombra) são medidos nela.
+ */
+export type CaixaNoQuadro = { x0: number; y0: number; x1: number; y1: number; altura?: number };
 
 /** O retângulo em volta de uma caixa girada (centro, tamanho e giro em pixels do quadro), em frações do quadro. */
 export function caixaNoQuadro(caixa: { cx: number; cy: number; largura: number; altura: number; rotacao: number }, quadro: { largura: number; altura: number }): CaixaNoQuadro {
@@ -17,6 +20,7 @@ export function caixaNoQuadro(caixa: { cx: number; cy: number; largura: number; 
     y0: (caixa.cy - meiaAltura) / quadro.altura,
     x1: (caixa.cx + meiaLargura) / quadro.largura,
     y1: (caixa.cy + meiaAltura) / quadro.altura,
+    altura: caixa.altura / quadro.altura,
   };
 }
 

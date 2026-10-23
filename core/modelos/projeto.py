@@ -41,7 +41,7 @@ FAIXAS_DE_TEXTO = (FAIXA_TEXTO, FAIXA_LEGENDA)
 LIMITE_FAIXAS = 30
 # No projeto de imagem cada camada é uma faixa, e a principal fica vazia embaixo
 LIMITE_CAMADAS = 100
-CAMPOS_DA_IMAGEM = ("pai", "recortada", "travas", "rotulo", "vinculo", "nome", "aberta")
+CAMPOS_DA_IMAGEM = ("pai", "recortada", "travas", "rotulo", "vinculo", "nome", "aberta", "fundo")
 LIMITE_CLIPES = 1500
 # O fim do clipe pode passar um pouco do fim da mídia: a duração do ffprobe e a borda do quadro
 # não batem exatamente.
@@ -162,6 +162,10 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
             return "A pasta fica numa faixa de sobreposição, sem mídia nem texto."
         if clipe and clipe.get("mesclagem") == "passagem" and not clipe.get("pasta"):
             return "Só uma pasta usa a mesclagem Passagem."
+        if faixa.get("fundo"):
+            da_raiz = [f for f in faixas if f.get("tipo") != FAIXA_PRINCIPAL and f.get("clipes") and not f.get("pai")]
+            if not (clipe and clipe.get("pixels")) or faixa.get("pai") or not da_raiz or da_raiz[-1] is not faixa:
+                return "A camada de fundo fica embaixo de todas, fora das pastas."
         if faixa.get("pai"):
             pai = por_id.get(faixa["pai"])
             if not pai or not pai.get("clipes") or not pai["clipes"][0].get("pasta"):

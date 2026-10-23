@@ -2,6 +2,7 @@
 // profissionais. Os atalhos que o navegador não deixa a página pegar (Ctrl+N, Ctrl+T, Ctrl+W) ficam de fora.
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
 import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
+import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
 
@@ -102,6 +103,17 @@ export type AcoesDosMenus = {
   apagarOcultas: () => void;
   /** Camada › Novo › Camada (Ctrl+Shift+N): uma camada de pixels vazia. */
   novaCamada: () => void;
+  /** Rasterizar a escolhida, o estilo dela ou todas. */
+  rasterizar: (tipo: "rasterizar" | "rasterizarEstilo" | "todas") => void;
+  /** Mesclar para baixo, as escolhidas, o grupo, as visíveis, achatar e carimbar. */
+  mesclar: (tipo: Exclude<TipoDaMesclagem, "rasterizar" | "rasterizarEstilo">) => void;
+  /** Camada a partir do fundo e Fundo a partir da camada. */
+  camadaDoFundo: () => void;
+  fundoDaCamada: () => void;
+  temFundo: boolean;
+  podeVirarFundo: boolean;
+  /** Os pixels de um mesclar ou rasterizar estão sendo gerados (os itens esperam). */
+  gerandoPixels: boolean;
   apagarVazias: () => void;
   selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
@@ -178,6 +190,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           nome: "Novo",
           itens: [
             { nome: "Camada…", atalho: "Ctrl+Shift+N", aoEscolher: a.novaCamada },
+            { nome: "Camada a partir do fundo", desativado: !a.temFundo, aoEscolher: a.camadaDoFundo },
+            { nome: "Fundo a partir da camada", desativado: !a.podeVirarFundo, aoEscolher: a.fundoDaCamada },
+            "-",
             { nome: "Grupo", aoEscolher: a.grupo },
             { nome: "Grupo a partir das camadas…", desativado: semCamada, aoEscolher: a.agrupar },
             "-",
@@ -224,6 +239,27 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         },
         { nome: "Alinhar", desativado: semCamada, itens: ALINHAMENTOS.map((item) => ({ nome: item.nome, aoEscolher: () => a.alinhar(item.id) })) },
         { nome: "Distribuir", desativado: a.quantas < 3, itens: DISTRIBUICOES.map((item) => ({ nome: item.nome, aoEscolher: () => a.distribuir(item.id) })) },
+        "-",
+        {
+          nome: "Rasterizar",
+          desativado: a.gerandoPixels,
+          itens: [
+            { nome: "Camada", desativado: semCamada, aoEscolher: () => a.rasterizar("rasterizar") },
+            { nome: "Estilo de camada", desativado: semCamada, aoEscolher: () => a.rasterizar("rasterizarEstilo") },
+            { nome: "Todas as camadas", aoEscolher: () => a.rasterizar("todas") },
+          ],
+        },
+        "-",
+        {
+          nome: a.temPasta && a.quantas === 1 ? "Mesclar grupo" : a.quantas > 1 ? "Mesclar camadas" : "Mesclar para baixo",
+          atalho: "Ctrl+E",
+          desativado: semCamada || a.gerandoPixels,
+          aoEscolher: () => a.mesclar(a.temPasta && a.quantas === 1 ? "grupo" : a.quantas > 1 ? "selecionadas" : "baixo"),
+        },
+        { nome: "Mesclar visíveis", atalho: "Ctrl+Shift+E", desativado: a.gerandoPixels, aoEscolher: () => a.mesclar("visiveis") },
+        { nome: "Achatar imagem", desativado: a.gerandoPixels, aoEscolher: () => a.mesclar("achatar") },
+        { nome: "Carimbar para baixo", atalho: "Ctrl+Alt+E", desativado: semCamada || a.gerandoPixels, aoEscolher: () => a.mesclar("carimbarBaixo") },
+        { nome: "Carimbar visíveis", atalho: "Ctrl+Alt+Shift+E", desativado: a.gerandoPixels, aoEscolher: () => a.mesclar("carimbarVisiveis") },
         "-",
         { nome: "Bloquear camadas", atalho: "Ctrl+/", desativado: semCamada, aoEscolher: a.bloquear },
         { nome: a.vinculadas ? "Desvincular camadas" : "Vincular camadas", desativado: !a.vinculadas && a.quantas < 2, aoEscolher: a.vincular },

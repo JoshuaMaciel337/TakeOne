@@ -94,3 +94,21 @@ def test_projeto_aponta_a_versao(cliente, db_limpo):
     sobre = {**faixa, "id": "fs"}
     resposta = salvar(cliente, video, video["faixas"] + [sobre])
     assert resposta.status_code == 422 and "camadas de pixels" in resposta.json()["detail"]
+
+
+def test_camada_de_fundo_fica_embaixo(cliente, db_limpo):
+    cadastrar(cliente)
+    camada = cliente.post("/api/camadas-pixels", json={"largura": 100, "altura": 100}).json()
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 100, "altura": 100}}).json()
+
+    def faixa(id_, **campos):
+        clipe = {"id": f"c{id_}", "midia_id": camada["id"], "inicio": 0, "duracao": 5 * SEGUNDO, "entrada": 0,
+                 "velocidade": 1, "volume": 1, "pixels": {"versao": 0}}
+        return {"id": id_, "tipo": "video", "oculta": False, "muda": False, "travada": False, "clipes": [clipe],
+                **campos}
+
+    fundo = faixa("f", fundo=True, nome="Fundo", travas={"transparencia": True, "posicao": True})
+    assert salvar(cliente, imagem, [faixa("a"), fundo] + imagem["faixas"]).status_code == 200
+    imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
+    resposta = salvar(cliente, imagem, [fundo, faixa("a")] + imagem["faixas"][2:])
+    assert resposta.status_code == 422 and "fundo" in resposta.json()["detail"]

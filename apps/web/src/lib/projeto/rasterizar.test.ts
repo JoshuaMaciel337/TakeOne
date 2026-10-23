@@ -1,0 +1,113 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { arvoreDaImagem, problemaNaArvore } from "./arvore.ts";
+import { executarComando } from "./comandos.ts";
+import type { Contexto } from "./edicao.ts";
+import type { Faixa, Projeto } from "./modelo.ts";
+import { planoDosPixels, substituirPorPixels } from "./rasterizar.ts";
+import { TEXTO_PADRAO } from "./texto.ts";
+
+function contexto(): Contexto {
+  let n = 0;
+  return { novoId: () => `n${++n}`, midia: () => null };
+}
+
+/** Três textos: c (em cima), b, a (embaixo). */
+function tres() {
+  const ctx = contexto();
+  let projeto: Projeto = {
+    id: "p",
+    nome: "Imagem",
+    proporcao: "1:1",
+    tipo: "imagem",
+    tamanho: { largura: 400, altura: 400 },
+    taxa: { num: 30, den: 1 },
+    fundo: { cor: "#ffffff" },
+    faixas: [{ id: "principal", tipo: "principal", oculta: false, muda: false, travada: false, clipes: [] }],
+    versao: 1,
+    duracao: 0,
+    criado_em: "",
+    atualizado_em: "",
+  };
+  const ids: string[] = [];
+  for (const letra of "abc") {
+    const r = executarComando(projeto, { comando: "imagem.adicionarTexto", parametros: { texto: { ...TEXTO_PADRAO, conteudo: letra } } }, ctx);
+    projeto = r.projeto;
+    ids.push(projeto.faixas.find((f) => f.clipes[0]?.id === r.selecao![0])!.id);
+  }
+  return { ctx, projeto, a: ids[0], b: ids[1], c: ids[2] };
+}
+
+const nome = (faixa: Faixa) => faixa.clipes[0].texto?.conteudo ?? faixa.nome ?? "?";
+const conteudos = (projeto: Projeto) => arvoreDaImagem(projeto).map((no) => no.faixa.nome ?? no.clipe.texto?.conteudo);
+
+test("mesclar para baixo: desenha as duas, a de baixo neutra, e a nova fica no lugar dela com as propriedades dela", () => {
+  const { ctx, projeto: inicio, b, c } = tres();
+  let projeto = executarComando(inicio, { comando: "clipe.transformar", parametros: { clipeIds: [inicio.faixas.find((f) => f.id === b)!.clipes[0].id], transformacao: { opacidade: 0.5 } } }, ctx).projeto;
+  projeto = executarComando(projeto, { comando: "clipe.mesclar", parametros: { clipeIds: [projeto.faixas.find((f) => f.id === c)!.clipes[0].id], mesclagem: "multiplicar" } }, ctx).projeto;
+  const plano = planoDosPixels(projeto, "baixo", [c], nome);
+  // No desenho: c com a mesclagem dela, b sem a opacidade (que fica na camada nova)
+  const desenhadas = plano.desenhar.faixas.filter((f) => f.clipes[0]);
+  assert.deepEqual(desenhadas.map((f) => [f.clipes[0].texto?.conteudo, f.clipes[0].transformacao.opacidade, f.clipes[0].mesclagem ?? "normal"]), [["c", 1, "multiplicar"], ["b", 1, "normal"]]);
+  assert.equal(plano.desenhar.fundo.transparente, true);
+  assert.deepEqual([plano.remover, plano.lugar, plano.nome, plano.manter.opacidade], [[c, b], b, "b", 0.5]);
+  const { projeto: depois } = substituirPorPixels(projeto, ctx.novoId, { ...plano, midiaId: "m1", versao: 3 });
+  assert.deepEqual(conteudos(depois), ["b", "a"]);
+  const nova = depois.faixas.find((f) => f.clipes[0]?.pixels)!;
+  assert.deepEqual([nova.clipes[0].pixels, nova.clipes[0].transformacao.opacidade, nova.clipes[0].midia_id], [{ versao: 3 }, 0.5, "m1"]);
+  // Carimbar para baixo deixa a de cima
+  const carimbo = planoDosPixels(projeto, "carimbarBaixo", [c], nome);
+  assert.deepEqual(carimbo.remover, [b]);
+  // A de baixo de todas não tem onde mesclar
+  assert.throws(() => planoDosPixels(projeto, "baixo", [inicio.faixas.find((f) => f.clipes[0]?.texto?.conteudo === "a")!.id], nome), /embaixo/);
+});
+
+test("rasterizar guarda a opacidade, a mesclagem e o estilo; rasterizar o estilo grava ele", () => {
+  const { ctx, projeto: inicio, b } = tres();
+  const clipeB = inicio.faixas.find((f) => f.id === b)!.clipes[0].id;
+  let projeto = executarComando(inicio, { comando: "clipe.transformar", parametros: { clipeIds: [clipeB], transformacao: { opacidade: 0.7 } } }, ctx).projeto;
+  projeto = executarComando(projeto, { comando: "clipe.silhueta", parametros: { clipeIds: [clipeB], contorno: { cor: "#ff0000", largura: 0.02 } } }, ctx).projeto;
+  const plano = planoDosPixels(projeto, "rasterizar", [b], nome);
+  const desenhada = plano.desenhar.faixas.find((f) => f.clipes[0])!.clipes[0];
+  assert.deepEqual([desenhada.transformacao.opacidade, desenhada.contorno ?? null], [1, null]);
+  assert.deepEqual([plano.manter.opacidade, plano.manter.contorno?.cor], [0.7, "#ff0000"]);
+  const estilo = planoDosPixels(projeto, "rasterizarEstilo", [b], nome);
+  assert.equal(estilo.desenhar.faixas.find((f) => f.clipes[0])!.clipes[0].contorno?.cor, "#ff0000");
+  assert.equal(estilo.manter.contorno, undefined);
+});
+
+test("mesclar visíveis, achatar e carimbar visíveis; a camada de fundo fica embaixo", () => {
+  const { ctx, projeto: inicio, a, b, c } = tres();
+  const projeto = executarComando(inicio, { comando: "faixa.alternar", parametros: { faixaId: a, propriedade: "oculta" } }, ctx).projeto;
+  const visiveis = planoDosPixels(projeto, "visiveis", [], nome);
+  assert.deepEqual([visiveis.remover, visiveis.lugar], [[c, b], c]);
+  const achatar = planoDosPixels(projeto, "achatar", [], nome);
+  assert.deepEqual([achatar.remover.length, achatar.fundo, achatar.desenhar.fundo.transparente ?? false], [3, true, false]);
+  const { projeto: achatado } = substituirPorPixels(projeto, ctx.novoId, { ...achatar, midiaId: "m", versao: 1 });
+  const fundo = achatado.faixas.find((f) => f.fundo)!;
+  assert.deepEqual([achatado.faixas.filter((f) => f.clipes[0]).length, fundo.nome, fundo.travas], [1, "Fundo", { transparencia: true, posicao: true }]);
+  assert.equal(problemaNaArvore(achatado), null);
+  // Uma camada nova por cima do fundo pode; abaixo dele, não
+  const comNova = executarComando(achatado, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO } }, ctx).projeto;
+  assert.equal(problemaNaArvore(comNova), null);
+  const nova = comNova.faixas.find((f) => f.clipes[0]?.texto)!;
+  assert.throws(() => executarComando(comNova, { comando: "imagem.mover", parametros: { faixaId: nova.id, para: "fundo" } }, ctx), /fundo fica embaixo/);
+  // Camada a partir do fundo
+  const solta = executarComando(achatado, { comando: "imagem.camadaDeFundo", parametros: { faixaId: fundo.id, ligar: false } }, ctx).projeto;
+  assert.deepEqual([solta.faixas.find((f) => f.id === fundo.id)!.fundo, solta.faixas.find((f) => f.id === fundo.id)!.nome], [false, "Camada 0"]);
+  // Carimbar visíveis: uma nova no topo, nada sai
+  const carimbo = planoDosPixels(projeto, "carimbarVisiveis", [], nome);
+  const { projeto: carimbado } = substituirPorPixels(projeto, ctx.novoId, { ...carimbo, midiaId: "m", versao: 1 });
+  assert.deepEqual(conteudos(carimbado), ["Carimbo", "c", "b", "a"]);
+});
+
+test("rasterizar refaz o contorno e a sombra na caixa nova (o quadro inteiro)", () => {
+  const { ctx, projeto: inicio, b } = tres();
+  const clipeB = inicio.faixas.find((f) => f.id === b)!.clipes[0].id;
+  const projeto = executarComando(inicio, { comando: "clipe.silhueta", parametros: { clipeIds: [clipeB], contorno: { cor: "#000000", largura: 0.05 }, sombra: { cor: "#000000", opacidade: 0.5, desfoque: 0.02, distancia: 0.04, angulo: 45 } } }, ctx).projeto;
+  // A caixa do texto tem um quarto da altura do quadro
+  const plano = planoDosPixels(projeto, "rasterizar", [b], nome, () => 0.25);
+  assert.ok(Math.abs(plano.manter.contorno!.largura - 0.0125) < 1e-12);
+  assert.ok(Math.abs(plano.manter.sombra!.distancia - 0.01) < 1e-12 && Math.abs(plano.manter.sombra!.desfoque - 0.005) < 1e-12);
+});

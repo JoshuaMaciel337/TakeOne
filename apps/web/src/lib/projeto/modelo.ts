@@ -335,6 +335,8 @@ export type Faixa = {
   vinculo?: string | null;
   /** A pasta aberta no painel Camadas. */
   aberta?: boolean;
+  /** A camada de fundo (Achatar imagem): de pixels, na raiz, embaixo de todas, com a transparência e a posição travadas. */
+  fundo?: boolean;
 };
 
 export type TravasDaCamada = { transparencia?: boolean; pixels?: boolean; posicao?: boolean };

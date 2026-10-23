@@ -113,7 +113,7 @@ export function problemaNaArvore(projeto: Projeto): string | null {
   const imagem = projeto.tipo === "imagem";
   for (const faixa of projeto.faixas) {
     const clipe = faixa.clipes[0];
-    const daImagem = faixa.pai || faixa.recortada || faixa.travas || faixa.rotulo || faixa.vinculo || faixa.nome || faixa.aberta;
+    const daImagem = faixa.pai || faixa.recortada || faixa.travas || faixa.rotulo || faixa.vinculo || faixa.nome || faixa.aberta || faixa.fundo;
     if (!imagem) {
       if (daImagem || faixa.clipes.some((item) => item.pasta || item.pixels || item.preenchimento !== undefined || (item.mesclagem && MESCLAGENS_SO_DA_IMAGEM.has(item.mesclagem)))) {
         return "Grupos, recortes, travas parciais, camadas de pixels e os modos de mesclagem novos só existem no editor de imagem.";
@@ -122,6 +122,11 @@ export function problemaNaArvore(projeto: Projeto): string | null {
     }
     if (clipe?.pasta && (faixa.tipo !== "video" || clipe.midia_id || clipe.texto || clipe.ajuste)) return "A pasta fica numa faixa de sobreposição, sem mídia nem texto.";
     if (clipe?.mesclagem === "passagem" && !clipe.pasta) return "Só uma pasta usa a mesclagem Passagem.";
+    if (faixa.fundo) {
+      // O fundo é de pixels, fica na raiz e embaixo de todas as camadas
+      const daRaiz = projeto.faixas.filter((item) => item.tipo !== "principal" && item.clipes.length && !item.pai);
+      if (!clipe?.pixels || faixa.pai || daRaiz[daRaiz.length - 1] !== faixa) return "A camada de fundo fica embaixo de todas, fora das pastas.";
+    }
     if (faixa.pai) {
       const pai = projeto.faixas.find((item) => item.id === faixa.pai);
       if (!pai?.clipes[0]?.pasta) return "Uma camada está dentro de uma pasta que não existe.";

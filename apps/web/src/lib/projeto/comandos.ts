@@ -116,6 +116,7 @@ import {
   moverCamada,
   moverCamadasPara,
   adicionarCamadaDePixels,
+  camadaDeFundo,
   mudarCamada,
   type MudancaDaCamada,
   trocarVersaoDosPixels,
@@ -130,6 +131,7 @@ import {
 } from "./imagem.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
+import { type PlanoDosPixels, substituirPorPixels } from "./rasterizar.ts";
 import type { Nivelamento } from "./nivelar.ts";
 import type { ChaveDeKeyframe, Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -201,6 +203,8 @@ export type Comando =
   | { comando: "imagem.posicoes"; parametros: { mudancas: { clipeId: string; transformacao: Partial<Transformacao> }[] } }
   | { comando: "imagem.soEsta"; parametros: { faixaId: string } }
   | { comando: "imagem.adicionarPixels"; parametros: { midiaId: string; nome: string; acima?: string | null } }
+  | { comando: "imagem.substituirPorPixels"; parametros: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number } }
+  | { comando: "imagem.camadaDeFundo"; parametros: { faixaId: string; ligar: boolean } }
   | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
   | { comando: "imagem.apagarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.duplicarVarias"; parametros: { faixaIds: string[] } }
@@ -308,6 +312,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.posicoes": "mover as camadas",
   "imagem.soEsta": "mostrar só uma camada",
   "imagem.adicionarPixels": "criar a camada",
+  "imagem.substituirPorPixels": "mesclar as camadas",
+  "imagem.camadaDeFundo": "mudar a camada de fundo",
   "camada.pixels": "pintar",
   "imagem.apagarVarias": "apagar as camadas",
   "imagem.duplicarVarias": "duplicar as camadas",
@@ -536,6 +542,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = adicionarCamadaDePixels(projeto, ctx, parametros.midiaId, parametros.nome, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.substituirPorPixels": {
+      const resultado = substituirPorPixels(projeto, ctx.novoId, parametros);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.camadaDeFundo":
+      return { projeto: camadaDeFundo(projeto, parametros.faixaId, parametros.ligar) };
     case "camada.pixels":
       return { projeto: trocarVersaoDosPixels(projeto, parametros.clipeId, parametros.versao) };
     case "imagem.soEsta":

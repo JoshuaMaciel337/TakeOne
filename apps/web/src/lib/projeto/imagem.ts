@@ -124,6 +124,26 @@ export function adicionarCamadaDePixels(projeto: Projeto, ctx: Contexto, midiaId
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
 }
 
+/**
+ * Camada › Novo › Fundo a partir da camada (ligar): a camada de pixels vai para baixo de todas, na raiz, com a
+ * transparência e a posição travadas. Camada a partir do fundo (desligar): vira uma camada comum, sem as travas.
+ */
+export function camadaDeFundo(projeto: Projeto, faixaId: string, ligar: boolean): Projeto {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  if (!faixa) throw new ErroEdicao("Essa camada não existe mais.");
+  if (!ligar) {
+    const comum: Faixa = { ...faixa, fundo: false, travas: null, nome: faixa.nome === "Fundo" ? "Camada 0" : faixa.nome };
+    return { ...projeto, faixas: projeto.faixas.map((item) => (item.id === faixaId ? comum : item)) };
+  }
+  if (!faixa.clipes[0]?.pixels) throw new ErroEdicao("Só uma camada de pixels vira o fundo.");
+  if (projeto.faixas.some((item) => item.fundo && item.id !== faixaId)) throw new ErroEdicao("A imagem já tem uma camada de fundo.");
+  const fundo: Faixa = { ...faixa, pai: null, recortada: false, fundo: true, travas: { transparencia: true, posicao: true }, nome: "Fundo" };
+  const resto = projeto.faixas.filter((item) => item.id !== faixaId);
+  const principal = resto.findIndex((item) => item.tipo === "principal");
+  resto.splice(principal < 0 ? resto.length : principal, 0, fundo);
+  return { ...projeto, faixas: resto };
+}
+
 /** A camada de pixels passa a mostrar outra versão do PNG (um traço novo, ou o desfazer). */
 export function trocarVersaoDosPixels(projeto: Projeto, clipeId: string, versao: number): Projeto {
   let achou = false;
@@ -416,8 +436,9 @@ export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string)
       id: novosIds.get(faixa.id)!,
       pai: faixa === original ? faixa.pai : (novosIds.get(faixa.pai ?? "") ?? faixa.pai),
       travada: false,
-      // Copiar não leva o vínculo: a cópia anda sozinha
+      // Copiar não leva o vínculo (a cópia anda sozinha) nem o fundo (o fundo é um só)
       vinculo: null,
+      ...(faixa.fundo ? { fundo: false, travas: null, nome: "Fundo cópia" } : {}),
       nome: faixa === original && faixa.nome ? `${faixa.nome} cópia`.slice(0, 60) : faixa.nome,
       clipes: [{ ...clipe, id: ctx.novoId(), transformacao: deslocar ? { ...t, x: Math.min(t.x + 0.03, 10), y: Math.min(t.y + 0.03, 10) } : t }],
     };

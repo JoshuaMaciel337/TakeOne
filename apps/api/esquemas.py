@@ -817,6 +817,8 @@ class FaixaEntrada(BaseModel):
                     "magenta", "fucsia"] | None = None
     vinculo: str | None = Field(default=None, max_length=40)
     aberta: bool = False
+    # A camada de fundo do editor de imagem (de pixels, embaixo de todas)
+    fundo: bool = False
 
     @model_validator(mode="after")
     def camera_so_em_video(self):
