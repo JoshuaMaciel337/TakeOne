@@ -41,6 +41,10 @@ ARQUIVO_PROXY_IMAGEM = "proxy.webp"
 ARQUIVO_MASCARA_IMAGEM = "mascara.png"
 # A de resolução cheia também: o editor de imagem exporta no navegador, no tamanho de verdade
 ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM, ARQUIVO_IMAGEM, ARQUIVO_MASCARA_IMAGEM}
+# O vídeo ao contrário (tarefa "inversao"): o de resolução cheia é do render; a cópia leve, com o som, da prévia
+ARQUIVO_INVERTIDO = "invertido.mp4"
+ARQUIVO_INVERTIDO_PROXY = "invertido_proxy.mp4"
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_INVERTIDO_PROXY}
 # A imagem estável (tarefa "estabilizacao"): estavel.mp4 só do render, estavel_proxy.mp4 da prévia;
 # sobre a imagem sem ruído, estavel_limpo.mp4 e estavel_limpo_proxy.mp4
 _ARQUIVO_ESTAVEL_PROXY = re.compile(r"estavel(_limpo)?_proxy\.mp4")

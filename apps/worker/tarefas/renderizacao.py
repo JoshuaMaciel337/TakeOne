@@ -24,6 +24,7 @@ from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import (
     ARQUIVO_IMAGEM,
     ARQUIVO_IMAGEM_LIMPA,
+    ARQUIVO_INVERTIDO,
     ARQUIVO_MASCARA,
     ARQUIVO_PROXY_AUDIO,
     ARQUIVO_PROXY_IMAGEM,
@@ -116,6 +117,9 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             lufs=(midia.get("audio") or {}).get("lufs"),
             imagem=e_imagem(midia),
             duracao_video=duracao_video,
+            invertido=str(invertido) if (midia.get("invertido") or {}).get("status") == "pronta" and (
+                invertido := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],
+                                                                 ARQUIVO_INVERTIDO))).is_file() else None,
         )
     return preparadas
 

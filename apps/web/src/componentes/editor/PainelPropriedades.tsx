@@ -265,7 +265,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
             aoTrocarImagem={aoTrocarImagem}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
-          <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
@@ -642,7 +642,31 @@ const FADE_MAXIMO_S = 10;
 const VELOCIDADES_RAPIDAS = [0.5, 1, 1.5, 2, 3];
 
 /** Velocidade do clipe de mídia: o trecho da mídia fica o mesmo e a duração muda; o som mantém o tom. */
-function AbaVelocidade({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
+/** "Ao contrário": liga no clipe e pede ao worker o vídeo invertido, se ele ainda não existe. */
+function AoContrario({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+  const [erro, setErro] = useState("");
+  const estado = midia.invertido;
+  function alternar(ligar: boolean) {
+    aoExecutar({ comando: "clipe.inverter", parametros: { clipeIds: [clipe.id], ligar } });
+    if (!ligar || estado?.status === "pronta" || estado?.status === "processando") return;
+    setErro("");
+    chamarApi(`/midias/${midia.id}/inversao`, { metodo: "POST" }).catch((e: unknown) => setErro(e instanceof Error ? e.message : "Não foi possível pedir o vídeo ao contrário agora."));
+  }
+  return (
+    <div className="mt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={Boolean(clipe.inverter)} disabled={travada} onChange={(evento) => alternar(evento.currentTarget.checked)} />
+        <span className="flex-1">Ao contrário</span>
+      </label>
+      {clipe.inverter && estado?.status === "processando" ? <p className="text-[11px] text-suave">Preparando o vídeo ao contrário… a prévia mostra o original até ficar pronto.</p> : null}
+      {clipe.inverter && estado?.status === "erro" ? <p className="text-[11px] text-red-400">{estado.erro ?? "O vídeo ao contrário não ficou pronto."}</p> : null}
+      {erro ? <p className="text-[11px] text-red-400">{erro}</p> : null}
+      {clipe.inverter ? <p className="text-[11px] text-suave">Ao contrário, o clipe fica sem curva de velocidade, recorte do fundo, estabilizar, tirar o ruído, voz limpa e tom.</p> : null}
+    </div>
+  );
+}
+
+function AbaVelocidade({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba & { midia: Midia | null }) {
   const travada = faixa.travada;
   const comando = (velocidade: number): Comando => ({ comando: "clipe.velocidade", parametros: { clipeId: clipe.id, velocidade } });
   const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
@@ -684,6 +708,7 @@ function AbaVelocidade({ clipe, faixa, aoPrever, aoExecutar }: PropsAba) {
         <p className="mt-2 text-[11px] text-suave">
           Duração: {duracaoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
         </p>
+        {midia?.video && !midia.imagem ? <AoContrario clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
       </Secao>
       <Secao titulo="Curva">
         <p className="mb-1 text-[11px] text-suave">Muda a velocidade ao longo do clipe, sem mudar a duração dele.</p>

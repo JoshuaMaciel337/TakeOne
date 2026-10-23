@@ -9,7 +9,7 @@ import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 import { arquivoDaMidia } from "@/lib/api";
 import { ajustarCadeia, criarCadeia } from "@/lib/previa/audio";
-import { arquivoDaImagemDoClipe, arquivoDoSom } from "@/lib/previa/arquivos";
+import { arquivoDaImagemDoClipe, arquivoDoSom, clipeNaFonte } from "@/lib/previa/arquivos";
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, type ItemDaPrevia, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { type Camada, Compositor, FUNDO } from "@/lib/previa/compositor";
 import { DecodificadorDeVideo, webCodecsDisponivel } from "@/lib/previa/decodificador";
@@ -53,7 +53,9 @@ function clipesComSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>): Ite
     .flatMap((faixa) =>
       faixa.clipes.flatMap((clipe) => {
         const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
-        return midia?.audio && midia.status === "pronta" && clipe.volume > 0 && !clipe.som_separado ? [{ chave: `${faixa.id}:${clipe.id}`, clipe, faixa, midia, ativo: true }] : [];
+        return midia?.audio && midia.status === "pronta" && clipe.volume > 0 && !clipe.som_separado
+          ? [{ chave: `${faixa.id}:${clipe.id}`, clipe: clipeNaFonte(clipe, midia), faixa, midia, ativo: true }]
+          : [];
       }),
     );
 }

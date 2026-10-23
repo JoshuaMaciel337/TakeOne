@@ -25,6 +25,7 @@ import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/key
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
+import { clipeNaFonte } from "./arquivos";
 import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type MascaraDeTransicao, mascaraNaTransicao, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -112,7 +113,8 @@ export function itensNoTempo(faixas: Faixa[], midias: ReadonlyMap<string, Midia>
       }
       chaves.add(chave);
       const efeitos = janelas?.get(clipe.id)?.efeitos;
-      itens.push({ chave, clipe, faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
+      // O clipe ao contrário lê o vídeo invertido, com a entrada espelhada (lib/previa/arquivos.ts)
+      itens.push({ chave, clipe: clipeNaFonte(clipe, midia), faixa, midia, ativo, efeitos: efeitos?.length ? efeitos : undefined });
     }
   }
   return itens;

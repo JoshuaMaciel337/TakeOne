@@ -628,7 +628,7 @@ export function curvarVelocidade(projeto: Projeto, clipeId: string, pontos: Pont
   }
   const curva = pontos?.map(([u, s]) => [u, limitar(s, LIMITES_DA_CURVA.minimo, LIMITES_DA_CURVA.maximo)] as PontoDeVelocidade) ?? null;
   const clipes = [...faixa.clipes];
-  clipes[indice] = { ...clipe, curva_velocidade: curva };
+  clipes[indice] = { ...clipe, curva_velocidade: curva, ...(curva ? { inverter: false } : {}) };
   return finalizar(trocarFaixa(projeto, { ...faixa, clipes }));
 }
 
@@ -1523,6 +1523,8 @@ export function ajustarAudio(projeto: Projeto, clipeIds: string[], mudanca: Muda
         igualar_volume: igualar,
         efeitos_voz: efeitos ?? null,
         tom: Math.round(limitar(mudanca.tom ?? clipe.tom ?? 0, -TOM_LIMITE, TOM_LIMITE)),
+        // A voz limpa e o tom são gerados do original: não valem no clipe ao contrário
+        ...(mudanca.voz_limpa || mudanca.tom ? { inverter: false } : {}),
       };
     });
     return { ...faixa, clipes };
@@ -1928,15 +1930,34 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
 export function limparImagem(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("Textos não têm ruído para tirar.");
-    return { ...clipe, imagem_limpa: ligar };
+    return { ...clipe, imagem_limpa: ligar, ...(ligar ? { inverter: false } : {}) };
   });
+}
+
+/**
+ * Toca os clipes de vídeo ao contrário (a imagem e o som do vídeo invertido). O que é medido ou gerado no
+ * original não vale nele: a curva de velocidade, o recorte do fundo, a imagem estável e a sem ruído, a voz
+ * limpa, o tom e o nivelamento saem ao ligar (e a API recusa os dois juntos).
+ */
+export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string[], ligar: boolean): Projeto {
+  return mudarClipes(
+    projeto,
+    clipeIds,
+    (clipe) => {
+      const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+      if (ligar && (clipe.texto || !info?.video || info.imagem)) throw new ErroEdicao("Só vídeos tocam ao contrário.");
+      if (!ligar) return { ...clipe, inverter: false };
+      return { ...clipe, inverter: true, curva_velocidade: null, remover_fundo: false, estabilizar: false, imagem_limpa: false, voz_limpa: false, tom: 0, nivelamento: null };
+    },
+    { comAudio: true },
+  );
 }
 
 /** Liga ou desliga o recorte do fundo dos clipes de vídeo. A máscara é do vídeo original: liga sem a estabilização. */
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
-    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false } : {}) };
+    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false } : {}) };
   });
 }
 
@@ -1945,7 +1966,7 @@ export function estabilizarClipes(projeto: Projeto, ctx: Contexto, clipeIds: str
   return mudarClipes(projeto, clipeIds, (clipe) => {
     const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
     if (ligar && (clipe.texto || !info?.video || info.imagem || info.transparente)) throw new ErroEdicao("Só vídeos gravados podem ser estabilizados.");
-    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false } : {}) };
+    return { ...clipe, estabilizar: ligar, ...(ligar ? { remover_fundo: false, inverter: false } : {}) };
   });
 }
 

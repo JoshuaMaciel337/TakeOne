@@ -78,6 +78,8 @@ export type Midia = {
   recorte_fundo?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   /** A imagem estável, por chave (estavel, estavel_limpo sobre a imagem sem ruído). */
   estabilizacoes?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
+  /** O vídeo ao contrário (tarefa "inversao"), quando foi pedido. */
+  invertido?: { status: "processando" | "pronta" | "erro"; erro: string | null } | null;
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Forma desenhada (lib/elementos.ts): o pedido que a gerou. Não aparece na biblioteca. */

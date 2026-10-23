@@ -23,6 +23,7 @@ export function pendenciaParaONavegador(projeto: Projeto, midias: ReadonlyMap<st
       if (clipe.remover_fundo && !midia.imagem && !tem("mascara.mp4")) return "O recorte do fundo de um clipe ainda está sendo preparado. Espere terminar.";
       if (clipe.estabilizar && !tem(`${chaveDaEstabilizacao(Boolean(clipe.imagem_limpa))}_proxy.mp4`)) return "A estabilização de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.imagem_limpa && !clipe.estabilizar && !tem("limpo_proxy.mp4")) return "A imagem sem ruído de um clipe ainda está sendo preparada. Espere terminar.";
+      if (clipe.inverter && !midia.imagem && !tem("invertido_proxy.mp4")) return "O vídeo ao contrário de um clipe ainda está sendo preparado. Espere terminar.";
       if (!midia.audio || faixa.muda || clipe.som_separado) continue;
       if (clipe.voz_limpa && !tem("voz_limpa.m4a")) return "A voz limpa de um clipe ainda está sendo preparada. Espere terminar.";
       if (clipe.tom && !tem(`${chaveDoTom(clipe.tom, Boolean(clipe.voz_limpa))}.m4a`)) return "O tom da voz de um clipe ainda está sendo preparado. Espere terminar.";

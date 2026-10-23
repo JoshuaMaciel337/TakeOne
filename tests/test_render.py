@@ -673,3 +673,17 @@ def test_zoom_e_giro_sao_a_media_das_copias():
     plano = planejar_render(projeto([faixa("principal", [giro])]), MIDIAS, 1080, 1920)
     assert "rotate=-0.175000:ow=1080:oh=608:c=black@0:bilinear=1" in plano.filtro
     assert "rotate=0.175000:ow=1080:oh=608" in plano.filtro and "unpremultiply=inplace=1" in plano.filtro
+
+
+def test_clipe_ao_contrario_le_o_video_invertido_com_a_entrada_espelhada():
+    midias = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10,
+                                                  duracao_video=10, invertido="/m/invertido.mp4")}
+    # Do segundo 2 ao 5 do original: no invertido, do 5 ao 8
+    video = clipe("c1", "deitado", 0, 3, entrada=2, inverter=True)
+    plano = planejar_render(projeto([faixa("principal", [video])], duracao=3), midias, 720, 1280)
+    assert plano.entradas[0].caminho == "/m/invertido.mp4"
+    assert plano.entradas[0].argumentos()[:2] == ["-ss", "4.900000"], "aberto 0,1 s antes da entrada (5 s)"
+    # Sem o invertido pronto, a exportação para com o aviso
+    sem = {**MIDIAS, "deitado": MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, duracao=10)}
+    with pytest.raises(ErroRender, match="ao contrário"):
+        planejar_render(projeto([faixa("principal", [video])], duracao=3), sem, 720, 1280)

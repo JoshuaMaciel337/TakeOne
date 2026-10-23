@@ -119,6 +119,7 @@ class MidiaDoRender:
     lufs: float | None = None      # loudness medido na ingestão, para o "Igualar o volume"
     imagem: bool = False           # imagem parada (foto, logo): aberta em laço, sem tempo próprio
     duracao_video: float = 0       # onde a imagem acaba (pode ser antes do som); 0 quando não se sabe
+    invertido: str | None = None   # o vídeo ao contrário (com o som), quando já foi gerado
 
 
 @dataclass(frozen=True)
@@ -857,6 +858,42 @@ def _camada_de_ajuste(clipe: dict, anterior: str, numero: int, largura: int, alt
     return f"base{numero}"
 
 
+def entrada_invertida(clipe: dict, duracao_da_imagem: float) -> int:
+    """
+    A entrada do clipe no vídeo ao contrário (ticks): o fim do trecho no original vira o começo
+    (entradaInvertida em lib/previa/arquivos.ts).
+    """
+    fim = clipe["entrada"] + clipe["duracao"] * clipe["velocidade"]
+    return max(0, round(duracao_da_imagem * TICKS_POR_SEGUNDO - fim))
+
+
+def _com_os_invertidos(projeto: dict, midias: dict[str, MidiaDoRender]) -> tuple[dict, dict[str, MidiaDoRender]]:
+    """
+    Os clipes ao contrário passam a ler o vídeo invertido (imagem e som), como uma mídia própria (`id:invertido`,
+    já em BT.709), com a entrada espelhada: o resto do render não precisa saber deles.
+    """
+    if not any(c.get("inverter") for f in projeto["faixas"] for c in f["clipes"]):
+        return projeto, midias
+    midias = dict(midias)
+    faixas = []
+    for faixa in projeto["faixas"]:
+        clipes = []
+        for clipe in faixa["clipes"]:
+            midia = midias.get(clipe.get("midia_id") or "")
+            if clipe.get("inverter") and midia and not midia.imagem:
+                if not midia.invertido:
+                    raise ErroRender("O vídeo ao contrário de um clipe ainda está sendo preparado. Espere terminar "
+                                     "ou desligue \"Ao contrário\" para exportar.")
+                chave = f"{clipe['midia_id']}:invertido"
+                midias[chave] = replace(midia, caminho=midia.invertido, matriz="bt709", hdr=None, voz_limpa=None,
+                                        tons=(), mascara=None, imagem_limpa=None, estaveis=(), invertido=None)
+                clipe = {**clipe, "midia_id": chave,
+                         "entrada": entrada_invertida(clipe, midia.duracao_video or midia.duracao)}
+            clipes.append(clipe)
+        faixas.append({**faixa, "clipes": clipes})
+    return {**projeto, "faixas": faixas}, midias
+
+
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
                     textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".",
                     ganho_db: float = 0.0) -> PlanoDeRender:
@@ -879,6 +916,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         projeto = {**projeto, "faixas": [
             {**f, "clipes": [{**c, "velocidade": 1, "curva_velocidade": None} if c.get("midia_id") in paradas else c
                              for c in f["clipes"]]} for f in projeto["faixas"]]}
+
+    projeto, midias = _com_os_invertidos(projeto, midias)
 
     # Imagem: faixas visíveis de baixo para cima (a lista do projeto vai de cima para baixo)
     visuais = [f for f in reversed(projeto["faixas"]) if f["tipo"] != FAIXA_AUDIO and not f.get("oculta")]

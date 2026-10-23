@@ -19,6 +19,7 @@ import {
   aplicarEfeito,
   colarAjustes,
   congelarQuadro,
+  inverterClipes,
   colarClipes,
   virarClipes,
   chaveLumaClipes,
@@ -1192,4 +1193,21 @@ test("congelar o quadro: divide o vídeo e põe a foto do instante entre as meta
   const comFoto = adicionarClipe(projeto, ctx, "video4", { novaFaixa: true, faixaId: undefined, inicio: 0 });
   const sobreposto = comFoto.projeto.faixas.find((f) => f.tipo === "video")?.clipes[0];
   if (sobreposto) assert.throws(() => congelarQuadro(comFoto.projeto, ctx, sobreposto.id, S, "foto", 3 * S), ErroEdicao);
+});
+
+test("ao contrário: tira o que é do original, e ligar o que é do original desliga o ao contrário", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  projeto = estabilizarClipes(projeto, ctx, [id], true);
+  projeto = ajustarAudio(projeto, [id], { voz_limpa: true, tom: 3 });
+  projeto = inverterClipes(projeto, ctx, [id], true);
+  let clipe = principal(projeto)[0];
+  assert.deepEqual([clipe.inverter, clipe.estabilizar, clipe.voz_limpa, clipe.tom], [true, false, false, 0]);
+  projeto = estabilizarClipes(projeto, ctx, [id], true);
+  clipe = principal(projeto)[0];
+  assert.deepEqual([clipe.inverter, clipe.estabilizar], [false, true]);
+  // Foto não toca ao contrário
+  const comFoto = adicionarClipe(projeto, ctx, "foto").projeto;
+  assert.throws(() => inverterClipes(comFoto, ctx, [principal(comFoto)[1].id], true), ErroEdicao);
 });

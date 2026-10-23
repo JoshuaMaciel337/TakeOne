@@ -113,6 +113,8 @@ class MidiaSaida(BaseModel):
     # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
     tons: dict = Field(default_factory=dict)
     estabilizacoes: dict = Field(default_factory=dict)
+    # O vídeo ao contrário (status e erro), quando foi pedido
+    invertido: dict | None = None
     # Vídeo gerado com IA: {descricao, formato, duracao}
     gerada: dict | None = None
     # Forma desenhada (POST /api/elementos/formas): o pedido que a gerou
@@ -566,6 +568,8 @@ class ClipeEntrada(BaseModel):
     estabilizar: bool = False
     # Tom da voz, em semitons (o som vem do arquivo que o worker gera para o tom)
     tom: int = Field(default=0, ge=-12, le=12)
+    # Toca ao contrário (a imagem e o som vêm do vídeo invertido que o worker gera)
+    inverter: bool = False
     efeitos_voz: EfeitosVozEntrada | None = None
     # Projetos salvos antes da fase 2 não têm os dois: entram com o padrão
     transformacao: TransformacaoEntrada = Field(default_factory=TransformacaoEntrada)
@@ -599,6 +603,15 @@ class ClipeEntrada(BaseModel):
         if any(not 0.2 <= s <= 5 for _, s in pontos):
             raise ValueError("A curva de velocidade vai de 0,2 a 5 vezes.")
         return pontos
+
+    @model_validator(mode="after")
+    def ao_contrario_sozinho(self):
+        # O vídeo ao contrário é outro arquivo: o que é medido ou gerado no original não vale nele
+        if self.inverter and (self.curva_velocidade or self.remover_fundo or self.estabilizar or self.imagem_limpa
+                              or self.voz_limpa or self.tom):
+            raise ValueError("O clipe ao contrário não combina com curva de velocidade, recorte do fundo, "
+                             "estabilizar, tirar o ruído, limpar a voz nem tom da voz.")
+        return self
 
     @model_validator(mode="after")
     def arco_sem_letra_a_letra(self):
@@ -1062,6 +1075,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                  for chave, tom in (doc.get("tons") or {}).items()},
         "estabilizacoes": {chave: {"status": item["status"], "erro": item.get("erro")}
                            for chave, item in (doc.get("estabilizacoes") or {}).items()},
+        "invertido": {"status": doc["invertido"]["status"], "erro": doc["invertido"].get("erro")}
+        if doc.get("invertido") else None,
     })
 
 

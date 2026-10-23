@@ -41,6 +41,7 @@ from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
     ARQUIVO_IMAGEM_LIMPA_PROXY,
+    ARQUIVO_INVERTIDO_PROXY,
     ARQUIVO_MASCARA,
     ARQUIVO_MASCARA_IMAGEM,
     ARQUIVO_VOZ_LIMPA,
@@ -376,6 +377,28 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"recorte_fundo": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Recorte do fundo pedido: {midia['nome']}")
     return (await para_saida(db, [{**midia, "recorte_fundo": atual}]))[0]
+
+
+@router.post("/{midia_id}/inversao", response_model=MidiaSaida)
+async def pedir_inversao(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila o vídeo ao contrário. Se já está pronto ou andando, só devolve a mídia."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Só vídeos tocam ao contrário ("{midia["nome"]}" não é).')
+    atual = midia.get("invertido") or {}
+    pronta = atual.get("status") == "pronta" and ARQUIVO_INVERTIDO_PROXY in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronta or andando):
+        job = montar_job("inversao", usuario["organizacao_id"], {"midia_id": str(midia["_id"])},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"invertido": atual, "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Vídeo ao contrário pedido: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "invertido": atual}]))[0]
 
 
 @router.post("/{midia_id}/estabilizacao", response_model=MidiaSaida)
