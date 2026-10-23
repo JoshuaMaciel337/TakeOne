@@ -39,6 +39,8 @@ export type AjustesCor = {
   niveis_preto: number;
   niveis_branco: number;
   niveis_gama: number;
+  /** -1 (põe névoa) a 1 (tira a névoa). */
+  nevoa: number;
 };
 
 /** As três rodas, na ordem dos tons. */
@@ -79,6 +81,7 @@ export const AJUSTES_NEUTROS: AjustesCor = {
   niveis_preto: 0,
   niveis_branco: 0,
   niveis_gama: 0,
+  nevoa: 0,
 };
 export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null, hsl: null };
 
@@ -103,6 +106,7 @@ export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: num
   niveis_preto: { minimo: 0, maximo: 0.45 },
   niveis_branco: { minimo: 0, maximo: 0.45 },
   niveis_gama: { minimo: -1, maximo: 1 },
+  nevoa: { minimo: -1, maximo: 1 },
 };
 
 /** O matiz sozinho não muda nada: só conta com força. */
@@ -175,6 +179,11 @@ export const FORCA_TOM = 0.1;
 const FORCA_REALCES_SOMBRAS = 0.25;
 /** Brancos e pretos: como realces e sombras, mas só nas pontas (a quarta potência da luminância). */
 const FORCA_BRANCOS_PRETOS = 0.25;
+/** Névoa: tirar puxa o preto (até 12%) e satura (até 25%); pôr mistura com um cinza claro (até 35%). */
+const NEVOA_PRETO = 0.12;
+const NEVOA_SATURACAO = 0.25;
+const NEVOA_MISTURA = 0.35;
+const NEVOA_CINZA = 0.82;
 /** Quanto uma roda de cor com força 1 desloca a cor. */
 const FORCA_RODAS = 0.3;
 const LUMA = [0.2126, 0.7152, 0.0722];
@@ -198,7 +207,16 @@ export function aplicarCor(entrada: [number, number, number], a: AjustesCor): [n
   const preto = a.niveis_preto ?? 0;
   const branco = 1 - (a.niveis_branco ?? 0);
   const expoente = 1 / 2 ** (a.niveis_gama ?? 0);
-  const [r, g, b] = entrada.map((v) => limitar((v - preto) / (branco - preto), 0, 1) ** expoente);
+  let [r, g, b] = entrada.map((v) => limitar((v - preto) / (branco - preto), 0, 1) ** expoente);
+  // Névoa, logo depois: tirar abre o preto (a névoa clareia os escuros); pôr mistura com o cinza claro dela
+  const nevoa = a.nevoa ?? 0;
+  if (nevoa > 0) {
+    const k = NEVOA_PRETO * nevoa;
+    [r, g, b] = [r, g, b].map((v) => limitar((v - k) / (1 - k), 0, 1));
+  } else if (nevoa < 0) {
+    const m = NEVOA_MISTURA * -nevoa;
+    [r, g, b] = [r, g, b].map((v) => v * (1 - m) + NEVOA_CINZA * m);
+  }
 
   // Luz linear: exposição e balanço de branco
   const ganho = 2 ** a.exposicao;
@@ -226,7 +244,7 @@ export function aplicarCor(entrada: [number, number, number], a: AjustesCor): [n
   // Saturação e vibração: afasta ou aproxima cada canal da luminância; a vibração pesa mais nas cores apagadas
   const y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   const croma = Math.max(...c) - Math.min(...c);
-  const fatorSaturacao = 1 + a.saturacao + (a.vibracao ?? 0) * (1 - croma);
+  const fatorSaturacao = 1 + a.saturacao + (a.vibracao ?? 0) * (1 - croma) + NEVOA_SATURACAO * Math.max(a.nevoa ?? 0, 0);
   c = c.map((v) => limitar(y2 + (v - y2) * fatorSaturacao, 0, 1));
   return [c[0], c[1], c[2]];
 }

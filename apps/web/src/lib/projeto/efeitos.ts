@@ -4,15 +4,17 @@
 //   - brilho: o clipe desfocado somado a ele mesmo em "tela" (a luz se espalha em volta dos claros);
 //   - distorção: lente de olho de peixe (a do lenscorrection do FFmpeg), com zoom para não sobrar canto vazio;
 //   - nitidez: o clipe mais a diferença entre ele e uma cópia pouco desfocada (máscara de nitidez);
+//   - clareza: a mesma conta com uma cópia bem desfocada, pesada nos meios-tons (contraste local);
 //   - VHS, glitch, luz e granulação: veja abaixo.
 import type { AjustesCor } from "./cor.ts";
 
-export type TipoEfeito = "desfoque" | "brilho" | "distorcao" | "vhs" | "glitch" | "luz" | "granulacao" | "nitidez";
+export type TipoEfeito = "desfoque" | "brilho" | "distorcao" | "vhs" | "glitch" | "luz" | "granulacao" | "nitidez" | "clareza";
 export type Efeito = { tipo: TipoEfeito; intensidade: number };
 
 export const EFEITOS: { id: TipoEfeito; nome: string; descricao: string }[] = [
   { id: "desfoque", nome: "Desfoque", descricao: "Deixa a imagem toda fora de foco" },
   { id: "nitidez", nome: "Nitidez", descricao: "Realça as bordas e os detalhes da imagem" },
+  { id: "clareza", nome: "Clareza", descricao: "Contraste local nos meios-tons: mais textura e profundidade" },
   { id: "brilho", nome: "Brilho", descricao: "A luz dos claros se espalha em volta deles" },
   { id: "distorcao", nome: "Olho de peixe", descricao: "Estufa o meio da imagem como uma lente grande-angular" },
   { id: "vhs", nome: "VHS", descricao: "Fita antiga: cores separadas, linhas e cor desbotada" },
@@ -28,6 +30,8 @@ export const DISTORCAO_MAXIMA = 0.5;
 /** Nitidez: o sigma da cópia desfocada (frações da altura do clipe) e quanto da diferença soma, com intensidade 1. */
 export const NITIDEZ_SIGMA = 0.0025;
 export const NITIDEZ_MAXIMA = 1.5;
+export const CLAREZA_SIGMA = 0.02;
+export const CLAREZA_MAXIMA = 1.0;
 export const INTENSIDADE_PADRAO = 0.6;
 
 export function efeitoAtivo(efeito: Efeito | null | undefined): efeito is Efeito {
@@ -44,9 +48,15 @@ export function brilhoDoEfeito(efeito: Efeito | null | undefined): number {
   return efeitoAtivo(efeito) && efeito.tipo === "brilho" ? efeito.intensidade : 0;
 }
 
-/** Quanto da diferença entre o clipe e a cópia desfocada soma a ele (0 sem nitidez). */
-export function nitidezDoEfeito(efeito: Efeito | null | undefined): number {
-  return efeitoAtivo(efeito) && efeito.tipo === "nitidez" ? NITIDEZ_MAXIMA * efeito.intensidade : 0;
+/**
+ * Nitidez ou clareza: o sigma da cópia desfocada (frações da altura do clipe), a força e se pesa só nos
+ * meios-tons; null sem elas. A conta é a de core/utils/efeitos.py (contraste_local_do_efeito).
+ */
+export function contrasteLocalDoEfeito(efeito: Efeito | null | undefined): { sigma: number; forca: number; meiosTons: boolean } | null {
+  if (!efeitoAtivo(efeito)) return null;
+  if (efeito.tipo === "nitidez") return { sigma: NITIDEZ_SIGMA, forca: NITIDEZ_MAXIMA * efeito.intensidade, meiosTons: false };
+  if (efeito.tipo === "clareza") return { sigma: CLAREZA_SIGMA, forca: CLAREZA_MAXIMA * efeito.intensidade, meiosTons: true };
+  return null;
 }
 
 /** O k1 da lente (0 sem distorção). */

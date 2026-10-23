@@ -109,6 +109,7 @@ const AJUSTES: { chave: keyof AjustesCor; nome: string; grupo: Grupo }[] = [
   { chave: "sombras", nome: "Sombras", grupo: "luz" },
   { chave: "brancos", nome: "Brancos", grupo: "luz" },
   { chave: "pretos", nome: "Pretos", grupo: "luz" },
+  { chave: "nevoa", nome: "Tirar a névoa", grupo: "luz" },
   { chave: "niveis_preto", nome: "Preto de entrada", grupo: "niveis" },
   { chave: "niveis_branco", nome: "Branco de entrada", grupo: "niveis" },
   { chave: "niveis_gama", nome: "Meio-tom (gama)", grupo: "niveis" },

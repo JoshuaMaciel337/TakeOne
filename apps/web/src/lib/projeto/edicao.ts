@@ -56,6 +56,8 @@ import {
   type Cantos,
   type ChaveLuma,
   type Chroma,
+  LIMITES_DA_MASCARA,
+  type MascaraDeForma,
   MESCLAGENS,
   type Mesclagem,
   type Projeto,
@@ -1745,6 +1747,24 @@ export function arredondarClipes(projeto: Projeto, clipeIds: string[], cantos: C
     const limpos = { raio: limitar(cantos.raio, 0, RAIO_MAXIMO), borda: limitar(cantos.borda, 0, BORDA_MAXIMA), cor: cantos.cor.toLowerCase() };
     return { ...clipe, cantos: limpos.raio > 0 || limpos.borda > 0 ? limpos : null };
   });
+}
+
+/** A máscara de forma dos clipes (null tira), com os números dentro dos limites. */
+export function mascararClipes(projeto: Projeto, clipeIds: string[], mascara: MascaraDeForma | null): Projeto {
+  if (mascara && mascara.forma !== "retangulo" && mascara.forma !== "elipse") throw new ErroEdicao("Esta forma de máscara não existe.");
+  const { centro, tamanho, suavidade } = LIMITES_DA_MASCARA;
+  const limpa = mascara
+    ? {
+        forma: mascara.forma,
+        x: limitar(mascara.x, centro.minimo, centro.maximo),
+        y: limitar(mascara.y, centro.minimo, centro.maximo),
+        largura: limitar(mascara.largura, tamanho.minimo, tamanho.maximo),
+        altura: limitar(mascara.altura, tamanho.minimo, tamanho.maximo),
+        suavidade: limitar(mascara.suavidade, suavidade.minimo, suavidade.maximo),
+        inverter: Boolean(mascara.inverter),
+      }
+    : null;
+  return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, mascara: limpa }));
 }
 
 /** Vira a imagem dos clipes no sentido pedido; virar de novo desvira. */

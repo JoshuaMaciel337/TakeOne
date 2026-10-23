@@ -8,7 +8,7 @@ import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
-import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
+import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "@/lib/projeto/modelo";
 import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
@@ -497,6 +497,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           </select>
         </label>
         <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        <MascaraDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {midia?.elemento && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
         ) : null}
@@ -816,6 +817,59 @@ function CantosDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe;
               aoConfirmar={(cor) => aoExecutar(comando({ ...cantos, cor }))}
             />
           ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Máscara de forma: só a parte de dentro (ou de fora) de um retângulo ou de uma elipse aparece. */
+function MascaraDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
+  const mascara = clipe.mascara ?? null;
+  const comando = (valor: MascaraDeForma | null): Comando => ({ comando: "clipe.mascara", parametros: { clipeIds: [clipe.id], mascara: valor } });
+  const controle = (campo: "x" | "y" | "largura" | "altura" | "suavidade", minimo: number, maximo: number) => ({
+    valor: (mascara?.[campo] ?? 0) * 100,
+    minimo: minimo * 100,
+    maximo: maximo * 100,
+    sufixo: "%",
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comando({ ...mascara!, [campo]: valor / 100 })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - mascara![campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comando({ ...mascara!, [campo]: valor / 100 }));
+    },
+  });
+  const { centro, tamanho, suavidade } = LIMITES_DA_MASCARA;
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center justify-between gap-2 text-xs">
+        <span>Máscara</span>
+        <select
+          aria-label="Forma da máscara"
+          value={mascara?.forma ?? ""}
+          disabled={travada}
+          onChange={(evento) => {
+            const forma = evento.currentTarget.value as MascaraDeForma["forma"] | "";
+            aoExecutar(comando(forma ? { ...(mascara ?? MASCARA_PADRAO), forma } : null));
+          }}
+          className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque"
+        >
+          <option value="">Nenhuma</option>
+          <option value="elipse">Elipse</option>
+          <option value="retangulo">Retângulo</option>
+        </select>
+      </label>
+      {mascara ? (
+        <>
+          <ControleNumerico rotulo="Centro na horizontal" {...controle("x", centro.minimo, centro.maximo)} />
+          <ControleNumerico rotulo="Centro na vertical" {...controle("y", centro.minimo, centro.maximo)} />
+          <ControleNumerico rotulo="Largura" {...controle("largura", tamanho.minimo, tamanho.maximo)} />
+          <ControleNumerico rotulo="Altura" {...controle("altura", tamanho.minimo, tamanho.maximo)} />
+          <ControleNumerico rotulo="Suavidade" {...controle("suavidade", suavidade.minimo, suavidade.maximo)} />
+          <label className="mt-1 flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={mascara.inverter} disabled={travada} onChange={(evento) => aoExecutar(comando({ ...mascara, inverter: evento.currentTarget.checked }))} />
+            Inverter (some o que está dentro)
+          </label>
         </>
       ) : null}
     </div>

@@ -6,9 +6,9 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
-import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, NITIDEZ_SIGMA, valoresDoGrao } from "../projeto/efeitos.ts";
+import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Cantos, ChaveLuma, Chroma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
+import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 
 export type Camada = {
@@ -33,8 +33,8 @@ export type Camada = {
   mesclagem?: Mesclagem;
   /** Efeito brilho: quanto da cópia desfocada soma em "tela" (lib/projeto/efeitos.ts). */
   brilho?: number;
-  /** Efeito nitidez: quanto da diferença entre a camada e a cópia pouco desfocada soma a ela. */
-  nitidez?: number;
+  /** Nitidez ou clareza: a diferença entre a camada e a cópia desfocada (sigma em frações da altura), na força dada. */
+  contrasteLocal?: { sigma: number; forca: number; meiosTons: boolean } | null;
   /** Efeito olho de peixe: o k1 da lente. */
   lente?: number;
   /** VHS e glitch: quanto o vermelho anda para a direita (e o azul para a esquerda), em frações da largura. */
@@ -49,6 +49,8 @@ export type Camada = {
   chroma?: Chroma | null;
   /** Cantos arredondados e borda (core/utils/cantos.py), entre as curvas e a vinheta, como no render. */
   cantos?: Cantos | null;
+  /** Máscara de forma (core/utils/cantos.py, cobertura_da_mascara), junto dos cantos. */
+  mascaraDeForma?: MascaraDeForma | null;
   /** Chave de luminância: o escuro ou o claro que some, depois da tela verde. */
   chaveLuma?: ChaveLuma | null;
   /** Recorte do fundo: o quadro da máscara da pessoa (o alfa), no mesmo enquadramento do vídeo. */
@@ -186,8 +188,10 @@ uniform vec3 u_corteAte;
 uniform int u_mesclagem;
 // Brilho: a cópia desfocada (unidade 2) somada em "tela", na força u_brilho
 uniform float u_brilho;
-// Nitidez: a diferença entre a camada e a cópia pouco desfocada (a mesma unidade 2), na força u_nitidez
+// Nitidez e clareza: a diferença entre a camada e a cópia desfocada (a mesma unidade 2), na força u_nitidez; a
+// clareza pesa pelos meios-tons
 uniform float u_nitidez;
+uniform bool u_meiosTons;
 uniform sampler2D u_desfocada;
 // Olho de peixe: o k1 da lente e o tamanho do clipe (só a proporção conta), como o lenscorrection
 uniform float u_lente;
@@ -224,6 +228,26 @@ ${CHAVE_DE_LUMA}
 uniform vec2 u_cantos;
 uniform vec3 u_corDaBorda;
 uniform float u_pixelsPorUnidade;
+// Máscara de forma: 0 sem ela, 1 retângulo, 2 elipse; centro e tamanho em frações do clipe; suavidade (fração do
+// lado menor) e inverter. A distância até a borda da forma, em pixels, vira a cobertura (cobertura_da_mascara)
+uniform int u_mascaraForma;
+uniform vec4 u_mascara;
+uniform vec2 u_mascaraSuave;
+float coberturaDaMascara(vec2 local, vec2 tamanho) {
+  if (u_mascaraForma == 0) return 1.0;
+  vec2 p = (local - u_mascara.xy) * tamanho;
+  vec2 meia = max(u_mascara.zw * tamanho / 2.0, vec2(1e-6));
+  float distancia;
+  if (u_mascaraForma == 1) {
+    vec2 q = abs(p) - meia;
+    distancia = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  } else {
+    distancia = (length(p / meia) - 1.0) * min(meia.x, meia.y);
+  }
+  float suave = max(u_mascaraSuave.x * min(tamanho.x, tamanho.y), 1.0);
+  float cobertura = clamp(0.5 - distancia / suave, 0.0, 1.0);
+  return u_mascaraSuave.y > 0.5 ? 1.0 - cobertura : cobertura;
+}
 float coberturaDoCanto(vec2 p, vec2 meia, float raio) {
   if (meia.x <= 0.0 || meia.y <= 0.0) return 0.0;
   raio = min(raio, min(meia.x, meia.y));
@@ -299,13 +323,14 @@ void main() {
   if (u_nitidez > 0.0) {
     // Como o lut2 do render: no alfa pré-multiplicado, cada canal preso entre 0 e 1
     vec3 borrada = texture(u_desfocada, uv).rgb;
-    texel.rgb = clamp(texel.rgb + u_nitidez * (texel.rgb - borrada), 0.0, 1.0);
+    vec3 peso = u_meiosTons ? 4.0 * texel.rgb * (1.0 - texel.rgb) : vec3(1.0);
+    texel.rgb = clamp(texel.rgb + u_nitidez * peso * (texel.rgb - borrada), 0.0, 1.0);
   }
   if (u_brilho > 0.0) {
     vec4 luz = texture(u_desfocada, uv) * u_brilho;
     texel = texel + luz - texel * luz;
   }
-  bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0;
+  bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0 || u_mascaraForma > 0;
   if ((u_comLut || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos) && (texel.a > 0.0 || comCantos)) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas), os cantos e depois a vinheta
@@ -319,8 +344,10 @@ void main() {
       float lado = 2.0 * min(meia.x, meia.y);
       float raio = u_cantos.x * lado;
       float borda = u_cantos.y * lado;
+      float forma = coberturaDaMascara(v_local, meia * 2.0);
       float dentro = coberturaDoCanto(p, meia - borda, max(raio - borda, 0.0));
-      float anel = clamp(coberturaDoCanto(p, meia, raio) - dentro, 0.0, 1.0);
+      float anel = clamp(coberturaDoCanto(p, meia, raio) - dentro, 0.0, 1.0) * forma;
+      dentro *= forma;
       float a = alfa * dentro;
       alfa = anel + a * (1.0 - anel);
       c = alfa > 0.0 ? (u_corDaBorda * anel + c * a * (1.0 - anel)) / alfa : c;
@@ -399,7 +426,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -512,6 +539,7 @@ export class Compositor {
         mesclagem: local("u_mesclagem"),
         brilho: local("u_brilho"),
         nitidez: local("u_nitidez"),
+        meiosTons: local("u_meiosTons"),
         desfocada: local("u_desfocada"),
         lente: local("u_lente"),
         desvio: local("u_desvio"),
@@ -524,6 +552,9 @@ export class Compositor {
         graoTextura: local("u_graoTextura"),
         comChroma: local("u_comChroma"),
         cantos: local("u_cantos"),
+        mascaraForma: local("u_mascaraForma"),
+        mascara: local("u_mascara"),
+        mascaraSuave: local("u_mascaraSuave"),
         corDaBorda: local("u_corDaBorda"),
         pixelsPorUnidade: local("u_pixelsPorUnidade"),
         luma: local("u_luma"),
@@ -751,11 +782,12 @@ export class Compositor {
         gl.activeTexture(gl.TEXTURE0);
       }
       const brilho = camada.brilho ?? 0;
-      const nitidez = camada.nitidez ?? 0;
+      const realce = camada.contrasteLocal ?? null;
       gl.uniform1f(uniformes.brilho, brilho > 0 && largura > 0 ? brilho : 0);
-      gl.uniform1f(uniformes.nitidez, nitidez > 0 && largura > 0 ? nitidez : 0);
-      // A cópia desfocada do brilho ou da nitidez (um efeito por clipe: nunca os dois)
-      const sigmaDaCopia = brilho > 0 ? SIGMA_DO_BRILHO : nitidez > 0 ? NITIDEZ_SIGMA : 0;
+      gl.uniform1f(uniformes.nitidez, realce && largura > 0 ? realce.forca : 0);
+      gl.uniform1i(uniformes.meiosTons, realce?.meiosTons ? 1 : 0);
+      // A cópia desfocada do brilho, da nitidez ou da clareza (um efeito por clipe: nunca dois)
+      const sigmaDaCopia = brilho > 0 ? SIGMA_DO_BRILHO : realce ? realce.sigma : 0;
       // Com brilho ou nitidez, a camada é recortada antes (máscara e tela verde) e o shader não recorta de novo
       const recortadaAntes = sigmaDaCopia > 0 && largura > 0 && Boolean(camada.mascaraDoFundo || camada.chroma || camada.chaveLuma);
       if (recortadaAntes) {
@@ -791,8 +823,14 @@ export class Compositor {
       }
       definirChaveDeLuma(gl, uniformes, recortadaAntes ? null : camada.chaveLuma);
       gl.uniform2f(uniformes.cantos, camada.cantos?.raio ?? 0, camada.cantos?.borda ?? 0);
-      if (camada.cantos) {
-        gl.uniform3f(uniformes.corDaBorda, ...corParaRgb(camada.cantos.cor));
+      const forma = camada.mascaraDeForma;
+      gl.uniform1i(uniformes.mascaraForma, forma ? (forma.forma === "retangulo" ? 1 : 2) : 0);
+      if (forma) {
+        gl.uniform4f(uniformes.mascara, forma.x, forma.y, forma.largura, forma.altura);
+        gl.uniform2f(uniformes.mascaraSuave, forma.suavidade, forma.inverter ? 1 : 0);
+      }
+      if (camada.cantos || forma) {
+        gl.uniform3f(uniformes.corDaBorda, ...corParaRgb(camada.cantos?.cor ?? "#ffffff"));
         gl.uniform1f(uniformes.pixelsPorUnidade, this.canvas.width / quadro.largura);
       }
       gl.uniform1f(uniformes.luz, camada.luz?.forca ?? 0);

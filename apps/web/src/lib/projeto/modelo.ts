@@ -53,6 +53,15 @@ export const CANTOS_PADRAO: Cantos = { raio: 0.08, borda: 0, cor: "#ffffff" };
 export const RAIO_MAXIMO = 0.5;
 export const BORDA_MAXIMA = 0.25;
 
+/**
+ * Máscara de forma: só a parte do clipe dentro (ou fora, invertida) de um retângulo ou de uma elipse aparece. O
+ * centro e o tamanho são frações do clipe como ele aparece; a suavidade, do lado menor dele. A conta é a de
+ * core/utils/cantos.py (cobertura_da_mascara), que o shader da prévia repete.
+ */
+export type MascaraDeForma = { forma: "retangulo" | "elipse"; x: number; y: number; largura: number; altura: number; suavidade: number; inverter: boolean };
+export const MASCARA_PADRAO: MascaraDeForma = { forma: "elipse", x: 0.5, y: 0.5, largura: 0.7, altura: 0.7, suavidade: 0.08, inverter: false };
+export const LIMITES_DA_MASCARA = { centro: { minimo: -0.5, maximo: 1.5 }, tamanho: { minimo: 0.02, maximo: 2 }, suavidade: { minimo: 0, maximo: 0.5 } } as const;
+
 /** A imagem do clipe espelhada na horizontal, na vertical ou nos dois sentidos. */
 export type Virar = { horizontal: boolean; vertical: boolean };
 
@@ -125,6 +134,8 @@ export type Clipe = {
   virar?: Virar | null;
   /** Cantos arredondados e borda; sem eles, o retângulo inteiro. */
   cantos?: Cantos | null;
+  /** Máscara de forma (retângulo ou elipse); sem ela, o clipe inteiro aparece. */
+  mascara?: MascaraDeForma | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

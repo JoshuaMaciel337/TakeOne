@@ -50,6 +50,7 @@ import {
   mesclarClipes,
   virarClipes,
   arredondarClipes,
+  mascararClipes,
   preencherVaga,
   aplicarEfeito,
   chromaClipes,
@@ -91,7 +92,7 @@ import type { Tamanho } from "./geometria.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
-import type { Cantos, ChaveLuma, Chroma, Mesclagem } from "./modelo.ts";
+import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
@@ -121,6 +122,7 @@ export type Comando =
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
+  | { comando: "clipe.mascara"; parametros: { clipeIds: string[]; mascara: MascaraDeForma | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
   | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string } }
   | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto } }
@@ -187,6 +189,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.virar": "virar o clipe",
   "clipe.cantos": "mudar os cantos",
+  "clipe.mascara": "mudar a máscara",
   "clipe.preencher": "trocar a mídia do modelo",
   "imagem.adicionarMidia": "pôr a imagem",
   "imagem.adicionarTexto": "pôr o texto",
@@ -293,6 +296,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
     case "clipe.cantos":
       return { projeto: arredondarClipes(projeto, parametros.clipeIds, parametros.cantos) };
+    case "clipe.mascara":
+      return { projeto: mascararClipes(projeto, parametros.clipeIds, parametros.mascara) };
     case "imagem.adicionarMidia": {
       const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
