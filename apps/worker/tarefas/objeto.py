@@ -74,7 +74,8 @@ def executar_selecao(db, job: dict, reportar: Callable[[int, str], None]) -> dic
     if midia is None:
         raise ErroDefinitivo("A foto foi excluída antes da seleção.")
     pontos = entrada["pontos"]
-    nome = arquivo_da_selecao(pontos)
+    caixa = entrada.get("caixa")
+    nome = arquivo_da_selecao(pontos, caixa)
     foto = _foto(midia)
     reportar(10, "Achando o objeto")
     if _modelos_da_selecao():
@@ -87,9 +88,9 @@ def executar_selecao(db, job: dict, reportar: Callable[[int, str], None]) -> dic
             np.save(guardado, embedding)
         reportar(70, "Desenhando a seleção")
         mascara = mascara_dos_pontos(_sessao(MODELO_SELECAO / DECODIFICADOR), embedding, pontos, foto.width,
-                                     foto.height)
+                                     foto.height, caixa)
     else:
-        mascara = mascara_simulada(pontos, foto.width, foto.height)
+        mascara = mascara_simulada(pontos, foto.width, foto.height, caixa)
     imagem = Image.fromarray((mascara * 255).astype(np.uint8), "L")
     imagem = imagem.resize(_tamanho_da_mascara(foto.width, foto.height), Image.Resampling.BILINEAR)
     destino = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], nome))

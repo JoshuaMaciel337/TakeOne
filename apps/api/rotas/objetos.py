@@ -49,13 +49,21 @@ async def selecionar(midia_id: str, dados: SelecaoEntrada, usuario=Depends(usuar
     """A máscara do objeto nos pontos (MobileSAM no worker de CPU). Os mesmos pontos devolvem a mesma máscara."""
     midia = await _foto_pronta(db, midia_id, usuario)
     pontos = [[p.x, p.y, p.incluir] for p in dados.pontos]
-    if not any(incluir for _, _, incluir in pontos):
+    caixa = None
+    if dados.caixa:
+        c = dados.caixa
+        caixa = [min(c.x0, c.x1), min(c.y0, c.y1), max(c.x0, c.x1), max(c.y0, c.y1)]
+        if caixa[2] - caixa[0] < 0.002 or caixa[3] - caixa[1] < 0.002:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                "O retângulo em volta do objeto é pequeno demais.")
+    if not caixa and not any(incluir for _, _, incluir in pontos):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Marque pelo menos um ponto no objeto.")
-    arquivo = arquivo_da_selecao(pontos)
+    arquivo = arquivo_da_selecao(pontos, caixa)
     if arquivo in midia.get("arquivos", []):
         return SelecaoSaida(arquivo=arquivo, job_id=None)
     # Na frente da fila: a pessoa está esperando com o dedo na tela
-    job = montar_job("selecao", usuario["organizacao_id"], {"midia_id": str(midia["_id"]), "pontos": pontos},
+    entrada = {"midia_id": str(midia["_id"]), "pontos": pontos, "caixa": caixa}
+    job = montar_job("selecao", usuario["organizacao_id"], entrada,
                      prioridade=PRIORIDADE_INGESTAO + 1, criado_por=usuario["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     return SelecaoSaida(arquivo=arquivo, job_id=str(job_id))

@@ -892,8 +892,17 @@ class QuadroEntrada(BaseModel):
     estabilizar: bool = False
 
 
+class CaixaDaSelecao(BaseModel):
+    """O retângulo arrastado em volta do objeto, em frações da foto."""
+    x0: float = Field(ge=0, le=1)
+    y0: float = Field(ge=0, le=1)
+    x1: float = Field(ge=0, le=1)
+    y1: float = Field(ge=0, le=1)
+
+
 class SelecaoEntrada(BaseModel):
-    pontos: list[PontoDaSelecao] = Field(min_length=1, max_length=12)
+    pontos: list[PontoDaSelecao] = Field(default_factory=list, max_length=12)
+    caixa: CaixaDaSelecao | None = None
 
 
 class SelecaoSaida(BaseModel):

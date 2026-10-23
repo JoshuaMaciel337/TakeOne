@@ -53,6 +53,15 @@ def test_selecionar_e_recortar_e_apagar_o_objeto(cliente, db_limpo):
     # Os mesmos pontos não pedem outro job
     de_novo = cliente.post(f"/api/midias/{foto_id}/selecao", json={"pontos": [{"x": 0.5, "y": 0.5}]}).json()
     assert de_novo == {"arquivo": selecao["arquivo"], "job_id": None}
+    # Só um retângulo em volta do quadrado amarelo (300 a 500, 200 a 400 numa foto de 800 × 600)
+    caixa = {"x0": 0.35, "y0": 0.3, "x1": 0.65, "y1": 0.7}
+    pela_caixa = cliente.post(f"/api/midias/{foto_id}/selecao", json={"caixa": caixa}).json()
+    assert pela_caixa["job_id"] and pela_caixa["arquivo"] != selecao["arquivo"]
+    _processar(db_limpo, "selecao")
+    caminho_da_caixa = storage.caminho_local(chave_arquivo(organizacao, ObjectId(foto_id), pela_caixa["arquivo"]))
+    with Image.open(caminho_da_caixa) as aberta:
+        mascara = np.asarray(aberta.convert("L").resize((800, 600)))
+    assert mascara[300, 400] > 127 and mascara[50, 50] < 128
 
     # Recortar: uma mídia nova, transparente fora do objeto
     nova = cliente.post(f"/api/midias/{foto_id}/objeto", json={"acao": "recortar", "selecao": selecao["arquivo"]})
@@ -90,6 +99,9 @@ def test_pedidos_que_nao_servem(cliente, db_limpo):
     assert cliente.post(f"/api/midias/{foto_id}/objeto", json=pincel_errado).status_code == 422
     assert cliente.post(f"/api/midias/{foto_id}/selecao",
                         json={"pontos": [{"x": 0.5, "y": 0.5, "incluir": False}]}).status_code == 422
+    assert cliente.post(f"/api/midias/{foto_id}/selecao", json={}).status_code == 422
+    caixa_fina = {"x0": 0.5, "y0": 0.2, "x1": 0.5005, "y1": 0.8}
+    assert cliente.post(f"/api/midias/{foto_id}/selecao", json={"caixa": caixa_fina}).status_code == 422
 
 
 def test_contas_do_objeto():

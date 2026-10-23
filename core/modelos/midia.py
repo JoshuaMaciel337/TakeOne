@@ -72,12 +72,17 @@ def arquivo_da_mascara_do_objeto(rastreio_id: str) -> str:
 ARQUIVO_EMBEDDING_SAM = "sam.npy"
 
 
-def arquivo_da_selecao(pontos: list[list[float]]) -> str:
-    """O nome da máscara de uma seleção: o mesmo para os mesmos pontos (em milésimos), para não refazer."""
+def arquivo_da_selecao(pontos: list[list[float]], caixa: list[float] | None = None) -> str:
+    """
+    O nome da máscara de uma seleção: o mesmo para os mesmos pontos e o mesmo retângulo (em milésimos), para não
+    refazer. Sem retângulo, o nome é o de antes dele existir.
+    """
     import hashlib
     import json
 
     chave = json.dumps([[round(x, 3), round(y, 3), bool(incluir)] for x, y, incluir in pontos])
+    if caixa:
+        chave += json.dumps([round(v, 3) for v in caixa])
     return f"selecao_{hashlib.sha1(chave.encode()).hexdigest()[:12]}.png"
 
 

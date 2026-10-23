@@ -28,14 +28,22 @@ def imagem_para_o_sam(imagem: Image.Image) -> tuple[np.ndarray, float]:
 
 
 def mascara_dos_pontos(decodificador, embedding: np.ndarray, pontos: list[list[float]], largura: int,
-                       altura: int) -> np.ndarray:
+                       altura: int, caixa: list[float] | None = None) -> np.ndarray:
     """
-    A máscara (bool, altura × largura) dos cliques. pontos: [x, y, incluir] com x e y em frações da foto; o
-    ponto de preenchimento (0, 0, -1) vai no fim, como o SAM pede quando não há caixa.
+    A máscara (bool, altura × largura) dos cliques e do retângulo. pontos: [x, y, incluir] e caixa: [x0, y0, x1,
+    y1], em frações da foto. O retângulo entra como dois pontos de rótulos 2 e 3; sem ele, o ponto de
+    preenchimento (0, 0, -1) vai no fim, como o SAM pede.
     """
     escala = LADO_DO_SAM / max(largura, altura)
-    coordenadas = [[x * largura * escala, y * altura * escala] for x, y, _ in pontos] + [[0.0, 0.0]]
-    rotulos = [1.0 if incluir else 0.0 for _, _, incluir in pontos] + [-1.0]
+    coordenadas = [[x * largura * escala, y * altura * escala] for x, y, _ in pontos]
+    rotulos = [1.0 if incluir else 0.0 for _, _, incluir in pontos]
+    if caixa:
+        x0, y0, x1, y1 = caixa
+        coordenadas += [[x0 * largura * escala, y0 * altura * escala], [x1 * largura * escala, y1 * altura * escala]]
+        rotulos += [2.0, 3.0]
+    else:
+        coordenadas.append([0.0, 0.0])
+        rotulos.append(-1.0)
     mascaras, _, _ = decodificador.run(None, {
         "image_embeddings": embedding,
         "point_coords": np.array([coordenadas], dtype=np.float32),
@@ -47,11 +55,18 @@ def mascara_dos_pontos(decodificador, embedding: np.ndarray, pontos: list[list[f
     return mascaras[0, 0] > 0
 
 
-def mascara_simulada(pontos: list[list[float]], largura: int, altura: int) -> np.ndarray:
-    """Sem o modelo (CI e modo simulado): um círculo em volta de cada ponto de incluir, menos os de excluir."""
+def mascara_simulada(pontos: list[list[float]], largura: int, altura: int,
+                     caixa: list[float] | None = None) -> np.ndarray:
+    """
+    Sem o modelo (CI e modo simulado): o retângulo, se houver, e um círculo em volta de cada ponto de incluir,
+    menos os de excluir.
+    """
     yy, xx = np.mgrid[0:altura, 0:largura]
     raio = 0.12 * min(largura, altura)
     mascara = np.zeros((altura, largura), dtype=bool)
+    if caixa:
+        x0, y0, x1, y1 = caixa
+        mascara = (xx >= x0 * largura) & (xx < x1 * largura) & (yy >= y0 * altura) & (yy < y1 * altura)
     for x, y, incluir in pontos:
         circulo = (xx - x * largura) ** 2 + (yy - y * altura) ** 2 <= raio ** 2
         mascara = mascara | circulo if incluir else mascara & ~circulo
