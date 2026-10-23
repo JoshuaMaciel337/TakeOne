@@ -256,3 +256,29 @@ def test_lista_de_projetos_em_paginas_traz_todos_sem_repetir(cliente, db_limpo):
         antes = pagina[-1]["id"]
     assert sorted(vistos) == sorted(criados) and len(vistos) == 7
     assert cliente.get("/api/projetos", params={"antes": "x"}).status_code == 422
+
+
+def test_imagem_tem_mais_camadas_que_o_video_tem_faixas(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, duracao=5.0, audio=False)
+    texto = {"conteudo": "Oi", "tamanho": 0.08}
+    camadas = lambda n: [  # noqa: E731
+        {"id": f"t{i}", "tipo": "texto", "oculta": False, "muda": False, "travada": False,
+         "clipes": [{"id": f"c{i}", "midia_id": None, "inicio": 0, "duracao": 5 * SEGUNDO, "entrada": 0,
+                     "velocidade": 1, "volume": 1, "texto": texto}]}
+        for i in range(n)
+    ]
+
+    # Vídeo: até 30 faixas
+    video = cliente.post("/api/projetos", json={}).json()
+    principal = principal_com(video, [clipe(midia_id, 0, 5)])
+    assert salvar(cliente, video, camadas(30) + principal).status_code == 422
+    assert salvar(cliente, video, camadas(29) + principal).status_code == 200
+
+    # Imagem: cada camada é uma faixa, e a principal fica vazia embaixo; até 100 camadas
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 1080, "altura": 1080}}).json()
+    vazia = imagem["faixas"]
+    assert salvar(cliente, imagem, camadas(40) + vazia).status_code == 200
+    imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
+    resposta = salvar(cliente, imagem, camadas(101) + vazia)
+    assert resposta.status_code == 422 and "100 camadas" in resposta.json()["detail"]

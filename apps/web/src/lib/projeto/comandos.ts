@@ -20,6 +20,8 @@ import {
   apararClipe,
   apararEmOndulacao,
   elevarTrecho,
+  ErroEdicao,
+  LIMITE_CAMADAS,
   inserirTrecho,
   esticarClipe,
   type AcaoDeKeyframe,
@@ -320,7 +322,17 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
-export function executarComando(projeto: Projeto, { comando, parametros }: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
+export function executarComando(projeto: Projeto, comando: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
+  const resultado = executarSemConferir(projeto, comando, ctx);
+  // Os comandos de camada da imagem não passam pelo `finalizar`: o limite de camadas é conferido aqui, antes de
+  // o salvamento esbarrar nele na API
+  if (resultado.projeto.tipo === "imagem" && resultado.projeto.faixas.length > LIMITE_CAMADAS + 1 && resultado.projeto.faixas.length > projeto.faixas.length) {
+    throw new ErroEdicao(`A imagem pode ter no máximo ${LIMITE_CAMADAS} camadas. Apague ou junte algumas antes.`);
+  }
+  return resultado;
+}
+
+function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
   switch (comando) {
     case "clipe.adicionar": {
       const { midiaId, ...destino } = parametros;

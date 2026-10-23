@@ -103,13 +103,14 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     if atual["versao"] != dados.versao:
         raise HTTPException(status.HTTP_409_CONFLICT, MENSAGEM_CONFLITO)
 
+    imagem = atual.get("tipo") == "imagem"
     faixas = [f.model_dump() for f in dados.faixas]
     usadas = midias_usadas(faixas)
-    problema = conferir_linha_do_tempo(faixas, await midias_do_espaco(db, usadas, usuario["organizacao_id"]))
+    midias = await midias_do_espaco(db, usadas, usuario["organizacao_id"])
+    problema = conferir_linha_do_tempo(faixas, midias, imagem=imagem)
     if problema:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problema)
 
-    imagem = atual.get("tipo") == "imagem"
     tamanho = (dados.tamanho.model_dump() if dados.tamanho else atual.get("tamanho")) if imagem else None
     campos = {
         "nome": dados.nome,

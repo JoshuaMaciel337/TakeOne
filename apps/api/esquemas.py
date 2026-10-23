@@ -922,7 +922,9 @@ class ProjetoSalvarEntrada(BaseModel):
     proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"]
     taxa: TaxaEntrada
     fundo: FundoEntrada
-    faixas: list[FaixaEntrada] = Field(min_length=1, max_length=30)
+    # Até 30 no vídeo e 100 camadas na imagem (uma faixa por camada): a rota confere pelo tipo do projeto e dá a
+    # mensagem; aqui fica só um teto com folga
+    faixas: list[FaixaEntrada] = Field(min_length=1, max_length=120)
     # Marcadores da régua (viram capítulos e marcadores do XML)
     marcadores: list[MarcadorEntrada] = Field(default=[], max_length=200)
     # Só no projeto de imagem (no de vídeo é ignorado)

@@ -94,6 +94,8 @@ const VELOCIDADE_NA_API = { minimo: 0.1, maximo: 100 } as const;
 /** Os limites da API (core/modelos/projeto.py): passar deles faria o salvamento parar. */
 const LIMITE_FAIXAS = 30;
 const LIMITE_CLIPES = 1500;
+/** No projeto de imagem cada camada é uma faixa (e a principal fica vazia embaixo): o limite é outro. */
+export const LIMITE_CAMADAS = 100;
 
 export type Contexto = {
   novoId: () => string;
@@ -215,7 +217,9 @@ function finalizar(projeto: Projeto): Projeto {
   let duracao = 0;
   for (const faixa of faixas) for (const clipe of faixa.clipes) duracao = Math.max(duracao, fimDoClipe(clipe));
   if (duracao > TICK_MAXIMO) throw new ErroEdicao("O projeto pode ter no máximo 6 horas.");
-  if (faixas.length > LIMITE_FAIXAS) throw new ErroEdicao(`O projeto pode ter no máximo ${LIMITE_FAIXAS} faixas.`);
+  if (projeto.tipo === "imagem") {
+    if (faixas.length > LIMITE_CAMADAS + 1) throw new ErroEdicao(`A imagem pode ter no máximo ${LIMITE_CAMADAS} camadas.`);
+  } else if (faixas.length > LIMITE_FAIXAS) throw new ErroEdicao(`O projeto pode ter no máximo ${LIMITE_FAIXAS} faixas.`);
   const clipes = faixas.reduce((soma, faixa) => soma + faixa.clipes.length, 0);
   if (clipes > LIMITE_CLIPES) throw new ErroEdicao(`O projeto pode ter no máximo ${LIMITE_CLIPES} clipes. Apague alguns (ou uma faixa de legendas repetida) antes.`);
   return { ...projeto, faixas, duracao };

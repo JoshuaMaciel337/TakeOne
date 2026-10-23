@@ -206,3 +206,15 @@ test("arrastar no painel Camadas põe a camada na posição, e a camada nova pod
   const tf = camadasDaImagem(f.projeto)[0].clipe.transformacao;
   assert.deepEqual([tf.x, tf.y, tf.escala], [0.2, 0, 0.3]);
 });
+
+test("a imagem vai até 100 camadas, mais que as 30 faixas do vídeo, e recusa a seguinte com aviso", () => {
+  const ctx = contexto();
+  let projeto = vazio();
+  for (let i = 0; i < 100; i++) projeto = executarComando(projeto, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO } }, ctx).projeto;
+  assert.equal(camadasDaImagem(projeto).length, 100);
+  // Mexer numa camada passa pelo finalizar do vídeo, que não pode cortar a imagem em 30
+  const id = camadasDaImagem(projeto)[50].clipe.id;
+  projeto = executarComando(projeto, { comando: "clipe.transformar", parametros: { clipeIds: [id], transformacao: { x: 0.1 } } }, ctx).projeto;
+  assert.throws(() => executarComando(projeto, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO } }, ctx), /100 camadas/);
+  assert.throws(() => executarComando(projeto, { comando: "imagem.duplicar", parametros: { faixaId: camadasDaImagem(projeto)[0].faixa.id } }, ctx), /100 camadas/);
+});

@@ -39,6 +39,8 @@ TIPOS_FAIXA = (FAIXA_PRINCIPAL, FAIXA_VIDEO, FAIXA_AUDIO, FAIXA_TEXTO, FAIXA_LEG
 FAIXAS_DE_TEXTO = (FAIXA_TEXTO, FAIXA_LEGENDA)
 
 LIMITE_FAIXAS = 30
+# No projeto de imagem cada camada é uma faixa, e a principal fica vazia embaixo
+LIMITE_CAMADAS = 100
 LIMITE_CLIPES = 1500
 # O fim do clipe pode passar um pouco do fim da mídia: a duração do ffprobe e a borda do quadro
 # não batem exatamente.
@@ -132,14 +134,17 @@ def _conferir_transicoes(faixa: dict, clipes: list[dict]) -> str | None:
     return None
 
 
-def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict]) -> str | None:
+def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem: bool = False) -> str | None:
     """
     Confere as regras que o editor mantém. Devolve a mensagem do primeiro problema, ou None.
     midias: id → documento da mídia, só as do espaço e já prontas.
     """
     if sum(f["tipo"] == FAIXA_PRINCIPAL for f in faixas) != 1:
         return "O projeto precisa de exatamente uma faixa principal."
-    if len(faixas) > LIMITE_FAIXAS:
+    if imagem:
+        if len(faixas) > LIMITE_CAMADAS + 1:
+            return f"A imagem pode ter no máximo {LIMITE_CAMADAS} camadas."
+    elif len(faixas) > LIMITE_FAIXAS:
         return f"O projeto pode ter no máximo {LIMITE_FAIXAS} faixas."
     if sum(len(f["clipes"]) for f in faixas) > LIMITE_CLIPES:
         return f"O projeto pode ter no máximo {LIMITE_CLIPES} clipes."
