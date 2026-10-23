@@ -212,14 +212,26 @@ export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoP
         {escolhido.textos.map((texto) => (
           <label key={texto.campo} className="flex flex-col gap-1 text-[11px] text-suave">
             {texto.rotulo}
-            <input
-              type="text"
-              value={textos[texto.campo] ?? ""}
-              placeholder={texto.padrao}
-              maxLength={120}
-              onChange={(evento) => setTextos({ ...textos, [texto.campo]: evento.target.value })}
-              className="rounded-md border border-borda bg-painel px-2 py-1.5 text-xs text-texto outline-none focus:border-destaque"
-            />
+            {/* O padrão com mais de uma linha pede a caixa de várias linhas: numa linha só, o texto passaria do quadro */}
+            {texto.padrao.includes("\n") ? (
+              <textarea
+                value={textos[texto.campo] ?? ""}
+                placeholder={texto.padrao}
+                maxLength={120}
+                rows={texto.padrao.split("\n").length}
+                onChange={(evento) => setTextos({ ...textos, [texto.campo]: evento.target.value })}
+                className="resize-y rounded-md border border-borda bg-painel px-2 py-1.5 text-xs text-texto outline-none focus:border-destaque"
+              />
+            ) : (
+              <input
+                type="text"
+                value={textos[texto.campo] ?? ""}
+                placeholder={texto.padrao}
+                maxLength={120}
+                onChange={(evento) => setTextos({ ...textos, [texto.campo]: evento.target.value })}
+                className="rounded-md border border-borda bg-painel px-2 py-1.5 text-xs text-texto outline-none focus:border-destaque"
+              />
+            )}
           </label>
         ))}
       </section>
