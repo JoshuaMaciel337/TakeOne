@@ -20,13 +20,13 @@ const CANTOS: { id: Canto; nome: string }[] = [
 
 type Props = {
   midias: Midia[];
-  proporcao: string;
-  aoExecutar: (comando: Comando) => void;
+  /** Sem projeto aberto (no hub), as ações "Neste projeto" não aparecem. */
+  projeto?: { proporcao: string; aoExecutar: (comando: Comando) => void };
   aoAvisar: (mensagem: string) => void;
 };
 
 /** Kit de marca do espaço: cores, fontes e logo, e os atalhos para usar no projeto aberto. */
-export function PainelMarca({ midias, proporcao, aoExecutar, aoAvisar }: Props) {
+export function PainelMarca({ midias, projeto, aoAvisar }: Props) {
   const salva = useMarca();
   // O rascunho começa no kit salvo e só vai para o servidor no "Salvar"
   const [rascunho, setRascunho] = useState<Marca | null>(null);
@@ -49,10 +49,10 @@ export function PainelMarca({ midias, proporcao, aoExecutar, aoAvisar }: Props) 
   }
 
   function porLogo() {
-    if (!logo?.video) return;
-    const [largura, altura] = proporcao.split(":").map(Number);
+    if (!logo?.video || !projeto) return;
+    const [largura, altura] = projeto.proporcao.split(":").map(Number);
     const transformacao = transformacaoDoLogo({ largura: logo.video.largura, altura: logo.video.altura }, { largura, altura }, canto);
-    aoExecutar({ comando: "marca.logo", parametros: { midiaId: logo.id, transformacao } });
+    projeto.aoExecutar({ comando: "marca.logo", parametros: { midiaId: logo.id, transformacao } });
   }
 
   return (
@@ -156,6 +156,7 @@ export function PainelMarca({ midias, proporcao, aoExecutar, aoAvisar }: Props) 
         {salvando ? "Salvando…" : rascunho ? "Salvar o kit" : "Kit salvo"}
       </button>
 
+      {projeto ? (
       <section className="flex flex-col gap-2 border-t border-borda pt-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Neste projeto</h3>
         <div className="flex gap-2">
@@ -179,13 +180,14 @@ export function PainelMarca({ midias, proporcao, aoExecutar, aoAvisar }: Props) 
         <button
           type="button"
           className="botao-secundario px-3 py-1.5 text-xs"
-          onClick={() => aoExecutar({ comando: "marca.textos", parametros: { fonteTitulo: marca.fonte_titulo, fonteTexto: marca.fonte_texto, cor: marca.cores[0] ?? null } })}
+          onClick={() => projeto.aoExecutar({ comando: "marca.textos", parametros: { fonteTitulo: marca.fonte_titulo, fonteTexto: marca.fonte_texto, cor: marca.cores[0] ?? null } })}
         >
           <Type className="size-4" aria-hidden />
           Aplicar fontes e cor aos textos
         </button>
         <p className="text-[11px] text-suave">Os títulos ganham a fonte de título e a cor principal; as legendas, a fonte de texto e a cor principal nas palavras destacadas.</p>
       </section>
+      ) : null}
     </div>
   );
 }

@@ -20,10 +20,12 @@ const LETRAS_POR_SEGUNDO = 15;
 type Props = {
   /** A fala pedida entra no cursor, numa faixa de áudio, quando ficar pronta. */
   aoPedir: (midia: Midia) => void;
+  /** Fora do editor (no hub): a fala só entra na biblioteca. */
+  soNaBiblioteca?: boolean;
 };
 
 /** Ferramenta Áudio: texto em fala com as vozes abertas do Kokoro, geradas no worker de CPU. */
-export function PainelAudio({ aoPedir }: Props) {
+export function PainelAudio({ aoPedir, soNaBiblioteca = false }: Props) {
   const [texto, setTexto] = useState("");
   const [voz, setVoz] = useState<string>(VOZES[0].id);
   const [velocidade, setVelocidade] = useState(1);
@@ -38,7 +40,7 @@ export function PainelAudio({ aoPedir }: Props) {
     setErro("");
     chamarApi<Midia>("/midias/fala", { metodo: "POST", corpo: { texto, voz, velocidade } })
       .then((midia) => {
-        setAviso("Gerando a fala. Ela entra no cursor, numa faixa de áudio, quando ficar pronta.");
+        setAviso(soNaBiblioteca ? "Gerando a fala. Ela aparece em Mídias quando ficar pronta." : "Gerando a fala. Ela entra no cursor, numa faixa de áudio, quando ficar pronta.");
         aoPedir(midia);
       })
       .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não foi possível pedir a fala agora."))

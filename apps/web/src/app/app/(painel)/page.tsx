@@ -1,71 +1,110 @@
 "use client";
 
-import { LoaderCircle, Plus } from "lucide-react";
+import { ArrowRight, Clapperboard, WandSparkles } from "lucide-react";
+import Link from "next/link";
 
-import { AvisoErro } from "@/componentes/AvisoErro";
 import { EstadoServidor } from "@/componentes/EstadoServidor";
-import { CartaoMidia } from "@/componentes/midia/CartaoMidia";
-import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
-import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
-import { ListaProjetos, useNovoProjeto } from "@/componentes/projeto/ListaProjetos";
-import { ErroApi } from "@/lib/api";
-import { useMidias } from "@/lib/useMidias";
+import { useAbrirNoEditor } from "@/componentes/hub/AbrirNoEditor";
+import { CartaoFerramenta } from "@/componentes/hub/CartaoFerramenta";
+import { CartaoModelo } from "@/componentes/hub/CartaoModelo";
+import { SecaoDoHub } from "@/componentes/hub/TituloDaPagina";
+import { ListaProjetos } from "@/componentes/projeto/ListaProjetos";
+import { ferramentaDoHub, NO_INICIO, saudacao } from "@/lib/hub";
+import { MODELOS_DE_PROJETO } from "@/lib/projeto/modelos";
 import { useSessao } from "@/lib/sessao";
+
+const VER_TUDO = "inline-flex items-center gap-1 text-xs font-medium text-suave transition hover:text-texto";
 
 export default function PaginaInicio() {
   const { sessao } = useSessao();
-  const { midias, erro, excluir } = useMidias();
-  const novoProjeto = useNovoProjeto();
+  const abrirNoEditor = useAbrirNoEditor();
   const primeiroNome = sessao.usuario.nome.split(" ")[0];
+  const criarAutomaticamente = ferramentaDoHub("criar-automaticamente");
+  const novoVideo = () => abrirNoEditor({ titulo: "Editor de vídeo", ferramenta: "midia" });
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-10 px-5 py-8">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold sm:text-3xl">Olá, {primeiroNome}</h1>
-          <p className="mt-1 text-sm text-suave">O que vamos editar hoje?</p>
-          <div className="mt-3">
-            <EstadoServidor />
+      <section className="flex flex-col gap-1">
+        <p className="text-sm text-suave">
+          {saudacao(new Date().getHours())}, {primeiroNome}
+        </p>
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">O que vamos criar hoje?</h1>
+        <div className="mt-2">
+          <EstadoServidor />
+        </div>
+      </section>
+
+      <section className="grid gap-5 overflow-hidden rounded-2xl border border-borda bg-gradient-to-br from-destaque/20 via-painel to-painel p-6 sm:p-8 md:grid-cols-[1.3fr_1fr] md:items-center">
+        <div className="flex flex-col gap-3">
+          <span className="w-fit rounded-full bg-destaque/20 px-2.5 py-0.5 text-[11px] font-semibold text-destaque">Editor de vídeo</span>
+          <h2 className="font-display text-3xl font-bold leading-tight sm:text-4xl">Do vídeo bruto ao pronto para postar.</h2>
+          <p className="max-w-lg text-sm text-suave">
+            Corte, legende, ponha títulos e música e exporte até 4K. Ou deixe o “Criar automaticamente” tirar as pausas e os retakes e montar o resto.
+          </p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <button type="button" className="botao-principal px-5 py-2.5" onClick={novoVideo}>
+              <Clapperboard className="size-4" aria-hidden />
+              Abrir o editor
+            </button>
+            <button
+              type="button"
+              className="botao-secundario px-5 py-2.5"
+              onClick={() => {
+                if (criarAutomaticamente.destino.tipo === "editor") {
+                  abrirNoEditor({ titulo: criarAutomaticamente.nome, ferramenta: criarAutomaticamente.destino.ferramenta, ondeFica: criarAutomaticamente.destino.ondeFica });
+                }
+              }}
+            >
+              <WandSparkles className="size-4" aria-hidden />
+              Criar automaticamente
+            </button>
           </div>
         </div>
-        <button type="button" onClick={novoProjeto.criar} disabled={novoProjeto.criando} className="botao-principal px-6 py-3 text-base">
-          {novoProjeto.criando ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <Plus className="size-5" aria-hidden />}
-          Novo projeto
-        </button>
+        <div className="hidden aspect-video items-center justify-center rounded-xl border border-borda bg-painel-3/70 md:flex" aria-hidden>
+          <Clapperboard className="size-16 text-destaque/70" />
+        </div>
       </section>
 
-      <section aria-labelledby="titulo-projetos">
-        <h2 id="titulo-projetos" className="font-display text-lg font-semibold">
-          Projetos
-        </h2>
-        {novoProjeto.erro ? <AvisoErro>{novoProjeto.erro}</AvisoErro> : null}
-        <ListaProjetos aoCriar={novoProjeto.criar} criando={novoProjeto.criando} />
-      </section>
+      <SecaoDoHub
+        titulo="Ferramentas"
+        acao={
+          <Link href="/app/ferramentas" className={VER_TUDO}>
+            Ver todas <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {NO_INICIO.map((id) => (
+            <CartaoFerramenta key={id} ferramenta={ferramentaDoHub(id)} compacto />
+          ))}
+        </div>
+      </SecaoDoHub>
 
-      <section aria-labelledby="titulo-midias" className="flex flex-col gap-4">
-        <h2 id="titulo-midias" className="font-display text-lg font-semibold">
-          Suas mídias
-        </h2>
-        <ZonaDeEnvio />
-        <ListaEnvios />
-        {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-        {midias && midias.some((midia) => !midia.elemento) ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            {midias.filter((midia) => !midia.elemento).map((midia) => (
-              <CartaoMidia
-                key={midia.id}
-                midia={midia}
-                aoExcluir={(alvo) => {
-                  if (!window.confirm(`Excluir "${alvo.nome}"? O arquivo sai da biblioteca.`)) return;
-                  excluir(alvo.id).catch((e) => window.alert(e instanceof ErroApi ? e.message : "Não foi possível excluir a mídia."));
-                }}
-              />
-            ))}
-          </div>
-        ) : midias ? (
-          <p className="text-sm text-suave">Nenhuma mídia ainda. Envie o primeiro vídeo acima.</p>
-        ) : null}
-      </section>
+      <SecaoDoHub
+        titulo="Continue criando"
+        acao={
+          <Link href="/app/projetos" className={VER_TUDO}>
+            Todos os projetos <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        }
+      >
+        <ListaProjetos aoCriar={novoVideo} criando={false} limite={7} />
+      </SecaoDoHub>
+
+      <SecaoDoHub
+        titulo="Modelos"
+        acao={
+          <Link href="/app/modelos" className={VER_TUDO}>
+            Ver todos <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
+          {MODELOS_DE_PROJETO.slice(0, 4).map((modelo) => (
+            <CartaoModelo key={modelo.id} modelo={modelo} />
+          ))}
+        </div>
+      </SecaoDoHub>
     </main>
   );
 }

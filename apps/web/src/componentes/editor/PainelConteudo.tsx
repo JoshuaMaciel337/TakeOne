@@ -52,6 +52,8 @@ type Props = {
   aoPrever: (comando: Comando | null) => void;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
+  /** O modelo de projeto que já vem escolhido (o "Usar" da página Modelos do hub). */
+  modeloInicial?: string;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -155,6 +157,7 @@ export function PainelConteudo({
   selecionado,
   aoPrever,
   aoFechar,
+  modeloInicial,
   className = "",
   style,
 }: Props) {
@@ -206,6 +209,7 @@ export function PainelConteudo({
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "modelos" ? (
           <PainelModelos
+            modeloInicial={modeloInicial}
             midias={biblioteca.midias ?? []}
             proporcao={legendas.projeto.proporcao}
             aoExecutar={legendas.aoExecutar}
@@ -213,7 +217,7 @@ export function PainelConteudo({
             aoAvisar={legendas.aoAvisar}
           />
         ) : ferramenta.id === "marca" ? (
-          <PainelMarca midias={biblioteca.midias ?? []} proporcao={legendas.projeto.proporcao} aoExecutar={legendas.aoExecutar} aoAvisar={legendas.aoAvisar} />
+          <PainelMarca midias={biblioteca.midias ?? []} projeto={{ proporcao: legendas.projeto.proporcao, aoExecutar: legendas.aoExecutar }} aoAvisar={legendas.aoAvisar} />
         ) : (
           <EmBreve ferramenta={ferramenta} />
         )}

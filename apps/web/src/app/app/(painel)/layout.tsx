@@ -1,10 +1,5 @@
-import { Cabecalho } from "@/componentes/Cabecalho";
+import { LayoutDoHub } from "@/componentes/hub/LayoutDoHub";
 
 export default function LayoutPainel({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <div className="min-h-dvh min-w-0 overflow-x-clip">
-      <Cabecalho />
-      {children}
-    </div>
-  );
+  return <LayoutDoHub>{children}</LayoutDoHub>;
 }

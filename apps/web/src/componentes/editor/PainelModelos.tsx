@@ -18,6 +18,8 @@ type Props = {
   /** O comando roda quando as mídias dadas (as formas do modelo) aparecem prontas na biblioteca. */
   aoExecutarQuandoProntas: (midiaIds: string[], comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
+  /** O id do modelo que abre já escolhido. */
+  modeloInicial?: string;
 };
 
 /** A faixa de cenas do modelo, em blocos do tamanho de cada uma: o desenho do card. */
@@ -34,9 +36,9 @@ function Roteiro({ modelo, cores }: { modelo: ModeloDeProjeto; cores: string[] }
 }
 
 /** Modelos de projeto: escolher um, pôr a mídia de cada cena e os textos, e ele entra no fim da principal. */
-export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoProntas, aoAvisar }: Props) {
+export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoProntas, aoAvisar, modeloInicial }: Props) {
   const marca = useMarca();
-  const [escolhido, setEscolhido] = useState<ModeloDeProjeto | null>(null);
+  const [escolhido, setEscolhido] = useState<ModeloDeProjeto | null>(() => MODELOS_DE_PROJETO.find((modelo) => modelo.id === modeloInicial) ?? null);
   const [cenas, setCenas] = useState<Record<string, string>>({});
   const [textos, setTextos] = useState<Record<string, string>>({});
   const [aplicando, setAplicando] = useState(false);

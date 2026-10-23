@@ -475,6 +475,16 @@ Cada fase termina com algo que dá para usar e testar.
 - Publicar direto no YouTube, TikTok e Instagram.
 - Colaboração e links de aprovação (do HolyCut).
 
+### Ordem combinada em 22/10/2026 (ondas)
+Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por seções, página inicial com as ferramentas e os projetos, página de todas as ferramentas e biblioteca de modelos com prévia) e dos editores de foto da storytold (PhotoCraft, LightCraft, figcraft), as demandas novas entram junto com os lotes que faltam das 42 funções:
+- [x] Onda 1, o hub: o editor de vídeo vira uma ferramenta do TakeOne. Menu lateral por seções (Criar, Biblioteca, Publicar), página inicial (destaque, ferramentas, "Continue criando" e modelos), "Todas as ferramentas" com abas por tipo, e páginas de Projetos, Mídias, Modelos, Kit de marca, Exportados, Gerar vídeo com IA e Texto em fala. As ferramentas do editor abrem nele, num projeto novo ou recente, já na ferramenta.
+- [ ] Onda 2, biblioteca de modelos com prévia em vídeo gerada pelo nosso render (as mídias de exemplo o dono decide depois; até lá, o desenho padrão), filtros, "Usar este modelo", salvar o próprio projeto como modelo, prévia das 1000 animações e mais modelos (30 a 50).
+- [ ] Onda 3, editor de imagem (primeira versão): projeto de imagem com camadas, tamanhos prontos, o que já existe no vídeo (cor, filtros, efeitos, texto, formas, fundo removido, kit de marca), desfocar o fundo, "Melhorar", exportar PNG, JPG e WebP com a prévia medida, e modelos de imagem.
+- [ ] Onda 4, lote C (imagem e cor): HDR do celular para SDR, vibração, brancos, pretos e níveis, a LUT 3D também na prévia, cor por matiz, nitidez, slip e roll.
+- [ ] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.
+- [ ] Onda 6, lote D (som). Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
+- Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
+
 **Estimativa:**
 - Versão utilizável ao final da fase 3: cerca de 7 a 9 semanas.
 - Paridade com as funções principais do CapCut ao final da fase 6: cerca de 4 a 5 meses.

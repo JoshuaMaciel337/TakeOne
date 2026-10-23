@@ -30,11 +30,13 @@ type Props = {
   /** As imagens prontas da biblioteca: qualquer uma pode ser o primeiro quadro. */
   imagens: Midia[];
   aoPedir: (midia: Midia) => void;
+  /** Na página própria do hub o formulário já começa aberto; no painel do editor, fechado. */
+  abertoDeInicio?: boolean;
 };
 
 /** Gerar um clipe curto com IA (Wan 2.2) a partir de um texto, ou de uma imagem e um texto. Ele entra na biblioteca quando fica pronto. */
-export function GerarVideo({ proporcao, imagens, aoPedir }: Props) {
-  const [aberto, setAberto] = useState(false);
+export function GerarVideo({ proporcao, imagens, aoPedir, abertoDeInicio = false }: Props) {
+  const [aberto, setAberto] = useState(abertoDeInicio);
   const [descricao, setDescricao] = useState("");
   const [formato, setFormato] = useState<Formato>(proporcao in FORMATOS ? (proporcao as Formato) : "16:9");
   const [duracao, setDuracao] = useState<number>(5);

@@ -90,9 +90,10 @@ function novoId(): string {
  * propriedades à direita e linha do tempo embaixo. No celular, a prévia ocupa o
  * topo, as ferramentas viram uma faixa embaixo e o painel abre por cima.
  */
-export function Editor({ projetoId }: { projetoId: string }) {
+/** `ferramentaInicial` e `modeloInicial` vêm do endereço, quando o hub abre o editor numa ferramenta. */
+export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projetoId: string; ferramentaInicial?: string; modeloInicial?: string }) {
   const biblioteca = useMidias();
-  const [ferramenta, setFerramenta] = useState<IdFerramenta>("midia");
+  const [ferramenta, setFerramenta] = useState<IdFerramenta>(() => FERRAMENTAS.find((item) => item.id === ferramentaInicial && !item.emBreve)?.id ?? "midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
   const [midiaId, setMidiaId] = useState<string | null>(null);
   const [selecao, definirSelecao] = useState<string[]>([]);
@@ -413,6 +414,7 @@ export function Editor({ projetoId }: { projetoId: string }) {
           aoAdicionarTexto={(texto) => executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto } })}
           aoPedirAnimacao={pedirAnimacao}
           aoExecutarQuandoProntas={executarQuandoProntas}
+          modeloInicial={modeloInicial}
           selecionado={selecionado}
           aoPrever={preverDoPainel}
           legendas={{

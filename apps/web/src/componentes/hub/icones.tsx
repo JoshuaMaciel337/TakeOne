@@ -1,0 +1,85 @@
+import {
+  Anchor,
+  ArrowLeftRight,
+  AtSign,
+  AudioLines,
+  CalendarDays,
+  Captions,
+  ChartColumn,
+  Clapperboard,
+  Combine,
+  Crosshair,
+  Download,
+  Drum,
+  Eraser,
+  FileCode,
+  FolderOpen,
+  House,
+  Image as ImageIcon,
+  ImagePlus,
+  Images,
+  LayoutGrid,
+  LayoutTemplate,
+  type LucideIcon,
+  Mic,
+  Palette,
+  Pipette,
+  ScanFace,
+  Scissors,
+  Shapes,
+  SlidersHorizontal,
+  Sparkle,
+  Sparkles,
+  Stamp,
+  Type,
+  Volume1,
+  WandSparkles,
+} from "lucide-react";
+import { createElement } from "react";
+
+/** O ícone de cada ferramenta do hub e de cada item do menu, pelo id (lib/hub.ts). */
+const ICONES: Record<string, LucideIcon> = {
+  inicio: House,
+  "editor-video": Clapperboard,
+  "editor-imagem": ImagePlus,
+  "criar-automaticamente": WandSparkles,
+  legendas: Captions,
+  "gerar-video": Sparkles,
+  "texto-em-fala": AudioLines,
+  montar: Combine,
+  modelos: LayoutTemplate,
+  "limpar-fala": Scissors,
+  animacoes: Type,
+  elementos: Shapes,
+  efeitos: Sparkle,
+  transicoes: ArrowLeftRight,
+  filtros: Palette,
+  "remover-fundo": Eraser,
+  "seguir-rosto": ScanFace,
+  "seguir-objeto": Crosshair,
+  estabilizar: Anchor,
+  "tela-verde": Pipette,
+  "fundo-da-foto": ImageIcon,
+  "limpar-voz": Mic,
+  ritmo: Drum,
+  abaixar: Volume1,
+  "efeitos-voz": SlidersHorizontal,
+  "kit-marca": Stamp,
+  "levar-xml": FileCode,
+  ferramentas: LayoutGrid,
+  projetos: FolderOpen,
+  midias: Images,
+  exportados: Download,
+  agenda: CalendarDays,
+  desempenho: ChartColumn,
+  redes: AtSign,
+};
+
+export function iconeDe(id: string): LucideIcon {
+  return ICONES[id] ?? Sparkle;
+}
+
+/** O ícone como componente: criar o componente no meio da renderização (const Icone = iconeDe(id)) o React recusa. */
+export function IconeDe({ id, className }: { id: string; className?: string }) {
+  return createElement(iconeDe(id), { className, "aria-hidden": true });
+}

@@ -59,13 +59,15 @@ export function useNovoProjeto() {
   return { criar, criando, erro };
 }
 
-export function ListaProjetos({ aoCriar, criando }: { aoCriar: () => void; criando: boolean }) {
-  const { projetos, erro, excluir } = useProjetos();
+/** `limite`: só os mais recentes (a página inicial do hub mostra alguns). */
+export function ListaProjetos({ aoCriar, criando, limite }: { aoCriar: () => void; criando: boolean; limite?: number }) {
+  const { projetos: todos, erro, excluir } = useProjetos();
+  const projetos = limite ? todos?.slice(0, limite) : todos;
 
   return (
     <>
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-      <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
         <button
           type="button"
           onClick={aoCriar}
