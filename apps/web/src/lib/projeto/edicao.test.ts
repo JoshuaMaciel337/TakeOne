@@ -18,6 +18,7 @@ import {
   virarClipes,
   chaveLumaClipes,
   arredondarClipes,
+  preencherVaga,
   type Contexto,
   dividirClipes,
   DURACAO_IMAGEM_S,
@@ -955,4 +956,23 @@ test("cantos nos limites; zerados ou null, o campo some", () => {
   projeto = arredondarClipes(projeto, [video.clipeId], { raio: 0, borda: 0, cor: "#ffffff" });
   assert.equal(principal(projeto)[0].cantos, null);
   assert.throws(() => arredondarClipes(projeto, [video.clipeId], { raio: 0.1, borda: 0, cor: "vermelho" }), /Cor/);
+});
+
+test("preencher a vaga troca a mídia do começo, encurta se ela for curta e a principal anda junto", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  projeto = adicionarClipe(projeto, ctx, "video10").projeto;
+  const [primeiro, segundo] = principal(projeto);
+  projeto = ajustarAudio(projeto, [primeiro.id], { voz_limpa: true });
+  projeto = preencherVaga(projeto, ctx, primeiro.id, "video4");
+  conferir(projeto);
+  const [cena, depois] = principal(projeto);
+  assert.deepEqual([cena.midia_id, cena.entrada, cena.duracao, cena.voz_limpa], ["video4", 0, 4 * S, false]);
+  assert.equal(depois.id, segundo.id);
+  assert.equal(depois.inicio, 4 * S, "a principal fecha o espaço");
+  // Uma foto no lugar do vídeo: a duração da vaga fica
+  projeto = preencherVaga(projeto, ctx, depois.id, "foto");
+  assert.equal(principal(projeto)[1].duracao, 10 * S);
+  assert.throws(() => preencherVaga(projeto, ctx, cena.id, "musica"), /vídeo ou uma imagem/);
+  assert.throws(() => preencherVaga(projeto, ctx, "nao-existe", "video4"));
 });

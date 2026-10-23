@@ -2,16 +2,19 @@
 
 import { ArrowRight, Clapperboard, WandSparkles } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { EstadoServidor } from "@/componentes/EstadoServidor";
 import { useAbrirNoEditor } from "@/componentes/hub/AbrirNoEditor";
 import { CartaoFerramenta } from "@/componentes/hub/CartaoFerramenta";
-import { CartaoModelo } from "@/componentes/hub/CartaoModelo";
+import { CartaoModelo, useUsarDaBiblioteca } from "@/componentes/hub/CartaoModelo";
+import { JanelaDoModelo } from "@/componentes/hub/JanelaDoModelo";
 import { SecaoDoHub } from "@/componentes/hub/TituloDaPagina";
 import { ListaProjetos } from "@/componentes/projeto/ListaProjetos";
+import { filtrarItens } from "@/lib/biblioteca";
 import { ferramentaDoHub, NO_INICIO, saudacao } from "@/lib/hub";
-import { MODELOS_DE_PROJETO } from "@/lib/projeto/modelos";
 import { useSessao } from "@/lib/sessao";
+import { useBiblioteca } from "@/lib/useBiblioteca";
 
 const VER_TUDO = "inline-flex items-center gap-1 text-xs font-medium text-suave transition hover:text-texto";
 
@@ -21,6 +24,11 @@ export default function PaginaInicio() {
   const primeiroNome = sessao.usuario.nome.split(" ")[0];
   const criarAutomaticamente = ferramentaDoHub("criar-automaticamente");
   const novoVideo = () => abrirNoEditor({ titulo: "Editor de vídeo", ferramenta: "midia" });
+  const biblioteca = useBiblioteca();
+  const usar = useUsarDaBiblioteca(biblioteca.contarUso);
+  const [aberto, setAberto] = useState<string | null>(null);
+  const populares = biblioteca.projetos ? filtrarItens(biblioteca.projetos, { aba: "todos", busca: "", formato: "", categoria: "", ordem: "populares" }).slice(0, 4) : [];
+  const itemAberto = aberto ? (biblioteca.projetos?.find((item) => item.chave === aberto) ?? null) : null;
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-10 px-5 py-8">
@@ -100,11 +108,12 @@ export default function PaginaInicio() {
         }
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
-          {MODELOS_DE_PROJETO.slice(0, 4).map((modelo) => (
-            <CartaoModelo key={modelo.id} modelo={modelo} />
+          {populares.map((item) => (
+            <CartaoModelo key={item.chave} item={item} aoAbrir={(alvo) => setAberto(alvo.chave)} aoSalvar={biblioteca.salvar} />
           ))}
         </div>
       </SecaoDoHub>
+      {itemAberto ? <JanelaDoModelo item={itemAberto} aoUsar={usar} aoSalvar={biblioteca.salvar} aoExcluir={biblioteca.excluirDoEspaco} aoFechar={() => setAberto(null)} /> : null}
     </main>
   );
 }

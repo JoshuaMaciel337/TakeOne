@@ -54,6 +54,8 @@ type Props = {
   aoFechar: () => void;
   /** O modelo de projeto que já vem escolhido (o "Usar" da página Modelos do hub). */
   modeloInicial?: string;
+  /** A animação que já vem aberta na ferramenta Texto ou Elementos (o "Usar" de uma animação no hub). */
+  animacaoInicial?: string;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -116,14 +118,14 @@ function PainelMidia({
  * Texto). Com uma animação aberta, as formas somem; o painel das animações não sai do lugar na árvore, para
  * o React não o remontar e perder o modelo aberto.
  */
-function PainelElementos({ proporcao, aoPedir, aoAvisar }: { proporcao: string; aoPedir: (midia: Midia) => void; aoAvisar: (mensagem: string) => void }) {
+function PainelElementos({ proporcao, aoPedir, aoAvisar, animacaoInicial }: { proporcao: string; aoPedir: (midia: Midia) => void; aoAvisar: (mensagem: string) => void; animacaoInicial?: string }) {
   const [animacaoAberta, setAnimacaoAberta] = useState(false);
   return (
     <div className="flex flex-col gap-3">
       <div hidden={animacaoAberta}>
         <PainelFormas aoPedir={aoPedir} aoAvisar={aoAvisar} />
       </div>
-      <PainelAnimacoes grupo="elementos" proporcao={proporcao} aoPedir={aoPedir} aoAbrir={setAnimacaoAberta} />
+      <PainelAnimacoes grupo="elementos" proporcao={proporcao} aoPedir={aoPedir} aoAbrir={setAnimacaoAberta} inicial={animacaoInicial} />
     </div>
   );
 }
@@ -158,6 +160,7 @@ export function PainelConteudo({
   aoPrever,
   aoFechar,
   modeloInicial,
+  animacaoInicial,
   className = "",
   style,
 }: Props) {
@@ -187,9 +190,9 @@ export function PainelConteudo({
         ) : ferramenta.id === "audio" ? (
           <PainelAudio aoPedir={aoPedirAnimacao} />
         ) : ferramenta.id === "elementos" ? (
-          <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} />
+          <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} animacaoInicial={animacaoInicial} />
         ) : ferramenta.id === "texto" ? (
-          <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} />
+          <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} animacaoInicial={animacaoInicial} />
         ) : ferramenta.id === "legendas" ? (
           <PainelLegendas {...legendas} />
         ) : ferramenta.id === "transcricao" ? (
@@ -209,6 +212,7 @@ export function PainelConteudo({
           <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} />
         ) : ferramenta.id === "modelos" ? (
           <PainelModelos
+            projeto={legendas.projeto}
             modeloInicial={modeloInicial}
             midias={biblioteca.midias ?? []}
             proporcao={legendas.projeto.proporcao}

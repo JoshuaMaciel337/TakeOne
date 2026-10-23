@@ -235,10 +235,11 @@ export function ferramentasDaCategoria(categoria: CategoriaDaFerramenta | "todas
   return categoria === "todas" ? FERRAMENTAS_DO_HUB : FERRAMENTAS_DO_HUB.filter((ferramenta) => ferramenta.categorias.includes(categoria));
 }
 
-/** O endereço do editor aberto num projeto, já na ferramenta. O modelo, quando há, já vem escolhido. */
-export function enderecoNoEditor(projetoId: string, ferramenta: IdFerramenta, modelo?: string): string {
+/** O endereço do editor aberto num projeto, já na ferramenta. O modelo ou a animação, quando há, já vêm escolhidos. */
+export function enderecoNoEditor(projetoId: string, ferramenta: IdFerramenta, escolhido: { modelo?: string; animacao?: string } = {}): string {
   const busca = new URLSearchParams({ ferramenta });
-  if (modelo) busca.set("modelo", modelo);
+  if (escolhido.modelo) busca.set("modelo", escolhido.modelo);
+  if (escolhido.animacao) busca.set("animacao", escolhido.animacao);
   return `/app/editor/${projetoId}?${busca}`;
 }
 

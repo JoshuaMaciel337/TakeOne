@@ -7,7 +7,8 @@ import { arquivoDaMidia } from "@/lib/api";
 import { criarForma } from "@/lib/elementos";
 import { useMarca } from "@/lib/marca";
 import type { Comando } from "@/lib/projeto/comandos";
-import type { Proporcao } from "@/lib/projeto/modelo";
+import type { Projeto, Proporcao } from "@/lib/projeto/modelo";
+import { vagasQueRestam } from "@/lib/projeto/vagas";
 import { formasDoModelo, MODELOS_DE_PROJETO, type ModeloDeProjeto, planoDoModelo, resolverCor } from "@/lib/projeto/modelos";
 import type { Midia } from "@/lib/tipos";
 
@@ -20,7 +21,59 @@ type Props = {
   aoAvisar: (mensagem: string) => void;
   /** O id do modelo que abre já escolhido. */
   modeloInicial?: string;
+  /** O projeto aberto: criado de um modelo do espaço, a ferramenta mostra o que trocar nele. */
+  projeto?: Projeto;
 };
+
+/** Criado de um modelo do espaço: as mídias e os textos que quem criou marcou para trocar. */
+function PreencherModelo({ projeto, midias, aoExecutar }: { projeto: Projeto; midias: Midia[]; aoExecutar: (comando: Comando) => void }) {
+  const vagas = vagasQueRestam(projeto);
+  if (!vagas.length) return null;
+  const prontas = midias.filter((midia) => midia.status === "pronta" && !midia.elemento && !midia.animacao);
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-destaque/40 bg-destaque/5 p-3">
+      <h3 className="text-xs font-semibold">Preencher “{projeto.modelo_origem?.nome}”</h3>
+      <p className="text-[11px] text-suave">Troque as mídias e os textos marcados por quem criou o modelo; o resto fica como veio.</p>
+      {vagas.map((vaga) =>
+        vaga.tipo === "midia" ? (
+          <label key={vaga.clipe_id} className="flex flex-col gap-1 text-[11px] text-suave">
+            {vaga.rotulo}
+            <select
+              value={vaga.clipe.midia_id ?? ""}
+              disabled={vaga.faixa.travada}
+              onChange={(evento) => aoExecutar({ comando: "clipe.preencher", parametros: { clipeId: vaga.clipe_id, midiaId: evento.currentTarget.value } })}
+              className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto outline-none focus:border-destaque"
+            >
+              {prontas
+                .filter((midia) => (vaga.faixa.tipo === "audio" ? midia.audio && !midia.video : midia.video))
+                .map((midia) => (
+                  <option key={midia.id} value={midia.id}>
+                    {midia.nome}
+                  </option>
+                ))}
+              {prontas.some((midia) => midia.id === vaga.clipe.midia_id) ? null : <option value={vaga.clipe.midia_id ?? ""}>(a mídia do modelo)</option>}
+            </select>
+          </label>
+        ) : (
+          <label key={vaga.clipe_id} className="flex flex-col gap-1 text-[11px] text-suave">
+            {vaga.rotulo}
+            <textarea
+              key={vaga.clipe.texto?.conteudo}
+              defaultValue={vaga.clipe.texto?.conteudo ?? ""}
+              rows={2}
+              disabled={vaga.faixa.travada}
+              onBlur={(evento) => {
+                const conteudo = evento.currentTarget.value;
+                if (conteudo.trim() && conteudo !== vaga.clipe.texto?.conteudo) aoExecutar({ comando: "texto.mudar", parametros: { clipeIds: [vaga.clipe_id], texto: { conteudo } } });
+              }}
+              className="resize-y rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto outline-none focus:border-destaque"
+            />
+          </label>
+        ),
+      )}
+    </section>
+  );
+}
 
 /** A faixa de cenas do modelo, em blocos do tamanho de cada uma: o desenho do card. */
 function Roteiro({ modelo, cores }: { modelo: ModeloDeProjeto; cores: string[] }) {
@@ -36,7 +89,7 @@ function Roteiro({ modelo, cores }: { modelo: ModeloDeProjeto; cores: string[] }
 }
 
 /** Modelos de projeto: escolher um, pôr a mídia de cada cena e os textos, e ele entra no fim da principal. */
-export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoProntas, aoAvisar, modeloInicial }: Props) {
+export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoProntas, aoAvisar, modeloInicial, projeto }: Props) {
   const marca = useMarca();
   const [escolhido, setEscolhido] = useState<ModeloDeProjeto | null>(() => MODELOS_DE_PROJETO.find((modelo) => modelo.id === modeloInicial) ?? null);
   const [cenas, setCenas] = useState<Record<string, string>>({});
@@ -79,6 +132,7 @@ export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoP
   if (!escolhido) {
     return (
       <div className="flex flex-col gap-2">
+        {projeto ? <PreencherModelo projeto={projeto} midias={midias} aoExecutar={aoExecutar} /> : null}
         <p className="text-[11px] text-suave">Projetos prontos: escolha um, troque as mídias e os textos, e ele entra no fim da linha do tempo.</p>
         {MODELOS_DE_PROJETO.map((modelo) => {
           const duracao = modelo.cenas.reduce((soma, cena) => soma + cena.duracaoS, 0);

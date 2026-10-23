@@ -20,6 +20,8 @@ export type PedidoDoEditor = {
   ondeFica?: string;
   /** Um modelo de projeto já escolhido; o projeto novo nasce na proporção dele. */
   modelo?: { id: string; proporcao: Proporcao };
+  /** Uma animação já escolhida na ferramenta Texto ou Elementos. */
+  animacao?: string;
 };
 
 const Contexto = createContext<(pedido: PedidoDoEditor) => void>(() => undefined);
@@ -47,7 +49,10 @@ function JanelaAbrirNoEditor({ pedido, aoFechar }: { pedido: PedidoDoEditor; aoF
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState("");
   const recentes = useMemo(() => (projetos ?? []).slice(0, 6), [projetos]);
-  const abrir = useCallback((id: string) => router.push(enderecoNoEditor(id, pedido.ferramenta, pedido.modelo?.id)), [router, pedido]);
+  const abrir = useCallback(
+    (id: string) => router.push(enderecoNoEditor(id, pedido.ferramenta, { modelo: pedido.modelo?.id, animacao: pedido.animacao })),
+    [router, pedido],
+  );
 
   useEffect(() => {
     const fechar = (evento: KeyboardEvent) => {

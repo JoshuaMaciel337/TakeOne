@@ -49,6 +49,7 @@ import {
   mesclarClipes,
   virarClipes,
   arredondarClipes,
+  preencherVaga,
   aplicarEfeito,
   chromaClipes,
   chaveLumaClipes,
@@ -101,6 +102,7 @@ export type Comando =
   | { comando: "clipe.mesclar"; parametros: { clipeIds: string[]; mesclagem: Mesclagem } }
   | { comando: "clipe.virar"; parametros: { clipeIds: string[]; sentido: keyof Virar } }
   | { comando: "clipe.cantos"; parametros: { clipeIds: string[]; cantos: Cantos | null } }
+  | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
   | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
@@ -154,6 +156,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mesclar": "mudar a mesclagem",
   "clipe.virar": "virar o clipe",
   "clipe.cantos": "mudar os cantos",
+  "clipe.preencher": "trocar a mídia do modelo",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
   "clipe.chaveLuma": "mudar a chave de luminância",
@@ -245,6 +248,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: virarClipes(projeto, parametros.clipeIds, parametros.sentido) };
     case "clipe.cantos":
       return { projeto: arredondarClipes(projeto, parametros.clipeIds, parametros.cantos) };
+    case "clipe.preencher":
+      return { projeto: preencherVaga(projeto, ctx, parametros.clipeId, parametros.midiaId), selecao: [parametros.clipeId] };
     case "clipe.abaixar":
       return { projeto: abaixarClipe(projeto, parametros.clipeId, parametros.abaixamento) };
     case "clipe.reenquadrar":

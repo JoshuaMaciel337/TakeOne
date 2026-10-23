@@ -58,6 +58,8 @@ export type ModeloDeProjeto = {
   nome: string;
   descricao: string;
   categoria: string;
+  /** Aparece na aba Destaques da biblioteca e antes dos outros, sem uso nenhum, nos populares. */
+  destaque?: boolean;
   proporcao: Proporcao;
   /** As cores no lugar das da marca, na ordem de "@1", "@2"... */
   paleta: string[];
@@ -177,6 +179,7 @@ const ESCURO = "#141821";
 export const MODELOS_DE_PROJETO: ModeloDeProjeto[] = [
   {
     id: "tres-dicas",
+    destaque: true,
     nome: "Três dicas",
     descricao: "Um título, uma dica por cena e a chamada para seguir no fim.",
     categoria: "Redes sociais",
@@ -215,6 +218,7 @@ export const MODELOS_DE_PROJETO: ModeloDeProjeto[] = [
   },
   {
     id: "produto",
+    destaque: true,
     nome: "Anúncio de produto",
     descricao: "O produto com o nome, o preço numa estrela e o botão de comprar.",
     categoria: "Vendas",
@@ -237,6 +241,7 @@ export const MODELOS_DE_PROJETO: ModeloDeProjeto[] = [
   },
   {
     id: "abertura",
+    destaque: true,
     nome: "Abertura de vídeo",
     descricao: "Título letra a letra com uma linha na cor da marca, e a entrada no vídeo.",
     categoria: "Abertura",

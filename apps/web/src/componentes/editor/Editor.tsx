@@ -20,6 +20,7 @@ import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
 import { JanelaAtalhos } from "./JanelaAtalhos";
 import { JanelaColarAjustes } from "./JanelaColarAjustes";
+import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
 import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
@@ -90,8 +91,10 @@ function novoId(): string {
  * propriedades à direita e linha do tempo embaixo. No celular, a prévia ocupa o
  * topo, as ferramentas viram uma faixa embaixo e o painel abre por cima.
  */
-/** `ferramentaInicial` e `modeloInicial` vêm do endereço, quando o hub abre o editor numa ferramenta. */
-export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projetoId: string; ferramentaInicial?: string; modeloInicial?: string }) {
+type PropsDoEditor = { projetoId: string; ferramentaInicial?: string; modeloInicial?: string; animacaoInicial?: string };
+
+/** `ferramentaInicial`, `modeloInicial` e `animacaoInicial` vêm do endereço, quando o hub abre o editor numa ferramenta. */
+export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoInicial }: PropsDoEditor) {
   const biblioteca = useMidias();
   const [ferramenta, setFerramenta] = useState<IdFerramenta>(() => FERRAMENTAS.find((item) => item.id === ferramentaInicial && !item.emBreve)?.id ?? "midia");
   const [painelNoCelular, setPainelNoCelular] = useState(false);
@@ -110,6 +113,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projet
   const [ima, setIma] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [vendoAtalhos, setVendoAtalhos] = useState(false);
+  const [salvandoModelo, setSalvandoModelo] = useState(false);
   // O clipe de onde saem os ajustes enquanto a janela "Colar ajustes" está aberta
   const [colandoAjustes, setColandoAjustes] = useState<ClipeCopiado | null>(null);
   // Os clipes copiados (Ctrl+C), na memória desta aba; o primeiro é a origem do "Colar ajustes"
@@ -305,7 +309,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projet
     const deslizante = alvo instanceof HTMLInputElement && alvo.type === "range";
     const doDeslizante = deslizante && (tecla.startsWith("arrow") || tecla === "home" || tecla === "end" || tecla === "pageup" || tecla === "pagedown");
     const campo = alvo?.closest("input, textarea, select, [contenteditable], [role=dialog]");
-    if (!projeto || exportando || vendoAtalhos || colandoAjustes || doDeslizante || (campo && !deslizante)) return;
+    if (!projeto || exportando || vendoAtalhos || colandoAjustes || salvandoModelo || doDeslizante || (campo && !deslizante)) return;
     if (deslizante && evento.code === "Space") alvo.blur();
     const quadro = duracaoDoQuadro(projeto.taxa);
 
@@ -390,6 +394,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projet
         aoDesfazer={desfazer}
         aoRefazer={refazer}
         aoExportar={() => setExportando(true)}
+        aoSalvarModelo={() => setSalvandoModelo(true)}
       />
 
       <div className="flex min-h-0 flex-1 max-md:flex-col">
@@ -415,6 +420,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projet
           aoPedirAnimacao={pedirAnimacao}
           aoExecutarQuandoProntas={executarQuandoProntas}
           modeloInicial={modeloInicial}
+          animacaoInicial={animacaoInicial}
           selecionado={selecionado}
           aoPrever={preverDoPainel}
           legendas={{
@@ -533,6 +539,17 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial }: { projet
       </div>
 
       {vendoAtalhos ? <JanelaAtalhos aoFechar={() => setVendoAtalhos(false)} /> : null}
+      {salvandoModelo ? (
+        <JanelaSalvarModelo
+          projetoId={projetoId}
+          projeto={projeto}
+          nome={edicao.nome}
+          midias={bibliotecaDoEditor.midias ?? []}
+          salvamento={edicao.salvamento}
+          aoFechar={() => setSalvandoModelo(false)}
+          aoSalvo={mostrarAviso}
+        />
+      ) : null}
       {colandoAjustes ? (
         <JanelaColarAjustes
           quantos={selecaoValida.filter((id) => id !== colandoAjustes.clipe.id).length}

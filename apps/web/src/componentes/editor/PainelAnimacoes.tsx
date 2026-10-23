@@ -50,10 +50,12 @@ type PropsDoPainel = Props & {
   grupo: GrupoDeAnimacoes;
   /** Avisa quando um modelo é aberto ou fechado, para o painel de fora esconder o resto enquanto ele está aberto. */
   aoAbrir?: (aberto: boolean) => void;
+  /** O id da animação que abre já escolhida, quando a lista chega (o "Usar" de uma animação no hub). */
+  inicial?: string;
 };
 
-/** A animação tocando, na mesma página que o worker grava, encolhida para caber no painel. */
-function Previa({ endereco, proporcao }: { endereco: string; proporcao: string }) {
+/** A animação tocando, na mesma página que o worker grava, encolhida para caber no painel (e nos cartões do hub). */
+export function PreviaDaAnimacao({ endereco, proporcao, alturaMaxima = 320 }: { endereco: string; proporcao: string; alturaMaxima?: number }) {
   const caixa = useRef<HTMLDivElement>(null);
   const [largura, setLargura] = useState(0);
   const [w, h] = QUADROS[proporcao] ?? QUADROS["16:9"];
@@ -71,7 +73,7 @@ function Previa({ endereco, proporcao }: { endereco: string; proporcao: string }
       className="relative w-full overflow-hidden rounded-md border border-borda"
       style={{
         aspectRatio: `${w} / ${h}`,
-        maxHeight: 320,
+        maxHeight: alturaMaxima,
         background: "repeating-conic-gradient(#2a2d36 0% 25%, #1c1e25 0% 50%) 50% / 16px 16px",
       }}
     >
@@ -151,7 +153,7 @@ function DescreverAnimacao({ proporcao, aoPedir }: Props) {
  * Modelos prontos que viram um clipe com transparência. A biblioteca é uma só; cada ferramenta mostra o seu
  * grupo: os textos animados na ferramenta Texto e o resto (chamadas, números, logos, fundos...) em Elementos.
  */
-export function PainelAnimacoes({ proporcao, aoPedir, grupo, aoAbrir }: PropsDoPainel) {
+export function PainelAnimacoes({ proporcao, aoPedir, grupo, aoAbrir, inicial }: PropsDoPainel) {
   const [todos, setTodos] = useState<Modelo[] | null>(null);
   const [erro, setErro] = useState("");
   const [escolhido, setEscolhido] = useState<Modelo | null>(null);
@@ -167,9 +169,18 @@ export function PainelAnimacoes({ proporcao, aoPedir, grupo, aoAbrir }: PropsDoP
 
   useEffect(() => {
     chamarApi<Modelo[]>("/animacoes/modelos")
-      .then(setTodos)
+      .then((lista) => {
+        setTodos(lista);
+        // Vindo do "Usar" do hub: a animação já abre escolhida, com os campos e a duração dela
+        const alvo = inicial ? lista.find((m) => m.id === inicial && DO_GRUPO[grupo](m.categoria)) : undefined;
+        if (!alvo) return;
+        setEscolhido(alvo);
+        setCampos(Object.fromEntries(alvo.campos.map((campo) => [campo.id, campo.padrao])));
+        setDuracao(alvo.duracao);
+        aoAbrir?.(true);
+      })
       .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não foi possível carregar as animações."));
-  }, []);
+  }, [inicial, grupo, aoAbrir]);
   const modelos = useMemo(() => todos?.filter((m) => DO_GRUPO[grupo](m.categoria)) ?? null, [todos, grupo]);
 
   const consulta = useMemo(
@@ -294,7 +305,7 @@ export function PainelAnimacoes({ proporcao, aoPedir, grupo, aoAbrir }: PropsDoP
       </button>
       <h3 className="text-sm font-semibold">{escolhido.nome}</h3>
       <p className="-mt-2 text-[11px] text-suave">{escolhido.descricao}</p>
-      {endereco ? <Previa endereco={endereco} proporcao={proporcao} /> : null}
+      {endereco ? <PreviaDaAnimacao endereco={endereco} proporcao={proporcao} /> : null}
       {marca.cores.length && camposDeCor.length ? (
         <button
           type="button"

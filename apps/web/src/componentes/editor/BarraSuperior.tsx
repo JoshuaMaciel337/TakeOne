@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2 } from "lucide-react";
+import { BookmarkPlus, Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
 
 import { BotaoTema } from "@/componentes/BotaoTema";
@@ -20,6 +20,7 @@ type Props = {
   aoDesfazer: () => void;
   aoRefazer: () => void;
   aoExportar: () => void;
+  aoSalvarModelo: () => void;
 };
 
 const SALVAMENTO: Record<EstadoSalvamento, { texto: string; icone: typeof Check; cor: string; dica?: string }> = {
@@ -52,6 +53,7 @@ export function BarraSuperior({
   aoDesfazer,
   aoRefazer,
   aoExportar,
+  aoSalvarModelo,
 }: Props) {
   const status = SALVAMENTO[salvamento];
   const Icone = status.icone;
@@ -127,6 +129,9 @@ export function BarraSuperior({
         ))}
       </select>
 
+      <button type="button" className="botao-icone shrink-0" onClick={aoSalvarModelo} aria-label="Salvar como modelo" title="Salvar como modelo (fica na biblioteca do espaço)">
+        <BookmarkPlus className="size-4" aria-hidden />
+      </button>
       <button type="button" className="botao-principal shrink-0 px-3 py-1.5" onClick={aoExportar} title="Exportar o vídeo">
         <Download className="size-4" aria-hidden />
         <span className="hidden sm:inline">Exportar</span>

@@ -158,6 +158,9 @@ export type Faixa = {
   clipes: Clipe[];
 };
 
+/** Um clipe do modelo do espaço que quem usa troca: a mídia dele ou o texto dele. */
+export type VagaDoModelo = { clipe_id: string; tipo: "midia" | "texto"; rotulo: string };
+
 export type Projeto = {
   id: string;
   nome: string;
@@ -167,6 +170,8 @@ export type Projeto = {
   faixas: Faixa[];
   versao: number;
   duracao: Tick;
+  /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
+  modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;
   atualizado_em: string;
 };

@@ -36,6 +36,7 @@ test("o item marcado no menu é o mais específico", () => {
 
 test("endereço do editor e saudação", () => {
   assert.equal(enderecoNoEditor("p1", "legendas"), "/app/editor/p1?ferramenta=legendas");
-  assert.equal(enderecoNoEditor("p1", "modelos", "tres-dicas"), "/app/editor/p1?ferramenta=modelos&modelo=tres-dicas");
+  assert.equal(enderecoNoEditor("p1", "modelos", { modelo: "tres-dicas" }), "/app/editor/p1?ferramenta=modelos&modelo=tres-dicas");
+  assert.equal(enderecoNoEditor("p1", "texto", { animacao: "tarja-nome" }), "/app/editor/p1?ferramenta=texto&animacao=tarja-nome");
   assert.deepEqual([saudacao(4), saudacao(9), saudacao(13), saudacao(20)], ["Boa noite", "Bom dia", "Boa tarde", "Boa noite"]);
 });

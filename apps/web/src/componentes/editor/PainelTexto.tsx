@@ -50,7 +50,7 @@ type Props = {
  * Painel da ferramenta Texto: um texto em branco ou um dos estilos prontos, no cursor, e embaixo os textos
  * animados da biblioteca (títulos, tarjas e citações). Com um texto animado aberto, só ele aparece.
  */
-export function PainelTexto({ aoAdicionar, proporcao, aoPedir }: Props) {
+export function PainelTexto({ aoAdicionar, proporcao, aoPedir, animacaoInicial }: Props & { animacaoInicial?: string }) {
   const [animadoAberto, setAnimadoAberto] = useState(false);
   // O painel das animações fica sempre no mesmo lugar da árvore (só o resto some), senão o React o remontaria
   // e o texto animado aberto se perderia
@@ -77,7 +77,7 @@ export function PainelTexto({ aoAdicionar, proporcao, aoPedir }: Props) {
           </button>
         ))}
       </div>
-      <PainelAnimacoes grupo="texto" proporcao={proporcao} aoPedir={aoPedir} aoAbrir={setAnimadoAberto} />
+      <PainelAnimacoes grupo="texto" proporcao={proporcao} aoPedir={aoPedir} aoAbrir={setAnimadoAberto} inicial={animacaoInicial} />
     </div>
   );
 }

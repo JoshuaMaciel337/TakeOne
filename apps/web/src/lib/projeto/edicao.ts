@@ -433,6 +433,41 @@ export function trocarMidiaDosClipes(projeto: Projeto, ctx: Contexto, clipeIds: 
   });
 }
 
+/**
+ * Preenche uma vaga de mídia de um modelo do espaço: o clipe passa a mostrar a mídia escolhida, do começo dela,
+ * e encurta se ela for mais curta (a principal anda junto). O que era gerado para a mídia antiga (voz limpa,
+ * imagem sem ruído, estável, recorte do fundo, tom) sai; o resto do clipe (posição, cor, efeitos, animações) fica.
+ */
+export function preencherVaga(projeto: Projeto, ctx: Contexto, clipeId: string, midiaId: string): Projeto {
+  const { faixa, clipe, indice } = acharOuErro(projeto, clipeId);
+  exigirDestravada(faixa);
+  if (clipe.texto) throw new ErroEdicao("Esta vaga é de texto.");
+  const info = ctx.midia(midiaId);
+  if (!info) throw new ErroEdicao("A mídia ainda não está pronta.");
+  if (!combina(faixa.tipo, info)) throw new ErroEdicao(faixa.tipo === "audio" ? "Escolha um áudio para esta vaga." : "Escolha um vídeo ou uma imagem para esta vaga.");
+  const velocidade = info.imagem ? 1 : clipe.velocidade;
+  const cabe = Number.isFinite(info.duracao) ? Math.max(duracaoDoQuadro(projeto.taxa), ajustarAoQuadro(projeto.taxa, info.duracao / velocidade)) : Number.POSITIVE_INFINITY;
+  const duracao = Math.min(clipe.duracao, cabe);
+  const novo: Clipe = {
+    ...clipe,
+    midia_id: midiaId,
+    entrada: 0,
+    duracao,
+    velocidade,
+    // A curva era do ritmo do vídeo antigo; com outro tamanho, ela sai
+    curva_velocidade: duracao === clipe.duracao && !info.imagem ? clipe.curva_velocidade : null,
+    voz_limpa: false,
+    imagem_limpa: false,
+    estabilizar: false,
+    remover_fundo: false,
+    tom: 0,
+  };
+  const clipes = [...faixa.clipes];
+  clipes[indice] = novo;
+  const alterada = { ...faixa, clipes };
+  return finalizar(trocarFaixa(projeto, faixa.tipo === "principal" ? compactar(alterada) : alterada));
+}
+
 /** Zoom lento das imagens nas cenas de um modelo, para a foto não ficar parada. */
 const ZOOM_LENTO = 1.12;
 
