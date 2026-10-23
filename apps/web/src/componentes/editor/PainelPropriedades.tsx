@@ -626,7 +626,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
-        {!clipe.texto && midia?.video && (!midia.imagem || !comTempo) && !midia.elemento ? (
+        {!clipe.texto && midia?.video && (!midia.imagem || !comTempo) && !midia.elemento && !midia.camada_pixels ? (
           <RemoverFundo
             clipe={clipe}
             midia={midia}

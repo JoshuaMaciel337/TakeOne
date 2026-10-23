@@ -8,7 +8,7 @@ import { exportarImagem, FORMATOS_DA_IMAGEM, type FormatoDaImagem } from "@/lib/
 import { useEnvios } from "@/lib/envios";
 import { formatarBytes } from "@/lib/formatar";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
-import type { Projeto } from "@/lib/projeto/modelo";
+import type { Clipe, Projeto } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 const ESCALAS = [0.5, 1, 2];
@@ -24,6 +24,9 @@ type Props = {
   midias: ReadonlyMap<string, Midia>;
   aoFechar: () => void;
   aoAvisar: (mensagem: string) => void;
+  /** Antes de gerar: espera a pintura que ainda está subindo (o projeto da hora vem depois dela). */
+  aoPrepararPintura?: () => Promise<Projeto>;
+  fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
 };
 
 /** Nome de arquivo sem os caracteres que os sistemas recusam. */
@@ -32,7 +35,7 @@ function nomeDoArquivo(nome: string, formato: FormatoDaImagem): string {
 }
 
 /** Exportar: o formato, o tamanho e a qualidade; baixar o arquivo ou mandar para a biblioteca, para usar nos vídeos. */
-export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar }: Props) {
+export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar, aoPrepararPintura, fonteDosPixels }: Props) {
   const { iniciar } = useEnvios();
   const [formato, setFormato] = useState<FormatoDaImagem>("png");
   const [escala, setEscala] = useState(1);
@@ -54,10 +57,12 @@ export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar
     setGerando(destino);
     setErro("");
     try {
-      const blob = await exportarImagem(projeto, midias, {
+      const atual = aoPrepararPintura ? await aoPrepararPintura() : projeto;
+      const blob = await exportarImagem(atual, midias, {
         formato,
         qualidade,
         escala,
+        fonteDosPixels,
       });
       const arquivo = nomeDoArquivo(nome, formato);
       if (destino === "baixar") {

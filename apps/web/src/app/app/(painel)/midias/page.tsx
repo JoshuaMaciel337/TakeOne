@@ -11,7 +11,7 @@ import { useMidias } from "@/lib/useMidias";
 export default function PaginaMidias() {
   const { midias, erro, excluir } = useMidias();
   // As formas desenhadas para os clipes não são da biblioteca
-  const daBiblioteca = midias?.filter((midia) => !midia.elemento) ?? null;
+  const daBiblioteca = midias?.filter((midia) => !midia.elemento && !midia.camada_pixels) ?? null;
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">

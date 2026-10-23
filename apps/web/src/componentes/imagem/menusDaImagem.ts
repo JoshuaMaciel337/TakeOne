@@ -98,6 +98,8 @@ export type AcoesDosMenus = {
   duplicar: () => void;
   excluir: () => void;
   apagarOcultas: () => void;
+  /** Camada › Novo › Camada (Ctrl+Shift+N): uma camada de pixels vazia. */
+  novaCamada: () => void;
   apagarVazias: () => void;
   selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
@@ -173,6 +175,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         {
           nome: "Novo",
           itens: [
+            { nome: "Camada…", atalho: "Ctrl+Shift+N", aoEscolher: a.novaCamada },
             { nome: "Grupo", aoEscolher: a.grupo },
             { nome: "Grupo a partir das camadas…", desativado: semCamada, aoEscolher: a.agrupar },
             "-",

@@ -25,7 +25,7 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { executarComando } from "@/lib/projeto/comandos";
 import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
-import { camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
+import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, MASCARA_PADRAO, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
@@ -37,7 +37,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DE_PINTURA, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
@@ -47,6 +47,10 @@ import { PainelAjustes, PainelAmostras, PainelBiblioteca, PainelCor, PainelModel
 import { PreviaDaImagem, proximoZoom } from "./PreviaDaImagem";
 import { PropriedadesDoDocumento } from "./PropriedadesDoDocumento";
 import { useObjeto } from "./useObjeto";
+import { usePinturas } from "./usePinturas";
+import type { AlvoDaPintura } from "./PinturaNaPrevia";
+import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO } from "@/lib/pintura/traco";
+import { criarCamadaDePixels } from "@/lib/pixels";
 
 const SEM_SEGUIR = {
   marcando: null,
@@ -96,7 +100,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const router = useRouter();
   const marca = useMarca();
   const biblioteca = useMidias();
-  const midias = useMemo(() => new Map((biblioteca.midias ?? []).map((midia) => [midia.id, midia])), [biblioteca.midias]);
+  // As camadas de pixels criadas agora entram aqui antes da biblioteca recarregar (a pessoa já está pintando)
+  const [criadas, setCriadas] = useState<ReadonlyMap<string, Midia>>(new Map());
+  const midias = useMemo(() => new Map([...criadas, ...(biblioteca.midias ?? []).map((midia) => [midia.id, midia] as const)]), [biblioteca.midias, criadas]);
   const ctx = useMemo(() => contextoDasMidias(midias), [midias]);
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
@@ -112,6 +118,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [pedindo, setPedindo] = useState(false);
   const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
 
+  // As opções de cada ferramenta de pintura (o pincel e a borracha guardam tamanhos diferentes, como lá)
+  const [pinceis, setPinceis] = useState<Record<FerramentaDePintura, OpcoesDoPincel>>({
+    pincel: PINCEL_PADRAO,
+    lapis: { ...PINCEL_PADRAO, tamanho: 4, dureza: 1, espacamento: 0.1, suavizacao: 0 },
+    borracha: { ...PINCEL_PADRAO, tamanho: 40 },
+  });
   const [selecao, definirSelecao] = useState<string[]>([]);
   const [exportando, setExportando] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
@@ -140,6 +152,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     [executarNoProjeto, setSelecao],
   );
+  const pinturas = usePinturas({ executar, aoAvisar: mostrarAviso });
+  // O projeto mais novo, para quem espera a pintura subir (a exportação) ler o que veio depois
+  const projetoRef = useRef(projeto);
+  useEffect(() => {
+    projetoRef.current = projeto;
+  });
+  /** Desfazer e refazer esperam a pintura que ainda está subindo: o traço vira um passo antes. */
+  const depoisDaPintura = (acao: () => void) => (pinturas.enviando ? void pinturas.esperar().then(acao) : acao());
   const projetoNaTela = useMemo(() => {
     if (!projeto || !provisorio) return projeto;
     try {
@@ -224,7 +244,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // Uma pasta não tem imagem: as propriedades, os filtros e as fotos valem só para as outras camadas
   const selecionado = escolhidoNaTela?.clipe.pasta ? null : escolhidoNaTela;
   const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
-  const foto = midiaDoClipe?.imagem && !midiaDoClipe.elemento && !midiaDoClipe.animacao ? midiaDoClipe : null;
+  const foto = midiaDoClipe?.imagem && !midiaDoClipe.elemento && !midiaDoClipe.camada_pixels && !midiaDoClipe.animacao ? midiaDoClipe : null;
   const objeto = useObjeto(selecionado?.clipe ?? null, midiaDoClipe);
   const temSelecao = Boolean(objeto.selecao) || objeto.temPincel;
   const camadaEscolhida = projeto && selecionado ? camadasDaImagem(projeto).find(({ clipe }) => clipe.id === selecionado.clipe.id) : undefined;
@@ -303,6 +323,58 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (executar({ comando: "clipe.efeito", parametros: { clipeIds: [selecionado.clipe.id], efeito: { tipo: efeito, intensidade: INTENSIDADE_PADRAO } } })) area.abrir("filtros");
   };
   const mudarZoom = (para: "mais" | "menos" | "ajustar" | 1) => setZoom(para === "ajustar" ? null : para === 1 ? 1 : proximoZoom(zoom ?? zoomMedido, para === "mais" ? 1 : -1));
+  /** Uma camada de pixels vazia, do tamanho da imagem, acima da escolhida. Devolve o clipe dela. */
+  const novaCamada = async (): Promise<string | null> => {
+    if (!projeto) return null;
+    const { largura, altura } = tamanhoDaImagem(projeto);
+    const numero = projeto.faixas.filter((faixa) => faixa.clipes[0]?.pixels).length + 1;
+    const nome = `Camada ${numero}`;
+    try {
+      const midia = await criarCamadaDePixels(largura, altura, nome);
+      setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
+      void biblioteca.recarregar();
+      const acima = escolhidas[0]?.id ?? null;
+      const resultado = executar({ comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome, acima } });
+      // Quem pinta logo em seguida procura a camada nova antes da tela desenhar de novo
+      if (resultado) projetoRef.current = resultado.projeto;
+      return resultado?.selecao?.[0] ?? null;
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar a camada.");
+      return null;
+    }
+  };
+  /**
+   * A camada do traço: a de pixels escolhida, ou uma nova acima da escolhida (como pintar numa foto ou num texto não
+   * muda a foto nem o texto). As travas de tudo e de pixels recusam; a de transparência só segura o alfa.
+   */
+  const alvoDaPintura = async (): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
+    const atual = projetoRef.current;
+    if (!atual) return null;
+    let clipeId = selecionado?.clipe.pixels ? selecionado.clipe.id : null;
+    if (!clipeId) clipeId = await novaCamada();
+    const achado = clipeId && projetoRef.current ? acharClipe(projetoRef.current, clipeId) : null;
+    if (!achado?.clipe.midia_id || !achado.clipe.pixels) return null;
+    const projetoAgora = projetoRef.current ?? atual;
+    if (camadaTravada(projetoAgora, achado.faixa)) {
+      mostrarAviso("A camada está travada. Destrave o cadeado para pintar.");
+      return null;
+    }
+    if (achado.faixa.travas?.pixels) {
+      mostrarAviso("Os pixels desta camada estão travados (painel Camadas).");
+      return null;
+    }
+    const midia = midias.get(achado.clipe.midia_id);
+    const tamanhoDaCamada = midia?.camada_pixels ?? tamanhoDaImagem(projetoAgora);
+    try {
+      const pintura = await pinturas.preparar(achado.clipe, tamanhoDaCamada);
+      return { clipeId: achado.clipe.id, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia) };
+    } catch {
+      mostrarAviso("Não foi possível abrir a camada para pintar. Tente de novo.");
+      return null;
+    }
+  };
+  const ferramentaDePintura = FERRAMENTAS_DE_PINTURA.has(ferramenta) ? (ferramenta as FerramentaDePintura) : null;
+  const mudarPincel = (mudanca: Partial<OpcoesDoPincel>) => ferramentaDePintura && setPinceis((atual) => ({ ...atual, [ferramentaDePintura]: { ...atual[ferramentaDePintura], ...mudanca } }));
   const ordenar = (para: "topo" | "cima" | "baixo" | "fundo") => {
     // Várias: cada uma anda entre as irmãs dela; para cima, a de cima anda primeiro (e o contrário para baixo)
     const ordem = para === "cima" || para === "fundo" ? escolhidas : [...escolhidas].reverse();
@@ -353,8 +425,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     abrir: () => router.push("/app/ferramentas/editor-de-imagem"),
     exportar: () => setExportando(true),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
-    desfazer,
-    refazer,
+    desfazer: () => depoisDaPintura(desfazer),
+    refazer: () => depoisDaPintura(refazer),
+    novaCamada: () => void novaCamada(),
     ferramenta: escolherFerramenta,
     ajuste: criarAjuste,
     documento: () => {
@@ -422,7 +495,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (alvo.closest("input, textarea, select, [contenteditable='true'], [role='menu']")) return;
     if (evento.ctrlKey || evento.metaKey || evento.altKey) return;
     const tecla = evento.key.length === 1 ? evento.key.toUpperCase() : evento.key;
-    // Os números dão a opacidade das escolhidas (1 é 10%, 0 é 100%), fora das ferramentas de pintar e de seleção
+    // Com uma ferramenta de pintura, os números dão a opacidade dela; fora delas, a das camadas escolhidas
+    if (/^[0-9]$/.test(tecla) && ferramentaDePintura) {
+      mudarPincel({ opacidade: tecla === "0" ? 1 : Number(tecla) / 10 });
+      evento.preventDefault();
+      return;
+    }
     if (/^[0-9]$/.test(tecla) && escolhidas.length && !MODO_DA_SELECAO[ferramenta]) {
       const clipeIds = escolhidas.filter((faixa) => !faixa.travada).map((faixa) => faixa.clipes[0].id);
       if (clipeIds.length) executar({ comando: "clipe.transformar", parametros: { clipeIds, transformacao: { opacidade: tecla === "0" ? 1 : Number(tecla) / 10 } } });
@@ -441,6 +519,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } else if (tecla === "D") setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }));
     else if (tecla === "X") setCores((atual) => ({ ...atual, primeiroPlano: atual.fundo, fundo: atual.primeiroPlano }));
     else if ((tecla === "[" || tecla === "]") && ferramenta === "remover") objeto.setTamanhoDoPincel(Math.min(0.2, Math.max(0.01, objeto.tamanhoDoPincel * (tecla === "]" ? 1.25 : 0.8))));
+    else if (ferramentaDePintura && (tecla === "[" || tecla === "]" || tecla === "{" || tecla === "}")) {
+      const opcoes = pinceis[ferramentaDePintura];
+      const maior = tecla === "]" || tecla === "}";
+      if (evento.shiftKey || tecla === "{" || tecla === "}") mudarPincel({ dureza: Math.min(1, Math.max(0, Math.round((opcoes.dureza + (maior ? 0.25 : -0.25)) * 4) / 4)) });
+      else {
+        // Os degraus dos editores de imagem: de 1 em 1 até 10, de 10 em 10 até 100, depois maiores
+        const t = opcoes.tamanho;
+        const passo = t < 10 ? 1 : t < 100 ? 10 : t < 200 ? 25 : t < 500 ? 50 : 100;
+        mudarPincel({ tamanho: Math.min(5000, Math.max(1, maior ? t + passo : t - (t <= 10 ? 1 : t <= 100 ? 10 : passo))) });
+      }
+    }
     else if (tecla === "Enter" && recorte) confirmarCorte();
     else if (tecla === "Escape") {
       if (recorte) cancelarCorte();
@@ -483,7 +572,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }
   if (projeto.tipo !== "imagem") return <Redirecionar para={enderecoDoProjeto({ id: projetoId, tipo: projeto.tipo })} />;
 
-  const imagensProntas = (biblioteca.midias ?? []).filter((midia) => midia.imagem && !midia.elemento && !midia.animacao);
+  const imagensProntas = (biblioteca.midias ?? []).filter((midia) => midia.imagem && !midia.elemento && !midia.camada_pixels && !midia.animacao);
   const tamanho = tamanhoDaImagem(projetoNaTela);
   const zoomNaTela = zoom ?? zoomMedido;
 
@@ -579,7 +668,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} />,
     },
     historico: { nome: PAINEIS_DA_IMAGEM.historico, conteudo: <PainelHistorico nome={edicao.nome} feitos={edicao.passos.feitos} desfeitos={edicao.passos.desfeitos} aoIr={edicao.irParaPasso} /> },
   };
@@ -649,6 +738,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         primeiroPlano={cores.primeiroPlano}
         aoZoom={setZoom}
         aoAlinhar={(eixo) => camadaEscolhida && executar({ comando: "clipe.transformar", parametros: { clipeIds: [camadaEscolhida.clipe.id], transformacao: { [eixo]: 0 } } })}
+        pincel={ferramentaDePintura ? pinceis[ferramentaDePintura] : undefined}
+        aoMudarPincel={mudarPincel}
       />
 
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
@@ -694,6 +785,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoPreverDeslocamento={(deslocamento) => setProvisorio(deslocamento ? { comando: "imagem.posicoes", parametros: { mudancas: mudancasDoDeslocamento(deslocamento.dx, deslocamento.dy) } } : null)}
             aoDeslocar={(dx, dy) => posicoes(mudancasDoDeslocamento(dx, dy))}
             caixasRef={caixasRef}
+            pintura={
+              ferramentaDePintura
+                ? {
+                    ferramenta: ferramentaDePintura,
+                    opcoes: pinceis[ferramentaDePintura],
+                    cores,
+                    aoPedirAlvo: alvoDaPintura,
+                    aoQuadro: pinturas.avisarQuadro,
+                    aoSoltar: pinturas.soltar,
+                    aoAjustar: mudarPincel,
+                  }
+                : null
+            }
+            fonteDosPixels={pinturas.fonte}
             ferramenta={ferramenta}
             zoom={zoom}
             aoMudarZoom={setZoom}
@@ -738,7 +843,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           }}
         />
       ) : null}
-      {exportando ? <JanelaExportarImagem projeto={projeto} nome={edicao.nome} midias={midias} aoFechar={() => setExportando(false)} aoAvisar={mostrarAviso} /> : null}
+      {exportando ? (
+        <JanelaExportarImagem
+          projeto={projeto}
+          nome={edicao.nome}
+          midias={midias}
+          aoFechar={() => setExportando(false)}
+          aoAvisar={mostrarAviso}
+          aoPrepararPintura={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
+          fonteDosPixels={pinturas.fonte}
+        />
+      ) : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}
       {edicao.aviso ? (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-8 z-50 flex justify-center px-4">
@@ -816,7 +931,10 @@ function JanelaDeAtalhos({ acoes, aoFechar }: { acoes: AcoesDosMenus; aoFechar: 
                 ["Mão temporária", "Espaço"],
                 ["Cores padrão", "D"],
                 ["Trocar as cores", "X"],
-                ["Pincel menor / maior (Remover)", "[ / ]"],
+                ["Pincel menor / maior", "[ / ]"],
+                ["Pincel mais macio / mais duro", "Shift + [ / ]"],
+                ["Tamanho e dureza arrastando", "Alt + botão direito"],
+                ["Opacidade do pincel (10% a 100%)", "1 … 0"],
                 ["Empurrar as camadas 1 px (10 com Shift)", "Setas"],
                 ["Opacidade das camadas (10% a 100%)", "1 … 0"],
                 ["Excluir as camadas", "Delete"],

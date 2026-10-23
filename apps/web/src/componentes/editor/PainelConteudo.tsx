@@ -81,7 +81,7 @@ function PainelMidia({
   aoAvisar: (mensagem: string) => void;
 }) {
   // As formas desenhadas (Elementos) não entram na biblioteca: elas são editadas no próprio clipe
-  const biblioteca = (midias ?? []).filter((midia) => !midia.elemento);
+  const biblioteca = (midias ?? []).filter((midia) => !midia.elemento && !midia.camada_pixels);
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />

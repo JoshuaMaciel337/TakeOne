@@ -1,8 +1,11 @@
 "use client";
 
-import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, X } from "lucide-react";
+import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, X } from "lucide-react";
+import { Fragment } from "react";
 
+import { LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel } from "@/lib/pintura/traco";
 import type { Comando } from "@/lib/projeto/comandos";
+import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
 import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/texto";
 
@@ -42,7 +45,32 @@ type Props = {
   primeiroPlano: string;
   aoZoom: (zoom: number | null) => void;
   aoAlinhar: (eixo: "x" | "y") => void;
+  /** As opções do pincel, do lápis ou da borracha (a ferramenta escolhida). */
+  pincel?: OpcoesDoPincel;
+  aoMudarPincel?: (mudanca: Partial<OpcoesDoPincel>) => void;
 };
+
+/** Um número da barra (o valor digitado só vale ao sair ou no Enter). */
+function Numero({ rotulo, valor, minimo, maximo, sufixo, aoMudar, largura = "w-12" }: { rotulo: string; valor: number; minimo: number; maximo: number; sufixo?: string; aoMudar: (valor: number) => void; largura?: string }) {
+  return (
+    <label className="flex items-center gap-1 text-suave">
+      {rotulo}:
+      <input
+        key={valor}
+        aria-label={rotulo}
+        defaultValue={valor}
+        inputMode="decimal"
+        onBlur={(evento) => {
+          const numero = Number(evento.currentTarget.value.replace(",", "."));
+          if (Number.isFinite(numero)) aoMudar(Math.min(maximo, Math.max(minimo, numero)));
+        }}
+        onKeyDown={(evento) => evento.key === "Enter" && evento.currentTarget.blur()}
+        className={`${campo} ${largura} text-right tabular-nums`}
+      />
+      {sufixo}
+    </label>
+  );
+}
 
 const SEPARADOR = <span className="mx-1 h-5 w-px shrink-0 bg-borda" aria-hidden />;
 const campo = "rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-xs text-texto";
@@ -188,6 +216,70 @@ export function BarraDeOpcoes(props: Props) {
       </>
     ) : (
       <span className="text-suave">Clique na imagem para escrever; o texto sai na cor de primeiro plano. Clique num texto para mudar a fonte, o tamanho e a cor.</span>
+    );
+  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha") && props.pincel && props.aoMudarPincel) {
+    const pincel = props.pincel;
+    const mudar = props.aoMudarPincel;
+    const porcento = (valor: number) => Math.round(valor * 100);
+    const alternar = (ligado: boolean, titulo: string, Icone: typeof PenTool, aoMudar: () => void) => (
+      <button type="button" className={`botao-icone size-6 ${ligado ? "bg-destaque/25 text-texto" : ""}`} aria-pressed={ligado} title={titulo} aria-label={titulo} onClick={aoMudar}>
+        <Icone className="size-3.5" aria-hidden />
+      </button>
+    );
+    const bloco = ferramenta === "borracha" && pincel.borracha === "bloco";
+    opcoes = (
+      <>
+        <Numero rotulo="Tamanho" valor={Math.round(pincel.tamanho)} minimo={LIMITES_DO_PINCEL.tamanho[0]} maximo={LIMITES_DO_PINCEL.tamanho[1]} sufixo="px" aoMudar={(tamanho) => mudar({ tamanho })} />
+        {ferramenta === "pincel" || (ferramenta === "borracha" && pincel.borracha === "pincel") ? (
+          <Numero rotulo="Dureza" valor={porcento(pincel.dureza)} minimo={0} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ dureza: valor / 100 })} />
+        ) : null}
+        {ferramenta === "borracha" ? (
+          <label className="flex items-center gap-1 text-suave">
+            Modo:
+            <select aria-label="Modo da borracha" className={campo} value={pincel.borracha} onChange={(evento) => mudar({ borracha: evento.currentTarget.value as OpcoesDoPincel["borracha"] })}>
+              <option value="pincel">Pincel</option>
+              <option value="lapis">Lápis</option>
+              <option value="bloco">Bloco</option>
+            </select>
+          </label>
+        ) : (
+          <label className="flex items-center gap-1 text-suave">
+            Modo:
+            <select aria-label="Modo da pintura" className={campo} value={pincel.modo} onChange={(evento) => mudar({ modo: evento.currentTarget.value as ModoDaPintura })}>
+              {MESCLAGENS_DA_IMAGEM.map((grupo, indice) => (
+                <Fragment key={grupo[0].id}>
+                  {indice > 0 ? <option disabled>──────────</option> : null}
+                  {grupo.map((modo) => (
+                    <option key={modo.id} value={modo.id}>
+                      {modo.nome}
+                    </option>
+                  ))}
+                  {indice === 0 ? <option value="limpar">Limpar</option> : null}
+                </Fragment>
+              ))}
+            </select>
+          </label>
+        )}
+        {SEPARADOR}
+        {bloco ? null : (
+          <>
+            <Numero rotulo="Opacidade" valor={porcento(pincel.opacidade)} minimo={1} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ opacidade: valor / 100 })} />
+            {alternar(pincel.pressaoNaOpacidade, "A pressão da caneta muda a opacidade", PenTool, () => mudar({ pressaoNaOpacidade: !pincel.pressaoNaOpacidade }))}
+            {ferramenta === "lapis" ? null : <Numero rotulo="Fluxo" valor={porcento(pincel.fluxo)} minimo={1} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ fluxo: valor / 100 })} />}
+            {ferramenta === "pincel" ? alternar(pincel.aerografo, "Aerógrafo: segurar parado continua pintando", SprayCan, () => mudar({ aerografo: !pincel.aerografo })) : null}
+            {ferramenta === "lapis" || (ferramenta === "borracha" && pincel.borracha !== "pincel") ? null : (
+              <Numero rotulo="Suavização" valor={porcento(pincel.suavizacao)} minimo={0} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ suavizacao: valor / 100 })} />
+            )}
+            {alternar(pincel.pressaoNoTamanho, "A pressão da caneta muda o tamanho", PenTool, () => mudar({ pressaoNoTamanho: !pincel.pressaoNoTamanho }))}
+          </>
+        )}
+        {ferramenta === "lapis" ? (
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={pincel.apagarAutomaticamente} onChange={(evento) => mudar({ apagarAutomaticamente: evento.currentTarget.checked })} />
+            Apagar automaticamente
+          </label>
+        ) : null}
+      </>
     );
   } else if (ferramenta === "mao" || ferramenta === "zoom") {
     opcoes = (

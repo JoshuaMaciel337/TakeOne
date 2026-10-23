@@ -62,7 +62,7 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
     setTemPincel(false);
   }
 
-  const foto = Boolean(midia?.imagem && !midia.elemento && !midia.animacao && midia.status === "pronta");
+  const foto = Boolean(midia?.imagem && !midia.elemento && !midia.camada_pixels && !midia.animacao && midia.status === "pronta");
 
   async function selecionar(novos: PontoDoObjeto[]) {
     if (!clipe || !midia) return;

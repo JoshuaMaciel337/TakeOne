@@ -1,9 +1,10 @@
 "use client";
 
-import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, Trash2, Type } from "lucide-react";
+import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, SquarePlus, Trash2, Type } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
+import { arquivoDaVersao } from "@/lib/pixels";
 import { arvoreDaImagem, camadaVisivel, type NoDaCamada, paiDaCamada } from "@/lib/projeto/arvore";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MASCARA_PADRAO, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
@@ -23,6 +24,8 @@ type Props = {
   aoCriarAjuste: (ajuste: Ajuste) => void;
   /** Um estilo de camada novo: abre o painel Propriedades na parte dele. */
   aoAbrirPropriedades: () => void;
+  /** Uma camada de pixels vazia acima da escolhida (Ctrl+Shift+N). */
+  aoNovaCamada: () => void;
 };
 
 /** O nome de cada camada: o que a pessoa deu, o do texto, "Camada de ajuste", "Grupo" ou o da mídia. */
@@ -184,7 +187,7 @@ function CampoDePorcentagem({ rotulo, valor, desativado, aoMudar }: { rotulo: st
  * (duplo clique renomeia); arrastar muda a ordem e põe dentro ou fora das pastas; Ctrl e Shift escolhem várias; o
  * botão direito abre o menu da camada. No rodapé: vincular, estilo (fx), máscara, ajuste, pasta, duplicar e apagar.
  */
-export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades }: Props) {
+export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades, aoNovaCamada }: Props) {
   // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [arrastadas, setArrastadas] = useState<string[] | null>(null);
@@ -528,6 +531,14 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
                       ) : (
                         <Folder className="size-3.5 text-suave" aria-hidden />
                       )
+                    ) : clipe.pixels ? (
+                      // A camada de pixels: a versão que ela mostra, sobre o xadrez da transparência
+                      <span className="size-full" style={{ background: "repeating-conic-gradient(#c8cad0 0% 25%, #ffffff 0% 50%) 50% / 8px 8px" }}>
+                        {clipe.pixels.versao > 0 && clipe.midia_id ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- a versão da API com a sessão do cookie
+                          <img src={arquivoDaMidia(clipe.midia_id, arquivoDaVersao(clipe.pixels.versao))} alt="" className="size-full object-contain" />
+                        ) : null}
+                      </span>
                     ) : clipe.texto ? (
                       <Type className="size-3.5 text-suave" aria-hidden />
                     ) : clipe.ajuste ? (
@@ -638,6 +649,9 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
           rotulo={<SlidersHorizontal className="size-3.5" aria-hidden />}
           itens={AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => aoCriarAjuste(ajuste) }))}
         />
+        <button type="button" className="botao-icone size-6" title="Criar uma camada (Ctrl+Shift+N)" aria-label="Criar uma camada" onClick={aoNovaCamada}>
+          <SquarePlus className="size-3.5" aria-hidden />
+        </button>
         <button
           type="button"
           className="botao-icone size-6"

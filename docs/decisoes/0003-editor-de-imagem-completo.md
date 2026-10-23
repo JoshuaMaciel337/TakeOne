@@ -90,15 +90,15 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.2 — Camadas de pixels e o pincel
 
-- [ ] Camada de pixels (Camada › Nova › Camada, Ctrl+Shift+N), com versões no servidor e edição no navegador
+- [x] Camada de pixels (Camada › Nova › Camada, Ctrl+Shift+N), com versões no servidor e edição no navegador
 - [ ] Camada de fundo (travada embaixo) e "Camada a partir do fundo"
-- [ ] Pincel (B): tamanho, dureza, opacidade, fluxo, aerógrafo, suavização (corda puxada, recuperar o traço), pressão no tamanho e na opacidade, modo (os 27 e Limpar)
-- [ ] Lápis (B), com "Apagar automaticamente"
-- [ ] Borracha (E): pincel, lápis e bloco; no fundo, pinta a cor de fundo
+- [x] Pincel (B): tamanho, dureza, opacidade, fluxo, aerógrafo, suavização (corda puxada, recuperar o traço), pressão no tamanho e na opacidade, modo (os 27 e Limpar)
+- [x] Lápis (B), com "Apagar automaticamente"
+- [x] Borracha (E): pincel, lápis e bloco; com a transparência travada, pinta a cor de fundo (a camada de fundo vem com o item dela)
 - [ ] Painel Pincéis: predefinições em pastas (gerais, materiais secos, molhados e efeitos especiais), busca, tamanho da miniatura, Definir predefinição de pincel a partir da seleção, importar .abr
 - [ ] Painel Configurações do pincel (F5): forma da ponta (ângulo, arredondamento, espaçamento, virar), dinâmica de forma, dispersão, textura, pincel duplo, dinâmica de cor, transferência, pose, ruído, bordas molhadas, acúmulo, suavização, proteger textura, travas das seções, prévia do traço
 - [ ] Simetria da pintura (vertical, horizontal, dois eixos, diagonal, radial, mandala)
-- [ ] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois
+- [x] [ e ] mudam o tamanho, Shift+[ e Shift+] a dureza; Alt + botão direito arrastando muda os dois
 - [ ] Máscara de camada pintável: Adicionar (revelar tudo, ocultar tudo, revelar seleção, ocultar seleção, a partir da transparência), pintar em preto e branco, Densidade e Difusão, Aplicar, Excluir, Ativar e desativar, Vincular, Ctrl+\ mira a máscara, Alt + clique mostra só a máscara
 - [ ] Rasterizar (texto, forma, preenchimento, máscara vetorial, objeto, estilo, camada, todas)
 - [ ] Mesclar para baixo (Ctrl+E), Mesclar visíveis (Ctrl+Shift+E), Achatar imagem, Carimbar para baixo (Ctrl+Alt+E), Carimbar visíveis (Ctrl+Alt+Shift+E), Mesclar grupo

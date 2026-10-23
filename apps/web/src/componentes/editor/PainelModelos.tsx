@@ -29,7 +29,7 @@ type Props = {
 function PreencherModelo({ projeto, midias, aoExecutar }: { projeto: Projeto; midias: Midia[]; aoExecutar: (comando: Comando) => void }) {
   const vagas = vagasQueRestam(projeto);
   if (!vagas.length) return null;
-  const prontas = midias.filter((midia) => midia.status === "pronta" && !midia.elemento && !midia.animacao);
+  const prontas = midias.filter((midia) => midia.status === "pronta" && !midia.elemento && !midia.camada_pixels && !midia.animacao);
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-destaque/40 bg-destaque/5 p-3">
       <h3 className="text-xs font-semibold">Preencher “{projeto.modelo_origem?.nome}”</h3>
@@ -104,7 +104,7 @@ export function PainelModelos({ midias, proporcao, aoExecutar, aoExecutarQuandoP
   }, []);
 
   // As mídias da biblioteca (sem as formas desenhadas), prontas e com imagem
-  const visuais = midias.filter((midia) => midia.status === "pronta" && midia.video && !midia.elemento && !midia.animacao);
+  const visuais = midias.filter((midia) => midia.status === "pronta" && midia.video && !midia.elemento && !midia.camada_pixels && !midia.animacao);
 
   function escolher(modelo: ModeloDeProjeto) {
     setEscolhido(modelo);

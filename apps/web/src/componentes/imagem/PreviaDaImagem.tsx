@@ -14,11 +14,14 @@ import { type CaixaNoQuadro, caixaNoQuadro, unidadesDaSelecao } from "@/lib/proj
 import { posicaoTravada } from "@/lib/projeto/arvore";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
-import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
+import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
+import type { FerramentaDePintura, OpcoesDoPincel } from "@/lib/pintura/traco";
+import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
 import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
+import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import type { FerramentaObjeto } from "./useObjeto";
 
@@ -67,6 +70,19 @@ type Props = {
   aoDesenharForma?: (retangulo: RetanguloDaImagem) => void;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
   aoPegarCor?: (cor: string, paraOFundo: boolean) => void;
+  /** Pincel, lápis e borracha: o traço por cima da prévia, numa camada de pixels. */
+  pintura?: {
+    ferramenta: FerramentaDePintura;
+    opcoes: OpcoesDoPincel;
+    cores: { primeiroPlano: string; fundo: string };
+    /** A camada do traço (a caixa vem daqui, da prévia); null quando não dá para pintar. */
+    aoPedirAlvo: () => Promise<Omit<AlvoDaPintura, "caixa"> | null>;
+    aoQuadro: () => void;
+    aoSoltar: (clipeId: string) => void;
+    aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
+  } | null;
+  /** O canvas de uma camada de pixels sendo pintada; sem ele, a versão do servidor. */
+  fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
 };
 
 /** O tamanho da área livre da prévia. */
@@ -112,6 +128,8 @@ export function PreviaDaImagem({
   aoClicarTexto,
   aoDesenharForma,
   aoPegarCor,
+  pintura = null,
+  fonteDosPixels,
 }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
@@ -152,8 +170,14 @@ export function PreviaDaImagem({
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
   const fonteDa = (midiaId: string) => arquivoDaMidia(midiaId, "proxy.webp");
+  // A camada de pixels lê a versão do clipe (a 0 é vazia), ou o canvas enquanto é pintada
+  const versaoDosPixels = (clipe: Clipe) => (clipe.pixels && clipe.midia_id && clipe.pixels.versao > 0 ? arquivoDaMidia(clipe.midia_id, arquivoDaVersao(clipe.pixels.versao)) : null);
   const enderecos = camadas.flatMap((camada) => {
     if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste) return [];
+    if (camada.clipe.pixels) {
+      const versao = fonteDosPixels?.(camada.clipe) ? null : versaoDosPixels(camada.clipe);
+      return versao ? [versao] : [];
+    }
     const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id)) : null;
     return mascara ? [fonteDa(camada.clipe.midia_id), mascara] : [fonteDa(camada.clipe.midia_id)];
   });
@@ -198,6 +222,11 @@ export function PreviaDaImagem({
       camadas.flatMap((camada) => {
         if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        if (camada.clipe.pixels) {
+          const endereco = versaoDosPixels(camada.clipe);
+          const pixels = fonteDosPixels?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
+          return pixels ? [[camada.faixa.id, camadaDoCompositor(camada, pixels, null)] as const] : [];
+        }
         const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
         if (!fonte) return [];
         const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;
@@ -284,7 +313,7 @@ export function PreviaDaImagem({
       // As ferramentas de seleção trabalham numa foto: a de cima no ponto passa a ser a escolhida
       const foto = camadaNoPonto(ponto, (camada) => {
         const midia = camada.clipe.midia_id ? midias.get(camada.clipe.midia_id) : undefined;
-        return Boolean(midia?.imagem && !midia.elemento && !midia.animacao);
+        return Boolean(midia?.imagem && !midia.elemento && !midia.camada_pixels && !midia.animacao);
       });
       if (foto) aoSelecionar([foto.clipe.id]);
       return;
@@ -456,6 +485,21 @@ export function PreviaDaImagem({
                   transform: `rotate(${selecionada.caixa.rotacao}deg)`,
                 }}
                 aria-hidden
+              />
+            ) : null}
+            {pintura && !maoAtiva && !recorte && tamanho.largura > 1 ? (
+              <PinturaNaPrevia
+                ferramenta={pintura.ferramenta}
+                opcoes={pintura.opcoes}
+                cores={pintura.cores}
+                quadro={tamanho}
+                escalaDaImagem={tamanho.largura / imagem.largura}
+                aoPedirAlvo={() =>
+                  pintura.aoPedirAlvo().then((alvo) => (alvo ? { ...alvo, caixa: camadas.find((camada) => camada.clipe.id === alvo.clipeId)?.caixa ?? null } : null))
+                }
+                aoQuadro={pintura.aoQuadro}
+                aoSoltar={pintura.aoSoltar}
+                aoAjustar={pintura.aoAjustar}
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}

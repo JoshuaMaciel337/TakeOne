@@ -5,7 +5,8 @@
 // mesma conta; muda só a nitidez das fontes (a prévia lê as cópias leves).
 import { arquivoDaMidia } from "@/lib/api";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
-import type { Projeto } from "@/lib/projeto/modelo";
+import type { Clipe, Projeto } from "@/lib/projeto/modelo";
+import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
 import { carregarBitmap } from "../previa/bitmaps";
@@ -39,7 +40,20 @@ function fonteDaMidia(midia: Midia): Promise<ImageBitmap> {
 export async function exportarImagem(
   projeto: Projeto,
   midias: ReadonlyMap<string, Midia>,
-  { formato, qualidade = 0.92, escala = 1, fonteDa = fonteDaMidia }: { formato: FormatoDaImagem; qualidade?: number; escala?: number; fonteDa?: (midia: Midia) => Promise<ImageBitmap> },
+  {
+    formato,
+    qualidade = 0.92,
+    escala = 1,
+    fonteDa = fonteDaMidia,
+    fonteDosPixels,
+  }: {
+    formato: FormatoDaImagem;
+    qualidade?: number;
+    escala?: number;
+    fonteDa?: (midia: Midia) => Promise<ImageBitmap>;
+    /** O canvas de uma camada de pixels sendo pintada (com o que ainda não subiu); sem ele, a versão do servidor. */
+    fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
+  },
 ): Promise<Blob> {
   const base = tamanhoDaImagem(projeto);
   const tamanho = { largura: Math.round(base.largura * escala), altura: Math.round(base.altura * escala) };
@@ -55,6 +69,13 @@ export async function exportarImagem(
     camadas.map(async (camada) => {
       if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
+      if (camada.clipe.pixels) {
+        // A camada de pixels: o canvas que está sendo pintado, ou o PNG da versão do clipe (a 0 é vazia)
+        const { versao } = camada.clipe.pixels;
+        const local = fonteDosPixels?.(camada.clipe);
+        const fonte = local ?? (versao > 0 ? await carregarBitmap(arquivoDaMidia(camada.clipe.midia_id!, arquivoDaVersao(versao))) : null);
+        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null)] as const) : null;
+      }
       const midia = midias.get(camada.clipe.midia_id!)!;
       const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
@@ -63,7 +84,7 @@ export async function exportarImagem(
       return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null)] as const;
     }),
   );
-  const arvore = camadasEmArvore(projeto, new Map(prontas), tamanho);
+  const arvore = camadasEmArvore(projeto, new Map(prontas.filter((item) => item !== null)), tamanho);
 
   const canvas = document.createElement("canvas");
   canvas.width = tamanho.largura;

@@ -1,6 +1,8 @@
 // As ferramentas do editor de imagem, na ordem e com as teclas do editor de imagem profissional (ADR 0002). Cada
 // posição da caixa de ferramentas é um grupo: o botão mostra a última usada do grupo e o botão direito abre as outras.
 import {
+  Bandage,
+  Brush,
   Circle,
   Crop,
   Eraser,
@@ -9,6 +11,7 @@ import {
   type LucideIcon,
   Minus,
   Move,
+  Pencil,
   Pentagon,
   Pipette,
   Shapes,
@@ -34,6 +37,9 @@ export type IdFerramentaDaImagem =
   | "corte"
   | "contaGotas"
   | "remover"
+  | "pincel"
+  | "lapis"
+  | "borracha"
   | "texto"
   | "retangulo"
   | "elipse"
@@ -69,7 +75,12 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [F("objeto", "Ferramenta Seleção de objeto", "W", SquareDashedMousePointer, "Clique no objeto para a IA achar o contorno; Shift + clique tira uma parte.")],
   [F("corte", "Ferramenta Corte", "C", Crop, "Arraste o retângulo e os cantos; Enter recorta, Esc cancela.")],
   [F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo.")],
-  [F("remover", "Ferramenta Remover", "J", Eraser, "Pinte por cima do que quer tirar da foto; a IA refaz o que estava atrás.")],
+  [F("remover", "Ferramenta Remover", "J", Bandage, "Pinte por cima do que quer tirar da foto; a IA refaz o que estava atrás.")],
+  [
+    F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
+    F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
+  ],
+  [F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo.")],
   [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
   [
     F("retangulo", "Ferramenta Retângulo", "U", Square, "Arraste para desenhar um retângulo na cor do primeiro plano."),
@@ -114,6 +125,9 @@ export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "retangulo" |
   objeto: "clique",
   remover: "pincel",
 };
+
+/** As ferramentas que pintam numa camada de pixels (lib/pintura). */
+export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha"]);
 
 /** O grupo de uma ferramenta (as do mesmo grupo dividem a tecla; Shift + tecla passa à seguinte). */
 export function grupoDa(id: IdFerramentaDaImagem): FerramentaDaImagem[] {

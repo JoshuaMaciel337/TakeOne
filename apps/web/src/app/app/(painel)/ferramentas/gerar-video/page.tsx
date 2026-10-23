@@ -11,7 +11,7 @@ import { useMidias } from "@/lib/useMidias";
 export default function PaginaGerarVideo() {
   const { midias } = useMidias();
   const [pedidos, setPedidos] = useState(0);
-  const imagens = (midias ?? []).filter((midia) => midia.status === "pronta" && midia.imagem && midia.video && !midia.elemento);
+  const imagens = (midias ?? []).filter((midia) => midia.status === "pronta" && midia.imagem && midia.video && !midia.elemento && !midia.camada_pixels);
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-8">
       <TituloDaPagina

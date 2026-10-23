@@ -115,6 +115,35 @@ export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId:
   };
 }
 
+/**
+ * Uma camada de pixels nova (a mídia já criada, vazia, do tamanho da imagem) acima da escolhida, cobrindo o quadro.
+ * Não depende da mídia estar na biblioteca da tela: a pessoa começa a pintar logo depois de criar.
+ */
+export function adicionarCamadaDePixels(projeto: Projeto, ctx: Contexto, midiaId: string, nome: string, acima?: string | null): { projeto: Projeto; clipeId: string } {
+  const clipe = clipeDaCamada(ctx.novoId(), { midia_id: midiaId, pixels: { versao: 0 } });
+  return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
+}
+
+/** A camada de pixels passa a mostrar outra versão do PNG (um traço novo, ou o desfazer). */
+export function trocarVersaoDosPixels(projeto: Projeto, clipeId: string, versao: number): Projeto {
+  let achou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.clipes.some((clipe) => clipe.id === clipeId)) return faixa;
+    if (faixa.travada) throw new ErroEdicao("A camada está travada. Destrave o cadeado para pintar.");
+    return {
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => {
+        if (clipe.id !== clipeId) return clipe;
+        if (!clipe.pixels) throw new ErroEdicao("Esta camada não é de pixels.");
+        achou = true;
+        return { ...clipe, pixels: { versao } };
+      }),
+    };
+  });
+  if (!achou) throw new ErroEdicao("Essa camada não existe mais.");
+  return { ...projeto, faixas };
+}
+
 /** Uma camada de ajuste acima da escolhida (ou de todas): muda a cor do que está embaixo dela. */
 export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { ajuste: true });

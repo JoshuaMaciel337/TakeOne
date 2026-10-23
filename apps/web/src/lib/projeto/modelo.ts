@@ -265,6 +265,11 @@ export type Clipe = {
   pasta?: boolean;
   /** Só no projeto de imagem: o preenchimento (0 a 1), a opacidade do conteúdo sem os estilos de camada. */
   preenchimento?: number;
+  /**
+   * Só no projeto de imagem: camada de pixels (a mídia é uma camada de lib/pixels.ts) e a versão do PNG que ela
+   * mostra; a 0 é a camada vazia. Pintar sobe uma versão nova e troca o número (o desfazer volta o anterior).
+   */
+  pixels?: { versao: number };
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

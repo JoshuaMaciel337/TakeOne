@@ -115,8 +115,10 @@ import {
   inverterCamadas,
   moverCamada,
   moverCamadasPara,
+  adicionarCamadaDePixels,
   mudarCamada,
   type MudancaDaCamada,
+  trocarVersaoDosPixels,
   soEstaVisivel,
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
@@ -198,6 +200,8 @@ export type Comando =
   | { comando: "imagem.apagarOcultas"; parametros: Record<string, never> }
   | { comando: "imagem.posicoes"; parametros: { mudancas: { clipeId: string; transformacao: Partial<Transformacao> }[] } }
   | { comando: "imagem.soEsta"; parametros: { faixaId: string } }
+  | { comando: "imagem.adicionarPixels"; parametros: { midiaId: string; nome: string; acima?: string | null } }
+  | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
   | { comando: "imagem.apagarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.duplicarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" | number } }
@@ -303,6 +307,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.apagarOcultas": "excluir as camadas ocultas",
   "imagem.posicoes": "mover as camadas",
   "imagem.soEsta": "mostrar só uma camada",
+  "imagem.adicionarPixels": "criar a camada",
+  "camada.pixels": "pintar",
   "imagem.apagarVarias": "apagar as camadas",
   "imagem.duplicarVarias": "duplicar as camadas",
   "imagem.mover": "mudar a ordem das camadas",
@@ -526,6 +532,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = duplicarCamadas(projeto, ctx, parametros.faixaIds);
       return { projeto: resultado.projeto, selecao: resultado.clipeIds };
     }
+    case "imagem.adicionarPixels": {
+      const resultado = adicionarCamadaDePixels(projeto, ctx, parametros.midiaId, parametros.nome, parametros.acima);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "camada.pixels":
+      return { projeto: trocarVersaoDosPixels(projeto, parametros.clipeId, parametros.versao) };
     case "imagem.soEsta":
       return { projeto: soEstaVisivel(projeto, parametros.faixaId) };
     case "imagem.mover":
