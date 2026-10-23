@@ -673,14 +673,21 @@ class ClipeEntrada(BaseModel):
     # Repetir os keyframes e tremer, por propriedade (lib/projeto/keyframes.ts)
     expressoes: ExpressoesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
+    # Do "dissolver" em diante, só no projeto de imagem (core/modelos/projeto.py, problema_na_arvore)
     mesclagem: Literal["normal", "multiplicar", "tela", "somar", "escurecer", "clarear", "sobrepor", "luz_forte",
-                       "diferenca", "exclusao"] = "normal"
+                       "diferenca", "exclusao", "dissolver", "superexposicao_cores", "superexposicao_linear",
+                       "cor_mais_escura", "subexposicao_cores", "cor_mais_clara", "luz_suave", "luz_brilhante",
+                       "luz_linear", "luz_do_pino", "mistura_solida", "subtrair", "dividir", "matiz", "saturacao",
+                       "cor", "luminosidade", "passagem"] = "normal"
     # A imagem espelhada; o recorte é do que aparece (core/utils/geometria.py, recorte_na_fonte)
     virar: VirarEntrada | None = None
     cantos: CantosEntrada | None = None
     mascara: MascaraEntrada | None = None
     # Camada de ajuste: sem mídia nem texto, muda a cor de tudo o que está embaixo
     ajuste: bool = False
+    # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
+    pasta: bool = False
+    preenchimento: float | None = Field(default=None, ge=0, le=1)
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
@@ -739,6 +746,12 @@ class MulticameraEntrada(BaseModel):
     atraso: int = Field(description="Em ticks; negativo quando a câmera ligou antes do começo do vídeo")
 
 
+class TravasEntrada(BaseModel):
+    transparencia: bool = False
+    pixels: bool = False
+    posicao: bool = False
+
+
 class FaixaEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     tipo: Literal["principal", "video", "audio", "texto", "legenda"]
@@ -748,6 +761,16 @@ class FaixaEntrada(BaseModel):
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
     # Só nas faixas de vídeo de uma multicâmera, que ficam mesmo vazias
     multicamera: MulticameraEntrada | None = None
+    # Só no projeto de imagem (cada faixa é uma camada): nome, pasta em que está, máscara de corte, travas parciais,
+    # cor do rótulo, vínculo e a pasta aberta no painel (lib/projeto/arvore.ts)
+    nome: str | None = Field(default=None, max_length=60)
+    pai: str | None = Field(default=None, min_length=1, max_length=40)
+    recortada: bool = False
+    travas: TravasEntrada | None = None
+    rotulo: Literal["vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "verde_agua", "anil",
+                    "magenta", "fucsia"] | None = None
+    vinculo: str | None = Field(default=None, max_length=40)
+    aberta: bool = False
 
     @model_validator(mode="after")
     def camera_so_em_video(self):

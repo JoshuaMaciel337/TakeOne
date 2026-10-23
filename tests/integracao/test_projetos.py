@@ -282,3 +282,47 @@ def test_imagem_tem_mais_camadas_que_o_video_tem_faixas(cliente, db_limpo):
     imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
     resposta = salvar(cliente, imagem, camadas(101) + vazia)
     assert resposta.status_code == 422 and "100 camadas" in resposta.json()["detail"]
+
+
+def test_arvore_de_camadas_so_na_imagem(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, duracao=5.0, audio=False)
+    texto = {"conteudo": "Oi", "tamanho": 0.08}
+
+    def camada(id_, **campos):
+        return {"id": id_, "tipo": "texto", "oculta": False, "muda": False, "travada": False,
+                "clipes": [{"id": f"c-{id_}", "midia_id": None, "inicio": 0, "duracao": 5 * SEGUNDO, "entrada": 0,
+                            "velocidade": 1, "volume": 1, "texto": texto}], **campos}
+
+    pasta = {"id": "g1", "tipo": "video", "oculta": False, "muda": False, "travada": False, "nome": "Grupo 1",
+             "aberta": True, "clipes": [{"id": "c-g1", "midia_id": None, "inicio": 0, "duracao": 5 * SEGUNDO,
+                                         "entrada": 0, "velocidade": 1, "volume": 1, "pasta": True,
+                                         "mesclagem": "passagem"}]}
+    imagem = cliente.post("/api/projetos", json={"tamanho": {"largura": 1080, "altura": 1080}}).json()
+    vazia = imagem["faixas"]
+    t1 = camada("t1", pai="g1", recortada=True, rotulo="azul", travas={"posicao": True})
+    faixas = [pasta, t1, camada("t2", pai="g1")] + vazia
+    resposta = salvar(cliente, imagem, faixas)
+    assert resposta.status_code == 200, resposta.text
+    salvo = {f["id"]: f for f in resposta.json()["faixas"]}
+    assert salvo["t1"]["pai"] == "g1" and salvo["t1"]["recortada"] and salvo["t1"]["travas"]["posicao"]
+    assert salvo["g1"]["clipes"][0]["pasta"] and salvo["g1"]["clipes"][0]["mesclagem"] == "passagem"
+
+    imagem = cliente.get(f"/api/projetos/{imagem['id']}").json()
+    casos = {
+        "pai que não é pasta": [camada("t1", pai="t2"), camada("t2")] + vazia,
+        "pasta dentro dela": [{**pasta, "pai": "g1"}] + vazia,
+        "passagem fora da pasta": [{**camada("t1"), "clipes": [{**t1["clipes"][0], "mesclagem": "passagem"}]}] + vazia,
+    }
+    for nome, caso in casos.items():
+        resposta = salvar(cliente, imagem, caso)
+        assert resposta.status_code == 422, nome
+
+    # No vídeo, nada disso entra
+    video = cliente.post("/api/projetos", json={}).json()
+    principal = principal_com(video, [clipe(midia_id, 0, 5)])
+    resposta = salvar(cliente, video, principal + [camada("t1", rotulo="azul")])
+    assert resposta.status_code == 422 and "editor de imagem" in resposta.json()["detail"]
+    luz = {**clipe(midia_id, 0, 5), "mesclagem": "luz_suave"}
+    sobre = {"id": "s1", "tipo": "video", "oculta": False, "muda": False, "travada": False, "clipes": [luz]}
+    assert salvar(cliente, video, principal + [sobre]).status_code == 422

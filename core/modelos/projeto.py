@@ -41,6 +41,7 @@ FAIXAS_DE_TEXTO = (FAIXA_TEXTO, FAIXA_LEGENDA)
 LIMITE_FAIXAS = 30
 # No projeto de imagem cada camada é uma faixa, e a principal fica vazia embaixo
 LIMITE_CAMADAS = 100
+CAMPOS_DA_IMAGEM = ("pai", "recortada", "travas", "rotulo", "vinculo", "nome", "aberta")
 LIMITE_CLIPES = 1500
 # O fim do clipe pode passar um pouco do fim da mídia: a duração do ffprobe e a borda do quadro
 # não batem exatamente.
@@ -134,6 +135,49 @@ def _conferir_transicoes(faixa: dict, clipes: list[dict]) -> str | None:
     return None
 
 
+# Os campos e os modos de mesclagem que só o editor de imagem desenha (o render do vídeo não sabe desenhá-los)
+MESCLAGENS_SO_DA_IMAGEM = {
+    "dissolver", "superexposicao_cores", "superexposicao_linear", "cor_mais_escura", "subexposicao_cores",
+    "cor_mais_clara", "luz_suave", "luz_brilhante", "luz_linear", "luz_do_pino", "mistura_solida", "subtrair",
+    "dividir", "matiz", "saturacao", "cor", "luminosidade", "passagem",
+}
+PROFUNDIDADE_DAS_PASTAS = 10
+
+
+def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
+    """As regras da árvore de camadas (as mesmas de lib/projeto/arvore.ts, problemaNaArvore)."""
+    por_id = {f["id"]: f for f in faixas}
+    for faixa in faixas:
+        clipes = faixa.get("clipes", [])
+        da_imagem = any(faixa.get(campo) for campo in CAMPOS_DA_IMAGEM)
+        if not imagem:
+            if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None
+                                or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
+                return "Grupos, recortes, travas parciais e os modos de mesclagem novos só existem no editor de imagem."
+            continue
+        clipe = clipes[0] if clipes else None
+        if clipe and clipe.get("pasta") and (faixa["tipo"] != FAIXA_VIDEO or clipe.get("midia_id") or clipe.get("texto")
+                                              or clipe.get("ajuste")):
+            return "A pasta fica numa faixa de sobreposição, sem mídia nem texto."
+        if clipe and clipe.get("mesclagem") == "passagem" and not clipe.get("pasta"):
+            return "Só uma pasta usa a mesclagem Passagem."
+        if faixa.get("pai"):
+            pai = por_id.get(faixa["pai"])
+            if not pai or not pai.get("clipes") or not pai["clipes"][0].get("pasta"):
+                return "Uma camada está dentro de uma pasta que não existe."
+            vistos = {faixa["id"]}
+            atual, nivel = pai, 1
+            while atual:
+                if atual["id"] in vistos:
+                    return "Uma pasta está dentro dela mesma."
+                vistos.add(atual["id"])
+                nivel += 1
+                if nivel > PROFUNDIDADE_DAS_PASTAS + 1:
+                    return f"As pastas vão até {PROFUNDIDADE_DAS_PASTAS} níveis."
+                atual = por_id.get(atual.get("pai")) if atual.get("pai") else None
+    return None
+
+
 def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem: bool = False) -> str | None:
     """
     Confere as regras que o editor mantém. Devolve a mensagem do primeiro problema, ou None.
@@ -151,6 +195,9 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem:
     ids = [f["id"] for f in faixas] + [c["id"] for f in faixas for c in f["clipes"]]
     if len(ids) != len(set(ids)):
         return "Há faixas ou clipes com o mesmo id."
+    problema = problema_na_arvore(faixas, imagem)
+    if problema:
+        return problema
 
     for faixa in faixas:
         clipes = sorted(faixa["clipes"], key=lambda c: c["inicio"])
@@ -159,8 +206,8 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem:
             return problema
         anterior_fim = 0
         for clipe in clipes:
-            if clipe.get("ajuste"):
-                # A camada de ajuste não tem mídia nem texto, e muda o que está embaixo: só nas sobreposições
+            if clipe.get("ajuste") or clipe.get("pasta"):
+                # A camada de ajuste e a pasta não têm mídia nem texto: só nas sobreposições
                 if faixa["tipo"] != FAIXA_VIDEO or clipe.get("texto") or clipe.get("midia_id"):
                     return "A camada de ajuste fica só numa faixa de sobreposição, sem mídia nem texto."
                 problema = _conferir_posicao(faixa, clipe, anterior_fim)
