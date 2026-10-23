@@ -7,10 +7,9 @@ import { useEffect, useState } from "react";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { arquivoDaExportacao, resumoDaExportacao } from "@/lib/exportacao/formatos";
 import { formatarBytes, formatarQuando, formatarTempo } from "@/lib/formatar";
 import type { Exportacao } from "@/lib/tipos";
-
-const RESOLUCOES: Record<Exportacao["resolucao"], string> = { "720p": "720p", "1080p": "1080p", "4k": "4K" };
 
 export default function PaginaExportados() {
   const [exportacoes, setExportacoes] = useState<Exportacao[] | null>(null);
@@ -32,7 +31,7 @@ export default function PaginaExportados() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">
-      <TituloDaPagina titulo="Exportados" descricao="Os vídeos gerados pelo servidor, do mais novo ao mais antigo. A exportação rápida no navegador baixa na hora e não fica aqui." />
+      <TituloDaPagina titulo="Exportados" descricao="Os vídeos, GIFs, quadros e sons gerados pelo servidor, do mais novo ao mais antigo. A exportação rápida no navegador baixa na hora e não fica aqui." />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {exportacoes === null && !erro ? <LoaderCircle className="size-5 animate-spin text-suave" aria-label="Carregando" /> : null}
       {exportacoes && !exportacoes.length ? <p className="text-sm text-suave">Nenhum vídeo exportado ainda. No editor, use o botão Exportar.</p> : null}
@@ -43,7 +42,7 @@ export default function PaginaExportados() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{exportacao.nome}</p>
                 <p className="text-xs text-suave">
-                  {RESOLUCOES[exportacao.resolucao]}
+                  {resumoDaExportacao(exportacao)}
                   {exportacao.duracao ? ` · ${formatarTempo(exportacao.duracao)}` : ""}
                   {exportacao.tamanho ? ` · ${formatarBytes(exportacao.tamanho)}` : ""} · {formatarQuando(exportacao.criado_em)}
                 </p>
@@ -60,7 +59,7 @@ export default function PaginaExportados() {
                     Falhou
                   </span>
                 ) : (
-                  <a href={`/api/exportacoes/${exportacao.id}/arquivos/video.mp4?baixar=true`} className="botao-principal px-3 py-1.5 text-xs">
+                  <a href={`/api/exportacoes/${exportacao.id}/arquivos/${arquivoDaExportacao(exportacao)}?baixar=true`} className="botao-principal px-3 py-1.5 text-xs">
                     <Download className="size-3.5" aria-hidden />
                     Baixar
                   </a>

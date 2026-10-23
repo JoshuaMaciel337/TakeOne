@@ -4,16 +4,34 @@ import { Download, FileCode, FolderArchive, LoaderCircle, QrCode, Trash2, Triang
 import { useEffect, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
+import {
+  arquivoDaExportacao,
+  type FormatoExportacao,
+  GIF_MAXIMO_S,
+  resumoDaExportacao,
+  TAXA_PADRAO_DO_GIF,
+  TAXAS_DO_GIF,
+  TAXAS_DO_VIDEO,
+} from "@/lib/exportacao/formatos";
 import { formatarBytes, formatarQuando, formatarTempo } from "@/lib/formatar";
-import { type Projeto, type Proporcao, textoDosCapitulos } from "@/lib/projeto/modelo";
+import { duracaoDoProjeto, type Projeto, type Proporcao, textoDosCapitulos } from "@/lib/projeto/modelo";
+import { ajustarAoQuadro, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Exportacao, Midia } from "@/lib/tipos";
-import { useExportacoes } from "@/lib/useExportacoes";
+import { type PedidoDeExportacao, useExportacoes } from "@/lib/useExportacoes";
 
 import { ExportarNoNavegador } from "./ExportarNoNavegador";
 import { PainelQrCelular, useLinkCelular } from "./QrDoCelular";
 import type { EstadoSalvamento } from "./useProjeto";
 
-type Resolucao = Exportacao["resolucao"];
+type Resolucao = PedidoDeExportacao["resolucao"];
+type Escolha = "video" | "gif" | "quadro" | "som";
+
+const ESCOLHAS: { id: Escolha; nome: string }[] = [
+  { id: "video", nome: "Vídeo" },
+  { id: "gif", nome: "GIF" },
+  { id: "quadro", nome: "Quadro" },
+  { id: "som", nome: "Só o som" },
+];
 
 const RESOLUCOES: { id: Resolucao; nome: string; lado: number; dica: string }[] = [
   { id: "720p", nome: "720p", lado: 720, dica: "Mais leve, sai mais rápido" },
@@ -35,13 +53,24 @@ type Props = {
   midias: ReadonlyMap<string, Midia>;
   proporcao: Proporcao;
   salvamento: EstadoSalvamento;
+  /** O cursor: o instante do quadro em PNG. */
+  tempo: Tick;
   aoFechar: () => void;
 };
 
 /** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular), ou levar a edição para outro editor. */
-export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, aoFechar }: Props) {
+export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, tempo, aoFechar }: Props) {
   const { exportacoes, erro, exportar, excluir } = useExportacoes(projetoId, true);
+  const [escolha, setEscolha] = useState<Escolha>("video");
   const [resolucao, setResolucao] = useState<Resolucao>("1080p");
+  const [taxa, setTaxa] = useState<number | null>(null);
+  const [taxaDoGif, setTaxaDoGif] = useState(TAXA_PADRAO_DO_GIF);
+  const [formatoDoSom, setFormatoDoSom] = useState<FormatoExportacao>("m4a");
+  // O quadro que a prévia mostra no cursor (o começo dele), como o render escolhe
+  const instante = ajustarAoQuadro(projeto.taxa, tempo);
+  const duracao = duracaoDoProjeto(projeto);
+  const gifLongo = escolha === "gif" && duracao > GIF_MAXIMO_S * TICKS_POR_SEGUNDO;
+  const quadroForaDoVideo = escolha === "quadro" && instante >= duracao;
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState("");
   const salvo = salvamento === "salvo";
@@ -57,7 +86,15 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
   function pedir() {
     setEnviando(true);
     setAviso("");
-    exportar(resolucao)
+    const pedido: PedidoDeExportacao =
+      escolha === "gif"
+        ? { resolucao, formato: "gif", taxa: taxaDoGif }
+        : escolha === "quadro"
+          ? { resolucao, formato: "png", tempo: instante }
+          : escolha === "som"
+            ? { resolucao, formato: formatoDoSom }
+            : { resolucao, formato: "mp4", ...(taxa ? { taxa } : {}) };
+    exportar(pedido)
       .catch((e) => setAviso(e instanceof ErroApi ? e.message : "Não foi possível pedir a exportação."))
       .finally(() => setEnviando(false));
   }
@@ -73,7 +110,7 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
       >
         <div className="flex items-center justify-between border-b border-borda px-4 py-3">
           <h2 id="titulo-exportar" className="font-display text-base font-semibold">
-            Exportar vídeo
+            Exportar
           </h2>
           <button type="button" className="botao-icone" onClick={aoFechar} aria-label="Fechar">
             <X className="size-4" aria-hidden />
@@ -84,6 +121,21 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
             celular não cabia nela */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-3 border-b border-borda p-4">
+            <div className="grid grid-cols-4 gap-1 rounded-lg bg-painel-2 p-1" role="radiogroup" aria-label="Formato">
+              {ESCOLHAS.map((opcao) => (
+                <button
+                  key={opcao.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={escolha === opcao.id}
+                  onClick={() => setEscolha(opcao.id)}
+                  className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${escolha === opcao.id ? "bg-painel-3 text-texto shadow" : "text-suave hover:text-texto"}`}
+                >
+                  {opcao.nome}
+                </button>
+              ))}
+            </div>
+            {escolha === "video" || escolha === "quadro" ? (
             <fieldset className="grid grid-cols-3 gap-2">
               <legend className="mb-2 text-xs text-suave">Resolução</legend>
               {RESOLUCOES.map((opcao) => (
@@ -100,15 +152,83 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
                 </label>
               ))}
             </fieldset>
-            <p className="text-xs text-suave">MP4 (H.264 e AAC), com o volume no padrão das redes sociais (-14 LUFS).</p>
-            <button type="button" className="botao-principal w-full" disabled={!salvo || enviando} onClick={pedir}>
+            ) : null}
+            {escolha === "video" ? (
+              <>
+                <label className="flex items-center justify-between gap-2 text-xs text-suave">
+                  Quadros por segundo
+                  <select
+                    className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto"
+                    value={taxa ?? ""}
+                    onChange={(evento) => setTaxa(evento.target.value ? Number(evento.target.value) : null)}
+                  >
+                    <option value="">Os do projeto ({formatarTaxa(projeto.taxa)})</option>
+                    {TAXAS_DO_VIDEO.map((opcao) => (
+                      <option key={opcao} value={opcao}>
+                        {opcao}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-xs text-suave">MP4 (H.264 e AAC), com o volume no padrão das redes sociais (-14 LUFS).</p>
+              </>
+            ) : escolha === "gif" ? (
+              <>
+                <label className="flex items-center justify-between gap-2 text-xs text-suave">
+                  Quadros por segundo
+                  <select
+                    className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs text-texto"
+                    value={taxaDoGif}
+                    onChange={(evento) => setTaxaDoGif(Number(evento.target.value))}
+                  >
+                    {TAXAS_DO_GIF.map((opcao) => (
+                      <option key={opcao} value={opcao}>
+                        {opcao}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-xs text-suave">
+                  GIF em laço, com o lado menor em 480 px ({tamanhoDeSaida(proporcao, 480)}) e sem som. Vale para vídeos de até {GIF_MAXIMO_S} s.
+                </p>
+              </>
+            ) : escolha === "quadro" ? (
+              <p className="text-xs text-suave">
+                O quadro do cursor ({formatarInstante(instante)}) numa imagem PNG, como a prévia mostra. Mova o cursor na linha do tempo para escolher outro.
+              </p>
+            ) : (
+              <>
+                <fieldset className="grid grid-cols-2 gap-2">
+                  <legend className="sr-only">Formato do som</legend>
+                  {[
+                    { id: "m4a" as const, nome: "M4A", dica: "AAC, leve, toca em qualquer lugar" },
+                    { id: "wav" as const, nome: "WAV", dica: "Sem perda (24 bits), para levar a outro programa" },
+                  ].map((opcao) => (
+                    <label
+                      key={opcao.id}
+                      className={`cursor-pointer rounded-lg border px-2 py-2 text-center transition ${
+                        formatoDoSom === opcao.id ? "border-destaque bg-destaque/10" : "border-borda hover:bg-painel-2"
+                      }`}
+                    >
+                      <input type="radio" name="formato-som" checked={formatoDoSom === opcao.id} onChange={() => setFormatoDoSom(opcao.id)} className="sr-only" />
+                      <span className="block text-sm font-semibold">{opcao.nome}</span>
+                      <span className="block text-[11px] text-suave">{opcao.dica}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <p className="text-xs text-suave">A mistura de todas as faixas, com o volume no padrão das redes sociais (-14 LUFS).</p>
+              </>
+            )}
+            {gifLongo ? <p className="text-xs text-erro">O vídeo passa de {GIF_MAXIMO_S} s. Para ele, exporte em vídeo.</p> : null}
+            {quadroForaDoVideo ? <p className="text-xs text-erro">O cursor está depois do fim do vídeo.</p> : null}
+            <button type="button" className="botao-principal w-full" disabled={!salvo || enviando || gifLongo || quadroForaDoVideo} onClick={pedir}>
               {enviando ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
-              {salvo ? "Exportar" : "Esperando salvar…"}
+              {!salvo ? "Esperando salvar…" : escolha === "gif" ? "Exportar o GIF" : escolha === "quadro" ? "Exportar o quadro" : escolha === "som" ? "Exportar o som" : "Exportar"}
             </button>
             {aviso ? <p className="text-xs text-erro">{aviso}</p> : null}
           </div>
 
-          <ExportarNoNavegador projeto={projeto} midias={midias} salvo={salvo} />
+          {escolha === "video" ? <ExportarNoNavegador projeto={projeto} midias={midias} salvo={salvo} /> : null}
 
           <div className="space-y-2 border-b border-borda p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Levar para outro editor</h3>
@@ -161,16 +281,16 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
 function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoExcluir: () => void }) {
   const progresso = exportacao.processamento?.progresso ?? 0;
   const celular = useLinkCelular(exportacao.id);
-  const nomeResolucao = RESOLUCOES.find((opcao) => opcao.id === exportacao.resolucao)?.nome ?? exportacao.resolucao;
+  const arquivo = arquivoDaExportacao(exportacao);
   return (
     <li className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 rounded-lg border border-borda bg-painel-2/50 px-3 py-2">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium">
-          {nomeResolucao} · {exportacao.largura} × {exportacao.altura}
-        </p>
+        <p className="truncate text-sm font-medium">{resumoDaExportacao(exportacao)}</p>
         <p className="text-xs text-suave">
           {exportacao.status === "pronta"
-            ? `${formatarTempo(exportacao.duracao)} · ${exportacao.tamanho ? formatarBytes(exportacao.tamanho) : ""} · ${formatarQuando(exportacao.concluido_em ?? exportacao.criado_em)}`
+            ? [exportacao.duracao != null ? formatarTempo(exportacao.duracao) : "", exportacao.tamanho ? formatarBytes(exportacao.tamanho) : "", formatarQuando(exportacao.concluido_em ?? exportacao.criado_em)]
+                .filter(Boolean)
+                .join(" · ")
             : exportacao.status === "erro"
               ? "Não deu certo"
               : `${exportacao.processamento?.mensagem || "Na fila"} · ${progresso}%`}
@@ -180,10 +300,10 @@ function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoE
         {exportacao.status === "pronta" ? (
           <>
             <a
-              href={`/api/exportacoes/${exportacao.id}/arquivos/video.mp4?baixar=true`}
+              href={`/api/exportacoes/${exportacao.id}/arquivos/${arquivo}?baixar=true`}
               className="botao-icone"
-              aria-label="Baixar o vídeo"
-              title="Baixar o vídeo"
+              aria-label="Baixar"
+              title="Baixar"
             >
               <Download className="size-4" aria-hidden />
             </a>
@@ -211,6 +331,18 @@ function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoE
       ) : null}
     </li>
   );
+}
+
+/** 30 → "30", 30000/1001 → "29,97". */
+function formatarTaxa(taxa: Projeto["taxa"]): string {
+  const valor = taxa.num / taxa.den;
+  return Number.isInteger(valor) ? String(valor) : valor.toFixed(2).replace(".", ",");
+}
+
+/** O instante com centésimos: "0:12,03". */
+function formatarInstante(ticks: Tick): string {
+  const segundos = ticks / TICKS_POR_SEGUNDO;
+  return `${Math.floor(segundos / 60)}:${(Math.floor((segundos % 60) * 100) / 100).toFixed(2).padStart(5, "0").replace(".", ",")}`;
 }
 
 /** Os marcadores como capítulos ("00:00 Nome", um por linha), para colar na descrição do vídeo. */

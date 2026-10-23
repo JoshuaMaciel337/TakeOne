@@ -11,6 +11,7 @@ from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
+from core.modelos.exportacao import TAXAS_DO_GIF, TAXAS_DO_VIDEO
 from core.modelos.geracao import DESCRICAO_MAXIMA, DESCRICAO_MINIMA, DURACOES
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.midia import STATUS_ERRO, STATUS_PROCESSANDO, arquivo_publico
@@ -898,6 +899,21 @@ class ProjetoResumoSaida(BaseModel):
 class ExportacaoCriarEntrada(BaseModel):
     projeto_id: str = Field(min_length=24, max_length=24)
     resolucao: Literal["720p", "1080p", "4k"] = "1080p"
+    # mp4; gif (480p); png (o quadro em `tempo`); m4a ou wav (só o som)
+    formato: Literal["mp4", "gif", "png", "m4a", "wav"] = "mp4"
+    # Quadros por segundo no lugar dos do projeto: 24 a 60 no vídeo, 10 a 24 no GIF
+    taxa: Literal[10, 15, 24, 25, 30, 50, 60] | None = None
+    tempo: int | None = Field(default=None, ge=0, description="Em ticks; só no png")
+
+    @model_validator(mode="after")
+    def _conferir(self):
+        if self.formato == "png" and self.tempo is None:
+            raise ValueError("Diga o instante do quadro.")
+        if self.taxa is not None and self.formato == "mp4" and self.taxa not in TAXAS_DO_VIDEO:
+            raise ValueError(f"O vídeo sai em {', '.join(map(str, TAXAS_DO_VIDEO))} quadros por segundo.")
+        if self.taxa is not None and self.formato == "gif" and self.taxa not in TAXAS_DO_GIF:
+            raise ValueError(f"O GIF sai em {', '.join(map(str, TAXAS_DO_GIF))} quadros por segundo.")
+        return self
 
 
 class ExportacaoSaida(BaseModel):
@@ -905,6 +921,9 @@ class ExportacaoSaida(BaseModel):
     projeto_id: str
     nome: str
     resolucao: str
+    formato: str = "mp4"
+    taxa: int | None = None
+    tempo: int | None = None
     largura: int
     altura: int
     status: str

@@ -5,6 +5,7 @@
 # pelos eventos do job, como na ingestão das mídias.
 # -----------------------------------------------
 import logging
+from pathlib import Path
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -15,11 +16,13 @@ from starlette.concurrency import run_in_threadpool
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import ExportacaoCriarEntrada, ExportacaoSaida, LinkCelularSaida, exportacao_para_saida
 from core.modelos.exportacao import (
-    ARQUIVO_VIDEO,
     ARQUIVOS_PUBLICOS,
+    GIF_MAXIMO_S,
     PRIORIDADE_RENDER,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
+    TIPOS_DOS_ARQUIVOS,
+    arquivo_do_formato,
     chave_exportacao,
     montar_exportacao,
     montar_link_celular,
@@ -30,6 +33,7 @@ from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.utils import storage
 from core.utils.mongo import agora
+from core.utils.tempo import TICKS_POR_SEGUNDO
 
 router = APIRouter(prefix="/api/exportacoes", tags=["exportacoes"])
 
@@ -94,13 +98,21 @@ async def criar_exportacao(dados: ExportacaoCriarEntrada, usuario=Depends(usuari
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "O projeto está vazio. Coloque alguma mídia na linha do tempo antes de exportar.")
 
-    exportacao = montar_exportacao(usuario["organizacao_id"], usuario["_id"], projeto, dados.resolucao)
+    if dados.formato == "png" and dados.tempo >= projeto["duracao"]:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O quadro pedido fica depois do fim do vídeo.")
+    if dados.formato == "gif" and projeto["duracao"] > GIF_MAXIMO_S * TICKS_POR_SEGUNDO:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"O GIF vale para vídeos de até {GIF_MAXIMO_S} s. Para um mais longo, exporte em MP4.")
+
+    exportacao = montar_exportacao(usuario["organizacao_id"], usuario["_id"], projeto, dados.resolucao,
+                                   formato=dados.formato, taxa=dados.taxa, tempo=dados.tempo)
     exportacao["_id"] = (await db.exportacoes.insert_one(exportacao)).inserted_id
     job = montar_job("renderizacao", usuario["organizacao_id"], {"exportacao_id": str(exportacao["_id"])},
                      prioridade=PRIORIDADE_RENDER, criado_por=usuario["_id"])
     exportacao["job_id"] = (await db.jobs.insert_one(job)).inserted_id
     await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"job_id": exportacao["job_id"]}})
-    logging.info(f"[{usuario['organizacao_id']}] Exportação pedida: {projeto['nome']} em {dados.resolucao}")
+    logging.info(f"[{usuario['organizacao_id']}] Exportação pedida: {projeto['nome']} em {dados.formato} "
+                 f"{exportacao['resolucao']}")
     return (await para_saida(db, [exportacao]))[0]
 
 
@@ -125,7 +137,7 @@ async def ver_exportacao(exportacao_id: str, usuario=Depends(usuario_atual), db=
 @router.get("/{exportacao_id}/arquivos/{nome}")
 async def baixar_arquivo(exportacao_id: str, nome: str, baixar: bool = False,
                          usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    """O vídeo final. Com baixar=true, o navegador salva o arquivo com o nome do projeto."""
+    """O arquivo final. Com baixar=true, o navegador salva o arquivo com o nome do projeto."""
     exportacao = await buscar_exportacao(db, exportacao_id, usuario)
     if nome not in ARQUIVOS_PUBLICOS or nome not in exportacao.get("arquivos", []):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
@@ -134,8 +146,8 @@ async def baixar_arquivo(exportacao_id: str, nome: str, baixar: bool = False,
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
     return FileResponse(
         caminho,
-        media_type="video/mp4",
-        filename=nome_de_arquivo(exportacao["nome"]) if baixar else None,
+        media_type=TIPOS_DOS_ARQUIVOS[nome],
+        filename=nome_de_arquivo(exportacao["nome"], Path(nome).suffix) if baixar else None,
         content_disposition_type="attachment" if baixar else "inline",
         headers={"Cache-Control": "private, max-age=86400"},
     )
@@ -151,8 +163,9 @@ async def excluir_exportacao(exportacao_id: str, usuario=Depends(usuario_atual),
 async def criar_link_celular(exportacao_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Um link de 24 h para o QR code: o celular baixa o vídeo sem entrar na conta."""
     exportacao = await buscar_exportacao(db, exportacao_id, usuario)
-    if exportacao["status"] != STATUS_PRONTA or ARQUIVO_VIDEO not in exportacao.get("arquivos", []):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Espere o vídeo ficar pronto.")
+    if exportacao["status"] != STATUS_PRONTA or arquivo_do_formato(exportacao.get("formato")) not in exportacao.get(
+            "arquivos", []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Espere o arquivo ficar pronto.")
     token, link = montar_link_celular()
     await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"link_celular": link}})
     return LinkCelularSaida(caminho=f"/api/baixar/{token}", expira_em=link["expira_em"])

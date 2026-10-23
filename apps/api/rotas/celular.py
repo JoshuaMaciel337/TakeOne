@@ -7,6 +7,7 @@
 # O token vale 24 horas e só abre aquele vídeo (core/modelos/exportacao.py).
 # -----------------------------------------------
 import io
+from pathlib import Path
 
 import segno
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -14,8 +15,9 @@ from fastapi.responses import FileResponse
 
 from api.dependencias import obter_db, usuario_atual
 from core.modelos.exportacao import (
-    ARQUIVO_VIDEO,
     STATUS_PRONTA,
+    TIPOS_DOS_ARQUIVOS,
+    arquivo_do_formato,
     chave_exportacao,
     hash_do_token,
     link_vencido,
@@ -33,10 +35,12 @@ async def baixar_pelo_link(token: str, db=Depends(obter_db)):
     exportacao = await db.exportacoes.find_one({"link_celular.token_hash": hash_do_token(token)}) if token else None
     if exportacao is None or exportacao["status"] != STATUS_PRONTA or link_vencido(exportacao.get("link_celular")):
         raise HTTPException(status.HTTP_404_NOT_FOUND, MENSAGEM_LINK_INVALIDO)
-    caminho = storage.caminho_local(chave_exportacao(exportacao["organizacao_id"], exportacao["_id"], ARQUIVO_VIDEO))
+    arquivo = arquivo_do_formato(exportacao.get("formato"))
+    caminho = storage.caminho_local(chave_exportacao(exportacao["organizacao_id"], exportacao["_id"], arquivo))
     if not caminho.is_file():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "O vídeo não foi encontrado no servidor.")
-    return FileResponse(caminho, media_type="video/mp4", filename=nome_de_arquivo(exportacao["nome"]),
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "O arquivo não foi encontrado no servidor.")
+    return FileResponse(caminho, media_type=TIPOS_DOS_ARQUIVOS[arquivo],
+                        filename=nome_de_arquivo(exportacao["nome"], Path(arquivo).suffix),
                         headers={"Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer"})
 
 

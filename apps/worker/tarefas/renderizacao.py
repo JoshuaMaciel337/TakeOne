@@ -6,6 +6,9 @@
 #   3. mistura o som num arquivo e mede o loudness dele (primeira passada, só de áudio)
 #   4. gera o vídeo com o som já misturado (segunda passada), com o progresso indo para o job
 #   5. confere o arquivo gerado e marca a exportação como pronta
+#
+# Os outros formatos usam o mesmo grafo: o quadro em PNG (só os clipes daquele instante, em RGB), o GIF
+# (os quadros em RGB sem perda, a paleta e o GIF) e só o som (a primeira passada e o ganho até -14 LUFS).
 # -----------------------------------------------
 import logging
 from collections.abc import Callable
@@ -14,10 +17,10 @@ from pathlib import Path
 from bson import ObjectId
 
 from core.modelos.exportacao import (
-    ARQUIVO_VIDEO,
     STATUS_ERRO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
+    arquivo_do_formato,
     chave_exportacao,
 )
 from core.modelos.job import ErroDefinitivo
@@ -47,18 +50,25 @@ from core.utils.render import (
     ErroRender,
     ImagemDoTexto,
     MidiaDoRender,
+    argumentos_da_paleta,
     argumentos_de_saida,
+    argumentos_do_gif,
+    argumentos_do_quadro,
     argumentos_do_som,
+    argumentos_do_som_final,
     argumentos_do_video,
+    argumentos_dos_quadros_sem_perda,
     ganho_para_o_alvo,
     ler_loudness,
     planejar_render,
+    projeto_do_quadro,
 )
 from core.utils.som import wav_do_reverb
 from core.utils.texto import desenhar_texto, layout_do_texto
 
 ARQUIVO_FILTRO = "filtro.txt"
-ARQUIVO_PARCIAL = "video.parcial.mp4"
+ARQUIVO_QUADROS = "quadros.mkv"
+ARQUIVO_PALETA = "paleta.png"
 
 
 def arquivo_da_midia(midia: dict) -> Path | None:
@@ -176,13 +186,43 @@ def marcar_exportacao_com_erro(db, job: dict, mensagem: str):
         }})
 
 
+def escrever_auxiliares(plano):
+    """LUTs da cor, roteiros e imagens (vinhetas, luz, cantos, grão) que o grafo abre."""
+    for auxiliar in plano.auxiliares:
+        if auxiliar.tipo == "lut":
+            Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
+        elif auxiliar.tipo == "comandos":
+            Path(auxiliar.caminho).write_text(auxiliar.conteudo, encoding="utf-8")
+        elif auxiliar.tipo == "reverb":
+            Path(auxiliar.caminho).write_bytes(wav_do_reverb())
+        elif auxiliar.tipo == "luz":
+            tira_de_luz(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["forca"]).save(auxiliar.caminho)
+        elif auxiliar.tipo in ("cantos", "anel"):
+            mascara, anel = desenhar_cantos(auxiliar.largura, auxiliar.altura, auxiliar.ajustes)
+            (mascara if auxiliar.tipo == "cantos" else anel).save(auxiliar.caminho)
+        elif auxiliar.tipo == "grao":
+            imagem_do_grao(auxiliar.ajustes["forca"]).save(auxiliar.caminho)
+        else:
+            desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"],
+                             auxiliar.ajustes.get("linhas", 0), LINHAS_POR_ALTURA).save(auxiliar.caminho)
+
+
 def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     exportacao = db.exportacoes.find_one({"_id": ObjectId(job["entrada"]["exportacao_id"])})
     if exportacao is None:
         raise ErroDefinitivo("A exportação foi excluída antes do render.")
     organizacao_id = exportacao["organizacao_id"]
     projeto = exportacao["projeto"]
+    formato = exportacao.get("formato") or "mp4"
+    so_som = formato in ("m4a", "wav")
+    imagem_rgb = formato in ("png", "gif")
     rotulo = f"[{organizacao_id}] [exportacao {exportacao['_id']}]"
+    if exportacao.get("taxa"):
+        # Outra taxa de quadros: a montagem inteira passa a ser nessa grade (as transições, os cortes)
+        projeto = {**projeto, "taxa": {"num": exportacao["taxa"], "den": 1}}
+    indice = None
+    if formato == "png":
+        projeto, indice = projeto_do_quadro(projeto, exportacao.get("tempo") or 0)
 
     def caminho(nome: str) -> Path:
         return storage.caminho_local(chave_exportacao(organizacao_id, exportacao["_id"], nome))
@@ -198,47 +238,56 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
     pasta.mkdir(parents=True, exist_ok=True)
     # Os grafos ficam num arquivo: com muitos clipes eles passam do limite da linha de comando
     filtro = caminho(ARQUIVO_FILTRO)
-    parcial = caminho(ARQUIVO_PARCIAL)
+    arquivo_final = arquivo_do_formato(formato)
+    parcial = caminho(f"parcial{Path(arquivo_final).suffix}")
+    quadros = caminho(ARQUIVO_QUADROS)
+    paleta = caminho(ARQUIVO_PALETA)
     # Tudo o que o render grava fica dentro do try: com o plano recusado ou o FFmpeg falhando, os PNGs dos
     # textos (e dos destaques) e o vídeo pela metade ficavam na pasta até a exportação ser excluída
     textos: dict = {}
     plano = None
     gerou = False
     try:
-        textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
+        if not so_som:
+            textos = preparar_textos(projeto["faixas"], largura, altura, pasta)
         try:
-            plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta))
+            plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), imagem_rgb=imagem_rgb,
+                                    sem_imagem=so_som)
         except ErroRender as e:
             raise ErroDefinitivo(str(e)) from e
-        logging.info(f"{rotulo} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
-        # LUTs da cor e imagens das vinhetas que o grafo usa (as duas passadas abrem as mesmas entradas)
-        for auxiliar in plano.auxiliares:
-            if auxiliar.tipo == "lut":
-                Path(auxiliar.caminho).write_text(gerar_cube(auxiliar.ajustes), encoding="utf-8")
-            elif auxiliar.tipo == "comandos":
-                Path(auxiliar.caminho).write_text(auxiliar.conteudo, encoding="utf-8")
-            elif auxiliar.tipo == "reverb":
-                Path(auxiliar.caminho).write_bytes(wav_do_reverb())
-            elif auxiliar.tipo == "luz":
-                tira_de_luz(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["forca"]).save(auxiliar.caminho)
-            elif auxiliar.tipo in ("cantos", "anel"):
-                mascara, anel = desenhar_cantos(auxiliar.largura, auxiliar.altura, auxiliar.ajustes)
-                (mascara if auxiliar.tipo == "cantos" else anel).save(auxiliar.caminho)
-            elif auxiliar.tipo == "grao":
-                imagem_do_grao(auxiliar.ajustes["forca"]).save(auxiliar.caminho)
-            else:
-                desenhar_vinheta(auxiliar.largura, auxiliar.altura, auxiliar.ajustes["vinheta"],
-                                 auxiliar.ajustes.get("linhas", 0), LINHAS_POR_ALTURA).save(auxiliar.caminho)
-        if plano.tem_som:
-            ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 12), "Misturando o som"), rotulo)
-            plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho)
-        filtro.write_text(plano.filtro, encoding="utf-8")
-        argumentos = argumentos_do_video(plano, str(filtro))
-        argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))
-        executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(15 + int(f * 80), "Gerando o vídeo"))
+        logging.info(f"{rotulo} {formato} {largura}x{altura}, {plano.duracao:.1f}s, {len(plano.entradas)} clipes")
+        escrever_auxiliares(plano)
+        if so_som:
+            if not plano.tem_som:
+                raise ErroDefinitivo("O projeto não tem som para exportar.")
+            ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 80), "Misturando o som"), rotulo)
+            executar_ffmpeg(argumentos_do_som_final(plano, ganho, str(parcial), formato), plano.duracao,
+                            lambda f: reportar(85 + int(f * 10), "Gravando o som"))
+        elif formato == "png":
+            filtro.write_text(plano.filtro, encoding="utf-8")
+            argumentos = argumentos_do_video(plano, str(filtro)) + argumentos_do_quadro(plano, indice, str(parcial))
+            executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(5 + int(f * 90), "Desenhando o quadro"))
+        elif formato == "gif":
+            filtro.write_text(plano.filtro, encoding="utf-8")
+            argumentos = argumentos_do_video(plano, str(filtro)) + argumentos_dos_quadros_sem_perda(plano, str(quadros))
+            executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(5 + int(f * 75), "Gerando os quadros"))
+            executar_ffmpeg(argumentos_da_paleta(str(quadros), str(paleta)), plano.duracao,
+                            lambda f: reportar(80 + int(f * 5), "Escolhendo as cores"))
+            executar_ffmpeg(argumentos_do_gif(str(quadros), str(paleta), str(parcial)), plano.duracao,
+                            lambda f: reportar(85 + int(f * 10), "Gravando o GIF"))
+        else:
+            if plano.tem_som:
+                ganho = misturar_o_som(plano, filtro, lambda f: reportar(3 + int(f * 12), "Misturando o som"), rotulo)
+                plano = planejar_render(projeto, midias, largura, altura, textos, pasta=str(pasta), ganho_db=ganho)
+            filtro.write_text(plano.filtro, encoding="utf-8")
+            argumentos = argumentos_do_video(plano, str(filtro))
+            argumentos += argumentos_de_saida(plano, str(parcial), max(largura, altura))
+            executar_ffmpeg(argumentos, plano.duracao, lambda f: reportar(15 + int(f * 80), "Gerando o vídeo"))
         gerou = True
     finally:
         filtro.unlink(missing_ok=True)
+        quadros.unlink(missing_ok=True)
+        paleta.unlink(missing_ok=True)
         for imagem in textos.values():
             Path(imagem.caminho).unlink(missing_ok=True)
             if imagem.destaque:
@@ -251,24 +300,25 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         if not gerou:
             parcial.unlink(missing_ok=True)
 
-    reportar(97, "Conferindo o vídeo")
+    reportar(97, "Conferindo o arquivo")
     try:
         resumo = resumir_sondagem(sondar(parcial))
     except ErroFFmpeg as e:
         parcial.unlink(missing_ok=True)
-        raise ErroFFmpeg(f"O vídeo gerado não abre: {e}") from e
-    final = caminho(ARQUIVO_VIDEO)
+        raise ErroFFmpeg(f"O arquivo gerado não abre: {e}") from e
+    final = caminho(arquivo_final)
     parcial.replace(final)
 
     momento = agora()
+    duracao = None if formato == "png" else resumo["duracao"]
     db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {
         "status": STATUS_PRONTA,
-        "arquivos": [ARQUIVO_VIDEO],
+        "arquivos": [arquivo_final],
         "tamanho": final.stat().st_size,
-        "duracao": resumo["duracao"],
+        "duracao": duracao,
         "erro": None,
         "concluido_em": momento,
         "atualizado_em": momento,
     }})
-    reportar(100, "Vídeo pronto")
-    return {"exportacao_id": str(exportacao["_id"]), "duracao": resumo["duracao"], "tamanho": final.stat().st_size}
+    reportar(100, "Pronto")
+    return {"exportacao_id": str(exportacao["_id"]), "duracao": duracao, "tamanho": final.stat().st_size}

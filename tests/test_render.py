@@ -17,12 +17,14 @@ from core.utils.render import (
     ImagemDoTexto,
     MidiaDoRender,
     argumentos_de_saida,
+    argumentos_do_quadro,
     argumentos_do_som,
     argumentos_do_video,
     cadeia_atempo,
     ganho_para_o_alvo,
     ler_loudness,
     planejar_render,
+    projeto_do_quadro,
 )
 from core.utils.som import afir_sem_normalizar
 from core.utils.tempo import TICKS_POR_SEGUNDO
@@ -172,6 +174,55 @@ def test_exportacao_guarda_uma_copia_do_projeto():
     assert exportacao["projeto"]["versao"] == 7 and "midias_usadas" not in exportacao["projeto"]
     assert nome_de_arquivo("Reels · Lançamento!") == "reels-lancamento.mp4"
     assert nome_de_arquivo("!!!") == "takeone.mp4"
+
+
+def test_formatos_da_exportacao_ajustam_tamanho_e_taxa():
+    doc = {"_id": "p1", "nome": "x", **projeto([faixa("principal", [clipe("c1", "deitado", 0, 4)])]), "versao": 1}
+    gif = montar_exportacao("org", "usuario", doc, "4k", formato="gif")
+    assert (gif["resolucao"], gif["largura"], gif["altura"], gif["taxa"]) == ("480p", 480, 854, 15)
+    quadro = montar_exportacao("org", "usuario", doc, "1080p", formato="png", taxa=60, tempo=S)
+    assert (quadro["taxa"], quadro["tempo"], quadro["largura"]) == (None, S, 1080)
+    som = montar_exportacao("org", "usuario", doc, "4k", formato="m4a", taxa=60, tempo=S)
+    assert (som["resolucao"], som["taxa"], som["tempo"]) == ("720p", None, None)
+    assert nome_de_arquivo("Só o som", ".m4a") == "so-o-som.m4a"
+
+
+def test_projeto_do_quadro_fica_so_com_o_que_aparece_e_adianta():
+    quadro = S // 30
+    principal = [clipe("a", "deitado", 0, 2), clipe("b", "deitado", 2, 2, transicao={"tipo": "fusao", "duracao": S}),
+                 clipe("c", "deitado", 4, 2)]
+    musica = [clipe("m", "musica", 0, 6)]
+    original = projeto([faixa("principal", principal), faixa("audio", musica)], duracao=6)
+    recortado, indice = projeto_do_quadro(original, 4 * S + quadro // 2)
+    # "a" acaba 2 s antes: nem a folga da transição (1 s e um quadro) chega nele
+    assert [c["id"] for c in recortado["faixas"][0]["clipes"]] == ["b", "c"]
+    # A música começa no zero: o projeto não adianta, e o quadro é o 120 (4 s a 30 por segundo)
+    assert indice == 120 and recortado["duracao"] == 121 * quadro
+    sem_musica, indice = projeto_do_quadro({**original, "faixas": original["faixas"][:1]}, 5 * S)
+    assert indice == 90 and [c["inicio"] for c in sem_musica["faixas"][0]["clipes"]] == [0, 2 * S]
+    assert sem_musica["duracao"] == 91 * quadro
+    vazio, indice = projeto_do_quadro(projeto([faixa("principal", [clipe("a", "deitado", 0, 1)])], duracao=1), S // 2)
+    assert indice == 15 and [c["id"] for c in vazio["faixas"][0]["clipes"]] == ["a"]
+
+
+def test_quadro_e_gif_saem_em_rgb_sem_som():
+    plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4)])]), MIDIAS, 1080, 1920,
+                            imagem_rgb=True)
+    assert plano.filtro.rstrip().endswith("format=rgb24[v]") and "[a]" not in plano.filtro
+    assert plano.tem_som, "a mistura continua planejada (o GIF e o quadro só não a usam)"
+    assert not any(argumento.endswith("som.mka") for argumento in argumentos_do_video(plano, "/tmp/f.txt"))
+    argumentos = argumentos_do_quadro(plano, 45, "/tmp/q.png")
+    assert argumentos[argumentos.index("-ss") + 1] == "1.483333" and "-frames:v" in argumentos
+    assert argumentos_do_quadro(plano, 0, "/tmp/q.png")[3] == "0"
+
+
+def test_so_o_som_nao_precisa_dos_textos():
+    texto = {"id": "t", "midia_id": None, "inicio": 0, "duracao": S, "texto": {"conteudo": "Oi"}, **PADRAO}
+    faixas = [faixa("texto", [texto]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]
+    with pytest.raises(ErroRender):
+        planejar_render(projeto(faixas), MIDIAS, 720, 1280)
+    plano = planejar_render(projeto(faixas), MIDIAS, 720, 1280, sem_imagem=True)
+    assert plano.tem_som and "overlay" not in plano.filtro
 
 
 def test_link_do_celular_vale_24_horas_e_guarda_so_o_hash():

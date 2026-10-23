@@ -522,7 +522,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Câmera lenta suave (minterpolate no trecho do clipe; aba Velocidade).
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.
   - [x] Marcadores na régua (tecla M, nome e cor, Shift+↑/↓), o ímã nos marcadores e nos keyframes, capítulos na janela Exportar e no XML.
-  - [ ] Exportar o quadro, outra taxa de quadros, só o som e GIF.
+  - [x] Exportar o quadro, outra taxa de quadros, só o som e GIF (e o quadro certo em vídeos de celular no render).
   - [ ] Mais modos de mesclagem.
   - [ ] Importar LUT (.cube) e igualar a cor de outro clipe.
   - [ ] Contorno e sombra em recortes (vídeo sem fundo, logos e formas).

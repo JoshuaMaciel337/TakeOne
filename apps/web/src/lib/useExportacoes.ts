@@ -4,7 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
+import type { FormatoExportacao } from "@/lib/exportacao/formatos";
 import type { Exportacao } from "@/lib/tipos";
+
+export type PedidoDeExportacao = {
+  resolucao: "720p" | "1080p" | "4k";
+  formato: FormatoExportacao;
+  /** Quadros por segundo; sem ela, os do projeto (no GIF, 15). */
+  taxa?: number;
+  /** O instante do quadro, em ticks (só no png). */
+  tempo?: number;
+};
 
 /**
  * Exportações de um projeto. O progresso de cada render chega pelos eventos dos jobs; quando um
@@ -50,8 +60,8 @@ export function useExportacoes(projetoId: string, ativo: boolean) {
   });
 
   const exportar = useCallback(
-    async (resolucao: Exportacao["resolucao"]) => {
-      const nova = await chamarApi<Exportacao>("/exportacoes", { metodo: "POST", corpo: { projeto_id: projetoId, resolucao } });
+    async (pedido: PedidoDeExportacao) => {
+      const nova = await chamarApi<Exportacao>("/exportacoes", { metodo: "POST", corpo: { projeto_id: projetoId, ...pedido } });
       setExportacoes((lista) => [nova, ...(lista ?? [])]);
     },
     [projetoId],

@@ -1,4 +1,5 @@
 // Formatos que a API devolve. Espelham apps/api/esquemas.py.
+import type { FormatoExportacao } from "./exportacao/formatos";
 import type { PedidoDeForma } from "./elementos";
 
 export type Usuario = {
@@ -125,7 +126,12 @@ export type Exportacao = {
   id: string;
   projeto_id: string;
   nome: string;
-  resolucao: "720p" | "1080p" | "4k";
+  resolucao: "480p" | "720p" | "1080p" | "4k";
+  /** mp4 (o padrão), gif, png (o quadro em `tempo`), m4a ou wav (só o som). */
+  formato?: FormatoExportacao;
+  /** Quadros por segundo no lugar dos do projeto; null mantém. */
+  taxa?: number | null;
+  tempo?: number | null;
   largura: number;
   altura: number;
   status: "processando" | "pronta" | "erro";

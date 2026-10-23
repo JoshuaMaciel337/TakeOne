@@ -207,6 +207,8 @@ class PlanoDeRender:
     # o som de um clipe que entra depois (adelay) e o vídeo ficam esperando um pelo outro.
     filtro_som: str = ""
     som: str = ""
+    # O grafo termina em RGB e sem som (quadro em PNG e GIF): a mistura não entra na segunda passada
+    imagem_rgb: bool = False
 
 
 class ErroRender(ValueError):
@@ -901,13 +903,15 @@ def _com_os_invertidos(projeto: dict, midias: dict[str, MidiaDoRender]) -> tuple
 
 def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: int, altura: int,
                     textos: dict[str, ImagemDoTexto] | None = None, pasta: str = ".",
-                    ganho_db: float = 0.0) -> PlanoDeRender:
+                    ganho_db: float = 0.0, imagem_rgb: bool = False, sem_imagem: bool = False) -> PlanoDeRender:
     """
     projeto: a cópia guardada na exportação (proporcao, taxa, fundo, faixas, duracao).
     midias: id → arquivo e tamanho da imagem de cada mídia usada.
     textos: id do clipe → PNG de cada clipe de texto.
     pasta: onde o worker grava as LUTs e as imagens de vinheta listadas em `auxiliares`.
     ganho_db: o ganho da mistura, medido na primeira passada (veja ganho_para_o_alvo).
+    imagem_rgb: a imagem sai em RGB, sem a conversão para o vídeo e sem o som no grafo (o quadro em PNG e o GIF).
+    sem_imagem: só o som interessa (exportar só o som): os textos não são desenhados nem entram no grafo.
     """
     textos = textos or {}
     duracao = segundos(projeto["duracao"])
@@ -953,6 +957,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             continue
         if clipe.get("texto"):
             imagem = textos.get(clipe["id"])
+            if imagem is None and sem_imagem:
+                continue
             if imagem is None:
                 raise ErroRender("Faltou a imagem de um texto do projeto.")
             entradas.append(Entrada(imagem.caminho, 0, segundos(clipe["duracao"]), imagem=True, taxa=taxa))
@@ -981,8 +987,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
     linhas = [f"color=c=0x{cor}:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp[base0]"]
     anterior = "base0"
     # Cada clipe é uma camada; o texto com destaque ganha outra por cima, com a imagem do destaque
-    camadas = [(c, destaque) for f in visuais for c in f["clipes"]
-               for destaque in ((False, True) if c["id"] in indice_do_destaque else (False,))]
+    camadas = [] if sem_imagem else [(c, destaque) for f in visuais for c in f["clipes"]
+                                     for destaque in ((False, True) if c["id"] in indice_do_destaque else (False,))]
     for numero, (clipe, destaque) in enumerate(camadas, start=1):
         if clipe.get("ajuste"):
             anterior = _camada_de_ajuste(clipe, anterior, numero, largura, altura, taxa, pasta, quadro, entradas,
@@ -1163,8 +1169,12 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             linhas.append(f"[n{numero}][c{numero}]{overlay}[l{numero}]")
             linhas.append(f"[{anterior}][l{numero}]blend=all_mode={MODOS_DE_MESCLAGEM[mesclagem]},format=gbrp[base{numero}]")
         anterior = f"base{numero}"
-    # A saída é sempre BT.709, marcada (argumentos_de_saida): todo player mostra a cor da prévia
-    linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,{FILTRO_MARCAS_BT709}[v]")
+    if imagem_rgb:
+        # O PNG e o GIF guardam a cor como o canvas da prévia a mostra: sem passar pelo YUV
+        linhas.append(f"[{anterior}]format=rgb24[v]")
+    else:
+        # A saída é sempre BT.709, marcada (argumentos_de_saida): todo player mostra a cor da prévia
+        linhas.append(f"[{anterior}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,{FILTRO_MARCAS_BT709}[v]")
 
     sons, linhas_som = [], []
     for faixa in com_som:
@@ -1235,9 +1245,6 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 cadeia = _som_do_clipe(entrada_do_som, clipe, pular, abaixar, igualar, reverb, andamento,
                                        antes, max(depois, 0), mistura)
                 linhas_som.append(f"{cadeia}[{sons[-1]}]")
-    inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
-    fim_do_som = (f"apad,atrim=0:{_numero(duracao)},"
-                  f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}[a]")
     filtro_som = som = ""
     if sons:
         # O som é misturado e medido antes, num arquivo (filtro_som); aqui ele entra depois das mídias.
@@ -1246,14 +1253,82 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         filtro_som = ";\n".join([*linhas_som, "".join(f"[{rotulo}]" for rotulo in sons)
                                  + f"amix=inputs={len(sons)}:duration=longest:normalize=0,"
                                  + f"aresample={TAXA_AUDIO},ebur128=framelog=quiet[m]"])
-        limite = 10 ** (PICO_MAXIMO_DB / 20)
-        linhas.append(f"[{len(entradas)}:a]volume={_numero(ganho_db)}dB,"
-                      f"alimiter=limit={_numero(limite)}:level=0:latency=1,{fim_do_som}")
-    else:
-        linhas.append(f"anullsrc=r={TAXA_AUDIO}:cl=stereo,{fim_do_som}")
+        if not imagem_rgb:
+            linhas.append(f"[{len(entradas)}:a]{cadeia_final_do_som(ganho_db, duracao)}[a]")
+    elif not imagem_rgb:
+        linhas.append(f"anullsrc=r={TAXA_AUDIO}:cl=stereo,{_fim_do_som(duracao)}[a]")
 
     return PlanoDeRender(entradas=entradas, filtro=";\n".join(linhas), duracao=duracao, taxa=taxa, tem_som=bool(sons),
-                         auxiliares=tuple(auxiliares.values()), filtro_som=filtro_som, som=som)
+                         auxiliares=tuple(auxiliares.values()), filtro_som=filtro_som, som=som, imagem_rgb=imagem_rgb)
+
+
+def _fim_do_som(duracao: float) -> str:
+    inicio_fade_saida = _numero(max(duracao - FADE_SAIDA, 0))
+    return (f"apad,atrim=0:{_numero(duracao)},"
+            f"afade=t=in:d={FADE_ENTRADA},afade=t=out:st={inicio_fade_saida}:d={FADE_SAIDA}")
+
+
+def cadeia_final_do_som(ganho_db: float, duracao: float) -> str:
+    """Da mistura medida ao som que sai: ganho fixo até o alvo, limitador só nos picos, a duração e os fades."""
+    limite = 10 ** (PICO_MAXIMO_DB / 20)
+    return f"volume={_numero(ganho_db)}dB,alimiter=limit={_numero(limite)}:level=0:latency=1,{_fim_do_som(duracao)}"
+
+
+def projeto_do_quadro(projeto: dict, tempo: int) -> tuple[dict, int]:
+    """
+    O projeto só com o que aparece no quadro de `tempo` (ticks), adiantado para começar perto dele, e o número
+    do quadro nesse projeto. O render de um quadro só precisa dos clipes que estão nele (com a folga das
+    transições, que mostram os vizinhos); sem os outros e sem o começo vazio, o FFmpeg não passa pelo vídeo
+    inteiro até chegar lá. Tudo nos clipes é contado do começo deles, então adiantar não muda o desenho.
+    """
+    num, den = projeto["taxa"]["num"], projeto["taxa"]["den"]
+    quadro = TICKS_POR_SEGUNDO * den // num
+    indice = tempo * num // (TICKS_POR_SEGUNDO * den)
+    instante = indice * quadro
+    folga = quadro + max((c["transicao"]["duracao"] for f in projeto["faixas"] for c in f["clipes"]
+                          if c.get("transicao")), default=0)
+    faixas = [{**f, "clipes": [c for c in f["clipes"]
+                               if c["inicio"] - folga <= instante < c["inicio"] + c["duracao"] + folga]}
+              for f in projeto["faixas"]]
+    inicios = [c["inicio"] for f in faixas for c in f["clipes"]]
+    adiantar = min(min(inicios, default=instante), instante) // quadro
+    faixas = [{**f, "clipes": [{**c, "inicio": c["inicio"] - adiantar * quadro} for c in f["clipes"]]} for f in faixas]
+    indice -= adiantar
+    return {**projeto, "faixas": faixas, "duracao": (indice + 1) * quadro}, indice
+
+
+def argumentos_do_quadro(plano: PlanoDeRender, indice: int, caminho_saida: str) -> list[str]:
+    """O quadro `indice` do grafo (feito com imagem_rgb) num PNG: os anteriores passam pelo grafo e ficam de fora."""
+    taxa = taxa_em_fracao(plano.taxa)
+    # Meio quadro antes: o quadro `indice` é o primeiro que fica, sem depender do arredondamento do tempo dele
+    return ["-map", "[v]", "-ss", _numero(float((indice - Fraction(1, 2)) / taxa)) if indice else "0",
+            "-frames:v", "1", "-update", "1", "-c:v", "png", caminho_saida]
+
+
+def argumentos_dos_quadros_sem_perda(plano: PlanoDeRender, caminho_saida: str) -> list[str]:
+    """Os quadros do GIF, antes da paleta: em FFV1 (sem perda), para a paleta e o GIF lerem a mesma imagem."""
+    return ["-map", "[v]", "-c:v", "ffv1", "-r", plano.taxa, "-t", _numero(plano.duracao), caminho_saida]
+
+
+def argumentos_da_paleta(quadros: str, caminho_paleta: str) -> list[str]:
+    """As 256 cores do GIF, escolhidas pelo que muda de um quadro para o outro (o que fica parado pesa menos)."""
+    return ["-i", quadros, "-vf", "palettegen=max_colors=256:stats_mode=diff", "-frames:v", "1", "-update", "1",
+            caminho_paleta]
+
+
+def argumentos_do_gif(quadros: str, paleta: str, caminho_saida: str) -> list[str]:
+    """O GIF com a paleta e o pontilhado ordenado (estável de um quadro para o outro, sem chuvisco), em laço."""
+    return ["-i", quadros, "-i", paleta, "-lavfi",
+            "[0:v][1:v]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle", "-loop", "0", "-f", "gif",
+            caminho_saida]
+
+
+def argumentos_do_som_final(plano: PlanoDeRender, ganho_db: float, caminho_saida: str, formato: str) -> list[str]:
+    """Só o som: a mistura da primeira passada com o ganho até -14 LUFS, em AAC (m4a) ou PCM de 24 bits (wav)."""
+    codificacao = (["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"] if formato == "m4a"
+                   else ["-c:a", "pcm_s24le"])
+    return ["-i", plano.som, "-filter_complex", f"[0:a]{cadeia_final_do_som(ganho_db, plano.duracao)}[a]",
+            "-map", "[a]", *codificacao, "-ar", str(TAXA_AUDIO), "-t", _numero(plano.duracao), caminho_saida]
 
 
 def ganho_para_o_alvo(lufs_medido: float | None) -> float:
@@ -1283,7 +1358,7 @@ def argumentos_do_som(plano: PlanoDeRender, caminho_filtro: str) -> list[str]:
 def argumentos_do_video(plano: PlanoDeRender, caminho_filtro: str) -> list[str]:
     """Segunda passada: as mídias, o som já misturado (se houver) e o grafo em caminho_filtro."""
     entradas = [argumento for entrada in plano.entradas for argumento in entrada.argumentos()]
-    if plano.tem_som:
+    if plano.tem_som and not plano.imagem_rgb:
         entradas += ["-i", plano.som]
     return [*entradas, *opcao_filtro_em_arquivo(caminho_filtro)]
 

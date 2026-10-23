@@ -21,11 +21,27 @@ STATUS_ERRO = "erro"
 PRIORIDADE_RENDER = 3   # depois da ingestão (5), que deixa a mídia pronta para editar
 
 ARQUIVO_VIDEO = "video.mp4"
-ARQUIVOS_PUBLICOS = {ARQUIVO_VIDEO}
+# Formato → (arquivo, tipo do conteúdo). O vídeo é o padrão; o GIF, o quadro e o som vêm da mesma montagem.
+FORMATOS = {
+    "mp4": (ARQUIVO_VIDEO, "video/mp4"),
+    "gif": ("video.gif", "image/gif"),
+    "png": ("quadro.png", "image/png"),
+    "m4a": ("som.m4a", "audio/mp4"),
+    "wav": ("som.wav", "audio/wav"),
+}
+ARQUIVOS_PUBLICOS = {arquivo for arquivo, _ in FORMATOS.values()}
+TIPOS_DOS_ARQUIVOS = dict(FORMATOS.values())
 
-# Nome → lado menor do vídeo, em pixels
-RESOLUCOES = {"720p": 720, "1080p": 1080, "4k": 2160}
+# Nome → lado menor do vídeo, em pixels (o 480p é o do GIF)
+RESOLUCOES = {"480p": 480, "720p": 720, "1080p": 1080, "4k": 2160}
 RESOLUCAO_PADRAO = "1080p"
+RESOLUCAO_DO_GIF = "480p"
+# Quadros por segundo que a exportação aceita no lugar da taxa do projeto
+TAXAS_DO_VIDEO = (24, 25, 30, 50, 60)
+TAXAS_DO_GIF = (10, 15, 24)
+TAXA_PADRAO_DO_GIF = 15
+# Um GIF longo passa fácil de dezenas de MB: acima disso, o vídeo é o formato certo
+GIF_MAXIMO_S = 30
 
 HORAS_LINK_CELULAR = 24
 
@@ -52,9 +68,23 @@ def tamanho_de_saida(proporcao: str, resolucao: str) -> tuple[int, int]:
     return lado_menor, _par(lado_menor * altura_prop / largura_prop)
 
 
+def arquivo_do_formato(formato: str | None) -> str:
+    return FORMATOS[formato or "mp4"][0]
+
+
 def montar_exportacao(organizacao_id, usuario_id, projeto: dict, resolucao: str,
-                      momento: datetime | None = None) -> dict:
+                      momento: datetime | None = None, formato: str = "mp4", taxa: int | None = None,
+                      tempo: int | None = None) -> dict:
+    """formato: mp4, gif, png (o quadro em `tempo`, em ticks), m4a ou wav. taxa: quadros por segundo no lugar
+    dos do projeto (None mantém)."""
     momento = momento or datetime.now(TZ)
+    if formato == "gif":
+        resolucao, taxa = RESOLUCAO_DO_GIF, taxa or TAXA_PADRAO_DO_GIF
+    elif formato in ("m4a", "wav"):
+        # O som não tem imagem: o tamanho só serve para medir os textos, que não entram no arquivo
+        resolucao, taxa = "720p", None
+    elif formato == "png":
+        taxa = None
     largura, altura = tamanho_de_saida(projeto["proporcao"], resolucao)
     return {
         "organizacao_id": organizacao_id,
@@ -62,6 +92,9 @@ def montar_exportacao(organizacao_id, usuario_id, projeto: dict, resolucao: str,
         "projeto_id": projeto["_id"],
         "nome": projeto["nome"],
         "resolucao": resolucao,
+        "formato": formato,
+        "taxa": taxa,
+        "tempo": tempo if formato == "png" else None,
         "largura": largura,
         "altura": altura,
         "status": STATUS_PROCESSANDO,

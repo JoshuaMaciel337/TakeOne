@@ -586,7 +586,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         />
       ) : null}
       {exportando ? (
-        <JanelaExportar projetoId={projetoId} projeto={projeto} midias={midias} proporcao={projeto.proporcao} salvamento={edicao.salvamento} aoFechar={() => setExportando(false)} />
+        <JanelaExportar projetoId={projetoId} projeto={projeto} midias={midias} proporcao={projeto.proporcao} salvamento={edicao.salvamento} tempo={tempo} aoFechar={() => setExportando(false)} />
       ) : null}
 
       {edicao.aviso ? (
