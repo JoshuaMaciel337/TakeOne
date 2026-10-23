@@ -58,11 +58,13 @@ import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { exportarImagem } from "@/lib/exportacao/imagem";
 import { planoDosPixels, type PlanoDosPixels, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
-import { arquivoDaMidia } from "@/lib/api";
+import { arquivoDaMidia, chamarApi } from "@/lib/api";
+import { ceu, imagemMenor } from "@/lib/selecao/cores";
+import { JanelaAreaDeFoco, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { type Afim, compor, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 import { borda, cheia, combinar, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
-import { imagemDoBlob, imagemNoDocumento, selecaoNaMidia } from "@/lib/selecao/naTela";
+import { imagemDoBlob, imagemNoDocumento, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
 import { aumentar, type ImagemRgba, varinha } from "@/lib/selecao/varinha";
 
@@ -185,6 +187,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const imagemLida = useRef<{ chave: string; projeto: Projeto; imagem: Promise<ImagemRgba> } | null>(null);
   const [bordasDaImagem, setBordasDaImagem] = useState<MapaDeBordas | null>(null);
   const [imagemDaRapida, setImagemDaRapida] = useState<ImagemRgba | null>(null);
+  // A janela do Intervalo de cores ou da Área de foco, com a imagem que ela lê
+  const [janelaDaSelecao, setJanelaDaSelecao] = useState<{ tipo: "cores" | "foco"; imagem: ImagemRgba } | null>(null);
+  const [achandoAssunto, setAchandoAssunto] = useState(false);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -428,23 +433,74 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }, [ferramenta, projeto, camadaDaRapida]);
   // A seleção da IA (na foto) vira a seleção do documento, com as formigas, para as outras ferramentas usarem
   const arquivoDoObjeto = objeto.selecao?.arquivo ?? null;
-  const levarObjeto = useEffectEvent((arquivo: string) => {
+  /** Uma máscara cinza da foto escolhida (a do objeto, a do assunto) como seleção do documento; null sem a camada na prévia. */
+  const mascaraDaFotoNoDocumento = async (arquivo: string): Promise<Selecao | null> => {
     const medida = selecionado ? caixasRef.current.get(selecionado.clipe.id) : undefined;
     const video = foto?.video;
-    if (!selecionado || !foto || !video || !projeto || !medida?.bruta || !medida.quadro) return;
+    if (!selecionado || !foto || !video || !projeto || !medida?.bruta || !medida.quadro) return null;
     const { bruta, quadro } = medida;
     const clipe = selecionado.clipe;
     const documento = tamanhoDaImagem(projeto);
-    carregarBitmap(arquivoDaMidia(foto.id, arquivo))
-      .then((mascara) => {
-        // A máscara vem menor que a foto (até 2048 no lado maior): o pixel dela vai para o da foto e daí ao documento
-        const escala: Afim = [video.largura / mascara.width, 0, 0, video.altura / mascara.height, 0, 0];
-        const matriz = compor(matrizDaMidiaNoDocumento(bruta, clipe.recorte, clipe.virar, video, quadro, documento), escala);
-        setSelecaoDoDocumento(imagemNoDocumento(mascara, matriz, documento, "cinza"));
+    const mascara = await carregarBitmap(arquivoDaMidia(foto.id, arquivo));
+    // A máscara vem menor que a foto: o pixel dela vai para o da foto e daí ao documento
+    const escala: Afim = [video.largura / mascara.width, 0, 0, video.altura / mascara.height, 0, 0];
+    return imagemNoDocumento(mascara, compor(matrizDaMidiaNoDocumento(bruta, clipe.recorte, clipe.virar, video, quadro, documento), escala), documento, "cinza");
+  };
+  const levarObjeto = useEffectEvent((arquivo: string) => {
+    mascaraDaFotoNoDocumento(arquivo)
+      .then((selecao) => {
+        if (!selecao) return;
+        setSelecaoDoDocumento(selecao);
         setBordasDaSelecao(true);
       })
       .catch(() => undefined);
   });
+  /** Selecionar › Assunto: a pessoa da foto escolhida (o MODNet do recorte do fundo), como seleção. */
+  const selecionarAssunto = async () => {
+    if (!selecionado || !foto) return mostrarAviso("Escolha uma foto: o assunto (a pessoa) é achado na foto escolhida.");
+    if (achandoAssunto) return;
+    setAchandoAssunto(true);
+    try {
+      let estado = foto.recorte_fundo?.status;
+      if (estado !== "pronta") {
+        if (estado !== "processando") await chamarApi(`/midias/${foto.id}/recorte-fundo`, { metodo: "POST" });
+        mostrarAviso("Achando o assunto da foto…");
+        for (let i = 0; i < 300 && estado !== "pronta"; i++) {
+          await new Promise((pronto) => setTimeout(pronto, 1000));
+          const atual = await chamarApi<Midia>(`/midias/${foto.id}`);
+          estado = atual.recorte_fundo?.status;
+          if (estado === "erro") throw new Error(atual.recorte_fundo?.erro ?? "Não foi possível achar o assunto.");
+        }
+        if (estado !== "pronta") throw new Error("O assunto demorou demais. Tente de novo.");
+        void biblioteca.recarregar();
+      }
+      const selecao = await mascaraDaFotoNoDocumento("mascara.png");
+      if (!selecao || !temAlgo(selecao)) mostrarAviso("Nenhuma pessoa foi achada na foto.");
+      else selecionarNoDocumento(selecao);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível achar o assunto.");
+    } finally {
+      setAchandoAssunto(false);
+    }
+  };
+  /** Uma seleção feita numa cópia menor da imagem, ampliada (suave) para o tamanho do documento. */
+  const ampliarSelecao = (selecao: Selecao, documento: { largura: number; altura: number }): Selecao =>
+    selecao.largura === documento.largura && selecao.altura === documento.altura
+      ? selecao
+      : imagemNoDocumento(selecaoParaCanvas(selecao), [documento.largura / selecao.largura, 0, 0, documento.altura / selecao.altura, 0, 0], documento, "alfa");
+  const selecionarPor = (como: "cores" | "foco" | "assunto" | "ceu") => {
+    if (como === "assunto") return void selecionarAssunto();
+    imagemParaSelecao(true)
+      .then((imagem) => {
+        if (como === "ceu") {
+          const nova = ceu(imagemMenor(imagem, 512));
+          const selecao = ampliarSelecao(nova, { largura: imagem.largura, altura: imagem.altura });
+          if (!temAlgo(selecao)) mostrarAviso("Nenhum céu foi achado (o céu precisa tocar a borda de cima).");
+          else selecionarNoDocumento(selecao);
+        } else setJanelaDaSelecao({ tipo: como, imagem });
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
   useEffect(() => {
     if (arquivoDoObjeto) levarObjeto(arquivoDoObjeto);
   }, [arquivoDoObjeto]);
@@ -924,6 +980,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     modificarSelecao: (como) => selecaoNoDocumento && setModificando(como),
     aumentarSelecao,
+    selecionarPor,
     podeDesfazer: edicao.nomeDesfazer,
     podeRefazer: edicao.nomeRefazer,
     area: area.area,
@@ -1041,7 +1098,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1539,6 +1596,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ) : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}
+      {janelaDaSelecao?.tipo === "cores" ? (
+        <JanelaIntervaloDeCores
+          imagem={janelaDaSelecao.imagem}
+          aoFechar={() => setJanelaDaSelecao(null)}
+          aoConfirmar={(selecao) => {
+            setJanelaDaSelecao(null);
+            if (!temAlgo(selecao)) mostrarAviso("Nenhum pixel ficou mais da metade selecionado.");
+            selecionarNoDocumento(selecao);
+          }}
+        />
+      ) : null}
+      {janelaDaSelecao?.tipo === "foco" ? (
+        <JanelaAreaDeFoco
+          imagem={janelaDaSelecao.imagem}
+          aoFechar={() => setJanelaDaSelecao(null)}
+          aoConfirmar={(selecao) => {
+            setJanelaDaSelecao(null);
+            selecionarNoDocumento(selecao);
+          }}
+        />
+      ) : null}
       {modificando ? (
         <JanelaDeNumero
           {...MODIFICACOES[modificando]}

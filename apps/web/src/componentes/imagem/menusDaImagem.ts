@@ -92,6 +92,8 @@ export type AcoesDosMenus = {
   modificarSelecao: (como: "borda" | "suavizar" | "expandir" | "contrair" | "difusao") => void;
   /** Aumentar (contígua) e Semelhante, com a tolerância da varinha. */
   aumentarSelecao: (contigua: boolean) => void;
+  /** Intervalo de cores e Área de foco (abrem a janela), Assunto (na foto escolhida) e Céu. */
+  selecionarPor: (como: "cores" | "foco" | "assunto" | "ceu") => void;
   podeDesfazer: string | null;
   podeRefazer: string | null;
   area: string;
@@ -340,6 +342,10 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Aumentar", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(true) },
         { nome: "Semelhante", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.aumentarSelecao(false) },
         "-",
+        { nome: "Assunto", aoEscolher: () => a.selecionarPor("assunto") },
+        { nome: "Céu", aoEscolher: () => a.selecionarPor("ceu") },
+        { nome: "Intervalo de cores…", aoEscolher: () => a.selecionarPor("cores") },
+        { nome: "Área de foco…", aoEscolher: () => a.selecionarPor("foco") },
         { nome: "Objeto", aoEscolher: () => a.ferramenta("objeto") },
       ],
     },

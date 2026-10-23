@@ -119,8 +119,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
 - [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
 - [ ] Selecionar › Converter em forma
-- [ ] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
-- [ ] Área de foco; Assunto; Céu
+- [x] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
+- [x] Área de foco; Assunto (a pessoa, pelo MODNet); Céu (pela linha do céu, sem modelo)
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
 - [x] Aumentar e Semelhante
 - [ ] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
