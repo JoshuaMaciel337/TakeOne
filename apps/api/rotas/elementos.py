@@ -4,13 +4,15 @@
 # Cada forma (retângulo, elipse, estrela, seta, balão...) vira uma imagem transparente da biblioteca,
 # desenhada pelo core/utils/forma.py e preparada como qualquer imagem enviada. A mídia guarda o pedido
 # (`elemento`), para o editor mudar a cor ou o contorno pedindo outra. O mesmo pedido no mesmo espaço
-# devolve a mídia que já existe, para a biblioteca não encher de cópias.
+# devolve a mídia que já existe, para a biblioteca não encher de cópias. A prévia dos modelos de imagem pede só
+# o desenho (GET /formas/imagem), sem criar mídia: a biblioteca mostra o modelo sem mexer no espaço de ninguém.
 # -----------------------------------------------
 import hashlib
 import json
 import logging
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
@@ -18,9 +20,10 @@ from api.esquemas import FormaEntrada, MidiaSaida
 from api.rotas.midias import para_saida
 from core.modelos.midia import STATUS_PRONTA, campos_da_imagem, chave_arquivo, montar_midia, pasta_da_midia
 from core.utils import storage
-from core.utils.forma import gravar_forma
+from core.utils.forma import desenhar_forma, gravar_forma
 from core.utils.imagem import preparar_imagem
 from core.utils.mongo import agora
+from core.utils.texto import para_png
 
 router = APIRouter(prefix="/api/elementos", tags=["elementos"])
 
@@ -62,3 +65,16 @@ async def criar_forma(dados: FormaEntrada, usuario=Depends(usuario_atual), db=De
     await db.midias.update_one({"_id": midia_id}, {"$set": campos})
     logging.info(f"[{usuario['organizacao_id']}] Forma criada: {nome}")
     return (await para_saida(db, [{**midia, **campos, "_id": midia_id}]))[0]
+
+
+@router.get("/formas/imagem")
+async def imagem_da_forma(tipo: str, cor: str | None = None, contorno_cor: str = "#000000", contorno: float = 0.0,
+                          proporcao: float | None = Query(default=None), _usuario=Depends(usuario_atual)):
+    """O PNG da forma, sem criar mídia (a prévia dos modelos de imagem). Os mesmos limites do POST."""
+    try:
+        forma = FormaEntrada(tipo=tipo, cor=cor, contorno_cor=contorno_cor, contorno=contorno,
+                             proporcao=proporcao).model_dump()
+    except ValidationError as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Forma inválida.") from erro
+    png = await run_in_threadpool(lambda: para_png(desenhar_forma(forma)))
+    return Response(png, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})

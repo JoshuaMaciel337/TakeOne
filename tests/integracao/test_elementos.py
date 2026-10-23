@@ -42,3 +42,20 @@ def test_forma_que_nao_serve_e_recusada(cliente):
     assert cliente.post("/api/elementos/formas", json={"tipo": "elipse", "contorno": 0.5}).status_code == 422
     vazada = cliente.post("/api/elementos/formas", json={"tipo": "elipse", "cor": None, "contorno": 0.05})
     assert vazada.status_code == 201
+
+
+def test_desenho_da_forma_sem_criar_midia(cliente, db_limpo):
+    import io
+
+    from PIL import Image
+
+    cadastrar(cliente)
+    pedido = {"tipo": "retangulo", "cor": "#D9DCE3", "proporcao": 2}
+    resposta = cliente.get("/api/elementos/formas/imagem", params=pedido)
+    assert resposta.status_code == 200 and resposta.headers["content-type"] == "image/png"
+    imagem = Image.open(io.BytesIO(resposta.content))
+    assert imagem.mode == "RGBA" and imagem.size == (2048, 1024)
+    assert db_limpo.midias.count_documents({}) == 0, "a prévia não cria mídia"
+    assert cliente.get("/api/elementos/formas/imagem", params={"tipo": "hexagono"}).status_code == 422
+    # Vazada sem contorno não existe
+    assert cliente.get("/api/elementos/formas/imagem", params={"tipo": "elipse"}).status_code == 422
