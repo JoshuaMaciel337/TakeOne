@@ -137,7 +137,7 @@ export function corNeutra(ajustes: AjustesCor): boolean {
 // -----------------------------------------------
 // A conta, pixel a pixel (valores de 0 a 1)
 // -----------------------------------------------
-function paraLinear(c: number): number {
+export function paraLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
 
@@ -147,8 +147,8 @@ function paraTela(c: number): number {
 }
 
 /** Quanto a temperatura e o tom mexem em cada canal. */
-const FORCA_TEMPERATURA = 0.15;
-const FORCA_TOM = 0.1;
+export const FORCA_TEMPERATURA = 0.15;
+export const FORCA_TOM = 0.1;
 /** Quanto realces e sombras somam, no máximo. */
 const FORCA_REALCES_SOMBRAS = 0.25;
 /** Quanto uma roda de cor com força 1 desloca a cor. */

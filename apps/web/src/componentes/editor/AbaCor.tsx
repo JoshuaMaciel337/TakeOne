@@ -1,18 +1,46 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { LoaderCircle, RotateCcw, WandSparkles } from "lucide-react";
 import { useState } from "react";
 
-import { chamarApi } from "@/lib/api";
+import { arquivoDaMidia, chamarApi } from "@/lib/api";
+import { amostraDaImagem } from "@/lib/previa/amostra";
 import type { Comando } from "@/lib/projeto/comandos";
 import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, CURVAS_NEUTRAS, curvasNeutras, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
+import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 import { ControleNumerico } from "./ControleNumerico";
 import { EditorDeCurva } from "./EditorDeCurva";
 import { usePedirImagemEstavel } from "./Estabilizar";
+
+/**
+ * Melhorar: luz, contraste e balanço de branco escolhidos pela imagem (lib/projeto/melhorar.ts), nos controles de
+ * sempre. Lê a cópia leve da foto ou a capa do vídeo; o filtro, as curvas e as rodas ficam como estão.
+ */
+function Melhorar({ midia, travada, aoAplicar }: { midia: Midia; travada: boolean; aoAplicar: (ajustes: Partial<Cor>) => void }) {
+  const [lendo, setLendo] = useState(false);
+  const [erro, setErro] = useState("");
+  function melhorar() {
+    setLendo(true);
+    setErro("");
+    amostraDaImagem(arquivoDaMidia(midia.id, midia.imagem ? "proxy.webp" : "capa.jpg"))
+      .then((pixels) => aoAplicar(ajustesAutomaticos(pixels)))
+      .catch((e: unknown) => setErro(e instanceof Error ? e.message : "Não foi possível ler a imagem."))
+      .finally(() => setLendo(false));
+  }
+  return (
+    <div className="mt-2">
+      <button type="button" className="botao-secundario w-full px-3 py-1.5 text-xs" disabled={travada || lendo} onClick={melhorar} title="Acerta a luz, o contraste e a cor pela imagem">
+        {lendo ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> : <WandSparkles className="size-3.5" aria-hidden />}
+        Melhorar
+      </button>
+      {erro ? <p className="mt-1 text-[11px] text-erro">{erro}</p> : null}
+    </div>
+  );
+}
 
 /** Tirar o ruído (o granulado) da imagem: o worker gera a versão limpa e a prévia e o render usam ela. */
 function TirarRuido({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
@@ -157,6 +185,7 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
             }}
           />
         ) : null}
+        {midia?.video && !midia.elemento && !midia.animacao ? <Melhorar midia={midia} travada={travada} aoAplicar={(ajustes) => aoExecutar(comando(ajustes))} /> : null}
       </section>
       {GRUPOS.filter((grupo) => grupo.id !== "efeito").map(secao)}
       <section className="border-b border-borda/60 pb-3 pt-3">

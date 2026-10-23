@@ -484,7 +484,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [ ] A prévia em vídeo dos modelos de projeto: as mídias de exemplo o dono decide depois (até lá, o desenho padrão).
 - [ ] Onda 3, editor de imagem (primeira versão): projeto de imagem com camadas, tamanhos prontos, o que já existe no vídeo (cor, filtros, efeitos, texto, formas, fundo removido, kit de marca), desfocar o fundo, "Melhorar", exportar PNG, JPG e WebP com a prévia medida, e modelos de imagem.
   - [x] Projeto de imagem (o mesmo documento do vídeo, com tamanho em pixels e fundo transparente), página com os tamanhos prontos no hub, editor com camadas, imagens, textos, formas, fundo e tamanho, as abas Básico, Texto e Cor, e exportação em PNG, JPG e WebP (ou para a biblioteca) medida contra a prévia.
-  - [ ] Remover e desfocar o fundo das fotos e "Melhorar" (cor automática).
+  - [x] Remover e desfocar o fundo das fotos (MODNet, `mascara.png`) e "Melhorar" (luz e cor pela imagem, também no editor de vídeo).
   - [ ] Modelos de imagem na biblioteca.
 - [ ] Onda 4, lote C (imagem e cor): HDR do celular para SDR, vibração, brancos, pretos e níveis, a LUT 3D também na prévia, cor por matiz, nitidez, slip e roll.
 - [ ] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.

@@ -493,7 +493,16 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
-        {!clipe.texto && midia?.video && !midia.imagem ? <RemoverFundo clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
+        {!clipe.texto && midia?.video && (!midia.imagem || !comTempo) && !midia.elemento ? (
+          <RemoverFundo
+            clipe={clipe}
+            midia={midia}
+            travada={travada}
+            aoExecutar={aoExecutar}
+            // Numa foto do editor de imagem: a pessoa nítida sobre uma cópia desfocada (duas camadas)
+            desfocar={!comTempo && midia.imagem && !midia.video.transparente ? () => aoExecutar({ comando: "imagem.desfocarFundo", parametros: { faixaId: faixa.id } }) : undefined}
+          />
+        ) : null}
         {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
         ) : null}
@@ -674,20 +683,24 @@ function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
 
 /**
  * Remover o fundo sem tela verde: o worker acha a pessoa em cada quadro (MODNet) e a prévia e o
- * render usam a mesma máscara.
+ * render usam a mesma máscara. Numa foto (só no editor de imagem), a máscara é uma imagem.
  */
-function RemoverFundo({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void; desfocar?: () => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   const recorte = midia.recorte_fundo;
   // A animação já nasce com a transparência: a mesma opção, com outro nome
   const animacao = Boolean(midia.animacao);
-  function mudar(ligar: boolean) {
-    aoExecutar({ comando: "clipe.removerFundo", parametros: { clipeIds: [clipe.id], ligar } });
-    if (!ligar || recorte?.status === "pronta" || recorte?.status === "processando") return;
+  const foto = Boolean(midia.imagem);
+  function pedirMascara() {
+    if (recorte?.status === "pronta" || recorte?.status === "processando") return;
     setErroDoPedido("");
     chamarApi(`/midias/${midia.id}/recorte-fundo`, { metodo: "POST" }).catch((erro: unknown) =>
       setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir o recorte agora."),
     );
+  }
+  function mudar(ligar: boolean) {
+    aoExecutar({ comando: "clipe.removerFundo", parametros: { clipeIds: [clipe.id], ligar } });
+    if (ligar) pedirMascara();
   }
   return (
     <div className="mt-2 border-t border-borda/60 pt-2">
@@ -695,15 +708,31 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; mid
         <input type="checkbox" checked={Boolean(clipe.remover_fundo)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
         <span className="flex-1">{animacao ? "Fundo transparente (só a animação aparece)" : "Remover o fundo (fica a pessoa)"}</span>
       </label>
+      {desfocar && !clipe.remover_fundo ? (
+        <button
+          type="button"
+          className="botao-secundario mt-1.5 w-full px-3 py-1.5 text-xs"
+          disabled={travada}
+          title="A pessoa fica nítida e uma cópia desfocada da foto entra embaixo"
+          onClick={() => {
+            desfocar();
+            pedirMascara();
+          }}
+        >
+          Desfocar o fundo
+        </button>
+      ) : null}
       {clipe.remover_fundo ? (
         <p className="mt-1 text-[11px] text-suave" role="status">
           {recorte?.status === "pronta"
             ? animacao
               ? "A animação aparece por cima do vídeo, sem fundo."
-              : "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
+              : foto
+                ? "Pronto. A prévia e a imagem exportada mostram só a pessoa."
+                : "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
             : recorte?.status === "erro" || erroDoPedido
               ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
-              : `Achando a pessoa em cada quadro${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}. Até terminar, a prévia mostra o clipe inteiro.`}
+              : `Achando a pessoa ${foto ? "na imagem" : "em cada quadro"}${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}. Até terminar, a prévia mostra ${foto ? "a imagem" : "o clipe"} inteir${foto ? "a" : "o"}.`}
         </p>
       ) : null}
     </div>

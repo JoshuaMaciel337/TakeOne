@@ -155,6 +155,27 @@ export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string)
   return { projeto: { ...projeto, faixas }, clipeId: copia.id };
 }
 
+/** A força do desfoque da cópia de baixo no "Desfocar o fundo". */
+export const DESFOQUE_DO_FUNDO = 0.4;
+
+/**
+ * Desfocar o fundo de uma foto: a camada fica com o fundo removido (só a pessoa) e ganha embaixo uma cópia
+ * inteira com o efeito de desfoque. São duas camadas comuns: a pessoa ajusta, move ou apaga cada uma.
+ */
+export function desfocarFundo(projeto: Projeto, ctx: Contexto, faixaId: string): { projeto: Projeto; clipeId: string } {
+  const indice = indiceDaCamada(projeto, faixaId);
+  const original = projeto.faixas[indice];
+  const clipe = original.clipes[0];
+  const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+  if (!info?.imagem || info.transparente) throw new ErroEdicao("O fundo desfocado vale em fotos.");
+  if (original.travada) throw new ErroEdicao("A camada está travada.");
+  const recortada: Clipe = { ...clipe, remover_fundo: true };
+  const desfocada: Clipe = { ...structuredClone(clipe), id: ctx.novoId(), remover_fundo: false, efeito: { tipo: "desfoque", intensidade: DESFOQUE_DO_FUNDO } };
+  const faixas = [...projeto.faixas];
+  faixas.splice(indice, 1, { ...original, clipes: [recortada] }, { ...original, id: ctx.novoId(), clipes: [desfocada] });
+  return { projeto: { ...projeto, faixas }, clipeId: recortada.id };
+}
+
 export function mudarFundoDaImagem(projeto: Projeto, fundo: { cor?: string; transparente?: boolean }): Projeto {
   if (fundo.cor !== undefined && !/^#[0-9a-f]{6}$/i.test(fundo.cor)) throw new ErroEdicao("Cor inválida.");
   return { ...projeto, fundo: { ...projeto.fundo, ...fundo } };

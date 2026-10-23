@@ -71,7 +71,7 @@ import {
   adicionarCamadaDeMidia,
   adicionarCamadaDeTexto,
   apagarCamada,
-  duplicarCamada,
+  desfocarFundo, duplicarCamada,
   moverCamada,
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
@@ -118,6 +118,7 @@ export type Comando =
   | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" } }
   | { comando: "imagem.apagar"; parametros: { faixaId: string } }
   | { comando: "imagem.duplicar"; parametros: { faixaId: string } }
+  | { comando: "imagem.desfocarFundo"; parametros: { faixaId: string } }
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
@@ -179,6 +180,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.mover": "mudar a ordem das camadas",
   "imagem.apagar": "apagar a camada",
   "imagem.duplicar": "duplicar a camada",
+  "imagem.desfocarFundo": "desfocar o fundo",
   "imagem.fundo": "mudar o fundo",
   "imagem.tamanho": "mudar o tamanho",
   "clipe.efeito": "mudar o efeito",
@@ -286,6 +288,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: apagarCamada(projeto, parametros.faixaId), selecao: [] };
     case "imagem.duplicar": {
       const resultado = duplicarCamada(projeto, ctx, parametros.faixaId);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.desfocarFundo": {
+      const resultado = desfocarFundo(projeto, ctx, parametros.faixaId);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.fundo":

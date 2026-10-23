@@ -52,6 +52,8 @@ export async function exportarImagem(
       // A de resolução cheia; a cópia leve só se ela não existir (mídia antiga)
       const fonte = await carregarBitmap(arquivoDaMidia(midia.id, "imagem.png")).catch(() => carregarBitmap(arquivoDaMidia(midia.id, "proxy.webp")));
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
+      // Como o render do vídeo: sem a máscara pronta, o arquivo sairia com o fundo que a pessoa pediu para tirar
+      if (camada.clipe.remover_fundo && !mascara) throw new Error(`O fundo de "${midia.nome}" ainda está sendo recortado. Espere terminar ou desligue "Remover o fundo".`);
       return camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null);
     }),
   );

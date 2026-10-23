@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { executarComando } from "./comandos.ts";
 import type { Contexto } from "./edicao.ts";
-import { camadasDaImagem, DURACAO_DA_CAMADA, ESCALA_DO_RECORTADO, problemaNoTamanho, TAMANHOS_PRONTOS } from "./imagem.ts";
+import { camadasDaImagem, DESFOQUE_DO_FUNDO, DURACAO_DA_CAMADA, ESCALA_DO_RECORTADO, problemaNoTamanho, TAMANHOS_PRONTOS } from "./imagem.ts";
 import type { Projeto } from "./modelo.ts";
 import { TEXTO_PADRAO } from "./texto.ts";
 
@@ -91,4 +91,23 @@ test("a foto cabe no quadro e o logo entra com metade do tamanho", () => {
   const [logo, foto] = camadasDaImagem(projeto);
   assert.equal(foto.clipe.transformacao.escala, 1);
   assert.equal(logo.clipe.transformacao.escala, ESCALA_DO_RECORTADO);
+});
+
+test("desfocar o fundo: a foto recortada por cima e uma cópia desfocada embaixo, num passo", () => {
+  const ctx = contexto();
+  let r = executarComando(vazio(), { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx);
+  const [foto] = camadasDaImagem(r.projeto);
+  r = executarComando(r.projeto, { comando: "imagem.desfocarFundo", parametros: { faixaId: foto.faixa.id } }, ctx);
+  const [cima, baixo] = camadasDaImagem(r.projeto);
+  assert.equal(cima.clipe.id, foto.clipe.id);
+  assert.deepEqual(r.selecao, [foto.clipe.id]);
+  assert.equal(cima.clipe.remover_fundo, true);
+  assert.equal(baixo.clipe.remover_fundo, false);
+  assert.deepEqual(baixo.clipe.efeito, { tipo: "desfoque", intensidade: DESFOQUE_DO_FUNDO });
+  assert.equal(baixo.clipe.midia_id, "foto");
+  assert.notEqual(baixo.faixa.id, cima.faixa.id);
+  // Num logo (com transparência) não vale
+  r = executarComando(r.projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "logo" } }, ctx);
+  const [logo] = camadasDaImagem(r.projeto);
+  assert.throws(() => executarComando(r.projeto, { comando: "imagem.desfocarFundo", parametros: { faixaId: logo.faixa.id } }, ctx), /fotos/);
 });
