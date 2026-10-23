@@ -98,6 +98,10 @@ ATEMPO_MINIMO = 0.5
 FAIXA_AUDIO = "audio"
 # Mesclagem do clipe → modo do blend do FFmpeg
 MODOS_DE_MESCLAGEM = {"multiplicar": "multiply", "tela": "screen", "somar": "addition"}
+# Os modos que não são lineares na cor da camada: o blend usa a cor inteira dela, e a opacidade (o alfa)
+# mistura o resultado com o fundo depois. O primeiro do blend é o fundo, o segundo a camada.
+MODOS_COM_O_FUNDO = {"escurecer": "darken", "clarear": "lighten", "sobrepor": "overlay", "luz_forte": "hardlight",
+                     "diferenca": "difference", "exclusao": "exclusion"}
 
 
 @dataclass(frozen=True)
@@ -1161,6 +1165,24 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":
             linhas.append(f"[{anterior}][c{numero}]{overlay}[base{numero}]")
+        elif mesclagem in MODOS_COM_O_FUNDO:
+            # A cor da camada (sem o alfa) e o alfa dela, cada um num quadro preto no lugar dela; o blend com o
+            # fundo inteiro, e o resultado volta por cima do fundo com o alfa da camada: fundo × (1 − a) + modo × a,
+            # a conta do shader da prévia
+            preto = f"color=c=black:s={largura}x{altura}:r={taxa}:d={_numero(duracao)},format=gbrp"
+            linhas += [
+                f"[c{numero}]split[cs{numero}][ck{numero}]",
+                f"[cs{numero}]format=gbrp[cc{numero}]",
+                f"[ck{numero}]alphaextract,format=gbrp[ca{numero}]",
+                f"{preto}[pc{numero}]",
+                f"[pc{numero}][cc{numero}]{overlay}[lc{numero}]",
+                f"{preto}[pa{numero}]",
+                f"[pa{numero}][ca{numero}]{overlay}[la{numero}]",
+                f"[{anterior}]split[fa{numero}][fb{numero}]",
+                f"[fa{numero}][lc{numero}]blend=all_mode={MODOS_COM_O_FUNDO[mesclagem]},format=gbrp[mx{numero}]",
+                f"[mx{numero}][la{numero}]alphamerge[ma{numero}]",
+                f"[fb{numero}][ma{numero}]overlay=format=rgb:eof_action=pass[base{numero}]",
+            ]
         else:
             # A camada achatada num quadro da cor que não muda nada no modo (a opacidade vira mistura
             # com essa cor), depois o blend com o que está embaixo: a conta das funções de mistura da prévia

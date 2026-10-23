@@ -70,7 +70,21 @@ export type Camada = {
 // Os modos de mesclagem são funções de mistura do WebGL, com a opacidade já na cor (alfa
 // pré-multiplicado): multiplicar = fundo × (cor·a + 1 − a); tela = cor·a + fundo × (1 − cor·a);
 // somar = fundo + cor·a. É a conta do blend do render sobre uma camada achatada na cor neutra.
-const CODIGO_DA_MESCLAGEM: Record<Mesclagem, number> = { normal: 0, multiplicar: 1, tela: 2, somar: 3 };
+// Do 4 em diante, os modos que precisam do fundo: o canvas é copiado para a unidade 6 antes da camada, e o
+// shader mistura (a fórmula do W3C, com o alfa do fundo), sem a função de mistura do WebGL.
+const CODIGO_DA_MESCLAGEM: Record<Mesclagem, number> = {
+  normal: 0,
+  multiplicar: 1,
+  tela: 2,
+  somar: 3,
+  escurecer: 4,
+  clarear: 5,
+  sobrepor: 6,
+  luz_forte: 7,
+  diferenca: 8,
+  exclusao: 9,
+};
+const MESCLAGEM_COM_O_FUNDO = 4;
 
 /** Sigma do brilho, em frações da altura do clipe (o mesmo de lib/projeto/efeitos.ts). */
 const SIGMA_DO_BRILHO = BRILHO_SIGMA;
@@ -194,8 +208,10 @@ uniform vec4 u_revelado;
 // Letra a letra (lib/projeto/letras.ts): y0, y1 e x de onde o trecho começa e de onde ele termina
 uniform vec3 u_corteDe;
 uniform vec3 u_corteAte;
-// 0 normal, 1 multiplicar (a cor sai já misturada ao branco pela opacidade), 2 tela, 3 somar
+// 0 normal, 1 multiplicar (a cor sai já misturada ao branco pela opacidade), 2 tela, 3 somar; do 4 ao 9, os
+// modos que leem o fundo (unidade 6): escurecer, clarear, sobrepor, luz forte, diferença e exclusão
 uniform int u_mesclagem;
+uniform sampler2D u_fundo;
 // Brilho: a cópia desfocada (unidade 2) somada em "tela", na força u_brilho
 uniform float u_brilho;
 // Nitidez e clareza: a diferença entre a camada e a cópia desfocada (a mesma unidade 2), na força u_nitidez; a
@@ -441,6 +457,21 @@ void main() {
   }
   cor = texel * u_opacidade;
   if (u_mesclagem == 1) cor = vec4(cor.rgb + (1.0 - cor.a), 1.0);
+  if (u_mesclagem >= 4) {
+    // O blend do render: o primeiro é o fundo (b), o segundo a camada (s), sem o alfa; o alfa mistura depois
+    vec4 fundo = texelFetch(u_fundo, ivec2(gl_FragCoord.xy), 0);
+    vec3 b = fundo.a > 0.0 ? fundo.rgb / fundo.a : vec3(0.0);
+    vec3 s = cor.a > 0.0 ? clamp(cor.rgb / cor.a, 0.0, 1.0) : vec3(0.0);
+    vec3 m;
+    if (u_mesclagem == 4) m = min(b, s);
+    else if (u_mesclagem == 5) m = max(b, s);
+    else if (u_mesclagem == 6) m = mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, b));
+    else if (u_mesclagem == 7) m = mix(2.0 * b * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, s));
+    else if (u_mesclagem == 8) m = abs(b - s);
+    else m = b + s - 2.0 * b * s;
+    vec3 misturada = (1.0 - fundo.a) * s + fundo.a * m;
+    cor = vec4(cor.a * misturada + (1.0 - cor.a) * fundo.rgb, cor.a + fundo.a * (1.0 - cor.a));
+  }
 }`;
 
 /** Largura e altura em pixels de uma fonte de textura. */
@@ -482,6 +513,8 @@ type Alvo = { buffer: WebGLFramebuffer; textura: WebGLTexture; largura: number; 
 
 /** O framebuffer da cópia do que já foi desenhado, para a camada de ajuste (os de 0 a 4 são dos desfoques e do recorte). */
 const ALVO_DO_FUNDO = 6;
+/** O da cópia do fundo para os modos de mesclagem que leem o fundo (unidade de textura 6). */
+const ALVO_DA_MESCLAGEM = 7;
 
 type Recursos = {
   programa: WebGLProgram;
@@ -499,7 +532,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -610,6 +643,7 @@ export class Compositor {
         revelado: local("u_revelado"),
         corteDe: local("u_corteDe"),
         mesclagem: local("u_mesclagem"),
+        fundo: local("u_fundo"),
         brilho: local("u_brilho"),
         nitidez: local("u_nitidez"),
         meiosTons: local("u_meiosTons"),
@@ -981,10 +1015,25 @@ export class Compositor {
       }
       gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
       const mesclagem = camada.mesclagem ?? "normal";
-      gl.uniform1i(uniformes.mesclagem, CODIGO_DA_MESCLAGEM[mesclagem]);
+      const codigo = CODIGO_DA_MESCLAGEM[mesclagem];
+      gl.uniform1i(uniformes.mesclagem, codigo);
       if (mesclagem === "multiplicar") gl.blendFunc(gl.DST_COLOR, gl.ZERO);
       else if (mesclagem === "tela") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
       else if (mesclagem === "somar") gl.blendFunc(gl.ONE, gl.ONE);
+      else if (codigo >= MESCLAGEM_COM_O_FUNDO) {
+        // O fundo até aqui, copiado do canvas pelo blit (como na camada de ajuste): o shader mistura e escreve
+        // o resultado no lugar
+        const copia = this.alvo(ALVO_DA_MESCLAGEM, this.canvas.width, this.canvas.height, !gl.getContextAttributes()?.alpha);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, copia.buffer);
+        gl.blitFramebuffer(0, 0, this.canvas.width, this.canvas.height, 0, 0, this.canvas.width, this.canvas.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_2D, copia.textura);
+        gl.uniform1i(uniformes.fundo, 6);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.blendFunc(gl.ONE, gl.ZERO);
+      }
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       if (mesclagem !== "normal") gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     });

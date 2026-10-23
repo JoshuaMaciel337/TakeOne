@@ -595,7 +595,8 @@ class ClipeEntrada(BaseModel):
     # Repetir os keyframes e tremer, por propriedade (lib/projeto/keyframes.ts)
     expressoes: ExpressoesEntrada | None = None
     animacao: AnimacoesEntrada | None = None
-    mesclagem: Literal["normal", "multiplicar", "tela", "somar"] = "normal"
+    mesclagem: Literal["normal", "multiplicar", "tela", "somar", "escurecer", "clarear", "sobrepor", "luz_forte",
+                       "diferenca", "exclusao"] = "normal"
     # A imagem espelhada; o recorte é do que aparece (core/utils/geometria.py, recorte_na_fonte)
     virar: VirarEntrada | None = None
     cantos: CantosEntrada | None = None

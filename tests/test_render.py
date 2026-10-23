@@ -352,6 +352,17 @@ def test_transicao_de_desfoque_vira_gblur_por_roteiro_com_borda_repetida():
     assert "premultiply" not in plano.filtro, "vídeo sem transparência não precisa"
 
 
+def test_modos_que_leem_o_fundo_misturam_a_cor_inteira_e_o_alfa_depois():
+    sobre = [clipe("s1", "empe", 0, 2, mesclagem="sobrepor"), clipe("s2", "empe", 2, 2, mesclagem="diferenca")]
+    plano = planejar_render(projeto([faixa("video", sobre), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            MIDIAS, 1080, 1920)
+    assert "[c2]split[cs2][ck2]" in plano.filtro and "[ck2]alphaextract,format=gbrp[ca2]" in plano.filtro
+    assert "[fa2][lc2]blend=all_mode=overlay,format=gbrp[mx2]" in plano.filtro
+    assert "[mx2][la2]alphamerge[ma2]" in plano.filtro
+    assert "[fb2][ma2]overlay=format=rgb:eof_action=pass[base2]" in plano.filtro
+    assert "blend=all_mode=difference" in plano.filtro
+
+
 def test_mesclagem_achata_a_camada_na_cor_neutra_e_usa_o_blend():
     sobre = [clipe("s1", "empe", 0, 2, mesclagem="multiplicar"), clipe("s2", "empe", 2, 2, mesclagem="tela")]
     faixas = [faixa("video", sobre), faixa("principal", [clipe("c1", "deitado", 0, 4)])]

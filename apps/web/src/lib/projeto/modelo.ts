@@ -68,15 +68,22 @@ export type Virar = { horizontal: boolean; vertical: boolean };
 
 /**
  * Como o clipe se mistura com o que está embaixo. "normal" cobre; "multiplicar" escurece; "tela"
- * clareia; "somar" soma a luz. A conta é a mesma no compositor da prévia e no blend do render.
+ * clareia; "somar" soma a luz; os outros são os modos clássicos (o mais escuro, o mais claro, sobrepor e luz
+ * forte, a diferença e a exclusão). A conta é a mesma no compositor da prévia e no blend do render.
  */
-export type Mesclagem = "normal" | "multiplicar" | "tela" | "somar";
+export type Mesclagem = "normal" | "multiplicar" | "tela" | "somar" | "escurecer" | "clarear" | "sobrepor" | "luz_forte" | "diferenca" | "exclusao";
 
 export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
   { id: "normal", nome: "Normal" },
   { id: "multiplicar", nome: "Multiplicar" },
   { id: "tela", nome: "Tela" },
   { id: "somar", nome: "Somar" },
+  { id: "escurecer", nome: "Escurecer" },
+  { id: "clarear", nome: "Clarear" },
+  { id: "sobrepor", nome: "Sobrepor" },
+  { id: "luz_forte", nome: "Luz forte" },
+  { id: "diferenca", nome: "Diferença" },
+  { id: "exclusao", nome: "Exclusão" },
 ];
 
 /**
