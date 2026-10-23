@@ -46,6 +46,7 @@ export async function exportarImagem(
     escala = 1,
     fonteDa = fonteDaMidia,
     fonteDosPixels,
+    fonteDaMascara,
   }: {
     formato: FormatoDaImagem;
     qualidade?: number;
@@ -53,6 +54,8 @@ export async function exportarImagem(
     fonteDa?: (midia: Midia) => Promise<ImageBitmap>;
     /** O canvas de uma camada de pixels sendo pintada (com o que ainda não subiu); sem ele, a versão do servidor. */
     fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
+    /** O canvas de uma máscara de camada sendo pintada; sem ele, a versão do servidor. */
+    fonteDaMascara?: (clipe: Clipe) => HTMLCanvasElement | null;
   },
 ): Promise<Blob> {
   const base = tamanhoDaImagem(projeto);
@@ -65,23 +68,30 @@ export async function exportarImagem(
   await Promise.all(textosParaImagens(projeto).map(async ({ id, texto }) => imagensDeTexto.set(id, await imagemDeTextoNoLado(texto, ladoMenor))));
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
 
+  // A máscara de camada pintável de cada uma: o canvas sendo pintado, ou a versão do servidor
+  const mascaraDe = async (clipe: Clipe) => {
+    const mascara = clipe.mascara_pixels;
+    if (!mascara || !mascara.ligada) return null;
+    const fonte = fonteDaMascara?.(clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
+    return { fonte, quadro: tamanho };
+  };
   const prontas = await Promise.all(
     camadas.map(async (camada) => {
-      if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const;
+      if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe))] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
       if (camada.clipe.pixels) {
         // A camada de pixels: o canvas que está sendo pintado, ou o PNG da versão do clipe (a 0 é vazia)
         const { versao } = camada.clipe.pixels;
         const local = fonteDosPixels?.(camada.clipe);
         const fonte = local ?? (versao > 0 ? await carregarBitmap(arquivoDaMidia(camada.clipe.midia_id!, arquivoDaVersao(versao))) : null);
-        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null)] as const) : null;
+        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const) : null;
       }
       const midia = midias.get(camada.clipe.midia_id!)!;
       const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
       // Como o render do vídeo: sem a máscara pronta, o arquivo sairia com o fundo que a pessoa pediu para tirar
       if (camada.clipe.remover_fundo && !mascara) throw new Error(`O fundo de "${midia.nome}" ainda está sendo recortado. Espere terminar ou desligue "Remover o fundo".`);
-      return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null)] as const;
+      return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null, await mascaraDe(camada.clipe))] as const;
     }),
   );
   const arvore = camadasEmArvore(projeto, new Map(prontas.filter((item) => item !== null)), tamanho);

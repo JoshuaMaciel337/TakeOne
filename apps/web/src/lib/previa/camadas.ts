@@ -23,6 +23,7 @@ import {
 } from "@/lib/projeto/efeitos";
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
 import { temSilhueta } from "@/lib/projeto/silhueta";
+import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
@@ -354,7 +355,14 @@ export function camadasEmArvore(projeto: Projeto, prontas: ReadonlyMap<string, C
 }
 
 /** A camada no formato do compositor, com o quadro da fonte e a máscara do fundo deste instante. */
-export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource | typeof FUNDO, mascaraDoFundo: TexImageSource | null): Camada {
+export function camadaDoCompositor(
+  camada: CamadaNaTela,
+  fonte: TexImageSource | typeof FUNDO,
+  mascaraDoFundo: TexImageSource | null,
+  /** A máscara de camada pintável (editor de imagem): a imagem dela e o quadro em que a caixa da camada foi medida. */
+  mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho } | null,
+): Camada {
+  const mascara = camada.clipe.mascara_pixels;
   const comEstilos = temSilhueta(camada.clipe) && !camada.clipe.ajuste;
   const preenchimento = Math.min(1, Math.max(0, camada.clipe.preenchimento ?? 1));
   return {
@@ -364,6 +372,10 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource |
     virar: fonte === FUNDO ? { horizontal: false, vertical: true } : camada.clipe.virar,
     cantos: camada.clipe.cantos,
     mascaraDeForma: camada.clipe.mascara,
+    mascaraDaCamada:
+      mascara && mascara.ligada && mascaraDaCamada
+        ? { fonte: mascaraDaCamada.fonte, matriz: matrizEmUso(mascara, camada.caixa, mascaraDaCamada.quadro), densidade: mascara.densidade, difusao: mascara.difusao }
+        : null,
     // O preenchimento (só na imagem) esconde a camada sem os estilos; sem estilos, é mais uma opacidade
     silhueta: comEstilos ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra, preenchimento } : undefined,
     caixa: comEstilos || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },

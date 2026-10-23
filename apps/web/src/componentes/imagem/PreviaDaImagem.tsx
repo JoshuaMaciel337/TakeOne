@@ -81,9 +81,14 @@ type Props = {
     aoSoltar: (clipeId: string) => void;
     aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
     simetria: Simetria | null;
+    emCinza: boolean;
   } | null;
   /** O canvas de uma camada de pixels sendo pintada; sem ele, a versão do servidor. */
   fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
+  /** O canvas de uma máscara de camada sendo pintada; sem ele, a versão do servidor. */
+  fonteDaMascara?: (clipe: Clipe) => HTMLCanvasElement | null;
+  /** Alt + clique na miniatura da máscara: a prévia mostra só a máscara desta camada (o clipe), em cinza. */
+  mascaraAVista?: string | null;
 };
 
 /** O tamanho da área livre da prévia. */
@@ -131,6 +136,8 @@ export function PreviaDaImagem({
   aoPegarCor,
   pintura = null,
   fonteDosPixels,
+  fonteDaMascara,
+  mascaraAVista = null,
 }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
@@ -173,6 +180,12 @@ export function PreviaDaImagem({
   const fonteDa = (midiaId: string) => arquivoDaMidia(midiaId, "proxy.webp");
   // A camada de pixels lê a versão do clipe (a 0 é vazia), ou o canvas enquanto é pintada
   const versaoDosPixels = (clipe: Clipe) => (clipe.pixels && clipe.midia_id && clipe.pixels.versao > 0 ? arquivoDaMidia(clipe.midia_id, arquivoDaVersao(clipe.pixels.versao)) : null);
+  // A máscara de camada: o canvas sendo pintado, ou a versão do servidor
+  const versaoDaMascara = (clipe: Clipe) => (clipe.mascara_pixels ? arquivoDaMidia(clipe.mascara_pixels.midia_id, arquivoDaVersao(clipe.mascara_pixels.versao)) : null);
+  const enderecosDasMascaras = camadas.flatMap((camada) => {
+    const endereco = !fonteDaMascara?.(camada.clipe) ? versaoDaMascara(camada.clipe) : null;
+    return endereco ? [endereco] : [];
+  });
   const enderecos = camadas.flatMap((camada) => {
     if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste) return [];
     if (camada.clipe.pixels) {
@@ -182,7 +195,7 @@ export function PreviaDaImagem({
     const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id)) : null;
     return mascara ? [fonteDa(camada.clipe.midia_id), mascara] : [fonteDa(camada.clipe.midia_id)];
   });
-  const bitmaps = useBitmaps(enderecos);
+  const bitmaps = useBitmaps([...enderecos, ...enderecosDasMascaras]);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
   // Uma pasta ou várias camadas: uma caixa só, em volta de tudo, que arrasta todas juntas
   const doGrupo = selecionada ? [] : unidadesDaSelecao(projeto, selecao).flatMap((unidade) => unidade.clipeIds);
@@ -218,25 +231,41 @@ export function PreviaDaImagem({
   useLayoutEffect(() => {
     const atual = compositor.current;
     if (!atual || tamanho.largura <= 1) return;
+    // A máscara de camada de cada uma (null enquanto a imagem dela não chegou)
+    const mascaraDe = (camada: (typeof camadas)[number]) => {
+      if (!camada.clipe.mascara_pixels) return null;
+      const endereco = versaoDaMascara(camada.clipe);
+      const fonte = fonteDaMascara?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
+      return fonte ? { fonte, quadro: tamanho } : null;
+    };
+    // Alt + clique na miniatura da máscara: só a máscara, em cinza, no lugar da imagem
+    const avista = mascaraAVista ? camadas.find((camada) => camada.clipe.id === mascaraAVista) : undefined;
+    const mascaraAVistaPronta = avista ? mascaraDe(avista) : null;
+    if (avista && mascaraAVistaPronta) {
+      const inteira = { ...avista, clipe: { ...avista.clipe, mascara_pixels: null }, caixa: { cx: tamanho.largura / 2, cy: tamanho.altura / 2, largura: tamanho.largura, altura: tamanho.altura, rotacao: 0, opacidade: 1 }, recorte: { x: 0, y: 0, largura: 1, altura: 1 } };
+      const resolucaoDaMascara = { largura: Math.round(tamanho.largura * densidade), altura: Math.round(tamanho.altura * densidade) };
+      atual.desenhar([camadaDoCompositor(inteira, mascaraAVistaPronta.fonte, null)], "#000000", tamanho, resolucaoDaMascara);
+      return;
+    }
     // As camadas de cada faixa, prontas para o compositor; a árvore junta as pastas e os recortes
     const porFaixa = new Map(
       camadas.flatMap((camada) => {
-        if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const];
+        if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada))] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
         if (camada.clipe.pixels) {
           const endereco = versaoDosPixels(camada.clipe);
           const pixels = fonteDosPixels?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
-          return pixels ? [[camada.faixa.id, camadaDoCompositor(camada, pixels, null)] as const] : [];
+          return pixels ? [[camada.faixa.id, camadaDoCompositor(camada, pixels, null, mascaraDe(camada))] as const] : [];
         }
         const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
         if (!fonte) return [];
         const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;
         const mascara = enderecoDaMascara ? bitmaps.get(enderecoDaMascara) : null;
         if (enderecoDaMascara && !mascara) return [];
-        return [[camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ?? null)] as const];
+        return [[camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ?? null, mascaraDe(camada))] as const];
       }),
     );
-    if (caixasRef) caixasRef.current = new Map(camadas.map((camada) => [camada.clipe.id, caixaNoQuadro(camada.caixa, tamanho)]));
+    if (caixasRef) caixasRef.current = new Map(camadas.map((camada) => [camada.clipe.id, { ...caixaNoQuadro(camada.caixa, tamanho), bruta: camada.caixa, quadro: tamanho }]));
     const resolucao = { largura: Math.round(tamanho.largura * densidade), altura: Math.round(tamanho.altura * densidade) };
     atual.desenhar(camadasEmArvore(projeto, porFaixa, tamanho), projeto.fundo.transparente ? null : projeto.fundo.cor, tamanho, resolucao);
   });
@@ -502,6 +531,7 @@ export function PreviaDaImagem({
                 aoSoltar={pintura.aoSoltar}
                 aoAjustar={pintura.aoAjustar}
                 simetria={pintura.simetria}
+                emCinza={pintura.emCinza}
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}

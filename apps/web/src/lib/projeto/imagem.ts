@@ -8,6 +8,7 @@ import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
 import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada } from "./modelo.ts";
+import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 
@@ -142,6 +143,50 @@ export function camadaDeFundo(projeto: Projeto, faixaId: string, ligar: boolean)
   const principal = resto.findIndex((item) => item.tipo === "principal");
   resto.splice(principal < 0 ? resto.length : principal, 0, fundo);
   return { ...projeto, faixas: resto };
+}
+
+/** O clipe da camada, com a mudança; travada, recusa. */
+function mudarClipeDaCamada(projeto: Projeto, clipeId: string, mudar: (clipe: Clipe) => Clipe): Projeto {
+  let achou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.clipes.some((clipe) => clipe.id === clipeId)) return faixa;
+    if (faixa.travada) throw new ErroEdicao("A camada está travada. Destrave o cadeado para mexer nela.");
+    achou = true;
+    return { ...faixa, clipes: faixa.clipes.map((clipe) => (clipe.id === clipeId ? mudar(clipe) : clipe)) };
+  });
+  if (!achou) throw new ErroEdicao("Essa camada não existe mais.");
+  return { ...projeto, faixas };
+}
+
+/** Põe, troca ou tira (null) a máscara de camada pintável. */
+export function definirMascaraDePixels(projeto: Projeto, clipeId: string, mascara: MascaraDePixels | null): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (clipe.pasta || clipe.ajuste) {
+      if (mascara) throw new ErroEdicao("A máscara de pixels vale para camadas com imagem.");
+    }
+    if (!mascara) {
+      const sem = { ...clipe };
+      delete sem.mascara_pixels;
+      return sem;
+    }
+    return { ...clipe, mascara_pixels: mascara };
+  });
+}
+
+/** Muda a máscara de camada (a versão pintada, ligar, vincular, densidade, difusão). */
+export function mudarMascaraDePixels(projeto: Projeto, clipeId: string, mudanca: Partial<Omit<MascaraDePixels, "midia_id">>): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (!clipe.mascara_pixels) throw new ErroEdicao("A camada não tem máscara.");
+    return {
+      ...clipe,
+      mascara_pixels: {
+        ...clipe.mascara_pixels,
+        ...mudanca,
+        densidade: Math.min(1, Math.max(0, mudanca.densidade ?? clipe.mascara_pixels.densidade)),
+        difusao: Math.min(1000, Math.max(0, mudanca.difusao ?? clipe.mascara_pixels.difusao)),
+      },
+    };
+  });
 }
 
 /** A camada de pixels passa a mostrar outra versão do PNG (um traço novo, ou o desfazer). */

@@ -117,6 +117,8 @@ import {
   moverCamadasPara,
   adicionarCamadaDePixels,
   camadaDeFundo,
+  definirMascaraDePixels,
+  mudarMascaraDePixels,
   mudarCamada,
   type MudancaDaCamada,
   trocarVersaoDosPixels,
@@ -132,6 +134,7 @@ import {
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
 import { type PlanoDosPixels, substituirPorPixels } from "./rasterizar.ts";
+import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { Nivelamento } from "./nivelar.ts";
 import type { ChaveDeKeyframe, Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -206,6 +209,8 @@ export type Comando =
   | { comando: "imagem.substituirPorPixels"; parametros: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number } }
   | { comando: "imagem.camadaDeFundo"; parametros: { faixaId: string; ligar: boolean } }
   | { comando: "camada.pixels"; parametros: { clipeId: string; versao: number } }
+  | { comando: "mascara.definir"; parametros: { clipeId: string; mascara: MascaraDePixels | null } }
+  | { comando: "mascara.mudar"; parametros: { clipeId: string; mudanca: Partial<Omit<MascaraDePixels, "midia_id">> } }
   | { comando: "imagem.apagarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.duplicarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" | number } }
@@ -315,6 +320,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.substituirPorPixels": "mesclar as camadas",
   "imagem.camadaDeFundo": "mudar a camada de fundo",
   "camada.pixels": "pintar",
+  "mascara.definir": "mudar a máscara de camada",
+  "mascara.mudar": "mudar a máscara de camada",
   "imagem.apagarVarias": "apagar as camadas",
   "imagem.duplicarVarias": "duplicar as camadas",
   "imagem.mover": "mudar a ordem das camadas",
@@ -548,6 +555,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     }
     case "imagem.camadaDeFundo":
       return { projeto: camadaDeFundo(projeto, parametros.faixaId, parametros.ligar) };
+    case "mascara.definir":
+      return { projeto: definirMascaraDePixels(projeto, parametros.clipeId, parametros.mascara) };
+    case "mascara.mudar":
+      return { projeto: mudarMascaraDePixels(projeto, parametros.clipeId, parametros.mudanca) };
     case "camada.pixels":
       return { projeto: trocarVersaoDosPixels(projeto, parametros.clipeId, parametros.versao) };
     case "imagem.soEsta":

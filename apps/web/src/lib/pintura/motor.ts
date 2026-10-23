@@ -69,7 +69,9 @@ function ponta(diametro: number, dureza: number, dura: boolean): HTMLCanvasEleme
   } else {
     const raio = d / 2;
     const gradiente = ctx.createRadialGradient(centro, centro, 0, centro, centro, raio);
-    const dentro = Math.min(0.999, Math.max(0, dureza));
+    // Mesmo a dureza 100% guarda um pixel de queda na borda: sem ele, a borda saía serrilhada e as marcas em fila
+    // formavam um tracejado
+    const dentro = Math.min(Math.max(0, dureza), Math.max(0, 1 - 1.2 / Math.max(raio, 1e-6)), 0.999);
     gradiente.addColorStop(0, "rgba(255,255,255,1)");
     gradiente.addColorStop(dentro, "rgba(255,255,255,1)");
     // A queda em S até a borda, em dez degraus (o gradiente do canvas é linear entre eles)

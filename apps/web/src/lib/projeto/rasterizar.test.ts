@@ -111,3 +111,25 @@ test("rasterizar refaz o contorno e a sombra na caixa nova (o quadro inteiro)", 
   assert.ok(Math.abs(plano.manter.contorno!.largura - 0.0125) < 1e-12);
   assert.ok(Math.abs(plano.manter.sombra!.distancia - 0.01) < 1e-12 && Math.abs(plano.manter.sombra!.desfoque - 0.005) < 1e-12);
 });
+
+test("a máscara de camada: rasterizar a guarda (com a matriz da caixa nova); aplicar grava nos pixels", () => {
+  const { ctx, projeto: inicio, b } = tres();
+  const clipeB = inicio.faixas.find((f) => f.id === b)!.clipes[0].id;
+  const mascara = { midia_id: "m", versao: 2, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz: [0.5, 0, 0, 0.5, 0.25, 0.25] as [number, number, number, number, number, number] };
+  const projeto = executarComando(inicio, { comando: "mascara.definir", parametros: { clipeId: clipeB, mascara } }, ctx).projeto;
+  const nova: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
+  const raster = planoDosPixels(projeto, "rasterizar", [b], nome, () => null, () => nova);
+  assert.equal(raster.desenhar.faixas.find((f) => f.clipes[0])!.clipes[0].mascara_pixels, undefined);
+  assert.deepEqual(raster.manter.mascara?.matriz, nova);
+  const { projeto: depois } = substituirPorPixels(projeto, ctx.novoId, { ...raster, midiaId: "px", versao: 1 });
+  assert.deepEqual(depois.faixas.find((f) => f.clipes[0]?.pixels)!.clipes[0].mascara_pixels?.matriz, nova);
+  const aplicar = planoDosPixels(projeto, "aplicarMascara", [b], nome);
+  assert.equal(aplicar.desenhar.faixas.find((f) => f.clipes[0])!.clipes[0].mascara_pixels?.versao, 2);
+  assert.equal(aplicar.manter.mascara, undefined);
+  // Mudar a máscara: a densidade presa entre 0 e 1
+  const mudada = executarComando(projeto, { comando: "mascara.mudar", parametros: { clipeId: clipeB, mudanca: { densidade: 3, ligada: false } } }, ctx).projeto;
+  const m = mudada.faixas.find((f) => f.id === b)!.clipes[0].mascara_pixels!;
+  assert.deepEqual([m.densidade, m.ligada], [1, false]);
+  // Num projeto de vídeo, não
+  assert.match(problemaNaArvore({ ...projeto, tipo: undefined }) ?? "", /editor de imagem/);
+});

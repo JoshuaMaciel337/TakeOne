@@ -114,6 +114,13 @@ export type AcoesDosMenus = {
   podeVirarFundo: boolean;
   /** Os pixels de um mesclar ou rasterizar estão sendo gerados (os itens esperam). */
   gerandoPixels: boolean;
+  /** A máscara de camada pintável da escolhida. */
+  temMascara: boolean;
+  mascaraLigada: boolean;
+  mascaraVinculada: boolean;
+  /** O pincel pinta a máscara (Ctrl+\). */
+  mascaraEmFoco: boolean;
+  mascaraDePixels: (acao: "revelar" | "ocultar" | "transparencia" | "excluir" | "aplicar" | "ligar" | "vincular" | "inverter" | "foco") => void;
   apagarVazias: () => void;
   selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
@@ -218,7 +225,26 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Sombra projetada…", aoEscolher: () => a.estilo("sombra") },
           ],
         },
-        { nome: "Máscara de camada", desativado: semCamada, itens: [{ nome: "Revelar tudo", aoEscolher: a.mascara }] },
+        {
+          nome: "Máscara de camada",
+          desativado: semCamada || a.gerandoPixels,
+          itens: [
+            { nome: "Revelar tudo", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("revelar") },
+            { nome: "Ocultar tudo", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("ocultar") },
+            { nome: "Revelar seleção", desativado: true, titulo: "Chega com a seleção do documento (13.3)", aoEscolher: () => undefined },
+            { nome: "Ocultar seleção", desativado: true, titulo: "Chega com a seleção do documento (13.3)", aoEscolher: () => undefined },
+            { nome: "A partir da transparência", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("transparencia") },
+            "-",
+            { nome: "Pintar na máscara", atalho: "Ctrl+\\", marcado: a.mascaraEmFoco, desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("foco") },
+            { nome: "Inverter", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("inverter") },
+            { nome: a.mascaraLigada || !a.temMascara ? "Desativar" : "Ativar", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("ligar") },
+            { nome: a.mascaraVinculada || !a.temMascara ? "Desvincular" : "Vincular", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("vincular") },
+            { nome: "Aplicar", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("aplicar") },
+            { nome: "Excluir", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("excluir") },
+            "-",
+            { nome: "Máscara de forma (elipse ou retângulo)…", aoEscolher: a.mascara },
+          ],
+        },
         { nome: a.recortadas ? "Liberar máscara de corte" : "Criar máscara de corte", atalho: "Ctrl+Alt+G", desativado: semCamada, aoEscolher: a.recortar },
         "-",
         { nome: "Agrupar camadas", atalho: "Ctrl+G", desativado: semCamada, aoEscolher: a.agrupar },

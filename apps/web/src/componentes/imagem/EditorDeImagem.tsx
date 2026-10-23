@@ -46,15 +46,20 @@ import { PainelFotoIA } from "./PainelFotoIA";
 import { PainelAjustes, PainelAmostras, PainelBiblioteca, PainelCor, PainelModelosDaImagem } from "./PaineisDaImagem";
 import { PreviaDaImagem, proximoZoom } from "./PreviaDaImagem";
 import { PropriedadesDoDocumento } from "./PropriedadesDoDocumento";
+import { PropriedadesDaMascara } from "./PropriedadesDaMascara";
 import { useObjeto } from "./useObjeto";
-import { usePinturas } from "./usePinturas";
+import { alvoDaMascara, alvoDosPixels, usePinturas } from "./usePinturas";
 import type { AlvoDaPintura } from "./PinturaNaPrevia";
 import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
 import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
 import { criarPincel, excluirPincel, importarAbr, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
 import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { exportarImagem } from "@/lib/exportacao/imagem";
-import { planoDosPixels, type PlanoDosPixels, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
+import { planoDosPixels, type PlanoDosPixels, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
+import { carregarBitmap } from "@/lib/previa/bitmaps";
+import { arquivoDaMidia } from "@/lib/api";
+import { arquivoDaVersao } from "@/lib/pixels";
+import { matrizDaCaixa, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 
 const SEM_SEGUIR = {
   marcando: null,
@@ -130,6 +135,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   });
   const [simetria, setSimetria] = useState<Simetria | null>(null);
   const [gerandoPixels, setGerandoPixels] = useState(false);
+  // A máscara de camada em foco (o pincel pinta nela) e a máscara à vista (Alt + clique na miniatura dela)
+  const [mascaraEmFoco, setMascaraEmFoco] = useState<string | null>(null);
+  const [mascaraAVista, setMascaraAVista] = useState<string | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -360,6 +368,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const alvoDaPintura = async (): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
+    // A máscara em foco (Ctrl+\ ou o clique na miniatura dela): o pincel pinta a máscara em tons de cinza
+    if (selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels) {
+      const achado = acharClipe(atual, selecionado.clipe.id);
+      const mascara = achado?.clipe.mascara_pixels;
+      const alvo = achado ? alvoDaMascara(achado.clipe) : null;
+      if (!achado || !mascara || !alvo) return null;
+      if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) {
+        mostrarAviso("A camada está travada. Destrave para pintar a máscara.");
+        return null;
+      }
+      try {
+        const pintura = await pinturas.preparar(alvo, tamanhoDaImagem(atual));
+        return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: true, mascara };
+      } catch {
+        mostrarAviso("Não foi possível abrir a máscara para pintar. Tente de novo.");
+        return null;
+      }
+    }
     let clipeId = selecionado?.clipe.pixels ? selecionado.clipe.id : null;
     if (!clipeId) clipeId = await novaCamada();
     const achado = clipeId && projetoRef.current ? acharClipe(projetoRef.current, clipeId) : null;
@@ -375,9 +401,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     const midia = midias.get(achado.clipe.midia_id);
     const tamanhoDaCamada = midia?.camada_pixels ?? tamanhoDaImagem(projetoAgora);
+    const alvo = alvoDosPixels(achado.clipe);
+    if (!alvo) return null;
     try {
-      const pintura = await pinturas.preparar(achado.clipe, tamanhoDaCamada);
-      return { clipeId: achado.clipe.id, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia) };
+      const pintura = await pinturas.preparar(alvo, tamanhoDaCamada);
+      return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia) };
     } catch {
       mostrarAviso("Não foi possível abrir a camada para pintar. Tente de novo.");
       return null;
@@ -392,7 +420,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     setGerandoPixels(true);
     try {
       await pinturas.esperar();
-      const blob = typeof plano === "function" ? await plano() : await exportarImagem(plano.desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte });
+      const blob = typeof plano === "function" ? await plano() : await exportarImagem(plano.desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
       const { largura, altura } = tamanhoDaImagem(projetoRef.current ?? projeto);
       const midia = await criarCamadaDePixels(largura, altura, dados.nome);
       setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
@@ -407,6 +435,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   const nomeDaFaixa = (faixa: Faixa) => nomeDaCamada(faixa.clipes[0], midias, faixa);
   const alturaDaCaixa = (faixa: Faixa) => caixasRef.current.get(faixa.clipes[0].id)?.altura ?? null;
+  /** A matriz da máscara de camada para o quadro inteiro (a camada que rasterizar cria), pela caixa de agora. */
+  const matrizNoQuadro = (faixa: Faixa) => {
+    const medida = caixasRef.current.get(faixa.clipes[0].id);
+    const mascara = faixa.clipes[0].mascara_pixels;
+    if (!medida?.bruta || !medida.quadro || !mascara) return null;
+    const inteira = { cx: medida.quadro.largura / 2, cy: medida.quadro.altura / 2, largura: medida.quadro.largura, altura: medida.quadro.altura, rotacao: 0, opacidade: 1 };
+    return matrizParaOutraCaixa(mascara, medida.bruta, inteira, medida.quadro);
+  };
   /** Rasterizar, mesclar, achatar ou carimbar as escolhidas (cada rasterizar é uma camada por vez). */
   const mesclarEmPixels = async (tipo: TipoDaMesclagem) => {
     if (!projeto || gerandoPixels) return;
@@ -415,7 +451,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const atual = projetoRef.current ?? projeto;
       let plano: PlanoDosPixels;
       try {
-        plano = planoDosPixels(atual, tipo, Array.isArray(grupo) ? grupo : [grupo], nomeDaFaixa, alturaDaCaixa);
+        plano = planoDosPixels(atual, tipo, Array.isArray(grupo) ? grupo : [grupo], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
       } catch (e) {
         mostrarAviso(e instanceof Error ? e.message : "Não foi possível.");
         return;
@@ -430,7 +466,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     for (const faixa of faixasEmOrdem(projeto).filter((item) => !item.clipes[0].pixels && !item.clipes[0].pasta && !item.clipes[0].ajuste && !item.travada)) {
       const atual = projetoRef.current ?? projeto;
       if (!atual.faixas.some((item) => item.id === faixa.id)) continue;
-      const { desenhar, ...dados } = planoDosPixels(atual, "rasterizar", [faixa.id], nomeDaFaixa, alturaDaCaixa);
+      const { desenhar, ...dados } = planoDosPixels(atual, "rasterizar", [faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
       await gerarPixels({ desenhar, ...dados }, dados);
     }
   };
@@ -454,6 +490,106 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     );
   };
   const camadaDeFundoAtual = projeto?.faixas.find((faixa) => faixa.fundo) ?? null;
+
+  /** Um PNG do tamanho da imagem: a cor lisa, ou a função que pinta o canvas. */
+  const pngDoDocumento = (pintar: (ctx: CanvasRenderingContext2D, largura: number, altura: number) => void | Promise<void>) => async (): Promise<Blob> => {
+    const { largura, altura } = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    await pintar(ctx2d, largura, altura);
+    return new Promise<Blob>((pronto, falhou) => canvas.toBlob((blob) => (blob ? pronto(blob) : falhou(new Error("O navegador não conseguiu gerar a máscara."))), "image/png"));
+  };
+  /** Sobe um PNG como camada de pixels (a máscara de camada) e devolve a mídia e a versão. */
+  const subirMascara = async (gerar: () => Promise<Blob>) => {
+    const { largura, altura } = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    const blob = await gerar();
+    const midia = await criarCamadaDePixels(largura, altura, "Máscara");
+    setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
+    const versao = await enviarVersao(midia.id, blob);
+    return { midia, versao };
+  };
+  /**
+   * Camada › Máscara de camada: revelar tudo (branca), ocultar tudo (preta) ou a partir da transparência (o alfa da
+   * camada, desenhada sozinha, vira o cinza). A matriz é a da caixa da camada agora: a máscara anda com ela.
+   */
+  const criarMascara = async (como: "revelar" | "ocultar" | "transparencia") => {
+    const alvo = selecionado;
+    if (!alvo || !projeto || gerandoPixels) return;
+    if (alvo.clipe.pasta || alvo.clipe.ajuste) return mostrarAviso("A máscara de pixels vale para camadas com imagem.");
+    if (alvo.faixa.travada) return mostrarAviso("A camada está travada.");
+    const medida = caixasRef.current.get(alvo.clipe.id);
+    if (!medida?.bruta || !medida.quadro) return mostrarAviso("A camada ainda não apareceu na prévia. Tente de novo.");
+    const matriz = matrizDaCaixa(medida.bruta, medida.quadro);
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const gerar =
+        como === "transparencia"
+          ? pngDoDocumento(async (ctx2d, largura, altura) => {
+              const sozinha = projetoSoCom(projetoRef.current ?? projeto, [alvo.faixa.id], { neutras: new Set([alvo.faixa.id]), semEstilo: true, semMascara: true });
+              const imagem = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte }));
+              ctx2d.drawImage(imagem, 0, 0, largura, altura);
+              imagem.close();
+              const dados = ctx2d.getImageData(0, 0, largura, altura);
+              for (let i = 0; i < dados.data.length; i += 4) {
+                const a = dados.data[i + 3];
+                dados.data[i] = a;
+                dados.data[i + 1] = a;
+                dados.data[i + 2] = a;
+                dados.data[i + 3] = 255;
+              }
+              ctx2d.putImageData(dados, 0, 0);
+            })
+          : pngDoDocumento((ctx2d, largura, altura) => {
+              ctx2d.fillStyle = como === "revelar" ? "#ffffff" : "#000000";
+              ctx2d.fillRect(0, 0, largura, altura);
+            });
+      const { midia, versao } = await subirMascara(gerar);
+      if (executar({ comando: "mascara.definir", parametros: { clipeId: alvo.clipe.id, mascara: { midia_id: midia.id, versao, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz } } })) {
+        setMascaraEmFoco(alvo.clipe.id);
+      }
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar a máscara.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Inverter a máscara (o que mostrava esconde): uma versão nova com o cinza ao contrário. */
+  const inverterMascara = async () => {
+    const mascara = selecionado?.clipe.mascara_pixels;
+    if (!selecionado || !mascara || gerandoPixels) return;
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const atual = pinturas.fonteDaMascara(selecionado.clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
+      const blob = await pngDoDocumento((ctx2d, largura, altura) => {
+        ctx2d.drawImage(atual, 0, 0, largura, altura);
+        const dados = ctx2d.getImageData(0, 0, largura, altura);
+        for (let i = 0; i < dados.data.length; i += 4) {
+          dados.data[i] = 255 - dados.data[i];
+          dados.data[i + 1] = 255 - dados.data[i + 1];
+          dados.data[i + 2] = 255 - dados.data[i + 2];
+          dados.data[i + 3] = 255;
+        }
+        ctx2d.putImageData(dados, 0, 0);
+      })();
+      const versao = await enviarVersao(mascara.midia_id, blob);
+      executar({ comando: "mascara.mudar", parametros: { clipeId: selecionado.clipe.id, mudanca: { versao } } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível inverter a máscara.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Vincular de novo guarda a matriz da caixa de agora: a máscara fica onde está e volta a andar com a camada. */
+  const vincularMascara = (clipeId: string, ligar: boolean) => {
+    const medida = caixasRef.current.get(clipeId);
+    if (ligar && (!medida?.bruta || !medida.quadro)) return;
+    executar({ comando: "mascara.mudar", parametros: { clipeId, mudanca: ligar ? { vinculada: true, matriz: matrizDaCaixa(medida!.bruta!, medida!.quadro!) } : { vinculada: false } } });
+  };
+  const mascaraDaEscolhida = selecionado?.clipe.mascara_pixels ?? null;
   const ferramentaDePintura = FERRAMENTAS_DE_PINTURA.has(ferramenta) ? (ferramenta as FerramentaDePintura) : null;
   // Fora das ferramentas de pintura, os painéis do pincel mostram o Pincel (como lá, o último pincel usado)
   const pincelDosPaineis: FerramentaDePintura = ferramentaDePintura ?? "pincel";
@@ -521,6 +657,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     temFundo: Boolean(camadaDeFundoAtual) || Boolean(projeto && !projeto.fundo.transparente),
     podeVirarFundo: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0].pixels) && !camadaDeFundoAtual,
     gerandoPixels,
+    temMascara: Boolean(mascaraDaEscolhida),
+    mascaraLigada: Boolean(mascaraDaEscolhida?.ligada),
+    mascaraVinculada: Boolean(mascaraDaEscolhida?.vinculada),
+    mascaraEmFoco: Boolean(selecionado && mascaraEmFoco === selecionado.clipe.id),
+    mascaraDePixels: (acao) => {
+      if (!selecionado) return;
+      const clipeId = selecionado.clipe.id;
+      if (acao === "revelar" || acao === "ocultar" || acao === "transparencia") void criarMascara(acao);
+      else if (acao === "excluir") {
+        if (executar({ comando: "mascara.definir", parametros: { clipeId, mascara: null } })) setMascaraEmFoco(null);
+      } else if (acao === "aplicar") void mesclarEmPixels("aplicarMascara").then(() => setMascaraEmFoco(null));
+      else if (acao === "ligar" && mascaraDaEscolhida) executar({ comando: "mascara.mudar", parametros: { clipeId, mudanca: { ligada: !mascaraDaEscolhida.ligada } } });
+      else if (acao === "vincular" && mascaraDaEscolhida) vincularMascara(clipeId, !mascaraDaEscolhida.vinculada);
+      else if (acao === "inverter") void inverterMascara();
+      else if (acao === "foco") setMascaraEmFoco((atual) => (atual === clipeId || !mascaraDaEscolhida ? null : clipeId));
+    },
     ferramenta: escolherFerramenta,
     ajuste: criarAjuste,
     documento: () => {
@@ -682,7 +834,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     propriedades: {
       nome: PAINEIS_DA_IMAGEM.propriedades,
-      conteudo: (
+      conteudo:
+        selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels ? (
+          <PropriedadesDaMascara
+            clipeId={selecionado.clipe.id}
+            mascara={selecionado.clipe.mascara_pixels}
+            travada={selecionado.faixa.travada}
+            aoPrever={preverDoPainel}
+            aoExecutar={executar}
+            aoAcao={(acao) => acoes.mascaraDePixels(acao)}
+          />
+        ) : (
         <PainelPropriedades
           modo="imagem"
           midia={midiaDoClipe}
@@ -703,7 +865,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           semSelecao={<PropriedadesDoDocumento projeto={projetoNaTela} aoPrever={preverDoPainel} aoExecutar={executar} />}
           className="h-full"
         />
-      ),
+        ),
     },
     ajustes: { nome: PAINEIS_DA_IMAGEM.ajustes, conteudo: <PainelAjustes aoCriar={criarAjuste} /> },
     biblioteca: {
@@ -761,7 +923,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(como)} aoVincularMascara={vincularMascara} />,
     },
     pinceis: {
       nome: PAINEIS_DA_IMAGEM.pinceis,
@@ -953,10 +1115,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     aoSoltar: pinturas.soltar,
                     aoAjustar: mudarPincel,
                     simetria,
+                    // Na máscara, a tinta é cinza: a luz das cores (o branco mostra, o preto esconde)
+                    emCinza: Boolean(selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels),
                   }
                 : null
             }
             fonteDosPixels={pinturas.fonte}
+            fonteDaMascara={pinturas.fonteDaMascara}
+            mascaraAVista={mascaraAVista}
             ferramenta={ferramenta}
             zoom={zoom}
             aoMudarZoom={setZoom}
@@ -1010,6 +1176,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoAvisar={mostrarAviso}
           aoPrepararPintura={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
           fonteDosPixels={pinturas.fonte}
+          fonteDaMascara={pinturas.fonteDaMascara}
         />
       ) : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}

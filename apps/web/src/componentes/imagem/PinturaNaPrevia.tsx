@@ -9,11 +9,16 @@ import type { Pintura } from "@/lib/pintura/motor";
 import { comprimentoDaCorda, copiasDaSimetria, Corda, Espacador, type FerramentaDePintura, type OpcoesDoPincel, pontoNaCamada, type PontoDoTraco, type Simetria } from "@/lib/pintura/traco";
 import type { Caixa, Tamanho } from "@/lib/projeto/geometria";
 import type { Recorte, Virar } from "@/lib/projeto/modelo";
+import { type MascaraDePixels, pontoNaMascara } from "@/lib/projeto/mascaraDePixels";
 
 /** A camada que recebe o traço, como está na prévia (sem caixa: uma camada nova, que cobre o quadro). */
 export type AlvoDaPintura = {
   clipeId: string;
+  /** O alvo no motor (o clipe, ou "<clipe>#mascara"). */
+  chave: string;
   pintura: Pintura;
+  /** Pintando a máscara de camada: o ponto vai para o documento pela matriz dela (lib/projeto/mascaraDePixels.ts). */
+  mascara?: Pick<MascaraDePixels, "vinculada" | "matriz">;
   caixa: Caixa | null;
   recorte: Recorte;
   virar: Virar | null | undefined;
@@ -35,7 +40,17 @@ type Props = {
   aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
   /** A simetria da pintura, em volta do meio do quadro; null sem ela. */
   simetria: Simetria | null;
+  /** Pintando uma máscara: as cores viram cinza pela luz delas. */
+  emCinza?: boolean;
 };
+
+/** A cor em cinza, pela luz (BT.709): na máscara, o branco mostra e o preto esconde. */
+function emTomDeCinza(cor: string): string {
+  const valor = Number.parseInt(cor.replace("#", "").slice(0, 6).padEnd(6, "0"), 16);
+  const luz = Math.round(0.2126 * ((valor >> 16) & 255) + 0.7152 * ((valor >> 8) & 255) + 0.0722 * (valor & 255));
+  const hex = luz.toString(16).padStart(2, "0");
+  return `#${hex}${hex}${hex}`;
+}
 
 type Traco = {
   pendentes: PontoDoTraco[];
@@ -58,7 +73,7 @@ function daCaneta(evento: PointerEvent | React.PointerEvent): Omit<PontoDoTraco,
   return { pressao: evento.pressure > 0 ? evento.pressure : 1, inclinacaoX: (evento.tiltX ?? 0) / 90, inclinacaoY: (evento.tiltY ?? 0) / 90, giro: evento.twist ?? 0 };
 }
 
-export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria }: Props) {
+export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false }: Props) {
   const centro = { x: quadro.largura / 2, y: quadro.altura / 2 };
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const tracoRef = useRef<Traco | null>(null);
@@ -112,7 +127,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
     if (traco.ultimoNaTela) andar(traco, traco.ultimoNaTela, true);
     const mudou = alvo.pintura.terminar();
     aoQuadro();
-    if (mudou) aoSoltar(alvo.clipeId);
+    if (mudou) aoSoltar(alvo.chave);
   }
 
   function aoApertar(evento: React.PointerEvent<HTMLDivElement>) {
@@ -145,14 +160,20 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       }
       const caixa = alvo.caixa ?? { cx: quadro.largura / 2, cy: quadro.altura / 2, largura: quadro.largura, altura: quadro.altura, rotacao: 0, opacidade: 1 };
       const midia = { largura: alvo.pintura.largura, altura: alvo.pintura.altura };
-      const escala = pontoNaCamada({ x: caixa.cx, y: caixa.cy }, caixa, alvo.recorte, alvo.virar, midia).escala;
+      const documento = { largura: quadro.largura / escalaDaImagem, altura: quadro.altura / escalaDaImagem };
+      const mascara = alvo.mascara;
+      // Na máscara (do tamanho do documento), um pixel da tela é 1/escalaDaImagem pixels dela
+      const escala = mascara ? 1 / escalaDaImagem : pontoNaCamada({ x: caixa.cx, y: caixa.cy }, caixa, alvo.recorte, alvo.virar, midia).escala;
       traco.alvo = alvo;
-      traco.mapear = (p) => ({ ...pontoNaCamada(p, caixa, alvo.recorte, alvo.virar, midia), pressao: p.pressao });
+      traco.mapear = mascara
+        ? (p) => ({ ...p, ...pontoNaMascara(p, mascara, caixa, quadro, documento) })
+        : (p) => ({ ...pontoNaCamada(p, caixa, alvo.recorte, alvo.virar, midia), pressao: p.pressao });
       // O tamanho do pincel é em pixels da imagem; a camada pode estar ampliada ou reduzida
       const diametro = Math.max(1, opcoes.tamanho * escalaDaImagem * escala);
       const [primeiro, ...resto] = traco.pendentes;
       const copias = copiasDaSimetria(primeiro, simetria, centro).map(traco.mapear);
-      alvo.pintura.iniciar({ ferramenta, opcoes, diametro, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, travarTransparencia: alvo.travarTransparencia }, copias[0]);
+      const tinta = emCinza || mascara ? { primeiroPlano: emTomDeCinza(cores.primeiroPlano), fundo: emTomDeCinza(cores.fundo) } : cores;
+      alvo.pintura.iniciar({ ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia }, copias[0]);
       for (const copia of copias.slice(1)) alvo.pintura.marcar(copia);
       traco.corda.puxar(primeiro);
       copias.forEach((copia, i) => traco.espacadores[i].ate(copia, () => diametro * opcoes.espacamento));

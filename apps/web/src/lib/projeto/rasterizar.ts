@@ -4,8 +4,10 @@
 import { ancestrais, camadaVisivel, comDescendentes, paiDaCamada } from "./arvore.ts";
 import { ErroEdicao } from "./edicao.ts";
 import type { Clipe, Faixa, Mesclagem, Projeto } from "./modelo.ts";
+import type { Afim, MascaraDePixels } from "./mascaraDePixels.ts";
 
 export type TipoDaMesclagem =
+  | "aplicarMascara"
   | "rasterizar"
   | "rasterizarEstilo"
   | "baixo"
@@ -23,6 +25,8 @@ export type ManterNaCamada = {
   contorno?: Clipe["contorno"];
   sombra?: Clipe["sombra"];
   preenchimento?: number;
+  /** A máscara de camada que continua separada (rasterizar), já com a matriz da caixa nova. */
+  mascara?: MascaraDePixels;
   faixa: Pick<Faixa, "nome" | "rotulo" | "travas" | "vinculo" | "recortada">;
 };
 
@@ -48,10 +52,11 @@ function camadas(projeto: Projeto): Faixa[] {
   return projeto.faixas.filter((faixa) => faixa.tipo !== "principal" && faixa.clipes[0]);
 }
 
-/** A faixa com o clipe sem a opacidade e a mesclagem dele (e sem os estilos, quando pedido). */
-function neutra(faixa: Faixa, semEstilo: boolean): Faixa {
+/** A faixa com o clipe sem a opacidade e a mesclagem dele (e sem os estilos e a máscara de camada, quando pedido). */
+function neutra(faixa: Faixa, semEstilo: boolean, semMascara = false): Faixa {
   const clipe: Clipe = { ...faixa.clipes[0], transformacao: { ...faixa.clipes[0].transformacao, opacidade: 1 } };
   delete clipe.mesclagem;
+  if (semMascara) delete clipe.mascara_pixels;
   if (semEstilo) {
     delete clipe.contorno;
     delete clipe.sombra;
@@ -64,12 +69,16 @@ function neutra(faixa: Faixa, semEstilo: boolean): Faixa {
  * O projeto com só estas camadas (e as de dentro das pastas delas), na ordem de sempre; quem estava numa pasta que
  * não entrou vai para a raiz. `neutras` perdem a opacidade e a mesclagem (ficam na camada nova).
  */
-export function projetoSoCom(projeto: Projeto, faixaIds: string[], { neutras = new Set<string>(), semEstilo = false, comFundo = false }: { neutras?: ReadonlySet<string>; semEstilo?: boolean; comFundo?: boolean } = {}): Projeto {
+export function projetoSoCom(
+  projeto: Projeto,
+  faixaIds: string[],
+  { neutras = new Set<string>(), semEstilo = false, comFundo = false, semMascara = false }: { neutras?: ReadonlySet<string>; semEstilo?: boolean; comFundo?: boolean; semMascara?: boolean } = {},
+): Projeto {
   const ids = new Set(faixaIds.flatMap((id) => comDescendentes(projeto, id).map((faixa) => faixa.id)));
   const faixas = projeto.faixas.flatMap((faixa): Faixa[] => {
     if (faixa.tipo === "principal") return [faixa];
     if (!ids.has(faixa.id)) return [];
-    const ajustada = neutras.has(faixa.id) ? neutra(faixa, semEstilo) : faixa;
+    const ajustada = neutras.has(faixa.id) ? neutra(faixa, semEstilo, semMascara) : faixa;
     return [ajustada.pai && !ids.has(ajustada.pai) ? { ...ajustada, pai: null } : ajustada];
   });
   return { ...projeto, faixas, fundo: comFundo ? projeto.fundo : { ...projeto.fundo, transparente: true } };
@@ -109,12 +118,25 @@ export function planoDosPixels(
   nomeDe: (faixa: Faixa) => string,
   /** A altura da caixa da camada em frações do quadro (a prévia mede): o estilo guardado é refeito na caixa nova. */
   alturaDaCaixa: (faixa: Faixa) => number | null = () => null,
+  /** A matriz da máscara de camada para a caixa do quadro inteiro (a camada nova): ela continua no mesmo lugar. */
+  matrizNoQuadro: (faixa: Faixa) => Afim | null = () => null,
 ): PlanoDosPixels {
   const todas = camadas(projeto);
   const escolhidas = todas.filter((faixa) => faixaIds.includes(faixa.id));
   const primeira = escolhidas[0];
   if (escolhidas.some((faixa) => faixa.travada) && tipo !== "carimbarVisiveis") throw new ErroEdicao("Uma das camadas está travada.");
   switch (tipo) {
+    case "aplicarMascara": {
+      if (escolhidas.length !== 1 || !primeira.clipes[0].mascara_pixels) throw new ErroEdicao("Escolha uma camada com máscara para aplicar.");
+      // A máscara vai para os pixels; a opacidade, a mesclagem e o estilo continuam na camada
+      return {
+        desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: true }),
+        remover: [primeira.id],
+        lugar: primeira.id,
+        nome: nomeDe(primeira),
+        manter: propriedadesDe(primeira, true),
+      };
+    }
     case "rasterizar":
     case "rasterizarEstilo": {
       if (escolhidas.length !== 1) throw new ErroEdicao("Escolha uma camada para rasterizar.");
@@ -129,8 +151,12 @@ export function planoDosPixels(
       const fator = alturaDaCaixa(primeira) ?? 1;
       if (manter.contorno) manter.contorno = { ...manter.contorno, largura: manter.contorno.largura * fator };
       if (manter.sombra) manter.sombra = { ...manter.sombra, distancia: manter.sombra.distancia * fator, desfoque: manter.sombra.desfoque * fator };
+      // A máscara de camada continua separada: os pixels saem sem ela, e ela passa para a caixa nova
+      const mascara = clipe.mascara_pixels;
+      const matriz = mascara ? matrizNoQuadro(primeira) : null;
+      if (mascara && matriz) manter.mascara = { ...mascara, vinculada: true, matriz };
       return {
-        desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: !comEstilo }),
+        desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: !comEstilo, semMascara: Boolean(manter.mascara) }),
         remover: [primeira.id],
         lugar: primeira.id,
         nome: nomeDe(primeira),
@@ -221,6 +247,7 @@ export function substituirPorPixels(
     ...(manter.contorno ? { contorno: manter.contorno } : {}),
     ...(manter.sombra ? { sombra: manter.sombra } : {}),
     ...(manter.preenchimento !== undefined && manter.preenchimento < 1 ? { preenchimento: manter.preenchimento } : {}),
+    ...(manter.mascara ? { mascara_pixels: manter.mascara } : {}),
   };
   if (!clipe.duracao) clipe.duracao = projeto.faixas.flatMap((faixa) => faixa.clipes).reduce((maior, item) => Math.max(maior, item.duracao), 1);
   const faixa: Faixa = {

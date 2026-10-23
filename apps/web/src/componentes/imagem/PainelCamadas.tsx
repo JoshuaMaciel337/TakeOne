@@ -7,7 +7,7 @@ import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { arvoreDaImagem, camadaVisivel, type NoDaCamada, paiDaCamada } from "@/lib/projeto/arvore";
 import type { Comando } from "@/lib/projeto/comandos";
-import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MASCARA_PADRAO, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
+import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import type { Midia } from "@/lib/tipos";
 
@@ -28,6 +28,13 @@ type Props = {
   aoNovaCamada: () => void;
   /** Camada a partir do fundo (duplo clique na linha do fundo). */
   aoCamadaDoFundo: () => void;
+  /** A máscara de camada pintável: a camada cuja máscara recebe o pincel, a que está à vista, e as ações. */
+  mascaraEmFoco: string | null;
+  mascaraAVista: string | null;
+  aoFocarMascara: (clipeId: string | null) => void;
+  aoVerMascara: (clipeId: string | null) => void;
+  aoCriarMascara: (como: "revelar" | "ocultar") => void;
+  aoVincularMascara: (clipeId: string, ligar: boolean) => void;
 };
 
 /** O nome de cada camada: o que a pessoa deu, o do texto, "Camada de ajuste", "Grupo" ou o da mídia. */
@@ -189,7 +196,23 @@ function CampoDePorcentagem({ rotulo, valor, desativado, aoMudar }: { rotulo: st
  * (duplo clique renomeia); arrastar muda a ordem e põe dentro ou fora das pastas; Ctrl e Shift escolhem várias; o
  * botão direito abre o menu da camada. No rodapé: vincular, estilo (fx), máscara, ajuste, pasta, duplicar e apagar.
  */
-export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades, aoNovaCamada, aoCamadaDoFundo }: Props) {
+export function PainelCamadas({
+  projeto,
+  midias,
+  selecao,
+  aoSelecionar,
+  aoExecutar,
+  aoCriarAjuste,
+  aoAbrirPropriedades,
+  aoNovaCamada,
+  aoCamadaDoFundo,
+  mascaraEmFoco,
+  mascaraAVista,
+  aoFocarMascara,
+  aoVerMascara,
+  aoCriarMascara,
+  aoVincularMascara,
+}: Props) {
   // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [arrastadas, setArrastadas] = useState<string[] | null>(null);
@@ -254,6 +277,8 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
   /** Clique na linha: só ela; Ctrl junta ou tira; Shift escolhe do último clique até ela. */
   const escolher = (faixa: Faixa, evento: React.MouseEvent) => {
     const clipeId = faixa.clipes[0].id;
+    // O clique na camada (não na miniatura da máscara) volta o pincel para a imagem dela
+    if (mascaraEmFoco === clipeId) aoFocarMascara(null);
     if (evento.ctrlKey || evento.metaKey) {
       aoSelecionar(selecao.includes(clipeId) ? selecao.filter((id) => id !== clipeId) : [...selecao, clipeId]);
     } else if (evento.shiftKey && ancora.current) {
@@ -552,7 +577,7 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
                       <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" />
                     ) : null}
                   </span>
-                  {clipe.mascara ? <SquareDashed className="size-3.5 shrink-0 text-suave" aria-label="Com máscara" /> : null}
+                  {clipe.mascara ? <SquareDashed className="size-3.5 shrink-0 text-suave" aria-label="Com máscara de forma" /> : null}
                   {renomeando === faixa.id ? null : <span className={`min-w-0 flex-1 truncate ${presa ? "underline decoration-dotted underline-offset-2" : ""} ${visivel ? "" : "text-apagado"}`}>{nome}</span>}
                 </button>
                 {renomeando === faixa.id ? (
@@ -583,6 +608,40 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
                     }}
                     className="min-w-0 flex-1 rounded border border-destaque bg-painel-2 px-1 py-0.5 outline-none"
                   />
+                ) : null}
+                {clipe.mascara_pixels ? (
+                  <>
+                    <button
+                      type="button"
+                      className={`grid size-4 shrink-0 place-items-center ${clipe.mascara_pixels.vinculada ? "text-suave" : "text-suave/30"} hover:text-texto`}
+                      title={clipe.mascara_pixels.vinculada ? "Máscara vinculada: anda com a camada (clique para soltar)" : "Máscara solta: fica no lugar (clique para vincular)"}
+                      aria-label={clipe.mascara_pixels.vinculada ? `Desvincular a máscara de ${nome}` : `Vincular a máscara de ${nome}`}
+                      aria-pressed={clipe.mascara_pixels.vinculada}
+                      onClick={() => aoVincularMascara(clipe.id, !clipe.mascara_pixels!.vinculada)}
+                    >
+                      <Link2 className="size-3" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(evento) => {
+                        const mascara = clipe.mascara_pixels!;
+                        if (evento.altKey) aoVerMascara(mascaraAVista === clipe.id ? null : clipe.id);
+                        else if (evento.shiftKey) aoExecutar({ comando: "mascara.mudar", parametros: { clipeId: clipe.id, mudanca: { ligada: !mascara.ligada } } });
+                        else {
+                          if (!marcada) aoSelecionar([clipe.id]);
+                          aoFocarMascara(clipe.id);
+                        }
+                      }}
+                      title="Máscara de camada: clique para pintar nela, Alt + clique para vê-la, Shift + clique para desativar"
+                      aria-label={`Máscara de ${nome}`}
+                      aria-pressed={mascaraEmFoco === clipe.id}
+                      className={`relative size-7 shrink-0 overflow-hidden rounded-sm border bg-black ${mascaraEmFoco === clipe.id ? "border-2 border-texto" : "border-borda"}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a versão da API com a sessão do cookie */}
+                      <img src={arquivoDaMidia(clipe.mascara_pixels.midia_id, arquivoDaVersao(clipe.mascara_pixels.versao))} alt="" className="size-full object-contain" />
+                      {!clipe.mascara_pixels.ligada ? <span className="absolute inset-0 grid place-items-center text-sm font-bold text-erro" aria-label="Desativada">✕</span> : null}
+                    </button>
+                  </>
                 ) : null}
                 {mesclagem ? <span className="shrink-0 text-[10px] text-suave">{mesclagem}</span> : null}
                 {faixa.vinculo ? <Link2 className="size-3 shrink-0 text-suave" aria-label="Vinculada" /> : null}
@@ -650,13 +709,10 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
         <button
           type="button"
           className="botao-icone size-6"
-          title="Adicionar uma máscara (elipse; mude a forma em Propriedades)"
-          aria-label="Adicionar uma máscara"
-          disabled={escolhidas.length !== 1 || algumaTravada || Boolean(primeira?.clipes[0].mascara)}
-          onClick={() => {
-            aoExecutar({ comando: "clipe.mascara", parametros: { clipeIds, mascara: MASCARA_PADRAO } });
-            aoAbrirPropriedades();
-          }}
+          title="Adicionar uma máscara de camada (Alt: ocultar tudo)"
+          aria-label="Adicionar uma máscara de camada"
+          disabled={escolhidas.length !== 1 || algumaTravada || Boolean(primeira?.clipes[0].mascara_pixels) || Boolean(primeira?.clipes[0].pasta) || Boolean(primeira?.clipes[0].ajuste)}
+          onClick={(evento) => aoCriarMascara(evento.altKey ? "ocultar" : "revelar")}
         >
           <SquareDashed className="size-3.5" aria-hidden />
         </button>

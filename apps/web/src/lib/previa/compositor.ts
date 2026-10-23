@@ -78,6 +78,12 @@ export type Camada = {
   cantos?: Cantos | null;
   /** Máscara de forma (core/utils/cantos.py, cobertura_da_mascara), junto dos cantos. */
   mascaraDeForma?: MascaraDeForma | null;
+  /**
+   * A máscara de camada pintável do editor de imagem (lib/projeto/mascaraDePixels.ts): a imagem cinza (o branco
+   * mostra), a matriz da posição na camada (0 a 1) para o ponto da máscara, a densidade e o desfoque da borda (pixels
+   * da máscara).
+   */
+  mascaraDaCamada?: { fonte: TexImageSource; matriz: [number, number, number, number, number, number]; densidade: number; difusao: number } | null;
   /** Chave de luminância: o escuro ou o claro que some, depois da tela verde. */
   chaveLuma?: ChaveLuma | null;
   /** Recorte do fundo: o quadro da máscara da pessoa (o alfa), no mesmo enquadramento do vídeo. */
@@ -377,6 +383,12 @@ uniform float u_desvio;
 // Recorte do fundo: o alfa vem da máscara da pessoa (unidade 4), como o alphamerge do render
 uniform bool u_comMascaraDoFundo;
 uniform sampler2D u_mascaraDoFundo;
+// A máscara de camada pintável (unidade 5): a posição na camada (v_local) vai pela matriz ao ponto da máscara, e o
+// cinza dela (com a densidade) multiplica o alfa, junto da máscara de forma
+uniform bool u_comMascaraCamada;
+uniform sampler2D u_mascaraCamada;
+uniform mat3 u_mascaraCamadaMatriz;
+uniform float u_mascaraCamadaDensidade;
 // O texel do ponto do clipe (frações de 0 a 1), transparente fora dele, já com a máscara do recorte do fundo
 vec4 noClipe(vec2 local) {
   if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0) return vec4(0.0);
@@ -584,7 +596,7 @@ void main() {
     texel = texel + luz - texel * luz;
   }
   bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0 || u_mascaraForma > 0;
-  if ((u_comLut || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos) && (texel.a > 0.0 || comCantos)) {
+  if ((u_comLut || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos || u_comMascaraCamada) && (texel.a > 0.0 || comCantos)) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas), os cantos e depois a vinheta
     vec3 c = texel.a > 0.0 ? texel.rgb / texel.a : vec3(0.0);
@@ -604,6 +616,10 @@ void main() {
       float a = alfa * dentro;
       alfa = anel + a * (1.0 - anel);
       c = alfa > 0.0 ? (u_corDaBorda * anel + c * a * (1.0 - anel)) / alfa : c;
+    }
+    if (u_comMascaraCamada) {
+      vec2 noDocumento = (u_mascaraCamadaMatriz * vec3(v_local, 1.0)).xy;
+      alfa *= 1.0 - u_mascaraCamadaDensidade * (1.0 - texture(u_mascaraCamada, noDocumento).r);
     }
     if (u_vinheta > 0.0) {
       float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
@@ -700,6 +716,8 @@ const ALVO_COM_SOMBRA = 14;
 /** A cópia do destino quando ele é um framebuffer (RGBA, sem as amostras do canvas). */
 /** O conjunto com o preenchimento (a camada sem a parte que o preenchimento esconde). */
 const ALVO_COM_PREENCHIMENTO = 17;
+/** O desfoque da difusão da máscara de camada (18 e 19). */
+const ALVO_DA_MASCARA_DA_CAMADA = 18;
 const ALVO_DO_FUNDO_EM_FRAMEBUFFER = 15;
 const ALVO_DA_MESCLAGEM_EM_FRAMEBUFFER = 16;
 /** Um framebuffer do tamanho do destino por nível de pasta (ou de recorte), a partir deste. */
@@ -722,8 +740,10 @@ type Recursos = {
   grao: WebGLTexture | null;
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
+  /** As máscaras de camada pintáveis, uma por camada (unidade 5). */
+  mascarasDaCamada: WebGLTexture[];
   uniformes: Record<
-    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono",
+    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono" | "comMascaraCamada" | "mascaraCamada" | "mascaraCamadaMatriz" | "mascaraCamadaDensidade",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -902,6 +922,10 @@ export class Compositor {
         lumaSuavidade: local("u_lumaSuavidade"),
         comMascaraDoFundo: local("u_comMascaraDoFundo"),
         mascaraDoFundo: local("u_mascaraDoFundo"),
+        comMascaraCamada: local("u_comMascaraCamada"),
+        mascaraCamada: local("u_mascaraCamada"),
+        mascaraCamadaMatriz: local("u_mascaraCamadaMatriz"),
+        mascaraCamadaDensidade: local("u_mascaraCamadaDensidade"),
         chromaCor: local("u_chromaCor"),
         semelhanca: local("u_semelhanca"),
         suavidade: local("u_suavidade"),
@@ -912,6 +936,7 @@ export class Compositor {
       luts: [],
       grao: null,
       mascaras: [],
+      mascarasDaCamada: [],
       desfoque,
       silhueta,
       recorte,
@@ -1203,6 +1228,30 @@ export class Compositor {
     // Daqui em diante, o recorte na textura: o pedaço espelhado quando o clipe está virado
     const recorte = recorteNaFonte(camada.recorte, camada.virar);
     if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
+    // A máscara de camada antes de tudo (o desfoque da difusão usa a unidade 0, que depois recebe a camada)
+    let texturaDaMascara: WebGLTexture | null = null;
+    if (camada.mascaraDaCamada) {
+      const { fonte, difusao } = camada.mascaraDaCamada;
+      gl.activeTexture(gl.TEXTURE0);
+      let textura = recursos.mascarasDaCamada[indice];
+      if (!textura) {
+        textura = gl.createTexture()!;
+        gl.bindTexture(gl.TEXTURE_2D, textura);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        recursos.mascarasDaCamada[indice] = textura;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, textura);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fonte);
+      texturaDaMascara = textura;
+      const { largura: lm, altura: am } = tamanhoDaFonte(fonte);
+      if (difusao > 0.05 && lm > 0 && am > 0) {
+        texturaDaMascara = this.desfocar(textura, lm, am, difusao, RECORTE_INTEIRO, ALVO_DA_MASCARA_DA_CAMADA);
+        this.irAoDestino();
+      }
+    }
     gl.bindTexture(gl.TEXTURE_2D, this.textura(indice));
     let largura: number;
     let altura: number;
@@ -1370,6 +1419,16 @@ export class Compositor {
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
+    gl.uniform1i(uniformes.comMascaraCamada, texturaDaMascara ? 1 : 0);
+    if (texturaDaMascara && camada.mascaraDaCamada) {
+      const [a, b, c, d, e, f] = camada.mascaraDaCamada.matriz;
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, texturaDaMascara);
+      gl.uniform1i(uniformes.mascaraCamada, 5);
+      gl.uniformMatrix3fv(uniformes.mascaraCamadaMatriz, false, [a, b, 0, c, d, 0, e, f, 1]);
+      gl.uniform1f(uniformes.mascaraCamadaDensidade, camada.mascaraDaCamada.densidade);
+      gl.activeTexture(gl.TEXTURE0);
+    }
     const mesclagem = camada.mesclagem ?? "normal";
     const codigo = CODIGO_DA_MESCLAGEM[mesclagem];
     const recortada = Boolean(camada.recortada);
@@ -1487,7 +1546,7 @@ export class Compositor {
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
       // As listas podem ter buracos (o brilho cria os framebuffers 2 e 3 sem o 0 e o 1)
-      for (const textura of [...recursos.texturas, ...recursos.luts.map((lut) => lut?.textura), ...recursos.mascaras, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.luts.map((lut) => lut?.textura), ...recursos.mascaras, ...recursos.mascarasDaCamada, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         if (!alvo) continue;
         this.gl.deleteTexture(alvo.textura);

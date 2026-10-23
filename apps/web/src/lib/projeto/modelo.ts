@@ -1,6 +1,7 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Contorno, Sombra } from "./silhueta.ts";
+import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -270,6 +271,8 @@ export type Clipe = {
    * mostra; a 0 é a camada vazia. Pintar sobe uma versão nova e troca o número (o desfazer volta o anterior).
    */
   pixels?: { versao: number };
+  /** Só no projeto de imagem: a máscara de camada pintável (lib/projeto/mascaraDePixels.ts). */
+  mascara_pixels?: MascaraDePixels | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

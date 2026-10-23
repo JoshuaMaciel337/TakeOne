@@ -117,7 +117,8 @@ export const PINCEL_PADRAO: OpcoesDoPincel = {
   dureza: 0.8,
   opacidade: 1,
   fluxo: 1,
-  espacamento: 0.25,
+  // 10% do diâmetro: com 25%, a borda da ponta dura ficava ondulada (cerca de 1 px entre uma marca e a outra)
+  espacamento: 0.1,
   suavizacao: 0.1,
   aerografo: false,
   pressaoNoTamanho: true,

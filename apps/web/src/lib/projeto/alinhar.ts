@@ -2,13 +2,14 @@
 // escolhidas e as vinculadas a elas andam o mesmo tanto; alinhar e distribuir movem cada camada (ou pasta, inteira)
 // pela caixa dela na tela. Tudo vira um comando `imagem.posicoes`, um passo só do desfazer.
 import { ancestrais, comDescendentes, posicaoTravada } from "./arvore.ts";
+import type { Caixa } from "./geometria.ts";
 import type { Clipe, Projeto, Transformacao } from "./modelo.ts";
 
 /**
  * Uma caixa em frações do quadro (0 a 1), sem giro: o retângulo que a camada ocupa na tela. `altura` é a altura da
  * própria caixa (antes do giro), em frações da altura do quadro: os estilos (contorno, sombra) são medidos nela.
  */
-export type CaixaNoQuadro = { x0: number; y0: number; x1: number; y1: number; altura?: number };
+export type CaixaNoQuadro = { x0: number; y0: number; x1: number; y1: number; altura?: number; bruta?: Caixa; quadro?: { largura: number; altura: number } };
 
 /** O retângulo em volta de uma caixa girada (centro, tamanho e giro em pixels do quadro), em frações do quadro. */
 export function caixaNoQuadro(caixa: { cx: number; cy: number; largura: number; altura: number; rotacao: number }, quadro: { largura: number; altura: number }): CaixaNoQuadro {

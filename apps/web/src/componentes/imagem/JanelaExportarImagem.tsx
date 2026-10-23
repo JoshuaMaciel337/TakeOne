@@ -27,6 +27,7 @@ type Props = {
   /** Antes de gerar: espera a pintura que ainda está subindo (o projeto da hora vem depois dela). */
   aoPrepararPintura?: () => Promise<Projeto>;
   fonteDosPixels?: (clipe: Clipe) => HTMLCanvasElement | null;
+  fonteDaMascara?: (clipe: Clipe) => HTMLCanvasElement | null;
 };
 
 /** Nome de arquivo sem os caracteres que os sistemas recusam. */
@@ -35,7 +36,7 @@ function nomeDoArquivo(nome: string, formato: FormatoDaImagem): string {
 }
 
 /** Exportar: o formato, o tamanho e a qualidade; baixar o arquivo ou mandar para a biblioteca, para usar nos vídeos. */
-export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar, aoPrepararPintura, fonteDosPixels }: Props) {
+export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar, aoPrepararPintura, fonteDosPixels, fonteDaMascara }: Props) {
   const { iniciar } = useEnvios();
   const [formato, setFormato] = useState<FormatoDaImagem>("png");
   const [escala, setEscala] = useState(1);
@@ -63,6 +64,7 @@ export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar
         qualidade,
         escala,
         fonteDosPixels,
+        fonteDaMascara,
       });
       const arquivo = nomeDoArquivo(nome, formato);
       if (destino === "baixar") {
