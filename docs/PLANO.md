@@ -513,6 +513,11 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Degradê em textos e formas e estilos prontos novos (Dourado, Cromado, Quadrinhos, Baixo relevo, Vazado e Pôr do sol).
   - [x] Texto em arco (arcos paralelos; desliga o destaque da fala e o letra a letra).
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
+  - [x] Congelar o quadro (a foto do instante entre as metades do vídeo, por 3 s).
+  - [ ] Transições de máscara.
+  - [ ] Desfoque de zoom e de giro e pixelizar.
+  - [ ] Inverter o clipe.
+  - [ ] Câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.
 - [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).

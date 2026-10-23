@@ -18,6 +18,7 @@ import {
   apararClipe,
   aplicarEfeito,
   colarAjustes,
+  congelarQuadro,
   colarClipes,
   virarClipes,
   chaveLumaClipes,
@@ -1170,4 +1171,25 @@ test("texto em arco: desliga o destaque e o letra a letra, e o letra a letra end
   projeto = mudarTexto(projeto, [id], { destaque: { modo: "palavra", cor: "#ffffff" } });
   clipe = projeto.faixas.find((f) => f.tipo === "texto")!.clipes[0];
   assert.equal(clipe.texto?.curvatura, 0, "o destaque endireita");
+});
+
+test("congelar o quadro: divide o vídeo e põe a foto do instante entre as metades", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  projeto = transformarClipes(projeto, [id], { escala: 1.5 });
+  const { projeto: congelado, clipeId } = congelarQuadro(projeto, ctx, id, 4 * S, "foto", 3 * S);
+  conferir(congelado);
+  const [antes, foto, depois] = principal(congelado);
+  assert.equal(foto.id, clipeId);
+  assert.deepEqual([antes.inicio, antes.duracao], [0, 4 * S]);
+  assert.deepEqual([foto.midia_id, foto.inicio, foto.duracao, foto.transformacao.escala], ["foto", 4 * S, 3 * S, 1.5]);
+  assert.deepEqual([depois.inicio, depois.entrada, depois.duracao], [7 * S, 4 * S, 6 * S], "o resto do vídeo vem depois, empurrado");
+  // No fim do clipe, a foto entra depois dele, sem dividir
+  const noFim = congelarQuadro(projeto, ctx, id, 10 * S, "foto", 3 * S).projeto;
+  assert.deepEqual(principal(noFim).map((c) => c.midia_id), ["video10", "foto"]);
+  // Fora da principal, não
+  const comFoto = adicionarClipe(projeto, ctx, "video4", { novaFaixa: true, faixaId: undefined, inicio: 0 });
+  const sobreposto = comFoto.projeto.faixas.find((f) => f.tipo === "video")?.clipes[0];
+  if (sobreposto) assert.throws(() => congelarQuadro(comFoto.projeto, ctx, sobreposto.id, S, "foto", 3 * S), ErroEdicao);
 });

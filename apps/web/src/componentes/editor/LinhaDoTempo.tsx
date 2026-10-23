@@ -14,6 +14,7 @@ import {
   Magnet,
   Music,
   Scissors,
+  Snowflake,
   Trash2,
   Type,
   Unlink,
@@ -51,6 +52,8 @@ type Props = {
   aoBuscar: (tempo: Tick) => void;
   aoSelecionar: (ids: string[]) => void;
   aoExecutar: (comando: Comando) => void;
+  /** Congela o quadro do cursor no vídeo escolhido da principal (sem ele, o botão fica desligado). */
+  aoCongelar?: () => void;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -136,6 +139,7 @@ export function LinhaDoTempo({
   aoBuscar,
   aoSelecionar,
   aoExecutar,
+  aoCongelar,
   className = "",
   style,
 }: Props) {
@@ -444,6 +448,16 @@ export function LinhaDoTempo({
           aria-label="Separar o som"
         >
           <Unlink className="size-4" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className="botao-icone"
+          disabled={!aoCongelar}
+          onClick={aoCongelar}
+          title="Congelar o quadro do cursor (o vídeo para ali por 3 s)"
+          aria-label="Congelar o quadro"
+        >
+          <Snowflake className="size-4" aria-hidden />
         </button>
         <button
           type="button"

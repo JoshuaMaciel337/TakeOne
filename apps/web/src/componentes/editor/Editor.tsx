@@ -5,17 +5,18 @@ import Link from "next/link";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
-import { ErroApi } from "@/lib/api";
+import { chamarApi, ErroApi } from "@/lib/api";
 import { useEnvios } from "@/lib/envios";
 import { enderecoDoProjeto } from "@/lib/hub";
 import { clipeParaAparar, corteVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import { retomarAudio } from "@/lib/previa/audio";
-import type { ClipeCopiado, Contexto } from "@/lib/projeto/edicao";
-import { acharClipe, fimDoClipe } from "@/lib/projeto/modelo";
+import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S } from "@/lib/projeto/edicao";
+import { acharClipe, fimDoClipe, tempoNaMidia } from "@/lib/projeto/modelo";
 import { duracaoDoQuadro, quadroMaisProximo, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
+import type { Midia } from "@/lib/tipos";
 
 import { BarraFerramentas } from "./BarraFerramentas";
 import { BarraSuperior } from "./BarraSuperior";
@@ -153,6 +154,32 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   // Depois de desfazer, a seleção pode apontar para clipes que não existem mais
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
   const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
+  // Congelar o quadro: um vídeo da principal escolhido, com o cursor sobre ele
+  const midiaDoEscolhido = selecionado?.clipe.midia_id ? midias.get(selecionado.clipe.midia_id) : undefined;
+  const congelavel =
+    selecionado?.faixa.tipo === "principal" &&
+    Boolean(midiaDoEscolhido?.video) &&
+    !midiaDoEscolhido?.imagem &&
+    tempo >= selecionado.clipe.inicio &&
+    tempo <= fimDoClipe(selecionado.clipe);
+  function congelar() {
+    if (!selecionado?.clipe.midia_id) return;
+    const { clipe } = selecionado;
+    // O quadro do corte (o mesmo que o comando usa): a foto é o que o vídeo mostra nele
+    const instante = Math.min(Math.max(quadroMaisProximo(projeto!.taxa, tempo), clipe.inicio), fimDoClipe(clipe));
+    chamarApi<Midia>(`/midias/${clipe.midia_id}/quadro`, {
+      metodo: "POST",
+      corpo: { segundos: tempoNaMidia(clipe, instante) / TICKS_POR_SEGUNDO, imagem_limpa: Boolean(clipe.imagem_limpa), estabilizar: Boolean(clipe.estabilizar) },
+    })
+      .then((midia) => {
+        mostrarAviso("Congelando o quadro: a foto entra no cursor quando ficar pronta.");
+        executarQuandoProntas([midia.id], {
+          comando: "clipe.congelar",
+          parametros: { clipeId: clipe.id, tempo: instante, midiaId: midia.id, duracao: DURACAO_CONGELADO_S * TICKS_POR_SEGUNDO },
+        });
+      })
+      .catch((erro: unknown) => mostrarAviso(erro instanceof ErroApi ? erro.message : "Não foi possível congelar o quadro agora."));
+  }
   /**
    * Os controles dos painéis comparam o valor solto com o que está na tela, que já tem a prévia, e
    * mandam null quando são iguais. Com uma prévia ativa, isso quer dizer que o valor final é o dela:
@@ -526,6 +553,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
               if (ids.length) setMidiaId(null);
             }}
             aoExecutar={executar}
+            aoCongelar={congelavel ? congelar : undefined}
             className="h-48 md:h-[var(--altura-linha)]"
           />
         </div>

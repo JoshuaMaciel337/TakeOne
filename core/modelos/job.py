@@ -38,6 +38,7 @@ TAREFAS = {
     "animacao_html": RECURSO_CPU,
     "selecao": RECURSO_CPU,
     "objeto": RECURSO_CPU,
+    "quadro": RECURSO_CPU,
 }
 
 

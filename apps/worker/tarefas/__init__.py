@@ -13,6 +13,7 @@ from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.objeto import executar_objeto, executar_selecao
 from worker.tarefas.palavras_chave import executar_palavras_chave
+from worker.tarefas.quadro import executar_quadro
 from worker.tarefas.qualidade import executar_qualidade, marcar_qualidade_com_erro
 from worker.tarefas.rastreio import executar_rastreio, marcar_rastreio_com_erro
 from worker.tarefas.recorte_fundo import executar_recorte_fundo, marcar_recorte_com_erro
@@ -50,6 +51,7 @@ REGISTRO = {
     "animacao_html": Tarefa(executar_animacao_html, ao_falhar=marcar_animacao_com_erro),
     "selecao": Tarefa(executar_selecao),
     "objeto": Tarefa(executar_objeto, ao_falhar=marcar_geracao_com_erro),
+    "quadro": Tarefa(executar_quadro, ao_falhar=marcar_geracao_com_erro),
     "direcao": Tarefa(executar_direcao),
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),

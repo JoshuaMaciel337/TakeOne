@@ -664,6 +664,13 @@ class PontoDaSelecao(BaseModel):
     incluir: bool = True
 
 
+class QuadroEntrada(BaseModel):
+    """Congelar o quadro: o instante na mídia e a versão do vídeo que o clipe usa (como o render escolhe)."""
+    segundos: float = Field(ge=0, le=6 * 3600)
+    imagem_limpa: bool = False
+    estabilizar: bool = False
+
+
 class SelecaoEntrada(BaseModel):
     pontos: list[PontoDaSelecao] = Field(min_length=1, max_length=12)
 

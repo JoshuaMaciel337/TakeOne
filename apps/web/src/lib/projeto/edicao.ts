@@ -39,6 +39,7 @@ import {
   keyframeEm,
   type PropriedadeAnimavel,
   PROPRIEDADES_ANIMAVEIS,
+  transformacaoNoTempo,
   transformacaoParaEditar,
   volumeNoTempo,
 } from "./keyframes.ts";
@@ -1016,6 +1017,50 @@ export function separarSom(projeto: Projeto, ctx: Contexto, clipeIds: string[]):
 /** Devolve o som ao vídeo (o clipe de áudio separado, se ainda existe, continua: apague-o para não dobrar o som). */
 export function devolverSom(projeto: Projeto, clipeIds: string[]): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, som_separado: false }));
+}
+
+/** Quanto o quadro congelado dura ao entrar. */
+export const DURACAO_CONGELADO_S = 3;
+
+/**
+ * Congela o quadro do vídeo da principal em `tempo`: divide o clipe ali e põe entre as metades a foto daquele
+ * quadro (`midiaId`, tirada no worker pela regra do render), com a posição do instante (sem os keyframes) e a
+ * cor, o efeito, o recorte, os cantos, a máscara e a mesclagem do clipe. No começo ou no fim do clipe, a foto
+ * entra antes ou depois dele, sem dividir.
+ */
+export function congelarQuadro(projeto: Projeto, ctx: Contexto, clipeId: string, tempo: Tick, midiaId: string, duracao: Tick): { projeto: Projeto; clipeId: string } {
+  const { faixa, clipe } = acharOuErro(projeto, clipeId);
+  if (faixa.tipo !== "principal") throw new ErroEdicao("Congelar o quadro vale nos vídeos da faixa principal.");
+  exigirDestravada(faixa);
+  const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+  if (!info?.video || info.imagem) throw new ErroEdicao("Congelar o quadro vale em vídeos.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const t = Math.min(Math.max(quadroMaisProximo(projeto.taxa, tempo), clipe.inicio), fimDoClipe(clipe));
+  const congelado: Clipe = {
+    id: ctx.novoId(),
+    midia_id: midiaId,
+    inicio: t,
+    duracao: Math.max(quadro, ajustarAoQuadro(projeto.taxa, duracao)),
+    entrada: 0,
+    velocidade: 1,
+    volume: 1,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: transformacaoNoTempo(clipe, t),
+    recorte: clipe.recorte,
+    virar: clipe.virar,
+    cantos: clipe.cantos,
+    mascara: clipe.mascara,
+    mesclagem: clipe.mesclagem,
+    cor: clipe.cor,
+    efeito: clipe.efeito,
+    chroma: clipe.chroma,
+    chave_luma: clipe.chave_luma,
+  };
+  let resultado = projeto;
+  if (t >= clipe.inicio + quadro && t <= fimDoClipe(clipe) - quadro) resultado = dividirClipes(projeto, ctx, t, [clipeId]).projeto;
+  resultado = inserirNaPrincipal(resultado, congelado, t);
+  return { projeto: finalizar(resultado), clipeId: congelado.id };
 }
 
 /** Um clipe copiado (Ctrl+C), com o tipo e a faixa de onde veio. */

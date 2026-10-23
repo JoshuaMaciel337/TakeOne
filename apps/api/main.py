@@ -28,6 +28,7 @@ from api.rotas import (
     modelos,
     objetos,
     projetos,
+    quadros,
     sistema,
     som,
     textos,
@@ -143,4 +144,5 @@ app.include_router(direcoes.router)
 app.include_router(marca.router)
 app.include_router(elementos.router)
 app.include_router(objetos.router)
+app.include_router(quadros.router)
 app.include_router(intercambio.router)

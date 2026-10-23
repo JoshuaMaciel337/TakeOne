@@ -63,6 +63,7 @@ import {
   mudarVelocidade,
   curvarVelocidade,
   ajustarMusicaAoVideo,
+  congelarQuadro,
   devolverSom,
   duplicarClipes,
   moverClipe,
@@ -123,6 +124,7 @@ export type Comando =
   | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
+  | { comando: "clipe.congelar"; parametros: { clipeId: string; tempo: Tick; midiaId: string; duracao: Tick } }
   | { comando: "clipe.devolverSom"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
@@ -198,6 +200,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.zoomNosTrechos": "dar zoom nos destaques",
   "clipe.duplicar": "duplicar",
   "clipe.separarSom": "separar o som",
+  "clipe.congelar": "congelar o quadro",
   "clipe.devolverSom": "devolver o som",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
@@ -303,6 +306,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     case "clipe.separarSom": {
       const resultado = separarSom(projeto, ctx, parametros.clipeIds);
       return { projeto: resultado.projeto, selecao: resultado.novos };
+    }
+    case "clipe.congelar": {
+      const resultado = congelarQuadro(projeto, ctx, parametros.clipeId, parametros.tempo, parametros.midiaId, parametros.duracao);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "clipe.devolverSom":
       return { projeto: devolverSom(projeto, parametros.clipeIds) };
