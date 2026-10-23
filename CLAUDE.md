@@ -27,7 +27,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
 - **Licenças:** só bibliotecas e modelos com licença permissiva (evite AGPL). Música só com licença. Código portado do FilmCraft ou do LightCraft segue as regras do [THIRD_PARTY.md](THIRD_PARTY.md).
 - **Prévia igual ao render:** toda diferença entre a prévia no navegador e o vídeo exportado é medida em números, não só no olho.
 
-## Estado atual (atualizado em 22/10/2026)
+## Estado atual (atualizado em 23/10/2026)
 
 - **Fase 0 (fundação):** pronta, rodando no Docker e com o CI verde no GitHub ([JoshuaMaciel337/TakeOne](https://github.com/JoshuaMaciel337/TakeOne)).
   - Do HolyCut, sem as partes de igreja: config, Mongo, fila com lease, storage, FFmpeg, sessão com organizações ("espaços"), jobs, eventos SSE, upload tus, mídias, ingestão (proxy 720p, forma de onda, níveis, miniaturas e capa), backup e Compose.
@@ -147,7 +147,7 @@ As referências são o CapCut (só funções e fluxo), o OpusClip e o Cut.Pro, a
   - Ampliar e expandir (ferramenta Foto com IA do editor de imagem): ampliar 2× ou 4× (até 4096 px no lado maior) com o Real-ESRGAN geral x4v3, trocando a foto da camada; expandir até outra proporção (a do quadro ou uma pronta, com a parte nova até o dobro da foto) com o LaMa, numa camada nova. Testado no Chrome com uma foto noturna de 2560 × 1440: ampliada para 4096 × 2304 em 100 s, mais nítida que o bicúbico; expandida para 1:1 em 28 s, com céu e chão inventados sem emenda visível.
   - Foto em 3D (aba Básico de uma foto no editor de vídeo): o Depth Anything V2 Small mede a profundidade, e o worker grava um vídeo da duração do clipe (2 a 10 s) com a câmera aproximando, afastando, de um lado ao outro ou em círculo, a frente andando mais que o fundo; o vídeo entra no lugar da foto. Testado no Chrome: 4 s em 1920 × 1080 prontos em 34 s; prévia e exportação a 3,4–3,8 níveis em 255.
   - Gerar imagem com IA (página própria no hub, no editor de imagem em Imagens e no painel Mídia do editor de vídeo): a pessoa descreve a imagem e escolhe o formato (1:1, 4:5, 9:16 ou 16:9, em 720p); o worker de GPU gera com o Wan 2.2 pelo ComfyUI (um vídeo de um quadro só, sem pesos novos) e a imagem entra na biblioteca (no editor de imagem, como camada). Testado no Nitro: uma xícara de café em 1280 × 704 em 194 s com o carregamento do modelo, e pelo editor de imagem um farol em 704 × 1280 em 120 s, os dois com cara de fotografia.
-- **Próximo passo:** os itens que a auditoria deixou para depois (na seção da fase 7 do plano); a prévia em vídeo dos modelos espera as mídias de exemplo que o dono vai escolher; o banco da Pixabay e a publicação nas redes dependem do dono.
+- **Próximo passo:** o que depende do dono (a prévia em vídeo dos modelos espera as mídias de exemplo, o banco da Pixabay espera a chave, a publicação nas redes e o que está em "Pendente no Nitro"); a auditoria não deixou nada para depois.
 
 ## Pendente no Nitro
 
