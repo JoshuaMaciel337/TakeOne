@@ -148,10 +148,10 @@ function arquivoDaImagem(item: ItemDaPrevia): string {
  * A máscara da pessoa (recorte do fundo): outro vídeo, no tempo da cópia leve, decodificado junto com
  * ela. Sem WebCodecs, não há máscara na prévia (o clipe aparece inteiro).
  */
-export function FonteDaMascara(props: PropsFonte) {
+export function FonteDaMascara({ arquivo = "mascara.mp4", ...props }: PropsFonte & { arquivo?: string }) {
   const [falhou, setFalhou] = useState(() => !webCodecsDisponivel());
   if (falhou) return null;
-  return <FonteWebCodecs {...props} arquivo="mascara.mp4" aoFalhar={() => setFalhou(true)} />;
+  return <FonteWebCodecs {...props} arquivo={arquivo} aoFalhar={() => setFalhou(true)} />;
 }
 
 function FonteWebCodecs({ item, tempo, aoRegistrar, aoTerQuadro, aoFalhar, arquivo = "proxy.mp4" }: PropsFonte & { aoFalhar: () => void; arquivo?: string }) {

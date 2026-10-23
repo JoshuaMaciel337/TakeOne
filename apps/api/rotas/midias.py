@@ -45,6 +45,7 @@ from core.modelos.midia import (
     ARQUIVO_INVERTIDO_PROXY,
     ARQUIVO_MASCARA,
     ARQUIVO_MASCARA_IMAGEM,
+    ARQUIVO_MASCARA_ROSTOS,
     ARQUIVO_VOZ_LIMPA,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
@@ -380,6 +381,29 @@ async def pedir_recorte_fundo(midia_id: str, usuario=Depends(usuario_atual), db=
         await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"recorte_fundo": atual, "atualizado_em": agora()}})
         logging.info(f"[{usuario['organizacao_id']}] Recorte do fundo pedido: {midia['nome']}")
     return (await para_saida(db, [{**midia, "recorte_fundo": atual}]))[0]
+
+
+@router.post("/{midia_id}/esconder-rostos", response_model=MidiaSaida)
+async def pedir_esconder_rostos(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila a máscara dos rostos (YuNet em todo quadro). Se já está pronta ou andando, só devolve a mídia."""
+    midia = await buscar_midia(db, midia_id, usuario)
+    if midia["status"] != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
+    if not midia.get("video") or e_imagem(midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, f'Esconder os rostos vale em vídeos ("{midia["nome"]}" não é).')
+    atual = midia.get("esconder_rostos") or {}
+    pronto = atual.get("status") == "pronta" and ARQUIVO_MASCARA_ROSTOS in midia.get("arquivos", [])
+    andando = atual.get("status") == "processando" and await db.jobs.find_one(
+        {"_id": atual.get("job_id"), "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}}, {"_id": 1})
+    if not (pronto or andando):
+        job = montar_job("esconder_rostos", usuario["organizacao_id"], {"midia_id": str(midia["_id"])},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        atual = {"status": "processando", "erro": None, "job_id": job_id}
+        await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"esconder_rostos": atual,
+                                                                     "atualizado_em": agora()}})
+        logging.info(f"[{usuario['organizacao_id']}] Rostos pedidos: {midia['nome']}")
+    return (await para_saida(db, [{**midia, "esconder_rostos": atual}]))[0]
 
 
 @router.post("/{midia_id}/fluido", response_model=MidiaSaida)

@@ -77,6 +77,8 @@ export type Midia = {
   imagem_limpa?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
   /** A máscara da pessoa em cada quadro (recorte do fundo). */
   recorte_fundo?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number } | null;
+  /** A máscara dos rostos (esconder os rostos): {status, erro, quadros_com_rosto}. */
+  esconder_rostos?: { status: "processando" | "pronta" | "erro"; erro: string | null; progresso?: number; quadros_com_rosto?: number } | null;
   /** A imagem estável, por chave (estavel, estavel_limpo sobre a imagem sem ruído). */
   estabilizacoes?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** O vídeo ao contrário (tarefa "inversao"), quando foi pedido. */

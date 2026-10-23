@@ -23,10 +23,11 @@ async function todasAsMidias(): Promise<Midia[]> {
 }
 // Jobs que geram um arquivo a mais para uma mídia pronta, e o campo da mídia que mostra o andamento.
 // null: o andamento fica num dicionário (um por tom ou por versão); só o fim recarrega.
-const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | null> = {
+const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | "esconder_rostos" | null> = {
   limpeza_voz: "voz_limpa",
   limpeza_imagem: "imagem_limpa",
   recorte_fundo: "recorte_fundo",
+  esconder_rostos: "esconder_rostos",
   tom: null,
   estabilizacao: null,
   inversao: null,

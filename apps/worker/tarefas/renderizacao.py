@@ -29,6 +29,7 @@ from core.modelos.midia import (
     ARQUIVO_IMAGEM_LIMPA,
     ARQUIVO_INVERTIDO,
     ARQUIVO_MASCARA,
+    ARQUIVO_MASCARA_ROSTOS,
     ARQUIVO_PROXY_AUDIO,
     ARQUIVO_PROXY_IMAGEM,
     ARQUIVO_PROXY_VIDEO,
@@ -43,7 +44,7 @@ from core.utils.cantos import desenhar_cantos
 from core.utils.cor import desenhar_vinheta, gerar_cube
 from core.utils.efeitos import LINHAS_POR_ALTURA, imagem_do_grao, tira_de_luz
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
-from core.utils.fundo_desfocado import expandir_fundo_desfocado
+from core.utils.fundo_desfocado import expandir_para_desenhar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
 from core.utils.lut import chave_da_lut, de_bytes
@@ -116,6 +117,8 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
             voz_limpa=str(voz) if voz.is_file() else None,
             imagem_limpa=str(limpa) if (limpa := storage.caminho_local(chave_arquivo(
                 midia["organizacao_id"], midia["_id"], ARQUIVO_IMAGEM_LIMPA))).is_file() else None,
+            mascara_rostos=str(rostos) if (rostos := storage.caminho_local(chave_arquivo(
+                midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA_ROSTOS))).is_file() else None,
             mascara=str(mascara) if (mascara := storage.caminho_local(chave_arquivo(
                 midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA))).is_file() else None,
             tons=tuple((chave, str(caminho)) for chave, tom in (midia.get("tons") or {}).items()
@@ -236,7 +239,7 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
         # Outra taxa de quadros: a montagem inteira passa a ser nessa grade (as transições, os cortes)
         projeto = {**projeto, "taxa": {"num": exportacao["taxa"], "den": 1}}
     # O fundo desfocado vira duas cópias do clipe, como na prévia
-    projeto = expandir_fundo_desfocado(projeto)
+    projeto = expandir_para_desenhar(projeto)
     indice = None
     if formato == "png":
         projeto, indice = projeto_do_quadro(projeto, exportacao.get("tempo") or 0)

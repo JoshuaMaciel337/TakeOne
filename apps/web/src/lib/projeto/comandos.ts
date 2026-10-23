@@ -60,6 +60,7 @@ import {
   chromaClipes,
   chaveLumaClipes,
   desfocarOFundo,
+  esconderRostos,
   removerFundo,
   estabilizarClipes,
   limparImagem,
@@ -172,6 +173,7 @@ export type Comando =
   | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
   | { comando: "clipe.removerFundo"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.fundoDesfocado"; parametros: { clipeIds: string[]; intensidade: number | null } }
+  | { comando: "clipe.esconderRostos"; parametros: { clipeIds: string[]; valor: { modo: "pixelizar" | "desfocar"; forca: number } | null } }
   | { comando: "clipe.estabilizar"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.limparImagem"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.velocidade"; parametros: { clipeId: string; velocidade: number } }
@@ -255,6 +257,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.chaveLuma": "mudar a chave de luminância",
   "clipe.removerFundo": "recortar o fundo",
   "clipe.fundoDesfocado": "desfocar o fundo",
+  "clipe.esconderRostos": "esconder os rostos",
   "clipe.estabilizar": "estabilizar",
   "clipe.limparImagem": "tirar o ruído da imagem",
   "clipe.velocidade": "mudar a velocidade",
@@ -363,6 +366,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: limparImagem(projeto, parametros.clipeIds, parametros.ligar) };
     case "clipe.removerFundo":
       return { projeto: removerFundo(projeto, parametros.clipeIds, parametros.ligar) };
+    case "clipe.esconderRostos":
+      return { projeto: esconderRostos(projeto, parametros.clipeIds, parametros.valor) };
     case "clipe.fundoDesfocado":
       return { projeto: desfocarOFundo(projeto, parametros.clipeIds, parametros.intensidade) };
     case "clipe.estabilizar":

@@ -1,5 +1,5 @@
 # Fundo desfocado: a expansão do projeto para o render, a mesma de lib/projeto/fundoDesfocado.ts.
-from core.utils.fundo_desfocado import SUFIXO_DO_RECORTE, expandir_fundo_desfocado
+from core.utils.fundo_desfocado import SUFIXO_DO_RECORTE, expandir_para_desenhar
 
 
 def _clipe(id_, **extra):
@@ -11,7 +11,7 @@ def test_clipe_vira_a_copia_desfocada_e_a_recortada_por_cima():
                           {"id": "p", "tipo": "principal", "clipes": [
                               _clipe("a", fundo_desfocado=0.7, transicao={"tipo": "fusao", "duracao": 5}),
                               _clipe("b")]}]}
-    desenhado = expandir_fundo_desfocado(projeto)
+    desenhado = expandir_para_desenhar(projeto)
     assert [(f["id"], f["tipo"]) for f in desenhado["faixas"]] == [("t", "texto"), (f"p{SUFIXO_DO_RECORTE}", "video"),
                                                                   ("p", "principal")]
     recortado = desenhado["faixas"][1]["clipes"][0]
@@ -21,4 +21,4 @@ def test_clipe_vira_a_copia_desfocada_e_a_recortada_por_cima():
     assert desfocado["efeito"] == {"tipo": "desfoque", "intensidade": 0.7} and not desfocado["remover_fundo"]
     assert desfocado["transicao"] and outro is projeto["faixas"][1]["clipes"][1]
     sem = {"faixas": [{"id": "p", "tipo": "principal", "clipes": [_clipe("x")]}]}
-    assert expandir_fundo_desfocado(sem) is sem
+    assert expandir_para_desenhar(sem) is sem

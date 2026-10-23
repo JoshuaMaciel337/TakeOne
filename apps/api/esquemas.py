@@ -109,6 +109,8 @@ class MidiaSaida(BaseModel):
     voz_limpa: dict | None = None
     # A máscara da pessoa (recorte do fundo): {status, erro}
     recorte_fundo: dict | None = None
+    # A máscara dos rostos (esconder os rostos): {status, erro, quadros_com_rosto}
+    esconder_rostos: dict | None = None
     # A imagem sem ruído: {status, erro}
     imagem_limpa: dict | None = None
     # A voz em outro tom: chave (tom_p3, tom_m2_limpa) → {status, erro}
@@ -174,6 +176,11 @@ class ChaveLumaEntrada(BaseModel):
     tirar: Literal["escuro", "claro"] = "escuro"
     limiar: float = Field(default=0.1, ge=0, le=1)
     suavidade: float = Field(default=0.1, ge=0, le=1)
+
+
+class EsconderRostosEntrada(BaseModel):
+    modo: Literal["pixelizar", "desfocar"] = "pixelizar"
+    forca: float = Field(default=0.6, ge=0, le=1)
 
 
 class ContornoEntrada(BaseModel):
@@ -640,6 +647,8 @@ class ClipeEntrada(BaseModel):
     chave_luma: ChaveLumaEntrada | None = None
     # Fundo desfocado (0 a 1): a pessoa nítida sobre uma cópia desfocada do clipe (core/utils/fundo_desfocado.py)
     fundo_desfocado: float | None = Field(default=None, ge=0, le=1)
+    # Esconder os rostos: uma cópia pixelizada ou desfocada por cima, recortada pela máscara dos rostos
+    esconder_rostos: EsconderRostosEntrada | None = None
     # Contorno e sombra em volta do que aparece (recortes, logos, formas, adesivos)
     contorno: ContornoEntrada | None = None
     sombra: SombraEntrada | None = None
@@ -1149,6 +1158,9 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
         "voz_limpa": {"status": voz["status"], "erro": voz.get("erro")} if (voz := doc.get("voz_limpa")) else None,
         "recorte_fundo": ({"status": recorte["status"], "erro": recorte.get("erro")}
                           if (recorte := doc.get("recorte_fundo")) else None),
+        "esconder_rostos": ({"status": rostos["status"], "erro": rostos.get("erro"),
+                             "quadros_com_rosto": rostos.get("quadros_com_rosto")}
+                            if (rostos := doc.get("esconder_rostos")) else None),
         "imagem_limpa": ({"status": limpa["status"], "erro": limpa.get("erro")}
                          if (limpa := doc.get("imagem_limpa")) else None),
         "elemento": ({k: v for k, v in elemento.items() if k != "chave"}

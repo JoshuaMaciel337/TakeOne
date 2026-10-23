@@ -2008,6 +2008,16 @@ export function inverterClipes(projeto: Projeto, ctx: Contexto, clipeIds: string
   );
 }
 
+/** Esconder os rostos dos clipes de vídeo (null tira): pixelizados ou desfocados, na força dada. */
+export function esconderRostos(projeto: Projeto, clipeIds: string[], valor: { modo: "pixelizar" | "desfocar"; forca: number } | null): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.texto || clipe.ajuste) throw new ErroEdicao("Esconder os rostos vale só em vídeos.");
+    if (!valor || valor.forca <= 0) return { ...clipe, esconder_rostos: null };
+    if (valor.modo !== "pixelizar" && valor.modo !== "desfocar") throw new ErroEdicao("Este jeito de esconder não existe.");
+    return { ...clipe, esconder_rostos: { modo: valor.modo, forca: limitar(valor.forca, 0.05, 1) }, inverter: false, fluido: null, estabilizar: false };
+  });
+}
+
 /** O fundo desfocado dos clipes de vídeo (null tira). Usa a máscara do recorte do fundo: liga sem ele e sem a estabilização. */
 export function desfocarOFundo(projeto: Projeto, clipeIds: string[], intensidade: number | null): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {

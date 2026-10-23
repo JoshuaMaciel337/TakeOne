@@ -565,6 +565,9 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             desfocar={!comTempo && midia.imagem && !midia.video.transparente ? () => aoExecutar({ comando: "imagem.desfocarFundo", parametros: { faixaId: faixa.id } }) : undefined}
           />
         ) : null}
+        {!clipe.texto && midia?.video && !midia.imagem && !midia.elemento && !midia.animacao && comTempo ? (
+          <EsconderRostos clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
+        ) : null}
         {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
         ) : null}
@@ -901,6 +904,77 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: 
               ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
               : `Achando a pessoa ${foto ? "na imagem" : "em cada quadro"}${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}. Até terminar, a prévia mostra ${foto ? "a imagem" : "o clipe"} inteir${foto ? "a" : "o"}.`}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Esconder os rostos: o worker acha todos os rostos de cada quadro (YuNet) e grava uma máscara; uma cópia pixelizada
+ * ou desfocada do clipe, recortada por ela, fica por cima (lib/projeto/fundoDesfocado.ts).
+ */
+function EsconderRostos({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
+  const [erroDoPedido, setErroDoPedido] = useState("");
+  const estado = midia.esconder_rostos;
+  const valor = clipe.esconder_rostos ?? null;
+  const executar = (novo: { modo: "pixelizar" | "desfocar"; forca: number } | null) => aoExecutar({ comando: "clipe.esconderRostos", parametros: { clipeIds: [clipe.id], valor: novo } });
+  function pedir() {
+    if (estado?.status === "pronta" || estado?.status === "processando") return;
+    setErroDoPedido("");
+    chamarApi(`/midias/${midia.id}/esconder-rostos`, { metodo: "POST" }).catch((erro: unknown) => setErroDoPedido(erro instanceof Error ? erro.message : "Não foi possível pedir agora."));
+  }
+  return (
+    <div className="mt-2 border-t border-borda/60 pt-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={valor !== null}
+          disabled={travada}
+          onChange={(evento) => {
+            const ligar = evento.currentTarget.checked;
+            executar(ligar ? { modo: "pixelizar", forca: 0.6 } : null);
+            if (ligar) pedir();
+          }}
+        />
+        <span className="flex-1">Esconder os rostos</span>
+      </label>
+      {valor ? (
+        <>
+          <div className="mt-1 grid grid-cols-2 gap-1" role="radiogroup" aria-label="Jeito de esconder">
+            {(["pixelizar", "desfocar"] as const).map((modo) => (
+              <button
+                key={modo}
+                type="button"
+                role="radio"
+                aria-checked={valor.modo === modo}
+                disabled={travada}
+                onClick={() => executar({ ...valor, modo })}
+                className={`rounded-md border px-2 py-1 text-xs ${valor.modo === modo ? "border-destaque bg-destaque/10" : "border-borda text-suave hover:text-texto"}`}
+              >
+                {modo === "pixelizar" ? "Pixelizar" : "Desfocar"}
+              </button>
+            ))}
+          </div>
+          <ControleNumerico
+            rotulo="Força"
+            valor={valor.forca * 100}
+            minimo={5}
+            maximo={100}
+            sufixo="%"
+            desativado={travada}
+            aoPrever={() => undefined}
+            aoConfirmar={(forca) => executar({ ...valor, forca: forca / 100 })}
+          />
+          <p className="mt-1 text-[11px] text-suave" role="status">
+            {estado?.status === "pronta"
+              ? estado.quadros_com_rosto === 0
+                ? "Nenhum rosto foi achado neste vídeo."
+                : "Pronto. Os rostos ficam escondidos na prévia e no vídeo exportado."
+              : estado?.status === "erro" || erroDoPedido
+                ? `Não deu certo: ${erroDoPedido || estado?.erro}`
+                : `Procurando os rostos em cada quadro${estado?.progresso ? ` · ${estado.progresso}%` : ""}.`}
+          </p>
+        </>
       ) : null}
     </div>
   );

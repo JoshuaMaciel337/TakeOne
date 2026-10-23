@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { expandirFundoDesfocado, SUFIXO_DO_RECORTE } from "./fundoDesfocado.ts";
+import { expandirParaDesenhar, SUFIXO_DO_RECORTE } from "./fundoDesfocado.ts";
 import type { Clipe, Projeto } from "./modelo.ts";
 
 const clipe = (id: string, extra: Partial<Clipe> = {}): Clipe =>
@@ -14,7 +14,7 @@ test("o clipe com fundo desfocado vira a cópia desfocada e, por cima, a recorta
       { id: "p", tipo: "principal", clipes: [clipe("a", { fundo_desfocado: 0.7, transicao: { tipo: "fusao", duracao: 5 } }), clipe("b")] },
     ],
   } as unknown as Projeto;
-  const desenhado = expandirFundoDesfocado(projeto);
+  const desenhado = expandirParaDesenhar(projeto);
   assert.deepEqual(desenhado.faixas.map((f) => [f.id, f.tipo]), [["t", "texto"], [`p${SUFIXO_DO_RECORTE}`, "video"], ["p", "principal"]]);
   const recortado = desenhado.faixas[1].clipes[0];
   assert.equal(recortado.id, `a${SUFIXO_DO_RECORTE}`);
@@ -24,5 +24,5 @@ test("o clipe com fundo desfocado vira a cópia desfocada e, por cima, a recorta
   assert.ok(!desfocado.remover_fundo && desfocado.transicao, "a transição fica na de baixo");
   assert.equal(outro, projeto.faixas[1].clipes[1]);
   const sem = { faixas: [{ id: "p", tipo: "principal", clipes: [clipe("x")] }] } as unknown as Projeto;
-  assert.equal(expandirFundoDesfocado(sem), sem, "sem fundo desfocado, o mesmo projeto");
+  assert.equal(expandirParaDesenhar(sem), sem, "sem fundo desfocado, o mesmo projeto");
 });

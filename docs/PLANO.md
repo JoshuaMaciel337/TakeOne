@@ -531,6 +531,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Adesivos animados próprios (24, na categoria Adesivos da biblioteca de animações).
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.
   - [x] Desfocar o fundo no vídeo (a máscara do recorte; o projeto é expandido em duas cópias na hora de desenhar).
+  - [x] Esconder os rostos (YuNet em todo quadro, máscara em vídeo, cópia pixelizada ou desfocada por cima).
+  - [ ] Esconder uma placa ou um objeto (o retângulo marcado e seguido pelo VitTrack, na mesma máscara).
 - [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 

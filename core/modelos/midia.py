@@ -33,7 +33,9 @@ ARQUIVO_MASCARA = "mascara.mp4"
 # A imagem sem ruído (tarefa "limpeza_imagem"): a de resolução cheia é só do render; a cópia leve, da prévia
 ARQUIVO_IMAGEM_LIMPA = "limpo.mp4"
 ARQUIVO_IMAGEM_LIMPA_PROXY = "limpo_proxy.mp4"
-ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_PROXY}
+# A máscara dos rostos de cada quadro (tarefa "esconder_rostos"), no tempo e no tamanho da do recorte
+ARQUIVO_MASCARA_ROSTOS = "rostos_mascara.mp4"
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_MASCARA, ARQUIVO_IMAGEM_LIMPA_PROXY, ARQUIVO_MASCARA_ROSTOS}
 # Imagem parada (core/utils/imagem.py): a de resolução cheia é do render; a cópia leve, da prévia
 ARQUIVO_IMAGEM = "imagem.png"
 ARQUIVO_PROXY_IMAGEM = "proxy.webp"
