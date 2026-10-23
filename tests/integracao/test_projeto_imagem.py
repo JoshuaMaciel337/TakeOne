@@ -1,0 +1,70 @@
+# Projeto de imagem: o tamanho em pixels, camadas em qualquer ordem, fundo transparente e o que não vale nele
+import pytest
+from fastapi.testclient import TestClient
+
+from api.main import app
+from core.modelos.midia import arquivo_publico
+from core.modelos.projeto import proporcao_mais_perto
+from tests.integracao.test_api import cadastrar
+from tests.integracao.test_projetos import SEGUNDO, clipe, criar_midia, salvar
+
+
+@pytest.fixture
+def cliente(db_limpo):
+    with TestClient(app) as cliente:
+        yield cliente
+
+
+def camada(tipo, clipe_):
+    return {"id": f"f-{clipe_['id']}", "tipo": tipo, "oculta": False, "muda": False, "travada": False,
+            "clipes": [clipe_]}
+
+
+def test_criar_salvar_e_abrir_um_projeto_de_imagem(cliente, db_limpo):
+    cadastrar(cliente)
+    criado = cliente.post("/api/projetos", json={"tamanho": {"largura": 1080, "altura": 1350}})
+    assert criado.status_code == 201, criado.text
+    projeto = criado.json()
+    assert projeto["tipo"] == "imagem" and projeto["tamanho"] == {"largura": 1080, "altura": 1350}
+    assert projeto["proporcao"] == "4:5" and projeto["nome"] == "Imagem sem título"
+    assert projeto["fundo"]["cor"] == "#ffffff", "a imagem nasce branca"
+
+    foto = criar_midia(db_limpo, cliente)
+    fundo = criar_midia(db_limpo, cliente)
+    titulo = {**clipe(None, 0, 5, id_="titulo"), "midia_id": None, "texto": {"conteudo": "Promoção", "cor": "#ffffff"}}
+    # De cima para baixo: a foto por cima do título, e o fundo embaixo de tudo (o vídeo não deixa)
+    faixas = [camada("video", clipe(foto, 0, 5, id_="foto")), camada("texto", titulo),
+              camada("video", clipe(fundo, 0, 5, id_="fundo")), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas, fundo={"cor": "#ffffff", "transparente": True},
+                   tamanho={"largura": 1080, "altura": 1920})
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert [f["tipo"] for f in aberto["faixas"]] == ["video", "texto", "video", "principal"]
+    assert aberto["tamanho"] == {"largura": 1080, "altura": 1920} and aberto["proporcao"] == "9:16"
+    assert aberto["fundo"] == {"cor": "#ffffff", "transparente": True}
+    resumo = next(p for p in cliente.get("/api/projetos").json() if p["id"] == projeto["id"])
+    assert resumo["tipo"] == "imagem" and resumo["capa_midia_id"] == fundo, "a capa é a camada de baixo"
+    assert resumo["duracao"] == 5 * SEGUNDO
+
+    # O que é de vídeo não vale na imagem
+    assert cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).status_code == 422
+    assert cliente.get(f"/api/projetos/{projeto['id']}/intercambio.xml").status_code == 422
+
+
+def test_tamanho_fora_dos_limites_e_o_video_continua_igual(cliente):
+    cadastrar(cliente)
+    assert cliente.post("/api/projetos", json={"tamanho": {"largura": 9000, "altura": 100}}).status_code == 422
+    resposta = cliente.post("/api/projetos", json={"tamanho": {"largura": 7000, "altura": 7000}})
+    assert resposta.status_code == 422 and "36 milhões" in resposta.json()["detail"]
+    video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    assert video["tipo"] == "video" and video["tamanho"] is None
+    # O tamanho mandado ao salvar um vídeo é ignorado
+    salvo = salvar(cliente, video, video["faixas"], tamanho={"largura": 500, "altura": 500}).json()
+    assert salvo["tamanho"] is None and salvo["proporcao"] == "16:9"
+
+
+def test_proporcao_mais_perto_e_imagem_em_resolucao_cheia_servida():
+    assert proporcao_mais_perto(1080, 1080) == "1:1"
+    assert proporcao_mais_perto(1500, 500) == "21:9"
+    assert proporcao_mais_perto(1280, 720) == "16:9"
+    assert arquivo_publico("imagem.png") and arquivo_publico("proxy.webp")

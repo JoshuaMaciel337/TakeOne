@@ -5,6 +5,7 @@
 # (core/utils/tempo.py). O editor no navegador monta e altera esse documento; a API confere se ele
 # continua válido antes de salvar, e o render vai ler o mesmo documento.
 # -----------------------------------------------
+import math
 import uuid
 
 from core.utils.mongo import agora
@@ -13,6 +14,21 @@ from core.utils.tempo import TICK_MAXIMO, segundos_para_ticks
 PROPORCOES = ("9:16", "16:9", "1:1", "4:5", "3:4", "21:9")
 PROPORCAO_PADRAO = "9:16"
 NOME_PADRAO = "Projeto sem título"
+# O projeto de imagem (editor de imagem) usa a mesma linha do tempo: cada camada é uma faixa com um clipe só,
+# no começo. Ele tem o tamanho em pixels; a proporção guardada é a mais perto, para a lista de projetos
+TIPOS = ("video", "imagem")
+NOME_PADRAO_IMAGEM = "Imagem sem título"
+LADO_MAXIMO_DA_IMAGEM = 8192
+AREA_MAXIMA_DA_IMAGEM = 36_000_000
+
+
+def proporcao_mais_perto(largura: int, altura: int) -> str:
+    """A proporção da lista mais perto do tamanho (em escala logarítmica: 2:1 e 1:2 ficam à mesma distância)."""
+    def distancia(proporcao: str) -> float:
+        a, b = (int(x) for x in proporcao.split(":"))
+        return abs(math.log((largura / altura) / (a / b)))
+
+    return min(PROPORCOES, key=distancia)
 
 FAIXA_PRINCIPAL = "principal"
 FAIXA_VIDEO = "video"      # sobreposição, por cima da principal
@@ -38,15 +54,21 @@ def faixa_vazia(tipo: str) -> dict:
 
 
 def montar_projeto(organizacao_id: str, usuario_id: str, nome: str | None = None,
-                   proporcao: str | None = None) -> dict:
+                   proporcao: str | None = None, tamanho: dict | None = None) -> dict:
+    """Com `tamanho` ({largura, altura} em pixels), um projeto de imagem."""
     momento = agora()
+    if tamanho:
+        proporcao = proporcao_mais_perto(tamanho["largura"], tamanho["altura"])
     return {
         "organizacao_id": organizacao_id,
         "criado_por": usuario_id,
-        "nome": nome or NOME_PADRAO,
+        "tipo": "imagem" if tamanho else "video",
+        "tamanho": tamanho,
+        "nome": nome or (NOME_PADRAO_IMAGEM if tamanho else NOME_PADRAO),
         "proporcao": proporcao if proporcao in PROPORCOES else PROPORCAO_PADRAO,
         "taxa": {"num": 30, "den": 1},
-        "fundo": {"cor": "#000000"},
+        # A imagem nasce branca, como uma folha; o vídeo, preto
+        "fundo": {"cor": "#ffffff" if tamanho else "#000000"},
         "faixas": [faixa_vazia(FAIXA_PRINCIPAL)],
         "versao": 1,
         "duracao": 0,
@@ -69,8 +91,13 @@ def midias_usadas(faixas: list[dict]) -> list[str]:
     return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")})
 
 
-def capa_do_projeto(faixas: list[dict]) -> str | None:
-    """A mídia do primeiro clipe da faixa principal: a capa dela vira a capa do projeto."""
+def capa_do_projeto(faixas: list[dict], tipo: str = "video") -> str | None:
+    """
+    A mídia do primeiro clipe da faixa principal: a capa dela vira a capa do projeto. Na imagem (sem nada na
+    principal), a mídia da camada mais de baixo.
+    """
+    if tipo == "imagem":
+        return next((c["midia_id"] for f in reversed(faixas) for c in f["clipes"] if c.get("midia_id")), None)
     principal = next((f for f in faixas if f["tipo"] == FAIXA_PRINCIPAL), None)
     return principal["clipes"][0]["midia_id"] if principal and principal["clipes"] else None
 

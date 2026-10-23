@@ -38,6 +38,8 @@ def nome_de_arquivo(nome: str) -> str:
 async def _preparar(db, projeto_id: str, usuario: dict) -> tuple[dict, dict[str, dict], dict[str, Path]]:
     """O projeto, as mídias dele (com o nome do arquivo na pasta midias/) e onde cada original está."""
     projeto = await buscar_projeto(db, projeto_id, usuario)
+    if projeto.get("tipo") == "imagem":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Só projetos de vídeo vão para outro editor.")
     ids = [ObjectId(i) for i in midias_usadas(projeto["faixas"]) if ObjectId.is_valid(i)]
     campos = {"nome": 1, "original": 1, "duracao": 1, "video": 1, "audio": 1, "imagem": 1, "extensao": 1}
     cursor = db.midias.find({"_id": {"$in": ids}, "organizacao_id": usuario["organizacao_id"]}, campos)

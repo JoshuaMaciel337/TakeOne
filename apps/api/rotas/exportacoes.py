@@ -87,6 +87,9 @@ async def criar_exportacao(dados: ExportacaoCriarEntrada, usuario=Depends(usuari
                                           "organizacao_id": usuario["organizacao_id"]})
     if projeto is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Projeto não encontrado.")
+    if projeto.get("tipo") == "imagem":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "Imagens são exportadas no próprio editor de imagem, em PNG, JPG ou WebP.")
     if not projeto.get("duracao"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "O projeto está vazio. Coloque alguma mídia na linha do tempo antes de exportar.")

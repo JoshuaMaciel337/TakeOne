@@ -140,6 +140,20 @@ class TaxaEntrada(BaseModel):
 
 class FundoEntrada(BaseModel):
     cor: str = Field(default="#000000", pattern=r"^#[0-9a-fA-F]{6}$")
+    # Só no projeto de imagem: sem fundo (o PNG e o WebP saem com transparência)
+    transparente: bool = False
+
+
+class TamanhoEntrada(BaseModel):
+    """O tamanho do projeto de imagem, em pixels (os limites são os de core/modelos/projeto.py)."""
+    largura: int = Field(ge=16, le=8192)
+    altura: int = Field(ge=16, le=8192)
+
+    @model_validator(mode="after")
+    def area_que_cabe(self):
+        if self.largura * self.altura > 36_000_000:
+            raise ValueError("A imagem pode ter no máximo 36 milhões de pixels (6000 × 6000).")
+        return self
 
 
 # Os limites são os mesmos de apps/web/src/lib/projeto/edicao.ts
@@ -580,6 +594,8 @@ class ImagemTextoEntrada(BaseModel):
 class ProjetoCriarEntrada(BaseModel):
     nome: str | None = Field(default=None, min_length=1, max_length=120)
     proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] | None = None
+    # Com o tamanho, o projeto é de imagem (o editor de imagem)
+    tamanho: TamanhoEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -594,6 +610,8 @@ class ProjetoSalvarEntrada(BaseModel):
     taxa: TaxaEntrada
     fundo: FundoEntrada
     faixas: list[FaixaEntrada] = Field(min_length=1, max_length=30)
+    # Só no projeto de imagem (no de vídeo é ignorado)
+    tamanho: TamanhoEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -628,6 +646,8 @@ class ProjetoSaida(BaseModel):
     faixas: list[FaixaEntrada]
     versao: int
     duracao: int
+    tipo: Literal["video", "imagem"] = "video"
+    tamanho: TamanhoEntrada | None = None
     # O projeto criado de um modelo do espaço: as vagas que o editor oferece para preencher
     modelo_origem: OrigemDoModeloSaida | None = None
     criado_em: datetime
@@ -682,6 +702,8 @@ class UsoDeModeloEntrada(BaseModel):
 class ProjetoResumoSaida(BaseModel):
     id: str
     nome: str
+    tipo: Literal["video", "imagem"] = "video"
+    tamanho: TamanhoEntrada | None = None
     proporcao: str
     duracao: int
     capa_midia_id: str | None = None

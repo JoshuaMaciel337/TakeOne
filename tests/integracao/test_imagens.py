@@ -52,7 +52,8 @@ def test_imagem_entra_na_biblioteca_e_no_projeto(cliente, db_limpo):
     assert midia["status"] == "pronta" and midia["imagem"] is True
     assert midia["duracao"] is None and midia["audio"] is None
     assert (midia["video"]["largura"], midia["video"]["altura"]) == (800, 400) and midia["video"]["transparente"]
-    assert set(midia["arquivos"]) == {"proxy.webp", "capa.jpg", "miniaturas.jpg"}, "imagem.png é só do render"
+    # imagem.png também é servida: a exportação do editor de imagem lê a resolução cheia
+    assert set(midia["arquivos"]) == {"proxy.webp", "imagem.png", "capa.jpg", "miniaturas.jpg"}
     resposta = cliente.get(f"/api/midias/{midia_id}/arquivos/proxy.webp")
     assert resposta.status_code == 200 and resposta.headers["content-type"] == "image/webp"
 

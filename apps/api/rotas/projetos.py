@@ -27,6 +27,7 @@ from core.modelos.projeto import (
     duracao_do_projeto,
     midias_usadas,
     montar_projeto,
+    proporcao_mais_perto,
 )
 from core.utils.mongo import agora
 
@@ -69,7 +70,8 @@ async def listar_projetos(limite: int = Query(default=60, ge=1, le=200),
 
 @router.post("", response_model=ProjetoSaida, status_code=status.HTTP_201_CREATED)
 async def criar_projeto(dados: ProjetoCriarEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    projeto = montar_projeto(usuario["organizacao_id"], usuario["_id"], dados.nome, dados.proporcao)
+    tamanho = dados.tamanho.model_dump() if dados.tamanho else None
+    projeto = montar_projeto(usuario["organizacao_id"], usuario["_id"], dados.nome, dados.proporcao, tamanho)
     resultado = await db.projetos.insert_one(projeto)
     projeto["_id"] = resultado.inserted_id
     logging.info(f"[{usuario['organizacao_id']}] Projeto criado: {projeto['nome']}")
@@ -84,7 +86,7 @@ async def abrir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depe
 @router.put("/{projeto_id}", response_model=ProjetoSaida)
 async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
                          usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    atual = await buscar_projeto(db, projeto_id, usuario, {"versao": 1})
+    atual = await buscar_projeto(db, projeto_id, usuario, {"versao": 1, "tipo": 1, "tamanho": 1})
     if atual["versao"] != dados.versao:
         raise HTTPException(status.HTTP_409_CONFLICT, MENSAGEM_CONFLITO)
 
@@ -94,15 +96,19 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     if problema:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problema)
 
+    imagem = atual.get("tipo") == "imagem"
+    tamanho = (dados.tamanho.model_dump() if dados.tamanho else atual.get("tamanho")) if imagem else None
     campos = {
         "nome": dados.nome,
-        "proporcao": dados.proporcao,
+        # Na imagem, a proporção acompanha o tamanho
+        "proporcao": proporcao_mais_perto(tamanho["largura"], tamanho["altura"]) if tamanho else dados.proporcao,
         "taxa": dados.taxa.model_dump(),
         "fundo": dados.fundo.model_dump(),
         "faixas": faixas,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
-        "capa_midia_id": capa_do_projeto(faixas),
+        "capa_midia_id": capa_do_projeto(faixas, "imagem" if imagem else "video"),
+        **({"tamanho": tamanho} if imagem else {}),
         "versao": dados.versao + 1,
         "atualizado_em": agora(),
     }
