@@ -12,13 +12,13 @@ export const FADE_SAIDA_S = 0.05;
 const ANTECIPACAO_S = 0.005;
 const SOLTURA_S = 0.05;
 
-type Biquad = { b: [number, number, number]; a: [number, number, number] };
+export type Biquad = { b: [number, number, number]; a: [number, number, number] };
 
 /**
  * Os dois filtros do K-weighting (prefiltro de prateleira e passa-altas RLB) para a taxa dada, pelas
  * fórmulas da norma (as mesmas do ebur128 e da libebur128).
  */
-function filtrosK(taxa: number): [Biquad, Biquad] {
+export function filtrosK(taxa: number): [Biquad, Biquad] {
   let f0 = 1681.974450955533;
   const g = 3.999843853973347;
   let q = 0.7071752369554196;
@@ -75,7 +75,18 @@ export function loudnessIntegrado(canais: Float32Array[], taxa: number): number 
     for (const acumulado of ponderados) soma += (acumulado[inicio + tamanho] - acumulado[inicio]) / tamanho;
     blocos.push(soma);
   }
-  const lufs = (energia: number) => -0.691 + 10 * Math.log10(energia);
+  return integradoDosBlocos(blocos);
+}
+
+/** O loudness de uma energia (a soma das médias dos quadrados ponderados de cada canal), em LUFS. */
+export const lufsDaEnergia = (energia: number) => -0.691 + 10 * Math.log10(energia);
+
+/**
+ * O loudness integrado de blocos de 400 ms (a energia de cada um), com os portões da norma: tira o silêncio
+ * (abaixo de -70 LUFS) e o que fica 10 LU abaixo da média do resto. Null sem nada acima dos portões.
+ */
+export function integradoDosBlocos(blocos: number[]): number | null {
+  const lufs = lufsDaEnergia;
   const absolutos = blocos.filter((energia) => energia > 0 && lufs(energia) > SILENCIO_LUFS);
   if (!absolutos.length) return null;
   const relativo = lufs(absolutos.reduce((a, b) => a + b, 0) / absolutos.length) - 10;

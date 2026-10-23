@@ -498,7 +498,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Camadas de ajuste (cor, filtro, curvas, vinheta, opacidade e máscara de forma), no vídeo e na imagem.
   - [x] Recortar a imagem (retângulo na prévia, proporções prontas, camadas no mesmo lugar em pixels).
   - [x] Seleção com um clique (MobileSAM) e com o pincel, apagar objeto (LaMa) e recortar objeto (camada nova), no editor de imagem.
-- [ ] Onda 6, lote D (som).
+- [x] Onda 6, lote D (som).
   - [x] Tirar o ronco (passa-altas de 80 Hz) nos efeitos de voz.
   - [x] Keyframes de volume (aba Áudio), na prévia, na exportação no navegador e no render.
   - [x] Separar o som (cortes em J e em L aparando o som sem o vídeo).
@@ -506,7 +506,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Ajustar a música à duração do vídeo (compassos do meio, cortes nos tempos fortes).
   - [x] Gravar narração (microfone do navegador, no cursor, com o vídeo tocando junto).
   - [x] Nivelar a voz (curva pelos níveis da ingestão, gravada no clipe).
-  - [ ] O medidor de loudness na prévia.
+  - [x] O medidor de loudness na prévia (momentâneo, curto, integrado, pico e o ganho da exportação).
 - [ ] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.

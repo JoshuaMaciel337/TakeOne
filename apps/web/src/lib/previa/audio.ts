@@ -10,6 +10,7 @@
 //
 // O navegador só deixa o som começar depois de um clique ou tecla da pessoa. Por isso o contexto
 // só é criado em `retomarAudio`, chamado quando a pessoa aperta reproduzir.
+import { criarMedidor, type Medidor } from "./medidor.ts";
 import { ECO_ATRASO_S, ECO_REPETICOES, type EfeitosVoz, FAIXAS_DO_EQ, RONCO_HZ, RONCO_Q_DB, SEM_EFEITOS_VOZ } from "../projeto/som.ts";
 
 export type Cadeia = {
@@ -22,6 +23,9 @@ export type Cadeia = {
 };
 
 let contexto: AudioContext | null = null;
+/** O barramento mestre: o som de todos os clipes passa por ele antes da saída (e o medidor escuta dali). */
+let mestre: GainNode | null = null;
+let medidor: Medidor | null = null;
 const cadeias = new WeakMap<HTMLMediaElement, Cadeia>();
 let respostaDaSala: Promise<AudioBuffer> | null = null;
 
@@ -32,8 +36,19 @@ function webAudioDisponivel(): boolean {
 /** Cria ou acorda o contexto de áudio. Chamar dentro do clique ou da tecla que começa a reprodução. */
 export function retomarAudio() {
   if (!webAudioDisponivel()) return;
-  contexto ??= new AudioContext({ latencyHint: "interactive" });
+  if (!contexto) {
+    contexto = new AudioContext({ latencyHint: "interactive" });
+    mestre = contexto.createGain();
+    mestre.connect(contexto.destination);
+  }
   if (contexto.state === "suspended") void contexto.resume();
+}
+
+/** O medidor de loudness da prévia (lib/previa/medidor.ts), ou null antes do primeiro reproduzir. */
+export function medidorDaPrevia(): Medidor | null {
+  if (!contexto || !mestre) return null;
+  medidor ??= criarMedidor(contexto, mestre);
+  return medidor;
 }
 
 /**
@@ -99,7 +114,7 @@ function cadeiaDo(elemento: HTMLMediaElement): Cadeia | null {
   let cadeia = cadeias.get(elemento) ?? null;
   if (!cadeia && contexto) {
     // Um elemento só pode ser ligado uma vez; depois disso o som dele sai só por esta cadeia
-    cadeia = criarCadeia(contexto, contexto.createMediaElementSource(elemento), contexto.destination);
+    cadeia = criarCadeia(contexto, contexto.createMediaElementSource(elemento), mestre ?? contexto.destination);
     cadeias.set(elemento, cadeia);
   }
   return cadeia;

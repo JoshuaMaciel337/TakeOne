@@ -16,6 +16,7 @@ import type { Midia } from "@/lib/tipos";
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
 import { GuiasDaPrevia } from "./GuiasDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
+import { MedidorDeLoudness } from "./MedidorDeLoudness";
 import { MarcadorDeObjeto, type ObjetoMarcado } from "./SeguirObjeto";
 import { razao } from "./proporcoes";
 
@@ -314,7 +315,8 @@ export function Previa({ projeto, midias, tempo, tocando, aoAlternar, selecao, a
             {tocando ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
           </button>
         </div>
-        <div className="flex w-40 items-center justify-end gap-1">
+        <div className="flex min-w-40 items-center justify-end gap-1">
+          <MedidorDeLoudness tocando={tocando} />
           <button
             type="button"
             className={`botao-icone ${modoDasGuias === "desligadas" ? "" : "text-destaque"}`}
