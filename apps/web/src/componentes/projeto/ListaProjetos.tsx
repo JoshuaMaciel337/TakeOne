@@ -12,13 +12,27 @@ import { enderecoDoProjeto } from "@/lib/hub";
 import { TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { ProjetoResumo } from "@/lib/tipos";
 
+/** Projetos por página da API; a lista busca todas as páginas, até o teto. */
+const POR_PAGINA = 200;
+const MAXIMO_DE_PROJETOS = 5000;
+
+async function todosOsProjetos(): Promise<ProjetoResumo[]> {
+  const lista: ProjetoResumo[] = [];
+  for (;;) {
+    const depois = lista.length ? `&antes=${lista[lista.length - 1].id}` : "";
+    const pagina = await chamarApi<ProjetoResumo[]>(`/projetos?limite=${POR_PAGINA}${depois}`);
+    lista.push(...pagina);
+    if (pagina.length < POR_PAGINA || lista.length >= MAXIMO_DE_PROJETOS) return lista;
+  }
+}
+
 export function useProjetos() {
   const [projetos, setProjetos] = useState<ProjetoResumo[] | null>(null);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
     let ativo = true;
-    chamarApi<ProjetoResumo[]>("/projetos")
+    todosOsProjetos()
       .then((lista) => {
         if (ativo) setProjetos(lista);
       })

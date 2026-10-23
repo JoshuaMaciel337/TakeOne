@@ -62,9 +62,22 @@ async def midias_do_espaco(db, ids: list[str], organizacao_id) -> dict[str, dict
 
 @router.get("", response_model=list[ProjetoResumoSaida])
 async def listar_projetos(limite: int = Query(default=60, ge=1, le=200),
+                          antes: str | None = Query(default=None, description="id do último da página anterior"),
                           usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    cursor = (db.projetos.find({"organizacao_id": usuario["organizacao_id"]}, {"faixas": 0})
-              .sort("atualizado_em", -1).limit(limite))
+    """Os projetos do espaço, dos mexidos há menos tempo para os mais antigos, em páginas: a seguinte começa depois
+    de `antes` (o id do último da página), pela data dele e, no empate, pelo id."""
+    filtro: dict = {"organizacao_id": usuario["organizacao_id"]}
+    if antes:
+        try:
+            ultimo = await db.projetos.find_one({"_id": ObjectId(antes), "organizacao_id": usuario["organizacao_id"]},
+                                                {"atualizado_em": 1})
+        except InvalidId as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Página inválida.") from erro
+        if ultimo is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Página inválida: o projeto saiu da lista.")
+        filtro["$or"] = [{"atualizado_em": {"$lt": ultimo["atualizado_em"]}},
+                         {"atualizado_em": ultimo["atualizado_em"], "_id": {"$lt": ultimo["_id"]}}]
+    cursor = db.projetos.find(filtro, {"faixas": 0}).sort([("atualizado_em", -1), ("_id", -1)]).limit(limite)
     return [projeto_para_resumo(p) async for p in cursor]
 
 

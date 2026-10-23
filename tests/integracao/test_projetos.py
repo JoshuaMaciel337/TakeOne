@@ -238,3 +238,21 @@ def test_lista_de_midias_em_paginas_traz_todas_sem_repetir(cliente, db_limpo):
     assert len(vistas) == len(set(vistas)) == 7 and set(vistas) == ids
     assert vistas == sorted(vistas, reverse=True), "das mais novas para as mais antigas"
     assert cliente.get("/api/midias", params={"antes": "nao-e-id"}).status_code == 422
+
+
+def test_lista_de_projetos_em_paginas_traz_todos_sem_repetir(cliente, db_limpo):
+    cadastrar(cliente)
+    criados = [cliente.post("/api/projetos", json={"nome": f"P{i}"}).json()["id"] for i in range(7)]
+    # Três com a mesma data: o empate se resolve pelo id
+    mesma = db_limpo.projetos.find_one({"_id": ObjectId(criados[0])})["atualizado_em"]
+    db_limpo.projetos.update_many({"_id": {"$in": [ObjectId(i) for i in criados[2:5]]}},
+                                  {"$set": {"atualizado_em": mesma}})
+    vistos, antes = [], None
+    while True:
+        pagina = cliente.get("/api/projetos", params={"limite": 3, **({"antes": antes} if antes else {})}).json()
+        vistos += [p["id"] for p in pagina]
+        if len(pagina) < 3:
+            break
+        antes = pagina[-1]["id"]
+    assert sorted(vistos) == sorted(criados) and len(vistos) == 7
+    assert cliente.get("/api/projetos", params={"antes": "x"}).status_code == 422
