@@ -90,9 +90,16 @@ REVERB_SEMENTE = 7
 REVERB_TAXA = 48000
 
 
+# Tirar o ronco: o passa-altas antes do equalizador
+RONCO_HZ = 80
+
+
 def filtros_de_voz(efeitos: dict) -> list[str]:
-    """Equalizador e eco, em ordem. O reverb precisa de outra entrada (veja render.py)."""
+    """Tirar o ronco, equalizador e eco, em ordem. O reverb precisa de outra entrada (veja render.py)."""
     filtros = []
+    if (efeitos.get("ronco") or 0) > 0.5:
+        # Passa-altas de Butterworth em 80 Hz (Cookbook), o mesmo do BiquadFilterNode da prévia
+        filtros.append(f"highpass=f={RONCO_HZ}:t=q:w=0.7071")
     for faixa, (filtro, frequencia, largura) in FAIXAS_DO_EQ.items():
         ganho = efeitos.get(faixa) or 0
         if abs(ganho) > 1e-9:

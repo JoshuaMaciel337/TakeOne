@@ -974,7 +974,7 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
   });
   const emTicks = (segundos: number) => Math.round(segundos * TICKS_POR_SEGUNDO);
   const voz = midia.voz_limpa;
-  const efeitos = clipe.efeitos_voz ?? SEM_EFEITOS_VOZ;
+  const efeitos = { ...SEM_EFEITOS_VOZ, ...clipe.efeitos_voz };
 
   /** Pede ao worker a voz limpa da mídia (a API não repete o que já está pronto ou andando). */
   function pedirLimpeza() {
@@ -1072,10 +1072,11 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
         <select
           aria-label="Efeito pronto"
           disabled={travada}
-          value={EFEITOS_PRONTOS.find((pronto) => JSON.stringify(pronto.efeitos) === JSON.stringify(efeitos))?.id ?? ""}
+          value={EFEITOS_PRONTOS.find((pronto) => JSON.stringify({ ...pronto.efeitos, ronco: efeitos.ronco }) === JSON.stringify(efeitos))?.id ?? ""}
           onChange={(evento) => {
+            // O ronco não faz parte dos prontos: fica como estava
             const pronto = EFEITOS_PRONTOS.find((item) => item.id === evento.currentTarget.value);
-            if (pronto) aoExecutar(comando({ efeitos_voz: pronto.efeitos }));
+            if (pronto) aoExecutar(comando({ efeitos_voz: { ...pronto.efeitos, ronco: efeitos.ronco } }));
           }}
           className="mt-1 w-full rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
         >
@@ -1088,6 +1089,15 @@ function AbaAudio({ clipe, faixa, midia, faixas, aoAvisar, aoPrever, aoExecutar 
             </option>
           ))}
         </select>
+        <label className="mt-2 flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={(efeitos.ronco ?? 0) > 0.5}
+            disabled={travada}
+            onChange={(evento) => aoExecutar(comando({ efeitos_voz: { ...efeitos, ronco: evento.currentTarget.checked ? 1 : 0 } }))}
+          />
+          Tirar o ronco (corta abaixo de 80 Hz: vento, ar-condicionado, batidas no microfone)
+        </label>
         <ControleNumerico rotulo="Graves" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.grave, (valor) => ({ efeitos_voz: { ...efeitos, grave: valor } }))} />
         <ControleNumerico rotulo="Médios" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.medio, (valor) => ({ efeitos_voz: { ...efeitos, medio: valor } }))} />
         <ControleNumerico rotulo="Agudos" minimo={-EQ_LIMITE_DB} maximo={EQ_LIMITE_DB} sufixo="dB" {...controle(efeitos.agudo, (valor) => ({ efeitos_voz: { ...efeitos, agudo: valor } }))} />

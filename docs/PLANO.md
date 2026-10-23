@@ -498,7 +498,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Camadas de ajuste (cor, filtro, curvas, vinheta, opacidade e máscara de forma), no vídeo e na imagem.
   - [x] Recortar a imagem (retângulo na prévia, proporções prontas, camadas no mesmo lugar em pixels).
   - [x] Seleção com um clique (MobileSAM) e com o pincel, apagar objeto (LaMa) e recortar objeto (camada nova), no editor de imagem.
-- [ ] Onda 6, lote D (som). Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
+- [ ] Onda 6, lote D (som).
+  - [x] Tirar o ronco (passa-altas de 80 Hz) nos efeitos de voz. Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 
 **Estimativa:**

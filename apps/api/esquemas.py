@@ -253,6 +253,8 @@ class EfeitosVozEntrada(BaseModel):
     agudo: float = Field(default=0, ge=-12, le=12, description="dB")
     eco: float = Field(default=0, ge=0, le=0.8)
     reverb: float = Field(default=0, ge=0, le=1)
+    # 1 liga o passa-altas de 80 Hz que tira o ronco
+    ronco: float = Field(default=0, ge=0, le=1)
 
 
 class EfeitoEntrada(BaseModel):

@@ -10,11 +10,11 @@
 //
 // O navegador só deixa o som começar depois de um clique ou tecla da pessoa. Por isso o contexto
 // só é criado em `retomarAudio`, chamado quando a pessoa aperta reproduzir.
-import { ECO_ATRASO_S, ECO_REPETICOES, type EfeitosVoz, FAIXAS_DO_EQ, SEM_EFEITOS_VOZ } from "../projeto/som.ts";
+import { ECO_ATRASO_S, ECO_REPETICOES, type EfeitosVoz, FAIXAS_DO_EQ, RONCO_HZ, RONCO_Q_DB, SEM_EFEITOS_VOZ } from "../projeto/som.ts";
 
 export type Cadeia = {
   ganho: GainNode;
-  filtros: Record<keyof typeof FAIXAS_DO_EQ, BiquadFilterNode>;
+  filtros: Record<keyof typeof FAIXAS_DO_EQ | "ronco", BiquadFilterNode>;
   ecos: GainNode[];
   /** A cauda da sala: nasce quando o reverb é ligado pela primeira vez. */
   sala: { convolucao: ConvolverNode; volume: GainNode } | null;
@@ -49,14 +49,18 @@ export function criarCadeia(ctx: BaseAudioContext, fonte: AudioNode, destino: Au
     no.gain.value = 0;
     return no;
   };
+  // Tirar o ronco: o passa-altas antes do equalizador, como no render; desligado, a frequência 0 deixa o som passar
+  const ronco = filtro("highpass", 0);
+  ronco.Q.value = RONCO_Q_DB;
   const filtros = {
+    ronco,
     grave: filtro(...FAIXAS_DO_EQ.grave),
     medio: filtro(...FAIXAS_DO_EQ.medio),
     agudo: filtro(...FAIXAS_DO_EQ.agudo),
   };
   const soma = ctx.createGain();
   const ganho = ctx.createGain();
-  fonte.connect(filtros.grave).connect(filtros.medio).connect(filtros.agudo).connect(soma);
+  fonte.connect(filtros.ronco).connect(filtros.grave).connect(filtros.medio).connect(filtros.agudo).connect(soma);
   const ecos = Array.from({ length: ECO_REPETICOES }, (_, i) => {
     const atraso = ctx.createDelay(1);
     atraso.delayTime.value = ECO_ATRASO_S * (i + 1);
@@ -75,6 +79,7 @@ export function criarCadeia(ctx: BaseAudioContext, fonte: AudioNode, destino: Au
  */
 export function ajustarCadeia(ctx: BaseAudioContext, cadeia: Cadeia, efeitos: EfeitosVoz | null | undefined, sala: AudioBuffer | null) {
   const valores = efeitos ?? SEM_EFEITOS_VOZ;
+  cadeia.filtros.ronco.frequency.value = (valores.ronco ?? 0) > 0.5 ? RONCO_HZ : 0;
   cadeia.filtros.grave.gain.value = valores.grave;
   cadeia.filtros.medio.gain.value = valores.medio;
   cadeia.filtros.agudo.gain.value = valores.agudo;

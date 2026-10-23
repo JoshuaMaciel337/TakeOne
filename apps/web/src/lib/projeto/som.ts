@@ -43,9 +43,14 @@ export function ganhoParaIgualar(lufs: number | null | undefined): number {
 // o render usa os filtros do FFmpeg com as mesmas fórmulas dos nós do Web Audio da prévia.
 // -----------------------------------------------
 /** grave, medio e agudo em dB; eco é o volume da primeira repetição; reverb, o volume da cauda. */
-export type EfeitosVoz = { grave: number; medio: number; agudo: number; eco: number; reverb: number };
+/** ronco: 1 liga o passa-altas que tira o ronco (vento, ar-condicionado, o microfone na mesa). */
+export type EfeitosVoz = { grave: number; medio: number; agudo: number; eco: number; reverb: number; ronco?: number };
 
-export const SEM_EFEITOS_VOZ: EfeitosVoz = { grave: 0, medio: 0, agudo: 0, eco: 0, reverb: 0 };
+export const SEM_EFEITOS_VOZ: EfeitosVoz = { grave: 0, medio: 0, agudo: 0, eco: 0, reverb: 0, ronco: 0 };
+/** Tirar o ronco: passa-altas de Butterworth (Q 0,7071) em 80 Hz, o highpass do FFmpeg e o BiquadFilterNode. */
+export const RONCO_HZ = 80;
+/** O Q do passa-altas no BiquadFilterNode é em dB: 0,7071 é -3,0103 dB. */
+export const RONCO_Q_DB = 20 * Math.log10(Math.SQRT1_2);
 export const EQ_LIMITE_DB = 12;
 export const ECO_MAXIMO = 0.8;
 /** Faixa → (tipo do BiquadFilterNode, frequência); o meio com Q 1, as prateleiras com inclinação 1. */
@@ -76,5 +81,6 @@ export function limitarEfeitos(efeitos: EfeitosVoz): EfeitosVoz {
     agudo: limitar(efeitos.agudo, -EQ_LIMITE_DB, EQ_LIMITE_DB),
     eco: limitar(efeitos.eco, 0, ECO_MAXIMO),
     reverb: limitar(efeitos.reverb, 0, 1),
+    ronco: (efeitos.ronco ?? 0) > 0.5 ? 1 : 0,
   };
 }

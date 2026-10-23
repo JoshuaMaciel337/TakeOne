@@ -130,3 +130,11 @@ def test_reverb_soma_a_resposta_da_sala_sem_normalizar(tmp_path):
     assert h[0] == pytest.approx(1 + 0.5 * sala[0], abs=1e-4)
     for n in (round(0.03 * TAXA), round(0.2 * TAXA), round(0.8 * TAXA)):
         assert h[n] == pytest.approx(0.5 * sala[n], abs=1e-4), n
+
+
+def test_tirar_o_ronco_e_o_passa_altas_de_80_hz_antes_do_equalizador():
+    from core.utils.som import filtros_de_voz
+
+    filtros = filtros_de_voz({"ronco": 1, "grave": 3})
+    assert filtros[0] == "highpass=f=80:t=q:w=0.7071" and filtros[1].startswith("lowshelf=")
+    assert filtros_de_voz({"ronco": 0}) == []
