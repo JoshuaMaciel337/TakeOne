@@ -62,3 +62,37 @@ def caixa_do_clipe(transformacao: dict, recorte: dict, midia: tuple[float, float
         rotacao=transformacao["rotacao"],
         opacidade=transformacao["opacidade"],
     )
+
+
+def caixa_visivel(caixa: Caixa, recorte: dict, quadro: tuple[float, float],
+                  margem: float = 2) -> tuple[Caixa, dict] | None:
+    """
+    Só o pedaço do clipe que cai no quadro: a caixa encolhida até ele (com `margem` pixels de folga, para a leitura
+    bilinear da borda) e o recorte da mídia que vai nela, para o mesmo desenho. Serve ao render de um clipe ampliado
+    demais (o quadro inteiro de um zoom de 2000% passaria dos limites do FFmpeg). None quando não encolhe.
+    """
+    import math
+
+    meia_l, meia_a = caixa.largura / 2, caixa.altura / 2
+    angulo = math.radians(caixa.rotacao)
+    cos, sen = math.cos(angulo), math.sin(angulo)
+    # Os cantos do quadro no espaço da caixa (sem o giro dela), e o retângulo que os contém, dentro da caixa
+    locais = []
+    for x, y in ((0, 0), (quadro[0], 0), (0, quadro[1]), (quadro[0], quadro[1])):
+        dx, dy = x - caixa.cx, y - caixa.cy
+        locais.append((dx * cos + dy * sen, -dx * sen + dy * cos))
+    u0 = max(-meia_l, min(u for u, _ in locais) - margem)
+    u1 = min(meia_l, max(u for u, _ in locais) + margem)
+    v0 = max(-meia_a, min(v for _, v in locais) - margem)
+    v1 = min(meia_a, max(v for _, v in locais) + margem)
+    if u1 <= u0 or v1 <= v0:
+        return None
+    if (u1 - u0) * (v1 - v0) > 0.9 * caixa.largura * caixa.altura:
+        return None
+    fu0, fu1 = (u0 + meia_l) / caixa.largura, (u1 + meia_l) / caixa.largura
+    fv0, fv1 = (v0 + meia_a) / caixa.altura, (v1 + meia_a) / caixa.altura
+    novo = {"x": recorte["x"] + fu0 * recorte["largura"], "y": recorte["y"] + fv0 * recorte["altura"],
+            "largura": recorte["largura"] * (fu1 - fu0), "altura": recorte["altura"] * (fv1 - fv0)}
+    uc, vc = (u0 + u1) / 2, (v0 + v1) / 2
+    return Caixa(cx=caixa.cx + uc * cos - vc * sen, cy=caixa.cy + uc * sen + vc * cos, largura=u1 - u0,
+                 altura=v1 - v0, rotacao=caixa.rotacao, opacidade=caixa.opacidade), novo

@@ -212,6 +212,30 @@ def test_render_segue_a_geometria_da_previa(cliente, db_limpo):
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_zoom_alto_girado_sai_no_lugar_da_previa(cliente, db_limpo):
+    # A 2000% e girado, só o pedaço que aparece vai para o render: os quatro quadrantes se encontram no lugar da conta
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, gerar=gerar_quadrantes)
+    transformacao = {"x": 0.03, "y": -0.02, "escala": 20, "rotacao": 30, "opacidade": 1}
+    projeto = projeto_com(cliente, midia_id, transformacao=transformacao)
+    video = _exportar(cliente, db_limpo, projeto["id"])
+    quadro = quadro_do_video(video, 1.0, 720, 1280)
+    caixa = caixa_do_clipe(transformacao, {"x": 0, "y": 0, "largura": 1, "altura": 1}, (640, 360), (720, 1280))
+    conferidos, erros = 0, []
+    for y in range(20, 1280, 40):
+        for x in range(20, 720, 40):
+            esperada = cor_esperada(caixa, (x, y), margem=45)
+            if esperada is None:
+                continue
+            conferidos += 1
+            obtida = tuple(int(c) for c in quadro[y, x])
+            if max(abs(a - b) for a, b in zip(obtida, esperada, strict=True)) > 48:
+                erros.append(((x, y), esperada, obtida))
+    assert conferidos > 400
+    assert not erros, f"{len(erros)} pontos fora do lugar, por exemplo {erros[:5]}"
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
 def test_render_com_empurroes_seguidos_sai_inteiro(cliente, db_limpo):
     # O clipe do meio recebe um empurrão e sai com outro: a expressão do x soma os dois
     cadastrar(cliente)
@@ -870,7 +894,8 @@ def test_render_recusado_nao_deixa_arquivos_na_pasta(cliente, db_limpo):
     midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False,
                            gerar=gerar_cor("0x00ff00"))
     grande = {"x": 0, "y": 0, "escala": 20, "rotacao": 0, "opacidade": 1}
-    projeto = projeto_com(cliente, midia_id, transformacao=grande)
+    # Com a vinheta, o zoom alto não vai só no pedaço visível (a vinheta é do clipe inteiro)
+    projeto = projeto_com(cliente, midia_id, transformacao=grande, cor={"vinheta": 0.4})
     clipe_texto = {"id": "t1", "midia_id": None, "texto": {"conteudo": "Oi"}, "inicio": 0, "duracao": 2 * SEGUNDO,
                    "entrada": 0}
     faixa_texto = {"id": "ft", "tipo": "texto", "oculta": False, "muda": False, "travada": False,

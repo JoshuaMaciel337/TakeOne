@@ -25,7 +25,7 @@ from functools import lru_cache
 
 from core.config import FFMPEG
 from core.modelos.midia import chave_da_estabilizacao, chave_do_fluido, chave_do_tom
-from core.utils.animacao import filtros_de_animacao, loop_gira, maior_zoom_do_loop
+from core.utils.animacao import filtros_de_animacao, loop_ativo, loop_gira, maior_zoom_do_loop
 from core.utils.cantos import tem_cantos, tem_mascara
 from core.utils.cor import ajustes_efetivos, cor_neutra, curvas_neutras, hsl_neutro, nome_da_lut, somar_ajustes
 from core.utils.efeitos import (
@@ -49,7 +49,7 @@ from core.utils.efeitos import (
     luz_do_efeito,
 )
 from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
-from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, recorte_na_fonte
+from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, caixa_visivel, recorte_na_fonte
 from core.utils.keyframes import (
     animadas,
     comandos_de_opacidade,
@@ -747,6 +747,25 @@ def base_do_render(clipe: dict) -> dict:
     return base
 
 
+def _grande_demais(caixa: Caixa) -> bool:
+    return max(caixa.largura, caixa.altura) > LADO_MAXIMO_DA_CAIXA or \
+        caixa.largura * caixa.altura > AREA_MAXIMA_DA_CAIXA
+
+
+def _recorta_ao_visivel(clipe: dict, leitura) -> bool:
+    """
+    Se o clipe pode ir ao render só no pedaço que aparece: parado no quadro (sem keyframes, tremido, animação, loop
+    nem transição) e sem nada que dependa do tamanho dele (efeito, vinheta, cantos, máscara, contorno ou sombra).
+    """
+    animacao = clipe.get("animacao") or {}
+    parado = not animadas(clipe) and not loop_ativo(animacao.get("loop")) and \
+        all((animacao.get(lado) or {}).get("tipo", "nenhuma") == "nenhuma" for lado in ("entrada", "saida")) and \
+        not (leitura and leitura.efeitos)
+    vinheta = ajustes_efetivos(clipe.get("cor"))["vinheta"] > 0
+    return parado and not clipe.get("texto") and not clipe.get("efeito") and not vinheta and \
+        not tem_cantos(clipe) and not tem_silhueta(clipe)
+
+
 def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[str, str] | None = None,
                   igualar_db: float = 0, reverb: tuple[int, str] | None = None,
                   andamento: tuple[str, list[str]] | None = None, antes: float = 0, depois: float = 0,
@@ -1057,8 +1076,14 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                 continue
             midia_tamanho = (midia.largura, midia.altura)
             caixa = caixa_do_clipe(base_do_render(clipe), clipe["recorte"], midia_tamanho, quadro)
-        if max(caixa.largura, caixa.altura) > LADO_MAXIMO_DA_CAIXA or \
-                caixa.largura * caixa.altura > AREA_MAXIMA_DA_CAIXA:
+        if _grande_demais(caixa) and _recorta_ao_visivel(clipe, leituras.get(clipe["id"])):
+            # Ampliado demais (o quadro inteiro de um zoom de 2000% passaria dos limites do FFmpeg): só o pedaço que
+            # cai no quadro vai para a cadeia, com o mesmo desenho
+            visivel = caixa_visivel(caixa, clipe["recorte"], quadro)
+            if visivel:
+                caixa, recorte = visivel
+                clipe = {**clipe, "recorte": recorte}
+        if _grande_demais(caixa):
             raise ErroRender(f"Um clipe ficou grande demais para exportar em {largura} × {altura} (zoom de "
                              f"{round(base_do_render(clipe)['escala'] * 100)}%). Diminua a escala dele ou exporte "
                              f"numa resolução menor.")

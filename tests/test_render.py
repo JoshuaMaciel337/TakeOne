@@ -619,11 +619,17 @@ def test_voz_limpa_entra_no_lugar_do_som_original():
         planejar_render(sem_voz, MIDIAS, 1080, 1920)
 
 
-def test_zoom_alto_demais_para_antes_com_uma_mensagem():
-    # A 2000% num 1080p a caixa teria 38400 × 21600 e o FFmpeg recusaria o quadro (erro -22)
-    grande = clipe("c1", "deitado", 0, 4, transformacao={"x": 0, "y": 0, "escala": 20, "rotacao": 0, "opacidade": 1})
+def test_zoom_alto_demais_vai_so_no_pedaco_visivel_ou_para_com_uma_mensagem():
+    # A 2000% num 1080p a caixa teria 38400 × 21600 e o FFmpeg recusaria o quadro (erro -22): parado, só o pedaço
+    # que cai no quadro vai para a cadeia (um vigésimo da mídia, numa caixa do tamanho do quadro e da folga)
+    zoom = {"x": 0, "y": 0, "escala": 20, "rotacao": 0, "opacidade": 1}
+    grande = clipe("c1", "deitado", 0, 4, transformacao=zoom)
+    plano = planejar_render({**projeto([faixa("principal", [grande])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080)
+    assert "scale=1924:1084" in plano.filtro and "crop=w=iw*0.050104" in plano.filtro
+    # Com um efeito que depende do tamanho do clipe (aqui a vinheta), a conta não fecha: para com uma mensagem
+    com_vinheta = clipe("c1", "deitado", 0, 4, transformacao=zoom, cor={"vinheta": 0.4})
     with pytest.raises(ErroRender, match="grande demais"):
-        planejar_render({**projeto([faixa("principal", [grande])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080)
+        planejar_render({**projeto([faixa("principal", [com_vinheta])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080)
     # 400% num 1080p ainda exporta
     normal = clipe("c1", "deitado", 0, 4, transformacao={"x": 0, "y": 0, "escala": 4, "rotacao": 0, "opacidade": 1})
     assert planejar_render({**projeto([faixa("principal", [normal])]), "proporcao": "16:9"}, MIDIAS, 1920, 1080).filtro
