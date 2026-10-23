@@ -4,7 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
-import { FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO } from "../projeto/transicao.ts";
+import { COLUNAS_DOS_BLOCOS, FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO } from "../projeto/transicao.ts";
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
@@ -261,6 +261,14 @@ float campoDaTransicao(vec2 local, vec2 tamanho) {
   if (u_transicao == 2) return length(d) / (0.5 * length(tamanho));
   if (u_transicao == 3) return (abs(d.x) + abs(d.y)) / (0.5 * (tamanho.x + tamanho.y));
   if (u_transicao == 4) return fract(local.y * FAIXAS_DAS_PERSIANAS);
+  if (u_transicao == 6) {
+    // Blocos: o valor sorteado do bloco, em inteiros como valorDoBloco (lib/projeto/transicao.ts)
+    uint linhas = uint(max(1.0, floor(${COLUNAS_DOS_BLOCOS}.0 * tamanho.y / tamanho.x + 0.5)));
+    uint coluna = min(uint(floor(local.x * ${COLUNAS_DOS_BLOCOS}.0)), ${COLUNAS_DOS_BLOCOS - 1}u);
+    uint linha = min(uint(floor(local.y * float(linhas))), linhas - 1u);
+    uint n = linha * ${COLUNAS_DOS_BLOCOS}u + coluna;
+    return float((n * n * 631u + n * 313u + 17u) % 1009u) / 1009.0;
+  }
   return (local.x * tamanho.x + local.y * tamanho.y) / (tamanho.x + tamanho.y);
 }
 // Zoom (1) e giro (2): a média de AMOSTRAS cópias, como o mix do render; pixelizar: a média de cada célula

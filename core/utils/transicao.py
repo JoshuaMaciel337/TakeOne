@@ -17,7 +17,8 @@ ZOOM_TRANSICAO = 0.6
 DESFOQUE_TRANSICAO = 0.03
 CORTINAS = ("cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima")
 # Transições de máscara (transicao.ts): o campo de cada tipo, a borda suave e as faixas das persianas
-MASCARAS = ("relogio", "iris", "losango", "persianas", "diagonal")
+MASCARAS = ("relogio", "iris", "losango", "persianas", "diagonal", "blocos")
+COLUNAS_DOS_BLOCOS = 12
 SUAVIDADE_DA_TRANSICAO = 0.04
 FAIXAS_DAS_PERSIANAS = 8
 REVELADO_INTEIRO = {"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0}
@@ -130,6 +131,15 @@ def revelado_na_transicao(efeitos: list[dict], t: float) -> dict:
     return revelado
 
 
+def valor_do_bloco(n: int) -> float:
+    """O valor sorteado do bloco n (valorDoBloco): conta de inteiros pequenos, exata no geq e no shader."""
+    return ((n * n * 631 + n * 313 + 17) % 1009) / 1009
+
+
+def linhas_dos_blocos(largura: float, altura: float) -> int:
+    return max(1, math.floor(COLUNAS_DOS_BLOCOS * altura / largura + 0.5))
+
+
 def campo_da_transicao(tipo: str, x: float, y: float, largura: float, altura: float) -> float:
     """O campo do tipo no ponto (x, y) do clipe, em frações (campoDaTransicao)."""
     dx, dy = (x - 0.5) * largura, (y - 0.5) * altura
@@ -143,6 +153,11 @@ def campo_da_transicao(tipo: str, x: float, y: float, largura: float, altura: fl
     if tipo == "persianas":
         faixa = y * FAIXAS_DAS_PERSIANAS
         return faixa - math.floor(faixa)
+    if tipo == "blocos":
+        linhas = linhas_dos_blocos(largura, altura)
+        coluna = min(math.floor(x * COLUNAS_DOS_BLOCOS), COLUNAS_DOS_BLOCOS - 1)
+        linha = min(math.floor(y * linhas), linhas - 1)
+        return valor_do_bloco(linha * COLUNAS_DOS_BLOCOS + coluna)
     return (x * largura + y * altura) / (largura + altura)
 
 
@@ -161,6 +176,11 @@ def _campo_no_geq(tipo: str) -> str:
         return f"(abs({dx})+abs({dy}))/(0.5*(W+H))"
     if tipo == "persianas":
         return f"mod((Y+0.5)/H*{FAIXAS_DAS_PERSIANAS},1)"
+    if tipo == "blocos":
+        c = COLUNAS_DOS_BLOCOS
+        linhas = f"max(1,floor({c}*H/W+0.5))"
+        n = f"(min(floor((Y+0.5)/H*{linhas}),{linhas}-1)*{c}+min(floor((X+0.5)/W*{c}),{c - 1}))"
+        return f"mod({n}*{n}*631+{n}*313+17,1009)/1009"
     return "((X+0.5)+(Y+0.5))/(W+H)"
 
 

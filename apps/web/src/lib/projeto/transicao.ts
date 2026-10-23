@@ -25,7 +25,8 @@ export type TipoTransicao =
   | "iris"
   | "losango"
   | "persianas"
-  | "diagonal";
+  | "diagonal"
+  | "blocos";
 /** `misturar_som`: os dois sons se cruzam na janela (janelasDoSom); sem ela, cada clipe soa só entre o começo e o fim dele. */
 export type Transicao = { tipo: TipoTransicao; duracao: Tick; misturar_som?: boolean };
 
@@ -45,6 +46,7 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "losango", nome: "Losango", descricao: "Um losango abre do meio e mostra o próximo" },
   { id: "persianas", nome: "Persianas", descricao: "O próximo aparece em faixas, como uma persiana" },
   { id: "diagonal", nome: "Diagonal", descricao: "O próximo é revelado do canto de cima para o de baixo" },
+  { id: "blocos", nome: "Blocos", descricao: "O próximo aparece em blocos, numa ordem sorteada" },
 ];
 
 /**
@@ -52,11 +54,25 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
  * de 0 a 1 sobre o clipe (em pixels, para o círculo ser redondo), e o que fica abaixo do limiar aparece. A mesma
  * conta em core/utils/transicao.py, que vira um geq do alfa no render (casos em tests/casos/transicao.json).
  */
-export const MASCARAS_DE_TRANSICAO = ["relogio", "iris", "losango", "persianas", "diagonal"] as const;
+export const MASCARAS_DE_TRANSICAO = ["relogio", "iris", "losango", "persianas", "diagonal", "blocos"] as const;
 export type MascaraDeTransicao = (typeof MASCARAS_DE_TRANSICAO)[number];
 /** A largura da borda suave, em frações do campo. */
 export const SUAVIDADE_DA_TRANSICAO = 0.04;
 export const FAIXAS_DAS_PERSIANAS = 8;
+/** Blocos: 12 colunas, e as linhas que deixam os blocos quase quadrados no clipe. */
+export const COLUNAS_DOS_BLOCOS = 12;
+
+/**
+ * O valor sorteado do bloco n, de 0 a 1: (n² × 631 + n × 313 + 17) mod 1009. É conta de inteiros pequenos, exata em
+ * double (o geq do render), em uint (o shader) e aqui; e não forma o desenho em grade de um sorteio linear.
+ */
+export function valorDoBloco(n: number): number {
+  return ((n * n * 631 + n * 313 + 17) % 1009) / 1009;
+}
+
+export function linhasDosBlocos(largura: number, altura: number): number {
+  return Math.max(1, Math.floor((COLUNAS_DOS_BLOCOS * altura) / largura + 0.5));
+}
 
 /** O campo do tipo no ponto (x, y) do clipe (frações de 0 a 1, pelo centro do pixel), num clipe largura × altura. */
 export function campoDaTransicao(tipo: MascaraDeTransicao, x: number, y: number, largura: number, altura: number): number {
@@ -71,6 +87,12 @@ export function campoDaTransicao(tipo: MascaraDeTransicao, x: number, y: number,
   if (tipo === "persianas") {
     const faixa = y * FAIXAS_DAS_PERSIANAS;
     return faixa - Math.floor(faixa);
+  }
+  if (tipo === "blocos") {
+    const linhas = linhasDosBlocos(largura, altura);
+    const coluna = Math.min(Math.floor(x * COLUNAS_DOS_BLOCOS), COLUNAS_DOS_BLOCOS - 1);
+    const linha = Math.min(Math.floor(y * linhas), linhas - 1);
+    return valorDoBloco(linha * COLUNAS_DOS_BLOCOS + coluna);
   }
   return (x * largura + y * altura) / (largura + altura);
 }
