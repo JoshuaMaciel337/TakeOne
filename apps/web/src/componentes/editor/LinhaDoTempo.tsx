@@ -36,6 +36,8 @@ import { acharClipe, type Clipe, CORES_DOS_MARCADORES, type Faixa, faixaDeTexto,
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
 import { formatarTimecodeLongo, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+
+import type { IdFerramentaDaLinha } from "./ferramentasDaLinha";
 import type { Midia } from "@/lib/tipos";
 
 import { MarcasDoRitmo } from "./NoRitmo";
@@ -59,6 +61,10 @@ type Props = {
   profissional?: boolean;
   /** O zoom pedido de fora (os menus): multiplica o atual; `vez` muda a cada pedido. */
   pedidoDeZoom?: { fator: number; vez: number };
+  /** A ferramenta da coluna de ferramentas (só no layout profissional); sem ela, a Seleção. */
+  ferramenta?: IdFerramentaDaLinha;
+  /** A entrada e a saída da sequência (I e O), marcadas na régua. */
+  entradaSaida?: { entrada: Tick | null; saida: Tick | null };
   className?: string;
   style?: React.CSSProperties;
 };
@@ -117,7 +123,7 @@ type Arrasto =
       comando: Comando | null;
       guia: Tick | null;
     }
-  | { tipo: "aparar"; clipe: Clipe; borda: "inicio" | "fim"; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
+  | { tipo: "aparar"; clipe: Clipe; borda: "inicio" | "fim"; jeito: "aparar" | "ondulacao" | "esticar"; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   // Alt + arrastar: o conteúdo do clipe (slip) ou o corte entre dois clipes encostados (roll), com o da esquerda
   | { tipo: "deslizar"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "corte"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
@@ -129,6 +135,20 @@ export function codigoDaFaixa(faixa: Faixa, projeto: Projeto): string {
   const imagem = projeto.faixas.filter((item) => item.tipo !== "audio");
   return `V${imagem.length - imagem.indexOf(faixa)}`;
 }
+
+/** O ponteiro de cada ferramenta (a Seleção usa o de cada parte do clipe). */
+const CURSOR_DA_FERRAMENTA: Record<IdFerramentaDaLinha, string | undefined> = {
+  selecao: undefined,
+  faixaAdiante: "e-resize",
+  ondulacao: undefined,
+  continua: undefined,
+  velocidade: undefined,
+  navalha: "crosshair",
+  deslizar: "ew-resize",
+  mao: "grab",
+  zoom: "zoom-in",
+  texto: undefined,
+};
 
 export function nomeDaFaixa(faixa: Faixa, projeto: Projeto): string {
   if (faixa.tipo === "principal") return "Principal";
@@ -154,6 +174,8 @@ export function LinhaDoTempo({
   aoCongelar,
   profissional = false,
   pedidoDeZoom,
+  ferramenta = "selecao",
+  entradaSaida,
   className = "",
   style,
 }: Props) {
@@ -171,6 +193,7 @@ export function LinhaDoTempo({
   const arrastoAtual = useRef<Arrasto | null>(null);
   const buscandoNaRegua = useRef(false);
   const [marcadorAberto, setMarcadorAberto] = useState<string | null>(null);
+  const andandoComAMao = useRef<{ x: number; rolagem: number } | null>(null);
 
   function trocarArrasto(novo: Arrasto | null) {
     arrastoAtual.current = novo;
@@ -283,7 +306,22 @@ export function LinhaDoTempo({
   // -----------------------------------------------
   function aoApertarClipe(evento: React.PointerEvent, clipe: Clipe, faixa: Faixa, borda?: "inicio" | "fim") {
     if (evento.button !== 0) return;
+    // A Mão e o Zoom agem na linha do tempo inteira, também em cima dos clipes
+    if (ferramenta === "mao" || ferramenta === "zoom") return;
     evento.stopPropagation();
+    if (ferramenta === "navalha") {
+      const t = Math.min(Math.max(tempoNoPonteiro(evento), clipe.inicio), fimDoClipe(clipe));
+      const ids = evento.shiftKey
+        ? exibido.faixas.filter((item) => !item.travada).flatMap((item) => item.clipes.filter((c) => c.inicio < t && t < fimDoClipe(c)).map((c) => c.id))
+        : [clipe.id];
+      aoExecutar({ comando: "linha.dividir", parametros: { tempo: t, clipeIds: ids } });
+      return;
+    }
+    if (ferramenta === "faixaAdiante") {
+      const faixas = evento.shiftKey ? exibido.faixas : [faixa];
+      aoSelecionar(faixas.flatMap((item) => item.clipes.filter((c) => c.inicio >= clipe.inicio).map((c) => c.id)));
+      return;
+    }
     const multiplo = evento.shiftKey || evento.ctrlKey || evento.metaKey;
     if (multiplo) {
       aoSelecionar(selecao.includes(clipe.id) ? selecao.filter((id) => id !== clipe.id) : [...selecao, clipe.id]);
@@ -292,7 +330,9 @@ export function LinhaDoTempo({
     if (!selecao.includes(clipe.id) || borda) aoSelecionar([clipe.id]);
     if (faixa.travada) return;
     evento.preventDefault();
-    if (evento.altKey) {
+    // A Edição contínua (N) e o Deslizar (Y) são o Alt + arrastar da Seleção
+    const alt = evento.altKey || (ferramenta === "continua" && Boolean(borda)) || (ferramenta === "deslizar" && !borda);
+    if (alt) {
       // O vizinho encostado do lado da borda: o corte entre os dois anda (o da esquerda guarda o corte)
       const vizinho = borda === "fim" ? faixa.clipes.find((item) => item.inicio === fimDoClipe(clipe)) : borda === "inicio" ? faixa.clipes.find((item) => fimDoClipe(item) === clipe.inicio) : undefined;
       if (vizinho) {
@@ -307,7 +347,7 @@ export function LinhaDoTempo({
     }
     trocarArrasto(
       borda
-        ? { tipo: "aparar", clipe, borda, x0: evento.clientX, ativo: false, comando: null, guia: null }
+        ? { tipo: "aparar", clipe, borda, jeito: ferramenta === "ondulacao" ? "ondulacao" : ferramenta === "velocidade" ? "esticar" : "aparar", x0: evento.clientX, ativo: false, comando: null, guia: null }
         : { tipo: "mover", clipe, faixaId: faixa.id, x0: evento.clientX, y0: evento.clientY, ativo: false, comando: null, guia: null },
     );
   }
@@ -345,7 +385,8 @@ export function LinhaDoTempo({
         const ponto = pontoMaisProximo(alvo, pontosDeEncaixe(projeto, tempo, new Set([clipe.id])), tolerancia);
         if (ponto !== null) alvo = guia = ponto;
       }
-      trocarArrasto({ ...atual, ativo: true, guia, comando: { comando: "clipe.aparar", parametros: { clipeId: clipe.id, borda, tempo: alvo } } });
+      const nome = atual.jeito === "ondulacao" ? "clipe.apararEmOndulacao" : atual.jeito === "esticar" ? "clipe.esticar" : "clipe.aparar";
+      trocarArrasto({ ...atual, ativo: true, guia, comando: { comando: nome, parametros: { clipeId: clipe.id, borda, tempo: alvo } } });
     }
   });
 
@@ -441,7 +482,7 @@ export function LinhaDoTempo({
           className="botao-icone"
           disabled={!clipeSobCursor}
           onClick={() => aoExecutar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecao } })}
-          title="Dividir no cursor (S ou Ctrl+B)"
+          title="Dividir no cursor (Ctrl+K)"
           aria-label="Dividir no cursor"
         >
           <Scissors className="size-4" aria-hidden />
@@ -461,7 +502,7 @@ export function LinhaDoTempo({
           className="botao-icone"
           disabled={!algumSelecionado}
           onClick={() => aoExecutar({ comando: "clipe.duplicar", parametros: { clipeIds: selecao } })}
-          title="Duplicar (Ctrl+D)"
+          title="Duplicar (Ctrl+Shift+/)"
           aria-label="Duplicar os clipes escolhidos"
         >
           <Copy className="size-4" aria-hidden />
@@ -512,7 +553,7 @@ export function LinhaDoTempo({
           className={`botao-icone ${ima ? "text-destaque" : ""}`}
           onClick={aoAlternarIma}
           aria-pressed={ima}
-          title={ima ? "Ímã ligado: os clipes grudam uns nos outros (N)" : "Ímã desligado (N)"}
+          title={ima ? "Ímã ligado: os clipes grudam uns nos outros (S)" : "Ímã desligado (S)"}
           aria-label="Ímã"
         >
           <Magnet className="size-4" aria-hidden />
@@ -584,6 +625,14 @@ export function LinhaDoTempo({
               }}
               title="Clique ou arraste para mover o cursor"
             >
+              {entradaSaida && (entradaSaida.entrada !== null || entradaSaida.saida !== null) ? (
+                <span
+                  className="pointer-events-none absolute inset-y-0 border-x-2 border-codigo bg-codigo/20"
+                  style={{ left: px(entradaSaida.entrada ?? 0), width: Math.max(2, px((entradaSaida.saida ?? exibido.duracao) - (entradaSaida.entrada ?? 0))) }}
+                  title="Entre a entrada e a saída"
+                  aria-hidden
+                />
+              ) : null}
               {marcas.map((segundo) => (
                 <span
                   key={segundo}
@@ -616,12 +665,36 @@ export function LinhaDoTempo({
             <div
               ref={area}
               className="relative"
-              style={{ height: layout.altura }}
               onPointerDown={(evento) => {
                 if (evento.button !== 0) return;
+                if (ferramenta === "mao" && rolagem.current) {
+                  evento.currentTarget.setPointerCapture(evento.pointerId);
+                  andandoComAMao.current = { x: evento.clientX, rolagem: rolagem.current.scrollLeft };
+                  return;
+                }
+                if (ferramenta === "zoom" && rolagem.current) {
+                  // O instante sob o ponteiro fica no mesmo lugar da tela
+                  const t = tempoNoPonteiro(evento);
+                  const naTela = evento.clientX - rolagem.current.getBoundingClientRect().left - larguraRotulos;
+                  const novo = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, evento.altKey ? zoom / 1.5 : zoom * 1.5));
+                  setZoom(novo);
+                  const elemento = rolagem.current;
+                  requestAnimationFrame(() => {
+                    elemento.scrollLeft = (t / TICKS_POR_SEGUNDO) * novo - naTela;
+                  });
+                  return;
+                }
                 aoSelecionar([]);
                 aoBuscar(Math.min(tempoNoPonteiro(evento), exibido.duracao));
               }}
+              onPointerMove={(evento) => {
+                const mao = andandoComAMao.current;
+                if (mao && rolagem.current) rolagem.current.scrollLeft = mao.rolagem - (evento.clientX - mao.x);
+              }}
+              onPointerUp={() => {
+                andandoComAMao.current = null;
+              }}
+              style={{ height: layout.altura, cursor: CURSOR_DA_FERRAMENTA[ferramenta] }}
               onDragOver={aoPassarArrastando}
               onDragLeave={aoSairArrastando}
               onDrop={aoSoltar}
@@ -648,6 +721,7 @@ export function LinhaDoTempo({
                       largura={Math.max(2, px(clipe.duracao))}
                       altura={altura}
                       selecionado={selecao.includes(clipe.id)}
+                      cursor={CURSOR_DA_FERRAMENTA[ferramenta]}
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                     />
                   ))}
@@ -778,6 +852,7 @@ function BlocoDoClipe({
   largura,
   altura,
   selecionado,
+  cursor,
   aoApertar,
 }: {
   clipe: Clipe;
@@ -788,6 +863,7 @@ function BlocoDoClipe({
   largura: number;
   altura: number;
   selecionado: boolean;
+  cursor?: string;
   aoApertar: (evento: React.PointerEvent, borda?: "inicio" | "fim") => void;
 }) {
   const audio = faixa.tipo === "audio";
@@ -810,7 +886,7 @@ function BlocoDoClipe({
       } ${selecionado ? "z-10 outline outline-2 -outline-offset-1 outline-white" : ""} ${faixa.travada ? "cursor-not-allowed opacity-70" : "cursor-grab active:cursor-grabbing"} ${
         faixa.oculta || faixa.muda ? "opacity-50" : ""
       }`}
-      style={{ left: esquerda, width: largura, height: alturaInterna }}
+      style={{ left: esquerda, width: largura, height: alturaInterna, cursor }}
       onPointerDown={(evento) => aoApertar(evento)}
       title={nome}
     >

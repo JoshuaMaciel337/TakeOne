@@ -19,6 +19,9 @@ import {
   alternarFaixa,
   apagarClipes,
   apararClipe,
+  apararEmOndulacao,
+  elevarTrecho,
+  esticarClipe,
   aplicarEfeito,
   colarAjustes,
   congelarQuadro,
@@ -1276,4 +1279,45 @@ test("marcadores: pôr no quadro do cursor, mudar, apagar e virar capítulos", (
   projeto = apagarMarcador(projeto, um.id);
   assert.equal(projeto.marcadores?.length, 1);
   assert.throws(() => mudarMarcador(projeto, um.id, { nome: "x" }), ErroEdicao);
+});
+
+test("ondulação, esticar a velocidade e elevar, como as ferramentas dos editores profissionais", () => {
+  const ctx = contexto();
+  let { projeto } = adicionarClipe(vazio(), ctx, "video10");
+  ({ projeto } = adicionarClipe(projeto, ctx, "musica", { inicio: 0 }));
+  const somDe = (p: Projeto) => p.faixas.find((f) => f.tipo === "audio")!;
+  const a = somDe(projeto).clipes[0].id;
+  projeto = apararClipe(projeto, ctx, a, "fim", 4 * S);
+  ({ projeto } = adicionarClipe(projeto, ctx, "musica", { inicio: 4 * S, faixaId: somDe(projeto).id }));
+  const b = somDe(projeto).clipes.find((c) => c.id !== a)!.id;
+  const pos = (p: Projeto) => somDe(p).clipes.map((c) => [c.id, c.inicio / S, c.duracao / S, c.entrada / S, c.velocidade]);
+
+  // Ondulação pelo fim: o seguinte anda junto, sem sobrepor
+  projeto = apararEmOndulacao(projeto, ctx, a, "fim", 6 * S);
+  assert.deepEqual(pos(projeto), [[a, 0, 6, 0, 1], [b, 6, 30, 0, 1]]);
+  // Pelo começo: o clipe fica no lugar, perde o primeiro segundo, e o seguinte volta
+  projeto = apararEmOndulacao(projeto, ctx, a, "inicio", 1 * S);
+  assert.deepEqual(pos(projeto), [[a, 0, 5, 1, 1], [b, 5, 30, 0, 1]]);
+  conferir(projeto);
+
+  // Esticar pelo fim muda a velocidade; passar por cima do vizinho não pode
+  assert.throws(() => esticarClipe(projeto, ctx, a, "fim", 10 * S), ErroEdicao);
+  projeto = esticarClipe(projeto, ctx, b, "fim", 20 * S);
+  assert.deepEqual(pos(projeto)[1], [b, 5, 15, 0, 2]);
+  // Pelo começo, o fim fica no lugar
+  projeto = esticarClipe(projeto, ctx, b, "inicio", 10 * S);
+  assert.deepEqual(pos(projeto)[1], [b, 10, 10, 0, 3]);
+  assert.throws(() => esticarClipe(projeto, ctx, b, "inicio", 2 * S), ErroEdicao);
+  conferir(projeto);
+
+  // Elevar de 2 s a 3 s: o som vira dois pedaços com o espaço no meio; a principal não muda
+  const antes = principal(projeto).map((c) => [c.inicio, c.duracao]);
+  projeto = elevarTrecho(projeto, ctx, { inicio: 2 * S, fim: 3 * S });
+  assert.deepEqual(
+    somDe(projeto).clipes.map((c) => [c.inicio / S, c.duracao / S]),
+    [[0, 2], [3, 2], [10, 10]],
+  );
+  assert.deepEqual(principal(projeto).map((c) => [c.inicio, c.duracao]), antes);
+  assert.throws(() => elevarTrecho(projeto, ctx, { inicio: 2 * S, fim: 3 * S }), ErroEdicao);
+  conferir(projeto);
 });

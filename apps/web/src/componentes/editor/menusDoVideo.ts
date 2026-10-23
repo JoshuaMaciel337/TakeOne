@@ -1,5 +1,5 @@
-// Os menus do editor de vídeo (ADR 0002), na ordem e com os nomes dos editores de vídeo profissionais. Os atalhos
-// são os que o editor já atende (a troca pelos atalhos de lá vem com as ferramentas da linha do tempo, na 12.5).
+// Os menus do editor de vídeo (ADR 0002), na ordem, com os nomes e com os atalhos dos editores de vídeo profissionais.
+// Os atalhos de uma tecla são atendidos pelo teclado do editor; aqui eles aparecem para quem procura.
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
 
 /** Os painéis do editor de vídeo, com o nome do menu Janela (em ordem alfabética, como lá). */
@@ -47,6 +47,14 @@ export type AcoesDoVideo = {
   limpar: () => void;
   excluirEmOndulacao: () => void;
   duplicar: () => void;
+  /** Há entrada ou saída marcada (elevar e extrair valem). */
+  temTrecho: boolean;
+  marcarEntradaSaida: (qual: "entrada" | "saida") => void;
+  irParaEntradaSaida: (qual: "entrada" | "saida") => void;
+  limparEntradaSaida: () => void;
+  elevar: () => void;
+  extrair: () => void;
+  transicaoPadrao: (doSom: boolean) => void;
   selecionarTudo: () => void;
   desmarcarTudo: () => void;
   atalhos: () => void;
@@ -105,7 +113,7 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
         "-",
         { nome: "Limpar", atalho: "Delete", desativado: semSelecao, aoEscolher: a.limpar },
         { nome: "Exclusão em ondulação", atalho: "Shift+Delete", desativado: semSelecao, aoEscolher: a.excluirEmOndulacao },
-        { nome: "Duplicar", atalho: "Ctrl+D", desativado: semSelecao, aoEscolher: a.duplicar },
+        { nome: "Duplicar", atalho: "Ctrl+Shift+/", desativado: semSelecao, aoEscolher: a.duplicar },
         "-",
         { nome: "Selecionar tudo", atalho: "Ctrl+A", aoEscolher: a.selecionarTudo },
         { nome: "Desmarcar tudo", atalho: "Ctrl+Shift+A", aoEscolher: a.desmarcarTudo },
@@ -127,9 +135,15 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
       itens: [
         { nome: "Configurações da sequência…", aoEscolher: a.configuracoes },
         "-",
-        { nome: "Adicionar edição", atalho: "Ctrl+K ou Ctrl+B", aoEscolher: a.dividir },
+        { nome: "Adicionar edição", atalho: "Ctrl+K", aoEscolher: a.dividir },
         "-",
-        { nome: "Encaixar na linha do tempo", atalho: "N", marcado: a.ima, aoEscolher: a.alternarIma },
+        { nome: "Elevar", atalho: ";", desativado: !a.temTrecho, aoEscolher: a.elevar, titulo: "Tira o trecho entre a entrada e a saída e deixa o espaço" },
+        { nome: "Extrair", atalho: "'", desativado: !a.temTrecho, aoEscolher: a.extrair, titulo: "Tira o trecho entre a entrada e a saída e fecha o espaço" },
+        "-",
+        { nome: "Aplicar transição de vídeo", atalho: "Ctrl+D", aoEscolher: () => a.transicaoPadrao(false) },
+        { nome: "Aplicar transição de áudio", atalho: "Ctrl+Shift+D", aoEscolher: () => a.transicaoPadrao(true) },
+        "-",
+        { nome: "Encaixar na linha do tempo", atalho: "S", marcado: a.ima, aoEscolher: a.alternarIma },
         "-",
         { nome: "Criar automaticamente…", aoEscolher: a.criarAutomaticamente, titulo: "Transcreve, corta pausas e retakes, cria legendas, títulos e zooms" },
         { nome: "Legendas…", aoEscolher: a.legendas },
@@ -138,9 +152,15 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
     {
       nome: "Marcadores",
       itens: [
+        { nome: "Marcar entrada", atalho: "I", aoEscolher: () => a.marcarEntradaSaida("entrada") },
+        { nome: "Marcar saída", atalho: "O", aoEscolher: () => a.marcarEntradaSaida("saida") },
+        { nome: "Ir para a entrada", atalho: "Shift+I", aoEscolher: () => a.irParaEntradaSaida("entrada") },
+        { nome: "Ir para a saída", atalho: "Shift+O", aoEscolher: () => a.irParaEntradaSaida("saida") },
+        { nome: "Limpar entrada e saída", atalho: "Ctrl+Shift+X", desativado: !a.temTrecho, aoEscolher: a.limparEntradaSaida },
+        "-",
         { nome: "Adicionar marcador", atalho: "M", aoEscolher: a.marcador },
-        { nome: "Ir para o próximo marcador", atalho: "Shift+↓", desativado: !a.temMarcadores, aoEscolher: () => a.marcadorVizinho(1) },
-        { nome: "Ir para o marcador anterior", atalho: "Shift+↑", desativado: !a.temMarcadores, aoEscolher: () => a.marcadorVizinho(-1) },
+        { nome: "Ir para o próximo marcador", atalho: "Shift+M", desativado: !a.temMarcadores, aoEscolher: () => a.marcadorVizinho(1) },
+        { nome: "Ir para o marcador anterior", atalho: "Ctrl+Shift+M", desativado: !a.temMarcadores, aoEscolher: () => a.marcadorVizinho(-1) },
         "-",
         { nome: "Limpar todos os marcadores", atalho: "Ctrl+Alt+Shift+M", desativado: !a.temMarcadores, aoEscolher: a.limparMarcadores },
         "-",

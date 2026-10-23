@@ -727,6 +727,47 @@ export function apararClipe(projeto: Projeto, ctx: Contexto, clipeId: string, bo
 }
 
 /**
+ * Edição em ondulação (a ferramenta B dos editores profissionais): apara a borda e os clipes seguintes da mesma faixa
+ * andam junto, sem deixar espaço nem passar por cima. Pelo começo, o clipe fica onde estava e o que vem depois anda.
+ * Na principal, que é magnética, aparar já é assim.
+ */
+export function apararEmOndulacao(projeto: Projeto, ctx: Contexto, clipeId: string, borda: "inicio" | "fim", tempo: Tick): Projeto {
+  const { faixa, clipe } = acharOuErro(projeto, clipeId);
+  if (faixa.tipo === "principal") return apararClipe(projeto, ctx, clipeId, borda, tempo);
+  exigirDestravada(faixa);
+  const fim = fimDoClipe(clipe);
+  const seguintes = faixa.clipes.filter((item) => item.id !== clipe.id && item.inicio >= fim);
+  // Sem os seguintes, a borda pode passar de onde eles estavam; depois eles voltam empurrados
+  const semSeguintes = trocarFaixa(projeto, { ...faixa, clipes: faixa.clipes.filter((item) => !seguintes.includes(item)) });
+  const aparado = acharOuErro(apararClipe(semSeguintes, ctx, clipeId, borda, tempo), clipeId).clipe;
+  // Pelo começo, o clipe volta para onde começava (o conteúdo anda com ele)
+  const novo = borda === "inicio" ? { ...aparado, inicio: clipe.inicio } : aparado;
+  const delta = novo.duracao - clipe.duracao;
+  const clipes = ordenar([...faixa.clipes.filter((item) => item.id !== clipe.id && !seguintes.includes(item)), novo, ...seguintes.map((item) => ({ ...item, inicio: item.inicio + delta }))]);
+  return finalizar(trocarFaixa(projeto, { ...faixa, clipes }));
+}
+
+/**
+ * Esticar a velocidade (a ferramenta R): puxar a borda muda a velocidade em vez do trecho da mídia, para o mesmo
+ * trecho caber na nova duração. Pela borda do começo, o fim fica no lugar (fora da principal).
+ */
+export function esticarClipe(projeto: Projeto, ctx: Contexto, clipeId: string, borda: "inicio" | "fim", tempo: Tick): Projeto {
+  const { faixa, clipe } = acharOuErro(projeto, clipeId);
+  if (infoDoClipe(ctx, clipe, faixa).imagem) throw new ErroEdicao("Imagens não têm velocidade: apare a borda para mudar a duração.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const alvo = quadroMaisProximo(projeto.taxa, tempo);
+  const fim = fimDoClipe(clipe);
+  const duracao = Math.max(quadro, borda === "fim" ? alvo - clipe.inicio : fim - alvo);
+  const esticado = mudarVelocidade(projeto, clipeId, (clipe.velocidade * clipe.duracao) / duracao);
+  if (borda === "fim" || faixa.tipo === "principal") return esticado;
+  const achado = acharOuErro(esticado, clipeId);
+  const inicio = fim - achado.clipe.duracao;
+  const anterior = [...achado.faixa.clipes].reverse().find((item) => item.id !== clipeId && fimDoClipe(item) <= clipe.inicio);
+  if (inicio < 0 || (anterior && inicio < fimDoClipe(anterior))) throw new ErroEdicao("Mais devagar, o clipe passaria por cima do anterior da faixa.");
+  return finalizar(trocarFaixa(esticado, { ...achado.faixa, clipes: achado.faixa.clipes.map((item) => (item.id === clipeId ? { ...item, inicio } : item)) }));
+}
+
+/**
  * Desliza o conteúdo (slip): o clipe fica no mesmo lugar e com a mesma duração, e o trecho da mídia anda.
  * `deslocamento` é quanto o conteúdo anda para a direita na linha do tempo (positivo mostra o que vinha antes na
  * mídia). Para no que a mídia tem dos dois lados; keyframes, fades e animações ficam onde estão.
@@ -896,14 +937,34 @@ function juntarIntervalos(projeto: Projeto, intervalos: Intervalo[]): Intervalo[
  * transição. É a base da limpeza de fala e da edição pelo texto.
  */
 export function removerIntervalos(projeto: Projeto, ctx: Contexto, intervalos: Intervalo[]): Projeto {
+  return tirarIntervalos(projeto, ctx, intervalos, { fecharEspaco: true, principal: true });
+}
+
+/**
+ * Elevar (a tecla ; dos editores profissionais): tira o trecho entre a entrada e a saída das faixas livres e deixa o
+ * espaço vazio no lugar; nada anda. A principal é magnética (não fica buraco nela), então ela fica como está: para
+ * tirar o trecho dela também, extrair (a tecla ') fecha o espaço em todas as faixas.
+ */
+export function elevarTrecho(projeto: Projeto, ctx: Contexto, intervalo: Intervalo): Projeto {
+  const atingidas = projeto.faixas.some(
+    (faixa) => faixa.tipo !== "principal" && faixa.clipes.some((clipe) => clipe.inicio < intervalo.fim && fimDoClipe(clipe) > intervalo.inicio),
+  );
+  if (!atingidas) throw new ErroEdicao("Fora da principal, não há nada entre a entrada e a saída para elevar.");
+  return tirarIntervalos(projeto, ctx, [intervalo], { fecharEspaco: false, principal: false });
+}
+
+function tirarIntervalos(projeto: Projeto, ctx: Contexto, intervalos: Intervalo[], opcoes: { fecharEspaco: boolean; principal: boolean }): Projeto {
   const cortes = juntarIntervalos(projeto, intervalos);
   if (!cortes.length) throw new ErroEdicao("Não há trechos para remover.");
   const quadro = duracaoDoQuadro(projeto.taxa);
-  /** Quanto foi removido antes do instante `t`. */
-  const removidoAntes = (t: Tick) => cortes.reduce((soma, corte) => soma + Math.max(0, Math.min(t, corte.fim) - corte.inicio), 0);
+  /** Quanto foi removido antes do instante `t` (nada anda quando o espaço fica vazio). */
+  const removidoAntes = (t: Tick) => (opcoes.fecharEspaco ? cortes.reduce((soma, corte) => soma + Math.max(0, Math.min(t, corte.fim) - corte.inicio), 0) : 0);
 
   const faixas = projeto.faixas.map((faixa) => {
-    const atingida = faixa.clipes.some((clipe) => cortes.some((corte) => corte.inicio < fimDoClipe(clipe)));
+    if (!opcoes.principal && faixa.tipo === "principal") return faixa;
+    const atingida = faixa.clipes.some((clipe) =>
+      cortes.some((corte) => corte.inicio < fimDoClipe(clipe) && (opcoes.fecharEspaco || corte.fim > clipe.inicio)),
+    );
     if (!atingida) return faixa;
     exigirDestravada(faixa);
     const clipes: Clipe[] = [];

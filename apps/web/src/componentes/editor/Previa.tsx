@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Camera, ChevronFirst, ChevronLast, Maximize, Pause, Play, SkipBack, SkipForward, SquareDashed, TriangleAlert } from "lucide-react";
+import { ArrowUpFromLine, Bookmark, Camera, ChevronFirst, ChevronLast, FoldHorizontal, Maximize, Pause, Play, SkipBack, SkipForward, SquareDashed, TriangleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
@@ -45,7 +45,18 @@ type Props = {
    * O monitor Programa dos editores profissionais: código de tempo azul, os botões de sempre embaixo (marcador,
    * ir ao começo, quadro anterior, reproduzir, quadro seguinte, ir ao fim, exportar quadro) e a duração à direita.
    */
-  programa?: { aoQuadro: (passo: -1 | 1) => void; aoIr: (onde: "inicio" | "fim") => void; aoMarcador: () => void; aoExportarQuadro: () => void };
+  programa?: {
+    aoQuadro: (passo: -1 | 1) => void;
+    aoIr: (onde: "inicio" | "fim" | "entrada" | "saida") => void;
+    aoMarcador: () => void;
+    aoExportarQuadro: () => void;
+    aoMarcar: (qual: "entrada" | "saida") => void;
+    aoElevar: () => void;
+    aoExtrair: () => void;
+    temTrecho: boolean;
+  };
+  /** A ferramenta Texto: o clique no quadro escreve ali (o centro do texto, em frações do quadro a partir do meio). */
+  aoClicarParaTexto?: (x: number, y: number) => void;
   className?: string;
 };
 
@@ -104,7 +115,7 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, className = "" }: Props) {
+export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, aoClicarParaTexto, className = "" }: Props) {
   // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
   const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao), [projetoDaEdicao]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
@@ -218,6 +229,10 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
     if (evento.button !== 0) return;
     const retangulo = evento.currentTarget.getBoundingClientRect();
     const ponto = { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
+    if (aoClicarParaTexto) {
+      aoClicarParaTexto(ponto.x / retangulo.width - 0.5, ponto.y / retangulo.height - 0.5);
+      return;
+    }
     const acima = [...camadas].reverse().find((camada) => !ehCopiaDesenhada(camada.clipe.id) && camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
     aoSelecionar(acima ? [acima.clipe.id] : []);
   }
@@ -347,7 +362,16 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
             <button type="button" className="botao-icone size-7" onClick={programa.aoMarcador} aria-label="Adicionar marcador" title="Adicionar marcador (M)">
               <Bookmark className="size-4" aria-hidden />
             </button>
+            <button type="button" className="botao-icone size-7 font-mono text-sm" onClick={() => programa.aoMarcar("entrada")} aria-label="Marcar entrada" title="Marcar entrada (I)">
+              {"{"}
+            </button>
+            <button type="button" className="botao-icone size-7 font-mono text-sm" onClick={() => programa.aoMarcar("saida")} aria-label="Marcar saída" title="Marcar saída (O)">
+              {"}"}
+            </button>
             <span className="mx-1 h-4 w-px bg-borda" aria-hidden />
+            <button type="button" className="botao-icone size-7 font-mono text-xs" onClick={() => programa.aoIr("entrada")} aria-label="Ir para a entrada" title="Ir para a entrada (Shift+I)">
+              {"{←"}
+            </button>
             <button type="button" className="botao-icone size-7" onClick={() => programa.aoIr("inicio")} aria-label="Ir para o começo" title="Ir para o começo (Home)">
               <ChevronFirst className="size-4" aria-hidden />
             </button>
@@ -362,6 +386,16 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
             </button>
             <button type="button" className="botao-icone size-7" onClick={() => programa.aoIr("fim")} aria-label="Ir para o fim" title="Ir para o fim (End)">
               <ChevronLast className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-7 font-mono text-xs" onClick={() => programa.aoIr("saida")} aria-label="Ir para a saída" title="Ir para a saída (Shift+O)">
+              {"→}"}
+            </button>
+            <span className="mx-1 h-4 w-px bg-borda" aria-hidden />
+            <button type="button" className="botao-icone size-7" disabled={!programa.temTrecho} onClick={programa.aoElevar} aria-label="Elevar" title="Elevar: tira o trecho entre a entrada e a saída e deixa o espaço (;)">
+              <ArrowUpFromLine className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-7" disabled={!programa.temTrecho} onClick={programa.aoExtrair} aria-label="Extrair" title="Extrair: tira o trecho entre a entrada e a saída e fecha o espaço (')">
+              <FoldHorizontal className="size-4" aria-hidden />
             </button>
             <span className="mx-1 h-4 w-px bg-borda" aria-hidden />
             <button type="button" className="botao-icone size-7" disabled={vazio} onClick={programa.aoExportarQuadro} aria-label="Exportar quadro" title="Exportar quadro (Ctrl+Shift+E)">

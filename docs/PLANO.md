@@ -546,7 +546,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [ ] Depois da 12.2, no editor de imagem: escrever direto na tela com a ferramenta Texto (hoje o texto nasce com "Texto" e muda na aba Texto), as formigas andando em volta da seleção (hoje uma área cinza) e Selecionar > Tudo e Inverter.
   - [x] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
   - [x] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
-  - [ ] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
+  - [x] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
   - [ ] 12.6 Monitor de origem, com Inserir e Sobrescrever.
   - [ ] 12.7 As outras áreas de trabalho e os ajustes finais.
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.

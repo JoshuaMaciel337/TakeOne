@@ -18,6 +18,9 @@ import {
   alternarFaixa,
   apagarClipes,
   apararClipe,
+  apararEmOndulacao,
+  elevarTrecho,
+  esticarClipe,
   type AcaoDeKeyframe,
   type Contexto,
   type DestinoClipe,
@@ -130,6 +133,8 @@ export type Comando =
   | { comando: "clipe.adicionar"; parametros: { midiaId: string } & DestinoClipe }
   | { comando: "clipe.mover"; parametros: { clipeId: string; inicio: Tick } & DestinoClipe }
   | { comando: "clipe.aparar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
+  | { comando: "clipe.apararEmOndulacao"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
+  | { comando: "clipe.esticar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
   | { comando: "imagem.adicionarAjuste"; parametros: Record<string, never> }
@@ -137,6 +142,7 @@ export type Comando =
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
   | { comando: "linha.removerIntervalos"; parametros: { intervalos: Intervalo[] } }
+  | { comando: "linha.elevar"; parametros: { intervalo: Intervalo } }
   | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
@@ -191,7 +197,7 @@ export type Comando =
   | { comando: "clipe.recortar"; parametros: { clipeIds: string[]; recorte: Recorte } }
   | { comando: "clipe.restaurar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.audio"; parametros: { clipeIds: string[] } & MudancaDeAudio }
-  | { comando: "texto.adicionar"; parametros: { inicio: Tick; texto: Texto } }
+  | { comando: "texto.adicionar"; parametros: { inicio: Tick; texto: Texto; transformacao?: Partial<Transformacao> } }
   | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } }
   | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
@@ -220,6 +226,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
   "clipe.mover": "mover clipe",
   "clipe.aparar": "aparar clipe",
+  "clipe.apararEmOndulacao": "aparar em ondulação",
+  "clipe.esticar": "esticar a velocidade",
   "clipe.deslizar": "deslizar o conteúdo",
   "clipe.adicionarAjuste": "pôr a camada de ajuste",
   "imagem.adicionarAjuste": "pôr a camada de ajuste",
@@ -227,6 +235,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
   "linha.removerIntervalos": "remover trechos",
+  "linha.elevar": "elevar o trecho",
   "linha.zoomNosTrechos": "dar zoom nos destaques",
   "clipe.duplicar": "duplicar",
   "clipe.separarSom": "separar o som",
@@ -321,6 +330,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     }
     case "clipe.aparar":
       return { projeto: apararClipe(projeto, ctx, parametros.clipeId, parametros.borda, parametros.tempo) };
+    case "clipe.apararEmOndulacao":
+      return { projeto: apararEmOndulacao(projeto, ctx, parametros.clipeId, parametros.borda, parametros.tempo) };
+    case "clipe.esticar":
+      return { projeto: esticarClipe(projeto, ctx, parametros.clipeId, parametros.borda, parametros.tempo) };
     case "clipe.adicionarAjuste": {
       const resultado = adicionarAjuste(projeto, ctx, parametros.inicio);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
@@ -341,6 +354,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: zoomNosTrechos(projeto, parametros.trechos) };
     case "linha.removerIntervalos":
       return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
+    case "linha.elevar":
+      return { projeto: elevarTrecho(projeto, ctx, parametros.intervalo) };
     case "clipe.apagar":
       return { projeto: apagarClipes(projeto, parametros.clipeIds, parametros.fecharEspaco), selecao: [] };
     case "clipe.duplicar": {
@@ -469,7 +484,9 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: restaurarClipes(projeto, parametros.clipeIds) };
     case "texto.adicionar": {
       const resultado = adicionarTexto(projeto, ctx, parametros.inicio, parametros.texto);
-      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+      // A ferramenta Texto do monitor escreve no ponto do clique: o mesmo passo do desfazer
+      const posto = parametros.transformacao ? transformarClipes(resultado.projeto, [resultado.clipeId], parametros.transformacao) : resultado.projeto;
+      return { projeto: posto, selecao: [resultado.clipeId] };
     }
     case "legenda.adicionar": {
       const resultado = adicionarLegenda(projeto, ctx, parametros.inicio, parametros.estilo);

@@ -23,6 +23,7 @@ import { retomarAudio } from "@/lib/previa/audio";
 import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { TEXTO_PADRAO } from "@/lib/projeto/texto";
+import { duracaoMaximaDaTransicao } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, quadroMaisProximo, type Taxa, type Tick, TICK_MAXIMO, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
@@ -34,6 +35,8 @@ import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
 import { contextoDasMidias } from "./contexto";
 import { ControlesDeEfeito } from "./ControlesDeEfeito";
+import { ColunaDeFerramentas } from "./ColunaDeFerramentas";
+import { FERRAMENTAS_DA_LINHA, type IdFerramentaDaLinha } from "./ferramentasDaLinha";
 import { JanelaAtalhos } from "./JanelaAtalhos";
 import { JanelaColarAjustes } from "./JanelaColarAjustes";
 import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
@@ -247,6 +250,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [pedidoTexto, setPedidoTexto] = useState(doEndereco?.painel === "texto" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const importarRef = useRef<HTMLInputElement>(null);
+  const [ferramentaDaLinha, setFerramentaDaLinha] = useState<IdFerramentaDaLinha>("selecao");
+  const [entradaSaida, setEntradaSaida] = useState<{ entrada: Tick | null; saida: Tick | null }>({ entrada: null, saida: null });
   // O painel da ferramenta do endereço fica à vista (depois de ler a área guardada no navegador)
   const abrirDoEndereco = useEffectEvent(() => {
     if (doEndereco) area.abrir(doEndereco.painel);
@@ -422,6 +427,62 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     }
   }
 
+  /** O trecho entre a entrada e a saída (sem uma delas, do começo ou até o fim); null sem nenhuma ou ao contrário. */
+  function trechoMarcado(): { inicio: Tick; fim: Tick } | null {
+    if (!projeto || (entradaSaida.entrada === null && entradaSaida.saida === null)) return null;
+    const inicio = entradaSaida.entrada ?? 0;
+    const fim = entradaSaida.saida ?? projeto.duracao;
+    return fim > inicio ? { inicio, fim } : null;
+  }
+  function marcarEntradaSaida(qual: "entrada" | "saida") {
+    if (!projeto) return;
+    const t = quadroMaisProximo(projeto.taxa, tempo);
+    // A saída marca o fim do quadro do cursor, como nos editores profissionais
+    setEntradaSaida((atual) => ({ ...atual, [qual]: qual === "saida" ? Math.min(t + duracaoDoQuadro(projeto.taxa), projeto.duracao) : t }));
+  }
+  function irParaEntradaSaida(qual: "entrada" | "saida") {
+    const t = entradaSaida[qual];
+    if (t === null) mostrarAviso(qual === "entrada" ? "Marque a entrada com I." : "Marque a saída com O.");
+    else buscar(qual === "saida" && projeto ? Math.max(0, t - duracaoDoQuadro(projeto.taxa)) : t);
+  }
+  /** Elevar (;) e extrair ('): tiram o trecho entre a entrada e a saída; extrair fecha o espaço em todas as faixas. */
+  function tirarTrecho(fechar: boolean) {
+    const trecho = trechoMarcado();
+    if (!trecho || !projeto) {
+      mostrarAviso("Marque a entrada (I) e a saída (O) antes.");
+      return;
+    }
+    const resultado = fechar
+      ? executar({ comando: "linha.removerIntervalos", parametros: { intervalos: [trecho] } })
+      : executar({ comando: "linha.elevar", parametros: { intervalo: trecho } });
+    if (!resultado) return;
+    setEntradaSaida({ entrada: null, saida: null });
+    if (fechar) buscar(trecho.inicio);
+    const naPrincipal = projeto.faixas.some((faixa) => faixa.tipo === "principal" && faixa.clipes.some((clipe) => clipe.inicio < trecho.fim && fimDoClipe(clipe) > trecho.inicio));
+    if (!fechar && naPrincipal) mostrarAviso("A principal é magnética e ficou como estava: para tirar o trecho dela também, use Extrair (').");
+  }
+  /** Ctrl+D e Ctrl+Shift+D: a transição padrão (fusão de 1 s) nos cortes dos clipes marcados da principal, ou no do cursor. */
+  function transicaoPadrao(doSom: boolean) {
+    if (!projeto) return;
+    const faixa = projeto.faixas.find((item) => item.tipo === "principal");
+    if (!faixa) return;
+    const marcados = faixa.clipes.filter((clipe) => selecaoValida.includes(clipe.id));
+    // Sem clipe marcado, o corte mais perto do cursor
+    const perto = [...faixa.clipes].slice(0, -1).sort((a, b) => Math.abs(fimDoClipe(a) - tempo) - Math.abs(fimDoClipe(b) - tempo))[0];
+    const alvos = (marcados.length ? marcados : perto ? [perto] : []).filter((clipe) => faixa.clipes.indexOf(clipe) < faixa.clipes.length - 1);
+    if (!alvos.length) {
+      mostrarAviso("A transição fica no corte entre dois clipes da principal.");
+      return;
+    }
+    for (const clipe of alvos) {
+      const proximo = faixa.clipes[faixa.clipes.indexOf(clipe) + 1];
+      const duracao = Math.min(TICKS_POR_SEGUNDO, duracaoMaximaDaTransicao(clipe, proximo));
+      const atual = clipe.transicao;
+      const transicao = doSom ? { ...(atual ?? { tipo: "fusao" as const, duracao }), misturar_som: true } : { tipo: "fusao" as const, duracao, misturar_som: Boolean(atual?.misturar_som) };
+      executar({ comando: "clipe.transicao", parametros: { clipeId: clipe.id, transicao } });
+    }
+  }
+
   const aoTeclar = useEffectEvent((evento: KeyboardEvent) => {
     const alvo = evento.target as HTMLElement | null;
     const ctrl = evento.ctrlKey || evento.metaKey;
@@ -441,9 +502,29 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     } else if (ctrl && tecla === "z" && !evento.shiftKey) desfazer();
     else if (ctrl && (tecla === "y" || (tecla === "z" && evento.shiftKey))) refazer();
     else if (ctrl && tecla === "s") mostrarAviso("O TakeOne salva sozinho a cada alteração.");
-    else if ((tecla === "s" && !ctrl) || (ctrl && tecla === "b")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
+    // S liga o ímã e Ctrl+K divide, como nos editores profissionais (Ctrl+B também divide)
+    else if (tecla === "s" && !ctrl && !evento.altKey) setIma((atual) => !atual);
+    else if (ctrl && !evento.shiftKey && (tecla === "b" || tecla === "k")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
+    else if (ctrl && tecla === "d") transicaoPadrao(evento.shiftKey);
+    else if (ctrl && evento.shiftKey && tecla === "x") setEntradaSaida({ entrada: null, saida: null });
+    else if ((tecla === "i" || tecla === "o") && !ctrl && !evento.altKey) {
+      if (evento.shiftKey) irParaEntradaSaida(tecla === "i" ? "entrada" : "saida");
+      else marcarEntradaSaida(tecla === "i" ? "entrada" : "saida");
+    } else if (evento.key === ";" && !ctrl) tirarTrecho(false);
+    else if (evento.key === "'" && !ctrl) tirarTrecho(true);
+    else if (tecla === "k" && !ctrl) {
+      if (reproducao.tocando) alternar();
+    } else if (tecla === "l" && !ctrl) {
+      if (!reproducao.tocando) alternar();
+    } else if (tecla === "j" && !ctrl) {
+      // O editor não toca para trás: o J para e volta um segundo
+      if (reproducao.tocando) alternar();
+      buscar(Math.max(0, tempo - TICKS_POR_SEGUNDO));
+    } else if (telaLarga && !ctrl && !evento.altKey && !evento.shiftKey && FERRAMENTAS_DA_LINHA.some((item) => item.tecla.toLowerCase() === tecla)) {
+      setFerramentaDaLinha(FERRAMENTAS_DA_LINHA.find((item) => item.tecla.toLowerCase() === tecla)!.id);
+    }
     else if ((tecla === "delete" || tecla === "backspace") && !evento.shiftKey && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
-    else if (ctrl && tecla === "d" && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
+    else if (ctrl && evento.shiftKey && (evento.key === "/" || evento.key === "?") && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
     else if (ctrl && tecla === "c" && selecaoValida.length) copiar();
     else if (ctrl && evento.altKey && tecla === "v") {
       if (!copiados.current.length) mostrarAviso("Copie um clipe antes (Ctrl+C).");
@@ -456,7 +537,12 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if (ctrl && tecla === "a") setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id)));
     else if (evento.altKey && (tecla === "arrowleft" || tecla === "arrowright")) empurrar(tecla === "arrowleft" ? -1 : 1, evento.shiftKey ? 5 : 1);
     else if ((tecla === "q" || tecla === "w") && !ctrl && !evento.altKey) aparaAteOCursor(tecla === "q" ? "inicio" : "fim");
-    else if (tecla === "m" && !ctrl && !evento.altKey) executar({ comando: "marcador.adicionar", parametros: { tempo } });
+    else if (tecla === "m" && !ctrl && !evento.altKey && !evento.shiftKey) executar({ comando: "marcador.adicionar", parametros: { tempo } });
+    else if (tecla === "m" && evento.shiftKey && !evento.altKey) {
+      // Shift+M: o próximo marcador; Ctrl+Shift+M: o anterior
+      const marcador = marcadorVizinho(projeto, tempo, ctrl ? -1 : 1, quadro / 2);
+      if (marcador !== null) buscar(marcador);
+    }
     else if ((tecla === "arrowup" || tecla === "arrowdown") && evento.shiftKey && !ctrl && !evento.altKey) {
       const marcador = marcadorVizinho(projeto, tempo, tecla === "arrowup" ? -1 : 1, quadro / 2);
       if (marcador !== null) buscar(marcador);
@@ -464,12 +550,14 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       const corte = corteVizinho(projeto, tempo, tecla === "arrowup" ? -1 : 1, quadro / 2);
       if (corte !== null) buscar(corte);
     } else if (evento.key === "?") setVendoAtalhos(true);
-    else if (tecla === "arrowleft") buscar(quadroMaisProximo(projeto.taxa, tempo) - (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
-    else if (tecla === "arrowright") buscar(quadroMaisProximo(projeto.taxa, tempo) + (evento.shiftKey ? TICKS_POR_SEGUNDO : quadro));
+    // Shift + seta: cinco quadros, como nos editores profissionais
+    else if (tecla === "arrowleft") buscar(quadroMaisProximo(projeto.taxa, tempo) - (evento.shiftKey ? 5 : 1) * quadro);
+    else if (tecla === "arrowright") buscar(quadroMaisProximo(projeto.taxa, tempo) + (evento.shiftKey ? 5 : 1) * quadro);
     else if (tecla === "home") buscar(0);
     else if (tecla === "end") buscar(projeto.duracao);
     else if (tecla === "escape") setSelecao([]);
-    else if (tecla === "n" && !ctrl) setIma((atual) => !atual);
+    // Na tela simplificada o N continua ligando o ímã (na larga, é a Edição contínua)
+    else if (tecla === "n" && !ctrl && !telaLarga) setIma((atual) => !atual);
     else return;
     evento.preventDefault();
   });
@@ -695,6 +783,13 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       limpar: () => executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } }),
       excluirEmOndulacao: () => executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida, fecharEspaco: true } }),
       duplicar: () => executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } }),
+      temTrecho: trechoMarcado() !== null,
+      marcarEntradaSaida,
+      irParaEntradaSaida,
+      limparEntradaSaida: () => setEntradaSaida({ entrada: null, saida: null }),
+      elevar: () => tirarTrecho(false),
+      extrair: () => tirarTrecho(true),
+      transicaoPadrao,
       selecionarTudo: () => setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id))),
       desmarcarTudo: () => setSelecao([]),
       atalhos: () => setVendoAtalhos(true),
@@ -853,10 +948,23 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 {...propsDaPrevia}
                 programa={{
                   aoQuadro: (passo) => buscar(quadroMaisProximo(projeto.taxa, tempo) + passo * duracaoDoQuadro(projeto.taxa)),
-                  aoIr: (onde) => buscar(onde === "inicio" ? 0 : projeto.duracao),
+                  aoIr: (onde) => (onde === "entrada" || onde === "saida" ? irParaEntradaSaida(onde) : buscar(onde === "inicio" ? 0 : projeto.duracao)),
                   aoMarcador: acoes.marcador,
                   aoExportarQuadro: acoes.exportarQuadro,
+                  aoMarcar: marcarEntradaSaida,
+                  aoElevar: () => tirarTrecho(false),
+                  aoExtrair: () => tirarTrecho(true),
+                  temTrecho: trechoMarcado() !== null,
                 }}
+                aoClicarParaTexto={
+                  ferramentaDaLinha === "texto"
+                    ? (x, y) => {
+                        executar({ comando: "texto.adicionar", parametros: { inicio: tempo, texto: TEXTO_PADRAO, transformacao: { x, y } } });
+                        setFerramentaDaLinha("selecao");
+                        abrirPainel("propriedades", "texto");
+                      }
+                    : undefined
+                }
                 className="min-h-0 flex-1"
               />
             </section>
@@ -875,7 +983,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 <Divisor direcao="coluna" valor={larguraEsquerdaBaixo} minimo={ESQUERDA_BAIXO.minimo} maximo={ESQUERDA_BAIXO.maximo} aoMudar={setLarguraEsquerdaBaixo} rotulo="Largura dos painéis de baixo à esquerda" />
               </>
             ) : null}
-            <LinhaDoTempo {...propsDaLinha} profissional pedidoDeZoom={pedidoDeZoom} className="min-w-0 flex-1" />
+            <ColunaDeFerramentas ativa={ferramentaDaLinha} aoEscolher={setFerramentaDaLinha} />
+            <LinhaDoTempo {...propsDaLinha} profissional pedidoDeZoom={pedidoDeZoom} ferramenta={ferramentaDaLinha} entradaSaida={entradaSaida} className="min-w-0 flex-1" />
             <MedidoresDeAudio tocando={reproducao.tocando} className="w-12" />
           </div>
           {janelas}
