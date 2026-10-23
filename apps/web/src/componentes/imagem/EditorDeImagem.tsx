@@ -24,7 +24,7 @@ import { enderecoDoProjeto } from "@/lib/hub";
 import { useMarca } from "@/lib/marca";
 import type { Comando } from "@/lib/projeto/comandos";
 import { executarComando } from "@/lib/projeto/comandos";
-import { camadasDaImagem, problemaNoTamanho, TAMANHOS_PRONTOS, tamanhoDaImagem } from "@/lib/projeto/imagem";
+import { camadasDaImagem, problemaNoTamanho, type RetanguloDaImagem, TAMANHOS_PRONTOS, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, MODELOS_DE_IMAGEM, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { ESTILOS_DE_TEXTO, TEXTO_PADRAO } from "@/lib/projeto/texto";
@@ -70,6 +70,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const modeloPendente = useRef<{ modelo: ModeloDeImagem; cores: string[]; midias: Record<string, Midia> } | null>(null);
   const [aplicando, setAplicando] = useState<string | null>(null);
   const [trocando, setTrocando] = useState<string | null>(null);
+  const [recorte, setRecorte] = useState<{ retangulo: RetanguloDaImagem; proporcao: number | null } | null>(null);
   const modeloDoEndereco = useRef(false);
 
   const setSelecao = useCallback((ids: string[]) => {
@@ -423,7 +424,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 aoAvisar={mostrarAviso}
               />
             ) : (
-              <FundoETamanho projeto={projetoNaTela} aoPrever={preverDoPainel} aoExecutar={executar} />
+              <FundoETamanho
+                projeto={projetoNaTela}
+                aoPrever={preverDoPainel}
+                aoExecutar={executar}
+                recorte={recorte}
+                aoRecortar={setRecorte}
+                aoAplicarRecorte={() => {
+                  if (!recorte) return;
+                  // O tamanho de cada mídia usada, para as camadas ficarem do mesmo tamanho em pixels
+                  const tamanhos: Record<string, { largura: number; altura: number }> = {};
+                  for (const midia of midias.values()) if (midia.video) tamanhos[midia.id] = { largura: midia.video.largura, altura: midia.video.altura };
+                  const r = recorte.retangulo;
+                  const retangulo = { x: Math.round(r.x), y: Math.round(r.y), largura: Math.round(r.largura), altura: Math.round(r.altura) };
+                  if (executar({ comando: "imagem.recortar", parametros: { retangulo, tamanhos } })) setRecorte(null);
+                }}
+              />
             )}
           </div>
         </aside>
@@ -449,6 +465,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               parametros: { clipeIds: [clipeId], transformacao: mudanca },
             })
           }
+          recorte={recorte ? { ...recorte, aoMudar: (retangulo) => setRecorte({ ...recorte, retangulo }) } : null}
         />
 
         <div className="flex shrink-0 flex-col border-borda bg-painel md:min-h-0 md:w-80 md:border-l">
@@ -522,14 +539,36 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 }
 
 /** A cor do fundo (ou sem fundo) e o tamanho, com os tamanhos prontos. */
+/** As proporções do recorte; null é livre. */
+const PROPORCOES_DO_RECORTE: { nome: string; valor: number | null }[] = [
+  { nome: "Livre", valor: null },
+  { nome: "1:1", valor: 1 },
+  { nome: "4:5", valor: 4 / 5 },
+  { nome: "9:16", valor: 9 / 16 },
+  { nome: "16:9", valor: 16 / 9 },
+];
+
+/** O maior retângulo na proporção, no meio do atual (ou da imagem). */
+function encaixarProporcao(r: RetanguloDaImagem, proporcao: number): RetanguloDaImagem {
+  const largura = Math.min(r.largura, r.altura * proporcao);
+  const altura = largura / proporcao;
+  return { x: r.x + (r.largura - largura) / 2, y: r.y + (r.altura - altura) / 2, largura, altura };
+}
+
 function FundoETamanho({
   projeto,
   aoPrever,
   aoExecutar,
+  recorte,
+  aoRecortar,
+  aoAplicarRecorte,
 }: {
   projeto: NonNullable<ReturnType<typeof useProjeto>["projeto"]>;
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
+  recorte: { retangulo: RetanguloDaImagem; proporcao: number | null } | null;
+  aoRecortar: (recorte: { retangulo: RetanguloDaImagem; proporcao: number | null } | null) => void;
+  aoAplicarRecorte: () => void;
 }) {
   const atual = tamanhoDaImagem(projeto);
   const [largura, setLargura] = useState(String(atual.largura));
@@ -542,8 +581,45 @@ function FundoETamanho({
     setErro(problema ?? "");
     if (!problema) aoExecutar({ comando: "imagem.tamanho", parametros: tamanho });
   }
+  const inteiro = { x: 0, y: 0, largura: atual.largura, altura: atual.altura };
   return (
     <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Recortar</h3>
+        {recorte ? (
+          <>
+            <p className="text-[11px] text-suave">Arraste o retângulo e os cantos na prévia. As camadas ficam onde estão; o que sair dele some.</p>
+            <div className="flex flex-wrap gap-1">
+              {PROPORCOES_DO_RECORTE.map((item) => (
+                <button
+                  key={item.nome}
+                  type="button"
+                  aria-pressed={recorte.proporcao === item.valor}
+                  onClick={() => aoRecortar({ proporcao: item.valor, retangulo: item.valor ? encaixarProporcao(inteiro, item.valor) : recorte.retangulo })}
+                  className={`rounded-md border px-2 py-1 text-[11px] ${recorte.proporcao === item.valor ? "border-destaque bg-destaque/10" : "border-borda hover:bg-painel-2"}`}
+                >
+                  {item.nome}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] tabular-nums text-apagado">
+              {Math.round(recorte.retangulo.largura)} × {Math.round(recorte.retangulo.altura)} px
+            </p>
+            <div className="flex gap-1.5">
+              <button type="button" className="botao-principal flex-1 px-2 py-1 text-xs" onClick={aoAplicarRecorte}>
+                Recortar
+              </button>
+              <button type="button" className="botao-secundario flex-1 px-2 py-1 text-xs" onClick={() => aoRecortar(null)}>
+                Cancelar
+              </button>
+            </div>
+          </>
+        ) : (
+          <button type="button" className="botao-secundario px-2 py-1 text-xs" onClick={() => aoRecortar({ retangulo: inteiro, proporcao: null })}>
+            Recortar a imagem
+          </button>
+        )}
+      </section>
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Fundo</h3>
         <label className="flex items-center gap-2 text-xs">

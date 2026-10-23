@@ -248,6 +248,47 @@ export function problemaNoTamanho({ largura, altura }: TamanhoDaImagem): string 
   return null;
 }
 
+/** Um retângulo do quadro, em pixels da imagem (o canto de cima à esquerda e o tamanho). */
+export type RetanguloDaImagem = { x: number; y: number; largura: number; altura: number };
+
+/**
+ * Recorta o quadro no retângulo: o tamanho passa a ser o dele, e cada camada fica no mesmo lugar e do mesmo tamanho
+ * em pixels (só o que fica fora some). A escala de uma mídia é relativa a caber no quadro e a de um texto, ao lado
+ * menor dele, então as duas são refeitas para o quadro novo; os tamanhos das mídias vêm de quem chama.
+ */
+export function recortarImagem(projeto: Projeto, retangulo: RetanguloDaImagem, tamanhos: Record<string, Tamanho>): Projeto {
+  const antes = tamanhoDaImagem(projeto);
+  const depois = { largura: Math.round(retangulo.largura), altura: Math.round(retangulo.altura) };
+  const problema = problemaNoTamanho(depois);
+  if (problema) throw new ErroEdicao(problema);
+  const ladoAntes = Math.min(antes.largura, antes.altura);
+  const ladoDepois = Math.min(depois.largura, depois.altura);
+  const faixas = projeto.faixas.map((faixa) => {
+    if (faixa.tipo === "principal") return faixa;
+    const clipes = faixa.clipes.map((clipe) => {
+      // A camada de ajuste cobre o quadro, qualquer que seja ele
+      if (clipe.ajuste) return clipe;
+      const t = clipe.transformacao;
+      const cx = antes.largura / 2 + t.x * antes.largura - retangulo.x;
+      const cy = antes.altura / 2 + t.y * antes.altura - retangulo.y;
+      let escala = t.escala;
+      if (clipe.texto) escala = (t.escala * ladoAntes) / ladoDepois;
+      else if (clipe.midia_id && tamanhos[clipe.midia_id]) {
+        const midia = tamanhos[clipe.midia_id];
+        const largura = midia.largura * clipe.recorte.largura;
+        const altura = midia.altura * clipe.recorte.altura;
+        const caberAntes = Math.min(antes.largura / largura, antes.altura / altura);
+        const caberDepois = Math.min(depois.largura / largura, depois.altura / altura);
+        escala = (t.escala * caberAntes) / caberDepois;
+      }
+      const transformacao = { ...t, x: (cx - depois.largura / 2) / depois.largura, y: (cy - depois.altura / 2) / depois.altura, escala };
+      return { ...clipe, transformacao };
+    });
+    return { ...faixa, clipes };
+  });
+  return { ...projeto, tamanho: depois, faixas };
+}
+
 /** Muda o tamanho do quadro. As camadas ficam no mesmo lugar em frações (o meio continua no meio). */
 export function mudarTamanhoDaImagem(projeto: Projeto, tamanho: TamanhoDaImagem): Projeto {
   const problema = problemaNoTamanho(tamanho);

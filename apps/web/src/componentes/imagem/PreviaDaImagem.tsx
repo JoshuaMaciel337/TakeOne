@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ManipuladorNaPrevia } from "@/componentes/editor/ManipuladorNaPrevia";
+import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaMascaraDaImagem } from "@/lib/exportacao/imagem";
 import { useBitmaps } from "@/lib/previa/bitmaps";
@@ -13,6 +14,8 @@ import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
+
+import { RecorteNaPrevia } from "./RecorteNaPrevia";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
 const DENSIDADE_MAXIMA = 2;
@@ -26,6 +29,8 @@ type Props = {
   aoSelecionar: (ids: string[]) => void;
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
+  /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
+  recorte?: { retangulo: RetanguloDaImagem; proporcao: number | null; aoMudar: (retangulo: RetanguloDaImagem) => void } | null;
 };
 
 /** O maior quadro na proporção da imagem que cabe na área livre. */
@@ -53,7 +58,7 @@ function useQuadro(largura: number, altura: number) {
  * A prévia do editor de imagem: o compositor da prévia do vídeo, num quadro só, com as alças para mover, girar
  * e redimensionar. A conta é a da exportação (lib/exportacao/imagem.ts); a prévia só lê as cópias leves.
  */
-export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPrever, aoTransformar }: Props) {
+export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPrever, aoTransformar, recorte = null }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, tamanho } = useQuadro(imagem.largura, imagem.altura);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,7 +115,7 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
   });
 
   function selecionarNoPonto(evento: React.PointerEvent<HTMLDivElement>) {
-    if (evento.button !== 0) return;
+    if (evento.button !== 0 || recorte) return;
     const retangulo = evento.currentTarget.getBoundingClientRect();
     const ponto = {
       x: evento.clientX - retangulo.left,
@@ -149,7 +154,10 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
                 ))}
               </>
             ) : null}
-            {selecionada ? (
+            {recorte && tamanho.largura > 0 ? (
+              <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} />
+            ) : null}
+            {selecionada && !recorte ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
                 caixa={selecionada.caixaBase}

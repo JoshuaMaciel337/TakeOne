@@ -145,3 +145,23 @@ test("trocar a imagem: a nova cobre a mesma caixa, cortada no meio", () => {
   const caixa = caixaDoClipe(depois.clipe.transformacao, depois.clipe.recorte, { largura: 800, altura: 800 }, quadro);
   assert.ok(Math.abs(caixa.largura - antes.largura) < 1e-6 && Math.abs(caixa.altura - antes.altura) < 1e-6);
 });
+
+test("recortar a imagem: o quadro fica do tamanho do recorte e as camadas no mesmo lugar em pixels", () => {
+  const ctx = contexto();
+  let r = executarComando(vazio(), { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx);
+  r = executarComando(r.projeto, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO } }, ctx);
+  const antes = r.projeto;
+  const quadroAntes = { largura: 1080, altura: 1080 };
+  const tamanhos = { foto: { largura: 2000, altura: 1000 } };
+  const [, fotoAntes] = camadasDaImagem(antes);
+  const caixaAntes = caixaDoClipe(fotoAntes.clipe.transformacao, fotoAntes.clipe.recorte, tamanhos.foto, quadroAntes);
+  const retangulo = { x: 100, y: 200, largura: 800, altura: 600 };
+  const depois = executarComando(antes, { comando: "imagem.recortar", parametros: { retangulo, tamanhos } }, ctx).projeto;
+  assert.deepEqual(depois.tamanho, { largura: 800, altura: 600 });
+  const [texto, foto] = camadasDaImagem(depois);
+  const caixa = caixaDoClipe(foto.clipe.transformacao, foto.clipe.recorte, tamanhos.foto, { largura: 800, altura: 600 });
+  assert.ok(Math.abs(caixa.largura - caixaAntes.largura) < 1e-6 && Math.abs(caixa.altura - caixaAntes.altura) < 1e-6);
+  assert.ok(Math.abs(caixa.cx - (caixaAntes.cx - 100)) < 1e-6 && Math.abs(caixa.cy - (caixaAntes.cy - 200)) < 1e-6);
+  // O texto: o lado menor era 1080 e passa a 600, então a escala cresce na mesma proporção
+  assert.ok(Math.abs(texto.clipe.transformacao.escala - 1080 / 600) < 1e-9);
+});

@@ -82,6 +82,8 @@ import {
   moverCamada,
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
+  recortarImagem,
+  type RetanguloDaImagem,
   type TamanhoDaImagem,
   trocarImagemDaCamada,
 } from "./imagem.ts";
@@ -138,6 +140,7 @@ export type Comando =
   | { comando: "imagem.trocarImagem"; parametros: { clipeId: string; midiaId: string; tamanhoAtual: Tamanho; tamanhoNovo: Tamanho } }
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
+  | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
   | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
@@ -207,6 +210,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.trocarImagem": "trocar a imagem",
   "imagem.fundo": "mudar o fundo",
   "imagem.tamanho": "mudar o tamanho",
+  "imagem.recortar": "recortar a imagem",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
   "clipe.chaveLuma": "mudar a chave de luminância",
@@ -328,6 +332,8 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       const resultado = duplicarCamada(projeto, ctx, parametros.faixaId);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.recortar":
+      return { projeto: recortarImagem(projeto, parametros.retangulo, parametros.tamanhos) };
     case "imagem.aplicarModelo":
       return { projeto: aplicarModeloDeImagem(projeto, ctx, parametros), selecao: [] };
     case "imagem.trocarImagem":
