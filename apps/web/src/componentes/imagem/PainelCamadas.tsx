@@ -1,12 +1,12 @@
 "use client";
 
-import { ChevronDown, Copy, Eye, Lock, Shapes, SlidersHorizontal, SquareDashed, Trash2, Type } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, Trash2, Type } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
+import { arvoreDaImagem, camadaVisivel, type NoDaCamada, paiDaCamada } from "@/lib/projeto/arvore";
 import type { Comando } from "@/lib/projeto/comandos";
-import { camadasDaImagem } from "@/lib/projeto/imagem";
-import { MASCARA_PADRAO, MESCLAGENS, type Mesclagem, type Projeto } from "@/lib/projeto/modelo";
+import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MASCARA_PADRAO, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import type { Midia } from "@/lib/tipos";
 
@@ -15,6 +15,7 @@ import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
 type Props = {
   projeto: Projeto;
   midias: ReadonlyMap<string, Midia>;
+  /** Os clipes das camadas escolhidas (uma camada é uma faixa com um clipe). */
   selecao: string[];
   aoSelecionar: (ids: string[]) => void;
   aoExecutar: (comando: Comando) => void;
@@ -24,23 +25,118 @@ type Props = {
   aoAbrirPropriedades: () => void;
 };
 
-/** O nome de cada camada: o do texto, "Camada de ajuste" ou o da mídia. */
-export function nomeDaCamada(clipe: Projeto["faixas"][number]["clipes"][number], midias: ReadonlyMap<string, Midia>): string {
+/** O nome de cada camada: o que a pessoa deu, o do texto, "Camada de ajuste", "Grupo" ou o da mídia. */
+export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, faixa?: Faixa): string {
+  if (faixa?.nome) return faixa.nome;
+  if (clipe.pasta) return "Grupo";
   if (clipe.texto) return clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto";
   if (clipe.ajuste) return "Camada de ajuste";
   return (clipe.midia_id ? midias.get(clipe.midia_id)?.nome : undefined) ?? "Imagem";
 }
 
-/** Um botão de rodapé que abre uma lista para cima. */
-function BotaoComLista({ titulo, rotulo, itens, desativado }: { titulo: string; rotulo: React.ReactNode; itens: { nome: string; aoEscolher: () => void }[]; desativado?: boolean }) {
-  const [aberto, setAberto] = useState(false);
+/** O tipo da camada, para o filtro do painel. */
+type TipoDaCamada = "imagem" | "texto" | "forma" | "ajuste" | "grupo";
+/** Os filtros do painel, como lá: por tipo, modo, atributo, efeito e cor ("tipo:texto", "modo:multiplicar"...). */
+const FILTROS: { grupo: string; itens: { id: string; nome: string }[] }[] = [
+  {
+    grupo: "Tipo",
+    itens: [
+      { id: "tipo:imagem", nome: "Imagens" },
+      { id: "tipo:texto", nome: "Textos" },
+      { id: "tipo:forma", nome: "Formas" },
+      { id: "tipo:ajuste", nome: "Ajustes" },
+      { id: "tipo:grupo", nome: "Grupos" },
+    ],
+  },
+  {
+    grupo: "Atributo",
+    itens: [
+      { id: "atributo:visivel", nome: "Visíveis" },
+      { id: "atributo:oculta", nome: "Ocultas" },
+      { id: "atributo:travada", nome: "Bloqueadas" },
+      { id: "atributo:vinculada", nome: "Vinculadas" },
+      { id: "atributo:recortada", nome: "Com máscara de corte" },
+      { id: "atributo:mascara", nome: "Com máscara" },
+    ],
+  },
+  {
+    grupo: "Efeito",
+    itens: [
+      { id: "efeito:contorno", nome: "Com contorno" },
+      { id: "efeito:sombra", nome: "Com sombra projetada" },
+      { id: "efeito:filtro", nome: "Com filtro" },
+    ],
+  },
+  { grupo: "Modo", itens: [{ id: "modo:passagem", nome: nomeDaMesclagem("passagem") }, ...MESCLAGENS_DA_IMAGEM.flat().map((modo) => ({ id: `modo:${modo.id}`, nome: modo.nome }))] },
+  { grupo: "Cor", itens: CORES_DOS_ROTULOS.map((cor) => ({ id: `cor:${cor.id}`, nome: cor.nome })) },
+];
+function tipoDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>): TipoDaCamada {
+  if (clipe.pasta) return "grupo";
+  if (clipe.texto) return "texto";
+  if (clipe.ajuste) return "ajuste";
+  return clipe.midia_id && midias.get(clipe.midia_id)?.elemento ? "forma" : "imagem";
+}
+
+/** As travas parciais, na ordem dos editores de imagem (a de tudo vem depois, pelo `travada` da faixa). */
+const TRAVAS: { id: keyof TravasDaCamada; nome: string; icone: typeof Lock }[] = [
+  { id: "transparencia", nome: "Bloquear pixels transparentes", icone: Grid2x2 },
+  { id: "pixels", nome: "Bloquear pixels da imagem", icone: Brush },
+  { id: "posicao", nome: "Bloquear posição", icone: Move },
+];
+
+/** Uma linha do painel: a camada, o nível (dentro de quantas pastas) e se está presa à de baixo. */
+type Linha = { no: NoDaCamada; nivel: number; presa: boolean };
+
+/** Onde a camada arrastada vai cair: acima ou abaixo de uma linha, ou dentro de uma pasta. */
+type Alvo = { faixaId: string; zona: "acima" | "abaixo" | "dentro" };
+
+/** Um item do menu de contexto (ou do botão com lista); "-" é o separador. */
+type Item = { nome: string; aoEscolher: () => void; desativado?: boolean; cor?: string } | "-";
+
+function ListaDeItens({ itens, aoFechar }: { itens: Item[]; aoFechar: () => void }) {
+  return itens.map((item, indice) =>
+    item === "-" ? (
+      <hr key={`-${indice}`} className="my-1 border-borda" />
+    ) : (
+      <button
+        key={item.nome}
+        type="button"
+        role="menuitem"
+        disabled={item.desativado}
+        className="flex w-full items-center gap-2 px-3 py-1 text-left hover:bg-destaque/20 disabled:opacity-40 disabled:hover:bg-transparent"
+        onClick={() => {
+          aoFechar();
+          item.aoEscolher();
+        }}
+      >
+        {item.cor ? <span className="size-2.5 shrink-0 rounded-sm" style={{ background: item.cor }} aria-hidden /> : null}
+        {item.nome}
+      </button>
+    ),
+  );
+}
+
+/** Fecha ao clicar fora ou com Esc. */
+function useFecharFora(aberto: boolean, aoFechar: () => void) {
   const caixaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!aberto) return;
-    const fora = (evento: PointerEvent) => !caixaRef.current?.contains(evento.target as Node) && setAberto(false);
+    const fora = (evento: PointerEvent) => !caixaRef.current?.contains(evento.target as Node) && aoFechar();
+    const tecla = (evento: KeyboardEvent) => evento.key === "Escape" && aoFechar();
     window.addEventListener("pointerdown", fora);
-    return () => window.removeEventListener("pointerdown", fora);
-  }, [aberto]);
+    window.addEventListener("keydown", tecla);
+    return () => {
+      window.removeEventListener("pointerdown", fora);
+      window.removeEventListener("keydown", tecla);
+    };
+  }, [aberto, aoFechar]);
+  return caixaRef;
+}
+
+/** Um botão de rodapé que abre uma lista para cima. */
+function BotaoComLista({ titulo, rotulo, itens, desativado }: { titulo: string; rotulo: React.ReactNode; itens: Item[]; desativado?: boolean }) {
+  const [aberto, setAberto] = useState(false);
+  const caixaRef = useFecharFora(aberto, () => setAberto(false));
   return (
     <div ref={caixaRef} className="relative">
       <button type="button" className="botao-icone h-6 w-auto gap-0.5 px-1" title={titulo} aria-label={titulo} aria-expanded={aberto} disabled={desativado} onClick={() => setAberto((valor) => !valor)}>
@@ -49,183 +145,476 @@ function BotaoComLista({ titulo, rotulo, itens, desativado }: { titulo: string; 
       </button>
       {aberto ? (
         <div role="menu" className="absolute bottom-full left-0 z-50 mb-1 min-w-48 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50">
-          {itens.map((item) => (
-            <button
-              key={item.nome}
-              type="button"
-              role="menuitem"
-              className="block w-full px-3 py-1 text-left hover:bg-destaque/20"
-              onClick={() => {
-                setAberto(false);
-                item.aoEscolher();
-              }}
-            >
-              {item.nome}
-            </button>
-          ))}
+          <ListaDeItens itens={itens} aoFechar={() => setAberto(false)} />
         </div>
       ) : null}
     </div>
   );
 }
 
+/** Um campo de porcentagem que só aplica ao sair (ou no Enter). */
+function CampoDePorcentagem({ rotulo, valor, desativado, aoMudar }: { rotulo: string; valor: number | null; desativado: boolean; aoMudar: (valor: number) => void }) {
+  const [digitado, setDigitado] = useState<string | null>(null);
+  return (
+    <label className="flex items-center gap-1 text-suave">
+      {rotulo}:
+      <input
+        aria-label={rotulo}
+        disabled={desativado}
+        inputMode="numeric"
+        value={digitado ?? (valor === null ? "" : String(Math.round(valor * 100)))}
+        onChange={(evento) => setDigitado(evento.currentTarget.value)}
+        onBlur={() => {
+          const numero = Number(digitado);
+          setDigitado(null);
+          if (digitado !== null && digitado.trim() !== "" && Number.isFinite(numero)) aoMudar(Math.min(100, Math.max(0, numero)) / 100);
+        }}
+        onKeyDown={(evento) => evento.key === "Enter" && evento.currentTarget.blur()}
+        className="w-10 rounded border border-borda bg-painel-2 px-1 py-0.5 text-right text-texto tabular-nums disabled:opacity-50"
+      />
+      %
+    </label>
+  );
+}
+
 /**
- * O painel Camadas, como nos editores de imagem profissionais: em cima, o modo de mesclagem e a opacidade da camada
- * escolhida, e o bloqueio; as camadas de cima para baixo (o olho na coluna da esquerda, arrastar muda a ordem); no
- * rodapé, estilo de camada (fx), máscara, ajuste, duplicar e apagar.
+ * O painel Camadas, como nos editores de imagem profissionais: em cima, o filtro, o modo de mesclagem, a opacidade, o
+ * preenchimento e as travas da camada escolhida; as camadas de cima para baixo, com as pastas (que abrem e fecham), as
+ * presas à de baixo (máscara de corte, com a seta), o olho (Alt + clique mostra só ela), o rótulo em cor e o nome
+ * (duplo clique renomeia); arrastar muda a ordem e põe dentro ou fora das pastas; Ctrl e Shift escolhem várias; o
+ * botão direito abre o menu da camada. No rodapé: vincular, estilo (fx), máscara, ajuste, pasta, duplicar e apagar.
  */
 export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecutar, aoCriarAjuste, aoAbrirPropriedades }: Props) {
-  const camadas = camadasDaImagem(projeto);
-  const escolhida = camadas.find(({ clipe }) => selecao.includes(clipe.id));
-  const [arrastada, setArrastada] = useState<string | null>(null);
-  const [alvo, setAlvo] = useState<number | null>(null);
-  const [opacidade, setOpacidade] = useState<string | null>(null);
-  const ids = escolhida ? [escolhida.clipe.id] : [];
-  const travada = Boolean(escolhida?.faixa.travada);
+  // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
+  const [abertas, setAbertas] = useState<Record<string, boolean>>({});
+  const [arrastadas, setArrastadas] = useState<string[] | null>(null);
+  const [alvo, setAlvo] = useState<Alvo | null>(null);
+  const [renomeando, setRenomeando] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState("todas");
+  // Arrastar na coluna do olho: o valor do primeiro (esconder ou mostrar) vai para as outras por onde o mouse passa
+  const [pintandoOlho, setPintandoOlho] = useState<{ oculta: boolean; ids: string[] } | null>(null);
+  const ancora = useRef<string | null>(null);
+  const menuRef = useFecharFora(menu !== null, () => setMenu(null));
+
+  const aberta = (faixa: Faixa) => abertas[faixa.id] ?? faixa.aberta !== false;
+  const filtrando = busca.trim() !== "" || filtro !== "todas";
+  const procura = busca.trim().toLocaleLowerCase("pt-BR");
+  const passaNoFiltro = ({ faixa, clipe }: NoDaCamada): boolean => {
+    const [tipo, valor] = filtro.split(":");
+    if (tipo === "tipo") return tipoDaCamada(clipe, midias) === valor;
+    if (tipo === "modo") return (clipe.mesclagem ?? (clipe.pasta ? "passagem" : "normal")) === valor;
+    if (tipo === "cor") return faixa.rotulo === valor;
+    if (tipo === "efeito") return valor === "contorno" ? Boolean(clipe.contorno) : valor === "sombra" ? Boolean(clipe.sombra) : Boolean(clipe.efeito);
+    if (tipo === "atributo") {
+      if (valor === "visivel") return camadaVisivel(projeto, faixa);
+      if (valor === "oculta") return !camadaVisivel(projeto, faixa);
+      if (valor === "travada") return faixa.travada || Boolean(faixa.travas);
+      if (valor === "vinculada") return Boolean(faixa.vinculo);
+      if (valor === "recortada") return Boolean(faixa.recortada);
+      return Boolean(clipe.mascara);
+    }
+    return true;
+  };
+  const passa = (no: NoDaCamada) => passaNoFiltro(no) && (!procura || nomeDaCamada(no.clipe, midias, no.faixa).toLocaleLowerCase("pt-BR").includes(procura));
+
+  const linhas: Linha[] = [];
+  const andar = (nos: NoDaCamada[], nivel: number) => {
+    for (const no of nos) {
+      for (const presa of no.recortadas) {
+        if (!filtrando || passa(presa)) linhas.push({ no: presa, nivel, presa: true });
+        if (presa.clipe.pasta && (filtrando || aberta(presa.faixa))) andar(presa.filhos, nivel + 1);
+      }
+      if (!filtrando || passa(no)) linhas.push({ no, nivel, presa: false });
+      if (no.clipe.pasta && (filtrando || aberta(no.faixa))) andar(no.filhos, nivel + 1);
+    }
+  };
+  andar(arvoreDaImagem(projeto), 0);
+
+  const todas = projeto.faixas.filter((faixa) => faixa.tipo !== "principal" && faixa.clipes.length);
+  const escolhidas = todas.filter((faixa) => selecao.includes(faixa.clipes[0].id));
+  const ids = escolhidas.map((faixa) => faixa.id);
+  const clipeIds = escolhidas.map((faixa) => faixa.clipes[0].id);
+  const primeira = escolhidas[0];
+  const algumaTravada = escolhidas.some((faixa) => faixa.travada);
+  const soPastas = escolhidas.length > 0 && escolhidas.every((faixa) => faixa.clipes[0].pasta);
+  const temPasta = escolhidas.some((faixa) => faixa.clipes[0].pasta);
+  const mesmaMesclagem = escolhidas.every((faixa) => (faixa.clipes[0].mesclagem ?? (faixa.clipes[0].pasta ? "passagem" : "normal")) === (primeira?.clipes[0].mesclagem ?? (primeira?.clipes[0].pasta ? "passagem" : "normal")));
+  const mesmo = (ler: (faixa: Faixa) => number) => (primeira && escolhidas.every((faixa) => ler(faixa) === ler(primeira)) ? ler(primeira) : null);
+  const opacidade = mesmo((faixa) => faixa.clipes[0].transformacao.opacidade);
+  const preenchimento = mesmo((faixa) => faixa.clipes[0].preenchimento ?? 1);
+  const vinculadas = escolhidas.length > 0 && escolhidas.every((faixa) => faixa.vinculo && faixa.vinculo === primeira.vinculo);
+
+  /** Clique na linha: só ela; Ctrl junta ou tira; Shift escolhe do último clique até ela. */
+  const escolher = (faixa: Faixa, evento: React.MouseEvent) => {
+    const clipeId = faixa.clipes[0].id;
+    if (evento.ctrlKey || evento.metaKey) {
+      aoSelecionar(selecao.includes(clipeId) ? selecao.filter((id) => id !== clipeId) : [...selecao, clipeId]);
+    } else if (evento.shiftKey && ancora.current) {
+      const ordem = linhas.map((linha) => linha.no.faixa.id);
+      const de = ordem.indexOf(ancora.current);
+      const ate = ordem.indexOf(faixa.id);
+      if (de >= 0 && ate >= 0) {
+        aoSelecionar(linhas.slice(Math.min(de, ate), Math.max(de, ate) + 1).map((linha) => linha.no.clipe.id));
+        return;
+      }
+      aoSelecionar([clipeId]);
+    } else aoSelecionar([clipeId]);
+    ancora.current = faixa.id;
+  };
+
+  const mudar = (mudanca: Extract<Comando, { comando: "imagem.camada" }>["parametros"]["mudanca"], faixaIds = ids) => aoExecutar({ comando: "imagem.camada", parametros: { faixaIds, mudanca } });
+  const alternarTrava = (trava: keyof TravasDaCamada) => {
+    const ligar = !escolhidas.every((faixa) => faixa.travas?.[trava]);
+    mudar({ travas: { [trava]: ligar } });
+  };
+  const travarTudo = () => mudar({ travada: !escolhidas.every((faixa) => faixa.travada) });
+  const recortar = (ligar: boolean) => mudar({ recortada: ligar });
+  const agrupar = () => aoExecutar({ comando: "imagem.agrupar", parametros: { faixaIds: ids } });
+  const desagrupar = () => {
+    for (const faixa of escolhidas) if (faixa.clipes[0].pasta) aoExecutar({ comando: "imagem.desagrupar", parametros: { faixaId: faixa.id } });
+  };
+  const duplicar = () => aoExecutar({ comando: "imagem.duplicarVarias", parametros: { faixaIds: ids } });
+  const apagar = () => aoExecutar({ comando: "imagem.apagarVarias", parametros: { faixaIds: ids } });
+  const vincular = () => aoExecutar({ comando: "imagem.vincular", parametros: { faixaIds: ids, ligar: !vinculadas } });
+  const vinculos = new Set(escolhidas.flatMap((faixa) => (faixa.vinculo ? [faixa.vinculo] : [])));
+  const selecionarVinculadas = () => aoSelecionar(todas.filter((faixa) => faixa.vinculo && vinculos.has(faixa.vinculo)).map((faixa) => faixa.clipes[0].id));
+
+  // Solta o arrasto do olho onde quer que o mouse seja solto: todas as tocadas mudam num passo só
+  useEffect(() => {
+    if (!pintandoOlho) return;
+    const soltar = () => {
+      setPintandoOlho(null);
+      aoExecutar({ comando: "imagem.camada", parametros: { faixaIds: pintandoOlho.ids, mudanca: { oculta: pintandoOlho.oculta } } });
+    };
+    window.addEventListener("pointerup", soltar);
+    return () => window.removeEventListener("pointerup", soltar);
+  }, [pintandoOlho, aoExecutar]);
+
+  /** Solta as arrastadas no alvo: acima ou abaixo de uma linha (entre as irmãs dela) ou no topo de uma pasta. */
+  const soltar = (arrastadasAgora: string[], destino: Alvo) => {
+    const faixa = projeto.faixas.find((item) => item.id === destino.faixaId);
+    if (!faixa || arrastadasAgora.includes(faixa.id)) return;
+    const primeiraDentro = (pasta: Faixa) => todas.find((item) => paiDaCamada(projeto, item) === pasta.id && !arrastadasAgora.includes(item.id))?.id ?? null;
+    if (destino.zona === "dentro" || (destino.zona === "abaixo" && faixa.clipes[0].pasta && aberta(faixa) && !filtrando)) {
+      aoExecutar({ comando: "imagem.moverPara", parametros: { faixaIds: arrastadasAgora, pai: faixa.id, acimaDe: primeiraDentro(faixa) } });
+      return;
+    }
+    const pai = paiDaCamada(projeto, faixa);
+    const irmas = todas.filter((item) => paiDaCamada(projeto, item) === pai && !arrastadasAgora.includes(item.id));
+    const acimaDe = destino.zona === "acima" ? faixa.id : (irmas[irmas.indexOf(faixa) + 1]?.id ?? null);
+    aoExecutar({ comando: "imagem.moverPara", parametros: { faixaIds: arrastadasAgora, pai, acimaDe } });
+  };
+
+  const itensDoMenu: Item[] = [
+    { nome: "Renomear camada", desativado: escolhidas.length !== 1, aoEscolher: () => primeira && setRenomeando(primeira.id) },
+    { nome: escolhidas.length > 1 ? "Duplicar camadas" : "Duplicar camada", desativado: !escolhidas.length, aoEscolher: duplicar },
+    { nome: escolhidas.length > 1 ? "Excluir camadas" : "Excluir camada", desativado: !escolhidas.length || algumaTravada, aoEscolher: apagar },
+    "-",
+    { nome: "Agrupar camadas", desativado: !escolhidas.length, aoEscolher: agrupar },
+    { nome: "Desagrupar camadas", desativado: !temPasta, aoEscolher: desagrupar },
+    escolhidas.length && escolhidas.every((faixa) => faixa.recortada)
+      ? { nome: "Liberar máscara de corte", aoEscolher: () => recortar(false) }
+      : { nome: "Criar máscara de corte", desativado: !escolhidas.length, aoEscolher: () => recortar(true) },
+    { nome: vinculadas ? "Desvincular camadas" : "Vincular camadas", desativado: vinculadas ? false : escolhidas.length < 2, aoEscolher: vincular },
+    { nome: "Selecionar camadas vinculadas", desativado: vinculos.size === 0, aoEscolher: selecionarVinculadas },
+    "-",
+    { nome: "Mostrar só esta camada", desativado: escolhidas.length !== 1, aoEscolher: () => primeira && aoExecutar({ comando: "imagem.soEsta", parametros: { faixaId: primeira.id } }) },
+    { nome: escolhidas.every((faixa) => faixa.travada) && escolhidas.length ? "Desbloquear camada" : "Bloquear tudo", desativado: !escolhidas.length, aoEscolher: travarTudo },
+    "-",
+    { nome: "Sem cor", desativado: !escolhidas.length, aoEscolher: () => mudar({ rotulo: null }) },
+    ...CORES_DOS_ROTULOS.map((rotulo): Item => ({ nome: rotulo.nome, cor: rotulo.cor, desativado: !escolhidas.length, aoEscolher: () => mudar({ rotulo: rotulo.id }) })),
+  ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col text-xs">
+    <div data-painel-camadas className="relative flex h-full min-h-0 flex-col text-xs">
       <div className="flex shrink-0 flex-col gap-1.5 border-b border-borda p-2">
+        <div className="flex items-center gap-1.5">
+          <label className="flex min-w-0 flex-1 items-center gap-1 rounded border border-borda bg-painel-2 px-1.5">
+            <Search className="size-3 shrink-0 text-suave" aria-hidden />
+            <input value={busca} onChange={(evento) => setBusca(evento.currentTarget.value)} placeholder="Procurar camadas" aria-label="Procurar camadas pelo nome" className="min-w-0 flex-1 bg-transparent py-0.5 outline-none" />
+          </label>
+          <select aria-label="Filtrar as camadas" value={filtro} onChange={(evento) => setFiltro(evento.currentTarget.value)} className="w-24 rounded border border-borda bg-painel-2 px-1 py-0.5">
+            <option value="todas">Todas</option>
+            {FILTROS.map((grupo) => (
+              <optgroup key={grupo.grupo} label={grupo.grupo}>
+                {grupo.itens.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nome}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
         <div className="flex items-center gap-2">
           <select
             aria-label="Modo de mesclagem"
-            disabled={!escolhida || travada}
-            value={escolhida?.clipe.mesclagem ?? "normal"}
-            onChange={(evento) => aoExecutar({ comando: "clipe.mesclar", parametros: { clipeIds: ids, mesclagem: evento.currentTarget.value as Mesclagem } })}
+            disabled={!escolhidas.length || algumaTravada}
+            value={mesmaMesclagem && primeira ? (primeira.clipes[0].mesclagem ?? (primeira.clipes[0].pasta ? "passagem" : "normal")) : ""}
+            onChange={(evento) => aoExecutar({ comando: "clipe.mesclar", parametros: { clipeIds, mesclagem: evento.currentTarget.value as Mesclagem } })}
+            onWheel={(evento) => {
+              // A roda passa pelos modos, como nos editores de imagem (o separador não conta)
+              const campo = evento.currentTarget;
+              if (campo.disabled || document.activeElement !== campo) return;
+              const modos = [...(soPastas ? ["passagem"] : []), ...MESCLAGENS_DA_IMAGEM.flat().map((modo) => modo.id)];
+              const proximo = modos[modos.indexOf(campo.value) + (evento.deltaY > 0 ? 1 : -1)];
+              if (proximo) aoExecutar({ comando: "clipe.mesclar", parametros: { clipeIds, mesclagem: proximo as Mesclagem } });
+            }}
             className="min-w-0 flex-1 rounded border border-borda bg-painel-2 px-1.5 py-0.5 disabled:opacity-50"
           >
-            {MESCLAGENS.map((modo) => (
-              <option key={modo.id} value={modo.id}>
-                {modo.nome}
-              </option>
+            {!mesmaMesclagem ? <option value="">—</option> : null}
+            {soPastas ? <option value="passagem">{nomeDaMesclagem("passagem")}</option> : null}
+            {MESCLAGENS_DA_IMAGEM.map((grupo, indice) => (
+              <Fragment key={grupo[0].id}>
+                {indice > 0 || soPastas ? <option disabled>──────────</option> : null}
+                {grupo.map((modo) => (
+                  <option key={modo.id} value={modo.id}>
+                    {modo.nome}
+                  </option>
+                ))}
+              </Fragment>
             ))}
           </select>
-          <label className="flex items-center gap-1 text-suave">
-            Opacidade:
-            <input
-              aria-label="Opacidade"
-              disabled={!escolhida || travada}
-              inputMode="numeric"
-              value={opacidade ?? (escolhida ? String(Math.round(escolhida.clipe.transformacao.opacidade * 100)) : "")}
-              onChange={(evento) => setOpacidade(evento.currentTarget.value)}
-              onBlur={() => {
-                const valor = Number(opacidade);
-                setOpacidade(null);
-                if (escolhida && opacidade !== null && Number.isFinite(valor)) {
-                  aoExecutar({ comando: "clipe.transformar", parametros: { clipeIds: ids, transformacao: { opacidade: Math.min(100, Math.max(0, valor)) / 100 } } });
-                }
-              }}
-              onKeyDown={(evento) => evento.key === "Enter" && evento.currentTarget.blur()}
-              className="w-10 rounded border border-borda bg-painel-2 px-1 py-0.5 text-right text-texto tabular-nums disabled:opacity-50"
-            />
-            %
-          </label>
+          <CampoDePorcentagem
+            rotulo="Opacidade"
+            valor={opacidade}
+            desativado={!escolhidas.length || algumaTravada}
+            aoMudar={(valor) => aoExecutar({ comando: "clipe.transformar", parametros: { clipeIds, transformacao: { opacidade: valor } } })}
+          />
         </div>
         <div className="flex items-center gap-1 text-suave">
           Bloquear:
+          {TRAVAS.map(({ id, nome, icone: Icone }) => {
+            const ligada = escolhidas.length > 0 && escolhidas.every((faixa) => faixa.travas?.[id]);
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={!escolhidas.length}
+                aria-pressed={ligada}
+                title={nome}
+                aria-label={nome}
+                onClick={() => alternarTrava(id)}
+                className={`grid size-5 place-items-center rounded border ${ligada ? "border-destaque bg-destaque/20 text-texto" : "border-borda hover:text-texto"} disabled:opacity-40`}
+              >
+                <Icone className="size-3" aria-hidden />
+              </button>
+            );
+          })}
           <button
             type="button"
-            disabled={!escolhida}
-            aria-pressed={travada}
+            disabled={!escolhidas.length}
+            aria-pressed={escolhidas.length > 0 && escolhidas.every((faixa) => faixa.travada)}
             title="Bloquear tudo (a camada não se move nem muda)"
-            onClick={() => escolhida && aoExecutar({ comando: "faixa.alternar", parametros: { faixaId: escolhida.faixa.id, propriedade: "travada" } })}
-            className={`grid size-5 place-items-center rounded border ${travada ? "border-destaque bg-destaque/20 text-texto" : "border-borda hover:text-texto"} disabled:opacity-40`}
+            aria-label="Bloquear tudo"
+            onClick={travarTudo}
+            className={`grid size-5 place-items-center rounded border ${escolhidas.length && escolhidas.every((faixa) => faixa.travada) ? "border-destaque bg-destaque/20 text-texto" : "border-borda hover:text-texto"} disabled:opacity-40`}
           >
             <Lock className="size-3" aria-hidden />
           </button>
+          <span className="ml-auto">
+            <CampoDePorcentagem rotulo="Preenchimento" valor={temPasta ? null : preenchimento} desativado={!escolhidas.length || algumaTravada || temPasta} aoMudar={(valor) => mudar({ preenchimento: valor })} />
+          </span>
         </div>
       </div>
 
-      <ol aria-label="Camadas, de cima para baixo" className="min-h-0 flex-1 overflow-y-auto" onDragLeave={() => setAlvo(null)}>
-        {camadas.length === 0 ? <li className="px-3 py-4 text-center text-suave">Nenhuma camada ainda.</li> : null}
-        {camadas.map(({ faixa, clipe }, indice) => {
+      <ol
+        aria-label="Camadas, de cima para baixo"
+        className="min-h-0 flex-1 overflow-y-auto"
+        onDragLeave={(evento) => !evento.currentTarget.contains(evento.relatedTarget as Node) && setAlvo(null)}
+        onClick={(evento) => evento.target === evento.currentTarget && aoSelecionar([])}
+      >
+        {linhas.length === 0 ? <li className="px-3 py-4 text-center text-suave">{filtrando ? "Nenhuma camada com esse filtro." : "Nenhuma camada ainda."}</li> : null}
+        {linhas.map(({ no, nivel, presa }, indiceDaLinha) => {
+          const { faixa, clipe } = no;
           const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
-          const nome = nomeDaCamada(clipe, midias);
+          const nome = nomeDaCamada(clipe, midias, faixa);
           const marcada = selecao.includes(clipe.id);
           const comEstilo = Boolean(clipe.contorno || clipe.sombra);
-          const mesclagem = clipe.mesclagem && clipe.mesclagem !== "normal" ? MESCLAGENS.find((m) => m.id === clipe.mesclagem)?.nome : null;
+          const mesclagem = clipe.pasta ? (clipe.mesclagem && clipe.mesclagem !== "passagem" ? nomeDaMesclagem(clipe.mesclagem) : null) : clipe.mesclagem && clipe.mesclagem !== "normal" ? nomeDaMesclagem(clipe.mesclagem) : null;
+          const visivel = camadaVisivel(projeto, faixa);
+          const rotulo = faixa.rotulo ? CORES_DOS_ROTULOS.find((cor) => cor.id === faixa.rotulo)?.cor : undefined;
+          const temTrava = faixa.travada || Boolean(faixa.travas);
+          const alvoAqui = alvo?.faixaId === faixa.id ? alvo.zona : null;
           return (
             <li
               key={faixa.id}
-              draggable
+              draggable={renomeando !== faixa.id}
               onDragStart={(evento) => {
-                setArrastada(faixa.id);
+                setArrastadas(marcada ? ids : [faixa.id]);
                 evento.dataTransfer.effectAllowed = "move";
+                evento.dataTransfer.setData("text/plain", nome);
               }}
               onDragOver={(evento) => {
-                if (!arrastada) return;
+                if (!arrastadas) return;
                 evento.preventDefault();
                 const caixa = evento.currentTarget.getBoundingClientRect();
-                setAlvo(evento.clientY < caixa.top + caixa.height / 2 ? indice : indice + 1);
+                const fracao = (evento.clientY - caixa.top) / caixa.height;
+                const zona: Alvo["zona"] = clipe.pasta && fracao > 0.25 && fracao < 0.75 ? "dentro" : fracao < 0.5 ? "acima" : "abaixo";
+                if (alvo?.faixaId !== faixa.id || alvo.zona !== zona) setAlvo({ faixaId: faixa.id, zona });
               }}
               onDrop={(evento) => {
                 evento.preventDefault();
-                if (arrastada && alvo !== null) {
-                  const de = camadas.findIndex((camada) => camada.faixa.id === arrastada);
-                  const para = alvo > de ? alvo - 1 : alvo;
-                  if (para !== de) aoExecutar({ comando: "imagem.mover", parametros: { faixaId: arrastada, para } });
-                }
-                setArrastada(null);
+                if (arrastadas && alvo) soltar(arrastadas, alvo);
+                setArrastadas(null);
                 setAlvo(null);
               }}
               onDragEnd={() => {
-                setArrastada(null);
+                setArrastadas(null);
                 setAlvo(null);
               }}
-              className={`relative flex h-9 items-stretch border-b border-borda/60 ${marcada ? "bg-destaque/25" : "hover:bg-painel-2"} ${arrastada === faixa.id ? "opacity-50" : ""}`}
+              onContextMenu={(evento) => {
+                evento.preventDefault();
+                if (!marcada) aoSelecionar([clipe.id]);
+                const caixa = evento.currentTarget.closest("[data-painel-camadas]")?.getBoundingClientRect();
+                setMenu({ x: evento.clientX - (caixa?.left ?? 0), y: evento.clientY - (caixa?.top ?? 0) });
+              }}
+              className={`relative flex h-9 items-stretch border-b border-borda/60 ${marcada ? "bg-destaque/25" : "hover:bg-painel-2"} ${arrastadas?.includes(faixa.id) ? "opacity-50" : ""} ${alvoAqui === "dentro" ? "outline outline-2 -outline-offset-2 outline-destaque" : ""}`}
             >
-              {alvo === indice ? <span className="absolute inset-x-0 top-0 h-0.5 bg-destaque" aria-hidden /> : null}
-              {alvo === indice + 1 && indice === camadas.length - 1 ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-destaque" aria-hidden /> : null}
+              {alvoAqui === "acima" ? <span className="absolute inset-x-0 top-0 h-0.5 bg-destaque" aria-hidden /> : null}
+              {alvoAqui === "abaixo" ? <span className="absolute inset-x-0 -bottom-px h-0.5 bg-destaque" aria-hidden /> : null}
               <button
                 type="button"
-                onClick={() => aoExecutar({ comando: "faixa.alternar", parametros: { faixaId: faixa.id, propriedade: "oculta" } })}
+                onPointerDown={(evento) => {
+                  if (evento.button !== 0) return;
+                  // Sem o arrasto da linha: o olho pinta (Alt + clique mostra só esta)
+                  evento.preventDefault();
+                  if (evento.altKey) aoExecutar({ comando: "imagem.soEsta", parametros: { faixaId: faixa.id } });
+                  else setPintandoOlho({ oculta: !faixa.oculta, ids: [faixa.id] });
+                }}
+                onPointerEnter={() => pintandoOlho && !pintandoOlho.ids.includes(faixa.id) && setPintandoOlho({ ...pintandoOlho, ids: [...pintandoOlho.ids, faixa.id] })}
+                onClick={(evento) => {
+                  // Pelo teclado (Enter ou espaço), o clique não passa pelo ponteiro
+                  if (evento.detail === 0) aoExecutar({ comando: "faixa.alternar", parametros: { faixaId: faixa.id, propriedade: "oculta" } });
+                }}
                 aria-label={faixa.oculta ? `Mostrar ${nome}` : `Esconder ${nome}`}
-                title={faixa.oculta ? "Mostrar a camada" : "Esconder a camada"}
-                className="grid w-7 shrink-0 place-items-center border-r border-borda/60 text-suave hover:text-texto"
+                title={faixa.oculta ? "Mostrar a camada (arraste para mais; Alt + clique: só ela)" : "Esconder a camada (arraste para mais; Alt + clique: só ela)"}
+                className="grid w-7 shrink-0 touch-none place-items-center border-r border-borda/60 text-suave hover:text-texto"
+                style={rotulo ? { background: `${rotulo}55` } : undefined}
               >
-                {faixa.oculta ? <span className="size-3.5" /> : <Eye className="size-3.5" aria-hidden />}
+                {(pintandoOlho?.ids.includes(faixa.id) ? pintandoOlho.oculta : faixa.oculta) ? <span className="size-3.5" /> : <Eye className={`size-3.5 ${visivel ? "" : "opacity-40"}`} aria-hidden />}
               </button>
-              <button type="button" onClick={() => aoSelecionar([clipe.id])} aria-pressed={marcada} className="flex min-w-0 flex-1 items-center gap-2 px-1.5 text-left">
-                <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-borda bg-painel-3">
-                  {clipe.texto ? (
-                    <Type className="size-3.5 text-suave" aria-hidden />
-                  ) : clipe.ajuste ? (
-                    <SlidersHorizontal className="size-3.5 text-suave" aria-hidden />
-                  ) : midia?.elemento ? (
-                    <Shapes className="size-3.5 text-suave" aria-hidden />
-                  ) : midia ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- capa da API com a sessão do cookie
-                    <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" />
-                  ) : null}
-                </span>
-                {clipe.mascara ? <SquareDashed className="size-3.5 shrink-0 text-suave" aria-label="Com máscara" /> : null}
-                <span className={`min-w-0 flex-1 truncate ${faixa.oculta ? "text-apagado" : ""}`}>{nome}</span>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 pr-1.5" style={{ paddingLeft: 4 + nivel * 14 }}>
+                {clipe.pasta ? (
+                  <button
+                    type="button"
+                    className="grid size-4 shrink-0 place-items-center text-suave hover:text-texto"
+                    aria-label={aberta(faixa) ? `Fechar ${nome}` : `Abrir ${nome}`}
+                    aria-expanded={aberta(faixa)}
+                    onClick={() => setAbertas((atual) => ({ ...atual, [faixa.id]: !aberta(faixa) }))}
+                  >
+                    {aberta(faixa) ? <ChevronDown className="size-3" aria-hidden /> : <ChevronRight className="size-3" aria-hidden />}
+                  </button>
+                ) : null}
+                {presa ? <CornerLeftDown className="size-3 shrink-0 text-suave" aria-label="Presa à camada de baixo" /> : null}
+                <button
+                  type="button"
+                  onClick={(evento) => {
+                    // Alt + clique prende a camada à de baixo (ou solta), como o Alt entre as duas nos editores de imagem
+                    if (evento.altKey) mudar({ recortada: !faixa.recortada }, [faixa.id]);
+                    else escolher(faixa, evento);
+                  }}
+                  onDoubleClick={() => setRenomeando(faixa.id)}
+                  title="Alt + clique: prende à camada de baixo (máscara de corte) ou solta" 
+                  aria-pressed={marcada}
+                  className="flex min-w-0 flex-1 items-center gap-2 self-stretch text-left"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-borda bg-painel-3">
+                    {clipe.pasta ? (
+                      aberta(faixa) ? (
+                        <FolderOpen className="size-3.5 text-suave" aria-hidden />
+                      ) : (
+                        <Folder className="size-3.5 text-suave" aria-hidden />
+                      )
+                    ) : clipe.texto ? (
+                      <Type className="size-3.5 text-suave" aria-hidden />
+                    ) : clipe.ajuste ? (
+                      <SlidersHorizontal className="size-3.5 text-suave" aria-hidden />
+                    ) : midia?.elemento ? (
+                      <Shapes className="size-3.5 text-suave" aria-hidden />
+                    ) : midia ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- capa da API com a sessão do cookie
+                      <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" />
+                    ) : null}
+                  </span>
+                  {clipe.mascara ? <SquareDashed className="size-3.5 shrink-0 text-suave" aria-label="Com máscara" /> : null}
+                  {renomeando === faixa.id ? null : <span className={`min-w-0 flex-1 truncate ${presa ? "underline decoration-dotted underline-offset-2" : ""} ${visivel ? "" : "text-apagado"}`}>{nome}</span>}
+                </button>
+                {renomeando === faixa.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={nome}
+                    maxLength={60}
+                    aria-label="Nome da camada"
+                    onFocus={(evento) => evento.currentTarget.select()}
+                    onBlur={(evento) => {
+                      const valor = evento.currentTarget.value.trim();
+                      setRenomeando(null);
+                      if (valor !== nome) mudar({ nome: valor || null }, [faixa.id]);
+                    }}
+                    onKeyDown={(evento) => {
+                      if (evento.key === "Enter") evento.currentTarget.blur();
+                      else if (evento.key === "Tab") {
+                        // Tab passa a renomear a de baixo (Shift+Tab, a de cima)
+                        evento.preventDefault();
+                        const valor = evento.currentTarget.value.trim();
+                        const proxima = linhas[indiceDaLinha + (evento.shiftKey ? -1 : 1)]?.no.faixa.id ?? null;
+                        if (valor !== nome) mudar({ nome: valor || null }, [faixa.id]);
+                        setRenomeando(proxima);
+                      } else if (evento.key === "Escape") {
+                        evento.currentTarget.value = nome;
+                        evento.currentTarget.blur();
+                      }
+                    }}
+                    className="min-w-0 flex-1 rounded border border-destaque bg-painel-2 px-1 py-0.5 outline-none"
+                  />
+                ) : null}
                 {mesclagem ? <span className="shrink-0 text-[10px] text-suave">{mesclagem}</span> : null}
+                {faixa.vinculo ? <Link2 className="size-3 shrink-0 text-suave" aria-label="Vinculada" /> : null}
                 {comEstilo ? <span className="shrink-0 font-serif text-[11px] italic text-suave">fx</span> : null}
-                {faixa.travada ? <Lock className="size-3 shrink-0 text-suave" aria-label="Bloqueada" /> : null}
-              </button>
+                {temTrava ? <Lock className={`size-3 shrink-0 ${faixa.travada ? "text-texto" : "text-suave/70"}`} aria-label={faixa.travada ? "Bloqueada" : "Com bloqueio parcial"} /> : null}
+              </div>
             </li>
           );
         })}
       </ol>
 
+      {menu ? (
+        <div ref={menuRef} role="menu" className="absolute z-50 min-w-52 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={{ left: Math.max(4, Math.min(menu.x, 140)), top: menu.y }}>
+          <ListaDeItens itens={itensDoMenu} aoFechar={() => setMenu(null)} />
+        </div>
+      ) : null}
+
       <div className="flex h-8 shrink-0 items-center justify-end gap-0.5 border-t border-borda px-1.5">
+        <button
+          type="button"
+          className={`botao-icone size-6 ${vinculadas ? "text-destaque" : ""}`}
+          title={vinculadas ? "Desvincular as camadas" : "Vincular as camadas (andam juntas)"}
+          aria-label={vinculadas ? "Desvincular as camadas" : "Vincular as camadas"}
+          aria-pressed={vinculadas}
+          disabled={vinculadas ? false : escolhidas.length < 2}
+          onClick={vincular}
+        >
+          <Link2 className="size-3.5" aria-hidden />
+        </button>
         <BotaoComLista
           titulo="Adicionar um estilo de camada"
           rotulo={<span className="font-serif text-[13px] italic">fx</span>}
-          desativado={!escolhida || travada}
+          desativado={escolhidas.length !== 1 || algumaTravada || temPasta}
           itens={[
             {
               nome: "Contorno…",
               aoEscolher: () => {
-                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds: ids, contorno: escolhida?.clipe.contorno ?? CONTORNO_PADRAO } });
+                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, contorno: primeira?.clipes[0].contorno ?? CONTORNO_PADRAO } });
                 aoAbrirPropriedades();
               },
             },
             {
               nome: "Sombra projetada…",
               aoEscolher: () => {
-                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds: ids, sombra: escolhida?.clipe.sombra ?? SOMBRA_PADRAO } });
+                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, sombra: primeira?.clipes[0].sombra ?? SOMBRA_PADRAO } });
                 aoAbrirPropriedades();
               },
             },
@@ -236,9 +625,9 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
           className="botao-icone size-6"
           title="Adicionar uma máscara (elipse; mude a forma em Propriedades)"
           aria-label="Adicionar uma máscara"
-          disabled={!escolhida || travada || Boolean(escolhida.clipe.mascara)}
+          disabled={escolhidas.length !== 1 || algumaTravada || Boolean(primeira?.clipes[0].mascara)}
           onClick={() => {
-            aoExecutar({ comando: "clipe.mascara", parametros: { clipeIds: ids, mascara: MASCARA_PADRAO } });
+            aoExecutar({ comando: "clipe.mascara", parametros: { clipeIds, mascara: MASCARA_PADRAO } });
             aoAbrirPropriedades();
           }}
         >
@@ -252,21 +641,16 @@ export function PainelCamadas({ projeto, midias, selecao, aoSelecionar, aoExecut
         <button
           type="button"
           className="botao-icone size-6"
-          title="Duplicar a camada (Ctrl+J)"
-          aria-label="Duplicar a camada"
-          disabled={!escolhida}
-          onClick={() => escolhida && aoExecutar({ comando: "imagem.duplicar", parametros: { faixaId: escolhida.faixa.id } })}
+          title={escolhidas.length ? "Agrupar as camadas escolhidas (Ctrl+G)" : "Criar um grupo"}
+          aria-label={escolhidas.length ? "Agrupar as camadas" : "Criar um grupo"}
+          onClick={agrupar}
         >
+          <FolderPlus className="size-3.5" aria-hidden />
+        </button>
+        <button type="button" className="botao-icone size-6" title="Duplicar a camada (Ctrl+J)" aria-label="Duplicar a camada" disabled={!escolhidas.length} onClick={duplicar}>
           <Copy className="size-3.5" aria-hidden />
         </button>
-        <button
-          type="button"
-          className="botao-icone size-6"
-          title="Excluir a camada (Delete)"
-          aria-label="Excluir a camada"
-          disabled={!escolhida || travada}
-          onClick={() => escolhida && aoExecutar({ comando: "imagem.apagar", parametros: { faixaId: escolhida.faixa.id } })}
-        >
+        <button type="button" className="botao-icone size-6" title="Excluir a camada (Delete)" aria-label="Excluir a camada" disabled={!escolhidas.length || algumaTravada} onClick={apagar}>
           <Trash2 className="size-3.5" aria-hidden />
         </button>
       </div>

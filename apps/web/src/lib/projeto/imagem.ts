@@ -6,7 +6,8 @@ import { segundosParaTicks } from "../tempo.ts";
 import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
-import { type Clipe, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
+import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada } from "./modelo.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 
@@ -69,9 +70,19 @@ function clipeDaCamada(id: string, extra: Partial<Clipe>): Clipe {
   };
 }
 
-/** Uma faixa nova por cima de todas (a camada nova aparece na frente). */
-function porNoTopo(projeto: Projeto, faixa: Faixa): Projeto {
-  return { ...projeto, faixas: [faixa, ...projeto.faixas] };
+/**
+ * Uma faixa nova logo acima de `acima` (a camada escolhida no painel), na mesma pasta dela, como nos editores
+ * profissionais; sem ela, por cima de todas.
+ */
+function porNoTopo(projeto: Projeto, faixa: Faixa, acima?: string | null): Projeto {
+  const indice = acima ? projeto.faixas.findIndex((item) => item.id === acima && item.tipo !== "principal") : -1;
+  if (indice < 0) return { ...projeto, faixas: [faixa, ...projeto.faixas] };
+  const referencia = projeto.faixas[indice];
+  // Acima de uma pasta, a camada nova fica fora dela (ao lado), como lá
+  const nova = { ...faixa, pai: paiDaCamada(projeto, referencia) };
+  const faixas = [...projeto.faixas];
+  faixas.splice(indice, 0, nova);
+  return { ...projeto, faixas };
 }
 
 function faixaNova(ctx: Contexto, tipo: "video" | "texto", clipe: Clipe): Faixa {
@@ -86,7 +97,7 @@ function faixaNova(ctx: Contexto, tipo: "video" | "texto", clipe: Clipe): Faixa 
 }
 
 /** `transformacao`: onde a camada entra (a forma desenhada com a ferramenta Forma), no lugar do padrão. */
-export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId: string, transformacao?: Partial<Transformacao>): { projeto: Projeto; clipeId: string } {
+export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId: string, transformacao?: Partial<Transformacao>, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const info = ctx.midia(midiaId);
   if (!info) throw new ErroEdicao("A mídia ainda não está pronta.");
   if (!info.imagem) throw new ErroEdicao("No editor de imagem entram imagens (JPG, PNG ou WebP).");
@@ -99,23 +110,23 @@ export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId:
     };
   if (transformacao) clipe.transformacao = { ...clipe.transformacao, ...transformacao };
   return {
-    projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe)),
+    projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima),
     clipeId: clipe.id,
   };
 }
 
-/** Uma camada de ajuste por cima de todas: muda a cor do que está embaixo dela. */
-export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto): { projeto: Projeto; clipeId: string } {
+/** Uma camada de ajuste acima da escolhida (ou de todas): muda a cor do que está embaixo dela. */
+export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { ajuste: true });
-  return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe)), clipeId: clipe.id };
+  return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
 }
 
 /** `transformacao`: onde o texto entra (o clique da ferramenta Texto), no lugar do meio. */
-export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto, transformacao?: Partial<Transformacao>): { projeto: Projeto; clipeId: string } {
+export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto, transformacao?: Partial<Transformacao>, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { texto });
   if (transformacao) clipe.transformacao = { ...clipe.transformacao, ...transformacao };
   return {
-    projeto: porNoTopo(projeto, faixaNova(ctx, "texto", clipe)),
+    projeto: porNoTopo(projeto, faixaNova(ctx, "texto", clipe), acima),
     clipeId: clipe.id,
   };
 }
@@ -126,58 +137,265 @@ function indiceDaCamada(projeto: Projeto, faixaId: string): number {
   return indice;
 }
 
+/** As camadas na mesma pasta que a faixa (ela inclusive), de cima para baixo. */
+function irmasDe(projeto: Projeto, faixa: Faixa): Faixa[] {
+  const pai = paiDaCamada(projeto, faixa);
+  return projeto.faixas.filter((item) => item.tipo !== "principal" && item.clipes.length && paiDaCamada(projeto, item) === pai);
+}
+
+/** Troca a ordem das irmãs: cada uma vai para a vaga (o índice na lista) de quem estava naquela posição. */
+function comIrmasEmOrdem(projeto: Projeto, antes: Faixa[], depois: Faixa[]): Projeto {
+  const vagas = antes.map((faixa) => projeto.faixas.indexOf(faixa));
+  const faixas = [...projeto.faixas];
+  vagas.forEach((vaga, i) => {
+    faixas[vaga] = depois[i];
+  });
+  return { ...projeto, faixas };
+}
+
 /**
- * Sobe (para a frente) ou desce (para trás) uma posição, vai direto para o topo ou o fundo, ou vai para a posição dada
- * (0 é a de cima, como na lista do painel Camadas, que arrasta a camada até ela).
+ * Sobe (para a frente) ou desce (para trás) uma posição entre as camadas da mesma pasta, vai direto para o topo ou o
+ * fundo dela, ou vai para a posição dada (0 é a de cima). As camadas de dentro de uma pasta andam com ela.
  */
 export function moverCamada(projeto: Projeto, faixaId: string, para: "cima" | "baixo" | "topo" | "fundo" | number): Projeto {
-  const indice = indiceDaCamada(projeto, faixaId);
-  const camadas = projeto.faixas.filter((faixa) => faixa.tipo !== "principal");
-  const principal = projeto.faixas.filter((faixa) => faixa.tipo === "principal");
-  const [faixa] = camadas.splice(indice, 1);
+  const faixa = projeto.faixas[indiceDaCamada(projeto, faixaId)];
+  const irmas = irmasDe(projeto, faixa);
+  const indice = irmas.indexOf(faixa);
+  const outras = irmas.filter((item) => item !== faixa);
   const destino =
     typeof para === "number"
-      ? Math.min(camadas.length, Math.max(0, Math.round(para)))
+      ? Math.min(outras.length, Math.max(0, Math.round(para)))
       : para === "topo"
         ? 0
         : para === "fundo"
-          ? camadas.length
+          ? outras.length
           : para === "cima"
             ? Math.max(0, indice - 1)
-            : Math.min(camadas.length, indice + 1);
-  camadas.splice(destino, 0, faixa);
-  return { ...projeto, faixas: [...camadas, ...principal] };
+            : Math.min(outras.length, indice + 1);
+  outras.splice(destino, 0, faixa);
+  return comIrmasEmOrdem(projeto, irmas, outras);
+}
+
+/** Organizar › Inverter: as camadas escolhidas (da mesma pasta) trocam de ordem entre si. */
+export function inverterCamadas(projeto: Projeto, faixaIds: string[]): Projeto {
+  const escolhidas = projeto.faixas.filter((faixa) => faixaIds.includes(faixa.id) && faixa.tipo !== "principal");
+  if (escolhidas.length < 2) throw new ErroEdicao("Escolha duas camadas ou mais para inverter a ordem.");
+  const pai = paiDaCamada(projeto, escolhidas[0]);
+  if (escolhidas.some((faixa) => paiDaCamada(projeto, faixa) !== pai)) throw new ErroEdicao("As camadas para inverter precisam estar na mesma pasta.");
+  const faixas = [...projeto.faixas];
+  const vagas = escolhidas.map((faixa) => faixas.indexOf(faixa));
+  [...escolhidas].reverse().forEach((faixa, i) => {
+    faixas[vagas[i]] = faixa;
+  });
+  return { ...projeto, faixas };
+}
+
+/**
+ * Leva as camadas (com o que há dentro das pastas) para a pasta `pai` (null é a raiz), logo acima de `acimaDe` (uma
+ * camada dessa pasta) ou no fundo dela. É o arrastar do painel Camadas.
+ */
+export function moverCamadasPara(projeto: Projeto, faixaIds: string[], pai: string | null, acimaDe: string | null): Projeto {
+  const pasta = pai ? projeto.faixas.find((faixa) => faixa.id === pai) : null;
+  if (pai && !pasta?.clipes[0]?.pasta) throw new ErroEdicao("Essa pasta não existe mais.");
+  // Só as de cima: quem está dentro de uma pasta que também vai anda junto com ela
+  const escolhidas = projeto.faixas.filter(
+    (faixa) => faixaIds.includes(faixa.id) && faixa.tipo !== "principal" && !ancestrais(projeto, faixa).some((ancestral) => faixaIds.includes(ancestral.id)),
+  );
+  if (!escolhidas.length) return projeto;
+  if (pasta && escolhidas.some((faixa) => faixa.id === pasta.id || ancestrais(projeto, pasta).some((ancestral) => ancestral.id === faixa.id))) {
+    throw new ErroEdicao("Uma pasta não entra dentro dela mesma.");
+  }
+  if (escolhidas.some((faixa) => faixa.travada)) throw new ErroEdicao("Uma das camadas está travada.");
+  const blocos = escolhidas.map((faixa) => comDescendentes(projeto, faixa.id));
+  const ids = new Set(blocos.flat().map((faixa) => faixa.id));
+  const restantes = projeto.faixas.filter((faixa) => !ids.has(faixa.id));
+  const movidas = blocos.flatMap((bloco) => bloco.map((faixa) => (faixa.id === bloco[0].id ? { ...faixa, pai } : faixa)));
+  let vaga = acimaDe ? restantes.findIndex((faixa) => faixa.id === acimaDe) : -1;
+  if (vaga < 0) {
+    // No fundo da pasta: logo depois da última camada dela (ou da própria pasta); na raiz, logo acima da principal
+    const daPasta = restantes.filter((faixa) => faixa.tipo !== "principal" && paiDaCamada({ ...projeto, faixas: restantes }, faixa) === pai);
+    const ultima = daPasta[daPasta.length - 1];
+    vaga = ultima ? restantes.indexOf(ultima) + 1 : pasta ? restantes.indexOf(pasta) + 1 : restantes.findIndex((faixa) => faixa.tipo === "principal");
+    if (vaga < 0) vaga = restantes.length;
+  }
+  return { ...projeto, faixas: [...restantes.slice(0, vaga), ...movidas, ...restantes.slice(vaga)] };
+}
+
+/**
+ * Camada › Agrupar camadas (Ctrl+G): uma pasta nova no lugar da de cima das escolhidas, com elas dentro (na ordem de
+ * antes). A pasta começa aberta, com a mesclagem Passagem.
+ */
+export function agruparCamadas(projeto: Projeto, ctx: Contexto, faixaIds: string[]): { projeto: Projeto; clipeId: string } {
+  const escolhidas = projeto.faixas.filter((faixa) => faixaIds.includes(faixa.id) && faixa.tipo !== "principal");
+  const pasta: Faixa = {
+    ...faixaNova(ctx, "video", clipeDaCamada(ctx.novoId(), { pasta: true, mesclagem: "passagem" })),
+    pai: escolhidas.length ? paiDaCamada(projeto, escolhidas[0]) : null,
+    aberta: true,
+    nome: `Grupo ${projeto.faixas.filter((faixa) => faixa.clipes[0]?.pasta).length + 1}`,
+  };
+  // Sem camadas escolhidas: uma pasta vazia no topo (o botão de pasta do painel)
+  if (!escolhidas.length) return { projeto: porNoTopo(projeto, pasta), clipeId: pasta.clipes[0].id };
+  const faixas = [...projeto.faixas];
+  faixas.splice(faixas.indexOf(escolhidas[0]), 0, pasta);
+  const comPasta = { ...projeto, faixas };
+  return { projeto: moverCamadasPara(comPasta, escolhidas.map((faixa) => faixa.id), pasta.id, null), clipeId: pasta.clipes[0].id };
+}
+
+/** Camada › Desagrupar (Ctrl+Shift+G): a pasta sai e as camadas de dentro ficam onde ela estava. */
+export function desagruparCamadas(projeto: Projeto, faixaId: string): Projeto {
+  const pasta = projeto.faixas.find((faixa) => faixa.id === faixaId);
+  if (!pasta?.clipes[0]?.pasta) throw new ErroEdicao("Escolha uma pasta para desagrupar.");
+  if (pasta.travada) throw new ErroEdicao("A pasta está travada.");
+  const pai = paiDaCamada(projeto, pasta);
+  return { ...projeto, faixas: projeto.faixas.filter((faixa) => faixa !== pasta).map((faixa) => (faixa.pai === pasta.id ? { ...faixa, pai } : faixa)) };
+}
+
+export type MudancaDaCamada = {
+  nome?: string | null;
+  rotulo?: CorDoRotulo | null;
+  travas?: TravasDaCamada | null;
+  recortada?: boolean;
+  aberta?: boolean;
+  oculta?: boolean;
+  travada?: boolean;
+  /** O preenchimento do clipe (0 a 1): a opacidade da camada sem os estilos. */
+  preenchimento?: number;
+};
+
+/** O nome, a cor do rótulo, as travas, o recorte na de baixo, a pasta aberta no painel, o olho e o preenchimento. */
+export function mudarCamada(projeto: Projeto, faixaIds: string[], mudanca: MudancaDaCamada): Projeto {
+  if (mudanca.nome !== undefined && mudanca.nome !== null && !mudanca.nome.trim()) throw new ErroEdicao("A camada precisa de um nome.");
+  const nome = mudanca.nome === undefined ? undefined : mudanca.nome?.trim().slice(0, 60) || null;
+  return {
+    ...projeto,
+    faixas: projeto.faixas.map((faixa) => {
+      if (!faixaIds.includes(faixa.id) || faixa.tipo === "principal") return faixa;
+      // Mudar o recorte e o preenchimento mexe no que aparece: travada, não muda (as outras são do painel)
+      if ((mudanca.recortada !== undefined || mudanca.preenchimento !== undefined) && faixa.travada) throw new ErroEdicao("A camada está travada.");
+      const clipe = faixa.clipes[0];
+      const preenchimento = mudanca.preenchimento === undefined || clipe?.pasta ? undefined : Math.min(1, Math.max(0, mudanca.preenchimento));
+      return {
+        ...faixa,
+        ...(mudanca.oculta !== undefined ? { oculta: mudanca.oculta } : {}),
+        ...(mudanca.travada !== undefined ? { travada: mudanca.travada } : {}),
+        ...(preenchimento !== undefined && clipe ? { clipes: [preenchimentoNoClipe(clipe, preenchimento), ...faixa.clipes.slice(1)] } : {}),
+        ...(nome !== undefined ? { nome } : {}),
+        ...(mudanca.rotulo !== undefined ? { rotulo: mudanca.rotulo } : {}),
+        ...(mudanca.travas !== undefined ? { travas: travasJuntas(faixa.travas, mudanca.travas) } : {}),
+        ...(mudanca.recortada !== undefined ? { recortada: mudanca.recortada } : {}),
+        ...(mudanca.aberta !== undefined ? { aberta: mudanca.aberta } : {}),
+      };
+    }),
+  };
+}
+
+/** As travas da camada com as mudadas (null tira todas); sem nenhuma ligada, o campo sai. */
+function travasJuntas(atuais: TravasDaCamada | null | undefined, mudadas: TravasDaCamada | null): TravasDaCamada | null {
+  if (!mudadas) return null;
+  const juntas = { ...atuais, ...mudadas };
+  const ligadas = Object.fromEntries(Object.entries(juntas).filter(([, valor]) => valor)) as TravasDaCamada;
+  return Object.keys(ligadas).length ? ligadas : null;
+}
+
+/** O clipe com o preenchimento; o 100% tira o campo, para o projeto ficar como antes. */
+function preenchimentoNoClipe(clipe: Clipe, preenchimento: number): Clipe {
+  if (preenchimento < 1) return { ...clipe, preenchimento };
+  const semCampo = { ...clipe };
+  delete semCampo.preenchimento;
+  return semCampo;
+}
+
+/**
+ * Alt + clique no olho: só esta camada aparece (com as pastas em volta e o que está dentro dela); se já era assim,
+ * todas voltam a aparecer.
+ */
+export function soEstaVisivel(projeto: Projeto, faixaId: string): Projeto {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  if (!faixa || faixa.tipo === "principal") throw new ErroEdicao("Essa camada não existe mais.");
+  const ficam = new Set([...comDescendentes(projeto, faixaId), ...ancestrais(projeto, faixa)].map((item) => item.id));
+  const outras = projeto.faixas.filter((item) => item.tipo !== "principal" && item.clipes.length && !ficam.has(item.id));
+  const jaEstava = outras.every((item) => item.oculta) && [...ficam].every((id) => !projeto.faixas.find((item) => item.id === id)?.oculta);
+  return {
+    ...projeto,
+    faixas: projeto.faixas.map((item) => {
+      if (item.tipo === "principal" || !item.clipes.length) return item;
+      const oculta = jaEstava ? false : !ficam.has(item.id);
+      return item.oculta === oculta ? item : { ...item, oculta };
+    }),
+  };
+}
+
+/** Vincular camadas (todas com o mesmo vínculo) ou desvincular (`ligar` falso). */
+export function vincularCamadas(projeto: Projeto, ctx: Contexto, faixaIds: string[], ligar: boolean): Projeto {
+  if (ligar && faixaIds.length < 2) throw new ErroEdicao("Escolha duas camadas ou mais para vincular.");
+  const vinculo = ligar ? ctx.novoId() : null;
+  return { ...projeto, faixas: projeto.faixas.map((faixa) => (faixaIds.includes(faixa.id) ? { ...faixa, vinculo } : faixa)) };
 }
 
 export function apagarCamada(projeto: Projeto, faixaId: string): Projeto {
-  const indice = indiceDaCamada(projeto, faixaId);
-  if (projeto.faixas[indice].travada) throw new ErroEdicao("A camada está travada. Destrave o cadeado para apagar.");
-  return { ...projeto, faixas: projeto.faixas.filter((_, i) => i !== indice) };
+  indiceDaCamada(projeto, faixaId);
+  const saem = comDescendentes(projeto, faixaId);
+  if (saem.some((faixa) => faixa.travada)) throw new ErroEdicao("A camada está travada. Destrave o cadeado para apagar.");
+  const ids = new Set(saem.map((faixa) => faixa.id));
+  return { ...projeto, faixas: projeto.faixas.filter((faixa) => !ids.has(faixa.id)) };
 }
 
-/** A cópia entra logo acima da original, com ids novos e um pouco deslocada (para dar para ver que são duas). */
+/** Camada › Excluir › Camadas ocultas: as escondidas (com o que há dentro, nas pastas) saem. */
+/** Excluir as camadas escolhidas (as de dentro de uma pasta escolhida já saem com ela). */
+export function apagarCamadas(projeto: Projeto, faixaIds: string[]): Projeto {
+  let resultado = projeto;
+  for (const faixaId of faixaIds) if (resultado.faixas.some((faixa) => faixa.id === faixaId)) resultado = apagarCamada(resultado, faixaId);
+  return resultado;
+}
+
+/** Duplicar as escolhidas, cada cópia acima da original; devolve os clipes das cópias. */
+export function duplicarCamadas(projeto: Projeto, ctx: Contexto, faixaIds: string[]): { projeto: Projeto; clipeIds: string[] } {
+  // As de dentro de uma pasta escolhida já vão na cópia dela
+  const escolhidas = projeto.faixas.filter((faixa) => faixaIds.includes(faixa.id) && !ancestrais(projeto, faixa).some((pasta) => faixaIds.includes(pasta.id)));
+  let resultado = projeto;
+  const clipeIds: string[] = [];
+  for (const faixa of escolhidas) {
+    const copia = duplicarCamada(resultado, ctx, faixa.id);
+    resultado = copia.projeto;
+    clipeIds.push(copia.clipeId);
+  }
+  return { projeto: resultado, clipeIds };
+}
+
+export function apagarCamadasOcultas(projeto: Projeto): Projeto {
+  const ocultas = projeto.faixas.filter((faixa) => faixa.tipo !== "principal" && faixa.oculta && !faixa.travada);
+  if (!ocultas.length) throw new ErroEdicao("Não há camadas ocultas para excluir.");
+  const ids = new Set(ocultas.flatMap((faixa) => comDescendentes(projeto, faixa.id)).map((faixa) => faixa.id));
+  return { ...projeto, faixas: projeto.faixas.filter((faixa) => !ids.has(faixa.id)) };
+}
+
+/**
+ * A cópia entra logo acima da original, com ids novos e um pouco deslocada (para dar para ver que são duas). Uma
+ * pasta é copiada com tudo o que há dentro (as cópias ficam na pasta copiada).
+ */
 export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string): { projeto: Projeto; clipeId: string } {
   const indice = indiceDaCamada(projeto, faixaId);
   const original = projeto.faixas[indice];
-  const clipe = structuredClone(original.clipes[0]);
-  const t = clipe.transformacao;
-  const copia: Clipe = {
-    ...clipe,
-    id: ctx.novoId(),
-    transformacao: {
-      ...t,
-      x: Math.min(t.x + 0.03, 10),
-      y: Math.min(t.y + 0.03, 10),
-    },
-  };
-  const faixas = [...projeto.faixas];
-  faixas.splice(indice, 0, {
-    ...original,
-    id: ctx.novoId(),
-    travada: false,
-    clipes: [copia],
+  const bloco = comDescendentes(projeto, faixaId);
+  const novosIds = new Map(bloco.map((faixa) => [faixa.id, ctx.novoId()]));
+  const copias = bloco.map((faixa) => {
+    const clipe = structuredClone(faixa.clipes[0]);
+    const t = clipe.transformacao;
+    const deslocar = faixa === original && !clipe.pasta;
+    return {
+      ...faixa,
+      id: novosIds.get(faixa.id)!,
+      pai: faixa === original ? faixa.pai : (novosIds.get(faixa.pai ?? "") ?? faixa.pai),
+      travada: false,
+      // Copiar não leva o vínculo: a cópia anda sozinha
+      vinculo: null,
+      nome: faixa === original && faixa.nome ? `${faixa.nome} cópia`.slice(0, 60) : faixa.nome,
+      clipes: [{ ...clipe, id: ctx.novoId(), transformacao: deslocar ? { ...t, x: Math.min(t.x + 0.03, 10), y: Math.min(t.y + 0.03, 10) } : t }],
+    };
   });
-  return { projeto: { ...projeto, faixas }, clipeId: copia.id };
+  const faixas = [...projeto.faixas];
+  faixas.splice(indice, 0, ...copias);
+  return { projeto: { ...projeto, faixas }, clipeId: copias[0].clipes[0].id };
 }
 
 /** A força do desfoque da cópia de baixo no "Desfocar o fundo". */

@@ -7,9 +7,11 @@ import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaMascaraDaImagem } from "@/lib/exportacao/imagem";
 import { useBitmaps } from "@/lib/previa/bitmaps";
-import { camadaDoCompositor, camadasDaImagem, textosParaImagens } from "@/lib/previa/camadas";
+import { camadaDoCompositor, camadasDaImagem, camadasEmArvore, textosParaImagens } from "@/lib/previa/camadas";
 import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
+import { type CaixaNoQuadro, caixaNoQuadro, unidadesDaSelecao } from "@/lib/projeto/alinhar";
+import { posicaoTravada } from "@/lib/projeto/arvore";
 import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
@@ -43,6 +45,11 @@ type Props = {
   aoSelecionar: (ids: string[]) => void;
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
+  /** Várias camadas (ou uma pasta) arrastadas juntas: o deslocamento em frações do quadro; null desfaz a prévia. */
+  aoPreverDeslocamento: (deslocamento: { dx: number; dy: number } | null) => void;
+  aoDeslocar: (dx: number, dy: number) => void;
+  /** As caixas das camadas na tela, em frações do quadro (para alinhar e distribuir). */
+  caixasRef?: React.RefObject<Map<string, CaixaNoQuadro>>;
   ferramenta: IdFerramentaDaImagem;
   /** Pixels de tela por pixel da imagem; null ajusta a imagem à área. */
   zoom: number | null;
@@ -92,6 +99,9 @@ export function PreviaDaImagem({
   aoSelecionar,
   aoPrever,
   aoTransformar,
+  aoPreverDeslocamento,
+  aoDeslocar,
+  caixasRef,
   ferramenta,
   zoom,
   aoMudarZoom,
@@ -149,6 +159,18 @@ export function PreviaDaImagem({
   });
   const bitmaps = useBitmaps(enderecos);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
+  // Uma pasta ou várias camadas: uma caixa só, em volta de tudo, que arrasta todas juntas
+  const doGrupo = selecionada ? [] : unidadesDaSelecao(projeto, selecao).flatMap((unidade) => unidade.clipeIds);
+  const caixasDoGrupo = camadas.filter((camada) => doGrupo.includes(camada.clipe.id)).map((camada) => caixaNoQuadro(camada.caixa, tamanho));
+  const caixaDoGrupo = caixasDoGrupo.length
+    ? {
+        x0: Math.min(...caixasDoGrupo.map((c) => c.x0)) * tamanho.largura,
+        y0: Math.min(...caixasDoGrupo.map((c) => c.y0)) * tamanho.altura,
+        x1: Math.max(...caixasDoGrupo.map((c) => c.x1)) * tamanho.largura,
+        y1: Math.max(...caixasDoGrupo.map((c) => c.y1)) * tamanho.altura,
+      }
+    : null;
+  const arrastandoGrupo = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -171,18 +193,22 @@ export function PreviaDaImagem({
   useLayoutEffect(() => {
     const atual = compositor.current;
     if (!atual || tamanho.largura <= 1) return;
-    const prontas = camadas.flatMap((camada) => {
-      if (camada.imagem) return [camadaDoCompositor(camada, camada.imagem, null)];
-      if (camada.clipe.ajuste) return [camadaDoCompositor(camada, FUNDO, null)];
-      const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
-      if (!fonte) return [];
-      const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;
-      const mascara = enderecoDaMascara ? bitmaps.get(enderecoDaMascara) : null;
-      if (enderecoDaMascara && !mascara) return [];
-      return [camadaDoCompositor(camada, fonte, mascara ?? null)];
-    });
+    // As camadas de cada faixa, prontas para o compositor; a árvore junta as pastas e os recortes
+    const porFaixa = new Map(
+      camadas.flatMap((camada) => {
+        if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const];
+        if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
+        if (!fonte) return [];
+        const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;
+        const mascara = enderecoDaMascara ? bitmaps.get(enderecoDaMascara) : null;
+        if (enderecoDaMascara && !mascara) return [];
+        return [[camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ?? null)] as const];
+      }),
+    );
+    if (caixasRef) caixasRef.current = new Map(camadas.map((camada) => [camada.clipe.id, caixaNoQuadro(camada.caixa, tamanho)]));
     const resolucao = { largura: Math.round(tamanho.largura * densidade), altura: Math.round(tamanho.altura * densidade) };
-    atual.desenhar(prontas, projeto.fundo.transparente ? null : projeto.fundo.cor, tamanho, resolucao);
+    atual.desenhar(camadasEmArvore(projeto, porFaixa, tamanho), projeto.fundo.transparente ? null : projeto.fundo.cor, tamanho, resolucao);
   });
 
   // Depois de um zoom pelo clique, o ponto clicado volta para baixo do mouse
@@ -264,7 +290,9 @@ export function PreviaDaImagem({
       return;
     }
     const acima = camadaNoPonto(ponto);
-    aoSelecionar(acima ? [acima.clipe.id] : []);
+    // Shift junta à seleção (ou tira), como nos editores de imagem
+    if (evento.shiftKey && acima) aoSelecionar(selecao.includes(acima.clipe.id) ? selecao.filter((id) => id !== acima.clipe.id) : [...selecao, acima.clipe.id]);
+    else aoSelecionar(acima ? [acima.clipe.id] : []);
   }
 
   function aoMover(evento: React.PointerEvent<HTMLDivElement>) {
@@ -360,7 +388,7 @@ export function PreviaDaImagem({
                 caixa={selecionada.caixaBase}
                 quadro={tamanho}
                 transformacao={selecionada.clipe.transformacao}
-                travado={selecionada.faixa.travada}
+                travado={posicaoTravada(projeto, selecionada.faixa)}
                 aoMudar={(mudanca, novasGuias) => {
                   aoPrever(selecionada.clipe.id, mudanca);
                   setGuias(novasGuias.verticais.length || novasGuias.horizontais.length ? novasGuias : null);
@@ -369,6 +397,50 @@ export function PreviaDaImagem({
                   setGuias(null);
                   aoPrever(selecionada.clipe.id, null);
                   if (mudanca) aoTransformar(selecionada.clipe.id, mudanca);
+                }}
+              />
+            ) : null}
+            {caixaDoGrupo && !recorte && !objeto && mostrarAlcas ? (
+              <div
+                role="group"
+                aria-label="Camadas escolhidas"
+                className="absolute cursor-move border border-dashed border-destaque outline outline-1 outline-black/40"
+                style={{ left: caixaDoGrupo.x0, top: caixaDoGrupo.y0, width: caixaDoGrupo.x1 - caixaDoGrupo.x0, height: caixaDoGrupo.y1 - caixaDoGrupo.y0 }}
+                onPointerDown={(evento) => {
+                  if (evento.button !== 0) return;
+                  evento.stopPropagation();
+                  evento.currentTarget.setPointerCapture(evento.pointerId);
+                  arrastandoGrupo.current = { x: evento.clientX, y: evento.clientY, dx: 0, dy: 0 };
+                }}
+                onPointerMove={(evento) => {
+                  const arrasto = arrastandoGrupo.current;
+                  if (!arrasto) return;
+                  evento.stopPropagation();
+                  // Shift prende a um eixo
+                  let dx = evento.clientX - arrasto.x;
+                  let dy = evento.clientY - arrasto.y;
+                  if (evento.shiftKey) {
+                    if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+                    else dx = 0;
+                  }
+                  arrasto.dx = dx / tamanho.largura;
+                  arrasto.dy = dy / tamanho.altura;
+                  aoPreverDeslocamento({ dx: arrasto.dx, dy: arrasto.dy });
+                }}
+                onPointerUp={(evento) => {
+                  const arrasto = arrastandoGrupo.current;
+                  arrastandoGrupo.current = null;
+                  if (!arrasto) return;
+                  evento.stopPropagation();
+                  aoPreverDeslocamento(null);
+                  if (arrasto.dx || arrasto.dy) aoDeslocar(arrasto.dx, arrasto.dy);
+                  else {
+                    // Um clique sem arrastar escolhe a camada do ponto, como fora da caixa
+                    const quadro = evento.currentTarget.parentElement!.getBoundingClientRect();
+                    const acima = camadaNoPonto({ x: evento.clientX - quadro.left, y: evento.clientY - quadro.top });
+                    if (evento.shiftKey && acima) aoSelecionar(selecao.includes(acima.clipe.id) ? selecao.filter((id) => id !== acima.clipe.id) : [...selecao, acima.clipe.id]);
+                    else aoSelecionar(acima ? [acima.clipe.id] : []);
+                  }
                 }}
               />
             ) : null}

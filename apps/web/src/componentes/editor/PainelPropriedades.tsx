@@ -95,6 +95,8 @@ const ABAS_AJUSTE = [
   { id: "cor", nome: "Cor", fase: "" },
   { id: "basico", nome: "Básico", fase: "" },
 ] as const;
+// O grupo do editor de imagem: só o básico (opacidade e máscara); a mesclagem fica no painel Camadas
+const ABAS_PASTA = [{ id: "basico", nome: "Básico", fase: "" }] as const;
 const ABAS_DESENHO = [
   { id: "basico", nome: "Básico", fase: "" },
   { id: "cor", nome: "Cor", fase: "" },
@@ -181,7 +183,9 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
     setAba(pedidoDeAba.aba);
   }
   const ehAudio = selecionado?.faixa.tipo === "audio";
-  const todasAsAbas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.ajuste
+  const todasAsAbas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.pasta
+    ? ABAS_PASTA
+    : selecionado?.clipe.ajuste
     ? ABAS_AJUSTE
     : modo === "imagem"
       ? ehTexto
@@ -436,14 +440,18 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
   }
-  if (clipe.ajuste) {
+  if (clipe.ajuste || clipe.pasta) {
     const opacidade = clipe.transformacao.opacidade;
     const comando = (valor: number): Comando => ({ comando: "clipe.transformar", parametros: { clipeIds: [clipe.id], transformacao: { opacidade: valor } } });
     return (
       <div>
         {faixa.travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
-        <Secao titulo="Camada de ajuste">
-          <p className="text-[11px] text-suave">A cor, o filtro e as curvas desta camada (aba Cor) valem para tudo o que está embaixo dela. A máscara limita a uma parte do quadro.</p>
+        <Secao titulo={clipe.pasta ? "Grupo" : "Camada de ajuste"}>
+          <p className="text-[11px] text-suave">
+            {clipe.pasta
+              ? "A opacidade e a máscara valem para tudo o que está dentro do grupo. A mesclagem e as travas ficam no painel Camadas."
+              : "A cor, o filtro e as curvas desta camada (aba Cor) valem para tudo o que está embaixo dela. A máscara limita a uma parte do quadro."}
+          </p>
           <ControleNumerico
             rotulo="Opacidade"
             valor={opacidade * 100}

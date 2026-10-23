@@ -102,20 +102,32 @@ import {
   adicionarCamadaDeAjuste,
   adicionarCamadaDeMidia,
   adicionarCamadaDeTexto,
+  agruparCamadas,
   apagarCamada,
+  apagarCamadas,
+  apagarCamadasOcultas,
   aplicarModeloDeImagem,
   camadaComOutraMidia,
+  desagruparCamadas,
   desfocarFundo,
   duplicarCamada,
+  duplicarCamadas,
+  inverterCamadas,
   moverCamada,
+  moverCamadasPara,
+  mudarCamada,
+  type MudancaDaCamada,
+  soEstaVisivel,
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
   recortarImagem,
   type RetanguloDaImagem,
   type TamanhoDaImagem,
   trocarImagemDaCamada,
+  vincularCamadas,
 } from "./imagem.ts";
 import type { Cor } from "./cor.ts";
+import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
 import type { Nivelamento } from "./nivelar.ts";
 import type { ChaveDeKeyframe, Expressao, PropriedadeAnimavel } from "./keyframes.ts";
 import type { Reenquadramento } from "./reenquadrar.ts";
@@ -140,7 +152,7 @@ export type Comando =
   | { comando: "clipe.esticar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
-  | { comando: "imagem.adicionarAjuste"; parametros: Record<string, never> }
+  | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null } }
   | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
@@ -175,8 +187,19 @@ export type Comando =
   | { comando: "clipe.silhueta"; parametros: { clipeIds: string[]; contorno?: Contorno | null; sombra?: Sombra | null } }
   | { comando: "clipe.mascara"; parametros: { clipeIds: string[]; mascara: MascaraDeForma | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
-  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string; transformacao?: Partial<Transformacao> } }
-  | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto; transformacao?: Partial<Transformacao> } }
+  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string; transformacao?: Partial<Transformacao>; acima?: string | null } }
+  | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto; transformacao?: Partial<Transformacao>; acima?: string | null } }
+  | { comando: "imagem.agrupar"; parametros: { faixaIds: string[] } }
+  | { comando: "imagem.desagrupar"; parametros: { faixaId: string } }
+  | { comando: "imagem.moverPara"; parametros: { faixaIds: string[]; pai: string | null; acimaDe: string | null } }
+  | { comando: "imagem.inverter"; parametros: { faixaIds: string[] } }
+  | { comando: "imagem.camada"; parametros: { faixaIds: string[]; mudanca: MudancaDaCamada } }
+  | { comando: "imagem.vincular"; parametros: { faixaIds: string[]; ligar: boolean } }
+  | { comando: "imagem.apagarOcultas"; parametros: Record<string, never> }
+  | { comando: "imagem.posicoes"; parametros: { mudancas: { clipeId: string; transformacao: Partial<Transformacao> }[] } }
+  | { comando: "imagem.soEsta"; parametros: { faixaId: string } }
+  | { comando: "imagem.apagarVarias"; parametros: { faixaIds: string[] } }
+  | { comando: "imagem.duplicarVarias"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" | number } }
   | { comando: "imagem.apagar"; parametros: { faixaId: string } }
   | { comando: "imagem.duplicar"; parametros: { faixaId: string } }
@@ -271,6 +294,17 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.preencher": "trocar a mídia do modelo",
   "imagem.adicionarMidia": "pôr a imagem",
   "imagem.adicionarTexto": "pôr o texto",
+  "imagem.agrupar": "agrupar as camadas",
+  "imagem.desagrupar": "desagrupar",
+  "imagem.moverPara": "mover as camadas",
+  "imagem.inverter": "inverter a ordem",
+  "imagem.camada": "mudar a camada",
+  "imagem.vincular": "vincular as camadas",
+  "imagem.apagarOcultas": "excluir as camadas ocultas",
+  "imagem.posicoes": "mover as camadas",
+  "imagem.soEsta": "mostrar só uma camada",
+  "imagem.apagarVarias": "apagar as camadas",
+  "imagem.duplicarVarias": "duplicar as camadas",
   "imagem.mover": "mudar a ordem das camadas",
   "imagem.apagar": "apagar a camada",
   "imagem.duplicar": "duplicar a camada",
@@ -323,7 +357,18 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
 export function executarComando(projeto: Projeto, comando: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
+  if (projeto.tipo === "imagem" && (comando.comando === "clipe.transformar" || comando.comando === "imagem.posicoes")) {
+    const ids = comando.comando === "clipe.transformar" ? comando.parametros.clipeIds : comando.parametros.mudancas.map((mudanca) => mudanca.clipeId);
+    for (const faixa of projeto.faixas) {
+      if (faixa.clipes.some((clipe) => ids.includes(clipe.id)) && posicaoTravada(projeto, faixa)) throw new ErroEdicao("A posição desta camada está travada.");
+    }
+  }
   const resultado = executarSemConferir(projeto, comando, ctx);
+  if (resultado.projeto !== projeto) {
+    // As regras da árvore de camadas (a API confere as mesmas): sem elas, o salvamento seguinte voltaria com erro
+    const problema = problemaNaArvore(resultado.projeto);
+    if (problema) throw new ErroEdicao(problema);
+  }
   // Os comandos de camada da imagem não passam pelo `finalizar`: o limite de camadas é conferido aqui, antes de
   // o salvamento esbarrar nele na API
   if (resultado.projeto.tipo === "imagem" && resultado.projeto.faixas.length > LIMITE_CAMADAS + 1 && resultado.projeto.faixas.length > projeto.faixas.length) {
@@ -354,7 +399,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarAjuste": {
-      const resultado = adicionarCamadaDeAjuste(projeto, ctx);
+      const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "clipe.deslizar":
@@ -446,13 +491,43 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     case "clipe.mascara":
       return { projeto: mascararClipes(projeto, parametros.clipeIds, parametros.mascara) };
     case "imagem.adicionarMidia": {
-      const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId, parametros.transformacao);
+      const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId, parametros.transformacao, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarTexto": {
-      const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto, parametros.transformacao);
+      const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto, parametros.transformacao, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.agrupar": {
+      const resultado = agruparCamadas(projeto, ctx, parametros.faixaIds);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.desagrupar":
+      return { projeto: desagruparCamadas(projeto, parametros.faixaId) };
+    case "imagem.moverPara":
+      return { projeto: moverCamadasPara(projeto, parametros.faixaIds, parametros.pai, parametros.acimaDe) };
+    case "imagem.inverter":
+      return { projeto: inverterCamadas(projeto, parametros.faixaIds) };
+    case "imagem.camada":
+      return { projeto: mudarCamada(projeto, parametros.faixaIds, parametros.mudanca) };
+    case "imagem.vincular":
+      return { projeto: vincularCamadas(projeto, ctx, parametros.faixaIds, parametros.ligar) };
+    case "imagem.apagarOcultas":
+      return { projeto: apagarCamadasOcultas(projeto), selecao: [] };
+    case "imagem.posicoes": {
+      // Alinhar, distribuir, mover várias e as vinculadas: cada camada com a mudança dela, num passo só
+      let resultado = projeto;
+      for (const { clipeId, transformacao } of parametros.mudancas) resultado = transformarClipes(resultado, [clipeId], transformacao);
+      return { projeto: resultado };
+    }
+    case "imagem.apagarVarias":
+      return { projeto: apagarCamadas(projeto, parametros.faixaIds), selecao: [] };
+    case "imagem.duplicarVarias": {
+      const resultado = duplicarCamadas(projeto, ctx, parametros.faixaIds);
+      return { projeto: resultado.projeto, selecao: resultado.clipeIds };
+    }
+    case "imagem.soEsta":
+      return { projeto: soEstaVisivel(projeto, parametros.faixaId) };
     case "imagem.mover":
       return { projeto: moverCamada(projeto, parametros.faixaId, parametros.para) };
     case "imagem.apagar":

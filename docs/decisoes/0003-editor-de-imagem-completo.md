@@ -70,23 +70,23 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.1 — Árvore de camadas
 
-- [ ] Grupos (pastas) com abrir e fechar no painel, mesclagem "Passagem" e as outras, opacidade e máscara do grupo
-- [ ] Camada › Agrupar camadas (Ctrl+G), Desagrupar (Ctrl+Shift+G), Novo › Grupo, Grupo a partir de camadas
-- [ ] Máscara de corte: criar e liberar (Ctrl+Alt+G, Alt + clique entre duas camadas)
-- [ ] Travas: pixels transparentes (/), pixels da imagem, posição, tudo; caixa "Bloquear camadas…"
-- [ ] Opacidade e Preenchimento (o preenchimento não leva os estilos); teclas 1–0 mudam a opacidade
-- [ ] Cor do rótulo da camada (11 cores), renomear com duplo clique, Tab vai para a seguinte
-- [ ] Arrastar na coluna do olho esconde várias; Alt + olho mostra só essa
-- [ ] Várias camadas escolhidas (Shift e Ctrl no painel), mover, alinhar e distribuir juntas
-- [ ] Alinhar (topos, centros verticais, bases, esquerdas, centros horizontais, direitas) e Distribuir (os seis, e "horizontalmente" e "verticalmente"), à seleção ou à tela
-- [ ] Vincular camadas e Selecionar camadas vinculadas
-- [ ] Organizar › Inverter; Alt+[ e Alt+] escolhem a camada de baixo e a de cima
-- [ ] Filtro do painel Camadas (tipo, nome, modo, efeito, atributo, cor)
-- [ ] Excluir › Camadas ocultas; Excluir camadas vazias
-- [ ] Menu de contexto do painel Camadas com a lista de lá
-- [ ] Os 27 modos de mesclagem (faltam: dissolver, subexposição de cores, queimar linear, cor mais escura, subexposição linear, cor mais clara, luz suave, luz vívida, luz linear, luz do ponto, mistura sólida, subtrair, dividir, matiz, saturação, cor, luminosidade); a roda do mouse anda pela lista
-- [ ] Compositor em árvore (framebuffers para grupos e bases de recorte), na prévia e na exportação
-- [ ] API: os campos novos só valem em projeto de imagem
+- [x] Grupos (pastas) com abrir e fechar no painel, mesclagem "Passagem" e as outras, opacidade e máscara do grupo
+- [x] Camada › Agrupar camadas (Ctrl+G), Desagrupar (Ctrl+Shift+G), Novo › Grupo, Grupo a partir de camadas
+- [x] Máscara de corte: criar e liberar (Ctrl+Alt+G; Alt + clique na camada, no lugar do Alt entre as duas)
+- [x] Travas: pixels transparentes, pixels da imagem, posição, tudo, em todas as escolhidas de uma vez (as duas de pixels passam a valer com a pintura, na 13.2)
+- [x] Opacidade e Preenchimento (o preenchimento não leva os estilos); teclas 1–0 mudam a opacidade
+- [x] Cor do rótulo da camada (11 cores), renomear com duplo clique, Tab vai para a seguinte
+- [x] Arrastar na coluna do olho esconde várias; Alt + olho mostra só essa
+- [x] Várias camadas escolhidas (Shift e Ctrl no painel, Shift na prévia), mover, alinhar e distribuir juntas
+- [x] Alinhar (topos, centros verticais, bases, esquerdas, centros horizontais, direitas) e Distribuir (os seis, e "horizontalmente" e "verticalmente"), à seleção ou à tela
+- [x] Vincular camadas e Selecionar camadas vinculadas
+- [x] Organizar › Inverter; Alt+[ e Alt+] escolhem a camada de baixo e a de cima
+- [x] Filtro do painel Camadas (tipo, nome, modo, efeito, atributo, cor)
+- [x] Excluir › Camadas ocultas; Excluir › Grupos vazios
+- [x] Menu de contexto do painel Camadas com a lista de lá
+- [x] Os 27 modos de mesclagem (faltam: dissolver, subexposição de cores, queimar linear, cor mais escura, subexposição linear, cor mais clara, luz suave, luz vívida, luz linear, luz do ponto, mistura sólida, subtrair, dividir, matiz, saturação, cor, luminosidade); a roda do mouse anda pela lista
+- [x] Compositor em árvore (framebuffers para grupos e bases de recorte), na prévia e na exportação
+- [x] API: os campos novos só valem em projeto de imagem
 
 ### Onda 13.2 — Camadas de pixels e o pincel
 

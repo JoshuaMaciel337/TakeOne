@@ -1,6 +1,7 @@
 // Os menus do editor de imagem (ADR 0002), na ordem e com os nomes e os atalhos dos editores de imagem
 // profissionais. Os atalhos que o navegador não deixa a página pegar (Ctrl+N, Ctrl+T, Ctrl+W) ficam de fora.
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
+import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
 import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
 
@@ -57,8 +58,25 @@ const FILTROS: { submenu: string; itens: { efeito: TipoEfeito; nome: string }[] 
   },
 ];
 
+/** Alinhar e distribuir, na ordem do menu Camada. */
+const ALINHAMENTOS: { id: Alinhamento; nome: string }[] = [
+  { id: "topo", nome: "Bordas superiores" },
+  { id: "centroV", nome: "Centros verticais" },
+  { id: "base", nome: "Bordas inferiores" },
+  { id: "esquerda", nome: "Bordas esquerdas" },
+  { id: "centroH", nome: "Centros horizontais" },
+  { id: "direita", nome: "Bordas direitas" },
+];
+const DISTRIBUICOES: { id: Distribuicao; nome: string }[] = [...ALINHAMENTOS, { id: "espacoH", nome: "Espaçamento horizontal" }, { id: "espacoV", nome: "Espaçamento vertical" }];
+
 export type AcoesDosMenus = {
   temCamada: boolean;
+  /** Quantas camadas estão escolhidas. */
+  quantas: number;
+  temPasta: boolean;
+  /** Todas as escolhidas estão presas à de baixo (o item vira "Liberar máscara de corte"). */
+  recortadas: boolean;
+  vinculadas: boolean;
   /** A camada escolhida é uma foto (as ações de foto e de seleção valem). */
   temFoto: boolean;
   temSelecao: boolean;
@@ -79,7 +97,20 @@ export type AcoesDosMenus = {
   alternarPainel: (painel: IdPainelDaImagem) => void;
   duplicar: () => void;
   excluir: () => void;
+  apagarOcultas: () => void;
+  apagarVazias: () => void;
+  selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
+  inverter: () => void;
+  grupo: () => void;
+  agrupar: () => void;
+  desagrupar: () => void;
+  recortar: () => void;
+  vincular: () => void;
+  alinhar: (como: Alinhamento) => void;
+  distribuir: (como: Distribuicao) => void;
+  /** Alt+[ e Alt+]: escolhe a camada de baixo (1) ou de cima (-1). */
+  camadaVizinha: (sentido: 1 | -1) => void;
   esconder: () => void;
   bloquear: () => void;
   estilo: (qual: "contorno" | "sombra") => void;
@@ -139,10 +170,25 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Camada",
       itens: [
+        {
+          nome: "Novo",
+          itens: [
+            { nome: "Grupo", aoEscolher: a.grupo },
+            { nome: "Grupo a partir das camadas…", desativado: semCamada, aoEscolher: a.agrupar },
+            "-",
+            { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: !a.temSelecao, aoEscolher: a.viaRecorte },
+          ],
+        },
         { nome: "Nova camada de ajuste", itens: AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => a.ajuste(ajuste) })) },
-        { nome: "Duplicar camada", atalho: "Ctrl+J", desativado: semCamada, aoEscolher: a.duplicar },
-        { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: !a.temSelecao, aoEscolher: a.viaRecorte },
-        { nome: "Excluir camada", desativado: semCamada, aoEscolher: a.excluir },
+        { nome: a.quantas > 1 ? "Duplicar camadas" : "Duplicar camada", atalho: "Ctrl+J", desativado: semCamada, aoEscolher: a.duplicar },
+        {
+          nome: "Excluir",
+          itens: [
+            { nome: a.quantas > 1 ? "Camadas" : "Camada", desativado: semCamada, aoEscolher: a.excluir },
+            { nome: "Camadas ocultas", aoEscolher: a.apagarOcultas },
+            { nome: "Grupos vazios", aoEscolher: a.apagarVazias },
+          ],
+        },
         "-",
         {
           nome: "Estilo de camada",
@@ -153,6 +199,11 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           ],
         },
         { nome: "Máscara de camada", desativado: semCamada, itens: [{ nome: "Revelar tudo", aoEscolher: a.mascara }] },
+        { nome: a.recortadas ? "Liberar máscara de corte" : "Criar máscara de corte", atalho: "Ctrl+Alt+G", desativado: semCamada, aoEscolher: a.recortar },
+        "-",
+        { nome: "Agrupar camadas", atalho: "Ctrl+G", desativado: semCamada, aoEscolher: a.agrupar },
+        { nome: "Desagrupar camadas", atalho: "Ctrl+Shift+G", desativado: !a.temPasta, aoEscolher: a.desagrupar },
+        { nome: "Ocultar camadas", atalho: "Ctrl+,", desativado: semCamada, aoEscolher: a.esconder },
         "-",
         {
           nome: "Organizar",
@@ -162,10 +213,15 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Avançar", atalho: "Ctrl+]", aoEscolher: () => a.ordenar("cima") },
             { nome: "Recuar", atalho: "Ctrl+[", aoEscolher: () => a.ordenar("baixo") },
             { nome: "Enviar para trás", atalho: "Ctrl+Shift+[", aoEscolher: () => a.ordenar("fundo") },
+            "-",
+            { nome: "Inverter", desativado: a.quantas < 2, aoEscolher: a.inverter },
           ],
         },
+        { nome: "Alinhar", desativado: semCamada, itens: ALINHAMENTOS.map((item) => ({ nome: item.nome, aoEscolher: () => a.alinhar(item.id) })) },
+        { nome: "Distribuir", desativado: a.quantas < 3, itens: DISTRIBUICOES.map((item) => ({ nome: item.nome, aoEscolher: () => a.distribuir(item.id) })) },
+        "-",
         { nome: "Bloquear camadas", atalho: "Ctrl+/", desativado: semCamada, aoEscolher: a.bloquear },
-        { nome: "Ocultar camadas", atalho: "Ctrl+,", desativado: semCamada, aoEscolher: a.esconder },
+        { nome: a.vinculadas ? "Desvincular camadas" : "Vincular camadas", desativado: !a.vinculadas && a.quantas < 2, aoEscolher: a.vincular },
       ],
     },
     {
@@ -182,6 +238,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       itens: [
         { nome: "Todas as camadas", atalho: "Ctrl+Alt+A", aoEscolher: a.todasAsCamadas },
         { nome: "Desmarcar camadas", aoEscolher: a.desmarcarCamadas },
+        { nome: "Camadas vinculadas", desativado: !a.temCamada, aoEscolher: a.selecionarVinculadas },
+        { nome: "Camada de cima", atalho: "Alt+]", aoEscolher: () => a.camadaVizinha(-1) },
+        { nome: "Camada de baixo", atalho: "Alt+[", aoEscolher: () => a.camadaVizinha(1) },
         "-",
         { nome: "Desmarcar", atalho: "Ctrl+D", desativado: !a.temSelecao, aoEscolher: a.desmarcar },
         { nome: "Objeto", aoEscolher: () => a.ferramenta("objeto") },

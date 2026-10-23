@@ -83,7 +83,37 @@ export type Virar = { horizontal: boolean; vertical: boolean };
  * clareia; "somar" soma a luz; os outros são os modos clássicos (o mais escuro, o mais claro, sobrepor e luz
  * forte, a diferença e a exclusão). A conta é a mesma no compositor da prévia e no blend do render.
  */
-export type Mesclagem = "normal" | "multiplicar" | "tela" | "somar" | "escurecer" | "clarear" | "sobrepor" | "luz_forte" | "diferenca" | "exclusao";
+export type Mesclagem =
+  | "normal"
+  | "multiplicar"
+  | "tela"
+  | "somar"
+  | "escurecer"
+  | "clarear"
+  | "sobrepor"
+  | "luz_forte"
+  | "diferenca"
+  | "exclusao"
+  // Os que só existem no editor de imagem (o render do vídeo não os desenha; a API recusa no vídeo)
+  | "dissolver"
+  | "superexposicao_cores"
+  | "superexposicao_linear"
+  | "cor_mais_escura"
+  | "subexposicao_cores"
+  | "cor_mais_clara"
+  | "luz_suave"
+  | "luz_brilhante"
+  | "luz_linear"
+  | "luz_do_pino"
+  | "mistura_solida"
+  | "subtrair"
+  | "dividir"
+  | "matiz"
+  | "saturacao"
+  | "cor"
+  | "luminosidade"
+  // Só nos grupos: o grupo não se isola e as camadas de dentro misturam direto com o que está embaixo
+  | "passagem";
 
 export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
   { id: "normal", nome: "Normal" },
@@ -97,6 +127,65 @@ export const MESCLAGENS: { id: Mesclagem; nome: string }[] = [
   { id: "diferenca", nome: "Diferença" },
   { id: "exclusao", nome: "Exclusão" },
 ];
+
+/**
+ * Os 27 modos do editor de imagem, na ordem e nos grupos dos editores profissionais (o separador fica entre os
+ * grupos: normais, escurecer, clarear, contraste, comparação e componentes).
+ */
+export const MESCLAGENS_DA_IMAGEM: { id: Mesclagem; nome: string }[][] = [
+  [
+    { id: "normal", nome: "Normal" },
+    { id: "dissolver", nome: "Dissolver" },
+  ],
+  [
+    { id: "escurecer", nome: "Escurecer" },
+    { id: "multiplicar", nome: "Multiplicar" },
+    { id: "superexposicao_cores", nome: "Superexposição de cores" },
+    { id: "superexposicao_linear", nome: "Superexposição linear" },
+    { id: "cor_mais_escura", nome: "Cor mais escura" },
+  ],
+  [
+    { id: "clarear", nome: "Clarear" },
+    { id: "tela", nome: "Tela" },
+    { id: "subexposicao_cores", nome: "Subexposição de cores" },
+    { id: "somar", nome: "Subexposição linear (adicionar)" },
+    { id: "cor_mais_clara", nome: "Cor mais clara" },
+  ],
+  [
+    { id: "sobrepor", nome: "Sobrepor" },
+    { id: "luz_suave", nome: "Luz suave" },
+    { id: "luz_forte", nome: "Luz direta" },
+    { id: "luz_brilhante", nome: "Luz brilhante" },
+    { id: "luz_linear", nome: "Luz linear" },
+    { id: "luz_do_pino", nome: "Luz do pino" },
+    { id: "mistura_solida", nome: "Mistura sólida" },
+  ],
+  [
+    { id: "diferenca", nome: "Diferença" },
+    { id: "exclusao", nome: "Exclusão" },
+    { id: "subtrair", nome: "Subtrair" },
+    { id: "dividir", nome: "Dividir" },
+  ],
+  [
+    { id: "matiz", nome: "Matiz" },
+    { id: "saturacao", nome: "Saturação" },
+    { id: "cor", nome: "Cor" },
+    { id: "luminosidade", nome: "Luminosidade" },
+  ],
+];
+/** O nome de qualquer modo (os do vídeo e os da imagem), para as listas e os avisos. */
+export function nomeDaMesclagem(mesclagem: Mesclagem | undefined): string {
+  if (!mesclagem || mesclagem === "normal") return "Normal";
+  if (mesclagem === "passagem") return "Passagem";
+  return MESCLAGENS_DA_IMAGEM.flat().find((modo) => modo.id === mesclagem)?.nome ?? mesclagem;
+}
+/** Os modos que o render do vídeo não desenha: só no projeto de imagem. */
+export const MESCLAGENS_SO_DA_IMAGEM: ReadonlySet<Mesclagem> = new Set(
+  MESCLAGENS_DA_IMAGEM.flat()
+    .map((modo) => modo.id)
+    .filter((id) => !MESCLAGENS.some((modo) => modo.id === id))
+    .concat("passagem"),
+);
 
 /**
  * Tela verde (chroma key): some o que tem cor perto de `cor`. A distância é a do colorkey do FFmpeg
@@ -169,6 +258,13 @@ export type Clipe = {
    * tudo o que está embaixo dela, durante o clipe.
    */
   ajuste?: boolean;
+  /**
+   * Só no projeto de imagem: o clipe de uma pasta (grupo de camadas). Ele não tem mídia nem texto; a opacidade, a
+   * mesclagem e a máscara dele valem para tudo o que está dentro (as faixas com `pai` apontando para a faixa dele).
+   */
+  pasta?: boolean;
+  /** Só no projeto de imagem: o preenchimento (0 a 1), a opacidade do conteúdo sem os estilos de camada. */
+  preenchimento?: number;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
@@ -219,7 +315,39 @@ export type Faixa = {
   clipes: Clipe[];
   /** Só nas faixas de câmera: elas ficam mesmo vazias, enquanto a multicâmera existir. */
   multicamera?: Multicamera | null;
+  // Do projeto de imagem (cada faixa é uma camada); a API recusa no vídeo (lib/projeto/arvore.ts)
+  /** O nome da camada; sem ele, o nome sai da mídia ou do texto. */
+  nome?: string | null;
+  /** A faixa da pasta (grupo) em que a camada está; sem ela, na raiz. */
+  pai?: string | null;
+  /** Presa à camada de baixo (máscara de corte): só aparece onde ela tem alfa. */
+  recortada?: boolean;
+  /** As travas parciais (a `travada` é a trava de tudo). */
+  travas?: TravasDaCamada | null;
+  /** A cor do rótulo no painel Camadas. */
+  rotulo?: CorDoRotulo | null;
+  /** As camadas com o mesmo vínculo andam juntas. */
+  vinculo?: string | null;
+  /** A pasta aberta no painel Camadas. */
+  aberta?: boolean;
 };
+
+export type TravasDaCamada = { transparencia?: boolean; pixels?: boolean; posicao?: boolean };
+export type CorDoRotulo = "vermelho" | "laranja" | "amarelo" | "verde" | "azul" | "violeta" | "cinza" | "verde_agua" | "anil" | "magenta" | "fucsia";
+/** As cores dos rótulos, na ordem do menu, com a cor que pinta a linha. */
+export const CORES_DOS_ROTULOS: { id: CorDoRotulo; nome: string; cor: string }[] = [
+  { id: "vermelho", nome: "Vermelho", cor: "#e5484d" },
+  { id: "laranja", nome: "Laranja", cor: "#f76b15" },
+  { id: "amarelo", nome: "Amarelo", cor: "#ffc53d" },
+  { id: "verde", nome: "Verde", cor: "#30a46c" },
+  { id: "azul", nome: "Azul", cor: "#3e63dd" },
+  { id: "violeta", nome: "Violeta", cor: "#8e4ec6" },
+  { id: "cinza", nome: "Cinza", cor: "#8b8d98" },
+  { id: "verde_agua", nome: "Verde-água", cor: "#12a594" },
+  { id: "anil", nome: "Anil", cor: "#3358d4" },
+  { id: "magenta", nome: "Magenta", cor: "#d6409f" },
+  { id: "fucsia", nome: "Fúcsia", cor: "#ab4aba" },
+];
 
 /** Um clipe do modelo do espaço que quem usa troca: a mídia dele ou o texto dele. */
 export type VagaDoModelo = { clipe_id: string; tipo: "midia" | "texto"; rotulo: string };

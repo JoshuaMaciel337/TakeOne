@@ -9,7 +9,7 @@ import type { Projeto } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 import { carregarBitmap } from "../previa/bitmaps";
-import { camadaDoCompositor, camadasDaImagem, textosParaImagens } from "../previa/camadas";
+import { camadaDoCompositor, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
 import { type ImagemDeTexto, imagemDeTextoNoLado, soltarImagensDeTexto } from "../previa/imagensDeTexto";
 
@@ -53,25 +53,26 @@ export async function exportarImagem(
 
   const prontas = await Promise.all(
     camadas.map(async (camada) => {
-      if (camada.imagem) return camadaDoCompositor(camada, camada.imagem, null);
-      if (camada.clipe.ajuste) return camadaDoCompositor(camada, FUNDO, null);
+      if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null)] as const;
+      if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
       const midia = midias.get(camada.clipe.midia_id!)!;
       const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
       // Como o render do vídeo: sem a máscara pronta, o arquivo sairia com o fundo que a pessoa pediu para tirar
       if (camada.clipe.remover_fundo && !mascara) throw new Error(`O fundo de "${midia.nome}" ainda está sendo recortado. Espere terminar ou desligue "Remover o fundo".`);
-      return camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null);
+      return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null)] as const;
     }),
   );
+  const arvore = camadasEmArvore(projeto, new Map(prontas), tamanho);
 
   const canvas = document.createElement("canvas");
   canvas.width = tamanho.largura;
   canvas.height = tamanho.altura;
   const compositor = new Compositor(canvas, { comAlfa: transparente });
   try {
-    compositor.desenhar(prontas, fundo, tamanho, tamanho);
+    compositor.desenhar(arvore, fundo, tamanho, tamanho);
     // O primeiro desenho de uma textura recém-criada pode sair sem o mipmap (como na exportação do vídeo)
-    compositor.desenhar(prontas, fundo, tamanho, tamanho);
+    compositor.desenhar(arvore, fundo, tamanho, tamanho);
     return await new Promise<Blob>((pronto, falhou) =>
       canvas.toBlob((blob) => (blob ? pronto(blob) : falhou(new Error("O navegador não conseguiu gerar a imagem."))), `image/${formato}`, qualidade),
     );

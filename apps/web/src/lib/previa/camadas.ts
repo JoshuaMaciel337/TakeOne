@@ -1,6 +1,7 @@
 // As camadas de um instante da linha do tempo, de baixo para cima: o que a prévia desenha e o que a
 // exportação no navegador desenha, pela mesma conta. Sai daqui também a camada no formato do
 // compositor (lib/previa/compositor.ts), com os efeitos do clipe.
+import { arvoreDaImagem, camadaVisivel, faixasEmOrdem, mesclagemDaPasta, type NoDaCamada } from "@/lib/projeto/arvore";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
 import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, hslNeutro, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
@@ -295,10 +296,12 @@ export function camadasNoTempo(
 export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Midia>, quadro: Tamanho, imagensDeTexto: ReadonlyMap<string, ImagemDeTexto>): CamadaNaTela[] {
   const camadas: CamadaNaTela[] = [];
   if (quadro.largura <= 0) return camadas;
-  for (const faixa of [...projeto.faixas].reverse()) {
-    if (faixa.tipo === "principal" || faixa.oculta) continue;
+  // De baixo para cima, na ordem da árvore (a lista do projeto pode ter as de dentro de uma pasta em outro lugar)
+  for (const faixa of [...faixasEmOrdem(projeto)].reverse()) {
+    if (faixa.tipo === "principal" || !camadaVisivel(projeto, faixa)) continue;
     const clipe = faixa.clipes[0];
-    if (!clipe) continue;
+    // A pasta não desenha nada sozinha: ela entra pela árvore (camadasEmArvore)
+    if (!clipe || clipe.pasta) continue;
     if (clipe.ajuste) {
       camadas.push(camadaDeAjuste(clipe, faixa, 0, quadro));
       continue;
@@ -320,8 +323,40 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
   return camadas;
 }
 
+/**
+ * As camadas prontas para o compositor (por faixa) na ordem da árvore do projeto de imagem, de baixo para cima: as
+ * pastas viram camadas com as de dentro (`pasta`) e as recortadas ficam presas à base delas (`recortadas`). As que
+ * não estão em `prontas` (ainda carregando, escondidas) ficam de fora.
+ */
+export function camadasEmArvore(projeto: Projeto, prontas: ReadonlyMap<string, Camada>, quadro: Tamanho): Camada[] {
+  const caixaDoQuadro = (opacidade: number) => ({ cx: quadro.largura / 2, cy: quadro.altura / 2, largura: quadro.largura, altura: quadro.altura, rotacao: 0, opacidade });
+  const montar = (nos: NoDaCamada[]): Camada[] =>
+    [...nos].reverse().flatMap((no): Camada[] => {
+      if (no.faixa.oculta) return [];
+      let camada: Camada | undefined;
+      if (no.clipe.pasta) {
+        const mesclagem = mesclagemDaPasta(no.clipe);
+        camada = {
+          fonte: FUNDO,
+          recorte: { x: 0, y: 0, largura: 1, altura: 1 },
+          caixa: caixaDoQuadro(no.clipe.transformacao.opacidade),
+          mesclagem: mesclagem === "passagem" ? "normal" : mesclagem,
+          mascaraDeForma: no.clipe.mascara,
+          pasta: { filhos: montar(no.filhos), passagem: mesclagem === "passagem" },
+        };
+      } else camada = prontas.get(no.faixa.id);
+      // Sem a base (escondida ou carregando), as presas a ela também não aparecem, como nos editores de imagem
+      if (!camada) return [];
+      const recortadas = montar(no.recortadas);
+      return [recortadas.length ? { ...camada, recortadas } : camada];
+    });
+  return montar(arvoreDaImagem(projeto));
+}
+
 /** A camada no formato do compositor, com o quadro da fonte e a máscara do fundo deste instante. */
 export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource | typeof FUNDO, mascaraDoFundo: TexImageSource | null): Camada {
+  const comEstilos = temSilhueta(camada.clipe) && !camada.clipe.ajuste;
+  const preenchimento = Math.min(1, Math.max(0, camada.clipe.preenchimento ?? 1));
   return {
     fonte,
     recorte: camada.recorte,
@@ -329,8 +364,9 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource |
     virar: fonte === FUNDO ? { horizontal: false, vertical: true } : camada.clipe.virar,
     cantos: camada.clipe.cantos,
     mascaraDeForma: camada.clipe.mascara,
-    silhueta: temSilhueta(camada.clipe) && !camada.clipe.ajuste ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra } : undefined,
-    caixa: camada.caixa,
+    // O preenchimento (só na imagem) esconde a camada sem os estilos; sem estilos, é mais uma opacidade
+    silhueta: comEstilos ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra, preenchimento } : undefined,
+    caixa: comEstilos || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
     lut: camada.lut,
     vinheta: camada.vinheta,
     revelado: camada.revelado,

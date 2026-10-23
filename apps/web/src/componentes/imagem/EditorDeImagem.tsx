@@ -24,6 +24,8 @@ import { useMarca } from "@/lib/marca";
 import type { Comando } from "@/lib/projeto/comandos";
 import { executarComando } from "@/lib/projeto/comandos";
 import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
+import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
+import { camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, MASCARA_PADRAO, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
@@ -122,6 +124,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [trocando, setTrocando] = useState<string | null>(null);
   const [recorte, setRecorte] = useState<{ retangulo: RetanguloDaImagem; proporcao: number | null } | null>(null);
   const modeloDoEndereco = useRef(false);
+  // As caixas das camadas na tela (a prévia mede), para alinhar e distribuir
+  const caixasRef = useRef<Map<string, CaixaNoQuadro>>(new Map());
 
   const setSelecao = useCallback((ids: string[]) => {
     const ativo = document.activeElement;
@@ -216,12 +220,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }, [projeto]);
 
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
-  const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
+  const escolhidoNaTela = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
+  // Uma pasta não tem imagem: as propriedades, os filtros e as fotos valem só para as outras camadas
+  const selecionado = escolhidoNaTela?.clipe.pasta ? null : escolhidoNaTela;
   const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
   const foto = midiaDoClipe?.imagem && !midiaDoClipe.elemento && !midiaDoClipe.animacao ? midiaDoClipe : null;
   const objeto = useObjeto(selecionado?.clipe ?? null, midiaDoClipe);
   const temSelecao = Boolean(objeto.selecao) || objeto.temPincel;
   const camadaEscolhida = projeto && selecionado ? camadasDaImagem(projeto).find(({ clipe }) => clipe.id === selecionado.clipe.id) : undefined;
+  // As camadas escolhidas (podem ser várias, e pastas), de cima para baixo como no painel
+  const escolhidas = projeto ? faixasEmOrdem(projeto).filter((faixa) => selecaoValida.includes(faixa.clipes[0].id)) : [];
+  const faixaIds = escolhidas.map((faixa) => faixa.id);
 
   const escolherFerramenta = (id: IdFerramentaDaImagem) => {
     setFerramenta(id);
@@ -294,10 +303,46 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (executar({ comando: "clipe.efeito", parametros: { clipeIds: [selecionado.clipe.id], efeito: { tipo: efeito, intensidade: INTENSIDADE_PADRAO } } })) area.abrir("filtros");
   };
   const mudarZoom = (para: "mais" | "menos" | "ajustar" | 1) => setZoom(para === "ajustar" ? null : para === 1 ? 1 : proximoZoom(zoom ?? zoomMedido, para === "mais" ? 1 : -1));
-  const ordenar = (para: "topo" | "cima" | "baixo" | "fundo") => camadaEscolhida && executar({ comando: "imagem.mover", parametros: { faixaId: camadaEscolhida.faixa.id, para } });
+  const ordenar = (para: "topo" | "cima" | "baixo" | "fundo") => {
+    // Várias: cada uma anda entre as irmãs dela; para cima, a de cima anda primeiro (e o contrário para baixo)
+    const ordem = para === "cima" || para === "fundo" ? escolhidas : [...escolhidas].reverse();
+    for (const faixa of ordem) executar({ comando: "imagem.mover", parametros: { faixaId: faixa.id, para } });
+  };
+  const posicoes = (mudancas: MudancaDePosicao[]) => mudancas.length > 0 && executar({ comando: "imagem.posicoes", parametros: { mudancas } });
+  /** A mudança de um clipe com as vinculadas a ele (um passo só). */
+  const comandoDaMudanca = (clipeId: string, mudanca: Partial<Transformacao>): Comando => {
+    const achado = projeto ? acharClipe(projeto, clipeId) : null;
+    const mudancas = projeto && achado ? mudancaComVinculadas(projeto, achado.clipe, mudanca) : [];
+    return mudancas.length > 1 ? { comando: "imagem.posicoes", parametros: { mudancas } } : { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } };
+  };
+  /** Deslocar as escolhidas (as pastas inteiras) e as vinculadas, em frações do quadro. */
+  const mudancasDoDeslocamento = (dx: number, dy: number) =>
+    projeto
+      ? deslocar(
+          projeto,
+          unidadesDaSelecao(projeto, selecaoValida).flatMap((unidade) => unidade.clipeIds),
+          dx,
+          dy,
+        )
+      : [];
+  /** Alt+[ e Alt+]: a camada visível de baixo ou de cima da escolhida (ou a de cima de todas). */
+  const camadaVizinha = (sentido: 1 | -1) => {
+    if (!projeto) return;
+    const visiveis = faixasEmOrdem(projeto).filter((faixa) => camadaVisivel(projeto, faixa));
+    if (!visiveis.length) return;
+    const atual = escolhidas.length ? visiveis.findIndex((faixa) => faixa.id === escolhidas[sentido > 0 ? escolhidas.length - 1 : 0].id) : -1;
+    const proxima = atual < 0 ? visiveis[0] : visiveis[Math.min(visiveis.length - 1, Math.max(0, atual + sentido))];
+    setSelecao([proxima.clipes[0].id]);
+  };
+  const todasRecortadas = escolhidas.length > 0 && escolhidas.every((faixa) => faixa.recortada);
+  const vinculadas = escolhidas.length > 1 && escolhidas.every((faixa) => faixa.vinculo && faixa.vinculo === escolhidas[0].vinculo);
 
   const acoes: AcoesDosMenus = {
-    temCamada: Boolean(camadaEscolhida),
+    temCamada: escolhidas.length > 0,
+    quantas: escolhidas.length,
+    temPasta: escolhidas.some((faixa) => faixa.clipes[0].pasta),
+    recortadas: todasRecortadas,
+    vinculadas,
     temFoto: Boolean(foto),
     temSelecao,
     podeDesfazer: edicao.nomeDesfazer,
@@ -318,11 +363,35 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     painel: (painel) => area.abrir(painel),
     alternarPainel: (painel) => area.alternar(painel),
-    duplicar: () => camadaEscolhida && executar({ comando: "imagem.duplicar", parametros: { faixaId: camadaEscolhida.faixa.id } }),
-    excluir: () => camadaEscolhida && executar({ comando: "imagem.apagar", parametros: { faixaId: camadaEscolhida.faixa.id } }),
+    duplicar: () => escolhidas.length && executar({ comando: "imagem.duplicarVarias", parametros: { faixaIds } }),
+    excluir: () => escolhidas.length && executar({ comando: "imagem.apagarVarias", parametros: { faixaIds } }),
+    apagarOcultas: () => executar({ comando: "imagem.apagarOcultas", parametros: {} }),
+    apagarVazias: () => {
+      if (!projeto) return;
+      // Os grupos sem nenhuma camada dentro (os de fora primeiro: apagar um leva os vazios de dentro)
+      const vazias = projeto.faixas.filter((faixa) => faixa.clipes[0]?.pasta && comDescendentes(projeto, faixa.id).every((item) => item.clipes[0]?.pasta));
+      if (vazias.length) executar({ comando: "imagem.apagarVarias", parametros: { faixaIds: vazias.map((faixa) => faixa.id) } });
+      else mostrarAviso("Não há grupos vazios para excluir.");
+    },
+    selecionarVinculadas: () => {
+      if (!projeto) return;
+      const vinculos = new Set(escolhidas.flatMap((faixa) => (faixa.vinculo ? [faixa.vinculo] : [])));
+      if (vinculos.size) setSelecao(camadasDaImagem(projeto).filter(({ faixa }) => faixa.vinculo && vinculos.has(faixa.vinculo)).map(({ clipe }) => clipe.id));
+    },
     ordenar,
-    esconder: () => camadaEscolhida && executar({ comando: "faixa.alternar", parametros: { faixaId: camadaEscolhida.faixa.id, propriedade: "oculta" } }),
-    bloquear: () => camadaEscolhida && executar({ comando: "faixa.alternar", parametros: { faixaId: camadaEscolhida.faixa.id, propriedade: "travada" } }),
+    inverter: () => executar({ comando: "imagem.inverter", parametros: { faixaIds } }),
+    esconder: () => escolhidas.length && executar({ comando: "imagem.camada", parametros: { faixaIds, mudanca: { oculta: !escolhidas.every((faixa) => faixa.oculta) } } }),
+    bloquear: () => escolhidas.length && executar({ comando: "imagem.camada", parametros: { faixaIds, mudanca: { travada: !escolhidas.every((faixa) => faixa.travada) } } }),
+    grupo: () => executar({ comando: "imagem.agrupar", parametros: { faixaIds: [] } }),
+    agrupar: () => escolhidas.length && executar({ comando: "imagem.agrupar", parametros: { faixaIds } }),
+    desagrupar: () => {
+      for (const faixa of escolhidas) if (faixa.clipes[0].pasta) executar({ comando: "imagem.desagrupar", parametros: { faixaId: faixa.id } });
+    },
+    recortar: () => escolhidas.length && executar({ comando: "imagem.camada", parametros: { faixaIds, mudanca: { recortada: !todasRecortadas } } }),
+    vincular: () => executar({ comando: "imagem.vincular", parametros: { faixaIds, ligar: !vinculadas } }),
+    alinhar: (como) => projeto && posicoes(alinhar(projeto, selecaoValida, caixasRef.current, como)),
+    distribuir: (como) => projeto && posicoes(distribuir(projeto, selecaoValida, caixasRef.current, como)),
+    camadaVizinha,
     estilo: (qual) => {
       if (!camadaEscolhida) return;
       const clipe = camadaEscolhida.clipe;
@@ -353,6 +422,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (alvo.closest("input, textarea, select, [contenteditable='true'], [role='menu']")) return;
     if (evento.ctrlKey || evento.metaKey || evento.altKey) return;
     const tecla = evento.key.length === 1 ? evento.key.toUpperCase() : evento.key;
+    // Os números dão a opacidade das escolhidas (1 é 10%, 0 é 100%), fora das ferramentas de pintar e de seleção
+    if (/^[0-9]$/.test(tecla) && escolhidas.length && !MODO_DA_SELECAO[ferramenta]) {
+      const clipeIds = escolhidas.filter((faixa) => !faixa.travada).map((faixa) => faixa.clipes[0].id);
+      if (clipeIds.length) executar({ comando: "clipe.transformar", parametros: { clipeIds, transformacao: { opacidade: tecla === "0" ? 1 : Number(tecla) / 10 } } });
+      evento.preventDefault();
+      return;
+    }
     const comTecla = TODAS_AS_FERRAMENTAS.filter((item) => item.tecla === tecla);
     if (comTecla.length) {
       // Shift + a tecla passa à seguinte do grupo; sem Shift, volta à última usada do grupo
@@ -370,15 +446,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (recorte) cancelarCorte();
       else if (temSelecao || objeto.pontos.length) objeto.limpar();
       else setSelecao([]);
-    } else if ((tecla === "Delete" || tecla === "Backspace") && camadaEscolhida && !camadaEscolhida.faixa.travada) executar({ comando: "imagem.apagar", parametros: { faixaId: camadaEscolhida.faixa.id } });
-    else if (camadaEscolhida && !camadaEscolhida.faixa.travada && evento.key.startsWith("Arrow")) {
-      // Um pixel da imagem por toque (dez com Shift), em frações do quadro
+    } else if ((tecla === "Delete" || tecla === "Backspace") && escolhidas.length && !escolhidas.some((faixa) => faixa.travada)) executar({ comando: "imagem.apagarVarias", parametros: { faixaIds } });
+    else if (escolhidas.length && evento.key.startsWith("Arrow")) {
+      // Um pixel da imagem por toque (dez com Shift), em frações do quadro, com as pastas e as vinculadas
       const { largura, altura } = tamanhoDaImagem(projeto);
       const passo = evento.shiftKey ? 10 : 1;
-      const t = camadaEscolhida.clipe.transformacao;
-      const mudanca: Partial<Transformacao> =
-        evento.key === "ArrowLeft" ? { x: t.x - passo / largura } : evento.key === "ArrowRight" ? { x: t.x + passo / largura } : evento.key === "ArrowUp" ? { y: t.y - passo / altura } : { y: t.y + passo / altura };
-      executar({ comando: "clipe.transformar", parametros: { clipeIds: [camadaEscolhida.clipe.id], transformacao: mudanca } });
+      const dx = evento.key === "ArrowLeft" ? -passo / largura : evento.key === "ArrowRight" ? passo / largura : 0;
+      const dy = evento.key === "ArrowUp" ? -passo / altura : evento.key === "ArrowDown" ? passo / altura : 0;
+      posicoes(mudancasDoDeslocamento(dx, dy));
     } else return;
     evento.preventDefault();
   });
@@ -429,7 +504,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <PainelPropriedades
           modo="imagem"
           midia={midiaDoClipe}
-          selecionado={selecionado}
+          selecionado={escolhidoNaTela}
           taxa={projeto.taxa}
           tempo={0}
           aoBuscar={NADA}
@@ -605,7 +680,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 className="min-w-0 bg-transparent font-medium outline-none focus:bg-painel-2"
               />
               <span className="shrink-0 truncate text-suave">
-                @ {porcentagem(zoomNaTela)} ({selecionado ? nomeDaCamada(selecionado.clipe, midias) : "Fundo"}, RGB/8)
+                @ {porcentagem(zoomNaTela)} ({escolhidoNaTela ? nomeDaCamada(escolhidoNaTela.clipe, midias, escolhidoNaTela.faixa) : escolhidas.length > 1 ? `${escolhidas.length} camadas` : "Fundo"}, RGB/8)
               </span>
             </div>
           </div>
@@ -614,8 +689,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             midias={midias}
             selecao={selecaoValida}
             aoSelecionar={setSelecao}
-            aoPrever={(clipeId, mudanca) => setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } } : null)}
-            aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca } })}
+            aoPrever={(clipeId, mudanca) => setProvisorio(mudanca ? comandoDaMudanca(clipeId, mudanca) : null)}
+            aoTransformar={(clipeId, mudanca) => executar(comandoDaMudanca(clipeId, mudanca))}
+            aoPreverDeslocamento={(deslocamento) => setProvisorio(deslocamento ? { comando: "imagem.posicoes", parametros: { mudancas: mudancasDoDeslocamento(deslocamento.dx, deslocamento.dy) } } : null)}
+            aoDeslocar={(dx, dy) => posicoes(mudancasDoDeslocamento(dx, dy))}
+            caixasRef={caixasRef}
             ferramenta={ferramenta}
             zoom={zoom}
             aoMudarZoom={setZoom}
@@ -739,8 +817,12 @@ function JanelaDeAtalhos({ acoes, aoFechar }: { acoes: AcoesDosMenus; aoFechar: 
                 ["Cores padrão", "D"],
                 ["Trocar as cores", "X"],
                 ["Pincel menor / maior (Remover)", "[ / ]"],
-                ["Empurrar a camada 1 px (10 com Shift)", "Setas"],
-                ["Excluir a camada", "Delete"],
+                ["Empurrar as camadas 1 px (10 com Shift)", "Setas"],
+                ["Opacidade das camadas (10% a 100%)", "1 … 0"],
+                ["Excluir as camadas", "Delete"],
+                ["Mostrar só uma camada", "Alt + clique no olho"],
+                ["Escolher várias camadas", "Ctrl ou Shift + clique"],
+                ["Renomear a camada", "Duplo clique no nome"],
               ].map(([nome, atalho]) => (
                 <div key={nome} className="flex justify-between gap-3 border-b border-borda/50 py-1">
                   <dt>{nome}</dt>
