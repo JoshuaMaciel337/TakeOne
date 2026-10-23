@@ -63,7 +63,7 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
               type="button"
               aria-pressed={ligada}
               aria-label={naVez.nome}
-              title={`${naVez.nome} (${naVez.tecla})`}
+              title={naVez.tecla ? `${naVez.nome} (${naVez.tecla})` : naVez.nome}
               onClick={() => aoEscolher(naVez.id)}
               onDoubleClick={() => aoDuploClique(naVez.id)}
               onContextMenu={(evento) => {

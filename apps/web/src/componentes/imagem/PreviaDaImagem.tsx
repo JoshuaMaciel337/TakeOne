@@ -17,12 +17,14 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
+import type { Selecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
 import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
+import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import type { FerramentaObjeto } from "./useObjeto";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
@@ -89,6 +91,14 @@ type Props = {
   fonteDaMascara?: (clipe: Clipe) => HTMLCanvasElement | null;
   /** Alt + clique na miniatura da máscara: a prévia mostra só a máscara desta camada (o clipe), em cinza. */
   mascaraAVista?: string | null;
+  /** A seleção do documento: as formigas (com `bordas`) e, com uma ferramenta de seleção, o desenho dela. */
+  selecaoDoDocumento?: {
+    selecao: Selecao | null;
+    bordas: boolean;
+    ferramenta: FerramentaDeSelecao | null;
+    opcoes: OpcoesDaSelecao;
+    aoSelecionar: (selecao: Selecao | null) => void;
+  } | null;
 };
 
 /** O tamanho da área livre da prévia. */
@@ -138,6 +148,7 @@ export function PreviaDaImagem({
   fonteDosPixels,
   fonteDaMascara,
   mascaraAVista = null,
+  selecaoDoDocumento = null,
 }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
@@ -517,6 +528,18 @@ export function PreviaDaImagem({
                 aria-hidden
               />
             ) : null}
+            {selecaoDoDocumento?.bordas && tamanho.largura > 1 ? <FormigasDaSelecao selecao={selecaoDoDocumento.selecao} quadro={tamanho} /> : null}
+            {selecaoDoDocumento?.ferramenta && !recorte && tamanho.largura > 1 ? (
+              <SelecaoNaPrevia
+                ferramenta={selecaoDoDocumento.ferramenta}
+                selecao={selecaoDoDocumento.selecao}
+                quadro={tamanho}
+                documento={imagem}
+                opcoes={selecaoDoDocumento.opcoes}
+                aoSelecionar={selecaoDoDocumento.aoSelecionar}
+                mao={maoAtiva}
+              />
+            ) : null}
             {pintura && !maoAtiva && !recorte && tamanho.largura > 1 ? (
               <PinturaNaPrevia
                 ferramenta={pintura.ferramenta}
@@ -532,6 +555,7 @@ export function PreviaDaImagem({
                 aoAjustar={pintura.aoAjustar}
                 simetria={pintura.simetria}
                 emCinza={pintura.emCinza}
+                selecao={selecaoDoDocumento?.selecao}
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}

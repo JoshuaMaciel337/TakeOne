@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, X } from "lucide-react";
+import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, Square, SquaresIntersect, SquaresSubtract, SquaresUnite, X } from "lucide-react";
 import { Fragment } from "react";
 
 import { ESTILOS_ARTISTICOS, LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel, type Simetria, TIPOS_DE_SIMETRIA } from "@/lib/pintura/traco";
@@ -8,8 +8,10 @@ import type { Comando } from "@/lib/projeto/comandos";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
 import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/texto";
+import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 
-import { ferramenta as dadosDa, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import type { FerramentaObjeto } from "./useObjeto";
 
 /** As opções da ferramenta Forma (a cor de preenchimento é a de primeiro plano). */
@@ -50,7 +52,16 @@ type Props = {
   aoMudarPincel?: (mudanca: Partial<OpcoesDoPincel>) => void;
   simetria?: Simetria | null;
   aoMudarSimetria?: (simetria: Simetria | null) => void;
+  /** As ferramentas da seleção do documento: as opções, se há seleção (e numa foto) e o Desmarcar. */
+  selecaoDoDocumento?: { opcoes: OpcoesDaSelecao; aoMudar: (mudanca: Partial<OpcoesDaSelecao>) => void; temSelecao: boolean; naFoto: boolean; aoDesmarcar: () => void };
 };
+
+const MODOS_DA_SELECAO: { modo: ModoDaSelecao; nome: string; icone: typeof Square }[] = [
+  { modo: "nova", nome: "Nova seleção", icone: Square },
+  { modo: "somar", nome: "Adicionar à seleção (Shift)", icone: SquaresUnite },
+  { modo: "subtrair", nome: "Subtrair da seleção (Alt)", icone: SquaresSubtract },
+  { modo: "intersectar", nome: "Fazer interseção com a seleção (Shift+Alt)", icone: SquaresIntersect },
+];
 
 /** Um número da barra (o valor digitado só vale ao sair ou no Enter). */
 function Numero({ rotulo, valor, minimo, maximo, sufixo, aoMudar, largura = "w-12" }: { rotulo: string; valor: number; minimo: number; maximo: number; sufixo?: string; aoMudar: (valor: number) => void; largura?: string }) {
@@ -102,6 +113,64 @@ export function BarraDeOpcoes(props: Props) {
         </button>
       </>
     );
+  } else if (FERRAMENTAS_DA_SELECAO.has(ferramenta) && props.selecaoDoDocumento) {
+    const { opcoes: o, aoMudar, temSelecao, naFoto } = props.selecaoDoDocumento;
+    const letreiro = ferramenta === "letreiro" || ferramenta === "letreiroEliptico";
+    opcoes = (
+      <>
+        <span className="flex items-center" role="group" aria-label="Modo da seleção">
+          {MODOS_DA_SELECAO.map(({ modo, nome, icone: IconeDoModo }) => (
+            <button key={modo} type="button" className={`botao-icone size-6 ${o.modo === modo ? "bg-painel-3 text-texto" : ""}`} title={nome} aria-label={nome} aria-pressed={o.modo === modo} onClick={() => aoMudar({ modo })}>
+              <IconeDoModo className="size-4" aria-hidden />
+            </button>
+          ))}
+        </span>
+        {SEPARADOR}
+        {ferramenta === "linhaUnica" || ferramenta === "colunaUnica" ? null : (
+          <>
+            <Numero rotulo="Difusão" valor={o.difusao} minimo={0} maximo={1000} sufixo="px" aoMudar={(difusao) => aoMudar({ difusao })} />
+            {ferramenta === "letreiro" ? null : (
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={o.suavizar} onChange={(evento) => aoMudar({ suavizar: evento.currentTarget.checked })} />
+                Suavização de serrilhado
+              </label>
+            )}
+          </>
+        )}
+        {letreiro ? (
+          <>
+            {SEPARADOR}
+            <label className="flex items-center gap-1 text-suave">
+              Estilo:
+              <select className={campo} value={o.estilo} onChange={(evento) => aoMudar({ estilo: evento.currentTarget.value as OpcoesDaSelecao["estilo"] })}>
+                <option value="normal">Normal</option>
+                <option value="proporcao">Proporção fixa</option>
+                <option value="tamanho">Tamanho fixo</option>
+              </select>
+            </label>
+            {o.estilo !== "normal" ? (
+              <>
+                <Numero rotulo="L" valor={o.largura} minimo={o.estilo === "tamanho" ? 1 : 0.01} maximo={o.estilo === "tamanho" ? 8192 : 1000} sufixo={o.estilo === "tamanho" ? "px" : undefined} aoMudar={(largura) => aoMudar({ largura })} />
+                <button type="button" className="botao-icone size-6 text-xs" title="Trocar a largura e a altura" aria-label="Trocar a largura e a altura" onClick={() => aoMudar({ largura: o.altura, altura: o.largura })}>
+                  ⇄
+                </button>
+                <Numero rotulo="A" valor={o.altura} minimo={o.estilo === "tamanho" ? 1 : 0.01} maximo={o.estilo === "tamanho" ? 8192 : 1000} sufixo={o.estilo === "tamanho" ? "px" : undefined} aoMudar={(altura) => aoMudar({ altura })} />
+              </>
+            ) : null}
+          </>
+        ) : null}
+        {SEPARADOR}
+        <button type="button" className="botao-secundario px-2 py-0.5 text-xs" disabled={!temSelecao || !naFoto || props.pedindo} onClick={() => props.aoUsarSelecao("apagar")} title="Preencher sensível ao conteúdo: a IA refaz o que estava atrás, na foto escolhida (Shift+F5)">
+          Preencher sensível ao conteúdo
+        </button>
+        <button type="button" className="botao-secundario px-2 py-0.5 text-xs" disabled={!temSelecao || !naFoto || props.pedindo} onClick={() => props.aoUsarSelecao("recortar")} title="Camada via recorte: o que foi selecionado na foto escolhida vira uma camada nova (Ctrl+Shift+J)">
+          Camada via recorte
+        </button>
+        <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" disabled={!temSelecao} onClick={props.selecaoDoDocumento.aoDesmarcar} title="Desmarcar (Ctrl+D)">
+          Desmarcar
+        </button>
+      </>
+    );
   } else if (selecao) {
     const temSelecao = Boolean(objeto.selecao) || objeto.temPincel;
     opcoes = (
@@ -118,7 +187,7 @@ export function BarraDeOpcoes(props: Props) {
             </label>
           </>
         ) : (
-          <span className="text-suave">{ferramenta === "objeto" ? "Clique no objeto; Shift + clique tira uma parte." : "Sem tecla, seleção nova; Shift soma; Alt subtrai."}</span>
+          <span className="text-suave">Clique no objeto; Shift + clique tira uma parte.</span>
         )}
         {SEPARADOR}
         {objeto.selecionando ? (

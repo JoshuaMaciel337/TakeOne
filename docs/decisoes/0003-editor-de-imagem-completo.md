@@ -108,25 +108,28 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.3 — Seleção
 
-- [ ] Seleção do documento com as formigas andando; Ctrl+H esconde as bordas
-- [ ] Modos novo, somar (Shift), subtrair (Alt) e intersectar (Shift+Alt) em toda ferramenta de seleção
-- [ ] Letreiro retangular e elíptico com Difusão, Suavização de serrilhado e Estilo (normal, proporção fixa, tamanho fixo); Alt desenha do centro, Espaço reposiciona
-- [ ] Letreiro de linha única e de coluna única
-- [ ] Laço, Laço poligonal (Shift trava em 45°) e Laço magnético (largura, contraste, frequência)
+- [x] Seleção do documento com as formigas andando; Ctrl+H esconde as bordas
+- [x] Modos novo, somar (Shift), subtrair (Alt) e intersectar (Shift+Alt) em toda ferramenta de seleção
+- [x] Letreiro retangular e elíptico com Difusão, Suavização de serrilhado e Estilo (normal, proporção fixa, tamanho fixo); Alt desenha do centro, Espaço reposiciona
+- [x] Letreiro de linha única e de coluna única
+- [x] Laço e Laço poligonal (Shift trava em 45°)
+- [ ] Laço magnético (largura, contraste, frequência)
 - [ ] Varinha mágica (tolerância, contígua, todas as camadas)
 - [ ] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
 - [ ] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
-- [ ] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter, Converter em forma
+- [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
+- [ ] Selecionar › Converter em forma
 - [ ] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
 - [ ] Área de foco; Assunto; Céu
-- [ ] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
+- [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
 - [ ] Aumentar e Semelhante
 - [ ] Transformar seleção (escala, girar, inclinar, distorcer, perspectiva, deformar)
 - [ ] Máscara rápida (Q) com pintura
-- [ ] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2; transparência da camada com Ctrl + clique na miniatura); painel Canais
+- [x] Seleção pela transparência da camada (Ctrl + clique na miniatura; Shift soma, Alt subtrai) e pela máscara dela
+- [ ] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2); painel Canais
 - [ ] Selecionar e mascarar (Ctrl+Alt+R): vistas (casca de cebola, formigas, sobreposição, no preto, no branco, preto e branco, nas camadas), pincel de refinar borda, raio e raio inteligente, suavizar, difusão, contraste, deslocar borda, descontaminar cores, saída (seleção, máscara, camada nova, com máscara, documento novo)
 - [ ] Encontrar camadas (Ctrl+Alt+Shift+F) e Isolar camadas
-- [ ] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (vindo da 13.2)
+- [x] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (vindo da 13.2)
 - [ ] Definir predefinição de pincel a partir da seleção (vindo da 13.2)
 
 ### Onda 13.4 — Seleção em uso e área de transferência

@@ -37,7 +37,8 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DE_PINTURA, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
@@ -59,7 +60,9 @@ import { planoDosPixels, type PlanoDosPixels, projetoSoCom, type TipoDaMesclagem
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { matrizDaCaixa, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
+import { type Afim, compor, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
+import { borda, cheia, combinar, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
+import { imagemNoDocumento, selecaoNaMidia } from "@/lib/selecao/naTela";
 
 const SEM_SEGUIR = {
   marcando: null,
@@ -95,6 +98,29 @@ const AREAS: Record<string, EstadoDaArea> = {
 const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DA_IMAGEM);
 
 type Pendente = { trocar?: string[]; camadaDe?: string; caixa?: RetanguloDaImagem };
+type ModificacaoDaSelecao = "borda" | "suavizar" | "expandir" | "contrair" | "difusao";
+
+/** O número de cada Selecionar › Modificar: o rótulo, o padrão e os limites, em pixels. */
+const MODIFICACOES: Record<ModificacaoDaSelecao, { titulo: string; rotulo: string; padrao: number; minimo: number; maximo: number }> = {
+  borda: { titulo: "Borda da seleção", rotulo: "Largura", padrao: 10, minimo: 1, maximo: 200 },
+  suavizar: { titulo: "Suavizar a seleção", rotulo: "Raio da amostra", padrao: 5, minimo: 1, maximo: 500 },
+  expandir: { titulo: "Expandir a seleção", rotulo: "Expandir em", padrao: 5, minimo: 1, maximo: 500 },
+  contrair: { titulo: "Contrair a seleção", rotulo: "Contrair em", padrao: 5, minimo: 1, maximo: 500 },
+  difusao: { titulo: "Difusão da seleção", rotulo: "Raio da difusão", padrao: 5, minimo: 0.2, maximo: 1000 },
+};
+
+/** A seleção em cinza opaco (branco no que entra), para uma máscara de camada. */
+function pintarSelecao(ctx2d: CanvasRenderingContext2D, selecao: Selecao, invertida = false) {
+  const dados = ctx2d.createImageData(selecao.largura, selecao.altura);
+  for (let i = 0; i < selecao.dados.length; i++) {
+    const valor = invertida ? 255 - selecao.dados[i] : selecao.dados[i];
+    dados.data[i * 4] = valor;
+    dados.data[i * 4 + 1] = valor;
+    dados.data[i * 4 + 2] = valor;
+    dados.data[i * 4 + 3] = 255;
+  }
+  ctx2d.putImageData(dados, 0, 0);
+}
 
 function porcentagem(zoom: number): string {
   return `${(Math.round(zoom * 1000) / 10).toLocaleString("pt-BR")}%`;
@@ -145,6 +171,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A máscara de camada em foco (o pincel pinta nela) e a máscara à vista (Alt + clique na miniatura dela)
   const [mascaraEmFoco, setMascaraEmFoco] = useState<string | null>(null);
   const [mascaraAVista, setMascaraAVista] = useState<string | null>(null);
+  // A seleção do documento (lib/selecao), a última desmarcada (Selecionar novamente), as bordas à vista (Ctrl+H), as
+  // opções das ferramentas de seleção e o Modificar que está perguntando o número
+  const [selecaoDoDocumento, setSelecaoDoDocumento] = useState<Selecao | null>(null);
+  const [selecaoAnterior, setSelecaoAnterior] = useState<Selecao | null>(null);
+  const [bordasDaSelecao, setBordasDaSelecao] = useState(true);
+  const [opcoesDaSelecao, setOpcoesDaSelecao] = useState<OpcoesDaSelecao>(OPCOES_DA_SELECAO);
+  const [modificando, setModificando] = useState<ModificacaoDaSelecao | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -271,7 +304,77 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
   const foto = midiaDoClipe?.imagem && !midiaDoClipe.elemento && !midiaDoClipe.camada_pixels && !midiaDoClipe.animacao ? midiaDoClipe : null;
   const objeto = useObjeto(selecionado?.clipe ?? null, midiaDoClipe);
-  const temSelecao = Boolean(objeto.selecao) || objeto.temPincel;
+  // A seleção só vale no tamanho em que foi feita (recortar ou mudar o tamanho da imagem a desfaz)
+  const tamanhoDoDocumento = projeto ? tamanhoDaImagem(projeto) : null;
+  const selecaoNoDocumento =
+    selecaoDoDocumento && tamanhoDoDocumento && selecaoDoDocumento.largura === tamanhoDoDocumento.largura && selecaoDoDocumento.altura === tamanhoDoDocumento.altura ? selecaoDoDocumento : null;
+  const temSelecao = Boolean(objeto.selecao) || objeto.temPincel || Boolean(selecaoNoDocumento && foto);
+  /** A seleção do documento muda; a que é desmarcada fica para o Selecionar novamente. */
+  const selecionarNoDocumento = (nova: Selecao | null) => {
+    const valida = nova && temAlgo(nova) ? nova : null;
+    if (!valida && selecaoNoDocumento) setSelecaoAnterior(selecaoNoDocumento);
+    setSelecaoDoDocumento(valida);
+    if (valida) setBordasDaSelecao(true);
+  };
+  const modificarSelecao = (como: ModificacaoDaSelecao, valor: number) => {
+    const atual = selecaoNoDocumento;
+    if (!atual) return;
+    const nova =
+      como === "borda" ? borda(atual, valor) : como === "suavizar" ? suavizar(atual, valor) : como === "expandir" ? expandir(atual, valor) : como === "contrair" ? contrair(atual, valor) : difusao(atual, valor / 2);
+    if (!temAlgo(nova)) mostrarAviso("Nenhum pixel ficou mais da metade selecionado: as bordas da seleção não vão aparecer.");
+    setSelecaoDoDocumento(nova);
+  };
+  /**
+   * A seleção do documento levada à foto escolhida, como o pincel da ferramenta Objeto: um PNG opaco, branco no que
+   * entra, no tamanho da foto (até 2048 no lado maior). Null sem seleção ou sem a camada na prévia.
+   */
+  const selecaoNaFoto = (): string | null => {
+    if (!selecaoNoDocumento || !selecionado || !foto?.video || !projeto) return null;
+    const medida = caixasRef.current.get(selecionado.clipe.id);
+    if (!medida?.bruta || !medida.quadro) return null;
+    const fator = Math.min(1, 2048 / Math.max(foto.video.largura, foto.video.altura));
+    const naFoto = { largura: Math.max(1, Math.round(foto.video.largura * fator)), altura: Math.max(1, Math.round(foto.video.altura * fator)) };
+    const matriz = matrizDaMidiaNoDocumento(medida.bruta, selecionado.clipe.recorte, selecionado.clipe.virar, naFoto, medida.quadro, tamanhoDaImagem(projeto));
+    const branca = selecaoNaMidia(selecaoNoDocumento, matriz, naFoto);
+    const canvas = document.createElement("canvas");
+    canvas.width = naFoto.largura;
+    canvas.height = naFoto.altura;
+    const ctx2d = canvas.getContext("2d")!;
+    ctx2d.fillStyle = "#000";
+    ctx2d.fillRect(0, 0, naFoto.largura, naFoto.altura);
+    ctx2d.drawImage(branca, 0, 0);
+    return canvas.toDataURL("image/png");
+  };
+  /** Ctrl + clique na miniatura: a seleção pela transparência da camada (sozinha) ou pelo cinza da máscara dela. */
+  const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => {
+    const atual = projetoRef.current;
+    const achado = atual ? acharClipe(atual, clipeId) : null;
+    if (!atual || !achado) return;
+    const documento = tamanhoDaImagem(atual);
+    try {
+      await pinturas.esperar();
+      let nova: Selecao;
+      if (de === "mascara") {
+        const mascara = achado.clipe.mascara_pixels;
+        const medida = caixasRef.current.get(clipeId);
+        if (!mascara || !medida?.bruta || !medida.quadro) return;
+        const imagem = pinturas.fonteDaMascara(achado.clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
+        // A máscara tem o tamanho do documento de quando foi feita: o pixel dela vai para o documento pela matriz
+        const escala: Afim = [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0];
+        nova = imagemNoDocumento(imagem, compor(matrizDaMascaraNoDocumento(mascara, medida.bruta, medida.quadro, documento), escala), documento, "cinza");
+      } else {
+        const sozinha = projetoSoCom(atual, [achado.faixa.id], { neutras: new Set([achado.faixa.id]), semEstilo: true, semMascara: true });
+        const imagem = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte }));
+        nova = imagemNoDocumento(imagem, [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0], documento, "alfa");
+        imagem.close();
+      }
+      const resultado = combinar(selecaoNoDocumento, nova, modo);
+      if (resultado && !temAlgo(resultado)) mostrarAviso("A camada não tem nenhum pixel mais da metade opaco: nada foi selecionado.");
+      selecionarNoDocumento(resultado);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível selecionar pela camada.");
+    }
+  };
   const camadaEscolhida = projeto && selecionado ? camadasDaImagem(projeto).find(({ clipe }) => clipe.id === selecionado.clipe.id) : undefined;
   // As camadas escolhidas (podem ser várias, e pastas), de cima para baixo como no painel
   const escolhidas = projeto ? faixasEmOrdem(projeto).filter((faixa) => selecaoValida.includes(faixa.clipes[0].id)) : [];
@@ -310,7 +413,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   async function usarSelecao(acao: "apagar" | "recortar") {
     if (!selecionado || pedindo) return;
     setPedindo(true);
-    const midia = await objeto.pedir(acao);
+    const midia = await objeto.pedir(acao, selecaoNaFoto());
     setPedindo(false);
     if (!midia) return;
     esperarMidia(midia, acao === "apagar" ? { trocar: [selecionado.clipe.id] } : { camadaDe: selecionado.faixa.id });
@@ -579,7 +682,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Camada › Máscara de camada: revelar tudo (branca), ocultar tudo (preta) ou a partir da transparência (o alfa da
    * camada, desenhada sozinha, vira o cinza). A matriz é a da caixa da camada agora: a máscara anda com ela.
    */
-  const criarMascara = async (como: "revelar" | "ocultar" | "transparencia") => {
+  const criarMascara = async (como: "revelar" | "ocultar" | "revelarSelecao" | "ocultarSelecao" | "transparencia") => {
+    const daSelecao = selecaoNoDocumento;
+    if ((como === "revelarSelecao" || como === "ocultarSelecao") && !daSelecao) return mostrarAviso("Não há seleção.");
     const alvo = selecionado;
     if (!alvo || !projeto || gerandoPixels) return;
     if (alvo.clipe.pasta || alvo.clipe.ajuste) return mostrarAviso("A máscara de pixels vale para camadas com imagem.");
@@ -607,10 +712,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               }
               ctx2d.putImageData(dados, 0, 0);
             })
-          : pngDoDocumento((ctx2d, largura, altura) => {
-              ctx2d.fillStyle = como === "revelar" ? "#ffffff" : "#000000";
-              ctx2d.fillRect(0, 0, largura, altura);
-            });
+          : daSelecao && (como === "revelarSelecao" || como === "ocultarSelecao")
+            ? pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, daSelecao, como === "ocultarSelecao"))
+            : pngDoDocumento((ctx2d, largura, altura) => {
+                ctx2d.fillStyle = como === "revelar" ? "#ffffff" : "#000000";
+                ctx2d.fillRect(0, 0, largura, altura);
+              });
       const { midia, versao } = await subirMascara(gerar);
       if (executar({ comando: "mascara.definir", parametros: { clipeId: alvo.clipe.id, mascara: { midia_id: midia.id, versao, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz } } })) {
         setMascaraEmFoco(alvo.clipe.id);
@@ -701,6 +808,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     vinculadas,
     temFoto: Boolean(foto),
     temSelecao,
+    temSelecaoDoDocumento: Boolean(selecaoNoDocumento),
+    podeSelecionarNovamente: !selecaoNoDocumento && Boolean(selecaoAnterior && selecaoAnterior.largura === tamanhoDoDocumento?.largura && selecaoAnterior.altura === tamanhoDoDocumento?.altura),
+    bordasVisiveis: bordasDaSelecao,
+    selecaoDoDocumento: (acao) => {
+      if (!tamanhoDoDocumento) return;
+      if (acao === "tudo") selecionarNoDocumento(cheia(tamanhoDoDocumento.largura, tamanhoDoDocumento.altura));
+      else if (acao === "desmarcar") selecionarNoDocumento(null);
+      else if (acao === "novamente" && selecaoAnterior) selecionarNoDocumento(selecaoAnterior);
+      else if (acao === "inverter" && selecaoNoDocumento) setSelecaoDoDocumento(inverterSelecao(selecaoNoDocumento));
+      else if (acao === "bordas") setBordasDaSelecao((atual) => !atual);
+    },
+    modificarSelecao: (como) => selecaoNoDocumento && setModificando(como),
     podeDesfazer: edicao.nomeDesfazer,
     podeRefazer: edicao.nomeRefazer,
     area: area.area,
@@ -748,7 +867,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     mascaraDePixels: (acao) => {
       if (!selecionado) return;
       const clipeId = selecionado.clipe.id;
-      if (acao === "revelar" || acao === "ocultar" || acao === "transparencia") void criarMascara(acao);
+      if (acao === "revelar" || acao === "ocultar" || acao === "revelarSelecao" || acao === "ocultarSelecao" || acao === "transparencia") void criarMascara(acao);
       else if (acao === "excluir") {
         if (executar({ comando: "mascara.definir", parametros: { clipeId, mascara: null } })) setMascaraEmFoco(null);
       } else if (acao === "aplicar") void mesclarEmPixels("aplicarMascara").then(() => setMascaraEmFoco(null));
@@ -805,7 +924,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     viaRecorte: () => void usarSelecao("recortar"),
     preencher: () => void usarSelecao("apagar"),
-    desmarcar: () => objeto.limpar(),
+    desmarcar: () => {
+      objeto.limpar();
+      selecionarNoDocumento(null);
+    },
     todasAsCamadas: () => projeto && setSelecao(camadasDaImagem(projeto).map(({ clipe }) => clipe.id)),
     desmarcarCamadas: () => setSelecao([]),
     texto: (texto) => porTexto(texto),
@@ -815,7 +937,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -843,7 +965,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const grupo = grupoDa(comTecla[0].id);
       const indice = GRUPOS_DE_FERRAMENTAS.indexOf(grupo);
       let id = ultimas[indice] ?? comTecla[0].id;
-      if (evento.shiftKey && atualNoGrupo) id = grupo[(grupo.findIndex((item) => item.id === ferramenta) + 1) % grupo.length].id;
+      // Shift passa só pelas do grupo com a mesma tecla (o letreiro de linha única não tem tecla, como lá)
+      const comAMesma = grupo.filter((item) => item.tecla === tecla);
+      if (evento.shiftKey && atualNoGrupo) id = comAMesma[(comAMesma.findIndex((item) => item.id === ferramenta) + 1) % comAMesma.length].id;
       escolherFerramenta(id);
     } else if (tecla === "D") setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }));
     else if (tecla === "X") setCores((atual) => ({ ...atual, primeiroPlano: atual.fundo, fundo: atual.primeiroPlano }));
@@ -1007,7 +1131,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(como)} aoVincularMascara={vincularMascara} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} />,
     },
     pinceis: {
       nome: PAINEIS_DA_IMAGEM.pinceis,
@@ -1167,6 +1291,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoMudarPincel={mudarPincel}
         simetria={simetria}
         aoMudarSimetria={setSimetria}
+        selecaoDoDocumento={{
+          opcoes: opcoesDaSelecao,
+          aoMudar: (mudanca) => setOpcoesDaSelecao((atual) => ({ ...atual, ...mudanca })),
+          temSelecao: Boolean(selecaoNoDocumento),
+          naFoto: Boolean(foto),
+          aoDesmarcar: acoes.desmarcar,
+        }}
       />
 
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
@@ -1231,6 +1362,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             fonteDosPixels={pinturas.fonte}
             fonteDaMascara={pinturas.fonteDaMascara}
             mascaraAVista={mascaraAVista}
+            selecaoDoDocumento={{
+              selecao: selecaoNoDocumento,
+              bordas: bordasDaSelecao,
+              ferramenta: FERRAMENTAS_DA_SELECAO.has(ferramenta) ? (ferramenta as FerramentaDeSelecao) : null,
+              opcoes: opcoesDaSelecao,
+              aoSelecionar: selecionarNoDocumento,
+            }}
             ferramenta={ferramenta}
             zoom={zoom}
             aoMudarZoom={setZoom}
@@ -1288,6 +1426,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ) : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}
+      {modificando ? (
+        <JanelaDeNumero
+          {...MODIFICACOES[modificando]}
+          aoFechar={() => setModificando(null)}
+          aoConfirmar={(valor) => {
+            setModificando(null);
+            modificarSelecao(modificando, valor);
+          }}
+        />
+      ) : null}
       {edicao.aviso ? (
         <div role="status" className="pointer-events-none fixed inset-x-0 bottom-8 z-50 flex justify-center px-4">
           <p className="rounded-lg border border-borda bg-painel-3 px-4 py-2 text-sm shadow-xl shadow-black/40">{edicao.aviso}</p>
@@ -1331,6 +1479,65 @@ function encaixarProporcao(r: RetanguloDaImagem, proporcao: number): RetanguloDa
 }
 
 /** Ajuda > Atalhos do teclado: as ferramentas e os atalhos dos menus. */
+/** A janela de um número só (Selecionar › Modificar): Enter confirma, Esc fecha. */
+function JanelaDeNumero({
+  titulo,
+  rotulo,
+  padrao,
+  minimo,
+  maximo,
+  aoFechar,
+  aoConfirmar,
+}: {
+  titulo: string;
+  rotulo: string;
+  padrao: number;
+  minimo: number;
+  maximo: number;
+  aoFechar: () => void;
+  aoConfirmar: (valor: number) => void;
+}) {
+  const [texto, setTexto] = useState(String(padrao));
+  const numero = Number(texto.replace(",", "."));
+  const valido = Number.isFinite(numero) && numero >= minimo && numero <= maximo;
+  useEffect(() => {
+    const esc = (evento: KeyboardEvent) => evento.key === "Escape" && aoFechar();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [aoFechar]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={aoFechar}>
+      <form
+        role="dialog"
+        aria-modal
+        aria-label={titulo}
+        className="w-full max-w-xs rounded-lg border border-borda bg-painel p-4 shadow-2xl"
+        onClick={(evento) => evento.stopPropagation()}
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          if (valido) aoConfirmar(numero);
+        }}
+      >
+        <h2 className="mb-3 text-sm font-semibold">{titulo}</h2>
+        <label className="flex items-center gap-2 text-xs">
+          {rotulo}:
+          <input autoFocus inputMode="decimal" value={texto} onChange={(evento) => setTexto(evento.currentTarget.value)} onFocus={(evento) => evento.currentTarget.select()} className="w-20 rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-right tabular-nums" />
+          pixels
+        </label>
+        {!valido ? <p className="mt-2 text-[11px] text-erro">Use um número de {minimo.toLocaleString("pt-BR")} a {maximo.toLocaleString("pt-BR")}.</p> : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" className="botao-secundario px-3 py-1 text-xs" onClick={aoFechar}>
+            Cancelar
+          </button>
+          <button type="submit" className="botao-principal px-3 py-1 text-xs" disabled={!valido}>
+            OK
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function JanelaDeAtalhos({ acoes, aoFechar }: { acoes: AcoesDosMenus; aoFechar: () => void }) {
   const menus = menusDaImagem(acoes);
   type Linha = { nome: string; atalho: string };

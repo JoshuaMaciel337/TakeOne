@@ -107,3 +107,10 @@ body {
     color: transparent;
   }
 }
+
+/* As formigas da seleção do editor de imagem: listras que andam, numa máscara com a borda da seleção */
+@keyframes to-formigas {
+  to {
+    background-position: 8.49px 0;
+  }
+}

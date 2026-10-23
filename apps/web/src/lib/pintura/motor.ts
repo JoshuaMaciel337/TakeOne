@@ -166,6 +166,8 @@ export type InicioDoTraco = {
   travarTransparencia: boolean;
   /** Os pincéis do histórico: a camada como estava no estado escolhido (do tamanho da camada). */
   fonteDaTinta?: HTMLCanvasElement | null;
+  /** A seleção do documento levada a esta camada (o alfa, do tamanho dela): o traço só vale dentro dela. */
+  limite?: HTMLCanvasElement | null;
 };
 
 export class Pintura {
@@ -177,7 +179,7 @@ export class Pintura {
   private readonly ctxCamada: CanvasRenderingContext2D;
   private readonly ctxTela: CanvasRenderingContext2D;
   private readonly ctxTraco: CanvasRenderingContext2D;
-  private atual: (InicioDoTraco & { tinta: Rgb; corDoFundo: Rgb; apagar: boolean; dura: boolean; colorido: boolean; fonte: Uint8ClampedArray | null }) | null = null;
+  private atual: (InicioDoTraco & { tinta: Rgb; corDoFundo: Rgb; apagar: boolean; dura: boolean; colorido: boolean; fonte: Uint8ClampedArray | null; dentro: Uint8ClampedArray | null }) | null = null;
   /** Quantas marcas o traço já tem (o desvanecer) e a variação de cor do começo (sem "por ponta"). */
   private indice = 0;
   private corDoTraco: Marca["cor"] = null;
@@ -236,7 +238,9 @@ export class Pintura {
       const ctxFonte = inicio.fonteDaTinta.getContext("2d", { willReadFrequently: true })!;
       fonte = ctxFonte.getImageData(0, 0, this.largura, this.altura).data;
     }
-    this.atual = { ...inicio, tinta: corParaRgb(cor), corDoFundo: corParaRgb(inicio.fundo), apagar, dura, colorido, fonte };
+    // A seleção, lida uma vez por traço (o alfa de cada pixel)
+    const dentro = inicio.limite ? inicio.limite.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, this.largura, this.altura).data : null;
+    this.atual = { ...inicio, tinta: corParaRgb(cor), corDoFundo: corParaRgb(inicio.fundo), apagar, dura, colorido, fonte, dentro };
     this.indice = 0;
     this.corDoTraco = null;
     this.area = null;
@@ -431,6 +435,15 @@ export class Pintura {
         traco[i] = r;
         traco[i + 1] = g;
         traco[i + 2] = b;
+      }
+    }
+    // Fora da seleção o traço não vale; na borda difusa, vale em parte
+    if (atual.dentro) {
+      for (let y = 0; y < altura; y++) {
+        for (let x = 0; x < largura; x++) {
+          const i = (y * largura + x) * 4 + 3;
+          traco[i] = Math.round((traco[i] * atual.dentro[((y0 + y) * this.largura + x0 + x) * 4 + 3]) / 255);
+        }
       }
     }
     const saida = this.ctxTela.createImageData(largura, altura);

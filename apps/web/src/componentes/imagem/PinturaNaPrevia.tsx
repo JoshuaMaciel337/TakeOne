@@ -9,7 +9,9 @@ import type { Pintura } from "@/lib/pintura/motor";
 import { comprimentoDaCorda, copiasDaSimetria, Corda, Espacador, type FerramentaDePintura, type OpcoesDoPincel, pontoNaCamada, type PontoDoTraco, type Simetria } from "@/lib/pintura/traco";
 import type { Caixa, Tamanho } from "@/lib/projeto/geometria";
 import type { Recorte, Virar } from "@/lib/projeto/modelo";
-import { type MascaraDePixels, pontoNaMascara } from "@/lib/projeto/mascaraDePixels";
+import { type MascaraDePixels, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, pontoNaMascara } from "@/lib/projeto/mascaraDePixels";
+import type { Selecao } from "@/lib/selecao/mascara";
+import { selecaoNaMidia } from "@/lib/selecao/naTela";
 
 /** A camada que recebe o traço, como está na prévia (sem caixa: uma camada nova, que cobre o quadro). */
 export type AlvoDaPintura = {
@@ -44,6 +46,8 @@ type Props = {
   simetria: Simetria | null;
   /** Pintando uma máscara: as cores viram cinza pela luz delas. */
   emCinza?: boolean;
+  /** A seleção do documento: o traço só pinta dentro dela. */
+  selecao?: Selecao | null;
 };
 
 /** A cor em cinza, pela luz (BT.709): na máscara, o branco mostra e o preto esconde. */
@@ -75,7 +79,7 @@ function daCaneta(evento: PointerEvent | React.PointerEvent): Omit<PontoDoTraco,
   return { pressao: evento.pressure > 0 ? evento.pressure : 1, inclinacaoX: (evento.tiltX ?? 0) / 90, inclinacaoY: (evento.tiltY ?? 0) / 90, giro: evento.twist ?? 0 };
 }
 
-export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false }: Props) {
+export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false, selecao = null }: Props) {
   const centro = { x: quadro.largura / 2, y: quadro.altura / 2 };
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const tracoRef = useRef<Traco | null>(null);
@@ -175,7 +179,12 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       const [primeiro, ...resto] = traco.pendentes;
       const copias = copiasDaSimetria(primeiro, simetria, centro).map(traco.mapear);
       const tinta = emCinza || mascara ? { primeiroPlano: emTomDeCinza(cores.primeiroPlano), fundo: emTomDeCinza(cores.fundo) } : cores;
-      alvo.pintura.iniciar({ ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia, fonteDaTinta: alvo.fonteDaTinta }, copias[0]);
+      // A seleção do documento vai para os pixels da camada (ou da máscara) pela conta inversa da prévia
+      const limite = selecao
+        ? selecaoNaMidia(selecao, mascara ? matrizDaMascaraNoDocumento(mascara, caixa, quadro, documento) : matrizDaMidiaNoDocumento(caixa, alvo.recorte, alvo.virar, midia, quadro, documento), midia)
+        : null;
+      const inicio = { ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia, fonteDaTinta: alvo.fonteDaTinta, limite };
+      alvo.pintura.iniciar(inicio, copias[0]);
       for (const copia of copias.slice(1)) alvo.pintura.marcar(copia);
       traco.corda.puxar(primeiro);
       copias.forEach((copia, i) => traco.espacadores[i].ate(copia, () => diametro * opcoes.espacamento));

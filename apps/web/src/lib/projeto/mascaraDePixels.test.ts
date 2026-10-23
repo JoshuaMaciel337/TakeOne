@@ -49,3 +49,29 @@ test("passar para outra caixa deixa a máscara no mesmo lugar do documento", () 
   perto(antes.x, depois.x, 1e-6);
   perto(antes.y, depois.y, 1e-6);
 });
+
+test("a mídia no documento: a camada inteira cobre o documento; virada, o canto vai para o outro lado", async () => {
+  const { matrizDaMidiaNoDocumento } = await import("./mascaraDePixels.ts");
+  const inteira = { cx: 400, cy: 200, largura: 800, altura: 400, rotacao: 0 };
+  const recorte = { x: 0, y: 0, largura: 1, altura: 1 };
+  const m = matrizDaMidiaNoDocumento(inteira, recorte, null, { largura: 100, altura: 50 }, quadro, documento);
+  assert.deepEqual(aplicar(m, 100, 50).map((v) => Math.round(v)), [1600, 800]);
+  const virada = matrizDaMidiaNoDocumento(inteira, recorte, { horizontal: true, vertical: false }, { largura: 100, altura: 50 }, quadro, documento);
+  assert.deepEqual(aplicar(virada, 0, 0).map((v) => Math.round(v)), [1600, 0]);
+  // Recortada na metade da direita: o pixel do meio da mídia vai para a borda esquerda da caixa
+  const metade = matrizDaMidiaNoDocumento(inteira, { x: 0.5, y: 0, largura: 0.5, altura: 1 }, null, { largura: 100, altura: 50 }, quadro, documento);
+  assert.deepEqual(aplicar(metade, 50, 0).map((v) => Math.round(v)), [0, 0]);
+});
+
+test("a máscara no documento desfaz o ponto na máscara", async () => {
+  const { matrizDaMascaraNoDocumento } = await import("./mascaraDePixels.ts");
+  const feita = { cx: 300, cy: 150, largura: 200, altura: 100, rotacao: 30, opacidade: 1 };
+  const mascara = { vinculada: true, matriz: matrizDaCaixa(feita, quadro) };
+  const agora = { ...feita, cx: 420, rotacao: 10 };
+  const ponto = { x: 410, y: 170 };
+  const naMascara = pontoNaMascara(ponto, mascara, agora, quadro, documento);
+  const [x, y] = aplicar(matrizDaMascaraNoDocumento(mascara, agora, quadro, documento), naMascara.x, naMascara.y);
+  // O ponto do quadro (800 × 400) no documento (1600 × 800) é o dobro
+  perto(x, 820, 1e-6);
+  perto(y, 340, 1e-6);
+});

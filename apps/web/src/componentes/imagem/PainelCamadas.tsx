@@ -9,6 +9,7 @@ import { arvoreDaImagem, camadaVisivel, type NoDaCamada, paiDaCamada } from "@/l
 import type { Comando } from "@/lib/projeto/comandos";
 import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
+import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
@@ -35,7 +36,14 @@ type Props = {
   aoVerMascara: (clipeId: string | null) => void;
   aoCriarMascara: (como: "revelar" | "ocultar") => void;
   aoVincularMascara: (clipeId: string, ligar: boolean) => void;
+  /** Ctrl + clique na miniatura: a seleção do documento pela transparência da camada (ou pelo cinza da máscara). */
+  aoSelecionarDaCamada?: (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => void;
 };
+
+/** O modo da seleção pelas teclas junto do Ctrl: Shift soma, Alt subtrai, os dois intersectam. */
+function modoDoCtrl(evento: React.MouseEvent): ModoDaSelecao {
+  return evento.shiftKey && evento.altKey ? "intersectar" : evento.shiftKey ? "somar" : evento.altKey ? "subtrair" : "nova";
+}
 
 /** O nome de cada camada: o que a pessoa deu, o do texto, "Camada de ajuste", "Grupo" ou o da mídia. */
 export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, faixa?: Faixa): string {
@@ -212,6 +220,7 @@ export function PainelCamadas({
   aoVerMascara,
   aoCriarMascara,
   aoVincularMascara,
+  aoSelecionarDaCamada,
 }: Props) {
   // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
@@ -551,7 +560,16 @@ export function PainelCamadas({
                   aria-pressed={marcada}
                   className="flex min-w-0 flex-1 items-center gap-2 self-stretch text-left"
                 >
-                  <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-borda bg-painel-3">
+                  <span
+                    className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-borda bg-painel-3"
+                    title={clipe.pasta ? undefined : "Ctrl + clique: seleciona pela transparência da camada (Shift soma, Alt subtrai)"}
+                    onClick={(evento) => {
+                      if (!(evento.ctrlKey || evento.metaKey) || clipe.pasta || !aoSelecionarDaCamada) return;
+                      evento.stopPropagation();
+                      evento.preventDefault();
+                      aoSelecionarDaCamada(clipe.id, modoDoCtrl(evento), "camada");
+                    }}
+                  >
                     {clipe.pasta ? (
                       aberta(faixa) ? (
                         <FolderOpen className="size-3.5 text-suave" aria-hidden />
@@ -625,14 +643,15 @@ export function PainelCamadas({
                       type="button"
                       onClick={(evento) => {
                         const mascara = clipe.mascara_pixels!;
-                        if (evento.altKey) aoVerMascara(mascaraAVista === clipe.id ? null : clipe.id);
+                        if ((evento.ctrlKey || evento.metaKey) && aoSelecionarDaCamada) aoSelecionarDaCamada(clipe.id, modoDoCtrl(evento), "mascara");
+                        else if (evento.altKey) aoVerMascara(mascaraAVista === clipe.id ? null : clipe.id);
                         else if (evento.shiftKey) aoExecutar({ comando: "mascara.mudar", parametros: { clipeId: clipe.id, mudanca: { ligada: !mascara.ligada } } });
                         else {
                           if (!marcada) aoSelecionar([clipe.id]);
                           aoFocarMascara(clipe.id);
                         }
                       }}
-                      title="Máscara de camada: clique para pintar nela, Alt + clique para vê-la, Shift + clique para desativar"
+                      title="Máscara de camada: clique para pintar nela, Alt + clique para vê-la, Shift + clique para desativar, Ctrl + clique para selecionar por ela"
                       aria-label={`Máscara de ${nome}`}
                       aria-pressed={mascaraEmFoco === clipe.id}
                       className={`relative size-7 shrink-0 overflow-hidden rounded-sm border bg-black ${mascaraEmFoco === clipe.id ? "border-2 border-texto" : "border-borda"}`}

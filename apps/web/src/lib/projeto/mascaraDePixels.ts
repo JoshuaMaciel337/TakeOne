@@ -75,3 +75,31 @@ export function matrizParaOutraCaixa(mascara: Pick<MascaraDePixels, "vinculada" 
   // Na posição L' da caixa nova: o ponto do quadro é Q'(L'); na caixa velha, L = Q⁻¹(Q'(L')); na máscara, M(L)
   return compor(matrizEmUso(mascara, antes, quadro), compor(inverter(matrizDaCaixa(antes, quadro)), matrizDaCaixa(depois, quadro)));
 }
+
+/**
+ * O pixel da mídia da camada → o pixel do documento: o recorte e a virada (a mídia como aparece na caixa), a caixa
+ * (pixels do quadro da prévia) e o documento. É a conta que leva a seleção do documento para a foto e volta.
+ */
+export function matrizDaMidiaNoDocumento(
+  caixa: Pick<Caixa, "cx" | "cy" | "largura" | "altura" | "rotacao">,
+  recorte: { x: number; y: number; largura: number; altura: number },
+  virar: { horizontal: boolean; vertical: boolean } | null | undefined,
+  midia: Tamanho,
+  quadro: Tamanho,
+  documento: Tamanho,
+): Afim {
+  // A mídia (pixels) → a posição na caixa (0 a 1): virar, depois o recorte
+  const sx = (virar?.horizontal ? -1 : 1) / midia.largura;
+  const sy = (virar?.vertical ? -1 : 1) / midia.altura;
+  const naCaixa: Afim = [sx / recorte.largura, 0, 0, sy / recorte.altura, ((virar?.horizontal ? 1 : 0) - recorte.x) / recorte.largura, ((virar?.vertical ? 1 : 0) - recorte.y) / recorte.altura];
+  const noDocumento: Afim = [documento.largura, 0, 0, documento.altura, 0, 0];
+  return compor(noDocumento, compor(matrizDaCaixa(caixa, quadro), naCaixa));
+}
+
+/** O pixel da máscara (do tamanho do documento) → o pixel do documento: a conta inversa do `pontoNaMascara`. */
+export function matrizDaMascaraNoDocumento(mascara: Pick<MascaraDePixels, "vinculada" | "matriz">, caixa: Caixa, quadro: Tamanho, documento: Tamanho): Afim {
+  // Pixel da máscara → fração dela → posição na caixa (M⁻¹) → fração do quadro (Q) → pixel do documento
+  const daMascara: Afim = [1 / documento.largura, 0, 0, 1 / documento.altura, 0, 0];
+  const noDocumento: Afim = [documento.largura, 0, 0, documento.altura, 0, 0];
+  return compor(noDocumento, compor(matrizDaCaixa(caixa, quadro), compor(inverter(matrizEmUso(mascara, caixa, quadro)), daMascara)));
+}

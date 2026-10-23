@@ -83,6 +83,13 @@ export type AcoesDosMenus = {
   /** A camada escolhida é uma foto (as ações de foto e de seleção valem). */
   temFoto: boolean;
   temSelecao: boolean;
+  /** A seleção do documento (letreiros, laços): tem algo, há uma anterior para selecionar de novo, as bordas à vista. */
+  temSelecaoDoDocumento: boolean;
+  podeSelecionarNovamente: boolean;
+  bordasVisiveis: boolean;
+  selecaoDoDocumento: (acao: "tudo" | "desmarcar" | "novamente" | "inverter" | "bordas") => void;
+  /** Selecionar › Modificar: pergunta o número e muda a seleção. */
+  modificarSelecao: (como: "borda" | "suavizar" | "expandir" | "contrair" | "difusao") => void;
   podeDesfazer: string | null;
   podeRefazer: string | null;
   area: string;
@@ -122,7 +129,7 @@ export type AcoesDosMenus = {
   mascaraVinculada: boolean;
   /** O pincel pinta a máscara (Ctrl+\). */
   mascaraEmFoco: boolean;
-  mascaraDePixels: (acao: "revelar" | "ocultar" | "transparencia" | "excluir" | "aplicar" | "ligar" | "vincular" | "inverter" | "foco") => void;
+  mascaraDePixels: (acao: "revelar" | "ocultar" | "revelarSelecao" | "ocultarSelecao" | "transparencia" | "excluir" | "aplicar" | "ligar" | "vincular" | "inverter" | "foco") => void;
   apagarVazias: () => void;
   selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
@@ -234,8 +241,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: [
             { nome: "Revelar tudo", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("revelar") },
             { nome: "Ocultar tudo", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("ocultar") },
-            { nome: "Revelar seleção", desativado: true, titulo: "Chega com a seleção do documento (13.3)", aoEscolher: () => undefined },
-            { nome: "Ocultar seleção", desativado: true, titulo: "Chega com a seleção do documento (13.3)", aoEscolher: () => undefined },
+            { nome: "Revelar seleção", desativado: a.temMascara || !a.temSelecaoDoDocumento, aoEscolher: () => a.mascaraDePixels("revelarSelecao") },
+            { nome: "Ocultar seleção", desativado: a.temMascara || !a.temSelecaoDoDocumento, aoEscolher: () => a.mascaraDePixels("ocultarSelecao") },
             { nome: "A partir da transparência", desativado: a.temMascara, aoEscolher: () => a.mascaraDePixels("transparencia") },
             "-",
             { nome: "Pintar na máscara", atalho: "Ctrl+\\", marcado: a.mascaraEmFoco, desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("foco") },
@@ -306,13 +313,29 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Selecionar",
       itens: [
+        { nome: "Tudo", atalho: "Ctrl+A", aoEscolher: () => a.selecaoDoDocumento("tudo") },
+        { nome: "Desmarcar", atalho: "Ctrl+D", desativado: !a.temSelecao && !a.temSelecaoDoDocumento, aoEscolher: a.desmarcar },
+        { nome: "Selecionar novamente", atalho: "Ctrl+Shift+D", desativado: !a.podeSelecionarNovamente, aoEscolher: () => a.selecaoDoDocumento("novamente") },
+        { nome: "Inverter", atalho: "Ctrl+Shift+I", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.selecaoDoDocumento("inverter") },
+        "-",
         { nome: "Todas as camadas", atalho: "Ctrl+Alt+A", aoEscolher: a.todasAsCamadas },
         { nome: "Desmarcar camadas", aoEscolher: a.desmarcarCamadas },
         { nome: "Camadas vinculadas", desativado: !a.temCamada, aoEscolher: a.selecionarVinculadas },
         { nome: "Camada de cima", atalho: "Alt+]", aoEscolher: () => a.camadaVizinha(-1) },
         { nome: "Camada de baixo", atalho: "Alt+[", aoEscolher: () => a.camadaVizinha(1) },
         "-",
-        { nome: "Desmarcar", atalho: "Ctrl+D", desativado: !a.temSelecao, aoEscolher: a.desmarcar },
+        {
+          nome: "Modificar",
+          desativado: !a.temSelecaoDoDocumento,
+          itens: [
+            { nome: "Borda…", aoEscolher: () => a.modificarSelecao("borda") },
+            { nome: "Suavizar…", aoEscolher: () => a.modificarSelecao("suavizar") },
+            { nome: "Expandir…", aoEscolher: () => a.modificarSelecao("expandir") },
+            { nome: "Contrair…", aoEscolher: () => a.modificarSelecao("contrair") },
+            { nome: "Difusão…", atalho: "Shift+F6", aoEscolher: () => a.modificarSelecao("difusao") },
+          ],
+        },
+        "-",
         { nome: "Objeto", aoEscolher: () => a.ferramenta("objeto") },
       ],
     },
@@ -335,6 +358,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Diminuir zoom", atalho: "Ctrl+-", aoEscolher: () => a.zoom("menos") },
         { nome: "Ajustar à tela", atalho: "Ctrl+0", aoEscolher: () => a.zoom("ajustar") },
         { nome: "100%", atalho: "Ctrl+1", aoEscolher: () => a.zoom(1) },
+        "-",
+        { nome: "Bordas da seleção", atalho: "Ctrl+H", marcado: a.bordasVisiveis, aoEscolher: () => a.selecaoDoDocumento("bordas") },
       ],
     },
     {

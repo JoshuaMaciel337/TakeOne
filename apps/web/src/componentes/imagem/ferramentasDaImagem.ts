@@ -16,6 +16,8 @@ import {
   Pencil,
   Pentagon,
   Pipette,
+  SeparatorHorizontal,
+  SeparatorVertical,
   Shapes,
   Square,
   SquareDashed,
@@ -33,6 +35,8 @@ export type IdFerramentaDaImagem =
   | "mover"
   | "letreiro"
   | "letreiroEliptico"
+  | "linhaUnica"
+  | "colunaUnica"
   | "laco"
   | "lacoPoligonal"
   | "objeto"
@@ -69,12 +73,14 @@ const F = (id: IdFerramentaDaImagem, nome: string, tecla: string, icone: LucideI
 export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [F("mover", "Ferramenta Mover", "V", Move, "Clique para escolher a camada; arraste para mover, as alças mudam o tamanho e o giro.")],
   [
-    F("letreiro", "Ferramenta Letreiro retangular", "M", SquareDashed, "Arraste na foto para selecionar um retângulo. Shift soma à seleção, Alt subtrai."),
-    F("letreiroEliptico", "Ferramenta Letreiro elíptico", "M", CircleDashed, "Arraste na foto para selecionar uma elipse. Shift soma à seleção, Alt subtrai."),
+    F("letreiro", "Ferramenta Letreiro retangular", "M", SquareDashed, "Arraste para selecionar um retângulo. Shift soma, Alt subtrai; no arrasto, Shift faz um quadrado e Alt parte do centro."),
+    F("letreiroEliptico", "Ferramenta Letreiro elíptico", "M", CircleDashed, "Arraste para selecionar uma elipse. Shift soma, Alt subtrai; no arrasto, Shift faz um círculo e Alt parte do centro."),
+    F("linhaUnica", "Ferramenta Letreiro de linha única", "", SeparatorHorizontal, "Clique para selecionar uma linha de 1 pixel da imagem inteira."),
+    F("colunaUnica", "Ferramenta Letreiro de coluna única", "", SeparatorVertical, "Clique para selecionar uma coluna de 1 pixel da imagem inteira."),
   ],
   [
-    F("laco", "Ferramenta Laço", "L", Lasso, "Arraste na foto contornando o que quer selecionar. Shift soma, Alt subtrai."),
-    F("lacoPoligonal", "Ferramenta Laço poligonal", "L", Spline, "Clique os cantos em volta do que quer selecionar; clique duplo fecha."),
+    F("laco", "Ferramenta Laço", "L", Lasso, "Arraste contornando o que quer selecionar. Shift soma, Alt subtrai."),
+    F("lacoPoligonal", "Ferramenta Laço poligonal", "L", Spline, "Clique os cantos; clique duplo, Enter ou o primeiro ponto fecham. Shift prende a 45°, Backspace tira o último."),
   ],
   [F("objeto", "Ferramenta Seleção de objeto", "W", SquareDashedMousePointer, "Clique no objeto para a IA achar o contorno; Shift + clique tira uma parte.")],
   [F("corte", "Ferramenta Corte", "C", Crop, "Arraste o retângulo e os cantos; Enter recorta, Esc cancela.")],
@@ -124,15 +130,14 @@ export const FORMAS_PERSONALIZADAS: { tipo: TipoDeForma; nome: string }[] = [
   { tipo: "coracao", nome: "Coração" },
 ];
 
-/** As ferramentas que marcam uma seleção na foto escolhida (e o jeito de marcar de cada uma). */
-export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "retangulo" | "elipse" | "laco" | "poligonal" | "clique" | "pincel">> = {
-  letreiro: "retangulo",
-  letreiroEliptico: "elipse",
-  laco: "laco",
-  lacoPoligonal: "poligonal",
+/** As ferramentas que marcam na foto escolhida (e o jeito de marcar de cada uma). */
+export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "clique" | "pincel">> = {
   objeto: "clique",
   remover: "pincel",
 };
+
+/** As ferramentas que desenham a seleção do documento (lib/selecao). */
+export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set(["letreiro", "letreiroEliptico", "linhaUnica", "colunaUnica", "laco", "lacoPoligonal"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
 export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico"]);

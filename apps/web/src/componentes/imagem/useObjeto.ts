@@ -10,8 +10,8 @@ import type { Clipe } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 export type PontoDoObjeto = { u: number; v: number; incluir: boolean };
-/** Como a seleção é marcada: o clique da IA, o pincel, os letreiros e os laços (os quatro pintam na máscara do pincel). */
-export type ModoDaSelecao = "clique" | "pincel" | "retangulo" | "elipse" | "laco" | "poligonal";
+/** Como a seleção é marcada: o clique da IA ou o pincel (a ferramenta Remover). */
+export type ModoDaSelecao = "clique" | "pincel";
 type Job = { status: string; erro: string | null };
 
 /** O lado maior do desenho do pincel mandado à API. */
@@ -121,9 +121,10 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
     return canvas.toDataURL("image/png");
   }
 
-  async function pedir(acao: "apagar" | "recortar"): Promise<Midia | null> {
+  /** `externo`: a seleção do documento já levada à foto (PNG em base64), quando não há seleção da IA nem pincel. */
+  async function pedir(acao: "apagar" | "recortar", externo?: string | null): Promise<Midia | null> {
     if (!midia) return null;
-    const pincel = desenhoDoPincel();
+    const pincel = desenhoDoPincel() ?? (selecao ? null : (externo ?? null));
     if (!selecao && !pincel) {
       setErro("Selecione uma parte da foto antes (letreiro, laço, seleção de objeto ou o pincel).");
       return null;
