@@ -507,11 +507,11 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Gravar narração (microfone do navegador, no cursor, com o vídeo tocando junto).
   - [x] Nivelar a voz (curva pelos níveis da ingestão, gravada no clipe).
   - [x] O medidor de loudness na prévia (momentâneo, curto, integrado, pico e o ganho da exportação).
-- [ ] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
+- [x] Onda 7, lote E (texto): efeitos do texto, espaçamento e entrelinha, degradê e estilos novos, texto em arco.
   - [x] Espaçamento entre letras, entrelinha, sublinhado e tachado.
   - [x] Efeitos: sombra com cor, direção, distância, desfoque e espalhar; até dois contornos por fora; tamanho do brilho; texto vazado.
   - [x] Degradê em textos e formas e estilos prontos novos (Dourado, Cromado, Quadrinhos, Baixo relevo, Vazado e Pôr do sol).
-  - [ ] Texto em arco.
+  - [x] Texto em arco (arcos paralelos; desliga o destaque da fala e o letra a letra).
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
 - [ ] Onda 9, lote G: adesivos SVG, exportar o quadro, importar LUT, marcadores, contorno e sombra em recortes, mais modos de mesclagem.
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.

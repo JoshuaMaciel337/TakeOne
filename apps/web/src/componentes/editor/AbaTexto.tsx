@@ -89,7 +89,7 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
   });
   /** Os campos que textos antigos não têm: `padrao` quando faltam. */
   const opcional = (
-    chave: "espacamento" | "entrelinha" | "sombra_angulo" | "sombra_distancia" | "sombra_desfoque" | "sombra_espalhar" | "brilho_tamanho" | "preenchimento",
+    chave: "espacamento" | "entrelinha" | "sombra_angulo" | "sombra_distancia" | "sombra_desfoque" | "sombra_espalhar" | "brilho_tamanho" | "preenchimento" | "curvatura",
     padrao: number,
     fator: number,
   ) => {
@@ -201,6 +201,8 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
           sufixo="%"
           {...opcional("entrelinha", ENTRELINHA_PADRAO, 100)}
         />
+        <ControleNumerico rotulo="Curvar" minimo={-100} maximo={100} sufixo="%" {...opcional("curvatura", 0, 100)} />
+        {texto.curvatura ? <p className="text-[11px] text-suave">Em arco, o texto não tem o destaque da fala nem a animação letra a letra.</p> : null}
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-suave">Riscos</span>
           <span className="flex gap-1">

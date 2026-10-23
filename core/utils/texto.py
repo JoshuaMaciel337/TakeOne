@@ -44,6 +44,8 @@ ANGULO_SOMBRA = 45
 DESFOQUE_SOMBRA = 0.08
 # Contornos além do principal, cada um por fora do anterior
 CONTORNOS_EXTRAS = 2
+# Texto em arco: com a curvatura em 1 (ou -1), a linha mais larga dá meia volta no círculo
+ARCO_MAXIMO = math.pi
 # Brilho: o texto desfocado na cor do brilho, por baixo dele, com este raio (fração da letra)
 RAIO_BRILHO = 0.18
 MAXIMO_LINHAS = 12
@@ -85,6 +87,8 @@ TEXTO_PADRAO = {
     "preenchimento": 1.0,
     # As letras em degradê no lugar da cor (core/utils/gradiente.py), sobre o bloco do texto
     "degrade": None,
+    # Texto em arco: de -1 (o centro do círculo em cima) a 1 (embaixo); 0 é reto
+    "curvatura": 0.0,
 }
 
 
@@ -156,10 +160,91 @@ def _medidas(texto: dict, lado_menor: int) -> dict:
         else:
             x = folga + (largura_texto - largura_linha) / 2
         posicoes.append((x, folga + indice * altura_linha))
-    return {"tamanho": tamanho, "fonte": fonte, "linhas": linhas, "posicoes": posicoes, "contorno": contorno,
-            "folga": folga, "largura": int(largura_texto) + 2 * folga, "altura": altura_texto + 2 * folga,
-            "espaco": espaco, "larguras": larguras, "subida": subida, "extras": extras,
-            "contorno_total": contorno_total}
+    medidas = {"tamanho": tamanho, "fonte": fonte, "linhas": linhas, "posicoes": posicoes, "contorno": contorno,
+               "folga": folga, "largura": int(largura_texto) + 2 * folga, "altura": altura_texto + 2 * folga,
+               "espaco": espaco, "larguras": larguras, "subida": subida, "extras": extras,
+               "contorno_total": contorno_total, "arco": None,
+               "caixa_letras": (folga, folga, int(largura_texto) + folga, altura_texto + folga)}
+    if texto["curvatura"]:
+        medidas.update(_medidas_do_arco(texto, medidas, altura_linha, descida))
+    return medidas
+
+
+def _medidas_do_arco(texto: dict, medidas: dict, altura_linha: int, descida: int) -> dict:
+    """
+    As letras no arco: cada uma vai para o ponto do círculo a que o meio dela chega, girada pela tangente.
+    O ângulo é o comprimento andado na linha reta dividido pelo raio, e a linha mais larga cobre ARCO_MAXIMO vezes
+    a curvatura. As linhas são arcos paralelos: o mesmo raio, cada uma uma entrelinha abaixo da anterior (com
+    centros diferentes, para nenhuma apertar nem dar mais voltas). A imagem é o retângulo das letras desenhadas
+    com o contorno todo, mais a folga.
+    """
+    fonte, tamanho = medidas["fonte"], medidas["tamanho"]
+    curvatura = texto["curvatura"]
+    largura_maior = max(max(medidas["larguras"]), 1.0)
+    raio = largura_maior / (abs(curvatura) * ARCO_MAXIMO)
+    sinal = 1 if curvatura > 0 else -1
+    letras, numero = [], 0
+    for indice, (linha, largura_linha) in enumerate(zip(medidas["linhas"], medidas["larguras"], strict=True)):
+        inicios = inicios_das_letras(fonte, linha, medidas["espaco"])
+        if texto["alinhamento"] == "esquerda":
+            desloca = 0.0
+        elif texto["alinhamento"] == "direita":
+            desloca = largura_maior - largura_linha
+        else:
+            desloca = (largura_maior - largura_linha) / 2
+        for k, letra in enumerate(linha):
+            andado = desloca + inicios[k] + fonte.getlength(letra) / 2 - largura_maior / 2
+            angulo = andado / raio
+            x = raio * math.sin(angulo)
+            y = -sinal * raio * math.cos(angulo) + indice * altura_linha
+            letras.append((letra, x, y, sinal * angulo, numero + k))
+        numero += len(linha)
+    # Cada ladrilho cabe a letra girada com o contorno todo
+    lado = 2 * math.ceil(tamanho * 1.5) + 2 * medidas["contorno_total"]
+    xs, ys = [x for _, x, _, _, _ in letras] or [0.0], [y for _, _, y, _, _ in letras] or [0.0]
+    origem = (lado - min(xs), lado - min(ys))
+    solto = (math.ceil(max(xs) - min(xs)) + 2 * lado, math.ceil(max(ys) - min(ys)) + 2 * lado)
+    provisorio = {**medidas, "arco": {"letras": letras, "origem": origem, "lado": lado, "descida": descida},
+                  "largura": solto[0], "altura": solto[1]}
+    caixa = _letras_em_arco(texto, provisorio, "#ffffff", medidas["contorno_total"], "#ffffff").getbbox()
+    if caixa is None:
+        caixa = (0, 0, 1, 1)
+    margem = medidas["folga"] - medidas["contorno_total"]
+    x0, y0 = caixa[0] - margem, caixa[1] - margem
+    largura, altura = caixa[2] - caixa[0] + 2 * margem, caixa[3] - caixa[1] + 2 * margem
+    arco = {"letras": letras, "origem": (origem[0] - x0, origem[1] - y0), "lado": lado, "descida": descida}
+    # O degradê cobre as letras (sem o contorno de fora)
+    preenchidas = _letras_em_arco(texto, {**medidas, "arco": arco, "largura": largura, "altura": altura}, "#ffffff",
+                                  0, "#ffffff").getbbox() or (0, 0, largura, altura)
+    return {"arco": arco, "largura": largura, "altura": altura, "caixa_letras": preenchidas}
+
+
+def _letras_em_arco(texto: dict, medidas: dict, cor: str, contorno: int, cor_contorno: str,
+                    so: set[int] | None = None) -> Image.Image:
+    """As letras no arco, em duas passadas (todo o contorno e depois o preenchimento), cada uma num ladrilho
+    girado pela tangente e colado no ponto do círculo. `so`: só estas letras (as palavras-chave)."""
+    arco, fonte = medidas["arco"], medidas["fonte"]
+    lado = arco["lado"]
+    ox, oy = arco["origem"]
+    camada = Image.new("RGBA", (medidas["largura"], medidas["altura"]), (0, 0, 0, 0))
+    cheio, borda = (*_rgb(cor), 255), (*_rgb(cor_contorno), 255)
+    for passada in ("contorno", "cheio"):
+        if passada == "contorno" and not contorno:
+            continue
+        for letra, x, y, angulo, numero in arco["letras"]:
+            if not letra.strip() or (so is not None and numero not in so):
+                continue
+            ladrilho = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+            desenho = ImageDraw.Draw(ladrilho)
+            # A letra pela linha de base, no meio do ladrilho: o giro é em volta do ponto do círculo
+            if passada == "contorno":
+                desenho.text((lado / 2, lado / 2), letra, font=fonte, anchor="ms", fill=borda, stroke_width=contorno,
+                             stroke_fill=borda)
+            else:
+                desenho.text((lado / 2, lado / 2), letra, font=fonte, anchor="ms", fill=cheio)
+            girado = ladrilho.rotate(-math.degrees(angulo), resample=Image.Resampling.BICUBIC)
+            camada.alpha_composite(girado, (round(ox + x - lado / 2), round(oy + y - lado / 2)))
+    return camada
 
 
 # Teto do bloco de texto, em múltiplos do lado menor do quadro: sem ele, 500 letras numa linha só com a letra
@@ -183,6 +268,17 @@ def _mascara_das_chaves(texto: dict, medidas: dict) -> Image.Image | None:
     chaves = set(texto.get("palavras_chave") or [])
     if not chaves:
         return None
+    if medidas["arco"]:
+        # No arco, as letras das palavras-chave com o contorno: a camada delas entra só ali
+        letras_chave, palavra, letra = set(), 0, 0
+        for linha in medidas["linhas"]:
+            palavras = palavras_das_letras(linha)
+            for k, (de, ate) in enumerate(palavras):
+                if palavra + k in chaves:
+                    letras_chave.update(range(letra + de, letra + ate))
+            palavra += len(palavras)
+            letra += len(linha)
+        return _letras_em_arco(texto, medidas, "#ffffff", medidas["contorno"], "#ffffff", letras_chave).getchannel("A")
     mascara = Image.new("L", (medidas["largura"], medidas["altura"]), 0)
     desenho = ImageDraw.Draw(mascara)
     fonte, numero = medidas["fonte"], 0
@@ -239,6 +335,8 @@ def _letras(texto: dict, medidas: dict, cor: str, contorno: int | None = None,
     """
     fonte = medidas["fonte"]
     contorno = medidas["contorno"] if contorno is None else contorno
+    if medidas["arco"]:
+        return _letras_em_arco(texto, medidas, cor, contorno, cor_contorno or texto["contorno_cor"])
     camada = Image.new("RGBA", (medidas["largura"], medidas["altura"]), (0, 0, 0, 0))
     desenho = ImageDraw.Draw(camada)
     cheio, borda = (*_rgb(cor), 255), (*_rgb(cor_contorno or texto["contorno_cor"]), 255)
@@ -284,9 +382,8 @@ def _camada_das_letras(texto: dict, medidas: dict) -> Image.Image:
         camada = _letras(texto, medidas, texto["cor"], largura_contorno)
         if texto["degrade"]:
             # O degradê cobre o bloco das letras (sem a folga) e entra só no miolo delas, por cima da cor
-            folga = medidas["folga"]
-            caixa = (folga, folga, medidas["largura"] - folga, medidas["altura"] - folga)
-            degrade = imagem_do_degrade(texto["degrade"], camada.width, camada.height, caixa).convert("RGBA")
+            degrade = imagem_do_degrade(texto["degrade"], camada.width, camada.height,
+                                        medidas["caixa_letras"]).convert("RGBA")
             degrade.putalpha(_letras(texto, medidas, "#ffffff", 0).getchannel("A"))
             camada.alpha_composite(degrade)
         mascara = _mascara_das_chaves(texto, medidas)

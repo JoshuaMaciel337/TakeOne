@@ -59,6 +59,8 @@ export type Texto = {
   preenchimento?: number;
   /** As letras em degradê no lugar da cor (lib/projeto/gradiente.ts). */
   degrade?: Degrade | null;
+  /** Texto em arco, de -1 (o centro do círculo em cima) a 1 (embaixo); 0 é reto. Não combina com o destaque da fala. */
+  curvatura?: number;
 };
 
 export type ContornoExtra = { cor: string; espessura: number };
@@ -245,11 +247,13 @@ export function ajustarTexto(atual: Texto, mudanca: Partial<Texto>): Texto {
       : null,
     preenchimento: limitar(texto.preenchimento ?? 1, 0, 1),
     degrade: limparDegrade(texto.degrade),
+    // O arco e o destaque da fala não andam juntos: ligar um desliga o outro
+    curvatura: mudanca.destaque ? 0 : limitar(texto.curvatura ?? 0, -1, 1),
     brilho_cor: cor(texto.brilho_cor, atual.brilho_cor ?? TEXTO_PADRAO.brilho_cor),
     cor: cor(texto.cor, atual.cor),
     contorno_cor: cor(texto.contorno_cor, atual.contorno_cor),
     fundo_cor: cor(texto.fundo_cor, atual.fundo_cor),
-    destaque: texto.destaque ? { ...texto.destaque, cor: cor(texto.destaque.cor, atual.destaque?.cor ?? "#ffd60a") } : null,
+    destaque: texto.destaque && !(mudanca.curvatura && !mudanca.destaque) ? { ...texto.destaque, cor: cor(texto.destaque.cor, atual.destaque?.cor ?? "#ffd60a") } : null,
     palavras_chave: limparPalavrasChave(texto.palavras_chave),
     cor_chave: cor(texto.cor_chave ?? COR_CHAVE, atual.cor_chave ?? COR_CHAVE),
   };

@@ -180,3 +180,54 @@ def test_brilho_maior_cresce_a_imagem():
     normal = desenhar_texto(base, 1000)
     largo = desenhar_texto({**base, "brilho_tamanho": 2}, 1000)
     assert largo.width - normal.width == 2 * (round(100 * 0.18 * 2) - round(100 * 0.18))
+
+
+# -----------------------------------------------
+# Texto em arco
+# -----------------------------------------------
+def _altura_media(imagem, de, ate):
+    alfa = imagem.getchannel("A")
+    soma = sy = 0
+    for x in range(de, ate):
+        for y in range(imagem.height):
+            valor = alfa.getpixel((x, y))
+            soma += valor
+            sy += y * valor
+    return sy / soma
+
+
+def test_arco_para_cima_e_para_baixo():
+    base = {**TEXTO_PADRAO, "conteudo": "TEXTO EM ARCO", "tamanho": 0.08}
+    reto = desenhar_texto(base, 1000)
+    for curvatura in (0.5, -0.5):
+        arco = desenhar_texto({**base, "curvatura": curvatura}, 1000)
+        assert arco.width < reto.width, "as pontas se aproximam"
+        quinto = arco.width // 5
+        pontas = (_altura_media(arco, 0, quinto) + _altura_media(arco, arco.width - quinto, arco.width)) / 2
+        meio = _altura_media(arco, 2 * quinto, 3 * quinto)
+        # Curvatura positiva: o meio fica em cima e as pontas descem; negativa, o contrário
+        assert (pontas - meio > 30) if curvatura > 0 else (meio - pontas > 30), curvatura
+
+
+def test_arco_com_degrade_contorno_e_palavras_chave():
+    texto = {**TEXTO_PADRAO, "conteudo": "um dois tres", "tamanho": 0.1, "curvatura": 0.4, "contorno_espessura": 0.05,
+             "palavras_chave": [1], "cor_chave": "#ff0000",
+             "degrade": {"tipo": "linear", "cores": ["#00ff00", "#0000ff"], "angulo": 0, "meio": 0.5}}
+    imagem = desenhar_texto(texto, 1000)
+    pixels = [imagem.getpixel((x, y)) for y in range(0, imagem.height, 2) for x in range(0, imagem.width, 2)]
+    assert any(r > 200 and g < 60 and b < 60 and a == 255 for r, g, b, a in pixels), "a palavra-chave em vermelho"
+    assert any(g > 200 and r < 60 and a == 255 for r, g, b, a in pixels), "o degradê nas outras"
+
+
+def test_api_recusa_arco_com_destaque_ou_letra_a_letra():
+    import pytest
+    from pydantic import ValidationError
+
+    from api.esquemas import ClipeEntrada, TextoEntrada
+
+    with pytest.raises(ValidationError, match="arco"):
+        TextoEntrada(conteudo="oi", curvatura=0.3, destaque={"modo": "karaoke", "cor": "#ffd60a"})
+    clipe = {"id": "t", "texto": {"conteudo": "oi", "curvatura": 0.3}, "inicio": 0, "duracao": 10, "entrada": 0}
+    ClipeEntrada(**clipe)
+    with pytest.raises(ValidationError, match="arco"):
+        ClipeEntrada(**clipe, animacao={"entrada": {"tipo": "letras", "duracao": 5}, "saida": {"tipo": "nenhuma"}})

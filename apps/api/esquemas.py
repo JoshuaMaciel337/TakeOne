@@ -411,6 +411,15 @@ class TextoEntrada(BaseModel):
     contornos: list[ContornoExtraEntrada] | None = Field(default=None, max_length=2)
     preenchimento: float = Field(default=1, ge=0, le=1)
     degrade: DegradeEntrada | None = None
+    # Texto em arco, de -1 a 1 (core/utils/texto.py); não combina com o destaque da fala nem com o letra a letra
+    curvatura: float = Field(default=0, ge=-1, le=1)
+
+    @model_validator(mode="after")
+    def arco_sem_destaque(self):
+        if self.curvatura and self.destaque:
+            raise ValueError("O texto em arco não tem o destaque da fala. "
+                             "Volte a curvatura a zero para usar o destaque.")
+        return self
 
     @model_validator(mode="after")
     def cabe_no_teto(self):
@@ -589,6 +598,14 @@ class ClipeEntrada(BaseModel):
         if any(not 0.2 <= s <= 5 for _, s in pontos):
             raise ValueError("A curva de velocidade vai de 0,2 a 5 vezes.")
         return pontos
+
+    @model_validator(mode="after")
+    def arco_sem_letra_a_letra(self):
+        # As letras no arco não ficam em linha: a máscara do letra a letra não acharia cada uma
+        if self.texto and self.texto.curvatura and self.animacao and any(
+                animacao.tipo in ("letras", "palavras") for animacao in (self.animacao.entrada, self.animacao.saida)):
+            raise ValueError("O texto em arco não tem animação letra a letra nem palavra a palavra.")
+        return self
     cor: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 

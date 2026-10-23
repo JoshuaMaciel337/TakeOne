@@ -1151,3 +1151,23 @@ test("ajustar a música ao vídeo: pedaços encostados que acabam no fim da mús
   assert.equal(pedacos[0].fade_entrada, S);
   assert.throws(() => ajustarMusicaAoVideo(ajustado, ctx, principal(ajustado)[0].id, fortes), ErroEdicao);
 });
+
+test("texto em arco: desliga o destaque e o letra a letra, e o letra a letra endireita o texto", () => {
+  const ctx = contexto();
+  const criado = adicionarTexto(vazio(), ctx, 0, { ...TEXTO_PADRAO, conteudo: "Oi gente", destaque: { modo: "karaoke", cor: "#ffd60a" } });
+  let projeto = criado.projeto;
+  const id = criado.clipeId;
+  projeto = animarClipes(projeto, [id], { entrada: { tipo: "letras", duracao: S } });
+  projeto = mudarTexto(projeto, [id], { curvatura: 0.4 });
+  let clipe = projeto.faixas.find((f) => f.tipo === "texto")!.clipes[0];
+  assert.equal(clipe.texto?.curvatura, 0.4);
+  assert.equal(clipe.texto?.destaque, null, "o arco tira o destaque");
+  assert.equal(clipe.animacao?.entrada.tipo, "nenhuma", "e o letra a letra");
+  projeto = animarClipes(projeto, [id], { saida: { tipo: "palavras", duracao: S } });
+  clipe = projeto.faixas.find((f) => f.tipo === "texto")!.clipes[0];
+  assert.equal(clipe.texto?.curvatura, 0, "o palavra a palavra endireita");
+  projeto = mudarTexto(projeto, [id], { curvatura: -0.3 });
+  projeto = mudarTexto(projeto, [id], { destaque: { modo: "palavra", cor: "#ffffff" } });
+  clipe = projeto.faixas.find((f) => f.tipo === "texto")!.clipes[0];
+  assert.equal(clipe.texto?.curvatura, 0, "o destaque endireita");
+});

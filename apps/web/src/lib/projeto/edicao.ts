@@ -10,7 +10,7 @@
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
+import { type Animacao, type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
 import {
   type AjustesCor,
   type Cor,
@@ -1803,16 +1803,28 @@ export function palavrasChaveDasLegendas(projeto: Projeto, chaves: Record<string
 export function mudarTexto(projeto: Projeto, clipeIds: string[], mudanca: Partial<Texto>): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (!clipe.texto) throw new ErroEdicao("Este clipe não é um texto.");
-    return { ...clipe, texto: ajustarTexto(clipe.texto, mudanca) };
+    const texto = ajustarTexto(clipe.texto, mudanca);
+    // O arco tira o letra a letra e o palavra a palavra (as letras não ficam em linha)
+    if (texto.curvatura && clipe.animacao) {
+      const sem = (animacao: Animacao) => (POR_LETRAS.includes(animacao.tipo) ? SEM_ANIMACAO.entrada : animacao);
+      return { ...clipe, texto, animacao: { ...clipe.animacao, entrada: sem(clipe.animacao.entrada), saida: sem(clipe.animacao.saida) } };
+    }
+    return { ...clipe, texto };
   });
 }
 
+/** As animações que mostram o texto letra a letra ou palavra a palavra (lib/projeto/letras.ts). */
+const POR_LETRAS: string[] = ["letras", "palavras"];
+
 /** Muda a animação de entrada, a de saída ou as duas. As durações ficam dentro do clipe. */
 export function animarClipes(projeto: Projeto, clipeIds: string[], mudanca: Partial<Animacoes>): Projeto {
-  return mudarClipes(projeto, clipeIds, (clipe) => ({
-    ...clipe,
-    animacao: limitarAnimacoes({ ...SEM_ANIMACAO, ...clipe.animacao, ...mudanca }, clipe.duracao),
-  }));
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const animacao = limitarAnimacoes({ ...SEM_ANIMACAO, ...clipe.animacao, ...mudanca }, clipe.duracao);
+    // O letra a letra endireita o texto em arco
+    const porLetras = POR_LETRAS.includes(animacao.entrada.tipo) || POR_LETRAS.includes(animacao.saida.tipo);
+    const texto = porLetras && clipe.texto?.curvatura ? { ...clipe.texto, curvatura: 0 } : clipe.texto;
+    return { ...clipe, animacao, texto };
+  });
 }
 
 /** Duração de uma transição nova. */
