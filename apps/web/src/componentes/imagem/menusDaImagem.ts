@@ -167,7 +167,15 @@ export type AcoesDosMenus = {
   estilo: (qual: "contorno" | "sombra") => void;
   mascara: () => void;
   viaRecorte: () => void;
+  /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
   preencher: () => void;
+  preencherRapido: (com: "primeiroPlano" | "fundo", preservar: boolean) => void;
+  /** Editar › Limpar (Delete com seleção) e Traçado. */
+  limpar: () => void;
+  tracado: () => void;
+  /** Imagem › Cortar (pela seleção, quando há) e Aparar. */
+  cortar: () => void;
+  aparar: () => void;
   desmarcar: () => void;
   todasAsCamadas: () => void;
   desmarcarCamadas: () => void;
@@ -201,7 +209,18 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z ou Ctrl+Y", desativado: !a.podeRefazer, aoEscolher: a.refazer },
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
         "-",
-        { nome: "Preencher sensível ao conteúdo", atalho: "Shift+F5", desativado: !a.temSelecao, aoEscolher: a.preencher },
+        { nome: "Preencher…", atalho: "Shift+F5", aoEscolher: a.preencher },
+        { nome: "Traçado…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.tracado },
+        { nome: "Limpar", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.limpar },
+        {
+          nome: "Preencher rápido",
+          itens: [
+            { nome: "Com a cor do primeiro plano", atalho: "Alt+Backspace", aoEscolher: () => a.preencherRapido("primeiroPlano", false) },
+            { nome: "Com a cor do fundo", atalho: "Ctrl+Backspace", aoEscolher: () => a.preencherRapido("fundo", false) },
+            { nome: "Com o primeiro plano, preservando a transparência", atalho: "Shift+Alt+Backspace", aoEscolher: () => a.preencherRapido("primeiroPlano", true) },
+            { nome: "Com o fundo, preservando a transparência", atalho: "Shift+Ctrl+Backspace", aoEscolher: () => a.preencherRapido("fundo", true) },
+          ],
+        },
         { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.ferramenta("mover") },
         { nome: "Definir predefinição de pincel…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.definirPincel },
         "-",
@@ -215,7 +234,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Tamanho da imagem…", atalho: "Ctrl+Alt+I", aoEscolher: a.documento },
         { nome: "Tamanho da tela…", atalho: "Ctrl+Alt+C", aoEscolher: a.documento },
-        { nome: "Cortar", aoEscolher: () => a.ferramenta("corte") },
+        { nome: "Cortar", aoEscolher: a.cortar },
+        { nome: "Aparar…", aoEscolher: a.aparar },
         "-",
         { nome: "Ampliar ou expandir com IA…", desativado: !a.temFoto, aoEscolher: () => a.painel("fotoIA") },
       ],

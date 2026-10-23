@@ -62,6 +62,9 @@ import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
 import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
+import { JanelaAparar, JanelaPreencher, JanelaTracado, type Preenchimento, type Tracado } from "./JanelasDePixels";
+import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCor } from "@/lib/pintura/operacoes";
+import { ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { desenharNaMalha } from "@/lib/transformar/malha";
@@ -210,6 +213,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoCanal, setJanelaDoCanal] = useState<"salvar" | "carregar" | null>(null);
   // Editar › Definir predefinição de pincel (pede o nome) e os pedidos ao painel Camadas (encontrar e isolar)
   const [nomeDoPincel, setNomeDoPincel] = useState(false);
+  // As janelas de Preencher, Traçado e Aparar (lembram as últimas escolhas, como lá)
+  const [janelaDePixels, setJanelaDePixels] = useState<"preencher" | "tracado" | "aparar" | null>(null);
+  const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
+  const [ultimoTracado, setUltimoTracado] = useState<Tracado>({ largura: 4, cor: "#000000", onde: "centro", modo: "normal", opacidade: 1, preservar: false });
   // Selecionar e mascarar: a camada sozinha (ou a imagem), o resto das camadas e o clipe da camada
   const [refinando, setRefinando] = useState<{ imagem: ImagemRgba; fundo: ImagemRgba | null; clipeId: string | null; faixaId: string | null } | null>(null);
   // Selecionar › Transformar seleção: a caixa (em pixels do documento), o modo, o pedaço da seleção em resolução cheia
@@ -612,6 +619,100 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       setGerandoPixels(false);
     }
   };
+  /**
+   * Os pixels da camada de pixels escolhida (sem uma, com `criar`, uma nova acima) passam pela função, com a cobertura
+   * da seleção levada à camada (sem seleção, a camada inteira); o resultado sobe como versão nova, um passo do desfazer.
+   */
+  const editarPixels = async (editar: (dados: Uint8ClampedArray, cobertura: Uint8ClampedArray | null, camada: { largura: number; altura: number; clipe: Clipe; faixa: Faixa }) => void | Promise<void>, { criar = false, selecao = selecaoNoDocumento }: { criar?: boolean; selecao?: Selecao | null } = {}) => {
+    let clipeId = selecionado?.clipe.pixels ? selecionado.clipe.id : null;
+    if (!clipeId) {
+      if (!criar) {
+        mostrarAviso("Escolha uma camada de pixels (Camada › Rasterizar transforma as outras).");
+        return;
+      }
+      clipeId = await novaCamada();
+    }
+    const atual = projetoRef.current;
+    const achado = clipeId && atual ? acharClipe(atual, clipeId) : null;
+    if (!atual || !achado?.clipe.midia_id || !achado.clipe.pixels) return;
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) {
+      mostrarAviso("Os pixels desta camada estão travados.");
+      return;
+    }
+    const alvo = alvoDosPixels(achado.clipe)!;
+    const documento = tamanhoDaImagem(atual);
+    const tamanho = midias.get(achado.clipe.midia_id)?.camada_pixels ?? documento;
+    try {
+      await pinturas.esperar();
+      const pintura = await pinturas.preparar(alvo, tamanho);
+      const ctx2d = pintura.camada.getContext("2d", { willReadFrequently: true })!;
+      const dados = ctx2d.getImageData(0, 0, tamanho.largura, tamanho.altura);
+      let cobertura: Uint8ClampedArray | null = null;
+      if (selecao) {
+        // A camada nova ainda não foi medida pela prévia: ela cobre o quadro, e o quadro é o documento
+        const medida = caixasRef.current.get(achado.clipe.id);
+        const caixa = medida?.bruta ?? { cx: documento.largura / 2, cy: documento.altura / 2, largura: documento.largura, altura: documento.altura, rotacao: 0 };
+        const quadro = medida?.quadro ?? documento;
+        const matriz = matrizDaMidiaNoDocumento(caixa, achado.clipe.recorte, achado.clipe.virar, tamanho, quadro, documento);
+        const naCamada = selecaoNaMidia(selecao, matriz, tamanho).getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, tamanho.largura, tamanho.altura).data;
+        cobertura = new Uint8ClampedArray(tamanho.largura * tamanho.altura);
+        for (let i = 0; i < cobertura.length; i++) cobertura[i] = naCamada[i * 4 + 3];
+      }
+      await editar(dados.data, cobertura, { ...tamanho, clipe: achado.clipe, faixa: achado.faixa });
+      ctx2d.putImageData(dados, 0, 0);
+      pinturas.soltar(alvo.chave);
+      pinturas.avisarQuadro();
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível mudar os pixels.");
+    }
+  };
+  /** Editar › Preencher: a cor, o padrão ou o estado do histórico, com o modo, a opacidade e o preservar transparência. */
+  const preencher = (p: Preenchimento) => {
+    if (p.conteudo === "sensivel") return void usarSelecao("apagar");
+    const cor = p.conteudo === "primeiroPlano" ? cores.primeiroPlano : p.conteudo === "fundo" ? cores.fundo : p.conteudo === "preto" ? "#000000" : p.conteudo === "cinza" ? "#808080" : p.conteudo === "branco" ? "#ffffff" : p.cor;
+    void editarPixels(
+      async (dados, cobertura, camada) => {
+        let tinta: [number, number, number] | Uint8ClampedArray = rgbDaCor(cor);
+        if (p.conteudo === "padrao") tinta = ladrilhar(ladrilhoDoPadrao(p.padrao, cores.primeiroPlano, cores.fundo), camada.largura, camada.altura);
+        if (p.conteudo === "historico") {
+          const fonte = await fonteDoHistoricoPara(camada.clipe, camada);
+          if (!fonte) return;
+          tinta = fonte.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, camada.largura, camada.altura).data;
+        }
+        preencherPixels(dados, camada.largura, cobertura, tinta, { modo: p.modo, opacidade: p.opacidade, preservar: p.preservar || Boolean(camada.faixa.travas?.transparencia) });
+      },
+      { criar: true },
+    );
+  };
+  /** Editar › Limpar (Delete com seleção): fica transparente; com a transparência travada (ou no fundo), a cor de fundo. */
+  const limpar = () => {
+    if (!selecaoNoDocumento) return;
+    void editarPixels((dados, cobertura, camada) => limparPixels(dados, cobertura, camada.faixa.travas?.transparencia || camada.faixa.fundo ? rgbDaCor(cores.fundo) : null));
+  };
+  /** Editar › Traçado: a faixa na borda da seleção, pintada como um preenchimento. */
+  const tracar = (t: Tracado) => {
+    if (!selecaoNoDocumento) return;
+    const faixa = faixaDoTracado(selecaoNoDocumento, t.largura, t.onde);
+    void editarPixels((dados, cobertura, camada) => preencherPixels(dados, camada.largura, cobertura, rgbDaCor(t.cor), { modo: t.modo, opacidade: t.opacidade, preservar: t.preservar }), { criar: true, selecao: faixa });
+  };
+  /** Imagem › Cortar: pela seleção (o retângulo em volta dela), ou a ferramenta Corte sem seleção. */
+  const cortarImagem = () => {
+    const caixa = selecaoNoDocumento ? limites(selecaoNoDocumento) : null;
+    if (!caixa) return escolherFerramenta("corte");
+    const retangulo = { x: caixa.x0, y: caixa.y0, largura: caixa.x1 - caixa.x0, altura: caixa.y1 - caixa.y0 };
+    if (executar({ comando: "imagem.recortar", parametros: { retangulo, tamanhos: tamanhosDasMidias() } })) setSelecaoDoDocumento(null);
+  };
+  /** Imagem › Aparar: tira as bordas transparentes, ou da cor de um canto, pela imagem inteira. */
+  const aparar = (por: "transparencia" | "cantoDeCima" | "cantoDeBaixo") => {
+    imagemParaSelecao(true)
+      .then((imagem) => {
+        const caixa = caixaParaAparar(imagem.dados as Uint8ClampedArray, imagem.largura, imagem.altura, por);
+        if (!caixa) return mostrarAviso("Não sobra nada para aparar com essa escolha.");
+        if (caixa.x0 === 0 && caixa.y0 === 0 && caixa.x1 === imagem.largura && caixa.y1 === imagem.altura) return mostrarAviso("Não há borda para aparar.");
+        executar({ comando: "imagem.recortar", parametros: { retangulo: { x: caixa.x0, y: caixa.y0, largura: caixa.x1 - caixa.x0, altura: caixa.y1 - caixa.y0 }, tamanhos: tamanhosDasMidias() } });
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível ler a imagem."));
+  };
   /** Começa a transformar a seleção: a caixa em volta dela, com a seleção cortada nela. */
   const transformarSelecao = () => {
     const selecao = selecaoNoDocumento;
@@ -817,11 +918,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } else setRecorte(null);
   };
 
+  /** O tamanho de cada mídia (as camadas de pixels também), para recortar a imagem sem mudar o tamanho delas em pixels. */
+  const tamanhosDasMidias = () => {
+    const tamanhos: Record<string, { largura: number; altura: number }> = {};
+    for (const midia of midias.values()) {
+      if (midia.camada_pixels) tamanhos[midia.id] = { largura: midia.camada_pixels.largura, altura: midia.camada_pixels.altura };
+      else if (midia.video) tamanhos[midia.id] = { largura: midia.video.largura, altura: midia.video.altura };
+    }
+    return tamanhos;
+  };
   const confirmarCorte = () => {
     if (!recorte) return;
     // O tamanho de cada mídia usada, para as camadas ficarem do mesmo tamanho em pixels
-    const tamanhos: Record<string, { largura: number; altura: number }> = {};
-    for (const midia of midias.values()) if (midia.video) tamanhos[midia.id] = { largura: midia.video.largura, altura: midia.video.altura };
+    const tamanhos = tamanhosDasMidias();
     const r = recorte.retangulo;
     const retangulo = { x: Math.round(r.x), y: Math.round(r.y), largura: Math.round(r.largura), altura: Math.round(r.altura) };
     if (executar({ comando: "imagem.recortar", parametros: { retangulo, tamanhos } })) {
@@ -1377,7 +1486,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (camadaEscolhida && executar({ comando: "clipe.mascara", parametros: { clipeIds: [camadaEscolhida.clipe.id], mascara: camadaEscolhida.clipe.mascara ?? MASCARA_PADRAO } })) abrirAba("basico");
     },
     viaRecorte: () => void usarSelecao("recortar"),
-    preencher: () => void usarSelecao("apagar"),
+    preencher: () => setJanelaDePixels("preencher"),
+    preencherRapido: (com, preservar) => preencher({ ...ultimoPreenchimento, conteudo: com, modo: "normal", opacidade: 1, preservar }),
+    limpar,
+    tracado: () => selecaoNoDocumento && setJanelaDePixels("tracado"),
+    cortar: cortarImagem,
+    aparar: () => setJanelaDePixels("aparar"),
     desmarcar: () => {
       objeto.limpar();
       selecionarNoDocumento(null);
@@ -1391,7 +1505,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null || janelaDePixels !== null;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1448,7 +1562,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (recorte) cancelarCorte();
       else if (temSelecao || objeto.pontos.length) objeto.limpar();
       else setSelecao([]);
-    } else if ((tecla === "Delete" || tecla === "Backspace") && escolhidas.length && !escolhidas.some((faixa) => faixa.travada)) executar({ comando: "imagem.apagarVarias", parametros: { faixaIds } });
+    } else if ((tecla === "Delete" || tecla === "Backspace") && selecaoNoDocumento && selecionado?.clipe.pixels) limpar();
+    else if ((tecla === "Delete" || tecla === "Backspace") && escolhidas.length && !escolhidas.some((faixa) => faixa.travada)) executar({ comando: "imagem.apagarVarias", parametros: { faixaIds } });
     else if (escolhidas.length && evento.key.startsWith("Arrow")) {
       // Um pixel da imagem por toque (dez com Shift), em frações do quadro, com as pastas e as vinculadas
       const { largura, altura } = tamanhoDaImagem(projeto);
@@ -1967,6 +2082,39 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(selecao) => {
             setJanelaDaSelecao(null);
             selecionarNoDocumento(selecao);
+          }}
+        />
+      ) : null}
+      {janelaDePixels === "preencher" ? (
+        <JanelaPreencher
+          inicial={ultimoPreenchimento}
+          comFoto={Boolean(foto && selecaoNoDocumento)}
+          aoFechar={() => setJanelaDePixels(null)}
+          aoConfirmar={(p) => {
+            setJanelaDePixels(null);
+            setUltimoPreenchimento(p);
+            preencher(p);
+          }}
+        />
+      ) : null}
+      {janelaDePixels === "tracado" ? (
+        <JanelaTracado
+          inicial={{ ...ultimoTracado, cor: ultimoTracado.cor || cores.primeiroPlano }}
+          aoFechar={() => setJanelaDePixels(null)}
+          aoConfirmar={(t) => {
+            setJanelaDePixels(null);
+            setUltimoTracado(t);
+            tracar(t);
+          }}
+        />
+      ) : null}
+      {janelaDePixels === "aparar" ? (
+        <JanelaAparar
+          temTransparencia={Boolean(projeto.fundo.transparente)}
+          aoFechar={() => setJanelaDePixels(null)}
+          aoConfirmar={(por) => {
+            setJanelaDePixels(null);
+            aparar(por);
           }}
         />
       ) : null}

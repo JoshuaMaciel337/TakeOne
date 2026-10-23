@@ -136,11 +136,11 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 - [ ] Recortar, Copiar, Copiar mesclado (Ctrl+Shift+C), Colar e Colar especial (no local, dentro, fora), com a área de transferência do sistema (colar uma imagem de fora vira camada)
 - [ ] Arquivo › Novo a partir da área de transferência
-- [ ] Limpar (Delete) apaga a seleção na camada
-- [ ] Preencher (Shift+F5): primeiro plano, fundo, cor, sensível ao conteúdo, padrão, histórico, preto, cinza 50%, branco, com modo, opacidade e preservar transparência; Alt+Backspace e Ctrl+Backspace
-- [ ] Traçado (largura, cor, dentro, centro, fora, modo, opacidade)
+- [x] Limpar (Delete) apaga a seleção na camada
+- [x] Preencher (Shift+F5): primeiro plano, fundo, cor, sensível ao conteúdo, padrão, histórico, preto, cinza 50%, branco, com modo, opacidade e preservar transparência; Alt+Backspace e Ctrl+Backspace
+- [x] Traçado (largura, cor, dentro, centro, fora, modo, opacidade)
 - [ ] Camada via cópia (Ctrl+J) e via recorte (Ctrl+Shift+J) com os pixels da seleção
-- [ ] Imagem › Cortar (pela seleção) e Aparar (pela transparência ou pela cor dos cantos)
+- [x] Imagem › Cortar (pela seleção) e Aparar (pela transparência ou pela cor dos cantos)
 - [ ] Atenuar (Ctrl+Shift+F) o último filtro ou a última pintura
 - [ ] A ferramenta Mover leva o que está selecionado (seleção flutuante); Alt + arrastar duplica
 
