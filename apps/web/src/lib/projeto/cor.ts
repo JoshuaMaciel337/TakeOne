@@ -1,11 +1,10 @@
-// Ajustes de cor e filtros prontos. A mesma conta roda em três lugares: aqui (testes e referência),
-// no shader do compositor da prévia (lib/previa/compositor.ts) e no Python do render
-// (core/utils/cor.py), que gera uma LUT 3D para o FFmpeg. Os casos de tests/casos/cor.json conferem
-// o TypeScript e o Python.
+// Ajustes de cor e filtros prontos. A mesma conta roda aqui e no Python do render (core/utils/cor.py), e vira
+// a mesma LUT 3D nos dois: o render passa ao lut3d do FFmpeg, a prévia lê numa textura 3D (lutDaCor e lerLut).
+// Os casos de tests/casos/cor.json conferem o TypeScript e o Python.
 //
-// Ordem: exposição e balanço de branco em luz linear; contraste, realces, sombras e saturação nos
-// valores de tela (sRGB), com as rodas de cor depois de realces e sombras. A vinheta depende da
-// posição do pixel e fica à parte.
+// Ordem: níveis (na tela); exposição e balanço de branco em luz linear; contraste, realces, sombras, brancos,
+// pretos, as rodas de cor, a saturação e a vibração nos valores de tela (sRGB); depois a cor por matiz e as
+// curvas. A vinheta depende da posição do pixel e fica à parte.
 
 export type AjustesCor = {
   /** -1 (frio, azulado) a 1 (quente, alaranjado). */
@@ -31,6 +30,15 @@ export type AjustesCor = {
   forca_medios: number;
   matiz_claros: number;
   forca_claros: number;
+  /** -1 a 1: como a saturação, mas mais forte nas cores apagadas. */
+  vibracao: number;
+  /** -1 a 1: como realces e sombras, só nas pontas (o quase branco e o quase preto). */
+  brancos: number;
+  pretos: number;
+  /** Níveis: o preto de entrada (0 a 0,45), o branco de entrada contado de 1 para baixo (0 a 0,45) e a gama em potência de 2 (-1 a 1). */
+  niveis_preto: number;
+  niveis_branco: number;
+  niveis_gama: number;
 };
 
 /** As três rodas, na ordem dos tons. */
@@ -46,6 +54,8 @@ export type Cor = AjustesCor & {
   intensidade: number;
   /** Curvas depois dos ajustes; sem elas, nada muda. */
   curvas?: Curvas | null;
+  /** Cor por matiz, entre os ajustes e as curvas; só as faixas mexidas. */
+  hsl?: Hsl | null;
 };
 
 export const AJUSTES_NEUTROS: AjustesCor = {
@@ -63,8 +73,14 @@ export const AJUSTES_NEUTROS: AjustesCor = {
   forca_medios: 0,
   matiz_claros: 0,
   forca_claros: 0,
+  vibracao: 0,
+  brancos: 0,
+  pretos: 0,
+  niveis_preto: 0,
+  niveis_branco: 0,
+  niveis_gama: 0,
 };
-export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null };
+export const COR_PADRAO: Cor = { ...AJUSTES_NEUTROS, filtro: null, intensidade: 1, curvas: null, hsl: null };
 
 export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: number }> = {
   temperatura: { minimo: -1, maximo: 1 },
@@ -81,6 +97,12 @@ export const LIMITES_COR: Record<keyof AjustesCor, { minimo: number; maximo: num
   forca_medios: { minimo: 0, maximo: 1 },
   matiz_claros: { minimo: 0, maximo: 360 },
   forca_claros: { minimo: 0, maximo: 1 },
+  vibracao: { minimo: -1, maximo: 1 },
+  brancos: { minimo: -1, maximo: 1 },
+  pretos: { minimo: -1, maximo: 1 },
+  niveis_preto: { minimo: 0, maximo: 0.45 },
+  niveis_branco: { minimo: 0, maximo: 0.45 },
+  niveis_gama: { minimo: -1, maximo: 1 },
 };
 
 /** O matiz sozinho não muda nada: só conta com força. */
@@ -151,6 +173,8 @@ export const FORCA_TEMPERATURA = 0.15;
 export const FORCA_TOM = 0.1;
 /** Quanto realces e sombras somam, no máximo. */
 const FORCA_REALCES_SOMBRAS = 0.25;
+/** Brancos e pretos: como realces e sombras, mas só nas pontas (a quarta potência da luminância). */
+const FORCA_BRANCOS_PRETOS = 0.25;
 /** Quanto uma roda de cor com força 1 desloca a cor. */
 const FORCA_RODAS = 0.3;
 const LUMA = [0.2126, 0.7152, 0.0722];
@@ -169,7 +193,13 @@ export function deslocamentosDasRodas(a: AjustesCor): [number, number, number][]
 }
 
 /** Cor de um pixel (sem a vinheta). */
-export function aplicarCor([r, g, b]: [number, number, number], a: AjustesCor): [number, number, number] {
+export function aplicarCor(entrada: [number, number, number], a: AjustesCor): [number, number, number] {
+  // Níveis, antes de tudo e na tela: o preto e o branco de entrada viram 0 e 1, e a gama curva o meio
+  const preto = a.niveis_preto ?? 0;
+  const branco = 1 - (a.niveis_branco ?? 0);
+  const expoente = 1 / 2 ** (a.niveis_gama ?? 0);
+  const [r, g, b] = entrada.map((v) => limitar((v - preto) / (branco - preto), 0, 1) ** expoente);
+
   // Luz linear: exposição e balanço de branco
   const ganho = 2 ** a.exposicao;
   let lr = paraLinear(r) * ganho * (1 + FORCA_TEMPERATURA * a.temperatura);
@@ -183,7 +213,8 @@ export function aplicarCor([r, g, b]: [number, number, number], a: AjustesCor): 
 
   // Realces pesam nos claros e sombras nos escuros, pela luminância
   const y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-  const soma = FORCA_REALCES_SOMBRAS * (a.realces * y * y + a.sombras * (1 - y) * (1 - y));
+  const soma =
+    FORCA_REALCES_SOMBRAS * (a.realces * y * y + a.sombras * (1 - y) * (1 - y)) + FORCA_BRANCOS_PRETOS * ((a.brancos ?? 0) * y ** 4 + (a.pretos ?? 0) * (1 - y) ** 4);
   c = c.map((v) => limitar(v + soma, 0, 1));
 
   // Rodas de cor: escuros, meios-tons e claros, pesados pela luminância (os pesos somam 1)
@@ -192,9 +223,10 @@ export function aplicarCor([r, g, b]: [number, number, number], a: AjustesCor): 
   const rodas = deslocamentosDasRodas(a);
   c = c.map((v, k) => limitar(v + pesos[0] * rodas[0][k] + pesos[1] * rodas[1][k] + pesos[2] * rodas[2][k], 0, 1));
 
-  // Saturação: afasta ou aproxima cada canal da luminância
+  // Saturação e vibração: afasta ou aproxima cada canal da luminância; a vibração pesa mais nas cores apagadas
   const y2 = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-  const fatorSaturacao = 1 + a.saturacao;
+  const croma = Math.max(...c) - Math.min(...c);
+  const fatorSaturacao = 1 + a.saturacao + (a.vibracao ?? 0) * (1 - croma);
   c = c.map((v) => limitar(y2 + (v - y2) * fatorSaturacao, 0, 1));
   return [c[0], c[1], c[2]];
 }
@@ -280,6 +312,93 @@ export function aplicarCurvas([r, g, b]: [number, number, number], curvas: Parti
   return [canal(curvas!.r, r), canal(curvas!.g, g), canal(curvas!.b, b)];
 }
 
+// -----------------------------------------------
+// Cor por matiz: oito faixas, cada uma com o giro do matiz, a saturação e a luminância (de -1 a 1)
+// -----------------------------------------------
+export type FaixaDeMatiz = "vermelho" | "laranja" | "amarelo" | "verde" | "ciano" | "azul" | "roxo" | "magenta";
+export type AjusteDaFaixa = { matiz: number; saturacao: number; luminancia: number };
+export type Hsl = Partial<Record<FaixaDeMatiz, AjusteDaFaixa>>;
+
+export const FAIXAS_DE_MATIZ: { id: FaixaDeMatiz; nome: string; centro: number; amostra: string }[] = [
+  { id: "vermelho", nome: "Vermelho", centro: 0, amostra: "#e5484d" },
+  { id: "laranja", nome: "Laranja", centro: 30, amostra: "#f2913d" },
+  { id: "amarelo", nome: "Amarelo", centro: 60, amostra: "#e9d53a" },
+  { id: "verde", nome: "Verde", centro: 120, amostra: "#46b562" },
+  { id: "ciano", nome: "Ciano", centro: 180, amostra: "#3dc4cf" },
+  { id: "azul", nome: "Azul", centro: 240, amostra: "#4867e0" },
+  { id: "roxo", nome: "Roxo", centro: 270, amostra: "#8a52d6" },
+  { id: "magenta", nome: "Magenta", centro: 300, amostra: "#d64fb4" },
+];
+/** Graus que o matiz gira com o ajuste da faixa em 1. */
+const GIRO_MAXIMO = 30;
+const FORCA_LUMINANCIA = 0.3;
+
+export function hslNeutro(hsl: Hsl | null | undefined): boolean {
+  return !hsl || Object.values(hsl).every((faixa) => !faixa || Object.values(faixa).every((v) => Math.abs(v) < 1e-9));
+}
+
+/** As duas faixas vizinhas do matiz (em graus) e o peso de cada uma, que somam 1. */
+function pesosDasFaixas(matiz: number): [FaixaDeMatiz, number][] {
+  const h = ((matiz % 360) + 360) % 360;
+  for (let i = 0; i < FAIXAS_DE_MATIZ.length; i++) {
+    const atual = FAIXAS_DE_MATIZ[i];
+    const proxima = FAIXAS_DE_MATIZ[(i + 1) % FAIXAS_DE_MATIZ.length];
+    const fim = i === FAIXAS_DE_MATIZ.length - 1 ? proxima.centro + 360 : proxima.centro;
+    if (atual.centro <= h && h < fim) {
+      const t = (h - atual.centro) / (fim - atual.centro);
+      return [
+        [atual.id, 1 - t],
+        [proxima.id, t],
+      ];
+    }
+  }
+  return [[FAIXAS_DE_MATIZ[0].id, 1]];
+}
+
+function paraHsl(r: number, g: number, b: number): [number, number, number] {
+  const maior = Math.max(r, g, b);
+  const menor = Math.min(r, g, b);
+  const l = (maior + menor) / 2;
+  const d = maior - menor;
+  if (d < 1e-12) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  // O resto de Python (sempre positivo) no setor do vermelho
+  const h = maior === r ? 60 * ((((g - b) / d) % 6) + 6) % 360 : maior === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+  return [h, s, l];
+}
+
+function deHsl(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hh = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hh % 2) - 1));
+  const setor = Math.floor(hh) % 6;
+  const [r, g, b] = ([[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]] as const)[setor];
+  const m = l - c / 2;
+  return [r + m, g + m, b + m];
+}
+
+/**
+ * Cor por matiz, depois dos ajustes: cada pixel pega a mistura das duas faixas vizinhas do matiz dele. O giro e a
+ * saturação não mexem no cinza (que não tem matiz); a luminância pesa pelo croma, para o cinza também ficar.
+ */
+export function aplicarHsl(rgb: [number, number, number], hsl: Hsl | null | undefined): [number, number, number] {
+  if (hslNeutro(hsl)) return rgb;
+  const [h, s0, l0] = paraHsl(...rgb);
+  const croma = Math.max(...rgb) - Math.min(...rgb);
+  let giro = 0;
+  let saturacao = 0;
+  let luminancia = 0;
+  for (const [faixa, peso] of pesosDasFaixas(h)) {
+    const ajuste = hsl![faixa];
+    giro += peso * (ajuste?.matiz ?? 0);
+    saturacao += peso * (ajuste?.saturacao ?? 0);
+    luminancia += peso * (ajuste?.luminancia ?? 0);
+  }
+  const s = limitar(s0 * (1 + saturacao), 0, 1);
+  const l = limitar(l0 + FORCA_LUMINANCIA * luminancia * croma, 0, 1);
+  return deHsl(h + GIRO_MAXIMO * giro, s, l).map((v) => limitar(v, 0, 1)) as [number, number, number];
+}
+
 /** Os pontos de cada eixo da LUT 3D, os mesmos do render (PONTOS_LUT em core/utils/cor.py). */
 export const PONTOS_DA_LUT = 33;
 
@@ -290,7 +409,7 @@ export type LutDaCor = { chave: string; dados: Float32Array };
  * A LUT 3D dos ajustes e das curvas, a mesma do .cube do render (gerar_cube): o vermelho varia mais rápido,
  * depois o verde e o azul, que é a ordem de uma textura 3D (x, y, z). A vinheta fica fora, porque depende do lugar.
  */
-export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | undefined): Float32Array {
+export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | undefined, hsl: Hsl | null = null): Float32Array {
   const n = PONTOS_DA_LUT;
   const passo = n - 1;
   const dados = new Float32Array(n * n * n * 4);
@@ -298,7 +417,7 @@ export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | u
   for (let b = 0; b < n; b++) {
     for (let g = 0; g < n; g++) {
       for (let r = 0; r < n; r++) {
-        const saida = aplicarCurvas(aplicarCor([r / passo, g / passo, b / passo], ajustes), curvas);
+        const saida = aplicarCurvas(aplicarHsl(aplicarCor([r / passo, g / passo, b / passo], ajustes), hsl), curvas);
         dados[i] = saida[0];
         dados[i + 1] = saida[1];
         dados[i + 2] = saida[2];

@@ -3,7 +3,7 @@
 // compositor (lib/previa/compositor.ts), com os efeitos do clipe.
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
-import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
+import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, hslNeutro, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
 import {
   ajustesDoEfeito,
   brilhoDoEfeito,
@@ -139,11 +139,12 @@ function corDoClipe(clipe: Clipe): Pick<CamadaNaTela, "lut" | "vinheta"> {
   const vinheta = ajustes.vinheta;
   const semVinheta = { ...ajustes, vinheta: 0 };
   const curvas = curvasNeutras(clipe.cor?.curvas) ? null : clipe.cor!.curvas!;
-  if (corNeutra(semVinheta) && !curvas) return { lut: null, vinheta };
-  const chave = JSON.stringify([semVinheta, curvas]);
+  const hsl = hslNeutro(clipe.cor?.hsl) ? null : clipe.cor!.hsl!;
+  if (corNeutra(semVinheta) && !curvas && !hsl) return { lut: null, vinheta };
+  const chave = JSON.stringify([semVinheta, curvas, hsl]);
   let lut = luts.get(chave);
   if (!lut) {
-    lut = { chave, dados: lutDaCor(semVinheta, curvas) };
+    lut = { chave, dados: lutDaCor(semVinheta, curvas, hsl) };
     if (luts.size > 40) luts.clear();
     luts.set(chave, lut);
   }

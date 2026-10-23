@@ -8,6 +8,8 @@ import {
   ajustesEfetivos,
   aplicarCor,
   aplicarCurvas,
+  aplicarHsl,
+  type Hsl,
   type Cor,
   type Curvas,
   curvasNeutras,
@@ -24,6 +26,7 @@ type Dados = {
   casos: { nome: string; ajustes: Partial<AjustesCor>; entrada: [number, number, number]; saida: [number, number, number] }[];
   vinhetas: { u: number; v: number; vinheta: number; escurecimento: number }[];
   filtros: { cor: Cor; ajustes: AjustesCor }[];
+  hsl: { nome: string; hsl: Hsl; entrada: [number, number, number]; saida: [number, number, number] }[];
 };
 
 // Calculados pelo core/utils/cor.py, que gera a LUT do render
@@ -102,4 +105,15 @@ test("a LUT da prévia: nos pontos da grade é a conta; a identidade sai igual; 
   // A LUT de 33 pontos erra até uns 6 níveis numa curva íngreme com saturação: o render erra o mesmo tanto, e é
   // por isso que a prévia lê a LUT em vez de fazer a conta
   assert.ok(maior < 8 / 255, `a interpolação ficou a ${(maior * 255).toFixed(2)} níveis da conta`);
+});
+
+test("a cor por matiz é a mesma do render, em todos os casos", () => {
+  assert.ok(dados.hsl.length > 0);
+  for (const caso of dados.hsl) {
+    const saida = aplicarHsl(caso.entrada, caso.hsl);
+    saida.forEach((v, k) => assert.ok(Math.abs(v - caso.saida[k]) < 1e-6, `${caso.nome}: ${saida} contra ${caso.saida}`));
+  }
+  // O cinza não muda, nem com tudo no máximo
+  const tudo = Object.fromEntries(["vermelho", "laranja", "amarelo", "verde", "ciano", "azul", "roxo", "magenta"].map((faixa) => [faixa, { matiz: 1, saturacao: 1, luminancia: 1 }]));
+  assert.deepEqual(aplicarHsl([0.4, 0.4, 0.4], tudo), [0.4, 0.4, 0.4]);
 });

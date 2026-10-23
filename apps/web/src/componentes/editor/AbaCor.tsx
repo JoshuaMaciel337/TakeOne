@@ -6,7 +6,21 @@ import { useState } from "react";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { amostraDaImagem } from "@/lib/previa/amostra";
 import type { Comando } from "@/lib/projeto/comandos";
-import { AJUSTES_NEUTROS, type AjustesCor, type Cor, COR_PADRAO, CURVAS_NEUTRAS, curvasNeutras, FILTROS, LIMITES_COR, RODAS } from "@/lib/projeto/cor";
+import {
+  AJUSTES_NEUTROS,
+  type AjusteDaFaixa,
+  type AjustesCor,
+  type Cor,
+  COR_PADRAO,
+  CURVAS_NEUTRAS,
+  curvasNeutras,
+  FAIXAS_DE_MATIZ,
+  type FaixaDeMatiz,
+  FILTROS,
+  hslNeutro,
+  LIMITES_COR,
+  RODAS,
+} from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
@@ -86,25 +100,84 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
 };
 
-type Grupo = "luz" | "cor" | "efeito";
+type Grupo = "luz" | "niveis" | "cor" | "efeito";
 
 const AJUSTES: { chave: keyof AjustesCor; nome: string; grupo: Grupo }[] = [
   { chave: "exposicao", nome: "Exposição", grupo: "luz" },
   { chave: "contraste", nome: "Contraste", grupo: "luz" },
   { chave: "realces", nome: "Realces", grupo: "luz" },
   { chave: "sombras", nome: "Sombras", grupo: "luz" },
+  { chave: "brancos", nome: "Brancos", grupo: "luz" },
+  { chave: "pretos", nome: "Pretos", grupo: "luz" },
+  { chave: "niveis_preto", nome: "Preto de entrada", grupo: "niveis" },
+  { chave: "niveis_branco", nome: "Branco de entrada", grupo: "niveis" },
+  { chave: "niveis_gama", nome: "Meio-tom (gama)", grupo: "niveis" },
   { chave: "temperatura", nome: "Temperatura", grupo: "cor" },
   { chave: "tom", nome: "Tom", grupo: "cor" },
   { chave: "saturacao", nome: "Saturação", grupo: "cor" },
+  { chave: "vibracao", nome: "Vibração", grupo: "cor" },
   { chave: "vinheta", nome: "Vinheta", grupo: "efeito" },
 ];
 const GRUPOS = [
   { id: "luz", nome: "Luz" },
+  { id: "niveis", nome: "Níveis" },
   { id: "cor", nome: "Cor" },
   { id: "efeito", nome: "Efeito" },
 ] as const;
 
 const PERTO = 1e-6;
+
+const FAIXA_NEUTRA: AjusteDaFaixa = { matiz: 0, saturacao: 0, luminancia: 0 };
+
+/** Cor por matiz: escolhe a faixa (vermelho, laranja...) e mexe no matiz, na saturação e na luminância dela. */
+function CorPorMatiz({ cor, travada, aoPrever, aoExecutar }: { cor: Cor; travada: boolean; aoPrever: (hsl: Cor["hsl"] | null) => void; aoExecutar: (hsl: Cor["hsl"]) => void }) {
+  const [faixa, setFaixa] = useState<FaixaDeMatiz>("vermelho");
+  const atual = { ...FAIXA_NEUTRA, ...cor.hsl?.[faixa] };
+  const comFaixa = (mudanca: Partial<AjusteDaFaixa>) => ({ ...cor.hsl, [faixa]: { ...atual, ...mudanca } });
+  const controle = (campo: keyof AjusteDaFaixa) => ({
+    valor: atual[campo] * 100,
+    minimo: -100,
+    maximo: 100,
+    sufixo: "",
+    desativado: travada,
+    aoPrever: (valor: number) => aoPrever(comFaixa({ [campo]: valor / 100 })),
+    aoConfirmar: (valor: number) => {
+      if (Math.abs(valor / 100 - atual[campo]) < PERTO) aoPrever(null);
+      else aoExecutar(comFaixa({ [campo]: valor / 100 }));
+    },
+  });
+  const mexida = (id: FaixaDeMatiz) => Object.values({ ...FAIXA_NEUTRA, ...cor.hsl?.[id] }).some((v) => Math.abs(v) > PERTO);
+  return (
+    <section className="border-b border-borda/60 pb-3 pt-3">
+      <div className="flex min-h-6 items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Cor por matiz</h3>
+        <button type="button" className="botao-icone size-6" disabled={travada || hslNeutro(cor.hsl)} onClick={() => aoExecutar(null)} aria-label="Voltar as cores por matiz" title="Voltar as cores por matiz">
+          <RotateCcw className="size-3.5" aria-hidden />
+        </button>
+      </div>
+      <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Faixa de cor">
+        {FAIXAS_DE_MATIZ.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="radio"
+            aria-checked={faixa === item.id}
+            aria-label={item.nome}
+            title={item.nome}
+            onClick={() => setFaixa(item.id)}
+            className={`relative size-6 rounded-full border-2 transition ${faixa === item.id ? "border-texto" : "border-transparent"}`}
+            style={{ backgroundColor: item.amostra }}
+          >
+            {mexida(item.id) ? <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full border border-painel bg-texto" aria-hidden /> : null}
+          </button>
+        ))}
+      </div>
+      <ControleNumerico rotulo="Matiz" {...controle("matiz")} />
+      <ControleNumerico rotulo="Saturação" {...controle("saturacao")} />
+      <ControleNumerico rotulo="Luminância" {...controle("luminancia")} />
+    </section>
+  );
+}
 
 /** Filtro pronto e ajustes de luz e cor do clipe. */
 export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
@@ -114,7 +187,7 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
   /** Os ajustes aparecem de -100 a 100 (a exposição, em pontos de luz, de -2 a 2). */
   const fator = (chave: keyof AjustesCor) => (chave === "exposicao" ? 1 : 100);
   const mudou =
-    (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null || !curvasNeutras(cor.curvas);
+    (Object.keys(AJUSTES_NEUTROS) as (keyof AjustesCor)[]).some((chave) => Math.abs(cor[chave]) > PERTO) || cor.filtro !== null || !curvasNeutras(cor.curvas) || !hslNeutro(cor.hsl);
 
   const controle = (chave: keyof AjustesCor) => ({
     valor: cor[chave] * fator(chave),
@@ -207,6 +280,7 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
           ))}
         </div>
       </section>
+      <CorPorMatiz cor={cor} travada={travada} aoPrever={(hsl) => aoPrever(hsl ? comando({ hsl }) : null)} aoExecutar={(hsl) => aoExecutar(comando({ hsl }))} />
       <section className="border-b border-borda/60 pb-3 pt-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Curvas</h3>
         <EditorDeCurva

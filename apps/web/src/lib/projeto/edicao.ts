@@ -11,7 +11,20 @@
 // ganha uma faixa nova.
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
-import { type AjustesCor, type Cor, COR_PADRAO, CURVA_NEUTRA, curvasNeutras, FILTROS, LIMITES_COR, PONTOS_MAXIMOS_DA_CURVA, type PontoDaCurva } from "./cor.ts";
+import {
+  type AjustesCor,
+  type Cor,
+  COR_PADRAO,
+  CURVA_NEUTRA,
+  curvasNeutras,
+  FAIXAS_DE_MATIZ,
+  FILTROS,
+  type Hsl,
+  hslNeutro,
+  LIMITES_COR,
+  PONTOS_MAXIMOS_DA_CURVA,
+  type PontoDaCurva,
+} from "./cor.ts";
 import {
   type Curva,
   deslocarExpressoes,
@@ -1594,6 +1607,18 @@ export function mudarCor(projeto: Projeto, clipeIds: string[], mudanca: Partial<
       const ajustar = (pontos: PontoDaCurva[] | undefined) =>
         (pontos ?? CURVA_NEUTRA).slice(0, PONTOS_MAXIMOS_DA_CURVA).map(([x, y]) => [limitar(x, 0, 1), limitar(y, 0, 1)] as PontoDaCurva).sort((a, b) => a[0] - b[0]);
       cor.curvas = { rgb: ajustar(cor.curvas!.rgb), r: ajustar(cor.curvas!.r), g: ajustar(cor.curvas!.g), b: ajustar(cor.curvas!.b) };
+    }
+    // Cor por matiz: só as faixas mexidas, cada valor de -1 a 1; tudo neutro não fica guardado
+    if (hslNeutro(cor.hsl)) cor.hsl = null;
+    else {
+      const hsl: Hsl = {};
+      for (const { id } of FAIXAS_DE_MATIZ) {
+        const faixa = cor.hsl![id];
+        if (!faixa) continue;
+        const ajustada = { matiz: limitar(faixa.matiz ?? 0, -1, 1), saturacao: limitar(faixa.saturacao ?? 0, -1, 1), luminancia: limitar(faixa.luminancia ?? 0, -1, 1) };
+        if (Object.values(ajustada).some((v) => Math.abs(v) > 1e-9)) hsl[id] = ajustada;
+      }
+      cor.hsl = hsl;
     }
     return { ...clipe, cor };
   });
