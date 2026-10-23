@@ -216,6 +216,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // As janelas de Preencher, Traçado e Aparar (lembram as últimas escolhas, como lá)
   const [janelaDePixels, setJanelaDePixels] = useState<"preencher" | "tracado" | "aparar" | null>(null);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
+  // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
+  // do sistema (para reconhecer a própria cópia ao colar e colar no mesmo lugar)
+  const areaDeTransferencia = useRef<{ canvas: HTMLCanvasElement; x: number; y: number; tamanhoDoPng: number } | null>(null);
   const [ultimoTracado, setUltimoTracado] = useState<Tracado>({ largura: 4, cor: "#000000", onde: "centro", modo: "normal", opacidade: 1, preservar: false });
   // Selecionar e mascarar: a camada sozinha (ou a imagem), o resto das camadas e o clipe da camada
   const [refinando, setRefinando] = useState<{ imagem: ImagemRgba; fundo: ImagemRgba | null; clipeId: string | null; faixaId: string | null } | null>(null);
@@ -623,8 +626,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Os pixels da camada de pixels escolhida (sem uma, com `criar`, uma nova acima) passam pela função, com a cobertura
    * da seleção levada à camada (sem seleção, a camada inteira); o resultado sobe como versão nova, um passo do desfazer.
    */
-  const editarPixels = async (editar: (dados: Uint8ClampedArray, cobertura: Uint8ClampedArray | null, camada: { largura: number; altura: number; clipe: Clipe; faixa: Faixa }) => void | Promise<void>, { criar = false, selecao = selecaoNoDocumento }: { criar?: boolean; selecao?: Selecao | null } = {}) => {
-    let clipeId = selecionado?.clipe.pixels ? selecionado.clipe.id : null;
+  type EdicaoDePixels = (dados: Uint8ClampedArray, cobertura: Uint8ClampedArray | null, camada: { largura: number; altura: number; clipe: Clipe; faixa: Faixa }) => void | Promise<void>;
+  const editarPixels = (editar: EdicaoDePixels, opcoes: { criar?: boolean; selecao?: Selecao | null } = {}) =>
+    editarPixelsDoClipe(selecionado?.clipe.pixels ? selecionado.clipe.id : null, editar, opcoes.selecao === undefined ? selecaoNoDocumento : opcoes.selecao, opcoes.criar);
+  const editarPixelsDoClipe = async (clipeDado: string | null, editar: EdicaoDePixels, selecao: Selecao | null, criar = false) => {
+    let clipeId = clipeDado;
     if (!clipeId) {
       if (!criar) {
         mostrarAviso("Escolha uma camada de pixels (Camada › Rasterizar transforma as outras).");
@@ -694,6 +700,165 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (!selecaoNoDocumento) return;
     const faixa = faixaDoTracado(selecaoNoDocumento, t.largura, t.onde);
     void editarPixels((dados, cobertura, camada) => preencherPixels(dados, camada.largura, cobertura, rgbDaCor(t.cor), { modo: t.modo, opacidade: t.opacidade, preservar: t.preservar }), { criar: true, selecao: faixa });
+  };
+  /** Os pixels da camada escolhida (ou da imagem inteira, mesclado) na seleção (sem ela, tudo), cortados em volta dela. */
+  const pixelsParaCopiar = async (mesclado: boolean): Promise<{ canvas: HTMLCanvasElement; x: number; y: number } | null> => {
+    if (!mesclado && !selecionado) {
+      mostrarAviso("Escolha a camada para copiar (ou use Copiar mesclado).");
+      return null;
+    }
+    const imagem = await imagemParaSelecao(mesclado);
+    const selecao = selecaoNoDocumento;
+    const caixa = selecao ? limites(selecao) : { x0: 0, y0: 0, x1: imagem.largura, y1: imagem.altura };
+    if (!caixa) return null;
+    const largura = caixa.x1 - caixa.x0;
+    const altura = caixa.y1 - caixa.y0;
+    const canvas = document.createElement("canvas");
+    canvas.width = largura;
+    canvas.height = altura;
+    const ctx2d = canvas.getContext("2d")!;
+    const dados = ctx2d.createImageData(largura, altura);
+    for (let y = 0; y < altura; y++) {
+      for (let x = 0; x < largura; x++) {
+        const i = (y + caixa.y0) * imagem.largura + x + caixa.x0;
+        const j = (y * largura + x) * 4;
+        dados.data[j] = imagem.dados[i * 4];
+        dados.data[j + 1] = imagem.dados[i * 4 + 1];
+        dados.data[j + 2] = imagem.dados[i * 4 + 2];
+        dados.data[j + 3] = selecao ? Math.round((imagem.dados[i * 4 + 3] * selecao.dados[i]) / 255) : imagem.dados[i * 4 + 3];
+      }
+    }
+    ctx2d.putImageData(dados, 0, 0);
+    return { canvas, x: caixa.x0, y: caixa.y0 };
+  };
+  const pngDoCanvas = (canvas: HTMLCanvasElement) => new Promise<Blob>((pronto, falhou) => canvas.toBlob((blob) => (blob ? pronto(blob) : falhou(new Error("O navegador não conseguiu gravar a imagem."))), "image/png"));
+  /** Editar › Copiar (e mesclado): guarda aqui, com o lugar, e manda o PNG para a área de transferência do sistema. */
+  const copiar = async (mesclado: boolean): Promise<boolean> => {
+    try {
+      const pixels = await pixelsParaCopiar(mesclado);
+      if (!pixels) return false;
+      const png = await pngDoCanvas(pixels.canvas);
+      areaDeTransferencia.current = { ...pixels, tamanhoDoPng: png.size };
+      // Sem a permissão (ou fora de um contexto seguro), fica só a cópia daqui
+      await navigator.clipboard?.write?.([new ClipboardItem({ "image/png": png })]).catch(() => undefined);
+      return true;
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível copiar.");
+      return false;
+    }
+  };
+  /** O que colar: a imagem da área de transferência do sistema (a própria cópia volta com o lugar) ou a daqui. */
+  const lerAreaDeTransferencia = async (): Promise<{ canvas: HTMLCanvasElement | ImageBitmap; x: number | null; y: number | null } | null> => {
+    const daqui = areaDeTransferencia.current;
+    try {
+      for (const item of (await navigator.clipboard?.read?.()) ?? []) {
+        const tipo = item.types.find((t) => t.startsWith("image/"));
+        if (!tipo) continue;
+        const blob = await item.getType(tipo);
+        if (daqui && blob.size === daqui.tamanhoDoPng) return daqui;
+        return { canvas: await createImageBitmap(blob), x: null, y: null };
+      }
+    } catch {
+      // Sem permissão para ler: vale a cópia daqui
+    }
+    return daqui;
+  };
+  /** Uma camada de pixels nova acima da escolhida com a imagem no lugar dado; devolve o clipe. */
+  const camadaComImagem = async (imagem: CanvasImageSource & { width: number; height: number }, x: number, y: number, largura: number, altura: number, nome: string): Promise<string | null> => {
+    if (!projeto) return null;
+    const documento = tamanhoDaImagem(projeto);
+    const midia = await criarCamadaDePixels(documento.largura, documento.altura, nome);
+    setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
+    const versao = await enviarVersao(midia.id, await pngDoDocumento((ctx2d) => ctx2d.drawImage(imagem, x, y, largura, altura))());
+    const resultado = executar({ comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome, acima: escolhidas[0]?.id ?? null, versao } });
+    return resultado?.selecao?.[0] ?? null;
+  };
+  /** Uma máscara de camada da seleção (ou dela invertida) num clipe que cobre o quadro (a camada nova). */
+  const mascaraNoClipeNovo = async (clipeId: string, selecao: Selecao, invertida: boolean) => {
+    const { midia, versao } = await subirMascara(pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, selecao, invertida)));
+    executar({ comando: "mascara.definir", parametros: { clipeId, mascara: { midia_id: midia.id, versao, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz: IDENTIDADE } } });
+  };
+  /** Editar › Colar: no meio da seleção (ou da imagem), no mesmo lugar, ou dentro ou fora da seleção (com máscara). */
+  const colar = async (como: "normal" | "noLocal" | "dentro" | "fora") => {
+    if (!projeto) return;
+    try {
+      const dado = await lerAreaDeTransferencia();
+      if (!dado) return mostrarAviso("A área de transferência está vazia: copie uma parte da imagem (Ctrl+C) ou uma imagem de outro programa.");
+      const documento = tamanhoDaImagem(projeto);
+      // Maior que a imagem, entra reduzida para caber
+      const fator = Math.min(1, documento.largura / dado.canvas.width, documento.altura / dado.canvas.height);
+      const largura = dado.canvas.width * fator;
+      const altura = dado.canvas.height * fator;
+      const caixa = selecaoNoDocumento ? limites(selecaoNoDocumento) : null;
+      let x = (documento.largura - largura) / 2;
+      let y = (documento.altura - altura) / 2;
+      if (como === "noLocal" && dado.x !== null && dado.y !== null) {
+        x = dado.x;
+        y = dado.y;
+      } else if (caixa) {
+        x = (caixa.x0 + caixa.x1 - largura) / 2;
+        y = (caixa.y0 + caixa.y1 - altura) / 2;
+      }
+      const clipeId = await camadaComImagem(dado.canvas, Math.round(x), Math.round(y), largura, altura, "Camada colada");
+      if (clipeId && (como === "dentro" || como === "fora") && selecaoNoDocumento) await mascaraNoClipeNovo(clipeId, selecaoNoDocumento, como === "fora");
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível colar.");
+    }
+  };
+  /** Editar › Recortar: copia e limpa (numa camada de pixels). */
+  const recortarPixels = async () => {
+    if (!(await copiar(false))) return;
+    if (!selecaoNoDocumento) return;
+    if (selecionado?.clipe.pixels) limpar();
+    else mostrarAviso("Copiado. Para tirar os pixels desta camada, rasterize ela antes (ou use Camada via recorte).");
+  };
+  /** Camada via cópia (sem seleção, duplica) e via recorte (na camada de pixels limpa; nas outras, uma máscara esconde). */
+  const camadaVia = async (recortar: boolean) => {
+    if (!selecaoNoDocumento) {
+      if (!recortar && faixaIds.length) executar({ comando: "imagem.duplicarVarias", parametros: { faixaIds } });
+      return;
+    }
+    const origem = selecionado;
+    const selecao = selecaoNoDocumento;
+    const pixels = await pixelsParaCopiar(false).catch(() => null);
+    if (!pixels || !origem) return;
+    await camadaComImagem(pixels.canvas, pixels.x, pixels.y, pixels.canvas.width, pixels.canvas.height, recortar ? "Camada recortada" : "Camada copiada");
+    if (!recortar) return;
+    if (origem.clipe.pixels) {
+      // A seleção continua no mesmo lugar: limpa a camada de origem, que deixou de ser a escolhida
+      setSelecao([origem.clipe.id]);
+      await new Promise((pronto) => setTimeout(pronto, 0));
+      void editarPixelsDoClipe(origem.clipe.id, (dados, cobertura) => limparPixels(dados, cobertura, null), selecao);
+    } else if (!origem.clipe.mascara_pixels) {
+      const medida = caixasRef.current.get(origem.clipe.id);
+      if (!medida?.bruta || !medida.quadro) return;
+      const { midia, versao } = await subirMascara(pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, selecao, true)));
+      executar({ comando: "mascara.definir", parametros: { clipeId: origem.clipe.id, mascara: { midia_id: midia.id, versao, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz: matrizDaCaixa(medida.bruta, medida.quadro) } } });
+    } else mostrarAviso("A camada já tem máscara: a cópia entrou numa camada nova, e a original ficou como estava.");
+  };
+  /** Arquivo › Novo a partir da área de transferência: uma imagem nova do tamanho da cópia, com ela numa camada. */
+  const novoDaAreaDeTransferencia = async () => {
+    try {
+      const dado = await lerAreaDeTransferencia();
+      if (!dado) return mostrarAviso("A área de transferência está vazia.");
+      const largura = Math.max(16, dado.canvas.width);
+      const altura = Math.max(16, dado.canvas.height);
+      const novo = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { tamanho: { largura, altura } } });
+      const midia = await criarCamadaDePixels(largura, altura, "Camada colada");
+      const canvas = document.createElement("canvas");
+      canvas.width = largura;
+      canvas.height = altura;
+      canvas.getContext("2d")!.drawImage(dado.canvas, 0, 0);
+      const versao = await enviarVersao(midia.id, await pngDoCanvas(canvas));
+      const { projeto: comCamada } = executarComando(novo, { comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome: "Camada colada", versao } }, ctx);
+      await chamarApi(`/projetos/${novo.id}`, {
+        metodo: "PUT",
+        corpo: { versao: novo.versao, nome: "Imagem colada", proporcao: comCamada.proporcao, taxa: comCamada.taxa, fundo: comCamada.fundo, faixas: comCamada.faixas, marcadores: [], canais: [], tamanho: comCamada.tamanho },
+      });
+      router.push(`/app/imagem/${novo.id}`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar a imagem.");
+    }
   };
   /** Imagem › Cortar: pela seleção (o retângulo em volta dela), ou a ferramenta Corte sem seleção. */
   const cortarImagem = () => {
@@ -1487,6 +1652,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     viaRecorte: () => void usarSelecao("recortar"),
     preencher: () => setJanelaDePixels("preencher"),
+    copiar: (mesclado) => void copiar(mesclado),
+    recortarPixels: () => void recortarPixels(),
+    colar: (como) => void colar(como),
+    novoDaAreaDeTransferencia: () => void novoDaAreaDeTransferencia(),
+    camadaVia: (recortar) => void camadaVia(recortar),
     preencherRapido: (com, preservar) => preencher({ ...ultimoPreenchimento, conteudo: com, modo: "normal", opacidade: 1, preservar }),
     limpar,
     tracado: () => selecaoNoDocumento && setJanelaDePixels("tracado"),

@@ -170,6 +170,14 @@ export type AcoesDosMenus = {
   /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
   preencher: () => void;
   preencherRapido: (com: "primeiroPlano" | "fundo", preservar: boolean) => void;
+  /** Editar › Recortar, Copiar, Copiar mesclado e Colar (normal, no local, dentro e fora da seleção). */
+  copiar: (mesclado: boolean) => void;
+  recortarPixels: () => void;
+  colar: (como: "normal" | "noLocal" | "dentro" | "fora") => void;
+  /** Arquivo › Novo a partir da área de transferência. */
+  novoDaAreaDeTransferencia: () => void;
+  /** Camada › Novo › Camada via cópia (Ctrl+J; sem seleção, duplica) e via recorte (Ctrl+Shift+J). */
+  camadaVia: (recortar: boolean) => void;
   /** Editar › Limpar (Delete com seleção) e Traçado. */
   limpar: () => void;
   tracado: () => void;
@@ -195,6 +203,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       nome: "Arquivo",
       itens: [
         { nome: "Novo…", aoEscolher: a.novo },
+        { nome: "Novo a partir da área de transferência", aoEscolher: a.novoDaAreaDeTransferencia },
         { nome: "Abrir…", atalho: "Ctrl+O", aoEscolher: a.abrir },
         "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
@@ -208,6 +217,19 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
         { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z ou Ctrl+Y", desativado: !a.podeRefazer, aoEscolher: a.refazer },
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
+        "-",
+        { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
+        { nome: "Copiar", atalho: "Ctrl+C", desativado: !a.temCamada, aoEscolher: () => a.copiar(false) },
+        { nome: "Copiar mesclado", atalho: "Ctrl+Shift+C", aoEscolher: () => a.copiar(true) },
+        { nome: "Colar", atalho: "Ctrl+V", aoEscolher: () => a.colar("normal") },
+        {
+          nome: "Colar especial",
+          itens: [
+            { nome: "Colar no local", atalho: "Ctrl+Shift+V", aoEscolher: () => a.colar("noLocal") },
+            { nome: "Colar dentro", atalho: "Ctrl+Alt+Shift+V", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.colar("dentro") },
+            { nome: "Colar fora", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.colar("fora") },
+          ],
+        },
         "-",
         { nome: "Preencher…", atalho: "Shift+F5", aoEscolher: a.preencher },
         { nome: "Traçado…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.tracado },
@@ -253,11 +275,12 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Grupo", aoEscolher: a.grupo },
             { nome: "Grupo a partir das camadas…", desativado: semCamada, aoEscolher: a.agrupar },
             "-",
-            { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: !a.temSelecao, aoEscolher: a.viaRecorte },
+            { nome: "Camada via cópia", atalho: "Ctrl+J", desativado: semCamada, aoEscolher: () => a.camadaVia(false) },
+            { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: semCamada || !a.temSelecaoDoDocumento, aoEscolher: () => a.camadaVia(true) },
           ],
         },
         { nome: "Nova camada de ajuste", itens: AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => a.ajuste(ajuste) })) },
-        { nome: a.quantas > 1 ? "Duplicar camadas" : "Duplicar camada", atalho: "Ctrl+J", desativado: semCamada, aoEscolher: a.duplicar },
+        { nome: a.quantas > 1 ? "Duplicar camadas" : "Duplicar camada", desativado: semCamada, aoEscolher: a.duplicar },
         {
           nome: "Excluir",
           itens: [
