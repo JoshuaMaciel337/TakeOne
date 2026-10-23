@@ -49,7 +49,15 @@ def _sobre_fundo(imagem: Image.Image) -> Image.Image:
 
 
 def abrir_imagem(caminho: Path) -> Image.Image:
-    """A imagem já girada pelo EXIF, em RGB ou RGBA (CMYK, paleta e 16 bits viram RGB/RGBA)."""
+    """A imagem já girada pelo EXIF, em RGB ou RGBA (CMYK, paleta e 16 bits viram RGB/RGBA). O SVG é desenhado
+    pelo Chromium do worker (core/utils/svg.py), em RGBA."""
+    if caminho.suffix.lower() == ".svg":
+        from core.utils.svg import SvgInvalido, rasterizar_svg
+
+        try:
+            return rasterizar_svg(caminho.read_bytes())
+        except SvgInvalido as e:
+            raise ImagemInvalida(str(e)) from e
     try:
         with Image.open(caminho) as arquivo:
             if arquivo.width * arquivo.height > PIXELS_MAXIMOS:

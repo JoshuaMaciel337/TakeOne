@@ -527,7 +527,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Importar LUT (.cube), antes dos ajustes, na mesma LUT 3D da prévia e do render.
   - [x] Igualar a cor de outro clipe (vira uma LUT do espaço).
   - [ ] Contorno e sombra em recortes (vídeo sem fundo, logos e formas).
-  - [ ] Adesivos SVG.
+  - [x] SVG na biblioteca (logos vetoriais viram imagem com transparência, pelo Chromium do worker).
+  - [ ] Adesivos animados próprios (uma categoria da biblioteca de animações).
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.
 - [ ] Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
