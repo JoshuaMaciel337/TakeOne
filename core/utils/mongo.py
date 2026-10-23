@@ -35,6 +35,9 @@ INDICES = {
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
     ],
+    "pinceis": [
+        ([("organizacao_id", 1), ("criado_em", 1)], {}),
+    ],
     "projetos": [
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
         # Para recusar a exclusão de uma mídia que ainda está em algum projeto

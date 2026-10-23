@@ -559,6 +559,27 @@ class LutDoClipeEntrada(BaseModel):
     intensidade: float = Field(default=1, ge=0, le=1)
 
 
+class PincelEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=80)
+    # "meus" (salvo pela pessoa) ou "importados" (de um arquivo .abr)
+    pasta: Literal["meus", "importados"] = "meus"
+    # As opções do pincel do editor (lib/pintura/traco.ts); a API só guarda
+    opcoes: dict
+    # A ponta em PNG (base64), quando o pincel tem uma própria
+    ponta_png: str | None = Field(default=None, max_length=6_000_000)
+
+
+class PincelSaida(BaseModel):
+    id: str
+    nome: str
+    pasta: str
+    opcoes: dict
+    tem_ponta: bool
+    # O tamanho da ponta própria: {largura, altura}
+    ponta: dict | None = None
+    criado_em: datetime
+
+
 class LutSaida(BaseModel):
     id: str
     nome: str
