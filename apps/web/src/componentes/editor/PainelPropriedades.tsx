@@ -10,7 +10,7 @@ import {
   SOMBRA_PADRAO,
 } from "@/lib/projeto/silhueta";
 import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 import { chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
@@ -41,6 +41,7 @@ import { AbaCor } from "./AbaCor";
 import { AbaTexto } from "./AbaTexto";
 import { CampoCor } from "./CampoCor";
 import { ControleNumerico } from "./ControleNumerico";
+import { IniciarDesenhoDaMascara } from "./DesenhoDaMascara";
 import { NoRitmo } from "./NoRitmo";
 import { Estabilizar } from "./Estabilizar";
 import { BotaoSeguirObjeto } from "./SeguirObjeto";
@@ -1200,6 +1201,7 @@ function SilhuetaDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clip
 /** Máscara de forma: só a parte de dentro (ou de fora) de um retângulo ou de uma elipse aparece. */
 function MascaraDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; travada: boolean } & Pick<PropsAba, "aoPrever" | "aoExecutar">) {
   const mascara = clipe.mascara ?? null;
+  const desenhar = useContext(IniciarDesenhoDaMascara);
   const comando = (valor: MascaraDeForma | null): Comando => ({ comando: "clipe.mascara", parametros: { clipeIds: [clipe.id], mascara: valor } });
   const controle = (campo: "x" | "y" | "largura" | "altura" | "suavidade", minimo: number, maximo: number) => ({
     valor: (mascara?.[campo] ?? 0) * 100,
@@ -1224,21 +1226,32 @@ function MascaraDoClipe({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe
           disabled={travada}
           onChange={(evento) => {
             const forma = evento.currentTarget.value as MascaraDeForma["forma"] | "";
-            aoExecutar(comando(forma ? { ...(mascara ?? MASCARA_PADRAO), forma } : null));
+            // O desenho começa na prévia: a máscara só muda quando ele fica pronto
+            if (forma === "desenho") return desenhar?.(clipe.id);
+            aoExecutar(comando(forma ? { ...(mascara ?? MASCARA_PADRAO), forma, pontos: null } : null));
           }}
           className="rounded-md border border-borda bg-painel-2 px-2 py-1 text-xs outline-none focus:border-destaque"
         >
           <option value="">Nenhuma</option>
           <option value="elipse">Elipse</option>
           <option value="retangulo">Retângulo</option>
+          {desenhar ? <option value="desenho">Desenho</option> : null}
         </select>
       </label>
       {mascara ? (
         <>
-          <ControleNumerico rotulo="Centro na horizontal" {...controle("x", centro.minimo, centro.maximo)} />
-          <ControleNumerico rotulo="Centro na vertical" {...controle("y", centro.minimo, centro.maximo)} />
-          <ControleNumerico rotulo="Largura" {...controle("largura", tamanho.minimo, tamanho.maximo)} />
-          <ControleNumerico rotulo="Altura" {...controle("altura", tamanho.minimo, tamanho.maximo)} />
+          {mascara.forma === "desenho" ? (
+            <button type="button" className="botao-secundario mt-1.5 w-full px-3 py-1.5 text-xs" disabled={travada || !desenhar} onClick={() => desenhar?.(clipe.id)}>
+              Desenhar de novo na prévia
+            </button>
+          ) : (
+            <>
+              <ControleNumerico rotulo="Centro na horizontal" {...controle("x", centro.minimo, centro.maximo)} />
+              <ControleNumerico rotulo="Centro na vertical" {...controle("y", centro.minimo, centro.maximo)} />
+              <ControleNumerico rotulo="Largura" {...controle("largura", tamanho.minimo, tamanho.maximo)} />
+              <ControleNumerico rotulo="Altura" {...controle("altura", tamanho.minimo, tamanho.maximo)} />
+            </>
+          )}
           <ControleNumerico rotulo="Suavidade" {...controle("suavidade", suavidade.minimo, suavidade.maximo)} />
           <label className="mt-1 flex items-center gap-2 text-xs">
             <input type="checkbox" checked={mascara.inverter} disabled={travada} onChange={(evento) => aoExecutar(comando({ ...mascara, inverter: evento.currentTarget.checked }))} />

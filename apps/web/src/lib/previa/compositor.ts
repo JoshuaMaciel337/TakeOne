@@ -9,7 +9,7 @@ import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
-import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Recorte, Virar } from "../projeto/modelo.ts";
+import { type Cantos, type ChaveLuma, type Chroma, type MascaraDeForma, type Mesclagem, PONTOS_MAXIMOS_DO_DESENHO, type Recorte, type Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 import { type Contorno, DENSIDADE_NA_BORDA, deslocamentoDaSombra, LIMIAR_DO_CONTORNO, margemDaSilhueta, type Sombra } from "../projeto/silhueta.ts";
 
@@ -318,10 +318,38 @@ uniform float u_pixelsPorUnidade;
 // Máscara de forma: 0 sem ela, 1 retângulo, 2 elipse; centro e tamanho em frações do clipe; suavidade (fração do
 // lado menor) e inverter. A distância até a borda da forma, em pixels, vira a cobertura (cobertura_da_mascara)
 uniform int u_mascaraForma;
+// O desenho (forma 3): o polígono em frações do clipe
+uniform vec2 u_poligono[${PONTOS_MAXIMOS_DO_DESENHO}];
+uniform int u_pontosDoPoligono;
+// A distância com sinal (negativa dentro) até o polígono, em pixels: o lado mais perto e a regra par-ímpar
+// (distancia_ao_poligono em core/utils/cantos.py faz a mesma conta)
+float distanciaAoPoligono(vec2 p, vec2 tamanho) {
+  vec2 v0 = u_poligono[0] * tamanho;
+  float d = dot(p - v0, p - v0);
+  float s = 1.0;
+  for (int i = 0; i < ${PONTOS_MAXIMOS_DO_DESENHO}; i++) {
+    if (i >= u_pontosDoPoligono) break;
+    int j = i == 0 ? u_pontosDoPoligono - 1 : i - 1;
+    vec2 vi = u_poligono[i] * tamanho;
+    vec2 vj = u_poligono[j] * tamanho;
+    vec2 e = vj - vi;
+    vec2 w = p - vi;
+    vec2 b = w - e * clamp(dot(w, e) / max(dot(e, e), 1e-12), 0.0, 1.0);
+    d = min(d, dot(b, b));
+    bvec3 c = bvec3(p.y >= vi.y, p.y < vj.y, e.x * w.y > e.y * w.x);
+    if (all(c) || all(not(c))) s = -s;
+  }
+  return s * sqrt(d);
+}
 uniform vec4 u_mascara;
 uniform vec2 u_mascaraSuave;
 float coberturaDaMascara(vec2 local, vec2 tamanho) {
   if (u_mascaraForma == 0) return 1.0;
+  if (u_mascaraForma == 3) {
+    float suaveDoDesenho = max(u_mascaraSuave.x * min(tamanho.x, tamanho.y), 1.0);
+    float coberturaDoDesenho = clamp(0.5 - distanciaAoPoligono(local * tamanho, tamanho) / suaveDoDesenho, 0.0, 1.0);
+    return u_mascaraSuave.y > 0.5 ? 1.0 - coberturaDoDesenho : coberturaDoDesenho;
+  }
   vec2 p = (local - u_mascara.xy) * tamanho;
   vec2 meia = max(u_mascara.zw * tamanho / 2.0, vec2(1e-6));
   float distancia;
@@ -575,7 +603,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -716,6 +744,8 @@ export class Compositor {
         corteDe: local("u_corteDe"),
         mesclagem: local("u_mesclagem"),
         fundo: local("u_fundo"),
+        poligono: local("u_poligono[0]"),
+        pontosDoPoligono: local("u_pontosDoPoligono"),
         brilho: local("u_brilho"),
         nitidez: local("u_nitidez"),
         meiosTons: local("u_meiosTons"),
@@ -1057,7 +1087,11 @@ export class Compositor {
     definirChaveDeLuma(gl, uniformes, recortadaAntes ? null : camada.chaveLuma);
     gl.uniform2f(uniformes.cantos, camada.cantos?.raio ?? 0, camada.cantos?.borda ?? 0);
     const forma = camada.mascaraDeForma;
-    gl.uniform1i(uniformes.mascaraForma, forma ? (forma.forma === "retangulo" ? 1 : 2) : 0);
+    gl.uniform1i(uniformes.mascaraForma, forma ? (forma.forma === "retangulo" ? 1 : forma.forma === "desenho" ? 3 : 2) : 0);
+    if (forma?.forma === "desenho" && forma.pontos?.length) {
+      gl.uniform2fv(uniformes.poligono, new Float32Array(forma.pontos.flat()));
+      gl.uniform1i(uniformes.pontosDoPoligono, forma.pontos.length);
+    }
     if (forma) {
       gl.uniform4f(uniformes.mascara, forma.x, forma.y, forma.largura, forma.altura);
       gl.uniform2f(uniformes.mascaraSuave, forma.suavidade, forma.inverter ? 1 : 0);

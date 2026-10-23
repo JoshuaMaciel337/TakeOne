@@ -566,14 +566,25 @@ class CorEntrada(BaseModel):
 
 
 class MascaraEntrada(BaseModel):
-    """Máscara de forma: os limites são os de apps/web/src/lib/projeto/modelo.ts (LIMITES_DA_MASCARA)."""
-    forma: Literal["retangulo", "elipse"]
+    """Máscara de forma: os limites são os de apps/web/src/lib/projeto/modelo.ts (LIMITES_DA_MASCARA). No desenho, os
+    pontos do polígono em frações do clipe (de 3 a 32)."""
+    forma: Literal["retangulo", "elipse", "desenho"]
+    pontos: list[tuple[float, float]] | None = Field(default=None, max_length=32)
     x: float = Field(default=0.5, ge=-0.5, le=1.5)
     y: float = Field(default=0.5, ge=-0.5, le=1.5)
     largura: float = Field(default=0.7, ge=0.02, le=2)
     altura: float = Field(default=0.7, ge=0.02, le=2)
     suavidade: float = Field(default=0.08, ge=0, le=0.5)
     inverter: bool = False
+
+    @model_validator(mode="after")
+    def _conferir_desenho(self):
+        if self.forma == "desenho":
+            if not self.pontos or len(self.pontos) < 3:
+                raise ValueError("O desenho da máscara precisa de pelo menos 3 pontos.")
+            if any(not (-0.5 <= x <= 1.5 and -0.5 <= y <= 1.5) for x, y in self.pontos):
+                raise ValueError("Um ponto do desenho ficou longe demais do clipe.")
+        return self
 
 
 class ChromaEntrada(BaseModel):

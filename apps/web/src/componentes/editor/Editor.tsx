@@ -26,6 +26,7 @@ import { contextoDasMidias } from "./contexto";
 import { JanelaAtalhos } from "./JanelaAtalhos";
 import { JanelaColarAjustes } from "./JanelaColarAjustes";
 import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
+import { IniciarDesenhoDaMascara } from "./DesenhoDaMascara";
 import { JanelaExportar } from "./JanelaExportar";
 import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PainelConteudo } from "./PainelConteudo";
@@ -141,6 +142,22 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const reproducao = useReproducao(projeto?.duracao ?? 0, projeto?.taxa ?? { num: 30, den: 1 });
   const { tempo, buscar, alternar } = reproducao;
   const objeto = useSeguirObjeto({ projeto, midias, tempo, executar: (comando) => executar(comando), aoAvisar: mostrarAviso });
+  // O desenho da máscara de um clipe, na prévia (o painel começa; a prévia devolve os pontos)
+  const [desenhandoMascara, setDesenhandoMascara] = useState<string | null>(null);
+  const iniciarDesenho = (clipeId: string) => {
+    if (reproducao.tocando) alternar();
+    setDesenhandoMascara(clipeId);
+  };
+  const concluirDesenho = (pontos: [number, number][]) => {
+    const clipeId = desenhandoMascara;
+    setDesenhandoMascara(null);
+    if (!clipeId || !projeto) return;
+    const anterior = acharClipe(projeto, clipeId)?.clipe.mascara;
+    executar({
+      comando: "clipe.mascara",
+      parametros: { clipeIds: [clipeId], mascara: { forma: "desenho", x: 0.5, y: 0.5, largura: 1, altura: 1, suavidade: anterior?.suavidade ?? 0.02, inverter: anterior?.inverter ?? false, pontos } },
+    });
+  };
 
   const [larguraConteudo, setLarguraConteudo] = useTamanhoSalvo("largura-conteudo", CONTEUDO.padrao, CONTEUDO.minimo, CONTEUDO.maximo);
   const [larguraPropriedades, setLarguraPropriedades] = useTamanhoSalvo(
@@ -396,7 +413,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   } as React.CSSProperties;
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto" style={tamanhos}>
+    <IniciarDesenhoDaMascara.Provider value={iniciarDesenho}>
+      <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto" style={tamanhos}>
       <BarraSuperior
         nome={edicao.nome}
         aoMudarNome={edicao.renomear}
@@ -492,6 +510,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 setProvisorio(mudanca ? { comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } } : null)
               }
               aoTransformar={(clipeId, mudanca) => executar({ comando: "clipe.transformar", parametros: { clipeIds: [clipeId], transformacao: mudanca, tempo } })}
+              desenhoDaMascara={desenhandoMascara ? { clipeId: desenhandoMascara, aoConcluir: concluirDesenho, aoCancelar: () => setDesenhandoMascara(null) } : null}
               marcacao={objeto.marcando ? { seguidorId: objeto.marcando, proprio: objeto.modo === "esconder", aoConfirmar: objeto.confirmar, aoCancelar: objeto.cancelar } : null}
               className="flex-1"
             />
@@ -600,5 +619,6 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         </div>
       ) : null}
     </div>
+    </IniciarDesenhoDaMascara.Provider>
   );
 }

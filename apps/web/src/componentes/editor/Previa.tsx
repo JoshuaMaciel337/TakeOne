@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
-import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
+import { contemPonto, type Guias, pontoNaCaixa, type Tamanho } from "@/lib/projeto/geometria";
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import { retanguloNaImagem } from "@/lib/projeto/seguirObjeto";
@@ -17,6 +17,7 @@ import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoC
 import { arquivoDaMascara, ehCopiaDesenhada, expandirParaDesenhar } from "@/lib/projeto/fundoDesfocado";
 import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
 import { useTabelasDasLuts } from "@/lib/useLuts";
+import { DesenhoDaMascara } from "./DesenhoDaMascara";
 import { GuiasDaPrevia } from "./GuiasDaPrevia";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { MedidorDeLoudness } from "./MedidorDeLoudness";
@@ -36,6 +37,8 @@ type Props = {
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
   /** Marcando o objeto que um clipe vai seguir: a prévia mostra o marcador no lugar das alças. */
+  /** O desenho da máscara de um clipe: os pontos voltam em frações do clipe. */
+  desenhoDaMascara?: { clipeId: string; aoConcluir: (pontos: [number, number][]) => void; aoCancelar: () => void } | null;
   /** `proprio`: o objeto é marcado no próprio clipe (esconder uma placa), não num vídeo embaixo dele. */
   marcacao?: { seguidorId: string; proprio?: boolean; aoConfirmar: (marcado: ObjetoMarcado) => void; aoCancelar: () => void } | null;
   className?: string;
@@ -94,7 +97,7 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, className = "" }: Props) {
+export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, className = "" }: Props) {
   // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
   const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao), [projetoDaEdicao]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
@@ -280,8 +283,24 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
             <GuiasDaPrevia modo={modoDasGuias} quadro={tamanho} emPe={razao(projeto.proporcao) < 1} />
 
             {marcacao ? <MarcadorDeObjeto aoMarcar={marcarObjeto} aoCancelar={marcacao.aoCancelar} /> : null}
+            {desenhoDaMascara ? (
+              <DesenhoDaMascara
+                aoCancelar={desenhoDaMascara.aoCancelar}
+                aoConcluir={(pontos) => {
+                  // Os cliques (pixels da prévia) em frações da caixa do clipe, antes do giro, como o v_local do shader
+                  const camada = camadas.find((c) => c.clipe.id === desenhoDaMascara.clipeId);
+                  if (!camada) return desenhoDaMascara.aoCancelar();
+                  desenhoDaMascara.aoConcluir(
+                    pontos.map((ponto) => {
+                      const local = pontoNaCaixa(camada.caixa, ponto);
+                      return [local.x / camada.caixa.largura + 0.5, local.y / camada.caixa.altura + 0.5];
+                    }),
+                  );
+                }}
+              />
+            ) : null}
 
-            {selecionada && !tocando && !marcacao ? (
+            {selecionada && !tocando && !marcacao && !desenhoDaMascara ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
                 caixa={selecionada.caixaBase}

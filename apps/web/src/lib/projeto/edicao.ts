@@ -62,6 +62,7 @@ import {
   type ChaveLuma,
   type Chroma,
   LIMITES_DA_MASCARA,
+  PONTOS_MAXIMOS_DO_DESENHO,
   type MascaraDeForma,
   type Marcador,
   MARCADORES_MAXIMOS,
@@ -2126,7 +2127,9 @@ export function silhuetaDosClipes(projeto: Projeto, clipeIds: string[], mudanca:
 
 /** A máscara de forma dos clipes (null tira), com os números dentro dos limites. */
 export function mascararClipes(projeto: Projeto, clipeIds: string[], mascara: MascaraDeForma | null): Projeto {
-  if (mascara && mascara.forma !== "retangulo" && mascara.forma !== "elipse") throw new ErroEdicao("Esta forma de máscara não existe.");
+  if (mascara && mascara.forma !== "retangulo" && mascara.forma !== "elipse" && mascara.forma !== "desenho") throw new ErroEdicao("Esta forma de máscara não existe.");
+  if (mascara?.forma === "desenho" && (mascara.pontos?.length ?? 0) < 3) throw new ErroEdicao("Desenhe pelo menos 3 pontos.");
+  if (mascara?.forma === "desenho" && mascara.pontos!.length > PONTOS_MAXIMOS_DO_DESENHO) throw new ErroEdicao(`O desenho vai até ${PONTOS_MAXIMOS_DO_DESENHO} pontos.`);
   const { centro, tamanho, suavidade } = LIMITES_DA_MASCARA;
   const limpa = mascara
     ? {
@@ -2137,6 +2140,9 @@ export function mascararClipes(projeto: Projeto, clipeIds: string[], mascara: Ma
         altura: limitar(mascara.altura, tamanho.minimo, tamanho.maximo),
         suavidade: limitar(mascara.suavidade, suavidade.minimo, suavidade.maximo),
         inverter: Boolean(mascara.inverter),
+        ...(mascara.forma === "desenho"
+          ? { pontos: mascara.pontos!.map(([x, y]) => [limitar(x, centro.minimo, centro.maximo), limitar(y, centro.minimo, centro.maximo)] as [number, number]) }
+          : {}),
       }
     : null;
   return mudarClipes(projeto, clipeIds, (clipe) => ({ ...clipe, mascara: limpa }));

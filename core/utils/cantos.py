@@ -28,13 +28,46 @@ def _cobertura(px: np.ndarray, py: np.ndarray, meia_l: float, meia_a: float, rai
     return np.clip(0.5 - (fora + dentro - raio), 0, 1)
 
 
+def distancia_ao_poligono(largura: int, altura: int, pontos: list) -> np.ndarray:
+    """
+    A distância com sinal (negativa dentro), em pixels, do centro de cada pixel até o polígono de `pontos` (frações
+    do clipe): a do lado mais perto, e o sinal pela regra par-ímpar, a mesma conta do shader (distanciaAoPoligono).
+    """
+    px = (np.arange(largura) + 0.5)[None, :] * np.ones((altura, 1))
+    py = (np.arange(altura) + 0.5)[:, None] * np.ones((1, largura))
+    vertices = [(x * largura, y * altura) for x, y in pontos]
+    d = (px - vertices[0][0]) ** 2 + (py - vertices[0][1]) ** 2
+    sinal = np.ones_like(px)
+    j = len(vertices) - 1
+    for i in range(len(vertices)):
+        (xi, yi), (xj, yj) = vertices[i], vertices[j]
+        ex, ey = xj - xi, yj - yi
+        wx, wy = px - xi, py - yi
+        t = np.clip((wx * ex + wy * ey) / max(ex * ex + ey * ey, 1e-12), 0, 1)
+        bx, by = wx - ex * t, wy - ey * t
+        d = np.minimum(d, bx * bx + by * by)
+        c1, c2, c3 = py >= yi, py < yj, ex * wy > ey * wx
+        troca = (c1 & c2 & c3) | (~c1 & ~c2 & ~c3)
+        sinal = np.where(troca, -sinal, sinal)
+        j = i
+    return sinal * np.sqrt(d)
+
+
 def cobertura_da_mascara(largura: int, altura: int, mascara: dict | None) -> np.ndarray | float:
     """
     Quanto de cada pixel a máscara de forma deixa aparecer (1 sem máscara). A distância até a borda da forma, em
     pixels, vira a cobertura pela suavidade (com 1 pixel de borda suave quando ela é zero), como o shader.
     """
-    if not mascara or mascara.get("forma") not in ("retangulo", "elipse"):
+    if not mascara or mascara.get("forma") not in ("retangulo", "elipse", "desenho"):
         return 1.0
+    if mascara["forma"] == "desenho":
+        pontos = mascara.get("pontos") or []
+        if len(pontos) < 3:
+            return 1.0
+        distancia = distancia_ao_poligono(largura, altura, pontos)
+        suave = max(mascara.get("suavidade", 0) * min(largura, altura), 1.0)
+        cobertura = np.clip(0.5 - distancia / suave, 0, 1)
+        return 1 - cobertura if mascara.get("inverter") else cobertura
     px = (np.arange(largura) + 0.5)[None, :] - mascara["x"] * largura
     py = (np.arange(altura) + 0.5)[:, None] - mascara["y"] * altura
     meia_l = max(mascara["largura"] * largura / 2, 1e-6)
@@ -80,7 +113,9 @@ def desenhar_cantos(largura: int, altura: int, cantos: dict) -> tuple[Image.Imag
 
 
 def tem_mascara(clipe: dict) -> bool:
-    return (clipe.get("mascara") or {}).get("forma") in ("retangulo", "elipse")
+    mascara = clipe.get("mascara") or {}
+    return mascara.get("forma") in ("retangulo", "elipse") or (
+        mascara.get("forma") == "desenho" and len(mascara.get("pontos") or []) >= 3)
 
 
 def tem_cantos(clipe: dict) -> bool:

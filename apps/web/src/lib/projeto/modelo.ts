@@ -60,7 +60,18 @@ export const BORDA_MAXIMA = 0.25;
  * centro e o tamanho são frações do clipe como ele aparece; a suavidade, do lado menor dele. A conta é a de
  * core/utils/cantos.py (cobertura_da_mascara), que o shader da prévia repete.
  */
-export type MascaraDeForma = { forma: "retangulo" | "elipse"; x: number; y: number; largura: number; altura: number; suavidade: number; inverter: boolean };
+/** No desenho, `pontos` é o polígono em frações do clipe (de 3 a PONTOS_MAXIMOS_DO_DESENHO); o centro e o tamanho não valem. */
+export type MascaraDeForma = {
+  forma: "retangulo" | "elipse" | "desenho";
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+  suavidade: number;
+  inverter: boolean;
+  pontos?: [number, number][] | null;
+};
+export const PONTOS_MAXIMOS_DO_DESENHO = 32;
 export const MASCARA_PADRAO: MascaraDeForma = { forma: "elipse", x: 0.5, y: 0.5, largura: 0.7, altura: 0.7, suavidade: 0.08, inverter: false };
 export const LIMITES_DA_MASCARA = { centro: { minimo: -0.5, maximo: 1.5 }, tamanho: { minimo: 0.02, maximo: 2 }, suavidade: { minimo: 0, maximo: 0.5 } } as const;
 
