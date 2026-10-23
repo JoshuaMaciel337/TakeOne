@@ -540,6 +540,14 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Ampliar (Real-ESRGAN geral x4v3, na CPU) e expandir até outra proporção (LaMa, a parte nova ampliada pelo Real-ESRGAN), na ferramenta Foto com IA do editor de imagem.
   - [x] Profundidade (Depth Anything V2 Small, na CPU) e a foto em 3D, na aba Básico de uma foto no editor de vídeo.
   - [x] Gerar imagem por texto (o Wan 2.2 com um quadro só, na placa).
+- [ ] Onda 12, os editores com o layout dos programas profissionais ([ADR 0002](decisoes/0002-layout-dos-editores.md)): quem vem do editor de imagem e do editor de vídeo mais usados acha cada coisa onde está acostumado, com os mesmos nomes; as funções só do TakeOne entram no lugar mais parecido.
+  - [ ] 12.1 Fundação: barra de menus, grupos de painéis com abas, áreas de trabalho guardadas e barra de status.
+  - [ ] 12.2 Editor de imagem: layout "Essenciais", ferramentas, barra de opções, Camadas, Propriedades e Ajustes, Histórico, Cor e Amostras.
+  - [ ] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
+  - [ ] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
+  - [ ] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.
+  - [ ] 12.6 Monitor de origem, com Inserir e Sobrescrever.
+  - [ ] 12.7 As outras áreas de trabalho e os ajustes finais.
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 
 **Estimativa:**
