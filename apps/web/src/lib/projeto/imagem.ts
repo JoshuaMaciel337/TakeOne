@@ -234,6 +234,20 @@ export function trocarImagemDaCamada(projeto: Projeto, ctx: Contexto, clipeId: s
   return { ...projeto, faixas };
 }
 
+/**
+ * Uma camada nova logo acima da camada dada, no mesmo lugar e com tudo dela, mas com outra mídia do mesmo tamanho
+ * (o objeto recortado de uma foto cai em cima da foto).
+ */
+export function camadaComOutraMidia(projeto: Projeto, ctx: Contexto, faixaId: string, midiaId: string): { projeto: Projeto; clipeId: string } {
+  const indice = indiceDaCamada(projeto, faixaId);
+  const original = projeto.faixas[indice];
+  if (!ctx.midia(midiaId)?.imagem) throw new ErroEdicao("A imagem nova ainda não está pronta.");
+  const clipe: Clipe = { ...structuredClone(original.clipes[0]), id: ctx.novoId(), midia_id: midiaId, remover_fundo: false };
+  const faixas = [...projeto.faixas];
+  faixas.splice(indice, 0, { ...original, id: ctx.novoId(), travada: false, oculta: false, clipes: [clipe] });
+  return { projeto: { ...projeto, faixas }, clipeId: clipe.id };
+}
+
 export function mudarFundoDaImagem(projeto: Projeto, fundo: { cor?: string; transparente?: boolean }): Projeto {
   if (fundo.cor !== undefined && !/^#[0-9a-f]{6}$/i.test(fundo.cor)) throw new ErroEdicao("Cor inválida.");
   return { ...projeto, fundo: { ...projeto.fundo, ...fundo } };

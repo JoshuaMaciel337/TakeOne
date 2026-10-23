@@ -165,3 +165,16 @@ test("recortar a imagem: o quadro fica do tamanho do recorte e as camadas no mes
   // O texto: o lado menor era 1080 e passa a 600, então a escala cresce na mesma proporção
   assert.ok(Math.abs(texto.clipe.transformacao.escala - 1080 / 600) < 1e-9);
 });
+
+test("o objeto recortado entra numa camada logo acima da foto, no mesmo lugar", () => {
+  const ctx = contexto();
+  let projeto = executarComando(vazio(), { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx).projeto;
+  projeto = executarComando(projeto, { comando: "clipe.transformar", parametros: { clipeIds: [camadasDaImagem(projeto)[0].clipe.id], transformacao: { x: 0.1, escala: 0.7 } } }, ctx).projeto;
+  const [foto] = camadasDaImagem(projeto);
+  const r = executarComando(projeto, { comando: "imagem.camadaComOutraMidia", parametros: { faixaId: foto.faixa.id, midiaId: "logo" } }, ctx);
+  const [objeto, embaixo] = camadasDaImagem(r.projeto);
+  assert.equal(objeto.clipe.midia_id, "logo");
+  assert.deepEqual(objeto.clipe.transformacao, foto.clipe.transformacao);
+  assert.equal(embaixo.clipe.id, foto.clipe.id);
+  assert.deepEqual(r.selecao, [objeto.clipe.id]);
+});

@@ -15,7 +15,9 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
+import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
+import type { FerramentaObjeto } from "./useObjeto";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
 const DENSIDADE_MAXIMA = 2;
@@ -31,6 +33,8 @@ type Props = {
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
   recorte?: { retangulo: RetanguloDaImagem; proporcao: number | null; aoMudar: (retangulo: RetanguloDaImagem) => void } | null;
+  /** A ferramenta Objeto: os cliques e o pincel vão para a camada escolhida, no lugar das alças. */
+  objeto?: { clipeId: string; ferramenta: FerramentaObjeto } | null;
 };
 
 /** O maior quadro na proporção da imagem que cabe na área livre. */
@@ -58,7 +62,7 @@ function useQuadro(largura: number, altura: number) {
  * A prévia do editor de imagem: o compositor da prévia do vídeo, num quadro só, com as alças para mover, girar
  * e redimensionar. A conta é a da exportação (lib/exportacao/imagem.ts); a prévia só lê as cópias leves.
  */
-export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPrever, aoTransformar, recorte = null }: Props) {
+export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPrever, aoTransformar, recorte = null, objeto = null }: Props) {
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, tamanho } = useQuadro(imagem.largura, imagem.altura);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -157,7 +161,10 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
             {recorte && tamanho.largura > 0 ? (
               <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} />
             ) : null}
-            {selecionada && !recorte ? (
+            {objeto && selecionada?.clipe.id === objeto.clipeId ? (
+              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} />
+            ) : null}
+            {selecionada && !recorte && !objeto ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
                 caixa={selecionada.caixaBase}

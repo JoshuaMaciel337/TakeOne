@@ -493,11 +493,11 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Nitidez (efeito, com a cópia desfocada do brilho).
   - [x] Slip e roll (Alt + arrastar o clipe ou a borda entre dois clipes encostados).
   - [x] HDR do celular (PQ e HLG) para SDR, com o mesmo filtro na cópia leve e no render.
-- [ ] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.
+- [x] Onda 5, editor de imagem (segundo passo): máscaras desenhadas, camadas de ajuste, seleções sem IA, seleção com um clique (MobileSAM ou SAM 2.1), apagar objeto (LaMa), clareza e névoa, tamanho e recorte.
   - [x] Clareza (efeito), tirar e pôr névoa (aba Cor) e máscara de forma por camada (elipse ou retângulo, com suavidade e inverter), também no vídeo.
   - [x] Camadas de ajuste (cor, filtro, curvas, vinheta, opacidade e máscara de forma), no vídeo e na imagem.
   - [x] Recortar a imagem (retângulo na prévia, proporções prontas, camadas no mesmo lugar em pixels).
-  - [ ] Seleções (sem IA e com um clique) e apagar objeto.
+  - [x] Seleção com um clique (MobileSAM) e com o pincel, apagar objeto (LaMa) e recortar objeto (camada nova), no editor de imagem.
 - [ ] Onda 6, lote D (som). Onda 7, lote E (texto). Onda 8, lote F (tempo, transições e efeitos). Onda 9, lote G (adesivos SVG, quadro, LUT, marcadores). Onda 10, lote H (esconder rosto ou placa, desfocar o fundo no vídeo, multicâmera, MCP). Onda 11, imagem com a placa (ampliar, gerar por texto, preencher, profundidade).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 

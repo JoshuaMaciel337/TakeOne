@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, Download, Image as ImageIcon, LayoutTemplate, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2 } from "lucide-react";
+import { Check, ChevronLeft, Download, Image as ImageIcon, LayoutTemplate, LoaderCircle, PaintBucket, Redo2, Shapes, Type, Undo2, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
@@ -34,12 +34,15 @@ import { useMidias } from "@/lib/useMidias";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
 import { PainelCamadas } from "./PainelCamadas";
+import { PainelObjeto } from "./PainelObjeto";
+import { useObjeto } from "./useObjeto";
 import { PreviaDaImagem } from "./PreviaDaImagem";
 
-type Ferramenta = "modelos" | "imagens" | "texto" | "elementos" | "fundo";
+type Ferramenta = "modelos" | "imagens" | "objeto" | "texto" | "elementos" | "fundo";
 const FERRAMENTAS: { id: Ferramenta; nome: string; icone: typeof ImageIcon }[] = [
   { id: "modelos", nome: "Modelos", icone: LayoutTemplate },
   { id: "imagens", nome: "Imagens", icone: ImageIcon },
+  { id: "objeto", nome: "Objeto", icone: WandSparkles },
   { id: "texto", nome: "Texto", icone: Type },
   { id: "elementos", nome: "Elementos", icone: Shapes },
   { id: "fundo", nome: "Fundo e tamanho", icone: PaintBucket },
@@ -65,7 +68,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [exportando, setExportando] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // As mídias pedidas (as formas) entram como camada quando ficam prontas; a troca de cor de uma forma também espera
-  const pendentes = useRef(new Map<string, { trocar?: string[] }>());
+  const pendentes = useRef(new Map<string, { trocar?: string[]; camadaDe?: string }>());
   // O modelo escolhido espera as formas dele aparecerem na biblioteca, como as formas avulsas
   const modeloPendente = useRef<{ modelo: ModeloDeImagem; cores: string[]; midias: Record<string, Midia> } | null>(null);
   const [aplicando, setAplicando] = useState<string | null>(null);
@@ -135,6 +138,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
       pendentes.current.delete(id);
       if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
+      else if (acao.camadaDe)
+        executar({
+          comando: "imagem.camadaComOutraMidia",
+          parametros: { faixaId: acao.camadaDe, midiaId: id },
+        });
       else if (acao.trocar)
         executar({
           comando: "clipe.trocarMidia",
@@ -167,6 +175,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
   const selecionado = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
   const midiaDoClipe = selecionado?.clipe.midia_id ? (midias.get(selecionado.clipe.midia_id) ?? null) : null;
+  const objeto = useObjeto(selecionado?.clipe ?? null, midiaDoClipe);
 
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
     if (!projeto || exportando) return;
@@ -346,6 +355,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   ))}
                 </div>
               </div>
+            ) : ferramenta === "objeto" ? (
+              <PainelObjeto
+                objeto={objeto}
+                aoPedir={(acao, midia) => {
+                  if (!selecionado) return;
+                  // Apagado: a foto da camada é trocada; recortado: entra uma camada nova por cima, no mesmo lugar
+                  pendentes.current.set(midia.id, acao === "apagar" ? { trocar: [selecionado.clipe.id] } : { camadaDe: selecionado.faixa.id });
+                  void biblioteca.recarregar();
+                  mostrarAviso(acao === "apagar" ? "Apagando o objeto: a foto troca quando ficar pronta." : "Recortando o objeto: ele entra numa camada nova quando ficar pronto.");
+                }}
+              />
             ) : ferramenta === "imagens" ? (
               <div className="flex flex-col gap-3">
                 <ZonaDeEnvio compacta />
@@ -466,6 +486,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             })
           }
           recorte={recorte ? { ...recorte, aoMudar: (retangulo) => setRecorte({ ...recorte, retangulo }) } : null}
+          objeto={ferramenta === "objeto" && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto } : null}
         />
 
         <div className="flex shrink-0 flex-col border-borda bg-painel md:min-h-0 md:w-80 md:border-l">
