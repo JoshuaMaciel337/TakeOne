@@ -16,6 +16,10 @@ ZOOM_TRANSICAO = 0.6
 # Desfoque no meio da transição "desfoque": sigma em frações da altura do clipe
 DESFOQUE_TRANSICAO = 0.03
 CORTINAS = ("cortina_direita", "cortina_esquerda", "cortina_baixo", "cortina_cima")
+# Transições de máscara (transicao.ts): o campo de cada tipo, a borda suave e as faixas das persianas
+MASCARAS = ("relogio", "iris", "losango", "persianas", "diagonal")
+SUAVIDADE_DA_TRANSICAO = 0.04
+FAIXAS_DAS_PERSIANAS = 8
 REVELADO_INTEIRO = {"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0}
 
 
@@ -126,6 +130,46 @@ def revelado_na_transicao(efeitos: list[dict], t: float) -> dict:
     return revelado
 
 
+def campo_da_transicao(tipo: str, x: float, y: float, largura: float, altura: float) -> float:
+    """O campo do tipo no ponto (x, y) do clipe, em frações (campoDaTransicao)."""
+    dx, dy = (x - 0.5) * largura, (y - 0.5) * altura
+    if tipo == "relogio":
+        volta = math.atan2(dx, -dy) / (2 * math.pi) + 1
+        return volta - math.floor(volta)
+    if tipo == "iris":
+        return math.hypot(dx, dy) / (0.5 * math.hypot(largura, altura))
+    if tipo == "losango":
+        return (abs(dx) + abs(dy)) / (0.5 * (largura + altura))
+    if tipo == "persianas":
+        faixa = y * FAIXAS_DAS_PERSIANAS
+        return faixa - math.floor(faixa)
+    return (x * largura + y * altura) / (largura + altura)
+
+
+def limiar_da_transicao(e: float) -> float:
+    return -SUAVIDADE_DA_TRANSICAO / 2 + e * (1 + SUAVIDADE_DA_TRANSICAO)
+
+
+def _campo_no_geq(tipo: str) -> str:
+    """O campo numa expressão do geq, pelo centro do pixel, como o shader."""
+    dx, dy = "(X+0.5-W/2)", "(Y+0.5-H/2)"
+    if tipo == "relogio":
+        return f"mod(atan2({dx},-{dy})/(2*PI)+1,1)"
+    if tipo == "iris":
+        return f"hypot({dx},{dy})/(0.5*hypot(W,H))"
+    if tipo == "losango":
+        return f"(abs({dx})+abs({dy}))/(0.5*(W+H))"
+    if tipo == "persianas":
+        return f"mod((Y+0.5)/H*{FAIXAS_DAS_PERSIANAS},1)"
+    return "((X+0.5)+(Y+0.5))/(W+H)"
+
+
+def _cobertura_no_geq(tipo: str, andamento: str) -> str:
+    """Máscara: o campo abaixo do limiar aparece, com a borda suave (revelarNoCampo)."""
+    limiar = f"{_n(-SUAVIDADE_DA_TRANSICAO / 2)}+{andamento}*{_n(1 + SUAVIDADE_DA_TRANSICAO)}"
+    return f"clip(({limiar}-{_campo_no_geq(tipo)})/{_n(SUAVIDADE_DA_TRANSICAO)}+0.5,0,1)"
+
+
 def filtro_de_cortina(efeitos: list[dict], deslocamento: float) -> str | None:
     """
     O geq que deixa transparente o que a cortina ainda não revelou, ou None sem cortina.
@@ -134,7 +178,7 @@ def filtro_de_cortina(efeitos: list[dict], deslocamento: float) -> str | None:
     """
     condicoes, fim = [], 0.0
     for efeito in efeitos:
-        if efeito["papel"] != "entra" or efeito["tipo"] not in CORTINAS:
+        if efeito["papel"] != "entra" or efeito["tipo"] not in CORTINAS + MASCARAS:
             continue
         inicio, duracao = efeito["inicio"], efeito["duracao"]
         e = f"(1-pow(1-clip((T+{_n(deslocamento)}-{_n(inicio)})/{_n(duracao)},0,1),3))"
@@ -144,7 +188,7 @@ def filtro_de_cortina(efeitos: list[dict], deslocamento: float) -> str | None:
             "cortina_esquerda": f"gte((X+0.5)/W,1-{e})",
             "cortina_baixo": f"lte((Y+0.5)/H,{e})",
             "cortina_cima": f"gte((Y+0.5)/H,1-{e})",
-        }[efeito["tipo"]])
+        }[efeito["tipo"]] if efeito["tipo"] in CORTINAS else _cobertura_no_geq(efeito["tipo"], e))
         fim = max(fim, inicio + duracao - deslocamento)
     if not condicoes:
         return None

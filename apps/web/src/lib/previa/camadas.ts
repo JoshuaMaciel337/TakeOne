@@ -25,7 +25,7 @@ import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/key
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
-import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
+import { desfoqueNaTransicao, janelasDaPrincipal, janelasDoSom, type MascaraDeTransicao, mascaraNaTransicao, type Revelado, reveladoNaTransicao, transformacaoNaTransicao } from "@/lib/projeto/transicao";
 import { duracaoDoQuadro, type Taxa, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
@@ -60,6 +60,7 @@ export type CamadaNaTela = {
   vinheta: number;
   /** A parte do clipe que aparece numa cortina; sem ela, o clipe inteiro. */
   revelado?: Revelado;
+  mascaraDaTransicao?: { tipo: MascaraDeTransicao; limiar: number } | null;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
   imagem?: ImageBitmap;
   /** As letras do texto que aparecem; sem ela, todas. */
@@ -226,6 +227,7 @@ export function camadasNoTempo(
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       ...luzEGrao(clipe, caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro), tempo, projeto.taxa),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
+      mascaraDaTransicao: item.efeitos?.length ? mascaraNaTransicao(item.efeitos, tempo) : null,
       desfoque: item.efeitos?.length ? desfoqueNaTransicao(item.efeitos, tempo) : 0,
       segundos: tempoNaMidia(clipe, tempo) / TICKS_POR_SEGUNDO,
     });
@@ -315,6 +317,7 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource |
     lut: camada.lut,
     vinheta: camada.vinheta,
     revelado: camada.revelado,
+    mascaraDaTransicao: camada.mascaraDaTransicao,
     mascara: camada.mascara,
     desfoque: (camada.desfoque ?? 0) + desfoqueDoEfeito(camada.clipe.efeito),
     mesclagem: camada.clipe.mesclagem,

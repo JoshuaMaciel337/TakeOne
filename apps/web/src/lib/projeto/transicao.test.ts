@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Clipe, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "./modelo.ts";
-import { desfoqueNaTransicao, fatorDaMistura, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
+import { campoDaTransicao, desfoqueNaTransicao, fatorDaMistura, limiarDaTransicao, type MascaraDeTransicao, mascaraNaTransicao, janelasDaPrincipal, janelasDoSom, type Revelado, reveladoNaTransicao, type TipoTransicao, transformacaoNaTransicao } from "./transicao.ts";
 
 type Caso = {
   nome: string;
@@ -85,4 +85,19 @@ test("mistura do som: só nas transições marcadas e em potência constante (os
   assert.deepEqual([fatorDaMistura(entra, 50), fatorDaMistura(entra, 70)], [0, 1]);
   for (const t of [55, 60, 63.3]) assert.ok(Math.abs(fatorDaMistura(sai, t) ** 2 + fatorDaMistura(entra, t) ** 2 - 1) < 1e-12);
   assert.ok(Math.abs(fatorDaMistura(entra, 60) - Math.SQRT1_2) < 1e-12);
+});
+
+test("transições de máscara: os campos e os limiares do render (tests/casos/transicao.json)", () => {
+  const dados = JSON.parse(readFileSync(new URL("../../../../../tests/casos/transicao.json", import.meta.url), "utf8")).mascaras as {
+    tipos: { tipo: MascaraDeTransicao; largura: number; altura: number; campos: [number, number, number][] }[];
+    limiares: [number, number][];
+  };
+  for (const { tipo, largura, altura, campos } of dados.tipos) {
+    for (const [x, y, campo] of campos) assert.ok(Math.abs(campoDaTransicao(tipo, x, y, largura, altura) - campo) < 1e-9, `${tipo} (${x}, ${y})`);
+  }
+  for (const [e, limiar] of dados.limiares) assert.ok(Math.abs(limiarDaTransicao(e) - limiar) < 1e-12);
+  // Só o clipe que entra tem a máscara
+  const efeitos = [{ tipo: "iris" as const, papel: "entra" as const, inicio: 0, duracao: 100 }];
+  assert.equal(mascaraNaTransicao(efeitos, 0)?.limiar, limiarDaTransicao(0));
+  assert.equal(mascaraNaTransicao([{ ...efeitos[0], papel: "sai" }], 50), null);
 });

@@ -29,7 +29,8 @@ const LIMITE_MEDIA = 6;
 const LIMITE_FORA = 0.08;
 // O vizinho só conta como "quadro errado" se bater claramente melhor: num trecho parado os quadros são iguais
 const FOLGA_VIZINHO = 0.5;
-const PARTES = [0.05, 0.25, 0.5, 0.75, 0.95];
+// Os instantes, em frações da duração (PARTES=0.2,0.4 escolhe outros, como o meio de cada transição)
+const PARTES = process.env.PARTES ? process.env.PARTES.split(",").map(Number) : [0.05, 0.25, 0.5, 0.75, 0.95];
 
 const navegador = await chromium.launch({ channel: "chrome", headless: true, args: ["--use-angle=d3d11"] });
 try {

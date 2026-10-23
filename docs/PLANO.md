@@ -514,7 +514,8 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Texto em arco (arcos paralelos; desliga o destaque da fala e o letra a letra).
 - [ ] Onda 8, lote F (tempo, transições e efeitos): congelar quadro, transições de máscara, desfoque de zoom e de giro, pixelizar, inverter o clipe, câmera lenta suave.
   - [x] Congelar o quadro (a foto do instante entre as metades do vídeo, por 3 s).
-  - [ ] Transições de máscara.
+  - [x] Transições de máscara: relógio, íris, losango, persianas e diagonal, com a borda suave.
+  - [ ] Blocos sorteados (um mapa de limiares em imagem, lido pelos dois lados).
   - [x] Desfoque de zoom e de giro e pixelizar (efeitos).
   - [ ] A transição zoom com desfoque (a força das 16 cópias muda no tempo; mais pesada no render).
   - [ ] Inverter o clipe.

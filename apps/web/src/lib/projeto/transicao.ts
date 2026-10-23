@@ -20,7 +20,12 @@ export type TipoTransicao =
   | "cortina_esquerda"
   | "cortina_baixo"
   | "cortina_cima"
-  | "desfoque";
+  | "desfoque"
+  | "relogio"
+  | "iris"
+  | "losango"
+  | "persianas"
+  | "diagonal";
 /** `misturar_som`: os dois sons se cruzam na janela (janelasDoSom); sem ela, cada clipe soa só entre o começo e o fim dele. */
 export type Transicao = { tipo: TipoTransicao; duracao: Tick; misturar_som?: boolean };
 
@@ -35,7 +40,60 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "cortina_baixo", nome: "Cortina para baixo", descricao: "O próximo é revelado de cima para baixo" },
   { id: "cortina_cima", nome: "Cortina para cima", descricao: "O próximo é revelado de baixo para cima" },
   { id: "desfoque", nome: "Desfoque", descricao: "Os dois desfocam no corte e o próximo aparece nítido" },
+  { id: "relogio", nome: "Relógio", descricao: "O próximo aparece girando como um ponteiro" },
+  { id: "iris", nome: "Íris", descricao: "Um círculo abre do meio e mostra o próximo" },
+  { id: "losango", nome: "Losango", descricao: "Um losango abre do meio e mostra o próximo" },
+  { id: "persianas", nome: "Persianas", descricao: "O próximo aparece em faixas, como uma persiana" },
+  { id: "diagonal", nome: "Diagonal", descricao: "O próximo é revelado do canto de cima para o de baixo" },
 ];
+
+/**
+ * Transições de máscara: o próximo aparece por uma forma que cresce, com a borda suave. Cada tipo é um campo
+ * de 0 a 1 sobre o clipe (em pixels, para o círculo ser redondo), e o que fica abaixo do limiar aparece. A mesma
+ * conta em core/utils/transicao.py, que vira um geq do alfa no render (casos em tests/casos/transicao.json).
+ */
+export const MASCARAS_DE_TRANSICAO = ["relogio", "iris", "losango", "persianas", "diagonal"] as const;
+export type MascaraDeTransicao = (typeof MASCARAS_DE_TRANSICAO)[number];
+/** A largura da borda suave, em frações do campo. */
+export const SUAVIDADE_DA_TRANSICAO = 0.04;
+export const FAIXAS_DAS_PERSIANAS = 8;
+
+/** O campo do tipo no ponto (x, y) do clipe (frações de 0 a 1, pelo centro do pixel), num clipe largura × altura. */
+export function campoDaTransicao(tipo: MascaraDeTransicao, x: number, y: number, largura: number, altura: number): number {
+  const dx = (x - 0.5) * largura;
+  const dy = (y - 0.5) * altura;
+  if (tipo === "relogio") {
+    const volta = Math.atan2(dx, -dy) / (2 * Math.PI) + 1;
+    return volta - Math.floor(volta);
+  }
+  if (tipo === "iris") return Math.hypot(dx, dy) / (0.5 * Math.hypot(largura, altura));
+  if (tipo === "losango") return (Math.abs(dx) + Math.abs(dy)) / (0.5 * (largura + altura));
+  if (tipo === "persianas") {
+    const faixa = y * FAIXAS_DAS_PERSIANAS;
+    return faixa - Math.floor(faixa);
+  }
+  return (x * largura + y * altura) / (largura + altura);
+}
+
+/** O limiar do campo em `e` (o andamento já suavizado): em 0 nada aparece, em 1 tudo, com a borda suave inteira. */
+export function limiarDaTransicao(e: number): number {
+  return -SUAVIDADE_DA_TRANSICAO / 2 + e * (1 + SUAVIDADE_DA_TRANSICAO);
+}
+
+/** Quanto do ponto aparece (0 a 1) com o limiar dado. */
+export function revelarNoCampo(campo: number, limiar: number): number {
+  return Math.min(1, Math.max(0, (limiar - campo) / SUAVIDADE_DA_TRANSICAO + 0.5));
+}
+
+/** A máscara do clipe que entra no instante `t` (o tipo e o limiar), ou null. */
+export function mascaraNaTransicao(efeitos: EfeitoDeTransicao[], t: Tick): { tipo: MascaraDeTransicao; limiar: number } | null {
+  for (const efeito of efeitos) {
+    if (efeito.papel !== "entra" || !(MASCARAS_DE_TRANSICAO as readonly string[]).includes(efeito.tipo)) continue;
+    const e = suavizar(Math.min(1, Math.max(0, (t - efeito.inicio) / efeito.duracao)));
+    return { tipo: efeito.tipo as MascaraDeTransicao, limiar: limiarDaTransicao(e) };
+  }
+  return null;
+}
 
 /**
  * A parte do clipe que aparece, em frações dele (0 a 1, com y para baixo), antes de girar.

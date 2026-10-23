@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from core.utils.transicao import (
+    campo_da_transicao,
     desfoque_na_transicao,
     expressao_da_mistura,
     fator_da_mistura,
@@ -13,6 +14,7 @@ from core.utils.transicao import (
     filtros_de_transicao,
     janelas_da_principal,
     janelas_do_som,
+    limiar_da_transicao,
     revelado_na_transicao,
     transformacao_na_transicao,
 )
@@ -150,3 +152,40 @@ def test_expressao_da_mistura_no_volume_do_ffmpeg():
         # O ganho muda a cada bloco de 10 ms: no máximo um passo da curva
         esperado = fator_da_mistura(efeitos, comeco + local)
         assert amostras[round(local * 48000) + 240] == pytest.approx(esperado, abs=0.035), local
+
+
+# -----------------------------------------------
+# Transições de máscara: o campo, e o geq do render contra a conta
+# -----------------------------------------------
+MASCARAS = DADOS["mascaras"]
+
+
+@pytest.mark.parametrize("caso", MASCARAS["tipos"], ids=[c["tipo"] for c in MASCARAS["tipos"]])
+def test_campo_da_mascara_igual_ao_da_previa(caso):
+    for x, y, campo in caso["campos"]:
+        assert campo_da_transicao(caso["tipo"], x, y, caso["largura"], caso["altura"]) == pytest.approx(campo, abs=1e-9)
+
+
+@pytest.mark.skipif(not __import__("shutil").which("ffmpeg"), reason="FFmpeg não instalado")
+@pytest.mark.parametrize("tipo", [c["tipo"] for c in MASCARAS["tipos"]])
+def test_geq_da_mascara_faz_a_conta(tipo):
+    import subprocess
+
+    import numpy as np
+
+    from core.config import FFMPEG
+
+    # Um clipe branco de 160 × 90 por 1 s, com a transição de 0 a 1 s; o quadro do meio (0,5 s)
+    efeitos = [{"tipo": tipo, "papel": "entra", "inicio": 0.0, "duracao": 1.0}]
+    geq = filtro_de_cortina(efeitos, 0.0)
+    saida = subprocess.run([FFMPEG, "-loglevel", "error", "-f", "lavfi", "-i", "color=c=white:s=160x90:r=10:d=1",
+                            "-vf", f"format=rgba,{geq}", "-f", "rawvideo", "-pix_fmt", "rgba", "-"],
+                           capture_output=True, check=True, timeout=60).stdout
+    alfa = np.frombuffer(saida, np.uint8).reshape(-1, 90, 160, 4)[5, :, :, 3] / 255
+    from core.utils.animacao import suavizar
+
+    limiar = limiar_da_transicao(suavizar(0.5))
+    campos = np.array([[campo_da_transicao(tipo, (x + 0.5) / 160, (y + 0.5) / 90, 160, 90) for x in range(160)]
+                       for y in range(90)])
+    esperado = np.clip((limiar - campos) / 0.04 + 0.5, 0, 1)
+    assert np.abs(alfa - esperado).max() < 0.01, np.abs(alfa - esperado).max()

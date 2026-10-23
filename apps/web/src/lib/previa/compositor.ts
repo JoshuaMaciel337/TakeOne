@@ -4,6 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
+import { FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO } from "../projeto/transicao.ts";
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
@@ -40,6 +41,8 @@ export type Camada = {
   contrasteLocal?: { sigma: number; forca: number; meiosTons: boolean } | null;
   /** Efeito olho de peixe: o k1 da lente. */
   lente?: number;
+  /** A máscara da transição que entra (lib/projeto/transicao.ts): o tipo e o limiar. */
+  mascaraDaTransicao?: { tipo: MascaraDeTransicao; limiar: number } | null;
   /** Zoom ou giro (lib/projeto/efeitos.ts): a média das cópias no shader. */
   borrao?: { tipo: "zoom" | "giro"; forca: number } | null;
   /** Pixelizar: quantas células na largura e na altura (0 sem o efeito). */
@@ -204,6 +207,20 @@ uniform sampler2D u_desfocada;
 uniform float u_lente;
 uniform vec2 u_tamanho;
 uniform vec4 u_recorte;
+// Transição de máscara (1 relógio, 2 íris, 3 losango, 4 persianas, 5 diagonal): o campo abaixo do limiar
+// aparece, com a borda suave, como o geq do alfa no render
+uniform int u_transicao;
+uniform float u_transicaoLimiar;
+const float SUAVIDADE_DA_TRANSICAO = ${SUAVIDADE_DA_TRANSICAO.toFixed(4)};
+const float FAIXAS_DAS_PERSIANAS = ${FAIXAS_DAS_PERSIANAS.toFixed(1)};
+float campoDaTransicao(vec2 local, vec2 tamanho) {
+  vec2 d = (local - 0.5) * tamanho;
+  if (u_transicao == 1) return fract(atan(d.x, -d.y) / 6.283185307179586 + 1.0);
+  if (u_transicao == 2) return length(d) / (0.5 * length(tamanho));
+  if (u_transicao == 3) return (abs(d.x) + abs(d.y)) / (0.5 * (tamanho.x + tamanho.y));
+  if (u_transicao == 4) return fract(local.y * FAIXAS_DAS_PERSIANAS);
+  return (local.x * tamanho.x + local.y * tamanho.y) / (tamanho.x + tamanho.y);
+}
 // Zoom (1) e giro (2): a média de AMOSTRAS cópias, como o mix do render; pixelizar: a média de cada célula
 uniform int u_borrao;
 uniform float u_borraoForca;
@@ -419,6 +436,9 @@ void main() {
     }
     texel = vec4(c * alfa, alfa);
   }
+  if (u_transicao > 0) {
+    texel *= clamp((u_transicaoLimiar - campoDaTransicao(v_local, u_tamanho)) / SUAVIDADE_DA_TRANSICAO + 0.5, 0.0, 1.0);
+  }
   cor = texel * u_opacidade;
   if (u_mesclagem == 1) cor = vec4(cor.rgb + (1.0 - cor.a), 1.0);
 }`;
@@ -479,7 +499,7 @@ type Recursos = {
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -595,6 +615,8 @@ export class Compositor {
         meiosTons: local("u_meiosTons"),
         desfocada: local("u_desfocada"),
         lente: local("u_lente"),
+        transicao: local("u_transicao"),
+        transicaoLimiar: local("u_transicaoLimiar"),
         borrao: local("u_borrao"),
         borraoForca: local("u_borraoForca"),
         celulas: local("u_celulas"),
@@ -885,6 +907,9 @@ export class Compositor {
         gl.bindTexture(gl.TEXTURE_2D, atual);
       }
       gl.uniform1f(uniformes.lente, camada.lente ?? 0);
+      const mascaraDaTransicao = camada.mascaraDaTransicao;
+      gl.uniform1i(uniformes.transicao, mascaraDaTransicao ? MASCARAS_DE_TRANSICAO.indexOf(mascaraDaTransicao.tipo) + 1 : 0);
+      gl.uniform1f(uniformes.transicaoLimiar, mascaraDaTransicao?.limiar ?? 0);
       gl.uniform1i(uniformes.borrao, camada.borrao ? (camada.borrao.tipo === "zoom" ? 1 : 2) : 0);
       gl.uniform1f(uniformes.borraoForca, camada.borrao?.forca ?? 0);
       gl.uniform2f(uniformes.celulas, camada.celulas?.[0] ?? 0, camada.celulas?.[1] ?? 0);
