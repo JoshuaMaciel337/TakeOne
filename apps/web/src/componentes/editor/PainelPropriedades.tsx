@@ -100,7 +100,7 @@ const ABAS_DESENHO = [
   { id: "cor", nome: "Cor", fase: "" },
 ] as const;
 
-type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
+export type IdAba = (typeof ABAS)[number]["id"] | (typeof ABAS_TEXTO)[number]["id"];
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -155,17 +155,27 @@ type Props = {
   aoTrocarImagem?: (clipeId: string) => void;
   /** Abaixo da tela larga o painel é uma folha por cima, com botão de fechar. */
   aoFechar?: () => void;
+  /** Abre uma aba de fora (os menus e os painéis do editor de imagem); `vez` muda a cada pedido. */
+  pedidoDeAba?: { aba: IdAba; vez: number };
+  /** Sem nada escolhido, no lugar do aviso (as propriedades do documento, no editor de imagem). */
+  semSelecao?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, semSelecao, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
   const ehTexto = Boolean(selecionado?.clipe.texto);
   const abaEscolhida = ehTexto ? abaDoTexto : abaDaMidia;
   const setAba = ehTexto ? setAbaDoTexto : setAbaDaMidia;
+  // O pedido de fora vale uma vez (o estado muda durante a renderização, sem efeito)
+  const [vezVista, setVezVista] = useState(0);
+  if (pedidoDeAba && pedidoDeAba.vez !== vezVista) {
+    setVezVista(pedidoDeAba.vez);
+    setAba(pedidoDeAba.aba);
+  }
   const ehAudio = selecionado?.faixa.tipo === "audio";
   const abas: readonly { id: IdAba; nome: string; fase: string }[] = selecionado?.clipe.ajuste
     ? ABAS_AJUSTE
@@ -180,6 +190,13 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
   const atual = abas.find((item) => item.id === aba)!;
 
   if (!midia && !selecionado) {
+    if (semSelecao) {
+      return (
+        <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col overflow-y-auto bg-painel ${className}`}>
+          {semSelecao}
+        </aside>
+      );
+    }
     return (
       <aside aria-label="Propriedades" style={style} className={`flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
         {modo === "imagem" ? null : (

@@ -178,3 +178,31 @@ test("o objeto recortado entra numa camada logo acima da foto, no mesmo lugar", 
   assert.equal(embaixo.clipe.id, foto.clipe.id);
   assert.deepEqual(r.selecao, [objeto.clipe.id]);
 });
+
+test("arrastar no painel Camadas põe a camada na posição, e a camada nova pode nascer num ponto", () => {
+  const ctx = contexto();
+  let projeto = vazio();
+  const ids: string[] = [];
+  for (const midiaId of ["foto", "logo", "foto"]) {
+    const r = executarComando(projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId } }, ctx);
+    projeto = r.projeto;
+    ids.unshift(r.selecao![0]);
+  }
+  const ordem = () => camadasDaImagem(projeto).map(({ clipe }) => clipe.id);
+  assert.deepEqual(ordem(), ids);
+  const faixaDe = (id: string) => camadasDaImagem(projeto).find(({ clipe }) => clipe.id === id)!.faixa.id;
+  // A de cima vai para a posição 2 (a última); um número fora dos limites fica na ponta
+  projeto = executarComando(projeto, { comando: "imagem.mover", parametros: { faixaId: faixaDe(ids[0]), para: 2 } }, ctx).projeto;
+  assert.deepEqual(ordem(), [ids[1], ids[2], ids[0]]);
+  projeto = executarComando(projeto, { comando: "imagem.mover", parametros: { faixaId: faixaDe(ids[0]), para: -5 } }, ctx).projeto;
+  assert.deepEqual(ordem(), ids);
+  assert.equal(projeto.faixas.at(-1)!.tipo, "principal");
+
+  // A ferramenta Texto e as formas desenhadas mandam o lugar (e o tamanho) da camada nova
+  const r = executarComando(projeto, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO, transformacao: { x: -0.25, y: 0.1 } } }, ctx);
+  const t = camadasDaImagem(r.projeto)[0].clipe.transformacao;
+  assert.deepEqual([t.x, t.y], [-0.25, 0.1]);
+  const f = executarComando(r.projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "logo", transformacao: { x: 0.2, escala: 0.3 } } }, ctx);
+  const tf = camadasDaImagem(f.projeto)[0].clipe.transformacao;
+  assert.deepEqual([tf.x, tf.y, tf.escala], [0.2, 0, 0.3]);
+});

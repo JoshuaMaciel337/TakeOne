@@ -15,14 +15,26 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
+import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import type { FerramentaObjeto } from "./useObjeto";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
 const DENSIDADE_MAXIMA = 2;
+/** O maior lado do canvas em pixels de tela (o zoom alto reduz a densidade para caber). */
+const LADO_MAXIMO_DO_CANVAS = 8192;
 /** O xadrez que aparece atrás da imagem sem fundo. */
 const XADREZ = "repeating-conic-gradient(#d6d8de 0% 25%, #ffffff 0% 50%) 50% / 20px 20px";
+/** A folga em volta da imagem ampliada (a "mesa" onde ela fica). */
+const MESA = 48;
+/** Os degraus do zoom, como nos programas de imagem. */
+export const DEGRAUS_DO_ZOOM = [0.0625, 0.125, 0.25, 0.333, 0.5, 0.667, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
+
+export function proximoZoom(atual: number, sentido: 1 | -1): number {
+  if (sentido > 0) return DEGRAUS_DO_ZOOM.find((degrau) => degrau > atual * 1.001) ?? DEGRAUS_DO_ZOOM.at(-1)!;
+  return [...DEGRAUS_DO_ZOOM].reverse().find((degrau) => degrau < atual * 0.999) ?? DEGRAUS_DO_ZOOM[0];
+}
 
 type Props = {
   projeto: Projeto;
@@ -31,44 +43,101 @@ type Props = {
   aoSelecionar: (ids: string[]) => void;
   aoPrever: (clipeId: string, mudanca: Partial<Transformacao> | null) => void;
   aoTransformar: (clipeId: string, mudanca: Partial<Transformacao>) => void;
+  ferramenta: IdFerramentaDaImagem;
+  /** Pixels de tela por pixel da imagem; null ajusta a imagem à área. */
+  zoom: number | null;
+  aoMudarZoom: (zoom: number | null) => void;
+  /** O zoom de verdade (o de ajustar, quando `zoom` é null), para a barra de status. */
+  aoMedirZoom?: (zoom: number) => void;
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
   recorte?: { retangulo: RetanguloDaImagem; proporcao: number | null; aoMudar: (retangulo: RetanguloDaImagem) => void } | null;
-  /** A ferramenta Objeto: os cliques e o pincel vão para a camada escolhida, no lugar das alças. */
+  /** As ferramentas de seleção: os cliques e os traços vão para a foto escolhida, no lugar das alças. */
   objeto?: { clipeId: string; ferramenta: FerramentaObjeto } | null;
+  aoTerminarTraco?: () => void;
+  /** Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels). */
+  aoClicarTexto?: (x: number, y: number) => void;
+  /** Ferramentas de forma: o retângulo arrastado, em pixels da imagem. */
+  aoDesenharForma?: (retangulo: RetanguloDaImagem) => void;
+  /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
+  aoPegarCor?: (cor: string, paraOFundo: boolean) => void;
 };
 
-/** O maior quadro na proporção da imagem que cabe na área livre. */
-function useQuadro(largura: number, altura: number) {
+/** O tamanho da área livre da prévia. */
+function useArea() {
   const areaRef = useRef<HTMLDivElement>(null);
-  const [tamanho, setTamanho] = useState<Tamanho>({ largura: 0, altura: 0 });
+  const [area, setArea] = useState<Tamanho>({ largura: 0, altura: 0 });
   useEffect(() => {
     const elemento = areaRef.current;
     if (!elemento) return;
-    const observador = new ResizeObserver(([entrada]) => {
-      const { width, height } = entrada.contentRect;
-      const caberLargura = Math.min(width, (height * largura) / altura);
-      setTamanho({
-        largura: Math.floor(caberLargura),
-        altura: Math.floor((caberLargura * altura) / largura),
-      });
-    });
+    const observador = new ResizeObserver(([entrada]) => setArea({ largura: entrada.contentRect.width, altura: entrada.contentRect.height }));
     observador.observe(elemento);
     return () => observador.disconnect();
-  }, [largura, altura]);
-  return { areaRef, tamanho };
+  }, []);
+  return { areaRef, area };
+}
+
+function hex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map((valor) => valor.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**
  * A prévia do editor de imagem: o compositor da prévia do vídeo, num quadro só, com as alças para mover, girar
- * e redimensionar. A conta é a da exportação (lib/exportacao/imagem.ts); a prévia só lê as cópias leves.
+ * e redimensionar, o zoom e as ferramentas que agem na imagem. A conta é a da exportação (lib/exportacao/imagem.ts);
+ * a prévia só lê as cópias leves.
  */
-export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPrever, aoTransformar, recorte = null, objeto = null }: Props) {
+export function PreviaDaImagem({
+  projeto,
+  midias,
+  selecao,
+  aoSelecionar,
+  aoPrever,
+  aoTransformar,
+  ferramenta,
+  zoom,
+  aoMudarZoom,
+  aoMedirZoom,
+  recorte = null,
+  objeto = null,
+  aoTerminarTraco,
+  aoClicarTexto,
+  aoDesenharForma,
+  aoPegarCor,
+}: Props) {
   const imagem = tamanhoDaImagem(projeto);
-  const { areaRef, tamanho } = useQuadro(imagem.largura, imagem.altura);
+  const { areaRef, area } = useArea();
+  const ajuste = area.largura > 0 ? Math.min((area.largura - MESA * 2) / imagem.largura, (area.altura - MESA * 2) / imagem.altura) : 0;
+  const escala = Math.max(0.01, zoom ?? ajuste);
+  const tamanho: Tamanho = { largura: Math.max(1, Math.round(imagem.largura * escala)), altura: Math.max(1, Math.round(imagem.altura * escala)) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositor = useRef<Compositor | null>(null);
   const [guias, setGuias] = useState<Guias | null>(null);
   const [semWebgl, setSemWebgl] = useState(false);
+  const [espaco, setEspaco] = useState(false);
+  const [desenho, setDesenho] = useState<{ inicio: { x: number; y: number }; fim: { x: number; y: number } } | null>(null);
+  const andando = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [arrastandoMao, setArrastandoMao] = useState(false);
+  const ancora = useRef<{ fx: number; fy: number; px: number; py: number } | null>(null);
+  const maoAtiva = ferramenta === "mao" || espaco;
+
+  useEffect(() => {
+    if (ajuste > 0) aoMedirZoom?.(escala);
+  }, [escala, ajuste, aoMedirZoom]);
+
+  // Espaço segura a Mão em qualquer ferramenta (fora dos campos de texto)
+  useEffect(() => {
+    const descer = (evento: KeyboardEvent) => {
+      if (evento.key !== " " || (evento.target as HTMLElement).closest("input, textarea, select, [contenteditable='true']")) return;
+      evento.preventDefault();
+      setEspaco(true);
+    };
+    const subir = (evento: KeyboardEvent) => evento.key === " " && setEspaco(false);
+    window.addEventListener("keydown", descer);
+    window.addEventListener("keyup", subir);
+    return () => {
+      window.removeEventListener("keydown", descer);
+      window.removeEventListener("keyup", subir);
+    };
+  }, []);
 
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
@@ -96,10 +165,12 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
     };
   }, []);
 
+  const densidade = Math.min((typeof window === "undefined" ? 1 : window.devicePixelRatio) || 1, DENSIDADE_MAXIMA, LADO_MAXIMO_DO_CANVAS / Math.max(tamanho.largura, tamanho.altura));
+
   // Desenha a cada mudança (a imagem é parada: não há laço de quadros)
   useLayoutEffect(() => {
     const atual = compositor.current;
-    if (!atual || tamanho.largura <= 0) return;
+    if (!atual || tamanho.largura <= 1) return;
     const prontas = camadas.flatMap((camada) => {
       if (camada.imagem) return [camadaDoCompositor(camada, camada.imagem, null)];
       if (camada.clipe.ajuste) return [camadaDoCompositor(camada, FUNDO, null)];
@@ -110,37 +181,158 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
       if (enderecoDaMascara && !mascara) return [];
       return [camadaDoCompositor(camada, fonte, mascara ?? null)];
     });
-    const densidade = Math.min(window.devicePixelRatio || 1, DENSIDADE_MAXIMA);
-    const resolucao = {
-      largura: Math.round(tamanho.largura * densidade),
-      altura: Math.round(tamanho.altura * densidade),
-    };
+    const resolucao = { largura: Math.round(tamanho.largura * densidade), altura: Math.round(tamanho.altura * densidade) };
     atual.desenhar(prontas, projeto.fundo.transparente ? null : projeto.fundo.cor, tamanho, resolucao);
   });
 
-  function selecionarNoPonto(evento: React.PointerEvent<HTMLDivElement>) {
-    if (evento.button !== 0 || recorte) return;
+  // Depois de um zoom pelo clique, o ponto clicado volta para baixo do mouse
+  useLayoutEffect(() => {
+    const pedido = ancora.current;
+    const elemento = areaRef.current;
+    if (!pedido || !elemento) return;
+    ancora.current = null;
+    elemento.scrollLeft = pedido.fx * tamanho.largura + MESA - pedido.px;
+    elemento.scrollTop = pedido.fy * tamanho.altura + MESA - pedido.py;
+  });
+
+  /** O ponto do evento no quadro (pixels de tela, a partir do canto da imagem). */
+  function noQuadro(evento: React.PointerEvent) {
     const retangulo = evento.currentTarget.getBoundingClientRect();
-    const ponto = {
-      x: evento.clientX - retangulo.left,
-      y: evento.clientY - retangulo.top,
-    };
-    const acima = [...camadas].reverse().find((camada) => camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
+    return { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
+  }
+
+  function camadaNoPonto(ponto: { x: number; y: number }, filtro: (camada: (typeof camadas)[number]) => boolean = () => true) {
+    return [...camadas].reverse().find((camada) => camada.caixa.opacidade > 0 && !camada.faixa.oculta && filtro(camada) && contemPonto(camada.caixa, ponto));
+  }
+
+  function pegarCor(ponto: { x: number; y: number }, paraOFundo: boolean) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const leitor = document.createElement("canvas");
+    leitor.width = 1;
+    leitor.height = 1;
+    const ctx = leitor.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = projeto.fundo.transparente ? "#ffffff" : projeto.fundo.cor;
+    ctx.fillRect(0, 0, 1, 1);
+    ctx.drawImage(canvas, Math.floor(ponto.x * densidade), Math.floor(ponto.y * densidade), 1, 1, 0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    aoPegarCor?.(hex(r, g, b), paraOFundo);
+  }
+
+  function aoApertar(evento: React.PointerEvent<HTMLDivElement>) {
+    if (evento.button !== 0 || recorte) return;
+    const ponto = noQuadro(evento);
+    if (maoAtiva) {
+      const elemento = areaRef.current;
+      if (!elemento) return;
+      evento.currentTarget.setPointerCapture(evento.pointerId);
+      andando.current = { x: evento.clientX, y: evento.clientY, left: elemento.scrollLeft, top: elemento.scrollTop };
+      setArrastandoMao(true);
+      return;
+    }
+    if (ferramenta === "zoom") {
+      const elemento = areaRef.current;
+      const caixa = elemento?.getBoundingClientRect();
+      const novo = proximoZoom(escala, evento.altKey ? -1 : 1);
+      if (caixa) ancora.current = { fx: ponto.x / tamanho.largura, fy: ponto.y / tamanho.altura, px: evento.clientX - caixa.left, py: evento.clientY - caixa.top };
+      aoMudarZoom(novo);
+      return;
+    }
+    if (ferramenta === "contaGotas") {
+      pegarCor(ponto, evento.altKey);
+      return;
+    }
+    if (ferramenta === "texto") {
+      const texto = camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto));
+      if (texto) aoSelecionar([texto.clipe.id]);
+      else aoClicarTexto?.(ponto.x / escala, ponto.y / escala);
+      return;
+    }
+    if (FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada") {
+      evento.currentTarget.setPointerCapture(evento.pointerId);
+      setDesenho({ inicio: ponto, fim: ponto });
+      return;
+    }
+    if (MODO_DA_SELECAO[ferramenta]) {
+      // As ferramentas de seleção trabalham numa foto: a de cima no ponto passa a ser a escolhida
+      const foto = camadaNoPonto(ponto, (camada) => {
+        const midia = camada.clipe.midia_id ? midias.get(camada.clipe.midia_id) : undefined;
+        return Boolean(midia?.imagem && !midia.elemento && !midia.animacao);
+      });
+      if (foto) aoSelecionar([foto.clipe.id]);
+      return;
+    }
+    const acima = camadaNoPonto(ponto);
     aoSelecionar(acima ? [acima.clipe.id] : []);
   }
 
+  function aoMover(evento: React.PointerEvent<HTMLDivElement>) {
+    if (andando.current && areaRef.current) {
+      areaRef.current.scrollLeft = andando.current.left - (evento.clientX - andando.current.x);
+      areaRef.current.scrollTop = andando.current.top - (evento.clientY - andando.current.y);
+      return;
+    }
+    if (desenho) setDesenho({ ...desenho, fim: noQuadro(evento) });
+  }
+
+  function aoSoltar() {
+    andando.current = null;
+    setArrastandoMao(false);
+    if (!desenho) return;
+    setDesenho(null);
+    const x = Math.min(desenho.inicio.x, desenho.fim.x) / escala;
+    const y = Math.min(desenho.inicio.y, desenho.fim.y) / escala;
+    const largura = Math.abs(desenho.fim.x - desenho.inicio.x) / escala;
+    const altura = Math.abs(desenho.fim.y - desenho.inicio.y) / escala;
+    // Um clique sem arrastar desenha uma forma de um quarto do lado menor da imagem, no ponto
+    const lado = Math.min(imagem.largura, imagem.altura) / 4;
+    aoDesenharForma?.(largura < 4 && altura < 4 ? { x: x - lado / 2, y: y - lado / 2, largura: lado, altura: lado } : { x, y, largura: Math.max(1, largura), altura: Math.max(1, altura) });
+  }
+
+  const ajustada = zoom === null;
+  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? "crosshair" : undefined;
+  const mostrarAlcas = ferramenta === "mover" && !espaco;
+  const retanguloDoDesenho = desenho
+    ? {
+        left: Math.min(desenho.inicio.x, desenho.fim.x),
+        top: Math.min(desenho.inicio.y, desenho.fim.y),
+        width: Math.abs(desenho.fim.x - desenho.inicio.x),
+        height: Math.abs(desenho.fim.y - desenho.inicio.y),
+      }
+    : null;
+
   return (
-    <section aria-label="Prévia da imagem" className="flex min-h-0 min-w-0 flex-1 flex-col bg-fundo max-md:order-first max-md:h-[52vh] max-md:flex-none">
-      <div ref={areaRef} className="relative min-h-0 flex-1 p-6">
-        <div className="absolute inset-6 flex items-center justify-center">
+    <section aria-label="Prévia da imagem" className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-fundo">
+      <div
+        ref={areaRef}
+        className={`min-h-0 flex-1 ${ajustada ? "overflow-hidden" : "overflow-auto"}`}
+        onWheel={(evento) => {
+          if (!evento.ctrlKey && !evento.altKey) return;
+          evento.preventDefault();
+          aoMudarZoom(proximoZoom(escala, evento.deltaY < 0 ? 1 : -1));
+        }}
+      >
+        <div
+          className="flex items-center justify-center"
+          style={{
+            minWidth: "100%",
+            minHeight: "100%",
+            width: tamanho.largura + MESA * 2,
+            height: tamanho.altura + MESA * 2,
+          }}
+        >
           <div
-            className="relative select-none shadow-lg shadow-black/40"
+            className="relative shrink-0 select-none shadow-lg shadow-black/40"
             style={{
               width: tamanho.largura,
               height: tamanho.altura,
               background: projeto.fundo.transparente ? XADREZ : projeto.fundo.cor,
+              cursor,
             }}
-            onPointerDown={selecionarNoPonto}
+            onPointerDown={aoApertar}
+            onPointerMove={aoMover}
+            onPointerUp={aoSoltar}
           >
             <canvas ref={canvasRef} className="absolute inset-0 size-full" />
             {semWebgl ? (
@@ -158,13 +350,11 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
                 ))}
               </>
             ) : null}
-            {recorte && tamanho.largura > 0 ? (
-              <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} />
+            {recorte && tamanho.largura > 1 ? <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} /> : null}
+            {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
+              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} />
             ) : null}
-            {objeto && selecionada?.clipe.id === objeto.clipeId ? (
-              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} />
-            ) : null}
-            {selecionada && !recorte && !objeto ? (
+            {selecionada && !recorte && !objeto && mostrarAlcas ? (
               <ManipuladorNaPrevia
                 key={selecionada.clipe.id}
                 caixa={selecionada.caixaBase}
@@ -182,17 +372,29 @@ export function PreviaDaImagem({ projeto, midias, selecao, aoSelecionar, aoPreve
                 }}
               />
             ) : null}
+            {selecionada && !mostrarAlcas && !objeto && !recorte ? (
+              // Nas outras ferramentas, a camada escolhida só ganha o contorno
+              <div
+                className="pointer-events-none absolute border border-destaque/80"
+                style={{
+                  left: selecionada.caixa.cx - selecionada.caixa.largura / 2,
+                  top: selecionada.caixa.cy - selecionada.caixa.altura / 2,
+                  width: selecionada.caixa.largura,
+                  height: selecionada.caixa.altura,
+                  transform: `rotate(${selecionada.caixa.rotacao}deg)`,
+                }}
+                aria-hidden
+              />
+            ) : null}
+            {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}
             {camadas.length === 0 ? (
               <p className="pointer-events-none absolute inset-0 flex items-center justify-center p-[10%] text-center text-xs text-black/50 mix-blend-difference">
-                Ponha uma imagem, um texto ou uma forma pelo painel da esquerda.
+                Ponha uma imagem pelo painel Biblioteca, ou use as ferramentas Texto e Forma.
               </p>
             ) : null}
           </div>
         </div>
       </div>
-      <p className="shrink-0 border-t border-borda px-3 py-2 text-center text-xs text-suave tabular-nums">
-        {imagem.largura} × {imagem.altura} px
-      </p>
     </section>
   );
 }

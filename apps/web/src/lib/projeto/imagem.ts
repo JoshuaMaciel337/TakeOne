@@ -6,7 +6,7 @@ import { segundosParaTicks } from "../tempo.ts";
 import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
-import { type Clipe, type Faixa, type Projeto, RECORTE_PADRAO, TRANSFORMACAO_PADRAO } from "./modelo.ts";
+import { type Clipe, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO } from "./modelo.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 
@@ -85,7 +85,8 @@ function faixaNova(ctx: Contexto, tipo: "video" | "texto", clipe: Clipe): Faixa 
   };
 }
 
-export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId: string): { projeto: Projeto; clipeId: string } {
+/** `transformacao`: onde a camada entra (a forma desenhada com a ferramenta Forma), no lugar do padrão. */
+export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId: string, transformacao?: Partial<Transformacao>): { projeto: Projeto; clipeId: string } {
   const info = ctx.midia(midiaId);
   if (!info) throw new ErroEdicao("A mídia ainda não está pronta.");
   if (!info.imagem) throw new ErroEdicao("No editor de imagem entram imagens (JPG, PNG ou WebP).");
@@ -96,6 +97,7 @@ export function adicionarCamadaDeMidia(projeto: Projeto, ctx: Contexto, midiaId:
       ...clipe.transformacao,
       escala: ESCALA_DO_RECORTADO,
     };
+  if (transformacao) clipe.transformacao = { ...clipe.transformacao, ...transformacao };
   return {
     projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe)),
     clipeId: clipe.id,
@@ -108,8 +110,10 @@ export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto): { proj
   return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe)), clipeId: clipe.id };
 }
 
-export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto): { projeto: Projeto; clipeId: string } {
+/** `transformacao`: onde o texto entra (o clique da ferramenta Texto), no lugar do meio. */
+export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto, transformacao?: Partial<Transformacao>): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { texto });
+  if (transformacao) clipe.transformacao = { ...clipe.transformacao, ...transformacao };
   return {
     projeto: porNoTopo(projeto, faixaNova(ctx, "texto", clipe)),
     clipeId: clipe.id,
@@ -122,13 +126,25 @@ function indiceDaCamada(projeto: Projeto, faixaId: string): number {
   return indice;
 }
 
-/** Sobe (para a frente) ou desce (para trás) uma posição, ou vai direto para o topo ou o fundo. */
-export function moverCamada(projeto: Projeto, faixaId: string, para: "cima" | "baixo" | "topo" | "fundo"): Projeto {
+/**
+ * Sobe (para a frente) ou desce (para trás) uma posição, vai direto para o topo ou o fundo, ou vai para a posição dada
+ * (0 é a de cima, como na lista do painel Camadas, que arrasta a camada até ela).
+ */
+export function moverCamada(projeto: Projeto, faixaId: string, para: "cima" | "baixo" | "topo" | "fundo" | number): Projeto {
   const indice = indiceDaCamada(projeto, faixaId);
   const camadas = projeto.faixas.filter((faixa) => faixa.tipo !== "principal");
   const principal = projeto.faixas.filter((faixa) => faixa.tipo === "principal");
   const [faixa] = camadas.splice(indice, 1);
-  const destino = para === "topo" ? 0 : para === "fundo" ? camadas.length : para === "cima" ? Math.max(0, indice - 1) : Math.min(camadas.length, indice + 1);
+  const destino =
+    typeof para === "number"
+      ? Math.min(camadas.length, Math.max(0, Math.round(para)))
+      : para === "topo"
+        ? 0
+        : para === "fundo"
+          ? camadas.length
+          : para === "cima"
+            ? Math.max(0, indice - 1)
+            : Math.min(camadas.length, indice + 1);
   camadas.splice(destino, 0, faixa);
   return { ...projeto, faixas: [...camadas, ...principal] };
 }

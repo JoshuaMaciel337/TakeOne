@@ -10,6 +10,8 @@ import type { Clipe } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 export type PontoDoObjeto = { u: number; v: number; incluir: boolean };
+/** Como a seleção é marcada: o clique da IA, o pincel, os letreiros e os laços (os quatro pintam na máscara do pincel). */
+export type ModoDaSelecao = "clique" | "pincel" | "retangulo" | "elipse" | "laco" | "poligonal";
 type Job = { status: string; erro: string | null };
 
 /** O lado maior do desenho do pincel mandado à API. */
@@ -40,7 +42,7 @@ async function mascaraParaVer(url: string): Promise<string> {
 }
 
 export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
-  const [modo, setModo] = useState<"clique" | "pincel">("clique");
+  const [modo, setModo] = useState<ModoDaSelecao>("clique");
   const [pontos, setPontos] = useState<PontoDoObjeto[]>([]);
   const [selecao, setSelecao] = useState<{ arquivo: string; ver: string } | null>(null);
   const [selecionando, setSelecionando] = useState(false);
@@ -123,7 +125,7 @@ export function useObjeto(clipe: Clipe | null, midia: Midia | null) {
     if (!midia) return null;
     const pincel = desenhoDoPincel();
     if (!selecao && !pincel) {
-      setErro("Marque o objeto com um clique ou com o pincel.");
+      setErro("Selecione uma parte da foto antes (letreiro, laço, seleção de objeto ou o pincel).");
       return null;
     }
     setErro("");

@@ -161,9 +161,9 @@ export type Comando =
   | { comando: "clipe.silhueta"; parametros: { clipeIds: string[]; contorno?: Contorno | null; sombra?: Sombra | null } }
   | { comando: "clipe.mascara"; parametros: { clipeIds: string[]; mascara: MascaraDeForma | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
-  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string } }
-  | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto } }
-  | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" } }
+  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string; transformacao?: Partial<Transformacao> } }
+  | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto; transformacao?: Partial<Transformacao> } }
+  | { comando: "imagem.mover"; parametros: { faixaId: string; para: "cima" | "baixo" | "topo" | "fundo" | number } }
   | { comando: "imagem.apagar"; parametros: { faixaId: string } }
   | { comando: "imagem.duplicar"; parametros: { faixaId: string } }
   | { comando: "imagem.desfocarFundo"; parametros: { faixaId: string } }
@@ -406,11 +406,11 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
     case "clipe.mascara":
       return { projeto: mascararClipes(projeto, parametros.clipeIds, parametros.mascara) };
     case "imagem.adicionarMidia": {
-      const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId);
+      const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId, parametros.transformacao);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarTexto": {
-      const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto);
+      const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto, parametros.transformacao);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.mover":
