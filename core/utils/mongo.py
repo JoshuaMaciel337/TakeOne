@@ -17,6 +17,10 @@ INDICES = {
     "organizacoes": [
         ([("slug", 1)], {"unique": True}),
     ],
+    "chaves_de_acesso": [
+        ([("hash", 1)], {"unique": True}),
+        ([("usuario_id", 1)], {}),
+    ],
     "usuarios": [
         ([("email", 1)], {"unique": True}),
         ([("organizacao_id", 1)], {}),

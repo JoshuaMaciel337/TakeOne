@@ -17,6 +17,7 @@ from api.rotas import (
     animacoes,
     auth,
     celular,
+    chaves,
     direcoes,
     elementos,
     eventos,
@@ -148,3 +149,4 @@ app.include_router(objetos.router)
 app.include_router(quadros.router)
 app.include_router(intercambio.router)
 app.include_router(luts.router)
+app.include_router(chaves.router)

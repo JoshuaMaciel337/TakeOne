@@ -517,6 +517,23 @@ class FaixaDeMatizEntrada(BaseModel):
     luminancia: float = Field(default=0, ge=-1, le=1)
 
 
+class ChaveEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=60)
+
+
+class ChaveSaida(BaseModel):
+    id: str
+    nome: str
+    inicio: str
+    criado_em: datetime
+    usado_em: datetime | None = None
+
+
+class ChaveCriadaSaida(ChaveSaida):
+    # A chave inteira: só nesta resposta
+    chave: str
+
+
 class LutDoClipeEntrada(BaseModel):
     """Uma LUT importada (/api/luts), antes dos ajustes, misturada ao original pela intensidade."""
     id: str = Field(min_length=24, max_length=24)
