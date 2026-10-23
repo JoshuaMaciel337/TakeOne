@@ -107,6 +107,8 @@ type EstadoSeguirObjeto = { marcando: string | null; andamento: { seguidorId: st
 
 type Props = {
   midia: Midia | null;
+  /** As mídias do projeto (o "Igualar a cor" lê a do clipe de referência). */
+  midias?: ReadonlyMap<string, Midia>;
   /** O clipe escolhido na linha do tempo; `midia` é a dele. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   taxa: Taxa;
@@ -135,7 +137,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -267,7 +269,7 @@ export function PainelPropriedades({ midia, selecionado, taxa, tempo, aoBuscar, 
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
-          <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} faixas={faixas} midias={midias} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (

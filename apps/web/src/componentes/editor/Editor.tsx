@@ -507,6 +507,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             />
             <PainelPropriedades
               midia={midiaDasPropriedades}
+              midias={midias}
               selecionado={selecionado}
               taxa={projeto.taxa}
               tempo={tempo}

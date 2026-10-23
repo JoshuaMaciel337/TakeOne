@@ -525,7 +525,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Exportar o quadro, outra taxa de quadros, só o som e GIF (e o quadro certo em vídeos de celular no render).
   - [x] Mais modos de mesclagem (escurecer, clarear, sobrepor, luz forte, diferença e exclusão).
   - [x] Importar LUT (.cube), antes dos ajustes, na mesma LUT 3D da prévia e do render.
-  - [ ] Igualar a cor de outro clipe.
+  - [x] Igualar a cor de outro clipe (vira uma LUT do espaço).
   - [ ] Contorno e sombra em recortes (vídeo sem fundo, logos e formas).
   - [ ] Adesivos SVG.
 - [ ] Onda 10, lote H: esconder rosto ou placa, desfocar o fundo no vídeo, máscaras desenhadas, multicâmera, servidor MCP.

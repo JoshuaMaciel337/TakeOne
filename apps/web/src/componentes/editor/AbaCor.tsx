@@ -23,6 +23,7 @@ import {
 } from "@/lib/projeto/cor";
 import { INTENSIDADE_MAXIMA } from "@/lib/projeto/edicao";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
+import { corDoClipeEmPixels, cubeParaIgualar, estatisticasDaCor } from "@/lib/projeto/igualarCor";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 import { useLuts } from "@/lib/useLuts";
@@ -41,7 +42,7 @@ function Melhorar({ midia, travada, aoAplicar }: { midia: Midia; travada: boolea
   function melhorar() {
     setLendo(true);
     setErro("");
-    amostraDaImagem(arquivoDaMidia(midia.id, midia.imagem ? "proxy.webp" : "capa.jpg"))
+    amostraDaImagem(amostraDaMidia(midia))
       .then((pixels) => aoAplicar(ajustesAutomaticos(pixels)))
       .catch((e: unknown) => setErro(e instanceof Error ? e.message : "Não foi possível ler a imagem."))
       .finally(() => setLendo(false));
@@ -64,17 +65,19 @@ function Melhorar({ midia, travada, aoAplicar }: { midia: Midia; travada: boolea
 function LutDoClipe({
   cor,
   travada,
+  estado,
   aoPrever,
   aoExecutar,
   aoMudar,
 }: {
   cor: Cor;
   travada: boolean;
+  estado: ReturnType<typeof useLuts>;
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
   aoMudar: (mudanca: Partial<Cor>) => Comando;
 }) {
-  const { luts, erro, importar, excluir } = useLuts();
+  const { luts, erro, importar, excluir } = estado;
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState("");
   const arquivo = useRef<HTMLInputElement>(null);
@@ -160,6 +163,88 @@ function LutDoClipe({
   );
 }
 
+/** A imagem que representa a mídia nas contas da imagem inteira: a cópia leve da foto ou a capa do vídeo. */
+const amostraDaMidia = (midia: Midia) => arquivoDaMidia(midia.id, midia.imagem ? "proxy.webp" : "capa.jpg");
+
+/**
+ * Igualar a cor a outro clipe: a luz e a cor da capa deste vão para as da referência (já com a cor dela). O resultado
+ * é uma LUT do espaço, posta no lugar da cor deste clipe (os ajustes voltam ao original, para não somar duas vezes).
+ */
+function IgualarCor({
+  clipe,
+  midia,
+  faixas,
+  midias,
+  travada,
+  importar,
+  aoExecutar,
+}: {
+  clipe: Clipe;
+  midia: Midia;
+  faixas: Faixa[];
+  midias: ReadonlyMap<string, Midia>;
+  travada: boolean;
+  importar: ReturnType<typeof useLuts>["importar"];
+  aoExecutar: (comando: Comando) => void;
+}) {
+  const opcoes = faixas
+    .filter((faixa) => faixa.tipo !== "audio")
+    .flatMap((faixa) => faixa.clipes)
+    .filter((outro) => outro.id !== clipe.id && outro.midia_id && !outro.ajuste)
+    .map((outro) => ({ clipe: outro, midia: midias.get(outro.midia_id!) }))
+    .filter((opcao): opcao is { clipe: Clipe; midia: Midia } => Boolean(opcao.midia?.video && opcao.midia.status === "pronta" && !opcao.midia.elemento && !opcao.midia.animacao));
+  const [referenciaId, setReferenciaId] = useState("");
+  const [lendo, setLendo] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const referencia = opcoes.find((opcao) => opcao.clipe.id === referenciaId) ?? null;
+  if (!opcoes.length) return null;
+
+  function igualar() {
+    if (!referencia) return;
+    setLendo(true);
+    setAviso("");
+    Promise.all([amostraDaImagem(amostraDaMidia(midia)), amostraDaImagem(amostraDaMidia(referencia.midia))])
+      .then(([doClipe, daReferencia]) => {
+        const alvo = estatisticasDaCor(doClipe);
+        const destino = estatisticasDaCor(daReferencia, corDoClipeEmPixels(referencia.clipe.cor) ?? undefined);
+        if (!alvo || !destino) throw new Error("As imagens não têm pixels para medir.");
+        const nome = `Igualar a ${referencia.midia.nome}`.slice(0, 110);
+        return importar(new File([cubeParaIgualar(alvo, destino, nome)], `${nome}.cube`, { type: "text/plain" }));
+      })
+      .then((lut) => aoExecutar({ comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: { ...COR_PADRAO, lut: { id: lut.id, intensidade: 1 } } } }))
+      .catch((e: unknown) => setAviso(e instanceof Error ? e.message : "Não foi possível igualar a cor."))
+      .finally(() => setLendo(false));
+  }
+
+  return (
+    <section className="border-b border-borda/60 pb-2 pt-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Igualar a cor</h3>
+      <div className="mt-1 flex items-center gap-1">
+        <select
+          value={referenciaId}
+          disabled={travada || lendo}
+          aria-label="Clipe de referência"
+          onChange={(evento) => setReferenciaId(evento.currentTarget.value)}
+          className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
+        >
+          <option value="">Escolha um clipe</option>
+          {opcoes.map((opcao) => (
+            <option key={opcao.clipe.id} value={opcao.clipe.id}>
+              {opcao.midia.nome}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="botao-secundario px-3 py-1.5 text-xs" disabled={travada || lendo || !referencia} onClick={igualar}>
+          {lendo ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> : null}
+          Igualar
+        </button>
+      </div>
+      <p className="mt-1 text-[11px] text-suave">A luz e a cor deste clipe passam a ser as do outro (pela capa de cada um). Vira uma LUT, que dá para suavizar na intensidade.</p>
+      {aviso ? <p className="mt-1 text-[11px] text-erro">{aviso}</p> : null}
+    </section>
+  );
+}
+
 /** Tirar o ruído (o granulado) da imagem: o worker gera a versão limpa e a prévia e o render usam ela. */
 function TirarRuido({ clipe, midia, travada, aoExecutar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
@@ -200,6 +285,9 @@ type Props = {
   faixa: Faixa;
   /** A mídia do clipe: a limpeza do ruído é dela. */
   midia: Midia | null;
+  /** As faixas e as mídias do projeto: o "Igualar a cor" escolhe a referência entre os outros clipes. */
+  faixas?: Faixa[];
+  midias?: ReadonlyMap<string, Midia>;
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
 };
@@ -285,7 +373,8 @@ function CorPorMatiz({ cor, travada, aoPrever, aoExecutar }: { cor: Cor; travada
 }
 
 /** Filtro pronto e ajustes de luz e cor do clipe. */
-export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
+export function AbaCor({ clipe, faixa, midia, faixas, midias, aoPrever, aoExecutar }: Props) {
+  const estadoDasLuts = useLuts();
   const cor: Cor = { ...COR_PADRAO, ...clipe.cor };
   const travada = faixa.travada;
   const comando = (mudanca: Partial<Cor>): Comando => ({ comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: mudanca } });
@@ -369,7 +458,10 @@ export function AbaCor({ clipe, faixa, midia, aoPrever, aoExecutar }: Props) {
         ) : null}
         {midia?.video && !midia.elemento && !midia.animacao ? <Melhorar midia={midia} travada={travada} aoAplicar={(ajustes) => aoExecutar(comando(ajustes))} /> : null}
       </section>
-      <LutDoClipe cor={cor} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} aoMudar={comando} />
+      <LutDoClipe cor={cor} travada={travada} estado={estadoDasLuts} aoPrever={aoPrever} aoExecutar={aoExecutar} aoMudar={comando} />
+      {midia?.video && !midia.elemento && !midia.animacao && faixas && midias ? (
+        <IgualarCor clipe={clipe} midia={midia} faixas={faixas} midias={midias} travada={travada} importar={estadoDasLuts.importar} aoExecutar={aoExecutar} />
+      ) : null}
       {GRUPOS.filter((grupo) => grupo.id !== "efeito").map(secao)}
       <section className="border-b border-borda/60 pb-3 pt-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">Rodas de cor</h3>
