@@ -209,6 +209,27 @@ export function JanelaAreaDeFoco({ imagem, aoFechar, aoConfirmar }: { imagem: Im
   );
 }
 
+/** Uma janela que só pede um nome (Definir predefinição de pincel). */
+export function JanelaDeNome({ titulo, rotulo, inicial, aoFechar, aoConfirmar }: { titulo: string; rotulo: string; inicial: string; aoFechar: () => void; aoConfirmar: (nome: string) => void }) {
+  const [nome, setNome] = useState(inicial);
+  return (
+    <Moldura titulo={titulo} aoFechar={aoFechar} aoConfirmar={() => nome.trim() && aoConfirmar(nome.trim())}>
+      <label className="flex items-center gap-2">
+        {rotulo}:
+        <input
+          className="flex-1 rounded border border-borda bg-painel-2 px-1.5 py-0.5"
+          value={nome}
+          maxLength={80}
+          autoFocus
+          onFocus={(evento) => evento.currentTarget.select()}
+          onChange={(evento) => setNome(evento.currentTarget.value)}
+          onKeyDown={(evento) => evento.key === "Enter" && nome.trim() && aoConfirmar(nome.trim())}
+        />
+      </label>
+    </Moldura>
+  );
+}
+
 const OPERACOES_NO_CANAL: { id: ModoDaSelecao; nome: string }[] = [
   { id: "nova", nome: "Substituir o canal" },
   { id: "somar", nome: "Adicionar ao canal" },

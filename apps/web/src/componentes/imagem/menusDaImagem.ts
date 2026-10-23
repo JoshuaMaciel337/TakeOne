@@ -98,6 +98,10 @@ export type AcoesDosMenus = {
   /** Salvar a seleção num canal alfa, carregar a de um canal e a luminosidade (Ctrl+Alt+2). */
   canalDaSelecao: (acao: "salvar" | "carregar" | "luminosidade") => void;
   temCanais: boolean;
+  /** Editar › Definir predefinição de pincel (a seleção vira a ponta). */
+  definirPincel: () => void;
+  /** Selecionar › Encontrar camadas e Isolar camadas. */
+  camadasNoPainel: (como: "procurar" | "isolar") => void;
   /** O modo Máscara rápida (Q). */
   mascaraRapida: boolean;
   alternarMascaraRapida: () => void;
@@ -195,6 +199,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Preencher sensível ao conteúdo", atalho: "Shift+F5", desativado: !a.temSelecao, aoEscolher: a.preencher },
         { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.ferramenta("mover") },
+        { nome: "Definir predefinição de pincel…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.definirPincel },
         "-",
         { nome: "Atalhos do teclado…", aoEscolher: a.atalhos },
       ],
@@ -334,6 +339,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Camadas vinculadas", desativado: !a.temCamada, aoEscolher: a.selecionarVinculadas },
         { nome: "Camada de cima", atalho: "Alt+]", aoEscolher: () => a.camadaVizinha(-1) },
         { nome: "Camada de baixo", atalho: "Alt+[", aoEscolher: () => a.camadaVizinha(1) },
+        { nome: "Encontrar camadas", atalho: "Ctrl+Alt+Shift+F", aoEscolher: () => a.camadasNoPainel("procurar") },
+        { nome: "Isolar camadas", desativado: !a.temCamada, aoEscolher: () => a.camadasNoPainel("isolar") },
         "-",
         {
           nome: "Modificar",

@@ -118,7 +118,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
 - [x] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
 - [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
-- [ ] Selecionar › Converter em forma
+- [ ] Selecionar › Converter em forma (vai com os caminhos, na 13.7)
 - [x] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
 - [x] Área de foco; Assunto (a pessoa, pelo MODNet); Céu (pela linha do céu, sem modelo)
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
@@ -128,9 +128,9 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Seleção pela transparência da camada (Ctrl + clique na miniatura; Shift soma, Alt subtrai) e pela máscara dela
 - [x] Salvar e Carregar seleção (canais alfa; luminosidade com Ctrl+Alt+2); painel Canais
 - [ ] Selecionar e mascarar (Ctrl+Alt+R): vistas (casca de cebola, formigas, sobreposição, no preto, no branco, preto e branco, nas camadas), pincel de refinar borda, raio e raio inteligente, suavizar, difusão, contraste, deslocar borda, descontaminar cores, saída (seleção, máscara, camada nova, com máscara, documento novo)
-- [ ] Encontrar camadas (Ctrl+Alt+Shift+F) e Isolar camadas
+- [x] Encontrar camadas (Ctrl+Alt+Shift+F) e Isolar camadas
 - [x] Máscara a partir da seleção: Revelar seleção e Ocultar seleção (vindo da 13.2)
-- [ ] Definir predefinição de pincel a partir da seleção (vindo da 13.2)
+- [x] Definir predefinição de pincel a partir da seleção (vindo da 13.2)
 
 ### Onda 13.4 — Seleção em uso e área de transferência
 

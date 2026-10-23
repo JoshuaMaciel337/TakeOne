@@ -38,6 +38,8 @@ type Props = {
   aoVincularMascara: (clipeId: string, ligar: boolean) => void;
   /** Ctrl + clique na miniatura: a seleção do documento pela transparência da camada (ou pelo cinza da máscara). */
   aoSelecionarDaCamada?: (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => void;
+  /** Selecionar › Encontrar camadas (o campo da busca) e Isolar camadas (só as faixas pedidas no painel). */
+  pedido?: { tipo: "procurar" | "isolar"; vez: number; faixaIds: string[] } | null;
 };
 
 /** O modo da seleção pelas teclas junto do Ctrl: Shift soma, Alt subtrai, os dois intersectam. */
@@ -221,6 +223,7 @@ export function PainelCamadas({
   aoCriarMascara,
   aoVincularMascara,
   aoSelecionarDaCamada,
+  pedido = null,
 }: Props) {
   // Pastas abertas e fechadas só nesta tela (abrir uma pasta não é um passo do desfazer)
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
@@ -230,6 +233,21 @@ export function PainelCamadas({
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todas");
+  // Isolar camadas: o filtro "isoladas" mostra só estas faixas
+  const [isoladas, setIsoladas] = useState<ReadonlySet<string>>(new Set());
+  const buscaRef = useRef<HTMLInputElement>(null);
+  const [pedidoVisto, setPedidoVisto] = useState(0);
+  if (pedido && pedido.vez !== pedidoVisto) {
+    setPedidoVisto(pedido.vez);
+    if (pedido.tipo === "isolar" && pedido.faixaIds.length) {
+      setIsoladas(new Set(pedido.faixaIds));
+      setFiltro("isoladas");
+    }
+  }
+  // Encontrar camadas: o cursor vai para a busca
+  useEffect(() => {
+    if (pedido?.tipo === "procurar") buscaRef.current?.focus();
+  }, [pedido]);
   // Arrastar na coluna do olho: o valor do primeiro (esconder ou mostrar) vai para as outras por onde o mouse passa
   const [pintandoOlho, setPintandoOlho] = useState<{ oculta: boolean; ids: string[] } | null>(null);
   const ancora = useRef<string | null>(null);
@@ -240,6 +258,7 @@ export function PainelCamadas({
   const procura = busca.trim().toLocaleLowerCase("pt-BR");
   const passaNoFiltro = ({ faixa, clipe }: NoDaCamada): boolean => {
     const [tipo, valor] = filtro.split(":");
+    if (tipo === "isoladas") return isoladas.has(faixa.id);
     if (tipo === "tipo") return tipoDaCamada(clipe, midias) === valor;
     if (tipo === "modo") return (clipe.mesclagem ?? (clipe.pasta ? "passagem" : "normal")) === valor;
     if (tipo === "cor") return faixa.rotulo === valor;
@@ -372,10 +391,11 @@ export function PainelCamadas({
         <div className="flex items-center gap-1.5">
           <label className="flex min-w-0 flex-1 items-center gap-1 rounded border border-borda bg-painel-2 px-1.5">
             <Search className="size-3 shrink-0 text-suave" aria-hidden />
-            <input value={busca} onChange={(evento) => setBusca(evento.currentTarget.value)} placeholder="Procurar camadas" aria-label="Procurar camadas pelo nome" className="min-w-0 flex-1 bg-transparent py-0.5 outline-none" />
+            <input ref={buscaRef} value={busca} onChange={(evento) => setBusca(evento.currentTarget.value)} placeholder="Procurar camadas" aria-label="Procurar camadas pelo nome" className="min-w-0 flex-1 bg-transparent py-0.5 outline-none" />
           </label>
           <select aria-label="Filtrar as camadas" value={filtro} onChange={(evento) => setFiltro(evento.currentTarget.value)} className="w-24 rounded border border-borda bg-painel-2 px-1 py-0.5">
             <option value="todas">Todas</option>
+            {isoladas.size ? <option value="isoladas">Isoladas</option> : null}
             {FILTROS.map((grupo) => (
               <optgroup key={grupo.grupo} label={grupo.grupo}>
                 {grupo.itens.map((item) => (

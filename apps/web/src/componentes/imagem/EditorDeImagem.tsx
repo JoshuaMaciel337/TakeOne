@@ -53,14 +53,14 @@ import { alvoDaMascara, alvoDosPixels, usePinturas } from "./usePinturas";
 import type { AlvoDaPintura } from "./PinturaNaPrevia";
 import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
 import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
-import { criarPincel, excluirPincel, importarAbr, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
+import { criarPincel, excluirPincel, importarAbr, pincelDaPonta, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
 import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { exportarImagem } from "@/lib/exportacao/imagem";
 import { planoDosPixels, type PlanoDosPixels, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
-import { JanelaAreaDeFoco, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
+import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
@@ -68,7 +68,7 @@ import type { AlvoDoMotor } from "./usePinturas";
 import { Pintura } from "@/lib/pintura/motor";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { type Afim, compor, IDENTIDADE, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
-import { borda, cheia, combinar, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
+import { borda, cheia, combinar, limites, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
 import { imagemDoBlob, imagemNoDocumento, selecaoDoCanvas, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
 import { aumentar, type ImagemRgba, varinha } from "@/lib/selecao/varinha";
@@ -205,6 +205,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [canalAtivo, setCanalAtivo] = useState<string | null>(null);
   const [imagemDoCanal, setImagemDoCanal] = useState<{ chave: string; imagem: ImageBitmap } | null>(null);
   const [janelaDoCanal, setJanelaDoCanal] = useState<"salvar" | "carregar" | null>(null);
+  // Editar › Definir predefinição de pincel (pede o nome) e os pedidos ao painel Camadas (encontrar e isolar)
+  const [nomeDoPincel, setNomeDoPincel] = useState(false);
+  const [pedidoAsCamadas, setPedidoAsCamadas] = useState<{ tipo: "procurar" | "isolar"; vez: number; faixaIds: string[] } | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
   const pinceisDoEspaco = usePinceisDoEspaco();
@@ -539,6 +542,31 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o canal.");
     }
+  };
+  /** A seleção vira a ponta de um pincel: o escuro da imagem pinta, vezes a cobertura da seleção, como lá. */
+  const definirPincelDaSelecao = (nome: string) => {
+    const selecao = selecaoNoDocumento;
+    const caixa = selecao ? limites(selecao) : null;
+    if (!selecao || !caixa) return;
+    imagemParaSelecao(true)
+      .then(async (imagem) => {
+        const largura = caixa.x1 - caixa.x0;
+        const altura = caixa.y1 - caixa.y0;
+        const dados = new Uint8Array(largura * altura);
+        const d = imagem.dados;
+        for (let y = 0; y < altura; y++) {
+          for (let x = 0; x < largura; x++) {
+            const i = (y + caixa.y0) * imagem.largura + x + caixa.x0;
+            const luz = 0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2];
+            // O transparente não pinta; o branco também não
+            dados[y * largura + x] = Math.round((((255 - luz) * d[i * 4 + 3]) / 255) * (selecao.dados[i] / 255));
+          }
+        }
+        await pincelDaPonta(nome, { largura, altura, dados });
+        pinceisDoEspaco.recarregar();
+        mostrarAviso(`"${nome}" está em Meus pincéis.`);
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o pincel."));
   };
   /** Selecionar › Luminosidade (Ctrl+Alt+2): a luz da imagem inteira vira a seleção (o claro mais selecionado). */
   const selecionarLuminosidade = () => {
@@ -1135,6 +1163,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     mascaraRapida: Boolean(mascaraRapida),
     alternarMascaraRapida,
     temCanais: canais.length > 0,
+    definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
+    camadasNoPainel: (como) => {
+      area.abrir("camadas");
+      setPedidoAsCamadas((atual) => ({ tipo: como, vez: (atual?.vez ?? 0) + 1, faixaIds }));
+    },
     canalDaSelecao: (acao) => (acao === "luminosidade" ? selecionarLuminosidade() : setJanelaDoCanal(acao)),
     podeDesfazer: edicao.nomeDesfazer,
     podeRefazer: edicao.nomeRefazer,
@@ -1253,7 +1286,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1474,7 +1507,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} pedido={pedidoAsCamadas} />,
     },
     pinceis: {
       nome: PAINEIS_DA_IMAGEM.pinceis,
@@ -1806,6 +1839,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(selecao) => {
             setJanelaDaSelecao(null);
             selecionarNoDocumento(selecao);
+          }}
+        />
+      ) : null}
+      {nomeDoPincel ? (
+        <JanelaDeNome
+          titulo="Nome do pincel"
+          rotulo="Nome"
+          inicial={`Pincel ${pinceisDoEspaco.pinceis.length + 1}`}
+          aoFechar={() => setNomeDoPincel(false)}
+          aoConfirmar={(nome) => {
+            setNomeDoPincel(false);
+            definirPincelDaSelecao(nome);
           }}
         />
       ) : null}
