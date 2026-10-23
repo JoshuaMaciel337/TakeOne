@@ -33,6 +33,7 @@ import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
 import { contextoDasMidias } from "./contexto";
+import { ControlesDeEfeito } from "./ControlesDeEfeito";
 import { JanelaAtalhos } from "./JanelaAtalhos";
 import { JanelaColarAjustes } from "./JanelaColarAjustes";
 import { JanelaSalvarModelo } from "./JanelaSalvarModelo";
@@ -43,7 +44,7 @@ import { JanelaSequencia } from "./JanelaSequencia";
 import { MedidoresDeAudio } from "./MedidoresDeAudio";
 import { type AcoesDoVideo, AREAS_DO_VIDEO, type IdPainelDoVideo, menusDoVideo, PAINEIS_DO_VIDEO } from "./menusDoVideo";
 import { ConteudoDaFerramenta, PainelConteudo } from "./PainelConteudo";
-import { PainelComRolagem, PainelEfeitosDoVideo, PainelGraficosEssenciais, PainelTextoDoVideo } from "./PaineisDoVideo";
+import { PainelComRolagem, PainelEfeitosDoVideo, PainelGraficosEssenciais, PainelSomEssencial, PainelTextoDoVideo } from "./PaineisDoVideo";
 import { PainelMarcadores } from "./PainelMarcadores";
 import { type IdAba, PainelPropriedades } from "./PainelPropriedades";
 import { Previa } from "./Previa";
@@ -54,7 +55,7 @@ const CONTEUDO = { padrao: 320, minimo: 240, maximo: 520 };
 const PROPRIEDADES = { padrao: 300, minimo: 240, maximo: 440 };
 const LINHA_DO_TEMPO = { padrao: 260, minimo: 150, maximo: 560 };
 // O layout dos programas profissionais (tela larga): as colunas de painéis e a altura da metade de cima
-const ESQUERDA_CIMA = { padrao: 380, minimo: 240, maximo: 640 };
+const ESQUERDA_CIMA = { padrao: 440, minimo: 260, maximo: 700 };
 const DIREITA_CIMA = { padrao: 320, minimo: 240, maximo: 560 };
 const ESQUERDA_BAIXO = { padrao: 380, minimo: 220, maximo: 640 };
 const METADE_DE_CIMA = { padrao: 470, minimo: 240, maximo: 900 };
@@ -732,7 +733,18 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     const paineis: Record<IdPainelDoVideo, Painel> = {
       controles: {
         nome: PAINEIS_DO_VIDEO.controles,
-        conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["basico", "texto", "animacao", "velocidade", "audio"]} pedidoDeAba={pedidoDeAba} className="h-full" />,
+        conteudo: (
+          <ControlesDeEfeito
+            projeto={projetoNaTela ?? projeto}
+            selecionado={selecionado}
+            midia={midiaDoClipe}
+            tempo={tempo}
+            aoBuscar={buscar}
+            aoPrever={preverDoPainel}
+            aoExecutar={propsDasPropriedades.aoExecutar}
+            aoAbrirAba={(aba) => abrirPainel("propriedades", aba)}
+          />
+        ),
       },
       cor: { nome: PAINEIS_DO_VIDEO.cor, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["cor"]} className="h-full" /> },
       metadados: { nome: PAINEIS_DO_VIDEO.metadados, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} somenteAbas={["info"]} className="h-full" /> },
@@ -743,7 +755,18 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       efeitos: { nome: PAINEIS_DO_VIDEO.efeitos, conteudo: <PainelEfeitosDoVideo conteudo={conteudo} /> },
       marcadores: { nome: PAINEIS_DO_VIDEO.marcadores, conteudo: <PainelMarcadores projeto={projeto} tempo={tempo} aoBuscar={buscar} aoExecutar={executar} /> },
       historico: { nome: PAINEIS_DO_VIDEO.historico, conteudo: <PainelHistorico nome={edicao.nome} feitos={edicao.passos.feitos} desfeitos={edicao.passos.desfeitos} aoIr={edicao.irParaPasso} Icone={Film} /> },
-      som: { nome: PAINEIS_DO_VIDEO.som, conteudo: <PainelComRolagem>{conteudo("audio")}</PainelComRolagem> },
+      som: {
+        nome: PAINEIS_DO_VIDEO.som,
+        conteudo: (
+          <PainelSomEssencial
+            clipe={selecionado?.clipe ?? null}
+            comSom={Boolean(selecionado && (selecionado.faixa.tipo === "audio" || (midiaDoClipe?.audio && !midiaDoClipe.imagem && !selecionado.clipe.texto)))}
+            sugerido={selecionado?.faixa.tipo === "audio" ? "musica" : "dialogo"}
+            ajustes={(tipoDeSom) => <PainelPropriedades {...propsDasPropriedades} midia={midiaDoClipe} selecionado={selecionado} somenteAbas={["audio"]} tipoDeSom={tipoDeSom} />}
+            adicionar={conteudo("audio")}
+          />
+        ),
+      },
       marca: { nome: PAINEIS_DO_VIDEO.marca, conteudo: <PainelComRolagem>{conteudo("marca")}</PainelComRolagem> },
     };
     const colunas = { cimaEsquerda: area.estado.cimaEsquerda ?? [], cimaDireita: area.estado.cimaDireita ?? [], baixoEsquerda: area.estado.baixoEsquerda ?? [] };
@@ -821,7 +844,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 <Divisor direcao="coluna" valor={larguraEsquerdaCima} minimo={ESQUERDA_CIMA.minimo} maximo={ESQUERDA_CIMA.maximo} aoMudar={setLarguraEsquerdaCima} rotulo="Largura dos painéis de cima à esquerda" />
               </>
             ) : null}
-            <section aria-label="Programa" className="flex min-w-0 flex-1 flex-col bg-painel">
+            <section aria-label="Programa" className="flex min-w-0 flex-1 flex-col overflow-hidden bg-painel">
               <div className="flex h-7 shrink-0 items-center gap-1 border-b border-borda bg-painel-2/60 px-3 text-[11px]">
                 <span className="font-semibold">Programa:</span>
                 <span className="truncate text-suave">{edicao.nome || "Sequência"}</span>

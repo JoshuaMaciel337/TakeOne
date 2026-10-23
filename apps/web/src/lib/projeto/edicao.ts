@@ -1386,6 +1386,36 @@ export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: Ch
   }, { comAudio: propriedade === "volume" });
 }
 
+/**
+ * Desliga a animação de uma propriedade (o cronômetro dos controles de efeito): tira todos os keyframes dela e fica o
+ * valor que ela tinha no instante do cursor, como nos editores profissionais.
+ */
+export function limparKeyframes(projeto: Projeto, clipeId: string, propriedade: ChaveDeKeyframe, tempo: Tick): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    if (!clipe.keyframes?.[propriedade]?.length) return clipe;
+    const instante = Math.min(Math.max(tempo, clipe.inicio), clipe.inicio + clipe.duracao);
+    const keyframes: Keyframes = { ...clipe.keyframes };
+    delete keyframes[propriedade];
+    const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
+    if (propriedade === "volume") return { ...clipe, keyframes: vazios ? null : keyframes, volume: volumeNoTempo(clipe, instante) };
+    return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: transformacaoParaEditar(clipe, instante)[propriedade] } };
+  }, { comAudio: propriedade === "volume" });
+}
+
+/** Leva um keyframe (pelo instante dele, desde o começo do clipe) para outro instante do clipe, no quadro. */
+export function moverKeyframe(projeto: Projeto, clipeId: string, propriedade: ChaveDeKeyframe, de: Tick, para: Tick): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    const pontos = clipe.keyframes?.[propriedade] ?? [];
+    const meioQuadro = duracaoDoQuadro(projeto.taxa) / 2;
+    const ponto = keyframeEm(pontos, de, meioQuadro);
+    if (!ponto) throw new ErroEdicao("Esse keyframe não existe mais.");
+    const t = quadroDoClipe(projeto, clipe, clipe.inicio + para);
+    if (Math.abs(t - ponto.t) <= meioQuadro) return clipe;
+    if (keyframeEm(pontos, t, meioQuadro)) throw new ErroEdicao("Já há um keyframe neste instante.");
+    return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: comPonto(pontos.filter((p) => p !== ponto), { ...ponto, t }, projeto) } };
+  }, { comAudio: propriedade === "volume" });
+}
+
 /** Quanto o zoom do "Criar automaticamente" aproxima, e quanto tempo leva para entrar e sair. */
 export const ZOOM_DO_DESTAQUE = { escala: 1.12, entrada: 0.25, saida: 0.35 } as const;
 

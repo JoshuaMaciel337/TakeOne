@@ -45,6 +45,8 @@ import {
   zoomNosTrechos,
   moverClipe,
   mudarCor,
+  limparKeyframes,
+  moverKeyframe,
   mudarKeyframe,
   mudarFundo,
   mudarTexto,
@@ -709,6 +711,31 @@ test("keyframes: pôr, mexer no instante, mudar a curva e tirar", () => {
   clipe = principal(projeto)[0];
   assert.equal(clipe.keyframes, null);
   assert.equal(clipe.transformacao.x, 0.5);
+});
+
+test("keyframes: o cronômetro desliga a animação no valor do cursor, e o keyframe muda de instante", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const id = principal(projeto)[0].id;
+  projeto = mudarKeyframe(projeto, id, "x", 1 * S, "alternar");
+  projeto = mudarKeyframe(projeto, id, "x", 3 * S, "alternar");
+  projeto = transformarClipes(projeto, [id], { x: 0.4 }, 3 * S);
+  projeto = mudarKeyframe(projeto, id, "escala", 2 * S, "alternar");
+
+  // Mover o ponto de 3 s para 5 s: o valor vai junto; para cima de outro ponto, não
+  projeto = moverKeyframe(projeto, id, "x", 3 * S, 5 * S);
+  assert.deepEqual(principal(projeto)[0].keyframes?.x?.map((k) => [k.t / S, k.valor]), [[1, 0], [5, 0.4]]);
+  assert.throws(() => moverKeyframe(projeto, id, "x", 5 * S, 1 * S), ErroEdicao);
+  assert.throws(() => moverKeyframe(projeto, id, "x", 4 * S, 2 * S), ErroEdicao);
+
+  // Desligar em 3 s: x fica no meio do caminho (0,2) e a escala continua animada
+  projeto = limparKeyframes(projeto, id, "x", 3 * S);
+  const clipe = principal(projeto)[0];
+  assert.equal(clipe.keyframes?.x, undefined);
+  assert.ok(Math.abs(clipe.transformacao.x - 0.2) < 1e-9);
+  assert.equal(clipe.keyframes?.escala?.length, 1);
+  projeto = limparKeyframes(projeto, id, "escala", 3 * S);
+  assert.equal(principal(projeto)[0].keyframes, null);
 });
 
 test("keyframes: aparar, dividir e cortar trechos não mudam o movimento na tela", () => {

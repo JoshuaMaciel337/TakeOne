@@ -1,11 +1,13 @@
 "use client";
 
 // Os painéis do editor de vídeo no layout dos programas profissionais (ADR 0002) que juntam ferramentas de antes:
-// Efeitos (em pastas), Texto (Transcrição, Legendas e Gráficos) e Gráficos essenciais (Modelos e Elementos).
+// Efeitos (em pastas), Texto (Transcrição, Legendas e Gráficos), Gráficos essenciais (Modelos e Elementos) e Som
+// essencial (o tipo do som e os ajustes dele).
 import { ChevronRight, Folder } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import type { IdFerramenta } from "./ferramentas";
+import { type TipoDeSom, TIPOS_DE_SOM } from "./PainelPropriedades";
 
 type Conteudo = (ferramenta: IdFerramenta) => ReactNode;
 
@@ -116,4 +118,57 @@ export function PainelGraficosEssenciais({ conteudo, pedido }: { conteudo: Conte
 /** Um painel simples com rolagem e margem, para os conteúdos das ferramentas de antes. */
 export function PainelComRolagem({ children }: { children: ReactNode }) {
   return <div className="h-full overflow-y-auto p-3">{children}</div>;
+}
+
+/**
+ * Som essencial: com um clipe com som escolhido, o tipo dele (Diálogo, Música, Efeitos sonoros ou Ambiente) e os
+ * ajustes que fazem sentido para o tipo; embaixo, o texto em fala e a narração, para pôr som novo.
+ */
+export function PainelSomEssencial({
+  clipe,
+  comSom,
+  sugerido,
+  ajustes,
+  adicionar,
+}: {
+  clipe: { id: string } | null;
+  comSom: boolean;
+  /** O tipo que o clipe ganha antes de a pessoa escolher (as faixas de áudio começam como música). */
+  sugerido: TipoDeSom;
+  ajustes: (tipo: TipoDeSom) => ReactNode;
+  adicionar: ReactNode;
+}) {
+  const [tipos, setTipos] = useState<Record<string, TipoDeSom>>({});
+  const tipo = clipe ? (tipos[clipe.id] ?? sugerido) : sugerido;
+  return (
+    <div className="h-full overflow-y-auto">
+      {clipe && comSom ? (
+        <>
+          <div className="border-b border-borda p-3">
+            <h3 className="mb-2 text-[11px] font-semibold text-suave">Tipo do som deste clipe</h3>
+            <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Tipo do som">
+              {TIPOS_DE_SOM.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={tipo === item.id}
+                  onClick={() => setTipos((atual) => ({ ...atual, [clipe.id]: item.id }))}
+                  className={`rounded border px-2 py-1.5 text-xs ${tipo === item.id ? "border-destaque bg-destaque/15 text-texto" : "border-borda text-suave hover:text-texto"}`}
+                >
+                  {item.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+          {ajustes(tipo)}
+        </>
+      ) : (
+        <p className="p-3 text-xs text-suave">Escolha um clipe com som na linha do tempo para ajustar como diálogo, música, efeitos sonoros ou ambiente.</p>
+      )}
+      <Pasta nome="Pôr som novo: texto em fala e narração" aberta={!clipe || !comSom}>
+        {adicionar}
+      </Pasta>
+    </div>
+  );
 }

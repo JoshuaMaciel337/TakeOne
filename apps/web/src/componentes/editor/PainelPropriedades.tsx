@@ -159,13 +159,15 @@ type Props = {
   pedidoDeAba?: { aba: IdAba; vez: number };
   /** Só estas abas (os painéis do layout profissional dividem as propriedades: Controles de efeito, Cor, Metadados). */
   somenteAbas?: readonly IdAba[];
+  /** O tipo de som escolhido no painel Som essencial: a aba Áudio mostra só as seções dele. */
+  tipoDeSom?: TipoDeSom;
   /** Sem nada escolhido, no lugar do aviso (as propriedades do documento, no editor de imagem). */
   semSelecao?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, semSelecao, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -346,6 +348,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             aoAvisar={aoAvisar}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
+            tipoDeSom={tipoDeSom}
           />
         ) : (
           <p className="py-8 text-center text-xs text-suave">
@@ -1362,6 +1365,21 @@ function ChaveDeLuma({ clipe, travada, aoPrever, aoExecutar }: { clipe: Clipe; t
   );
 }
 
+/** Os tipos de som do painel Som essencial, como nos editores profissionais. */
+export type TipoDeSom = "dialogo" | "musica" | "efeitos" | "ambiente";
+export const TIPOS_DE_SOM: { id: TipoDeSom; nome: string }[] = [
+  { id: "dialogo", nome: "Diálogo" },
+  { id: "musica", nome: "Música" },
+  { id: "efeitos", nome: "Efeitos sonoros" },
+  { id: "ambiente", nome: "Ambiente" },
+];
+const SECOES_DO_TIPO: Record<TipoDeSom, ("efeitos" | "nivelar" | "abaixar" | "ritmo" | "voz")[]> = {
+  dialogo: ["voz", "nivelar", "efeitos"],
+  musica: ["ritmo", "abaixar"],
+  efeitos: ["efeitos"],
+  ambiente: ["abaixar", "efeitos"],
+};
+
 function AbaAudio({
   clipe,
   faixa,
@@ -1373,8 +1391,11 @@ function AbaAudio({
   aoAvisar,
   aoPrever,
   aoExecutar,
-}: PropsAba & { midia: Midia | null; faixas: Faixa[]; tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void; aoAvisar: (mensagem: string) => void }) {
+  tipoDeSom,
+}: PropsAba & { midia: Midia | null; faixas: Faixa[]; tempo: Tick; taxa: Taxa; aoBuscar: (tempo: Tick) => void; aoAvisar: (mensagem: string) => void; tipoDeSom?: TipoDeSom }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
+  // No painel Som essencial, cada tipo mostra as seções que fazem sentido para ele; sem tipo, todas
+  const mostra = (secao: "efeitos" | "nivelar" | "abaixar" | "ritmo" | "voz") => !tipoDeSom || SECOES_DO_TIPO[tipoDeSom].includes(secao);
   if (!midia?.audio) return <p className="py-8 text-center text-xs text-suave">Este clipe não tem som.</p>;
   if (clipe.som_separado) {
     return (
@@ -1577,7 +1598,8 @@ function AbaAudio({
           </label>
         ) : null}
       </Secao>
-      <Secao titulo="Efeitos de voz">
+      {mostra("efeitos") ? (
+      <Secao titulo={tipoDeSom === "dialogo" ? "Clareza" : tipoDeSom ? "Criativo" : "Efeitos de voz"}>
         <select
           aria-label="Efeito pronto"
           disabled={travada}
@@ -1613,16 +1635,24 @@ function AbaAudio({
         <ControleNumerico rotulo="Eco" minimo={0} maximo={ECO_MAXIMO * 100} sufixo="%" {...controle(efeitos.eco * 100, (valor) => ({ efeitos_voz: { ...efeitos, eco: valor / 100 } }))} />
         <ControleNumerico rotulo="Reverb" minimo={0} maximo={100} sufixo="%" {...controle(efeitos.reverb * 100, (valor) => ({ efeitos_voz: { ...efeitos, reverb: valor / 100 } }))} />
       </Secao>
-      <Secao titulo="Nivelar a voz">
-        <NivelarVoz clipe={clipe} faixa={faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
-      </Secao>
-      <Secao titulo="Abaixar na fala">
-        <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
-      </Secao>
-      <Secao titulo="Ritmo">
-        <NoRitmo clipe={clipe} faixa={faixas.find((item) => item.tipo === "principal") ?? faixa} faixaDoClipe={faixa} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
-      </Secao>
-      <Secao titulo="Voz">
+      ) : null}
+      {mostra("nivelar") ? (
+        <Secao titulo={tipoDeSom === "dialogo" ? "Reparar: nivelar a voz" : "Nivelar a voz"}>
+          <NivelarVoz clipe={clipe} faixa={faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+        </Secao>
+      ) : null}
+      {mostra("abaixar") ? (
+        <Secao titulo={tipoDeSom ? "Atenuação (abaixar na fala)" : "Abaixar na fala"}>
+          <AbaixarNaFala clipe={clipe} faixa={faixa} faixas={faixas} aoPrever={aoPrever} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+        </Secao>
+      ) : null}
+      {mostra("ritmo") ? (
+        <Secao titulo={tipoDeSom === "musica" ? "Duração e ritmo" : "Ritmo"}>
+          <NoRitmo clipe={clipe} faixa={faixas.find((item) => item.tipo === "principal") ?? faixa} faixaDoClipe={faixa} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+        </Secao>
+      ) : null}
+      {mostra("voz") ? (
+      <Secao titulo={tipoDeSom === "dialogo" ? "Reparar: voz limpa e tom" : "Voz"}>
         <ControleNumerico
           rotulo="Tom da voz"
           valor={tom}
@@ -1667,6 +1697,7 @@ function AbaAudio({
           </button>
         ) : null}
       </Secao>
+      ) : null}
     </div>
   );
 }

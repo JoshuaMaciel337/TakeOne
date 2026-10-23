@@ -45,6 +45,8 @@ import {
   type MudancaDeAudio,
   mudarExpressao,
   mudarKeyframe,
+  limparKeyframes,
+  moverKeyframe,
   reenquadrarClipe,
   seguirObjetoClipe,
   zoomNosTrechos,
@@ -150,6 +152,8 @@ export type Comando =
   | { comando: "projeto.fundo"; parametros: { cor: string } }
   | { comando: "clipe.transformar"; parametros: { clipeIds: string[]; transformacao: Partial<Transformacao>; tempo?: Tick } }
   | { comando: "clipe.keyframe"; parametros: { clipeId: string; propriedade: ChaveDeKeyframe; tempo: Tick; acao: AcaoDeKeyframe } }
+  | { comando: "clipe.limparKeyframes"; parametros: { clipeId: string; propriedade: ChaveDeKeyframe; tempo: Tick } }
+  | { comando: "clipe.moverKeyframe"; parametros: { clipeId: string; propriedade: ChaveDeKeyframe; de: Tick; para: Tick } }
   | { comando: "clipe.expressao"; parametros: { clipeId: string; propriedade: PropriedadeAnimavel; expressao: Expressao | null } }
   | { comando: "clipe.reenquadrar"; parametros: { clipeId: string; reenquadramento: Reenquadramento } }
   | { comando: "clipe.seguirObjeto"; parametros: { clipeId: string; caminho: CaminhoDoSeguidor } }
@@ -238,6 +242,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "projeto.fundo": "mudar o fundo",
   "clipe.transformar": "mudar posição e tamanho",
   "clipe.keyframe": "mudar keyframe",
+  "clipe.limparKeyframes": "desligar a animação",
+  "clipe.moverKeyframe": "mover o keyframe",
   "clipe.expressao": "mudar a expressão",
   "clipe.reenquadrar": "seguir o rosto",
   "clipe.seguirObjeto": "seguir o objeto",
@@ -451,6 +457,10 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: seguirObjetoClipe(projeto, parametros.clipeId, parametros.caminho) };
     case "clipe.keyframe":
       return { projeto: mudarKeyframe(projeto, parametros.clipeId, parametros.propriedade, parametros.tempo, parametros.acao) };
+    case "clipe.limparKeyframes":
+      return { projeto: limparKeyframes(projeto, parametros.clipeId, parametros.propriedade, parametros.tempo) };
+    case "clipe.moverKeyframe":
+      return { projeto: moverKeyframe(projeto, parametros.clipeId, parametros.propriedade, parametros.de, parametros.para) };
     case "clipe.expressao":
       return { projeto: mudarExpressao(projeto, parametros.clipeId, parametros.propriedade, parametros.expressao) };
     case "clipe.recortar":

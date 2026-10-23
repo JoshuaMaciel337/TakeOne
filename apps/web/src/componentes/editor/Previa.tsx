@@ -223,7 +223,7 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
   }
 
   return (
-    <section aria-label="Prévia" className={`flex min-h-0 min-w-0 flex-col bg-fundo ${className}`}>
+    <section aria-label="Prévia" className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-fundo ${className}`}>
       <div ref={areaRef} className="relative min-h-0 flex-1 p-4">
         <div className="absolute inset-4 flex items-center justify-center">
           <div
