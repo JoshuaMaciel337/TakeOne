@@ -88,7 +88,9 @@ def duracao_do_projeto(faixas: list[dict]) -> int:
 
 
 def midias_usadas(faixas: list[dict]) -> list[str]:
-    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")})
+    # A gravação de uma câmera conta mesmo sem clipe na faixa: a troca de câmera volta a usar
+    cameras = {f["multicamera"]["midia_id"] for f in faixas if f.get("multicamera")}
+    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")} | cameras)
 
 
 def capa_do_projeto(faixas: list[dict], tipo: str = "video") -> str | None:

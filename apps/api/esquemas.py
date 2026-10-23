@@ -732,6 +732,13 @@ class ClipeEntrada(BaseModel):
     transicao: TransicaoEntrada | None = None
 
 
+class MulticameraEntrada(BaseModel):
+    """A câmera de uma faixa da multicâmera: a gravação e o atraso dela na linha do tempo (o tempo da mídia
+    é o da linha menos o atraso), para o editor pôr de volta o trecho certo ao trocar de câmera."""
+    midia_id: str = Field(min_length=24, max_length=24)
+    atraso: int = Field(description="Em ticks; negativo quando a câmera ligou antes do começo do vídeo")
+
+
 class FaixaEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     tipo: Literal["principal", "video", "audio", "texto", "legenda"]
@@ -739,6 +746,14 @@ class FaixaEntrada(BaseModel):
     muda: bool = False
     travada: bool = False
     clipes: list[ClipeEntrada] = Field(default=[], max_length=1500)
+    # Só nas faixas de vídeo de uma multicâmera, que ficam mesmo vazias
+    multicamera: MulticameraEntrada | None = None
+
+    @model_validator(mode="after")
+    def camera_so_em_video(self):
+        if self.multicamera and self.tipo != "video":
+            raise ValueError("Só uma faixa de vídeo pode ser de uma câmera.")
+        return self
 
 
 class PalavraDaDirecao(BaseModel):

@@ -84,6 +84,10 @@ import {
   restaurarClipes,
   transformarClipes,
   separarSom,
+  type CameraSincronizada,
+  sincronizarCameras,
+  trocarCamera,
+  desfazerMulticamera,
 } from "./edicao.ts";
 import type { Animacoes } from "./animacao.ts";
 import {
@@ -200,6 +204,9 @@ export type Comando =
   | { comando: "marca.logo"; parametros: { midiaId: string; transformacao: Transformacao } }
   | { comando: "marca.textos"; parametros: { fonteTitulo: FonteTexto; fonteTexto: FonteTexto; cor: string | null } }
   | { comando: "linha.montar"; parametros: { trechos: TrechoNaLinha[]; musica: { midiaId: string; entrada: Tick } | null } }
+  | { comando: "multicamera.sincronizar"; parametros: { cameras: CameraSincronizada[] } }
+  | { comando: "multicamera.trocar"; parametros: { tempo: Tick; faixaId: string | null } }
+  | { comando: "multicamera.desfazer"; parametros: Record<string, never> }
   | { comando: "linha.pulsarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
@@ -281,6 +288,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.cortarNoRitmo": "cortar no ritmo",
   "musica.ajustar": "ajustar a música ao vídeo",
   "linha.montar": "montar com vários clipes",
+  "multicamera.sincronizar": "sincronizar as câmeras",
+  "multicamera.trocar": "trocar a câmera",
+  "multicamera.desfazer": "encerrar a multicâmera",
   "marca.logo": "pôr o logo",
   "clipe.trocarMidia": "mudar a forma",
   "modelo.aplicar": "usar o modelo",
@@ -493,6 +503,12 @@ export function executarComando(projeto: Projeto, { comando, parametros }: Coman
       return { projeto: aplicarMarcaAosTextos(projeto, parametros.fonteTitulo, parametros.fonteTexto, parametros.cor) };
     case "linha.montar":
       return montarNaLinha(projeto, ctx, parametros.trechos, parametros.musica);
+    case "multicamera.sincronizar":
+      return sincronizarCameras(projeto, ctx, parametros.cameras);
+    case "multicamera.trocar":
+      return trocarCamera(projeto, ctx, parametros.tempo, parametros.faixaId);
+    case "multicamera.desfazer":
+      return { projeto: desfazerMulticamera(projeto) };
     case "linha.pulsarNoRitmo":
       return { projeto: pulsarNoRitmo(projeto, parametros.batidas) };
     case "clipe.transicao":

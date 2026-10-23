@@ -194,6 +194,24 @@ def test_midia_em_projeto_nao_pode_ser_excluida(cliente, db_limpo):
     assert cliente.delete(f"/api/midias/{midia_id}").status_code == 204
 
 
+def test_faixa_de_camera_fica_vazia_e_prende_a_gravacao(cliente, db_limpo):
+    cadastrar(cliente)
+    principal = criar_midia(db_limpo, cliente)
+    camera = criar_midia(db_limpo, cliente)
+    projeto = cliente.post("/api/projetos", json={}).json()
+    faixa_da_camera = {"id": "cam", "tipo": "video", "clipes": [],
+                       "multicamera": {"midia_id": camera, "atraso": -2 * SEGUNDO}}
+    salvo = salvar(cliente, projeto, [faixa_da_camera, *principal_com(projeto, [clipe(principal, 0, 4)])])
+    assert salvo.status_code == 200, salvo.text
+    assert salvo.json()["faixas"][0]["multicamera"] == {"midia_id": camera, "atraso": -2 * SEGUNDO}
+    # A gravação da câmera conta como usada mesmo sem clipe: a troca de câmera volta a usar
+    assert cliente.delete(f"/api/midias/{camera}").status_code == 409
+    # Só faixa de vídeo é de câmera
+    faixa_de_audio = {**faixa_da_camera, "tipo": "audio"}
+    recusado = salvar(cliente, salvo.json(), [faixa_de_audio, *principal_com(projeto, [clipe(principal, 0, 4)])])
+    assert recusado.status_code == 422 and "câmera" in recusado.text
+
+
 def test_projetos_sao_separados_por_espaco(cliente):
     cadastrar(cliente)
     projeto = cliente.post("/api/projetos", json={}).json()

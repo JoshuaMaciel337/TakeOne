@@ -204,6 +204,12 @@ export type Clipe = {
   transicao?: Transicao | null;
 };
 
+/**
+ * A câmera de uma multicâmera: a faixa de vídeo guarda a gravação e o atraso dela na linha do tempo
+ * (o tempo da mídia é o da linha menos o atraso), para a troca de câmera pôr de volta o trecho certo.
+ */
+export type Multicamera = { midia_id: string; atraso: Tick };
+
 export type Faixa = {
   id: string;
   tipo: TipoFaixa;
@@ -211,6 +217,8 @@ export type Faixa = {
   muda: boolean;
   travada: boolean;
   clipes: Clipe[];
+  /** Só nas faixas de câmera: elas ficam mesmo vazias, enquanto a multicâmera existir. */
+  multicamera?: Multicamera | null;
 };
 
 /** Um clipe do modelo do espaço que quem usa troca: a mídia dele ou o texto dele. */

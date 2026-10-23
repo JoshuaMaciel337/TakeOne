@@ -65,6 +65,7 @@ import {
   PONTOS_MAXIMOS_DO_DESENHO,
   type MascaraDeForma,
   type Marcador,
+  type Multicamera,
   MARCADORES_MAXIMOS,
   CORES_DOS_MARCADORES,
   MESCLAGENS,
@@ -208,7 +209,7 @@ function arrumarTransicoes(faixa: Faixa): Faixa {
 
 function finalizar(projeto: Projeto): Projeto {
   const faixas = projeto.faixas
-    .filter((faixa) => faixa.tipo === "principal" || faixa.clipes.length > 0)
+    .filter((faixa) => faixa.tipo === "principal" || faixa.clipes.length > 0 || faixa.multicamera)
     .map((faixa) => (faixa.clipes.every((clipe) => limitarFades(clipe) === clipe) ? faixa : { ...faixa, clipes: faixa.clipes.map(limitarFades) }))
     .map(arrumarTransicoes);
   let duracao = 0;
@@ -2223,4 +2224,156 @@ export function reenquadrarClipe(projeto: Projeto, clipeId: string, r: Reenquadr
       keyframes: vazios ? null : keyframes,
     };
   });
+}
+
+// -----------------------------------------------
+// Multicâmera
+// -----------------------------------------------
+/** Uma câmera sincronizada: a gravação e o atraso dela na linha do tempo (lib/projeto/multicamera.ts). */
+export type CameraSincronizada = { midiaId: string; atraso: Tick };
+
+/**
+ * O clipe da câmera entre `de` e `ate` (no quadro), cortado no que a gravação cobre, mudo (o som fica na
+ * principal) e com a posição e o tamanho de `modelo`; `null` quando ela não gravou nada ali.
+ */
+function clipeDaCamera(projeto: Projeto, ctx: Contexto, camera: Multicamera, de: Tick, ate: Tick, modelo?: Clipe): Clipe | null {
+  const info = ctx.midia(camera.midia_id);
+  if (!info) throw new ErroEdicao("A gravação desta câmera não está pronta.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const inicio = Math.max(de, Math.ceil(Math.max(0, camera.atraso) / quadro) * quadro);
+  const fim = Math.min(ate, Math.floor((camera.atraso + info.duracao) / quadro) * quadro);
+  if (fim - inicio < quadro) return null;
+  return {
+    id: ctx.novoId(),
+    midia_id: camera.midia_id,
+    inicio,
+    duracao: fim - inicio,
+    entrada: inicio - camera.atraso,
+    velocidade: 1,
+    volume: 0,
+    fade_entrada: 0,
+    fade_saida: 0,
+    transformacao: modelo?.transformacao ?? TRANSFORMACAO_PADRAO,
+    recorte: modelo?.recorte ?? RECORTE_PADRAO,
+  };
+}
+
+/**
+ * Põe cada câmera numa faixa de vídeo própria, logo acima da principal, com a gravação inteira no lugar
+ * em que ela encaixa na linha do tempo. Sincronizar de novo uma câmera que já está troca a faixa dela.
+ */
+export function sincronizarCameras(projeto: Projeto, ctx: Contexto, cameras: CameraSincronizada[]): { projeto: Projeto; selecao: string[] } {
+  if (!cameras.length) throw new ErroEdicao("Escolha as outras câmeras.");
+  const selecao: string[] = [];
+  let faixas = [...projeto.faixas];
+  for (const { midiaId, atraso } of cameras) {
+    const camera: Multicamera = { midia_id: midiaId, atraso: Math.round(atraso) };
+    const clipe = clipeDaCamera(projeto, ctx, camera, 0, TICK_MAXIMO);
+    if (!clipe) throw new ErroEdicao("Uma das câmeras terminou de gravar antes do começo do vídeo.");
+    selecao.push(clipe.id);
+    const existente = faixas.findIndex((faixa) => faixa.multicamera?.midia_id === midiaId);
+    if (existente >= 0) {
+      exigirDestravada(faixas[existente]);
+      faixas[existente] = { ...faixas[existente], multicamera: camera, clipes: [clipe] };
+      continue;
+    }
+    const principal = faixas.findIndex((faixa) => faixa.tipo === "principal");
+    const faixa: Faixa = { id: ctx.novoId(), tipo: "video", oculta: false, muda: false, travada: false, clipes: [clipe], multicamera: camera };
+    faixas = [...faixas.slice(0, Math.max(principal, 0)), faixa, ...faixas.slice(Math.max(principal, 0))];
+  }
+  return { projeto: finalizar({ ...projeto, faixas }), selecao };
+}
+
+/** O clipe sem o trecho [de, ate): nenhum, um ou dois pedaços. */
+function semOTrecho(clipe: Clipe, ctx: Contexto, de: Tick, ate: Tick): Clipe[] {
+  const fim = fimDoClipe(clipe);
+  if (fim <= de || clipe.inicio >= ate) return [clipe];
+  const pedacos: Clipe[] = [];
+  if (clipe.inicio < de) pedacos.push({ ...clipe, ...pedacoDoClipe(clipe, clipe.inicio, de), duracao: de - clipe.inicio, fade_saida: 0, transicao: null });
+  if (fim > ate) {
+    pedacos.push({
+      ...clipe,
+      id: ctx.novoId(),
+      inicio: ate,
+      duracao: fim - ate,
+      ...pedacoDoClipe(clipe, ate, fim),
+      fade_entrada: 0,
+      keyframes: deslocarKeyframes(clipe.keyframes, ate - clipe.inicio),
+      expressoes: deslocarExpressoes(clipe.expressoes, ate - clipe.inicio),
+    });
+  }
+  return pedacos;
+}
+
+/** Junta os clipes vizinhos da mesma gravação que continuam um no outro (os pedaços de trocas desfeitas). */
+function juntarContinuos(clipes: Clipe[]): Clipe[] {
+  const juntos: Clipe[] = [];
+  for (const clipe of ordenar(clipes)) {
+    const anterior = juntos[juntos.length - 1];
+    const continua =
+      anterior &&
+      anterior.midia_id === clipe.midia_id &&
+      fimDoClipe(anterior) === clipe.inicio &&
+      anterior.velocidade === 1 &&
+      clipe.velocidade === 1 &&
+      !anterior.curva_velocidade &&
+      !clipe.curva_velocidade &&
+      !anterior.keyframes &&
+      !clipe.keyframes &&
+      anterior.entrada + anterior.duracao === clipe.entrada;
+    if (continua) juntos[juntos.length - 1] = { ...anterior, duracao: anterior.duracao + clipe.duracao, fade_saida: clipe.fade_saida };
+    else juntos.push(clipe);
+  }
+  return juntos;
+}
+
+/**
+ * Troca a câmera do cursor até a próxima troca (a próxima ponta de um clipe de câmera, ou o fim do vídeo):
+ * as outras câmeras saem desse trecho e a escolhida entra nele. `faixaId` nulo mostra a principal.
+ */
+export function trocarCamera(projeto: Projeto, ctx: Contexto, tempo: Tick, faixaId: string | null): { projeto: Projeto; selecao: string[] } {
+  const cameras = projeto.faixas.filter((faixa) => faixa.multicamera);
+  if (!cameras.length) throw new ErroEdicao("Sincronize as câmeras antes de trocar.");
+  if (faixaId && !cameras.some((faixa) => faixa.id === faixaId)) throw new ErroEdicao("Esta faixa não é de uma câmera.");
+  const quadro = duracaoDoQuadro(projeto.taxa);
+  const t = Math.max(0, quadroMaisProximo(projeto.taxa, tempo));
+  let ate = projeto.duracao;
+  for (const faixa of cameras) {
+    for (const clipe of faixa.clipes) {
+      for (const ponta of [clipe.inicio, fimDoClipe(clipe)]) if (ponta > t && ponta < ate) ate = ponta;
+    }
+  }
+  // A câmera que desliga antes da próxima troca entra só até desligar: as outras continuam depois
+  const escolhida = cameras.find((faixa) => faixa.id === faixaId)?.multicamera;
+  const gravacao = escolhida ? ctx.midia(escolhida.midia_id) : null;
+  if (escolhida && gravacao) {
+    const desliga = Math.floor((escolhida.atraso + gravacao.duracao) / quadro) * quadro;
+    if (desliga > t) ate = Math.min(ate, desliga);
+  }
+  if (ate - t < quadro) throw new ErroEdicao("O cursor está no fim do vídeo.");
+  const selecao: string[] = [];
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.multicamera) return faixa;
+    exigirDestravada(faixa);
+    const clipes = faixa.clipes.flatMap((clipe) => semOTrecho(clipe, ctx, t, ate));
+    if (faixa.id !== faixaId) return { ...faixa, clipes };
+    const novo = clipeDaCamera(projeto, ctx, faixa.multicamera, t, ate, faixa.clipes[0]);
+    if (!novo) throw new ErroEdicao("Esta câmera não gravou este trecho.");
+    const juntos = juntarContinuos([...clipes, novo]);
+    const escolhido = juntos.find((clipe) => clipe.inicio <= novo.inicio && fimDoClipe(clipe) >= fimDoClipe(novo));
+    if (escolhido) selecao.push(escolhido.id);
+    return { ...faixa, clipes: juntos };
+  });
+  // Com a principal, fica selecionado o clipe dela no cursor: o painel continua com as câmeras à mão
+  if (!faixaId) {
+    const daPrincipal = projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes.find((clipe) => clipe.inicio <= t && t < fimDoClipe(clipe));
+    if (daPrincipal) selecao.push(daPrincipal.id);
+  }
+  return { projeto: finalizar({ ...projeto, faixas }), selecao };
+}
+
+/** Desfaz a multicâmera: os clipes das câmeras ficam onde estão, e as faixas vazias somem. */
+export function desfazerMulticamera(projeto: Projeto): Projeto {
+  if (!projeto.faixas.some((faixa) => faixa.multicamera)) throw new ErroEdicao("O projeto não tem multicâmera.");
+  return finalizar({ ...projeto, faixas: projeto.faixas.map((faixa) => (faixa.multicamera ? { ...faixa, multicamera: null } : faixa)) });
 }

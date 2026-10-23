@@ -44,6 +44,7 @@ import { ControleNumerico } from "./ControleNumerico";
 import { IniciarDesenhoDaMascara } from "./DesenhoDaMascara";
 import { NoRitmo } from "./NoRitmo";
 import { Estabilizar } from "./Estabilizar";
+import { Multicamera } from "./Multicamera";
 import { BotaoSeguirObjeto } from "./SeguirObjeto";
 import { SecaoExpressoes } from "./SecaoExpressoes";
 import { SecaoForma } from "./SecaoForma";
@@ -277,6 +278,8 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             aoAvisar={aoAvisar}
             seguirObjeto={seguirObjeto}
             aoTrocarMidia={aoTrocarMidia}
+            faixas={faixas}
+            midias={midias}
             aoPrever={aoPrever}
             aoExecutar={aoExecutar}
             modo={modo}
@@ -354,6 +357,9 @@ type PropsBasico = PropsAba & {
   aoAvisar: (mensagem: string) => void;
   seguirObjeto: EstadoSeguirObjeto;
   aoTrocarMidia: (clipeIds: string[], midia: Midia) => void;
+  /** Para a multicâmera: as faixas (as câmeras) e as mídias da biblioteca (as gravações). */
+  faixas: Faixa[];
+  midias?: ReadonlyMap<string, Midia>;
 };
 
 /** O losango do keyframe: cheio com ponto no instante, vazado com pontos em outros instantes. */
@@ -378,7 +384,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -646,6 +652,11 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
       {comTempo ? (
         <Secao titulo="Expressões">
           <SecaoExpressoes clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        </Secao>
+      ) : null}
+      {comTempo && midias && midia?.video && !midia.imagem && (faixa.tipo === "principal" || faixa.multicamera) ? (
+        <Secao titulo="Multicâmera">
+          <Multicamera clipe={clipe} faixas={faixas} midias={midias} tempo={tempo} travada={travada} aoExecutar={aoExecutar} aoAvisar={aoAvisar} soTrocar={faixa.tipo !== "principal"} />
         </Secao>
       ) : null}
       {clipe.texto ? null : (

@@ -3,7 +3,7 @@
 import { AudioLines, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 
-import { arquivoDaMidia } from "@/lib/api";
+import { lerNiveis } from "@/lib/niveis";
 import type { Comando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import { FORCA_PADRAO, mudarForca, type Nivelamento, nivelamentoDaVoz } from "@/lib/projeto/nivelar";
@@ -17,20 +17,6 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
 };
-
-// Os níveis de cada mídia mudam só numa nova ingestão: lidos uma vez por página
-const niveisLidos = new Map<string, Promise<Int8Array>>();
-function lerNiveis(midiaId: string): Promise<Int8Array> {
-  let pedido = niveisLidos.get(midiaId);
-  if (!pedido) {
-    pedido = fetch(arquivoDaMidia(midiaId, "niveis.bin"), { credentials: "same-origin" })
-      .then((resposta) => (resposta.ok ? resposta.arrayBuffer() : Promise.reject(new Error("Os níveis desta mídia não estão disponíveis. Envie de novo para medir."))))
-      .then((dados) => new Int8Array(dados));
-    pedido.catch(() => niveisLidos.delete(midiaId));
-    niveisLidos.set(midiaId, pedido);
-  }
-  return pedido;
-}
 
 /**
  * Nivelar a voz, na aba Áudio: os trechos falados mais baixo sobem e os mais altos descem (lib/projeto/nivelar.ts),
