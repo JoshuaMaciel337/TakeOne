@@ -280,6 +280,63 @@ export function aplicarCurvas([r, g, b]: [number, number, number], curvas: Parti
   return [canal(curvas!.r, r), canal(curvas!.g, g), canal(curvas!.b, b)];
 }
 
+/** Os pontos de cada eixo da LUT 3D, os mesmos do render (PONTOS_LUT em core/utils/cor.py). */
+export const PONTOS_DA_LUT = 33;
+
+/** A LUT 3D da prévia: a chave (para não subir a mesma de novo) e os valores em RGBA. */
+export type LutDaCor = { chave: string; dados: Float32Array };
+
+/**
+ * A LUT 3D dos ajustes e das curvas, a mesma do .cube do render (gerar_cube): o vermelho varia mais rápido,
+ * depois o verde e o azul, que é a ordem de uma textura 3D (x, y, z). A vinheta fica fora, porque depende do lugar.
+ */
+export function lutDaCor(ajustes: AjustesCor, curvas: Partial<Curvas> | null | undefined): Float32Array {
+  const n = PONTOS_DA_LUT;
+  const passo = n - 1;
+  const dados = new Float32Array(n * n * n * 4);
+  let i = 0;
+  for (let b = 0; b < n; b++) {
+    for (let g = 0; g < n; g++) {
+      for (let r = 0; r < n; r++) {
+        const saida = aplicarCurvas(aplicarCor([r / passo, g / passo, b / passo], ajustes), curvas);
+        dados[i] = saida[0];
+        dados[i + 1] = saida[1];
+        dados[i + 2] = saida[2];
+        dados[i + 3] = 1;
+        i += 4;
+      }
+    }
+  }
+  return dados;
+}
+
+/**
+ * A leitura tetraédrica da LUT, a do lut3d do FFmpeg (interp=tetrahedral): o cubo entre os pontos vizinhos é
+ * dividido em seis tetraedros pela ordem das frações. O shader da prévia faz a mesma conta.
+ */
+export function lerLut(dados: Float32Array, [r, g, b]: [number, number, number]): [number, number, number] {
+  const n = PONTOS_DA_LUT;
+  const s = [r, g, b].map((v) => Math.min(Math.max(v, 0), 1) * (n - 1));
+  const p = s.map((v) => Math.floor(v));
+  const q = p.map((v) => Math.min(v + 1, n - 1));
+  const [dr, dg, db] = s.map((v, k) => v - p[k]);
+  const ponto = (x: number, y: number, z: number) => {
+    const j = ((z * n + y) * n + x) * 4;
+    return [dados[j], dados[j + 1], dados[j + 2]];
+  };
+  const c000 = ponto(p[0], p[1], p[2]);
+  const c111 = ponto(q[0], q[1], q[2]);
+  const somar = (pesos: number[], cantos: number[][]) => [0, 1, 2].map((k) => pesos.reduce((soma, peso, m) => soma + peso * cantos[m][k], 0)) as [number, number, number];
+  if (dr > dg) {
+    if (dg > db) return somar([1 - dr, dr - dg, dg - db, db], [c000, ponto(q[0], p[1], p[2]), ponto(q[0], q[1], p[2]), c111]);
+    if (dr > db) return somar([1 - dr, dr - db, db - dg, dg], [c000, ponto(q[0], p[1], p[2]), ponto(q[0], p[1], q[2]), c111]);
+    return somar([1 - db, db - dr, dr - dg, dg], [c000, ponto(p[0], p[1], q[2]), ponto(q[0], p[1], q[2]), c111]);
+  }
+  if (db > dg) return somar([1 - db, db - dg, dg - dr, dr], [c000, ponto(p[0], p[1], q[2]), ponto(p[0], q[1], q[2]), c111]);
+  if (db > dr) return somar([1 - dg, dg - db, db - dr, dr], [c000, ponto(p[0], q[1], p[2]), ponto(p[0], q[1], q[2]), c111]);
+  return somar([1 - dg, dg - dr, dr - db, db], [c000, ponto(p[0], q[1], p[2]), ponto(q[0], q[1], p[2]), c111]);
+}
+
 /** A tabela que o shader lê: 256 tons, cada um com o vermelho, o verde e o azul da curva (RGBA de 8 bits). */
 export function tabelaDasCurvas(curvas: Partial<Curvas>): Uint8Array {
   const tabela = new Uint8Array(256 * 4);

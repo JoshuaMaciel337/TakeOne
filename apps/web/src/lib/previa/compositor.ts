@@ -4,7 +4,7 @@
 // As cores são misturadas como o FFmpeg faz no `overlay` do render: alfa pré-multiplicado, sem
 // conversão para luz linear. A mistura em luz linear (ideia do `render` do FilmCraft) entra junto
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
-import { type AjustesCor, deslocamentosDasRodas } from "../projeto/cor.ts";
+import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
@@ -17,8 +17,10 @@ export type Camada = {
   /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
   virar?: Virar | null;
-  /** Ajustes de cor já com o filtro somado (lib/projeto/cor.ts); null quando não há. */
-  cor?: AjustesCor | null;
+  /** A LUT 3D dos ajustes (já com o filtro) e das curvas, a mesma do render; null quando a cor é a original. */
+  lut?: LutDaCor | null;
+  /** A vinheta (0 a 1), que fica fora da LUT. */
+  vinheta?: number;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
   /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
@@ -27,8 +29,6 @@ export type Camada = {
   mascara?: Cortes;
   /** Desfoque gaussiano: sigma em frações da altura do clipe (o render faz a mesma conta). */
   desfoque?: number;
-  /** As curvas de cor numa tabela de 256 tons (lib/projeto/cor.ts, tabelaDasCurvas); null sem curvas. */
-  curvas?: Uint8Array | null;
   /** Mistura com o que já foi desenhado; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito brilho: quanto da cópia desfocada soma em "tela" (lib/projeto/efeitos.ts). */
@@ -161,24 +161,20 @@ void main() {
   v_uv = u_recorte.xy + v_fonte * u_recorte.zw;
 }`;
 
-// A conta da cor é a de lib/projeto/cor.ts (aplicarCor e escurecimentoDaVinheta), linha a linha.
+// A cor é a LUT 3D de lib/projeto/cor.ts (lutDaCor, a mesma do render) lida como o lut3d do FFmpeg, e a
+// vinheta é a conta de escurecimentoDaVinheta, linha a linha.
 const FRAGMENTOS = `#version 300 es
 precision highp float;
+precision highp sampler3D;
 in vec2 v_uv;
 in vec2 v_local;
 in vec2 v_fonte;
 uniform sampler2D u_textura;
 uniform float u_opacidade;
-uniform bool u_comCor;
-// temperatura, tom, exposicao, contraste
-uniform vec4 u_cor1;
-// realces, sombras, saturacao, vinheta
-uniform vec4 u_cor2;
-// Rodas de cor (escuros, meios-tons, claros): o deslocamento de cada uma, já com a força
-uniform vec3 u_rodas[3];
-// Curvas: o tom de cada canal (0 a 255) lido numa tabela de 256, depois dos ajustes e antes da vinheta
-uniform bool u_comCurvas;
-uniform sampler2D u_curvas;
+// A LUT 3D dos ajustes e das curvas (unidade 1), em RGBA de ponto flutuante; a vinheta fica fora
+uniform bool u_comLut;
+uniform sampler3D u_lut;
+uniform float u_vinheta;
 // x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
 uniform vec4 u_revelado;
 // Letra a letra (lib/projeto/letras.ts): y0, y1 e x de onde o trecho começa e de onde ele termina
@@ -234,23 +230,24 @@ out vec4 cor;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
-float paraLinear(float c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
-float paraTela(float c) { c = clamp(c, 0.0, 1.0); return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
-
-vec3 aplicarCor(vec3 c) {
-  float ganho = exp2(u_cor1.z);
-  vec3 l = vec3(
-    paraTela(paraLinear(c.r) * ganho * (1.0 + 0.15 * u_cor1.x)),
-    paraTela(paraLinear(c.g) * ganho * (1.0 - 0.1 * u_cor1.y)),
-    paraTela(paraLinear(c.b) * ganho * (1.0 - 0.15 * u_cor1.x))
-  );
-  l = clamp((l - 0.5) * (1.0 + u_cor1.w) + 0.5, 0.0, 1.0);
-  float y = dot(l, LUMA);
-  l = clamp(l + 0.25 * (u_cor2.x * y * y + u_cor2.y * (1.0 - y) * (1.0 - y)), 0.0, 1.0);
-  float yr = dot(l, LUMA);
-  l = clamp(l + (1.0 - yr) * (1.0 - yr) * u_rodas[0] + 2.0 * yr * (1.0 - yr) * u_rodas[1] + yr * yr * u_rodas[2], 0.0, 1.0);
-  float y2 = dot(l, LUMA);
-  return clamp(y2 + (l - y2) * (1.0 + u_cor2.z), 0.0, 1.0);
+// A leitura tetraédrica do lut3d do FFmpeg (e de lerLut em lib/projeto/cor.ts): seis tetraedros pela ordem
+// das frações, com as comparações estritas dele
+vec3 ponto(ivec3 p) { return texelFetch(u_lut, p, 0).rgb; }
+vec3 lerLut(vec3 c) {
+  vec3 s = clamp(c, 0.0, 1.0) * float(${PONTOS_DA_LUT - 1});
+  ivec3 p = ivec3(floor(s));
+  ivec3 q = min(p + 1, ivec3(${PONTOS_DA_LUT - 1}));
+  vec3 d = s - vec3(p);
+  vec3 c000 = ponto(p);
+  vec3 c111 = ponto(q);
+  if (d.r > d.g) {
+    if (d.g > d.b) return (1.0 - d.r) * c000 + (d.r - d.g) * ponto(ivec3(q.x, p.y, p.z)) + (d.g - d.b) * ponto(ivec3(q.x, q.y, p.z)) + d.b * c111;
+    if (d.r > d.b) return (1.0 - d.r) * c000 + (d.r - d.b) * ponto(ivec3(q.x, p.y, p.z)) + (d.b - d.g) * ponto(ivec3(q.x, p.y, q.z)) + d.g * c111;
+    return (1.0 - d.b) * c000 + (d.b - d.r) * ponto(ivec3(p.x, p.y, q.z)) + (d.r - d.g) * ponto(ivec3(q.x, p.y, q.z)) + d.g * c111;
+  }
+  if (d.b > d.g) return (1.0 - d.b) * c000 + (d.b - d.g) * ponto(ivec3(p.x, p.y, q.z)) + (d.g - d.r) * ponto(ivec3(p.x, q.y, q.z)) + d.r * c111;
+  if (d.b > d.r) return (1.0 - d.g) * c000 + (d.g - d.b) * ponto(ivec3(p.x, q.y, p.z)) + (d.b - d.r) * ponto(ivec3(p.x, q.y, q.z)) + d.r * c111;
+  return (1.0 - d.g) * c000 + (d.g - d.r) * ponto(ivec3(p.x, q.y, p.z)) + (d.r - d.b) * ponto(ivec3(q.x, q.y, p.z)) + d.b * c111;
 }
 
 void main() {
@@ -300,16 +297,12 @@ void main() {
     texel = texel + luz - texel * luz;
   }
   bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0;
-  if ((u_comCor || u_comCurvas || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos) && (texel.a > 0.0 || comCantos)) {
+  if ((u_comLut || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos) && (texel.a > 0.0 || comCantos)) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas), os cantos e depois a vinheta
     vec3 c = texel.a > 0.0 ? texel.rgb / texel.a : vec3(0.0);
     float alfa = texel.a;
-    if (u_comCor) c = aplicarCor(c);
-    if (u_comCurvas) {
-      vec3 i = (clamp(c, 0.0, 1.0) * 255.0 + 0.5) / 256.0;
-      c = vec3(texture(u_curvas, vec2(i.r, 0.5)).r, texture(u_curvas, vec2(i.g, 0.5)).g, texture(u_curvas, vec2(i.b, 0.5)).b);
-    }
+    if (u_comLut) c = lerLut(c);
     if (comCantos) {
       // O clipe fica com a parte de dentro e a borda (o anel) vai por cima, como o alphamerge e o overlay do render
       vec2 meia = u_tamanho * u_pixelsPorUnidade / 2.0;
@@ -323,9 +316,9 @@ void main() {
       alfa = anel + a * (1.0 - anel);
       c = alfa > 0.0 ? (u_corDaBorda * anel + c * a * (1.0 - anel)) / alfa : c;
     }
-    if (u_comCor) {
+    if (u_vinheta > 0.0) {
       float distancia = length((v_local - 0.5) * 2.0) / sqrt(2.0);
-      c *= 1.0 - u_cor2.w * smoothstep(0.3, 1.0, distancia);
+      c *= 1.0 - u_vinheta * smoothstep(0.3, 1.0, distancia);
     }
     if (u_linhas > 0.0 && mod(floor(v_local.y * LINHAS), 2.0) >= 1.0) c *= 1.0 - u_linhas;
     if (u_luz > 0.0) {
@@ -390,14 +383,14 @@ type Recursos = {
   };
   /** Os dois framebuffers das passadas do desfoque. */
   alvos: Alvo[];
-  /** A tabela das curvas de cada camada (256 × 1), na unidade de textura 1. */
-  tabelas: WebGLTexture[];
+  /** A LUT 3D de cada camada, na unidade de textura 1, com a chave da que está nela (para não subir de novo). */
+  luts: ({ textura: WebGLTexture; chave: string } | undefined)[];
   /** A imagem fixa do grão, feita na primeira vez que um clipe usa granulação. */
   grao: WebGLTexture | null;
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
   mascaras: WebGLTexture[];
   uniformes: Record<
-    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comCor" | "cor1" | "cor2" | "rodas" | "revelado" | "corteDe" | "corteAte" | "comCurvas" | "curvas" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
+    "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "desfocada" | "lente" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -502,13 +495,11 @@ export class Compositor {
         recorte: local("u_recorte"),
         virar: local("u_virar"),
         opacidade: local("u_opacidade"),
-        comCor: local("u_comCor"),
-        cor1: local("u_cor1"),
-        cor2: local("u_cor2"),
-        rodas: local("u_rodas"),
+        comLut: local("u_comLut"),
+        lut: local("u_lut"),
+        vinheta: local("u_vinheta"),
         revelado: local("u_revelado"),
         corteDe: local("u_corteDe"),
-        comCurvas: local("u_comCurvas"),
         mesclagem: local("u_mesclagem"),
         brilho: local("u_brilho"),
         desfocada: local("u_desfocada"),
@@ -533,12 +524,11 @@ export class Compositor {
         chromaCor: local("u_chromaCor"),
         semelhanca: local("u_semelhanca"),
         suavidade: local("u_suavidade"),
-        curvas: local("u_curvas"),
         corteAte: local("u_corteAte"),
         textura: local("u_textura"),
       },
       texturas: [],
-      tabelas: [],
+      luts: [],
       grao: null,
       mascaras: [],
       desfoque,
@@ -813,32 +803,30 @@ export class Compositor {
       const mascara = camada.mascara ?? SEM_MASCARA;
       gl.uniform3f(uniformes.corteDe, ...mascara.de);
       gl.uniform3f(uniformes.corteAte, ...mascara.ate);
-      gl.uniform1i(uniformes.comCurvas, camada.curvas ? 1 : 0);
-      if (camada.curvas) {
-        let tabela = recursos.tabelas[indice];
-        if (!tabela) {
-          tabela = gl.createTexture()!;
-          recursos.tabelas[indice] = tabela;
+      gl.uniform1i(uniformes.comLut, camada.lut ? 1 : 0);
+      // A unidade 1 é sempre do sampler3D: com o padrão (0), ela dividiria a unidade com a textura 2D
+      gl.uniform1i(uniformes.lut, 1);
+      if (camada.lut) {
+        let lut = recursos.luts[indice];
+        if (!lut) {
+          lut = { textura: gl.createTexture()!, chave: "" };
+          recursos.luts[indice] = lut;
         }
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, tabela);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, camada.curvas);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.uniform1i(uniformes.curvas, 1);
+        gl.bindTexture(gl.TEXTURE_3D, lut.textura);
+        if (lut.chave !== camada.lut.chave) {
+          const n = PONTOS_DA_LUT;
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+          gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA32F, n, n, n, 0, gl.RGBA, gl.FLOAT, camada.lut.dados);
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          // Lida só com texelFetch; sem filtro, a textura de ponto flutuante fica completa sem extensão
+          gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          lut.chave = camada.lut.chave;
+        }
         gl.activeTexture(gl.TEXTURE0);
       }
-      const ajustes = camada.cor;
-      gl.uniform1i(uniformes.comCor, ajustes ? 1 : 0);
-      if (ajustes) {
-        gl.uniform4f(uniformes.cor1, ajustes.temperatura, ajustes.tom, ajustes.exposicao, ajustes.contraste);
-        gl.uniform4f(uniformes.cor2, ajustes.realces, ajustes.sombras, ajustes.saturacao, ajustes.vinheta);
-        gl.uniform3fv(uniformes.rodas, deslocamentosDasRodas(ajustes).flat());
-      }
+      gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
       const mesclagem = camada.mesclagem ?? "normal";
       gl.uniform1i(uniformes.mesclagem, CODIGO_DA_MESCLAGEM[mesclagem]);
       if (mesclagem === "multiplicar") gl.blendFunc(gl.DST_COLOR, gl.ZERO);
@@ -855,7 +843,7 @@ export class Compositor {
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
       // As listas podem ter buracos (o brilho cria os framebuffers 2 e 3 sem o 0 e o 1)
-      for (const textura of [...recursos.texturas, ...recursos.tabelas, ...recursos.mascaras, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.luts.map((lut) => lut?.textura), ...recursos.mascaras, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         if (!alvo) continue;
         this.gl.deleteTexture(alvo.textura);

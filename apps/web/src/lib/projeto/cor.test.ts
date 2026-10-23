@@ -12,6 +12,9 @@ import {
   type Curvas,
   curvasNeutras,
   escurecimentoDaVinheta,
+  lerLut,
+  lutDaCor,
+  PONTOS_DA_LUT,
   type PontoDaCurva,
   tabelaDasCurvas,
   valorDaCurva,
@@ -74,4 +77,29 @@ test("curvas: a geral nos três canais, depois a de cada um; a tabela do shader 
   const [r, g, b] = aplicarCurvas([128 / 255, 128 / 255, 128 / 255], composta.curvas);
   assert.deepEqual([...tabela.slice(128 * 4, 128 * 4 + 4)], [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255]);
   assert.ok(curvasNeutras({ rgb: [[0, 0], [1, 1]] }) && curvasNeutras(null));
+});
+
+test("a LUT da prévia: nos pontos da grade é a conta; a identidade sai igual; entre os pontos, perto da conta", () => {
+  const ajustes = { ...AJUSTES_NEUTROS, temperatura: 0.4, exposicao: 0.6, contraste: 0.3, saturacao: 0.5, forca_medios: 0.4, matiz_medios: 200 };
+  const curvas = { rgb: [[0, 0], [0.4, 0.6], [1, 1]] as [number, number][] };
+  const dados = lutDaCor(ajustes, curvas);
+  assert.equal(dados.length, PONTOS_DA_LUT ** 3 * 4);
+  const passo = PONTOS_DA_LUT - 1;
+  for (const [r, g, b] of [[0, 0, 0], [5, 17, 30], [32, 32, 32], [12, 0, 31]]) {
+    const esperado = aplicarCurvas(aplicarCor([r / passo, g / passo, b / passo], ajustes), curvas);
+    lerLut(dados, [r / passo, g / passo, b / passo]).forEach((v, k) => assert.ok(Math.abs(v - esperado[k]) < 1e-6));
+  }
+  const identidade = lutDaCor(AJUSTES_NEUTROS, null);
+  for (const c of [[0.123, 0.456, 0.789], [0.9, 0.1, 0.5], [0.33, 0.33, 0.34]] as [number, number, number][]) {
+    lerLut(identidade, c).forEach((v, k) => assert.ok(Math.abs(v - c[k]) < 1e-6, `identidade ${c}`));
+  }
+  let maior = 0;
+  for (let i = 0; i < 200; i++) {
+    const c: [number, number, number] = [((i * 37) % 101) / 100, ((i * 53) % 103) / 102, ((i * 71) % 107) / 106];
+    const esperado = aplicarCurvas(aplicarCor(c, ajustes), curvas);
+    lerLut(dados, c).forEach((v, k) => (maior = Math.max(maior, Math.abs(v - esperado[k]))));
+  }
+  // A LUT de 33 pontos erra até uns 6 níveis numa curva íngreme com saturação: o render erra o mesmo tanto, e é
+  // por isso que a prévia lê a LUT em vez de fazer a conta
+  assert.ok(maior < 8 / 255, `a interpolação ficou a ${(maior * 255).toFixed(2)} níveis da conta`);
 });

@@ -3,7 +3,7 @@
 // compositor (lib/previa/compositor.ts), com os efeitos do clipe.
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
-import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, somarAjustes, tabelaDasCurvas } from "@/lib/projeto/cor";
+import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
 import {
   ajustesDoEfeito,
   brilhoDoEfeito,
@@ -51,7 +51,10 @@ export type CamadaNaTela = {
   /** Sem a animação: é nela que as alças da prévia mexem. */
   caixaBase: Caixa;
   segundos: number;
-  cor: AjustesCor | null;
+  /** A LUT 3D dos ajustes e das curvas (a mesma do render); null quando a cor é a original. */
+  lut: LutDaCor | null;
+  /** A vinheta, que fica fora da LUT (depende do lugar no clipe). */
+  vinheta: number;
   /** A parte do clipe que aparece numa cortina; sem ela, o clipe inteiro. */
   revelado?: Revelado;
   /** Clipes de texto já trazem a imagem; os de vídeo pegam o quadro da fonte deles. */
@@ -64,8 +67,6 @@ export type CamadaNaTela = {
   desvio?: number;
   luz?: { forca: number; posicao: number };
   grao?: { forca: number; colunas: number; deslocamento: [number, number] };
-  /** A tabela das curvas de cor; null sem curvas. */
-  curvas?: Uint8Array | null;
 };
 
 /** O próximo clipe da faixa começa a carregar quando falta isto para ele entrar. */
@@ -126,11 +127,27 @@ function tamanhoDaMidia(midia: Midia): Tamanho | null {
   return midia.video && midia.video.largura > 0 && midia.video.altura > 0 ? { largura: midia.video.largura, altura: midia.video.altura } : null;
 }
 
-/** Os ajustes que o shader aplica, ou null quando a cor é a original. */
-function corDoClipe(clipe: Clipe): AjustesCor | null {
-  // O efeito (VHS) soma aos ajustes de cor do clipe, como no render
-  const ajustes = somarAjustes(ajustesEfetivos(clipe.cor), ajustesDoEfeito(clipe.efeito));
-  return corNeutra(ajustes) ? null : ajustes;
+/** As LUTs já montadas, pelos ajustes e curvas (a mesma para todo quadro do clipe e para clipes com a mesma cor). */
+const luts = new Map<string, LutDaCor>();
+
+/**
+ * A cor do clipe para o compositor: a LUT dos ajustes e das curvas, como o render (o efeito VHS soma aos ajustes),
+ * e a vinheta à parte.
+ */
+function corDoClipe(clipe: Clipe): Pick<CamadaNaTela, "lut" | "vinheta"> {
+  const ajustes: AjustesCor = somarAjustes(ajustesEfetivos(clipe.cor), ajustesDoEfeito(clipe.efeito));
+  const vinheta = ajustes.vinheta;
+  const semVinheta = { ...ajustes, vinheta: 0 };
+  const curvas = curvasNeutras(clipe.cor?.curvas) ? null : clipe.cor!.curvas!;
+  if (corNeutra(semVinheta) && !curvas) return { lut: null, vinheta };
+  const chave = JSON.stringify([semVinheta, curvas]);
+  let lut = luts.get(chave);
+  if (!lut) {
+    lut = { chave, dados: lutDaCor(semVinheta, curvas) };
+    if (luts.size > 40) luts.clear();
+    luts.set(chave, lut);
+  }
+  return { lut, vinheta };
 }
 
 /** O quadro desde o começo do clipe, na taxa do projeto (o glitch muda de quadro em quadro). */
@@ -147,22 +164,6 @@ function luzEGrao(clipe: Clipe, caixa: Caixa, tempo: Tick, taxa: Taxa): Pick<Cam
     luz: forcaDaLuz ? { forca: forcaDaLuz, posicao: posicaoDaLuz((tempo - clipe.inicio) / TICKS_POR_SEGUNDO) } : undefined,
     grao: forcaDoGrao ? { forca: forcaDoGrao, colunas, deslocamento: deslocamentoDoGrao(quadroDoClipe(clipe, tempo, taxa), colunas) } : undefined,
   };
-}
-
-/** As tabelas das curvas, guardadas pelas curvas (a mesma para todo quadro do clipe). */
-const tabelasDasCurvas = new Map<string, Uint8Array>();
-
-function tabelaDoClipe(clipe: Clipe): Uint8Array | null {
-  const curvas = clipe.cor?.curvas;
-  if (curvasNeutras(curvas)) return null;
-  const chave = JSON.stringify(curvas);
-  let tabela = tabelasDasCurvas.get(chave);
-  if (!tabela) {
-    tabela = tabelaDasCurvas(curvas!);
-    if (tabelasDasCurvas.size > 50) tabelasDasCurvas.clear();
-    tabelasDasCurvas.set(chave, tabela);
-  }
-  return tabela;
 }
 
 /** Os textos que precisam de imagem: por id do clipe, e o destaque da fala com ":destaque". */
@@ -203,8 +204,7 @@ export function camadasNoTempo(
       caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, quadro),
       // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
       caixaBase: caixaDoClipe(transformacaoParaEditar(clipe, tempo), clipe.recorte, tamanhoMidia, quadro),
-      cor: corDoClipe(clipe),
-      curvas: tabelaDoClipe(clipe),
+      ...corDoClipe(clipe),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       ...luzEGrao(clipe, caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro), tempo, projeto.taxa),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
@@ -228,8 +228,7 @@ export function camadasNoTempo(
       recorte: clipe.recorte,
       caixa,
       caixaBase,
-      cor: corDoClipe(clipe),
-      curvas: tabelaDoClipe(clipe),
+      ...corDoClipe(clipe),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       segundos: 0,
     };
@@ -256,7 +255,7 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
     if (faixa.tipo === "principal" || faixa.oculta) continue;
     const clipe = faixa.clipes[0];
     if (!clipe) continue;
-    const comum = { clipe, faixa, recorte: clipe.recorte, cor: corDoClipe(clipe), curvas: tabelaDoClipe(clipe), desvio: desvioDeCor(clipe.efeito, 0), segundos: 0 };
+    const comum = { clipe, faixa, recorte: clipe.recorte, ...corDoClipe(clipe), desvio: desvioDeCor(clipe.efeito, 0), segundos: 0 };
     if (clipe.texto) {
       const imagem = imagensDeTexto.get(clipe.id);
       if (!imagem) continue;
@@ -281,11 +280,11 @@ export function camadaDoCompositor(camada: CamadaNaTela, fonte: TexImageSource, 
     virar: camada.clipe.virar,
     cantos: camada.clipe.cantos,
     caixa: camada.caixa,
-    cor: camada.cor,
+    lut: camada.lut,
+    vinheta: camada.vinheta,
     revelado: camada.revelado,
     mascara: camada.mascara,
     desfoque: (camada.desfoque ?? 0) + desfoqueDoEfeito(camada.clipe.efeito),
-    curvas: camada.curvas,
     mesclagem: camada.clipe.mesclagem,
     brilho: brilhoDoEfeito(camada.clipe.efeito),
     lente: distorcaoDoEfeito(camada.clipe.efeito),
