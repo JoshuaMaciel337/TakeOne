@@ -36,6 +36,8 @@ TAREFAS = {
     "batidas": RECURSO_CPU,
     "fala": RECURSO_CPU,
     "animacao_html": RECURSO_CPU,
+    "selecao": RECURSO_CPU,
+    "objeto": RECURSO_CPU,
 }
 
 

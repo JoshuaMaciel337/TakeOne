@@ -26,6 +26,14 @@ ADD --checksum=sha256:07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66
     https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model.onnx \
     /app/modelos/modnet.onnx
 RUN chmod 644 /app/modelos/modnet.onnx
+# MobileSAM em ONNX (seleção com um clique, MIT; Acly/MobileSAM numa revisão fixa): o codificador e o decodificador
+ARG MOBILESAM=https://huggingface.co/Acly/MobileSAM/resolve/0d3b403339b4674a82493d5e97964dd78089ddc8
+ADD --checksum=sha256:580f5fb648ea1062c0aabc26217aed56921985f03f0cbbd852bba81d760cc749 ${MOBILESAM}/mobile_sam_image_encoder.onnx /app/modelos/mobilesam/mobile_sam_image_encoder.onnx
+ADD --checksum=sha256:93915fc7c993ab9d59ab8c9ccd3bce37f7509c81ab4150a74abd4d2abbd8570d ${MOBILESAM}/sam_mask_decoder_single.onnx /app/modelos/mobilesam/sam_mask_decoder_single.onnx
+RUN chmod -R a+rX /app/modelos/mobilesam
+# LaMa em ONNX (apagar objeto, Apache-2.0; Carve/LaMa-ONNX numa revisão fixa, entrada de 512 × 512)
+ADD --checksum=sha256:1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6     https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx     /app/modelos/lama.onnx
+RUN chmod 644 /app/modelos/lama.onnx
 # Kokoro-82M v1.0 em ONNX (texto em fala, Apache-2.0; onnx-community numa revisão fixa) e as três vozes pt-BR.
 # O espeak-ng (GPL-3, pelo apt) converte o texto em fonemas, chamado como programa separado.
 ARG KOKORO=https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231

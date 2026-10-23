@@ -586,6 +586,36 @@ class AnimacaoHtmlEntrada(BaseModel):
     duracao: float = Field(default=4, ge=DURACAO_MINIMA_ANIMACAO, le=DURACAO_MAXIMA_ANIMACAO)
 
 
+class PontoDaSelecao(BaseModel):
+    """Um clique na foto, em frações dela; incluir false tira o que está ali da seleção."""
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    incluir: bool = True
+
+
+class SelecaoEntrada(BaseModel):
+    pontos: list[PontoDaSelecao] = Field(min_length=1, max_length=12)
+
+
+class SelecaoSaida(BaseModel):
+    arquivo: str
+    # Sem job, a máscara desses pontos já existe
+    job_id: str | None = None
+
+
+class ObjetoEntrada(BaseModel):
+    acao: Literal["apagar", "recortar"]
+    selecao: str | None = Field(default=None, pattern=r"^selecao_[0-9a-f]{12}\.png$")
+    # O pincel desenhado no editor: um PNG em base64 (branco é o que entra)
+    pincel: str | None = Field(default=None, max_length=12_000_000)
+
+    @model_validator(mode="after")
+    def com_alguma_mascara(self):
+        if not self.selecao and not self.pincel:
+            raise ValueError("Marque o objeto com um clique ou com o pincel.")
+        return self
+
+
 class FalaEntrada(BaseModel):
     texto: str = Field(min_length=2, max_length=3000)
     voz: Literal["pf_dora", "pm_alex", "pm_santa"] = "pf_dora"
