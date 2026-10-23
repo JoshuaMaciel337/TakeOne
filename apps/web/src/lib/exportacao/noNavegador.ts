@@ -137,6 +137,9 @@ async function misturarSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>,
       );
     });
     cadeia.ganho.gain.setValueCurveAtTime(curva, comeco / TICKS_POR_SEGUNDO, total / TICKS_POR_SEGUNDO);
+    // No fim da janela o clipe cala, com a cauda do eco e do reverb junto, como a prévia e o render (que corta o som
+    // do clipe na duração dele): o ganho ficava no último valor da curva e a sala continuava soando depois
+    cadeia.ganho.gain.setValueAtTime(0, (comeco + total) / TICKS_POR_SEGUNDO);
     fonte.start(comeco / TICKS_POR_SEGUNDO, entradaS - antesS * clipe.velocidade, total / TICKS_POR_SEGUNDO);
   }
   conferir(sinal);

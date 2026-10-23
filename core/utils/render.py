@@ -784,6 +784,9 @@ def _som_do_clipe(entrada: int, clipe: dict, pular: float = 0, abaixar: tuple[st
                    f"[{nome}c][{entrada_ir}:a]{afir_sem_normalizar()}[{nome}r];\n"
                    f"[{nome}s][{nome}r]{mistura}")
         filtros = []
+    # O eco e a sala soam além do fim da entrada (o aecho e o afir soltam a cauda): o som do clipe para no fim da
+    # janela dele, como a prévia, que zera o ganho fora do clipe (medido: -31 dB depois do corte, agora silêncio)
+    filtros.append(f"atrim=duration={_numero(antes + duracao + depois)}")
     # Com keyframes, o volume vai inteiro no roteiro do abaixar (o fixo não vale)
     if not (clipe.get("keyframes") or {}).get("volume"):
         filtros.append(f"volume={_numero(clipe['volume'])}")
