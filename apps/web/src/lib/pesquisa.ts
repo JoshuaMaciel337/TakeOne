@@ -2,9 +2,9 @@
 // e as ferramentas numa lista só, procurados sem acento e sem diferença de maiúsculas, pelo começo das palavras; o que
 // começa pela busca vem primeiro, depois o que tem todas as palavras no nome, depois no caminho.
 
-export type ItemPesquisavel = { nome: string; caminho: string; atalho?: string; desativado?: boolean; tipo: "comando" | "ferramenta"; acao: () => void };
+export type ItemPesquisavel = { nome: string; caminho: string; atalho?: string; desativado?: boolean; tipo: "comando" | "ferramenta"; acao: () => void; /** A chave do comando (a personalização dos atalhos e dos menus). */ chave?: string };
 
-type ItemDoMenu = "-" | { nome: string; atalho?: string; desativado?: boolean; aoEscolher?: () => void; itens?: ItemDoMenu[] };
+type ItemDoMenu = "-" | { nome: string; chave?: string; atalho?: string; desativado?: boolean; aoEscolher?: () => void; itens?: ItemDoMenu[] };
 type MenuSimples = { nome: string; itens: ItemDoMenu[] };
 
 /** Os comandos dos menus, um por item que faz algo, com o caminho ("Imagem › Ajustes"). */
@@ -14,7 +14,7 @@ export function achatarMenus(menus: MenuSimples[]): ItemPesquisavel[] {
     for (const item of lista) {
       if (item === "-") continue;
       if (item.itens) andar(item.itens, [...caminho, item.nome], desligado || Boolean(item.desativado));
-      else if (item.aoEscolher) itens.push({ nome: item.nome, caminho: caminho.join(" › "), atalho: item.atalho, desativado: desligado || Boolean(item.desativado), tipo: "comando", acao: item.aoEscolher });
+      else if (item.aoEscolher) itens.push({ nome: item.nome, caminho: caminho.join(" › "), atalho: item.atalho, desativado: desligado || Boolean(item.desativado), tipo: "comando", acao: item.aoEscolher, chave: item.chave ?? [...caminho, item.nome].join(" › ") });
     }
   };
   for (const menu of menus) andar(menu.itens, [menu.nome], false);

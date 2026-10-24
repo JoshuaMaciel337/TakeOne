@@ -126,6 +126,8 @@ import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { PainelComps } from "./PainelComps";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
+import { type AbaDaPersonalizacao, JanelaPersonalizar } from "./JanelaPersonalizar";
+import { carregarPersonalizacao, guardarPersonalizacao, type Personalizacao, personalizarMenus, teclaDaFerramenta } from "@/lib/imagem/personalizacao";
 import { achatarMenus } from "@/lib/pesquisa";
 import { PredefinicoesDeFerramenta } from "./PredefinicoesDeFerramenta";
 import { gerarAtivos } from "@/lib/exportacao/varios";
@@ -353,6 +355,9 @@ const RETOQUES_PADRAO: Record<FerramentaDoRetoque, OpcoesDoRetoque> = {
 const FORMA_PADRAO: OpcoesDaForma = { ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "coracao" };
 const PERSPECTIVA_PADRAO = { largura: 0, altura: 0, resolucao: 0, grade: true };
 
+/** Quanto a tecla de uma ferramenta precisa ficar apertada para valer só enquanto está (a ferramenta de mola). */
+const SEGURAR_A_FERRAMENTA_MS = 400;
+
 export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string; modeloInicial?: string }) {
   const router = useRouter();
   const marca = useMarca();
@@ -519,6 +524,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // As comps de camada: a aplicada por último e a última posição do documento (o estado de antes), só na sessão
   const [compsEmArquivos, setCompsEmArquivos] = useState(false);
   const [pesquisando, setPesquisando] = useState(false);
+  // Editar › Atalhos de teclado e menus e Barra de ferramentas (no navegador), e os itens escondidos à vista
+  const [personalizacao, setPersonalizacao] = useState<Personalizacao>(carregarPersonalizacao);
+  const [personalizando, setPersonalizando] = useState<AbaDaPersonalizacao | null>(null);
+  const [mostrarTudoNosMenus, setMostrarTudoNosMenus] = useState(false);
+  // A ferramenta de mola: segurar a tecla de uma ferramenta usa ela só enquanto a tecla está apertada
+  const mola = useRef<{ tecla: string; anterior: IdFerramentaDaImagem; inicio: number } | null>(null);
   const [compAplicada, setCompAplicada] = useState<string | null>(null);
   const [ultimaPosicao, setUltimaPosicao] = useState<CompDeCamada | null>(null);
   const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
@@ -5013,6 +5024,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     temComps: Boolean(projeto?.comps?.length),
     pesquisar: () => setPesquisando(true),
+    personalizar: setPersonalizando,
     compsEmArquivos: () => setCompsEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
@@ -5409,7 +5421,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || personalizando !== null || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5438,16 +5450,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else setOpcoesDoCorte((atual) => ({ ...atual, sobreposicao: SOBREPOSICOES_DO_CORTE[(SOBREPOSICOES_DO_CORTE.findIndex((item) => item.id === atual.sobreposicao) + 1) % SOBREPOSICOES_DO_CORTE.length].id }));
       return;
     }
-    const comTecla = TODAS_AS_FERRAMENTAS.filter((item) => item.tecla === tecla);
+    const comTecla = TODAS_AS_FERRAMENTAS.filter((item) => teclaDaFerramenta(item, personalizacao) === tecla);
     if (comTecla.length) {
-      // Shift + a tecla passa à seguinte do grupo; sem Shift, volta à última usada do grupo
+      // Segurando a tecla, o navegador repete o evento: a ferramenta já está escolhida (e a mola conta o tempo)
+      if (evento.repeat) {
+        evento.preventDefault();
+        return;
+      }
+      // Shift + a tecla passa à seguinte do grupo; sem Shift, volta à última usada do grupo (entre as da tecla)
       const atualNoGrupo = comTecla.some((item) => item.id === ferramenta);
       const grupo = grupoDa(comTecla[0].id);
       const indice = GRUPOS_DE_FERRAMENTAS.indexOf(grupo);
-      let id = ultimas[indice] ?? comTecla[0].id;
+      const ultima = ultimas[indice];
+      let id = ultima && comTecla.some((item) => item.id === ultima) ? ultima : comTecla[0].id;
       // Shift passa só pelas do grupo com a mesma tecla (o letreiro de linha única não tem tecla, como lá)
-      const comAMesma = grupo.filter((item) => item.tecla === tecla);
+      const comAMesma = grupo.filter((item) => teclaDaFerramenta(item, personalizacao) === tecla);
       if (evento.shiftKey && atualNoGrupo) id = comAMesma[(comAMesma.findIndex((item) => item.id === ferramenta) + 1) % comAMesma.length].id;
+      if (id !== ferramenta) mola.current = { tecla, anterior: ferramenta, inicio: performance.now() };
       escolherFerramenta(id);
     } else if (tecla === "D") setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }));
     else if (tecla === "X") setCores((atual) => ({ ...atual, primeiroPlano: atual.fundo, fundo: atual.primeiroPlano }));
@@ -5491,6 +5510,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ouvir = (evento: KeyboardEvent) => teclas(evento);
     window.addEventListener("keydown", ouvir);
     return () => window.removeEventListener("keydown", ouvir);
+  }, []);
+  const soltarMola = useEffectEvent((evento: KeyboardEvent) => {
+    const atual = mola.current;
+    if (!atual || evento.key.toUpperCase() !== atual.tecla) return;
+    mola.current = null;
+    // Um toque rápido troca de ferramenta; segurada (e usada) mais que isso, a tecla só emprestou a ferramenta
+    if (performance.now() - atual.inicio > SEGURAR_A_FERRAMENTA_MS) escolherFerramenta(atual.anterior);
+  });
+  useEffect(() => {
+    const ouvir = (evento: KeyboardEvent) => soltarMola(evento);
+    window.addEventListener("keyup", ouvir);
+    return () => window.removeEventListener("keyup", ouvir);
   }, []);
 
   if (edicao.erroCarga) {
@@ -6046,7 +6077,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           <ChevronLeft className="size-3.5" aria-hidden />
           <Simbolo tamanho={18} />
         </Link>
-        <MenusDaImagem acoes={acoes} ativo={!janelaAberta} />
+        <MenusDaImagem acoes={acoes} ativo={!janelaAberta} personalizacao={personalizacao} mostrarTudo={mostrarTudoNosMenus} aoMostrarTudo={() => setMostrarTudoNosMenus(true)} />
         <span className="ml-auto hidden items-center gap-1 text-[11px] text-suave sm:flex" role="status">
           {edicao.salvamento === "salvo" ? <Check className="size-3" aria-hidden /> : <LoaderCircle className="size-3 animate-spin" aria-hidden />}
           {salvamento}
@@ -6311,6 +6342,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
         <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
         <CaixaDeFerramentas
+          ocultas={new Set(personalizacao.ferramentasOcultas)}
+          colunas={personalizacao.colunas}
+          teclaDe={(item) => teclaDaFerramenta(item, personalizacao)}
           ativa={ferramenta}
           aoEscolher={escolherFerramenta}
           ultimas={ultimas}
@@ -6695,13 +6729,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoAvisar={mostrarAviso}
         />
       ) : null}
+      {personalizando ? (
+        <JanelaPersonalizar
+          aba={personalizando}
+          personalizacao={personalizacao}
+          comandos={achatarMenus(menusDaImagem(acoes))}
+          ferramentas={[...new Map(TODAS_AS_FERRAMENTAS.map((item) => [item.id, { id: item.id, nome: item.nome.replace(/^Ferramenta /, ""), tecla: item.tecla, grupo: GRUPOS_DE_FERRAMENTAS.indexOf(grupoDa(item.id)) }])).values()]}
+          aoFechar={() => setPersonalizando(null)}
+          aoConfirmar={(nova) => {
+            setPersonalizando(null);
+            setPersonalizacao(nova);
+            guardarPersonalizacao(nova);
+          }}
+        />
+      ) : null}
       {pesquisando ? (
         <JanelaPesquisar
           aoFechar={() => setPesquisando(false)}
           itens={[
-            ...achatarMenus(menusDaImagem(acoes)),
+            ...achatarMenus(personalizarMenus(menusDaImagem(acoes), personalizacao, true)),
             // As ferramentas (cada uma uma vez; algumas aparecem em dois grupos)
-            ...[...new Map(TODAS_AS_FERRAMENTAS.map((item) => [item.id, item])).values()].map((item) => ({ nome: item.nome, caminho: "Ferramentas", atalho: item.tecla || undefined, tipo: "ferramenta" as const, acao: () => escolherFerramenta(item.id) })),
+            ...[...new Map(TODAS_AS_FERRAMENTAS.map((item) => [item.id, item])).values()].map((item) => ({ nome: item.nome, caminho: "Ferramentas", atalho: teclaDaFerramenta(item, personalizacao) || undefined, tipo: "ferramenta" as const, acao: () => escolherFerramenta(item.id) })),
           ]}
         />
       ) : null}
@@ -7359,8 +7407,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 }
 
 /** A barra de menus e os atalhos dela (os menus são montados aqui, com o estado da vez). */
-function MenusDaImagem({ acoes, ativo }: { acoes: AcoesDosMenus; ativo: boolean }) {
-  const menus = menusDaImagem(acoes);
+function MenusDaImagem({ acoes, ativo, personalizacao, mostrarTudo, aoMostrarTudo }: { acoes: AcoesDosMenus; ativo: boolean; personalizacao: Personalizacao; mostrarTudo: boolean; aoMostrarTudo: () => void }) {
+  // Os menus com os atalhos, as cores e os itens escondidos da personalização; os menus com algum escondido ganham
+  // no fim o item que mostra todos (até recarregar)
+  const menus = personalizarMenus(menusDaImagem(acoes), personalizacao, mostrarTudo).map((menu) =>
+    !mostrarTudo && personalizacao.ocultos.some((chave) => chave.startsWith(`${menu.nome} › `)) ? { ...menu, itens: [...menu.itens, "-" as const, { nome: "Mostrar todos os itens do menu", aoEscolher: aoMostrarTudo }] } : menu,
+  );
   useAtalhosDosMenus(menus, ativo);
   return (
     <>

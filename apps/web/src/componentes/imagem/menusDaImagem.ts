@@ -190,6 +190,8 @@ export type AcoesDosMenus = {
   documentoVizinho: (sentido: 1 | -1) => void;
   fecharDocumento: (id?: string) => void;
   fecharTodos: () => void;
+  /** Editar › Atalhos de teclado e menus e Barra de ferramentas: a janela da personalização, na aba pedida. */
+  personalizar: (aba: "atalhos" | "menus" | "ferramentas") => void;
   /** Editar › Pesquisar (Ctrl+F): a caixa que procura nos comandos e nas ferramentas. */
   pesquisar: () => void;
   /** Imagem › Análise: a escala de medida, o registro e o marcador de escala. */
@@ -462,12 +464,14 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Editar",
       itens: [
-        { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
-        { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z", desativado: !a.podeRefazer, aoEscolher: a.refazer },
+        { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", chave: "Editar › Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
+        { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", chave: "Editar › Refazer", atalho: "Ctrl+Shift+Z", desativado: !a.podeRefazer, aoEscolher: a.refazer },
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
         { nome: "Avançar um passo", desativado: !a.podeRefazer, aoEscolher: a.refazer, titulo: "O mesmo que refazer (Ctrl+Shift+Z)" },
         { nome: "Voltar um passo", desativado: !a.podeDesfazer, aoEscolher: a.desfazer, titulo: "O mesmo que desfazer (Ctrl+Z)" },
         { nome: "Pesquisar…", atalho: "Ctrl+F", aoEscolher: a.pesquisar, titulo: "Procurar um comando ou uma ferramenta" },
+        { nome: "Atalhos de teclado e menus…", atalho: "Ctrl+Alt+Shift+K", aoEscolher: () => a.personalizar("atalhos") },
+        { nome: "Barra de ferramentas…", aoEscolher: () => a.personalizar("ferramentas") },
         "-",
         { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
         { nome: "Copiar", atalho: "Ctrl+C", desativado: !a.temCamada, aoEscolher: () => a.copiar(false) },
@@ -1005,7 +1009,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: [
             ...Object.entries(AREAS_DA_IMAGEM).map(([id, nome]): ItemDeMenu => ({ nome, marcado: a.area === id, aoEscolher: () => a.area_(id) })),
             "-",
-            { nome: `Redefinir ${AREAS_DA_IMAGEM[a.area as keyof typeof AREAS_DA_IMAGEM] ?? ""}`.trim(), aoEscolher: a.restaurarArea },
+            { nome: `Redefinir ${AREAS_DA_IMAGEM[a.area as keyof typeof AREAS_DA_IMAGEM] ?? ""}`.trim(), chave: "Janela › Área de trabalho › Redefinir", aoEscolher: a.restaurarArea },
           ],
         },
         "-",

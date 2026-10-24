@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Circle, CircleDashed } from "lucide-react";
+import { ArrowLeftRight, Circle, CircleDashed, MoreHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { type FerramentaDaImagem, GRUPOS_DE_FERRAMENTAS, type IdFerramentaDaImagem } from "./ferramentasDaImagem";
@@ -21,7 +21,15 @@ type Props = {
   /** O modo Máscara rápida (Q) ligado, e o botão que liga e desliga. */
   mascaraRapida?: boolean;
   aoMascaraRapida?: () => void;
+  /** Editar › Barra de ferramentas: as tiradas da caixa (ficam no "…"), as colunas e a tecla de cada uma. */
+  ocultas?: ReadonlySet<string>;
+  colunas?: 1 | 2;
+  teclaDe?: (item: FerramentaDaImagem) => string;
 };
+
+const SEM_OCULTAS: ReadonlySet<string> = new Set();
+// O grupo das extras (as tiradas da caixa) no menu da lista
+const EXTRAS = -1;
 
 const SEGURAR_MS = 350;
 
@@ -30,7 +38,10 @@ const SEGURAR_MS = 350;
  * outras; o botão direito (ou segurar) abre a lista do grupo, com o nome e a tecla de cada uma. Embaixo, as cores de
  * primeiro plano e de fundo, as cores padrão (D) e a troca (X).
  */
-export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, fundo, aoEditarCor, aoTrocarCores, aoCoresPadrao, aoDuploClique, mascaraRapida = false, aoMascaraRapida }: Props) {
+export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, fundo, aoEditarCor, aoTrocarCores, aoCoresPadrao, aoDuploClique, mascaraRapida = false, aoMascaraRapida, ocultas = SEM_OCULTAS, colunas = 1, teclaDe = (item) => item.tecla }: Props) {
+  // Os grupos sem as ferramentas tiradas (o índice continua o do grupo, para a última usada de cada um)
+  const grupos = GRUPOS_DE_FERRAMENTAS.map((grupo, i) => ({ i, itens: grupo.filter((item) => !ocultas.has(item.id)) })).filter((grupo) => grupo.itens.length);
+  const extras = GRUPOS_DE_FERRAMENTAS.flat().filter((item, i, todas) => ocultas.has(item.id) && todas.findIndex((x) => x.id === item.id) === i);
   const [lista, setLista] = useState<{ grupo: number; topo: number } | null>(null);
   const segurando = useRef<number | null>(null);
   const caixaRef = useRef<HTMLDivElement>(null);
@@ -54,9 +65,9 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
   }
 
   return (
-    <div ref={caixaRef} className="relative z-20 flex w-10 shrink-0 flex-col items-center gap-0.5 border-r border-borda bg-painel py-1.5">
-      <nav aria-label="Ferramentas" className="flex flex-col items-center gap-0.5">
-        {GRUPOS_DE_FERRAMENTAS.map((grupo, i) => {
+    <div ref={caixaRef} className={`relative z-20 flex shrink-0 flex-col items-center gap-0.5 border-r border-borda bg-painel py-1.5 ${colunas === 2 ? "w-[70px]" : "w-10"}`}>
+      <nav aria-label="Ferramentas" className={colunas === 2 ? "grid grid-cols-2 gap-0.5" : "flex flex-col items-center gap-0.5"}>
+        {grupos.map(({ i, itens: grupo }) => {
           const naVez: FerramentaDaImagem = grupo.find((item) => item.id === ativa) ?? grupo.find((item) => item.id === ultimas[i]) ?? grupo[0];
           const ligada = grupo.some((item) => item.id === ativa);
           const Icone = naVez.icone;
@@ -66,7 +77,7 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
               type="button"
               aria-pressed={ligada}
               aria-label={naVez.nome}
-              title={naVez.tecla ? `${naVez.nome} (${naVez.tecla})` : naVez.nome}
+              title={teclaDe(naVez) ? `${naVez.nome} (${teclaDe(naVez)})` : naVez.nome}
               onClick={() => aoEscolher(naVez.id)}
               onDoubleClick={() => aoDuploClique(naVez.id)}
               onContextMenu={(evento) => {
@@ -91,10 +102,21 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
             </button>
           );
         })}
+        {extras.length ? (
+          <button
+            type="button"
+            aria-label="Ferramentas extras"
+            title="Ferramentas extras (as tiradas da caixa)"
+            onClick={(evento) => abrirLista(EXTRAS, evento.currentTarget)}
+            className={`grid size-[30px] place-items-center rounded transition ${extras.some((item) => item.id === ativa) ? "bg-destaque text-white" : "text-suave hover:bg-painel-3 hover:text-texto"}`}
+          >
+            <MoreHorizontal className="size-[18px]" aria-hidden />
+          </button>
+        ) : null}
       </nav>
       {lista ? (
         <div role="menu" className="absolute left-full z-50 ml-1 min-w-64 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={{ top: lista.topo }}>
-          {GRUPOS_DE_FERRAMENTAS[lista.grupo].map((item) => {
+          {(lista.grupo === EXTRAS ? extras : (grupos.find((g) => g.i === lista.grupo)?.itens ?? [])).map((item) => {
             const Icone = item.icone;
             return (
               <button
@@ -111,7 +133,7 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
                 <span className={`size-1.5 rounded-full ${item.id === ativa ? "bg-texto" : ""}`} aria-hidden />
                 <Icone className="size-4 text-suave" aria-hidden />
                 <span className="flex-1">{item.nome}</span>
-                <span className="text-[11px] text-suave">{item.tecla}</span>
+                <span className="text-[11px] text-suave">{teclaDe(item)}</span>
               </button>
             );
           })}

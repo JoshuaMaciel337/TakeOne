@@ -16,6 +16,10 @@ export type ItemDeMenu =
       marcado?: boolean;
       aoEscolher: () => void;
       titulo?: string;
+      /** Para a personalização: a chave do item quando o nome muda ("Desfazer <passo>"). */
+      chave?: string;
+      /** A cor de fundo do item (Editar › Atalhos de teclado e menus). */
+      cor?: string;
     }
   | { nome: string; itens: ItemDeMenu[]; desativado?: boolean }
   | "-";
@@ -152,6 +156,7 @@ function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFe
             role="menuitem"
             disabled={item.desativado}
             title={item.titulo}
+            style={item.cor ? { background: item.cor } : undefined}
             onMouseEnter={() => setAberto(null)}
             onClick={() => {
               aoFechar();
