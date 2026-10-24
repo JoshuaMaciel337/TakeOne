@@ -28,10 +28,11 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { type CaixaDoCorte, camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, type Canal, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Canal, type Clipe, type Faixa, type GeracaoDoClipe, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
+import { JanelaPreenchimentoGenerativo } from "./ia/JanelaPreenchimentoGenerativo";
 import { useMidias } from "@/lib/useMidias";
 
 import type { Ajuste } from "./ajustesDaImagem";
@@ -223,7 +224,7 @@ const AREAS: Record<string, EstadoDaArea> = {
 };
 const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DA_IMAGEM);
 
-type Pendente = { trocar?: string[]; camadaDe?: string; caixa?: RetanguloDaImagem };
+type Pendente = { trocar?: string[]; camadaDe?: string; caixa?: RetanguloDaImagem; geracao?: GeracaoDoClipe };
 /** A chave do motor da máscara rápida (não é um clipe). */
 const CHAVE_DA_MASCARA_RAPIDA = "#mascaraRapida";
 type ModificacaoDaSelecao = "borda" | "suavizar" | "expandir" | "contrair" | "difusao";
@@ -484,6 +485,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const modeloPendente = useRef<{ modelo: ModeloDeImagem; cores: string[]; midias: Record<string, Midia> } | null>(null);
   const [aplicando, setAplicando] = useState<string | null>(null);
   const [trocando, setTrocando] = useState<string | null>(null);
+  // Editar › Preenchimento generativo: a janela do texto (a área é a seleção do documento)
+  const [preenchendoComIA, setPreenchendoComIA] = useState(false);
   // O Corte (C): a caixa em andamento e as opções, que ficam de um corte para o outro
   const [recorte, setRecorte] = useState<CaixaDoCorte | null>(null);
   const [opcoesDoCorte, setOpcoesDoCorte] = useState<OpcoesDoCorte>(CORTE_PADRAO);
@@ -592,12 +595,77 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
       else if (acao.camadaDe) executar({ comando: "imagem.camadaComOutraMidia", parametros: { faixaId: acao.camadaDe, midiaId: id } });
       else if (acao.trocar) executar({ comando: "clipe.trocarMidia", parametros: { clipeIds: acao.trocar, midiaId: id } });
-      else executar({ comando: "imagem.adicionarMidia", parametros: { midiaId: id, transformacao: acao.caixa && projeto ? transformacaoDaCaixa(acao.caixa, midia, tamanhoDaImagem(projeto)) : undefined } });
+      else
+        executar({
+          comando: "imagem.adicionarMidia",
+          parametros: { midiaId: id, transformacao: acao.caixa && projeto ? transformacaoDaCaixa(acao.caixa, midia, tamanhoDaImagem(projeto)) : undefined, geracao: acao.geracao },
+        });
     }
   });
   useEffect(() => {
     if (pendentes.current.size || modeloPendente.current) resolverPendentes();
   }, [midias]);
+
+  /**
+   * O preenchimento generativo: o recorte em volta da área marcada (com uma folga, para o modelo ver o que combina),
+   * como a imagem aparece, com a área transparente; a primeira variação entra como camada no recorte, e as outras
+   * ficam na seção Variações.
+   */
+  const pedirPreenchimento = async (descricao: string, variacoes: number) => {
+    const atual = projetoRef.current;
+    const selecao = selecaoNoDocumento;
+    const caixa = selecao ? limites(selecao) : null;
+    if (!atual || !selecao || !caixa) return mostrarAviso("Marque a área a preencher com uma ferramenta de seleção.");
+    const documento = tamanhoDaImagem(atual);
+    const folga = Math.max(32, 0.3 * Math.max(caixa.x1 - caixa.x0, caixa.y1 - caixa.y0));
+    const x = Math.max(0, Math.floor(caixa.x0 - folga));
+    const y = Math.max(0, Math.floor(caixa.y0 - folga));
+    const recorte: RetanguloDaImagem = { x, y, largura: Math.min(documento.largura, Math.ceil(caixa.x1 + folga)) - x, altura: Math.min(documento.altura, Math.ceil(caixa.y1 + folga)) - y };
+    setPreenchendoComIA(false);
+    try {
+      await pinturas.esperar();
+      const bitmap = await createImageBitmap(await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
+      // Até 2048 de lado (o worker leva ao tamanho do modelo); por baixo, branco: o que é transparente na imagem não é área a preencher
+      const escala = Math.min(1, 2048 / Math.max(recorte.largura, recorte.altura));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(recorte.largura * escala));
+      canvas.height = Math.max(1, Math.round(recorte.altura * escala));
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+      ctx2d.drawImage(bitmap, (recorte.x * bitmap.width) / documento.largura, (recorte.y * bitmap.height) / documento.altura, (recorte.largura * bitmap.width) / documento.largura, (recorte.altura * bitmap.height) / documento.altura, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const dados = ctx2d.getImageData(0, 0, canvas.width, canvas.height);
+      for (let py = 0, i = 3; py < canvas.height; py++) {
+        const dy = Math.min(selecao.altura - 1, Math.floor(recorte.y + (py + 0.5) / escala));
+        for (let px = 0; px < canvas.width; px++, i += 4) {
+          const dx = Math.min(selecao.largura - 1, Math.floor(recorte.x + (px + 0.5) / escala));
+          if (selecao.dados[dy * selecao.largura + dx] >= 128) dados.data[i] = 0;
+        }
+      }
+      ctx2d.putImageData(dados, 0, 0);
+      const criadas = await chamarApi<Midia[]>("/midias/preencher", { metodo: "POST", corpo: { imagem: canvas.toDataURL("image/png"), descricao, variacoes } });
+      if (!criadas.length) return;
+      esperarMidia(criadas[0], { caixa: recorte, geracao: { descricao, variacoes: criadas.map((midia) => midia.id) } });
+      mostrarAviso(variacoes > 1 ? `Gerando ${variacoes} variações: a primeira entra como camada quando ficar pronta (a primeira leva uns 2 min).` : "Gerando o preenchimento: ele entra como camada quando ficar pronto (uns 2 min).");
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível pedir o preenchimento.");
+    }
+  };
+  /** Mais variações do preenchimento da camada: o mesmo recorte e o mesmo texto, guardados no servidor. */
+  const maisVariacoes = async (clipeId: string) => {
+    const atual = projetoRef.current;
+    const clipe = atual ? acharClipe(atual, clipeId)?.clipe : null;
+    if (!clipe?.geracao?.variacoes.length) return;
+    try {
+      const novas = await chamarApi<Midia[]>(`/midias/${clipe.geracao.variacoes[0]}/variacoes`, { metodo: "POST", corpo: { variacoes: 3 } });
+      void biblioteca.recarregar();
+      executar({ comando: "imagem.geracao", parametros: { clipeId, geracao: { ...clipe.geracao, variacoes: [...clipe.geracao.variacoes, ...novas.map((midia) => midia.id)] } } });
+      mostrarAviso("Gerando mais 3 variações: elas aparecem na seção Variações quando ficarem prontas.");
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível pedir mais variações.");
+    }
+  };
 
   // O modelo escolhido na biblioteca (?modelo=): entra uma vez, na imagem ainda vazia, e sai do endereço
   const aplicarDoEndereco = useEffectEvent(() => {
@@ -4408,6 +4476,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     viaRecorte: () => void usarSelecao("recortar"),
     preencher: () => setJanelaDePixels("preencher"),
+    preenchimentoGenerativo: () => (selecaoNoDocumento ? setPreenchendoComIA(true) : mostrarAviso("Marque a área a preencher com uma ferramenta de seleção.")),
     copiar: (mesclado) => void copiar(mesclado),
     recortarPixels: () => void recortarPixels(),
     colar: (como) => void colar(como),
@@ -4620,6 +4689,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <PainelPropriedades
           modo="imagem"
           midia={midiaDoClipe}
+          midias={midias}
           selecionado={escolhidoNaTela}
           taxa={projeto.taxa}
           tempo={0}
@@ -4630,6 +4700,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoTrocarMidia={(clipeIds, midia) => esperarMidia(midia, { trocar: clipeIds })}
           seguirObjeto={SEM_SEGUIR}
           aoTrocarImagem={setTrocando}
+          aoMaisVariacoes={(clipeId) => void maisVariacoes(clipeId)}
           fundo={projeto.fundo.cor}
           aoPrever={preverDoPainel}
           aoExecutar={executar}
@@ -5481,6 +5552,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
       </div>
 
+      {preenchendoComIA ? <JanelaPreenchimentoGenerativo aoGerar={(descricao, variacoes) => void pedirPreenchimento(descricao, variacoes)} aoCancelar={() => setPreenchendoComIA(false)} /> : null}
       {trocando ? (
         <JanelaEscolherImagem
           imagens={imagensProntas}

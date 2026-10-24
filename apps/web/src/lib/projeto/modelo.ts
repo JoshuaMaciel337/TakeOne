@@ -303,6 +303,8 @@ export type Clipe = {
   camada_de_preenchimento?: CamadaDePreenchimento | null;
   /** Só no projeto de imagem: os filtros inteligentes (lib/imagem/filtros/pilha.ts), a pilha não destrutiva da camada. */
   filtros_inteligentes?: FiltrosInteligentes | null;
+  /** Só na imagem: o preenchimento generativo de onde a camada veio (o texto e as variações, mídias para trocar). */
+  geracao?: GeracaoDoClipe | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
@@ -402,6 +404,9 @@ export const MARCADORES_MAXIMOS = 200;
  * da imagem (branco é selecionado). Pintar nele sobe uma versão nova, como na máscara de camada.
  */
 export type Canal = { id: string; nome: string; midia_id: string; versao: number };
+
+/** As variações de um preenchimento generativo (cada uma é uma mídia) e o texto pedido. */
+export type GeracaoDoClipe = { descricao: string; variacoes: string[] };
 
 /** Os marcadores como capítulos: "mm:ss Nome" (ou "h:mm:ss" depois de uma hora), um por linha, em ordem. */
 export function textoDosCapitulos(marcadores: Marcador[]): string {

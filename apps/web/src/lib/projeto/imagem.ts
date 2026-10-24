@@ -7,7 +7,7 @@ import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
-import { acharClipe, type Clipe, type Mesclagem, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
+import { acharClipe, type Clipe, type Mesclagem, type CorDoRotulo, type Faixa, type GeracaoDoClipe, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
@@ -500,6 +500,18 @@ export function definirFiltrosInteligentes(projeto: Projeto, clipeId: string, fi
       return sem;
     }
     return { ...clipe, filtros_inteligentes: filtros };
+  });
+}
+
+/** O preenchimento generativo da camada (as variações, para trocar); `null` tira. */
+export function definirGeracao(projeto: Projeto, clipeId: string, geracao: GeracaoDoClipe | null): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (!geracao) {
+      const sem = { ...clipe };
+      delete sem.geracao;
+      return sem;
+    }
+    return { ...clipe, geracao: { descricao: geracao.descricao, variacoes: geracao.variacoes.slice(-12) } };
   });
 }
 

@@ -12,7 +12,7 @@ import {
 import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, X } from "lucide-react";
 import { useContext, useState } from "react";
 
-import { chamarApi } from "@/lib/api";
+import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
@@ -156,6 +156,8 @@ type Props = {
   modo?: "video" | "imagem";
   /** No editor de imagem: abre a escolha de outra imagem para a camada, no mesmo lugar. */
   aoTrocarImagem?: (clipeId: string) => void;
+  /** No editor de imagem: pede mais variações do preenchimento generativo da camada. */
+  aoMaisVariacoes?: (clipeId: string) => void;
   /** Abaixo da tela larga o painel é uma folha por cima, com botão de fechar. */
   aoFechar?: () => void;
   /** Abre uma aba de fora (os menus e os painéis do editor de imagem); `vez` muda a cada pedido. */
@@ -172,7 +174,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, formas, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, formas, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -336,6 +338,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             aoExecutar={aoExecutar}
             modo={modo}
             aoTrocarImagem={aoTrocarImagem}
+            aoMaisVariacoes={aoMaisVariacoes}
             formas={formas}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
@@ -439,7 +442,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, formas }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void; formas?: ContextoDasFormas }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, formas }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void; aoMaisVariacoes?: (clipeId: string) => void; formas?: ContextoDasFormas }) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -539,6 +542,47 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           <ImageIcon className="size-3.5" aria-hidden />
           Trocar a imagem
         </button>
+      ) : null}
+      {modo === "imagem" && clipe.geracao?.variacoes.length ? (
+        <Secao titulo="Variações">
+          <p className="mb-1.5 text-xs text-suave">{clipe.geracao.descricao ? `“${clipe.geracao.descricao}”` : "Preenchimento generativo"}: clique numa para trocar.</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {clipe.geracao.variacoes.map((id, i) => {
+              const variacao = midias?.get(id);
+              const pronta = variacao?.status === "pronta";
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={travada || !pronta || clipe.midia_id === id}
+                  aria-label={`Variação ${i + 1}${clipe.midia_id === id ? " (em uso)" : ""}`}
+                  aria-pressed={clipe.midia_id === id}
+                  className={`relative aspect-square overflow-hidden rounded border bg-painel-2 ${clipe.midia_id === id ? "border-destaque ring-1 ring-destaque" : "border-borda hover:border-destaque"}`}
+                  onClick={() => aoExecutar({ comando: "clipe.trocarMidia", parametros: { clipeIds: [clipe.id], midiaId: id } })}
+                  style={{ background: "repeating-conic-gradient(#cfcfcf 0 25%, #fff 0 50%) 0 0 / 10px 10px" }}
+                >
+                  {pronta ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- a cópia leve da variação, servida pela API
+                    <img src={arquivoDaMidia(id, "proxy.webp")} alt="" className="size-full object-contain" />
+                  ) : variacao?.status === "erro" ? (
+                    <span className="flex size-full items-center justify-center p-1 text-[10px] text-erro" title={variacao.erro ?? undefined}>
+                      Falhou
+                    </span>
+                  ) : (
+                    <span className="flex size-full items-center justify-center">
+                      <LoaderCircle className="size-4 animate-spin text-suave" aria-hidden />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {aoMaisVariacoes ? (
+            <button type="button" className="botao-secundario mt-2 w-full px-3 py-1 text-xs" disabled={travada || clipe.geracao.variacoes.length >= 12} onClick={() => aoMaisVariacoes(clipe.id)}>
+              Mais variações
+            </button>
+          ) : null}
+        </Secao>
       ) : null}
       <Secao
         titulo="Posição e tamanho"

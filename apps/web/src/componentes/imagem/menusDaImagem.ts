@@ -253,6 +253,8 @@ export type AcoesDosMenus = {
   viaRecorte: () => void;
   /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
   preencher: () => void;
+  /** Editar › Preenchimento generativo: a área marcada refeita pelo texto, no worker de GPU. */
+  preenchimentoGenerativo: () => void;
   preencherRapido: (com: "primeiroPlano" | "fundo", preservar: boolean) => void;
   /** Editar › Recortar, Copiar, Copiar mesclado e Colar (normal, no local, dentro e fora da seleção). */
   copiar: (mesclado: boolean) => void;
@@ -342,6 +344,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: a.podeDesfazer ? `Atenuar ${a.podeDesfazer}…` : "Atenuar…", atalho: "Ctrl+Shift+F", desativado: !a.podeDesfazer, aoEscolher: a.atenuar },
         "-",
         { nome: "Preencher…", atalho: "Shift+F5", aoEscolher: a.preencher },
+        { nome: "Preenchimento generativo…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.preenchimentoGenerativo, titulo: "Marque a área com uma ferramenta de seleção" },
         { nome: "Traçado…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.tracado },
         { nome: "Limpar", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.limpar },
         {

@@ -152,6 +152,7 @@ import {
   mudarCamadaDePreenchimento,
   mudarAjusteDaCamada,
   definirFiltrosInteligentes,
+  definirGeracao,
   mudarMascaraDosFiltros,
   textoEmForma,
   mudarTextosRicos,
@@ -183,7 +184,7 @@ import type { Efeito } from "./efeitos.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Prancheta } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
-import type { Canal, Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
+import type { Canal, Clipe, GeracaoDoClipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
@@ -235,7 +236,8 @@ export type Comando =
   | { comando: "clipe.silhueta"; parametros: { clipeIds: string[]; contorno?: Contorno | null; sombra?: Sombra | null } }
   | { comando: "clipe.mascara"; parametros: { clipeIds: string[]; mascara: MascaraDeForma | null } }
   | { comando: "clipe.preencher"; parametros: { clipeId: string; midiaId: string } }
-  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string; transformacao?: Partial<Transformacao>; acima?: string | null } }
+  | { comando: "imagem.adicionarMidia"; parametros: { midiaId: string; transformacao?: Partial<Transformacao>; acima?: string | null; geracao?: GeracaoDoClipe } }
+  | { comando: "imagem.geracao"; parametros: { clipeId: string; geracao: GeracaoDoClipe | null } }
   | { comando: "imagem.adicionarTexto"; parametros: { texto: Texto; transformacao?: Partial<Transformacao>; acima?: string | null } }
   | { comando: "imagem.agrupar"; parametros: { faixaIds: string[] } }
   | { comando: "imagem.desagrupar"; parametros: { faixaId: string } }
@@ -380,6 +382,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.mascara": "mudar a máscara",
   "clipe.preencher": "trocar a mídia do modelo",
   "imagem.adicionarMidia": "pôr a imagem",
+  "imagem.geracao": "mudar as variações",
   "imagem.adicionarTexto": "pôr o texto",
   "imagem.agrupar": "agrupar as camadas",
   "imagem.desagrupar": "desagrupar",
@@ -625,8 +628,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mascararClipes(projeto, parametros.clipeIds, parametros.mascara) };
     case "imagem.adicionarMidia": {
       const resultado = adicionarCamadaDeMidia(projeto, ctx, parametros.midiaId, parametros.transformacao, parametros.acima);
-      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+      // O preenchimento generativo entra já com as variações dele (um passo do desfazer só)
+      const comGeracao = parametros.geracao ? definirGeracao(resultado.projeto, resultado.clipeId, parametros.geracao) : resultado.projeto;
+      return { projeto: comGeracao, selecao: [resultado.clipeId] };
     }
+    case "imagem.geracao":
+      return { projeto: definirGeracao(projeto, parametros.clipeId, parametros.geracao) };
     case "imagem.adicionarTexto": {
       const resultado = adicionarCamadaDeTexto(projeto, ctx, parametros.texto, parametros.transformacao, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };

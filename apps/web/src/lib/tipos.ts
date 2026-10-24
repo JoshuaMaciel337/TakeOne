@@ -94,7 +94,8 @@ export type Midia = {
   /** Camada de pixels do editor de imagem (lib/pixels.ts): o tamanho e a última versão enviada. Fora da biblioteca. */
   camada_pixels?: { largura: number; altura: number; ultima: number } | null;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
-  gerada?: { descricao: string; formato: string; duracao?: number | null; imagem_id?: string | null } | null;
+  /** Gerada com IA: o texto, o formato e a duração (vídeo e imagem), a imagem de partida e se é um preenchimento. */
+  gerada?: { descricao: string; formato: string | null; duracao?: number | null; imagem_id?: string | null; preenchimento?: boolean } | null;
   /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */
   animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
   criado_em: string;
