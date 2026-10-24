@@ -24,9 +24,11 @@ const ESPERAS_MS = [0, 1_000, 3_000, 5_000, 10_000, 20_000, 30_000, 60_000];
 const EXTENSOES_ACEITAS = [
   ".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts",
   ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac",
-  ".jpg", ".jpeg", ".png", ".webp", ".svg",
+  ".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif",
 ];
-export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", "image/jpeg", "image/png", "image/webp", "image/svg+xml", ...EXTENSOES_ACEITAS].join(",");
+export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", "image/*", ...EXTENSOES_ACEITAS].join(",");
+/** Só as imagens (Arquivo › Abrir do editor de imagem). */
+export const ACEITAR_IMAGENS = ["image/*", ...EXTENSOES_ACEITAS.slice(EXTENSOES_ACEITAS.indexOf(".jpg"))].join(",");
 
 function extensaoAceita(nome: string): boolean {
   const indice = nome.lastIndexOf(".");

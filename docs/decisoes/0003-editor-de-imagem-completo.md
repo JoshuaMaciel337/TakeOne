@@ -258,9 +258,9 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.13 — Arquivos, documento e automação
 
-- [ ] Abrir uma imagem do computador como documento (PNG, JPG, WebP, GIF, BMP, TIFF, SVG, HEIC pelo servidor), Abrir recentes
+- [x] Abrir uma imagem do computador como documento (PNG, JPG, WebP, GIF, BMP, TIFF, SVG, HEIC pelo servidor), Abrir recentes
 - [ ] Abrir e salvar PSD com as camadas (grupos, máscaras, mesclagens, textos e ajustes quando der)
-- [ ] Colocar incorporado (do computador ou da biblioteca)
+- [x] Colocar incorporado (do computador ou da biblioteca)
 - [ ] Exportar como (PNG, JPG com qualidade, WebP com e sem perda, GIF, TIFF, AVIF, BMP, ICO, PDF), Exportação rápida, Salvar para web (GIF e PNG-8 com paleta), Preferências de exportação
 - [ ] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem
 - [ ] Duplicar documento; Informações do arquivo; Imprimir

@@ -159,6 +159,11 @@ export type AcoesDosMenus = {
   painelAberto: (painel: IdPainelDaImagem) => boolean;
   novo: () => void;
   abrir: () => void;
+  /** As imagens mexidas há menos tempo (Arquivo › Abrir recentes). */
+  recentes: { id: string; nome: string }[];
+  abrirRecente: (id: string) => void;
+  /** Arquivo › Colocar incorporado: uma imagem do computador como camada. */
+  colocarIncorporado: () => void;
   exportar: () => void;
   /** As pranchetas: Camada › Novo › Prancheta (nova, a partir do grupo escolhido ou das camadas escolhidas) e a exportação. */
   temPranchetas: boolean;
@@ -312,7 +317,14 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       itens: [
         { nome: "Novo…", aoEscolher: a.novo },
         { nome: "Novo a partir da área de transferência", aoEscolher: a.novoDaAreaDeTransferencia },
-        { nome: "Abrir…", atalho: "Ctrl+O", aoEscolher: a.abrir },
+        { nome: "Abrir…", atalho: "Ctrl+O", aoEscolher: a.abrir, titulo: "Uma imagem do computador vira um documento do tamanho dela" },
+        {
+          nome: "Abrir recentes",
+          desativado: !a.recentes.length,
+          itens: a.recentes.map((recente) => ({ nome: recente.nome, aoEscolher: () => a.abrirRecente(recente.id) })),
+        },
+        "-",
+        { nome: "Colocar incorporado…", aoEscolher: a.colocarIncorporado, titulo: "Uma imagem do computador entra como camada neste documento" },
         "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
         "-",

@@ -1,13 +1,15 @@
 "use client";
 
-import { LoaderCircle, Plus } from "lucide-react";
+import { FolderOpen, LoaderCircle, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { SecaoDoHub, TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { ListaProjetos } from "@/componentes/projeto/ListaProjetos";
+import { documentoDaImagem, enviarEEsperar } from "@/lib/abrirImagem";
 import { chamarApi, ErroApi } from "@/lib/api";
+import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
 import { problemaNoTamanho, TAMANHOS_PRONTOS, type TamanhoDaImagem } from "@/lib/projeto/imagem";
 
 /** O desenho de um tamanho: o retângulo na proporção, dentro de uma caixa fixa. */
@@ -32,6 +34,20 @@ export default function PaginaEditorDeImagem() {
   const [erro, setErro] = useState("");
   const [largura, setLargura] = useState("1080");
   const [altura, setAltura] = useState("1080");
+  const { iniciar } = useEnvios();
+
+  /** Abrir do computador: a imagem sobe, fica pronta e vira um documento do tamanho dela. */
+  function abrirDoComputador(arquivo: File) {
+    setCriando("abrir");
+    setErro("");
+    enviarEEsperar(iniciar, arquivo)
+      .then((midia) => documentoDaImagem(midia.id))
+      .then((id) => router.push(`/app/imagem/${id}`))
+      .catch((e: unknown) => {
+        setErro(e instanceof Error ? e.message : "Não foi possível abrir a imagem.");
+        setCriando(null);
+      });
+  }
 
   function criar(id: string, tamanho: TamanhoDaImagem) {
     const problema = problemaNoTamanho(tamanho);
@@ -61,6 +77,24 @@ export default function PaginaEditorDeImagem() {
       <SecaoDoHub titulo="Novo design">
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
+          <label
+            className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border border-borda bg-painel-2 p-3 text-suave transition hover:-translate-y-0.5 hover:border-suave/50 hover:text-texto ${criando !== null ? "pointer-events-none opacity-60" : ""}`}
+          >
+            <span className="flex size-16 items-center justify-center">{criando === "abrir" ? <LoaderCircle className="size-6 animate-spin" aria-hidden /> : <FolderOpen className="size-8" aria-hidden />}</span>
+            <span className="text-sm font-medium text-texto">Abrir do computador</span>
+            <span className="text-xs">JPG, PNG, WebP, GIF, BMP, TIFF, AVIF, SVG, HEIC</span>
+            <input
+              type="file"
+              accept={ACEITAR_IMAGENS}
+              className="sr-only"
+              aria-label="Abrir uma imagem do computador"
+              onChange={(evento) => {
+                const arquivo = evento.currentTarget.files?.[0];
+                evento.currentTarget.value = "";
+                if (arquivo) abrirDoComputador(arquivo);
+              }}
+            />
+          </label>
           {TAMANHOS_PRONTOS.map((item) => (
             <button
               key={item.id}

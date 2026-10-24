@@ -65,6 +65,8 @@ import { FERRAMENTAS_DA_GALERIA, type FerramentaDaGaleria, type Galeria, galeria
 import { type Escolhido } from "./filtros/Galeria";
 import { JanelaGaleriaDeFiltros } from "./filtros/JanelaGaleriaDeFiltros";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
+import { documentoDaImagem, enviarEEsperar, type ImagemRecente, imagensRecentes } from "@/lib/abrirImagem";
+import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, ceuPelaProfundidade, imagemMenor } from "@/lib/selecao/cores";
 import { REFINAMENTO_PADRAO, refinarSelecao } from "@/lib/selecao/refinar";
@@ -685,6 +687,36 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível pedir o filtro.");
     }
+  };
+  // Arquivo › Abrir (vira um documento) e Colocar incorporado (vira uma camada aqui): o arquivo do computador sobe
+  // pelo envio de sempre e espera a ingestão
+  const { iniciar: iniciarEnvio } = useEnvios();
+  const [recentes, setRecentes] = useState<ImagemRecente[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    imagensRecentes(projetoId)
+      .then((lista) => vivo && setRecentes(lista))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [projetoId]);
+  const escolherArquivo = (destino: "documento" | "camada") => {
+    const entrada = document.createElement("input");
+    entrada.type = "file";
+    entrada.accept = ACEITAR_IMAGENS;
+    entrada.onchange = () => {
+      const arquivo = entrada.files?.[0];
+      if (!arquivo) return;
+      mostrarAviso(destino === "documento" ? `Abrindo "${arquivo.name}"…` : `Colocando "${arquivo.name}"…`);
+      enviarEEsperar(iniciarEnvio, arquivo)
+        .then(async (midia) => {
+          if (destino === "documento") return router.push(`/app/imagem/${await documentoDaImagem(midia.id)}`);
+          esperarMidia(midia);
+        })
+        .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir a imagem."));
+    };
+    entrada.click();
   };
   /** Mais variações do preenchimento da camada: o mesmo recorte e o mesmo texto, guardados no servidor. */
   const maisVariacoes = async (clipeId: string) => {
@@ -4511,7 +4543,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     area: area.area,
     painelAberto: (painel) => area.aberto(painel),
     novo: () => router.push("/app/ferramentas/editor-de-imagem"),
-    abrir: () => router.push("/app/ferramentas/editor-de-imagem"),
+    abrir: () => escolherArquivo("documento"),
+    recentes,
+    abrirRecente: (id: string) => router.push(`/app/imagem/${id}`),
+    colocarIncorporado: () => escolherArquivo("camada"),
     exportar: () => setExportando(true),
     temPranchetas: Boolean(projeto?.faixas.some((faixa) => faixa.clipes[0]?.prancheta)),
     grupoEscolhido: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0]?.pasta) && !escolhidas[0].clipes[0]?.prancheta,
