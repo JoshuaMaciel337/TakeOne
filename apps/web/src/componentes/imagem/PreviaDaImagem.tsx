@@ -93,6 +93,8 @@ type Props = {
   /** Pixels de tela por pixel da imagem; null ajusta a imagem à área. */
   zoom: number | null;
   aoMudarZoom: (zoom: number | null) => void;
+  /** Modo de tela cheia: a mesa em volta da imagem fica preta. */
+  telaCheia?: boolean;
   /** Girar vista (R) e Exibir › Espelhar a vista: só a tela gira; a imagem não muda. */
   giroDaVista?: { angulo: number; espelhada: boolean };
   aoGirarVista?: (angulo: number) => void;
@@ -304,6 +306,7 @@ export function PreviaDaImagem({
   fonteDaMascaraDosFiltros,
   mascaraAVista = null,
   giroDaVista = { angulo: 0, espelhada: false },
+  telaCheia = false,
   aoGirarVista,
   enquadrar = null,
   vista = VISTA_PADRAO,
@@ -772,7 +775,7 @@ export function PreviaDaImagem({
     : null;
 
   return (
-    <section aria-label="Prévia da imagem" className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-fundo">
+    <section aria-label="Prévia da imagem" className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${telaCheia ? "bg-black" : "bg-fundo"}`}>
       {vista.reguas && !girada ? (
         <Reguas
           imagemRef={imagemRef}

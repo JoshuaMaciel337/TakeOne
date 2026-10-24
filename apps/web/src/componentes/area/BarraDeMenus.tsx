@@ -74,6 +74,8 @@ export function useAtalhosDosMenus(menus: Menu[], ativo = true) {
       if (evento.defaultPrevented) return;
       const tecla = teclaDoEvento(evento);
       if (!tecla) return;
+      // O Tab sozinho só vale com o foco fora dos controles: nos botões, ele continua andando pelo foco
+      if ((tecla === "Tab" || tecla === "Shift+Tab") && alvo && alvo !== document.body && alvo !== document.documentElement) return;
       for (const menu of menusRef.current) {
         const item = acoes(menu.itens).find((acao) => acao.atalho && !acao.desativado && acao.atalho.split(" ou ").map(normalizarAtalho).includes(tecla));
         if (item) {

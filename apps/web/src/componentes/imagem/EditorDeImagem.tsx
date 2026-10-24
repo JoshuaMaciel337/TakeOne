@@ -59,7 +59,7 @@ import type { TipoDaProva } from "@/lib/imagem/prova";
 import { indexar, type PaletaDaExportacao, type Pontilhado } from "@/lib/exportacao/formatos/quantizar";
 import { imprimirImagem, type OpcoesDaImpressao } from "@/lib/exportacao/imprimir";
 import { baixarBlob, caixaDoConteudo as caixaDoDesenho, codificarCanvas, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
-import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
+import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, type ModoDeTela, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
 import { PainelFotoIA } from "./PainelFotoIA";
 import { PainelAjustes, PainelAmostras, PainelBiblioteca, PainelCor, PainelModelosDaImagem } from "./PaineisDaImagem";
@@ -494,6 +494,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [vista, setVista] = useState<PreferenciasDaVista>(lerVista);
   // A vista girada (R) e o pedido de enquadrar uma camada: só da tela
   const [giroDaVista, setGiroDaVista] = useState({ angulo: 0, espelhada: false });
+  // Exibir › Modo de tela (F) e os painéis escondidos pelo Tab (todos) ou pelo Shift+Tab (só os da direita)
+  const [modoDeTela, setModoDeTela] = useState<ModoDeTela>("padrao");
+  const [paineisOcultos, setPaineisOcultos] = useState<"nenhum" | "todos" | "encaixados">("nenhum");
+  const mudarModoDeTela = (modo: ModoDeTela) => {
+    setModoDeTela(modo);
+    // Só a imagem: os painéis saem (o Tab os traz de volta); voltando ao padrão, eles voltam
+    setPaineisOcultos(modo === "cheia" ? "todos" : "nenhum");
+    // A tela cheia do navegador: o Esc dele sai, e o editor volta ao modo padrão (abaixo)
+    if (modo !== "padrao" && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+    else if (modo === "padrao" && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  };
+  useEffect(() => {
+    const aoMudar = () => {
+      if (!document.fullscreenElement) {
+        setModoDeTela("padrao");
+        setPaineisOcultos("nenhum");
+      }
+    };
+    document.addEventListener("fullscreenchange", aoMudar);
+    return () => document.removeEventListener("fullscreenchange", aoMudar);
+  }, []);
   const [enquadrar, setEnquadrar] = useState<{ retangulo: RetanguloDaImagem; vez: number } | null>(null);
   const mudarVista = (mudanca: Partial<PreferenciasDaVista>) =>
     setVista((atual) => {
@@ -4857,6 +4878,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     giroDaVista,
     girarVista: (giro) => setGiroDaVista((atual) => ({ ...atual, ...giro })),
+    modoDeTela,
+    mudarModoDeTela,
+    ocultarPaineis: (quais) => setPaineisOcultos((atual) => (atual === "nenhum" ? quais : "nenhum")),
     janelaDaVista: (janela) => setJanelaDaVista(janela),
     temGuias: Boolean(projeto?.guias),
     limparGuias: () => executar({ comando: "imagem.guias", parametros: { guias: { verticais: [], horizontais: [] } } }),
@@ -5619,7 +5643,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto">
-      <header className="flex h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5">
+      <header className={`h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5 ${modoDeTela === "cheia" ? "hidden" : "flex"}`}>
         <Link href="/app" className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-suave transition hover:text-texto" title="Voltar ao início">
           <ChevronLeft className="size-3.5" aria-hidden />
           <Simbolo tamanho={18} />
@@ -5649,6 +5673,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </button>
       </header>
 
+      <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
       <BarraDeOpcoes
         giroDaVista={giroDaVista}
         aoGirarVista={(giro) => setGiroDaVista((atual) => ({ ...atual, ...giro }))}
@@ -5866,8 +5891,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoDesmarcar: acoes.desmarcar,
         }}
       />
+      </div>
 
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
+        <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
         <CaixaDeFerramentas
           ativa={ferramenta}
           aoEscolher={escolherFerramenta}
@@ -5884,9 +5911,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoCoresPadrao={() => setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }))}
           aoDuploClique={(id) => setZoom(id === "zoom" ? 1 : null)}
         />
+        </div>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col max-md:h-[62vh]">
-          <div role="tablist" aria-label="Documentos" className="flex h-7 shrink-0 items-end border-b border-borda bg-painel-2">
+          <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end border-b border-borda bg-painel-2 ${modoDeTela === "padrao" ? "flex" : "hidden"}`}>
             <div role="tab" aria-selected className="flex h-full max-w-full items-center gap-1 border-r border-borda bg-fundo px-2 text-[11px]">
               <input
                 id="nome-projeto"
@@ -5903,6 +5931,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             </div>
           </div>
           <PreviaDaImagem
+            telaCheia={modoDeTela === "cheia"}
             giroDaVista={giroDaVista}
             aoGirarVista={(angulo) => setGiroDaVista((atual) => ({ ...atual, angulo }))}
             enquadrar={enquadrar}
@@ -6102,16 +6131,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             }}
             aoPegarCor={(cor, paraOFundo) => setCores((atual) => ({ ...atual, [paraOFundo ? "fundo" : "primeiroPlano"]: cor }))}
           />
-          <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-borda bg-painel px-2 text-[11px] text-suave">
+          <footer className={`h-6 shrink-0 items-center gap-3 border-t border-borda bg-painel px-2 text-[11px] text-suave ${paineisOcultos === "todos" ? "hidden" : "flex"}`}>
             <span className="tabular-nums">{porcentagem(zoomNaTela)}</span>
             <span className="tabular-nums">
-              {tamanho.largura} px × {tamanho.altura} px (72 ppp)
+              {tamanho.largura} px × {tamanho.altura} px ({projeto.tamanho?.resolucao ?? 72} ppp)
             </span>
             <span className="min-w-0 truncate max-md:hidden">{dadosDa(ferramenta).dica}</span>
           </footer>
         </main>
 
-        <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
+        <div className={paineisOcultos === "nenhum" ? "contents" : "hidden"}>
+          <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
+        </div>
       </div>
 
       {filtroNeural ? <JanelaFiltroNeural tipo={filtroNeural} aoConfirmar={(corpo) => void pedirFiltroNeural(filtroNeural, corpo)} aoCancelar={() => setFiltroNeural(null)} /> : null}

@@ -89,6 +89,10 @@ const ALINHAMENTOS: { id: Alinhamento; nome: string }[] = [
 ];
 const DISTRIBUICOES: { id: Distribuicao; nome: string }[] = [...ALINHAMENTOS, { id: "espacoH", nome: "Espaçamento horizontal" }, { id: "espacoV", nome: "Espaçamento vertical" }];
 
+/** Os modos de tela, na ordem do F: o padrão, a tela cheia com os menus e só a imagem no preto. */
+export type ModoDeTela = "padrao" | "comMenus" | "cheia";
+export const MODOS_DE_TELA: ModoDeTela[] = ["padrao", "comMenus", "cheia"];
+
 export type AcoesDosMenus = {
   temCamada: boolean;
   /** Quantas camadas estão escolhidas. */
@@ -171,6 +175,10 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Exibir › Modo de tela (F) e os painéis escondidos (Tab: todos; Shift+Tab: só os encaixados, que alternam). */
+  modoDeTela: ModoDeTela;
+  mudarModoDeTela: (modo: ModoDeTela) => void;
+  ocultarPaineis: (quais: "todos" | "encaixados") => void;
   /** Exibir › 200%, Tamanho de impressão, Ajustar a camada à tela, Espelhar e Redefinir a vista. */
   zoomExato: (zoom: number) => void;
   tamanhoDeImpressao: () => void;
@@ -874,6 +882,19 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Espelhar a vista na horizontal", marcado: a.giroDaVista.espelhada, aoEscolher: () => a.girarVista({ espelhada: !a.giroDaVista.espelhada }) },
         { nome: "Redefinir a vista", desativado: !a.giroDaVista.angulo && !a.giroDaVista.espelhada, aoEscolher: () => a.girarVista({ angulo: 0, espelhada: false }), titulo: "Tira o giro e o espelho da vista" },
+        {
+          nome: "Modo de tela",
+          itens: [
+            { nome: "Modo de tela padrão", marcado: a.modoDeTela === "padrao", aoEscolher: () => a.mudarModoDeTela("padrao") },
+            { nome: "Modo de tela cheia com a barra de menus", marcado: a.modoDeTela === "comMenus", aoEscolher: () => a.mudarModoDeTela("comMenus") },
+            { nome: "Modo de tela cheia", marcado: a.modoDeTela === "cheia", aoEscolher: () => a.mudarModoDeTela("cheia"), titulo: "Só a imagem, no preto; Tab mostra os painéis e F (ou Esc) volta" },
+            "-",
+            { nome: "Próximo modo de tela", atalho: "F", aoEscolher: () => a.mudarModoDeTela(MODOS_DE_TELA[(MODOS_DE_TELA.indexOf(a.modoDeTela) + 1) % MODOS_DE_TELA.length]) },
+            { nome: "Modo de tela anterior", atalho: "Shift+F", aoEscolher: () => a.mudarModoDeTela(MODOS_DE_TELA[(MODOS_DE_TELA.indexOf(a.modoDeTela) + MODOS_DE_TELA.length - 1) % MODOS_DE_TELA.length]) },
+          ],
+        },
+        { nome: "Mostrar ou ocultar os painéis", atalho: "Tab", aoEscolher: () => a.ocultarPaineis("todos") },
+        { nome: "Mostrar ou ocultar os painéis encaixados", atalho: "Shift+Tab", aoEscolher: () => a.ocultarPaineis("encaixados"), titulo: "Só os painéis da direita; a caixa de ferramentas e a barra de opções ficam" },
         "-",
         { nome: "Extras", atalho: "Ctrl+H", marcado: a.vista.extras, aoEscolher: () => a.mudarVista({ extras: !a.vista.extras }), titulo: "Mostra ou esconde de uma vez as guias, a grade, as bordas e as formigas da seleção" },
         {
