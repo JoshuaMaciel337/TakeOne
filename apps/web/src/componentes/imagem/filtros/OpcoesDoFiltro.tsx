@@ -69,6 +69,7 @@ export function OpcoesDoFiltro({
               <input type="color" className="h-6 w-12 cursor-pointer rounded border border-borda" aria-label={opcao.nome} value={String(v[opcao.id])} onChange={(evento) => aoMudar(com(opcao.id, evento.currentTarget.value))} />
             </label>
           );
+        if (opcao.tipo === "texto") return null;
         // A matriz 5 × 5 do Personalizado
         const numeros = String(v[opcao.id])
           .split(",")

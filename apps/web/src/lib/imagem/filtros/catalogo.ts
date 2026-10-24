@@ -5,6 +5,7 @@
 import type { ContextoDoFiltro, ImagemDoFiltro } from "./comum.ts";
 import { hexParaRgb } from "./comum.ts";
 import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radial } from "./desfoque.ts";
+import { galeriaDasOpcoes, galeriaDeDesfoque, margemDaGaleria } from "./galeria.ts";
 import { desfoqueDeLente } from "./lente.ts";
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
 import { coresNtsc, desentrelacar, difusao, encontrarBordas, entalhe, extrusao, ladrilhos, pinturaAOleo, solarizar, tracarContorno, vento } from "./estilizacao.ts";
@@ -36,11 +37,14 @@ export type Opcao =
   | { id: string; nome: string; tipo: "escolha"; opcoes: { id: string; nome: string }[]; padrao: string; comCanais?: boolean }
   | { id: string; nome: string; tipo: "marcar"; padrao: boolean }
   | { id: string; nome: string; tipo: "cor"; padrao: string }
-  | { id: string; nome: string; tipo: "matriz"; padrao: string };
+  | { id: string; nome: string; tipo: "matriz"; padrao: string }
+  /** Um texto que a janela genérica não mostra (os alfinetes da galeria de desfoque, que têm a janela deles). */
+  | { id: string; nome: string; tipo: "texto"; padrao: string };
 
-export type GrupoDoFiltro = "desfoque" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
+export type GrupoDoFiltro = "desfoque" | "galeria" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
 export const GRUPOS_DE_FILTROS: { id: GrupoDoFiltro; nome: string }[] = [
   { id: "desfoque", nome: "Desfoque" },
+  { id: "galeria", nome: "Galeria de desfoque" },
   { id: "distorcao", nome: "Distorção" },
   { id: "ruido", nome: "Ruído" },
   { id: "pixelizacao", nome: "Pixelização" },
@@ -58,6 +62,8 @@ export type DefinicaoDoFiltro = {
   opcoes: Opcao[];
   /** Sem opções: aplica direto, sem janela (como o Desfoque e o Tornar nítido de lá). */
   semJanela?: boolean;
+  /** A janela própria (a galeria de desfoque, com os alfinetes na prévia) no lugar da genérica. */
+  janela?: "galeria";
   margem?: (v: Valores) => number;
   aplicar: (imagem: ImagemDoFiltro, v: Valores, ctx: ContextoDoFiltro) => ImagemDoFiltro;
 };
@@ -157,6 +163,35 @@ export const FILTROS: DefinicaoDoFiltro[] = [
     grupo: "desfoque",
     opcoes: [numero("raio", "Raio", 2, 100, 5, "px"), numero("limiar", "Limiar", 2, 255, 15, "níveis")],
     aplicar: (imagem, v, ctx) => preservandoBordas(imagem, n(v, "raio") * ctx.escala, n(v, "limiar") / 255, "superficie"),
+  },
+  // ——— Galeria de desfoque ———
+  {
+    id: "galeria",
+    nome: "Galeria de desfoque",
+    grupo: "galeria",
+    janela: "galeria",
+    opcoes: [
+      { id: "campo", nome: "Campo", tipo: "texto", padrao: "" },
+      { id: "iris", nome: "Íris", tipo: "texto", padrao: "" },
+      { id: "inclinacao", nome: "Inclinação", tipo: "texto", padrao: "" },
+      { id: "caminho", nome: "Caminho", tipo: "texto", padrao: "" },
+      { id: "giro", nome: "Giro", tipo: "texto", padrao: "" },
+      numero("luz", "Luz do bokeh", 0, 100, 0, "%"),
+      numero("cor", "Cor do bokeh", 0, 100, 0, "%"),
+      numero("faixa_de", "Faixa de luz (de)", 0, 255, 191),
+      numero("faixa_ate", "Faixa de luz (até)", 0, 255, 255),
+      numero("ruido", "Ruído", 0, 100, 0, "%"),
+      escolha("distribuicao", "Distribuição do ruído", [["uniforme", "Uniforme"], ["gaussiana", "Gaussiana"]]),
+      marcar("monocromatico", "Ruído monocromático"),
+    ],
+    margem: (v) => margemDaGaleria(galeriaDasOpcoes(v)),
+    aplicar: (imagem, v, ctx) =>
+      galeriaDeDesfoque(
+        imagem,
+        galeriaDasOpcoes(v),
+        { luz: n(v, "luz"), cor: n(v, "cor"), faixaDe: n(v, "faixa_de"), faixaAte: n(v, "faixa_ate"), ruido: n(v, "ruido"), distribuicao: s(v, "distribuicao"), monocromatico: Boolean(v.monocromatico) },
+        ctx,
+      ),
   },
   // ——— Distorção ———
   {
@@ -550,7 +585,7 @@ export function valoresDoFiltro(definicao: DefinicaoDoFiltro, v: Valores = {}): 
     if (opcao.tipo === "numero") saida[opcao.id] = typeof dado === "number" && Number.isFinite(dado) ? Math.min(opcao.maximo, Math.max(opcao.minimo, dado)) : opcao.padrao;
     else if (opcao.tipo === "marcar") saida[opcao.id] = typeof dado === "boolean" ? dado : opcao.padrao;
     else if (opcao.tipo === "escolha") saida[opcao.id] = typeof dado === "string" && (opcao.opcoes.some((item) => item.id === dado) || (opcao.comCanais && /^canal:[\w-]{1,64}$/.test(dado))) ? dado : opcao.padrao;
-    else saida[opcao.id] = typeof dado === "string" ? dado : opcao.padrao;
+    else saida[opcao.id] = typeof dado === "string" && (opcao.tipo !== "texto" || dado.length <= 400) ? dado : opcao.padrao;
   }
   return saida;
 }

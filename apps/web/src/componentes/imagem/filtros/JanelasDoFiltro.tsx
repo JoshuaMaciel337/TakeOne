@@ -10,6 +10,7 @@ import { MESCLAGENS_DA_IMAGEM, type Mesclagem } from "@/lib/projeto/modelo";
 
 import { JanelaFlutuante } from "../ajustes/JanelaDeAjusteNosPixels";
 import { Moldura } from "../JanelasDePixels";
+import { PainelDaGaleria } from "./Galeria";
 import { OpcoesDoFiltro } from "./OpcoesDoFiltro";
 
 export function JanelaDoFiltroInteligente({
@@ -19,19 +20,30 @@ export function JanelaDoFiltroInteligente({
   aoConfirmar,
   aoCancelar,
   canais,
+  controlado,
+  galeria,
 }: {
   tipo: string;
   inicial: Valores;
   canais?: { id: string; nome: string }[];
+  /** As opções vindas de fora (a galeria de desfoque: os alfinetes na prévia mudam as mesmas opções). */
+  controlado?: { valores: Valores; aoMudar: (valores: Valores) => void };
+  galeria?: Omit<React.ComponentProps<typeof PainelDaGaleria>, "valores" | "aoMudar">;
   /** O filtro com as opções da vez (null: sem o Visualizar, como estava). */
   aoPrever: (valores: Valores | null) => void;
   aoConfirmar: (valores: Valores) => void;
   aoCancelar: () => void;
 }) {
   const definicao = FILTRO_POR_ID.get(tipo);
-  const [valores, setValores] = useState<Valores>(inicial);
+  const [proprios, setProprios] = useState<Valores>(inicial);
+  const valores = controlado?.valores ?? proprios;
+  const setValores = controlado?.aoMudar ?? setProprios;
   const [visualizar, setVisualizar] = useState(true);
-  useEffect(() => aoPrever(visualizar ? valores : null), [valores, visualizar, aoPrever]);
+  // Um pouco depois de mexer (arrastar um alfinete da galeria muda as opções a cada movimento)
+  useEffect(() => {
+    const espera = window.setTimeout(() => aoPrever(visualizar ? valores : null), 40);
+    return () => window.clearTimeout(espera);
+  }, [valores, visualizar, aoPrever]);
   if (!definicao) return null;
   return (
     <JanelaFlutuante
@@ -46,7 +58,11 @@ export function JanelaDoFiltroInteligente({
       }
     >
       <div className="p-3 text-xs">
-        <OpcoesDoFiltro definicao={definicao} valores={valores} aoPrever={setValores} aoMudar={setValores} canais={canais} />
+        {definicao.janela === "galeria" && galeria ? (
+          <PainelDaGaleria valores={valores} aoMudar={setValores} {...galeria} />
+        ) : (
+          <OpcoesDoFiltro definicao={definicao} valores={valores} aoPrever={setValores} aoMudar={setValores} canais={canais} />
+        )}
       </div>
     </JanelaFlutuante>
   );

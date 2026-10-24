@@ -45,6 +45,7 @@ import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { CortePerspectivaNaPrevia } from "./CortePerspectivaNaPrevia";
+import { GaleriaNaPrevia } from "./filtros/Galeria";
 import { ReguaNaPrevia } from "./ReguaNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
@@ -91,6 +92,8 @@ type Props = {
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
   /** A Régua: a medida e quem a muda. */
   regua?: Omit<React.ComponentProps<typeof ReguaNaPrevia>, "escala"> | null;
+  /** Os alfinetes da galeria de desfoque, enquanto a janela dela está aberta. */
+  galeria?: Omit<React.ComponentProps<typeof GaleriaNaPrevia>, "escala" | "documento"> | null;
   /** O Corte de perspectiva em andamento (CortePerspectivaNaPrevia). */
   cortePerspectiva?: Omit<React.ComponentProps<typeof CortePerspectivaNaPrevia>, "imagem" | "escala"> | null;
   /** O Corte em andamento: a caixa e as opções dela (RecorteNaPrevia). */
@@ -261,6 +264,7 @@ export function PreviaDaImagem({
   recorte = null,
   cortePerspectiva = null,
   regua = null,
+  galeria = null,
   objeto = null,
   aoTerminarTraco,
   preencherCercado,
@@ -698,6 +702,7 @@ export function PreviaDaImagem({
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia {...recorte} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {cortePerspectiva && tamanho.largura > 1 ? <CortePerspectivaNaPrevia {...cortePerspectiva} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {regua && tamanho.largura > 1 ? <ReguaNaPrevia {...regua} escala={tamanho.largura / imagem.largura} /> : null}
+            {galeria && tamanho.largura > 1 ? <GaleriaNaPrevia {...galeria} escala={tamanho.largura / imagem.largura} documento={imagem} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
               <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} preencherCercado={preencherCercado} />
             ) : null}

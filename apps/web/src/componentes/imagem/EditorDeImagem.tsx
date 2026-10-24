@@ -57,6 +57,8 @@ import { criarPincel, excluirPincel, importarAbr, pincelDaPonta, predefinicaoDoE
 import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { exportarImagem } from "@/lib/exportacao/imagem";
 import { planoDosPixels, type PlanoDosPixels, planosDosEfeitos, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
+import { FERRAMENTAS_DA_GALERIA, type FerramentaDaGaleria, type Galeria, galeriaDasOpcoes, pinoNovo, textoDosPinos } from "@/lib/imagem/filtros/galeria";
+import { type Escolhido } from "./filtros/Galeria";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
@@ -2321,6 +2323,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ultimoFiltro, setUltimoFiltro] = useState<{ tipo: string; opcoes: Valores } | null>(null);
   /** A janela de um filtro inteligente: o novo (que entra no topo da pilha) ou um que já está nela. */
   const [filtroAberto, setFiltroAberto] = useState<{ clipeId: string; filtroId: string; tipo: string; antes: FiltrosInteligentes | null; inicial: Valores; novo: boolean } | null>(null);
+  // A galeria de desfoque: a ferramenta, o alfinete escolhido e, no filtro inteligente, as opções (que os alfinetes na
+  // prévia mudam junto com a janela)
+  const [ferramentaDaGaleria, setFerramentaDaGaleria] = useState<FerramentaDaGaleria>("campo");
+  const [escolhidoDaGaleria, setEscolhidoDaGaleria] = useState<Escolhido>(null);
+  const [valoresDaGaleria, setValoresDaGaleria] = useState<Valores | null>(null);
   const [mesclagemDoFiltro, setMesclagemDoFiltro] = useState<{ clipeId: string; filtroId: string; antes: FiltrosInteligentes } | null>(null);
   const [mascaraDosFiltrosEmFoco, setMascaraDosFiltrosEmFoco] = useState<string | null>(null);
   /** A pilha com o filtro da janela nas opções da vez. */
@@ -2414,7 +2421,35 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (executar({ comando: "imagem.filtros", parametros: { clipeId: achado.clipe.id, filtros: { ...pilha, filtros: [...pilha.filtros, novo] } } })) setUltimoFiltro({ tipo, opcoes: valores });
       return;
     }
+    if (tipo === "galeria") setValoresDaGaleria(valores);
     setFiltroAberto({ clipeId: achado.clipe.id, filtroId, tipo, antes: achado.clipe.filtros_inteligentes ?? null, inicial: valores, novo: true });
+  };
+  /** Filtro › Galeria de desfoque: a galeria com um alfinete da ferramenta no meio da imagem. */
+  const abrirGaleria = (ferramenta: FerramentaDaGaleria) => {
+    const documento = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    setFerramentaDaGaleria(ferramenta);
+    setEscolhidoDaGaleria({ ferramenta, indice: 0 });
+    aplicarFiltroDoMenu("galeria", { [ferramenta]: textoDosPinos(ferramenta, [pinoNovo(ferramenta, 50, 50, documento)] as Galeria[typeof ferramenta]) });
+  };
+  // Os alfinetes na prévia mudam as opções da janela aberta: a do filtro inteligente ou a dos pixels
+  const galeriaNaTela: { valores: Valores; aoMudar: (valores: Valores) => void } | null =
+    filtroAberto?.tipo === "galeria" && valoresDaGaleria
+      ? { valores: valoresDaGaleria, aoMudar: setValoresDaGaleria }
+      : nosPixels?.operacao.tipo === "filtro" && nosPixels.operacao.filtro === "galeria"
+        ? { valores: nosPixels.operacao.opcoes, aoMudar: (opcoes) => setNosPixels((atual) => (atual && atual.operacao.tipo === "filtro" ? { ...atual, operacao: { ...atual.operacao, opcoes } } : atual)) }
+        : null;
+  const escolherNaGaleria = (escolhido: Escolhido) => {
+    setEscolhidoDaGaleria(escolhido);
+    if (escolhido) setFerramentaDaGaleria(escolhido.ferramenta);
+  };
+  const propsDaGaleria = {
+    ferramenta: ferramentaDaGaleria,
+    aoFerramenta: (f: FerramentaDaGaleria) => {
+      setFerramentaDaGaleria(f);
+      setEscolhidoDaGaleria(null);
+    },
+    escolhido: escolhidoDaGaleria,
+    aoEscolher: escolherNaGaleria,
   };
   /** O clique duplo num filtro da pilha: a janela dele, com as opções que ele tem. */
   const editarFiltroInteligente = (clipeId: string, filtroId: string) => {
@@ -2422,6 +2457,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const filtro = pilha?.filtros.find((item) => item.id === filtroId);
     if (!pilha || !filtro) return;
     if (!FILTRO_POR_ID.get(filtro.tipo)?.opcoes.length) return mostrarAviso("Este filtro não tem opções.");
+    if (filtro.tipo === "galeria") {
+      const galeria = galeriaDasOpcoes(filtro.opcoes);
+      setFerramentaDaGaleria(FERRAMENTAS_DA_GALERIA.find((f) => (galeria[f] as unknown[]).length) ?? "campo");
+      setEscolhidoDaGaleria(null);
+      setValoresDaGaleria(filtro.opcoes);
+    }
     setFiltroAberto({ clipeId, filtroId, tipo: filtro.tipo, antes: pilha, inicial: filtro.opcoes, novo: false });
   };
   /** A máscara dos filtros: a primeira vez, uma branca (ou a seleção); depois, o clique põe ela em foco para o pincel. */
@@ -4245,6 +4286,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     automatico: (jeito) => void ajusteInstantaneo(jeito),
     filtroDoCatalogo: (tipo) => aplicarFiltroDoMenu(tipo),
+    galeriaDeDesfoque: abrirGaleria,
     ultimoFiltro: { nome: ultimoFiltro ? (FILTRO_POR_ID.get(ultimoFiltro.tipo)?.nome ?? null) : null, aplicar: () => ultimoFiltro && aplicarFiltroDoMenu(ultimoFiltro.tipo, ultimoFiltro.opcoes, true) },
     converterParaFiltrosInteligentes,
     preenchimento: {
@@ -5301,6 +5343,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMudarZoom={setZoom}
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
+            galeria={galeriaNaTela ? { ...galeriaNaTela, ferramenta: ferramentaDaGaleria, escolhido: escolhidoDaGaleria, aoEscolher: escolherNaGaleria } : null}
             cortePerspectiva={
               ferramenta === "corteDePerspectiva"
                 ? { quad: cortePerspectiva, grade: opcoesDaPerspectiva.grade, aoMudar: setCortePerspectiva, aoConfirmar: () => void confirmarCortePerspectiva() }
@@ -5476,6 +5519,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={confirmarNosPixels}
           aoCancelar={cancelarNosPixels}
           canais={projeto.canais ?? []}
+          galeria={propsDaGaleria}
         />
       ) : null}
       {filtroAberto ? (
@@ -5485,6 +5529,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           inicial={filtroAberto.inicial}
           aoPrever={preverFiltro}
           canais={projeto?.canais ?? []}
+          controlado={filtroAberto.tipo === "galeria" && valoresDaGaleria ? { valores: valoresDaGaleria, aoMudar: setValoresDaGaleria } : undefined}
+          galeria={propsDaGaleria}
           aoConfirmar={(valores) => {
             const filtros = pilhaComFiltro(valores);
             setProvisorio(null);

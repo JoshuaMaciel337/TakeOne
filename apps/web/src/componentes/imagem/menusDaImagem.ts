@@ -8,6 +8,7 @@ import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
 import { NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { TipoDoAjuste } from "@/lib/imagem/ajustes";
 import { FILTROS as CATALOGO_DE_FILTROS, GRUPOS_DE_FILTROS } from "@/lib/imagem/filtros/catalogo";
+import { FERRAMENTAS_DA_GALERIA, type FerramentaDaGaleria, NOMES_DA_GALERIA } from "@/lib/imagem/filtros/galeria";
 import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
@@ -177,6 +178,8 @@ export type AcoesDosMenus = {
   automatico: (jeito: "tom" | "contraste" | "cor") => void;
   /** Um filtro do catálogo (lib/imagem/filtros), o último de novo (com as mesmas opções) e converter a camada. */
   filtroDoCatalogo: (tipo: string) => void;
+  /** A galeria de desfoque, aberta numa ferramenta (campo, íris, inclinação, caminho ou giro). */
+  galeriaDeDesfoque: (ferramenta: FerramentaDaGaleria) => void;
   ultimoFiltro: { nome: string | null; aplicar: () => void };
   converterParaFiltrosInteligentes: () => void;
   /** Camada › Nova camada de preenchimento, Opções do conteúdo e Alterar o conteúdo (da escolhida, se for uma). */
@@ -684,7 +687,10 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           (grupo): ItemDeMenu => ({
             nome: grupo.nome,
             desativado: semCamada,
-            itens: CATALOGO_DE_FILTROS.filter((filtro) => filtro.grupo === grupo.id).map((filtro) => ({ nome: filtro.semJanela ? filtro.nome : `${filtro.nome}…`, aoEscolher: () => a.filtroDoCatalogo(filtro.id) })),
+            itens:
+              grupo.id === "galeria"
+                ? FERRAMENTAS_DA_GALERIA.map((ferramenta) => ({ nome: `${NOMES_DA_GALERIA[ferramenta]}…`, aoEscolher: () => a.galeriaDeDesfoque(ferramenta) }))
+                : CATALOGO_DE_FILTROS.filter((filtro) => filtro.grupo === grupo.id).map((filtro) => ({ nome: filtro.semJanela ? filtro.nome : `${filtro.nome}…`, aoEscolher: () => a.filtroDoCatalogo(filtro.id) })),
           }),
         ),
         {

@@ -140,3 +140,42 @@ test("desfoque de lente com mapa: o nítido fica, e não vaza para o fundo borra
   // O ponto do borrado se espalha e perde força
   assert.ok(pixel(saida, 24, 10)[0] < 128 && pixel(saida, 27, 10)[0] > 0);
 });
+
+test("galeria de desfoque: os alfinetes vão e voltam pelo texto", async () => {
+  const { pinosDoTexto, textoDosPinos } = await import("./galeria.ts");
+  const iris = [{ x: 50, y: 40.5, rx: 120, ry: 80, giro: 15, arredondado: 60, nitida: 50, desfoque: 12 }];
+  assert.deepEqual(pinosDoTexto("iris", textoDosPinos("iris", iris)), iris);
+  const caminho = [{ pontos: [{ x: 10, y: 20 }, { x: 30, y: 40 }, { x: 50, y: 20 }], velocidade: 40, afunilar: 25 }];
+  assert.deepEqual(pinosDoTexto("caminho", textoDosPinos("caminho", caminho)), caminho);
+  // Texto estragado vira nada, sem lançar erro
+  assert.deepEqual(pinosDoTexto("campo", "1,2;abc;;3"), []);
+});
+
+test("galeria de desfoque: a íris e a inclinação deixam o meio nítido e borram longe", async () => {
+  const { desfoqueNoPonto } = await import("./galeria.ts");
+  const documento = { largura: 200, altura: 100 };
+  const vazia = { campo: [], iris: [], inclinacao: [], caminho: [], giro: [] };
+  const iris = desfoqueNoPonto({ ...vazia, iris: [{ x: 50, y: 50, rx: 40, ry: 20, giro: 0, arredondado: 100, nitida: 50, desfoque: 10 }] }, documento)!;
+  assert.equal(iris(100, 50), 0);
+  assert.equal(iris(0, 0), 10);
+  assert.ok(iris(135, 50) > 0 && iris(135, 50) < 10);
+  const inclinacao = desfoqueNoPonto({ ...vazia, inclinacao: [{ x: 50, y: 50, angulo: 0, nitida: 10, transicao: 20, desfoque: 8 }] }, documento)!;
+  assert.equal(inclinacao(10, 55), 0);
+  assert.equal(inclinacao(10, 95), 8);
+  // Um alfinete de campo só: o mesmo desfoque em tudo; o campo e a íris juntos ficam no maior
+  assert.equal(desfoqueNoPonto({ ...vazia, campo: [{ x: 0, y: 0, desfoque: 3 }] }, documento)!(150, 80), 3);
+  assert.equal(desfoqueNoPonto({ ...vazia, campo: [{ x: 0, y: 0, desfoque: 3 }], iris: [{ x: 50, y: 50, rx: 40, ry: 20, giro: 0, arredondado: 100, nitida: 50, desfoque: 10 }] }, documento)!(100, 50), 3);
+});
+
+test("galeria de desfoque: o giro não mexe fora da elipse, e o caminho borra só na direção dele", () => {
+  const doc = { ...ctx, documento: { largura: 31, altura: 31 } };
+  const ponto = imagem(31, 31, [0, 0, 0, 0], [[15, 15, [255, 255, 255, 255]], [2, 2, [255, 255, 255, 255]]]);
+  const giro = aplicarFiltro(ponto, "galeria", { giro: "50,50,10,10,0,90,0" }, doc);
+  assert.deepEqual(pixel(giro, 2, 2), [255, 255, 255, 255]);
+  const anel = imagem(31, 31, [0, 0, 0, 0], [[20, 15, [255, 255, 255, 255]]]);
+  const girado = aplicarFiltro(anel, "galeria", { giro: "50,50,10,10,0,90,0" }, doc);
+  assert.ok(pixel(girado, 20, 15)[3] < 255 && pixel(girado, 19, 18)[3] > 0);
+  const caminho = aplicarFiltro(ponto, "galeria", { caminho: "0 50 100 50|10|0" }, doc);
+  assert.ok(pixel(caminho, 19, 15)[3] > 0);
+  assert.equal(pixel(caminho, 15, 18)[3], 0);
+});
