@@ -239,6 +239,7 @@ export type Comando =
   | { comando: "imagem.tamanhoDaTela"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho>; fundo: { cor: string; transparente: boolean } | null } }
   | { comando: "imagem.girar"; parametros: { giro: GiroDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.cortar"; parametros: { caixa: CaixaDoCorte; tamanhos: Record<string, Tamanho>; pixels?: TrocaDePixels[] } }
+  | { comando: "imagem.retificar"; parametros: { tamanho: TamanhoDaImagem; trocas: (Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number })[] } }
   | { comando: "imagem.camadaComOutraMidia"; parametros: { faixaId: string; midiaId: string } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
@@ -359,6 +360,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.tamanhoDaTela": "mudar o tamanho da tela",
   "imagem.girar": "girar a imagem",
   "imagem.cortar": "cortar a imagem",
+  "imagem.retificar": "cortar em perspectiva",
   "imagem.camadaComOutraMidia": "pôr o objeto recortado",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
@@ -626,6 +628,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: girarImagem(projeto, parametros.giro, parametros.tamanhos) };
     case "imagem.cortar":
       return { projeto: cortarImagem(projeto, parametros.caixa, parametros.tamanhos, parametros.pixels) };
+    case "imagem.retificar": {
+      // O Corte de perspectiva: o quadro novo e cada camada trocada pela versão retificada dela, num passo só
+      let atual = mudarTamanhoDaImagem(projeto, parametros.tamanho);
+      for (const troca of parametros.trocas) atual = substituirPorPixels(atual, ctx.novoId, troca).projeto;
+      return { projeto: atual, selecao: [] };
+    }
     case "imagem.aplicarModelo":
       return { projeto: aplicarModeloDeImagem(projeto, ctx, parametros), selecao: [] };
     case "imagem.trocarImagem":

@@ -94,6 +94,7 @@ import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
 import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./OpcoesDoCorte";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
+import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
 import { preencherBuracos } from "@/lib/pintura/recuperar";
 import { JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
 import { redimensionar } from "@/lib/transformar/reamostragem";
@@ -101,7 +102,7 @@ import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEM
 import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
 import { type Malha, malhaDoEstilo, mapaDaMalha, type OpcoesDoEstilo } from "@/lib/transformar/deformar";
-import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, type Referencia, semelhanca } from "@/lib/transformar/livre";
+import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, type Referencia, retificar, semelhanca } from "@/lib/transformar/livre";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
@@ -339,6 +340,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // O Corte (C): a caixa em andamento e as opções, que ficam de um corte para o outro
   const [recorte, setRecorte] = useState<CaixaDoCorte | null>(null);
   const [opcoesDoCorte, setOpcoesDoCorte] = useState<OpcoesDoCorte>(CORTE_PADRAO);
+  // O Corte de perspectiva: o quadrilátero e o tamanho do resultado (0 é pelos lados do quadrilátero)
+  const [cortePerspectiva, setCortePerspectiva] = useState<Quadrilatero | null>(null);
+  const [opcoesDaPerspectiva, setOpcoesDaPerspectiva] = useState({ largura: 0, altura: 0, resolucao: 0, grade: true });
+  // A Régua: a última medida (fica ao trocar de ferramenta, como lá)
+  const [medida, setMedida] = useState<Medida | null>(null);
   const modeloDoEndereco = useRef(false);
   // As caixas das camadas na tela (a prévia mede), para alinhar e distribuir
   const caixasRef = useRef<Map<string, CaixaNoQuadro>>(new Map());
@@ -1414,6 +1420,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const { largura, altura } = tamanhoDaImagem(projeto);
       setRecorte(caixaNaPredefinicao({ cx: largura / 2, cy: altura / 2, largura, altura, angulo: 0 }, opcoesDoCorte, { largura, altura }));
     } else setRecorte(null);
+    if (id !== "corteDePerspectiva") setCortePerspectiva(null);
   };
 
   /** O tamanho de cada mídia (as camadas de pixels também), para recortar a imagem sem mudar o tamanho delas em pixels. */
@@ -1467,6 +1474,61 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (o.predefinicao === "tamanho") await aplicarTamanhoDaImagem({ ...o.tamanhoFinal, reamostrar: true, metodo: "automatica" });
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /**
+   * O Corte de perspectiva: cada camada (desenhada sozinha, como no rasterizar) é retificada do quadrilátero para o
+   * retângulo do resultado e entra no lugar dela como camada de pixels; o quadro fica do tamanho dele. Num passo só.
+   */
+  const confirmarCortePerspectiva = async () => {
+    const atual = projetoRef.current;
+    const quad = cortePerspectiva;
+    if (!atual || !quad || gerandoPixels) return;
+    const lado = (a: PontoDaMalha, b: PontoDaMalha) => Math.hypot(b.x - a.x, b.y - a.y);
+    const largura = opcoesDaPerspectiva.largura || Math.round(Math.max(lado(quad[0], quad[1]), lado(quad[3], quad[2])));
+    const altura = opcoesDaPerspectiva.altura || Math.round(Math.max(lado(quad[0], quad[3]), lado(quad[1], quad[2])));
+    const tamanho = { largura, altura, ...(opcoesDaPerspectiva.resolucao ? { resolucao: opcoesDaPerspectiva.resolucao } : {}) };
+    const problema = largura < 16 || altura < 16 || largura > 8192 || altura > 8192 || largura * altura > 36_000_000;
+    if (problema) return mostrarAviso("O resultado precisa ter de 16 a 8192 px de lado e até 36 milhões de pixels.");
+    const documento = tamanhoDaImagem(atual);
+    setCortePerspectiva(null);
+    setFerramenta("mover");
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const trocas: (Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number })[] = [];
+      for (const { clipe, faixa } of camadasDaImagem(atual)) {
+        if (clipe.pasta || clipe.ajuste) continue;
+        let plano: PlanoDosPixels;
+        try {
+          plano = planoDosPixels(atual, clipe.mascara_pixels ? "aplicarMascara" : "transformar", [faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
+        } catch {
+          continue;
+        }
+        const { desenhar, ...dados } = plano;
+        const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+        const tela = document.createElement("canvas");
+        tela.width = documento.largura;
+        tela.height = documento.altura;
+        const ctxTela = tela.getContext("2d", { willReadFrequently: true })!;
+        ctxTela.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+        bitmap.close();
+        const origem = ctxTela.getImageData(0, 0, documento.largura, documento.altura);
+        const canvas = document.createElement("canvas");
+        canvas.width = largura;
+        canvas.height = altura;
+        canvas.getContext("2d")!.putImageData(new ImageData(retificar({ dados: origem.data, largura: origem.width, altura: origem.height }, quad, largura, altura, "bicubica"), largura, altura), 0, 0);
+        const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+        const midia = await criarCamadaDePixels(largura, altura, dados.nome);
+        setCriadas((atuais) => new Map([...atuais, [midia.id, midia]]));
+        trocas.push({ ...dados, midiaId: midia.id, versao: await enviarVersao(midia.id, blob) });
+      }
+      void biblioteca.recarregar();
+      executar({ comando: "imagem.retificar", parametros: { tamanho, trocas } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar em perspectiva.");
     } finally {
       setGerandoPixels(false);
     }
@@ -2740,6 +2802,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     else if (tecla === "Enter" && transformando) confirmarTransformacao();
     else if (tecla === "Escape" && transformando) setTransformando(null);
     else if (tecla === "Enter" && recorte) void confirmarCorte();
+    else if (tecla === "Enter" && cortePerspectiva) void confirmarCortePerspectiva();
     else if (tecla === "Escape") {
       if (recorte) cancelarCorte();
       else if (temSelecao || objeto.pontos.length) objeto.limpar();
@@ -3134,7 +3197,31 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "corte" && recorte ? (
+          ferramenta === "regua" ? (
+            <OpcoesDaReguaNaBarra
+              medida={medida}
+              aoLimpar={() => setMedida(null)}
+              aoEndireitar={() => {
+                if (!medida || !camadaEscolhida) return mostrarAviso("Escolha a camada para endireitar.");
+                // A linha fica reta: na horizontal, ou na vertical se ela é mais em pé
+                let angulo = (Math.atan2(medida.ate.y - medida.de.y, medida.ate.x - medida.de.x) * 180) / Math.PI;
+                if (angulo > 45 && angulo <= 135) angulo -= 90;
+                else if (angulo < -45 && angulo >= -135) angulo += 90;
+                else if (angulo > 135) angulo -= 180;
+                else if (angulo < -135) angulo += 180;
+                executar({ comando: "imagem.transformarCamada", parametros: { clipeId: camadaEscolhida.clipe.id, transformacao: { rotacao: camadaEscolhida.clipe.transformacao.rotacao - angulo } } });
+                setMedida(null);
+              }}
+            />
+          ) : ferramenta === "corteDePerspectiva" ? (
+            <OpcoesDoCortePerspectivaNaBarra
+              opcoes={opcoesDaPerspectiva}
+              temQuad={Boolean(cortePerspectiva)}
+              aoMudar={(mudanca) => setOpcoesDaPerspectiva((atual) => ({ ...atual, ...mudanca }))}
+              aoConfirmar={() => void confirmarCortePerspectiva()}
+              aoCancelar={() => setCortePerspectiva(null)}
+            />
+          ) : ferramenta === "corte" && recorte ? (
             <OpcoesDoCorteNaBarra
               opcoes={opcoesDoCorte}
               medidas={recorte}
@@ -3342,6 +3429,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             zoom={zoom}
             aoMudarZoom={setZoom}
             aoMedirZoom={setZoomMedido}
+            regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
+            cortePerspectiva={
+              ferramenta === "corteDePerspectiva"
+                ? { quad: cortePerspectiva, grade: opcoesDaPerspectiva.grade, aoMudar: setCortePerspectiva, aoConfirmar: () => void confirmarCortePerspectiva() }
+                : null
+            }
             recorte={
               recorte
                 ? {

@@ -270,3 +270,22 @@ export function reamostrarPeloMapa(origem: Imagem, mapa: (u: number, v: number) 
   }
   return saida;
 }
+
+/**
+ * O Corte de perspectiva: o quadrilátero da origem (o plano visto de lado) vira o retângulo do destino. Cada pixel do
+ * destino lê a origem no ponto da homografia (o contrário do `reamostrar`).
+ */
+export function retificar(origem: Imagem, quad: Quadrilatero, largura: number, altura: number, interpolacao: Interpolacao): Uint8ClampedArray<ArrayBuffer> {
+  const saida = new Uint8ClampedArray(largura * altura * 4);
+  const [a, b, c, d, e, f, g, h] = coeficientesDaHomografia(quad);
+  const ler = leitor(origem, interpolacao);
+  for (let y = 0; y < altura; y++) {
+    const v = (y + 0.5) / altura;
+    for (let x = 0; x < largura; x++) {
+      const u = (x + 0.5) / largura;
+      const w = g * u + h * v + 1;
+      ler((a * u + b * v + c) / w - 0.5, (d * u + e * v + f) / w - 0.5, saida, (y * largura + x) * 4);
+    }
+  }
+  return saida;
+}

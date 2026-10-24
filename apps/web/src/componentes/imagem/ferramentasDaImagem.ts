@@ -2,6 +2,8 @@
 // posição da caixa de ferramentas é um grupo: o botão mostra a última usada do grupo e o botão direito abre as outras.
 import {
   Bandage,
+  Ruler,
+  Scan,
   Cloud,
   Diamond,
   Droplet,
@@ -53,6 +55,8 @@ import {
 import type { TipoDeForma } from "@/lib/elementos";
 
 export type IdFerramentaDaImagem =
+  | "corteDePerspectiva"
+  | "regua"
   | "substituicaoDeCor"
   | "misturador"
   | "borrachaDeFundo"
@@ -130,8 +134,14 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("selecaoRapida", "Ferramenta Seleção rápida", "W", Sparkles, "Pinte sobre o que quer: a seleção cresce até as bordas. Depois da primeira, soma; Alt tira. [ e ] mudam o tamanho."),
     F("varinha", "Ferramenta Varinha mágica", "W", WandSparkles, "Clique numa cor para selecionar os pixels parecidos. Shift soma, Alt subtrai."),
   ],
-  [F("corte", "Ferramenta Corte", "C", Crop, "Arraste o retângulo e os cantos; Enter recorta, Esc cancela.")],
-  [F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo.")],
+  [
+    F("corte", "Ferramenta Corte", "C", Crop, "Arraste a caixa e os cantos; fora dela gira. Enter corta, Esc cancela."),
+    F("corteDePerspectiva", "Ferramenta Corte de perspectiva", "C", Scan, "Arraste um retângulo e leve os cantos aos do que deveria ser reto; Enter endireita e corta."),
+  ],
+  [
+    F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo."),
+    F("regua", "Ferramenta Régua", "I", Ruler, "Arraste para medir a distância e o ângulo; Endireitar camada deixa a linha medida reta."),
+  ],
   [
     F("recuperacaoParaManchas", "Ferramenta Pincel de recuperação para manchas", "J", Sparkle, "Pinte por cima da mancha: ela é refeita com o que está em volta."),
     F("recuperacao", "Ferramenta Pincel de recuperação", "J", HeartPulse, "Alt + clique marca de onde copiar; pinte para copiar a textura de lá com a luz e a cor daqui."),

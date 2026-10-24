@@ -26,6 +26,8 @@ import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from 
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
+import { CortePerspectivaNaPrevia } from "./CortePerspectivaNaPrevia";
+import { ReguaNaPrevia } from "./ReguaNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
 import { PontoNaPrevia } from "./PontoNaPrevia";
@@ -69,6 +71,10 @@ type Props = {
   /** O zoom de verdade (o de ajustar, quando `zoom` é null), para a barra de status. */
   aoMedirZoom?: (zoom: number) => void;
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
+  /** A Régua: a medida e quem a muda. */
+  regua?: Omit<React.ComponentProps<typeof ReguaNaPrevia>, "escala"> | null;
+  /** O Corte de perspectiva em andamento (CortePerspectivaNaPrevia). */
+  cortePerspectiva?: Omit<React.ComponentProps<typeof CortePerspectivaNaPrevia>, "imagem" | "escala"> | null;
   /** O Corte em andamento: a caixa e as opções dela (RecorteNaPrevia). */
   recorte?: Omit<React.ComponentProps<typeof RecorteNaPrevia>, "imagem" | "escala"> | null;
   /** As ferramentas de seleção: os cliques e os traços vão para a foto escolhida, no lugar das alças. */
@@ -197,6 +203,8 @@ export function PreviaDaImagem({
   aoMudarZoom,
   aoMedirZoom,
   recorte = null,
+  cortePerspectiva = null,
+  regua = null,
   objeto = null,
   aoTerminarTraco,
   preencherCercado,
@@ -530,6 +538,8 @@ export function PreviaDaImagem({
               </>
             ) : null}
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia {...recorte} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
+            {cortePerspectiva && tamanho.largura > 1 ? <CortePerspectivaNaPrevia {...cortePerspectiva} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
+            {regua && tamanho.largura > 1 ? <ReguaNaPrevia {...regua} escala={tamanho.largura / imagem.largura} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
               <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} preencherCercado={preencherCercado} />
             ) : null}

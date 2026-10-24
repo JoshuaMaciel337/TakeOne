@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { afimEntre, doReferencial, noReferencial, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, semelhanca } from "./livre.ts";
+import { afimEntre, doReferencial, noReferencial, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, retificar, semelhanca } from "./livre.ts";
 import { quadDoRetangulo, type Quadrilatero } from "./malha.ts";
 
 const perto = (a: number, b: number, tolerancia = 1e-6) => assert.ok(Math.abs(a - b) < tolerancia, `${a} != ${b}`);
@@ -96,4 +96,30 @@ test("reamostrar pelo mapa: um mapa que estica não deixa emenda (nenhum pixel m
   let buracos = 0;
   for (let y = 10; y < 28; y++) for (let x = 15; x < 55; x++) if (saida[(y * 80 + x) * 4 + 3] !== 255) buracos++;
   assert.equal(buracos, 0);
+});
+
+test("retificar: o quadrilátero levado ao retângulo, e o retângulo inteiro é a própria imagem", () => {
+  const largura = 8;
+  const altura = 6;
+  const dados = new Uint8ClampedArray(largura * altura * 4);
+  for (let i = 0; i < largura * altura; i++) dados.set([(i * 37) % 256, (i * 11) % 256, 9, 255], i * 4);
+  const inteiro: Quadrilatero = [
+    { x: 0, y: 0 },
+    { x: 8, y: 0 },
+    { x: 8, y: 6 },
+    { x: 0, y: 6 },
+  ];
+  const igual = retificar({ dados, largura, altura }, inteiro, largura, altura, "vizinho");
+  assert.deepEqual([...igual], [...dados]);
+  // A metade de baixo à direita, no dobro: cada pixel da fonte vira quatro
+  const quarto: Quadrilatero = [
+    { x: 4, y: 3 },
+    { x: 8, y: 3 },
+    { x: 8, y: 6 },
+    { x: 4, y: 6 },
+  ];
+  const ampliado = retificar({ dados, largura, altura }, quarto, 8, 6, "vizinho");
+  const fonte = (x: number, y: number) => [...dados.slice((y * largura + x) * 4, (y * largura + x) * 4 + 4)];
+  assert.deepEqual([...ampliado.slice(0, 4)], fonte(4, 3));
+  assert.deepEqual([...ampliado.slice((5 * 8 + 7) * 4, (5 * 8 + 7) * 4 + 4)], fonte(7, 5));
 });
