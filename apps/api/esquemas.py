@@ -918,6 +918,8 @@ class EstiloDoCaractereEntrada(SoOQueVeio):
     escalaH: float | None = Field(default=None, ge=0.01, le=10)  # noqa: N815
     escalaV: float | None = Field(default=None, ge=0.01, le=10)  # noqa: N815
     linhaDeBase: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    giro: float | None = Field(default=None, ge=-360, le=360)
+    deslocamento: float | None = Field(default=None, ge=-10000, le=10000)
     negritoFalso: bool | None = None  # noqa: N815
     italicoFalso: bool | None = None  # noqa: N815
     caixa: Literal["normal", "maiusculas", "versalete"] | None = None

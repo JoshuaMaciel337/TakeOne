@@ -144,6 +144,16 @@ def test_texto_rico(cliente):
     assert salvar(cliente, aberto, [com_area, faixas[1]]).status_code == 422
     exagero = {**texto, "deformar": {"estilo": "onda", "curvatura": 150}}
     assert salvar(cliente, aberto, [camada("video", {**camada_, "texto_rico": exagero}), faixas[1]]).status_code == 422
+    # Toque no texto: a letra girada e deslocada volta como foi; giro além de uma volta não vale
+    tocado = {**texto, "paragrafos": [{"trechos": [{"texto": "O", "estilo": {"giro": -30, "deslocamento": 12.5}},
+                                                   {"texto": "lá", "estilo": {}}], "estilo": {}}]}
+    salvo = salvar(cliente, aberto, [camada("video", {**camada_, "texto_rico": tocado}), faixas[1]])
+    assert salvo.status_code == 200, salvo.text
+    guardado = cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["texto_rico"]
+    assert guardado["paragrafos"][0]["trechos"][0]["estilo"] == {"giro": -30, "deslocamento": 12.5}
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    demais = {**texto, "paragrafos": [{"trechos": [{"texto": "O", "estilo": {"giro": 400}}], "estilo": {}}]}
+    assert salvar(cliente, aberto, [camada("video", {**camada_, "texto_rico": demais}), faixas[1]]).status_code == 422
 
 
 def test_pranchetas(cliente, db_limpo):
