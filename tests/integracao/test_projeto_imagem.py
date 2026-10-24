@@ -246,3 +246,34 @@ def test_proporcao_mais_perto_e_imagem_em_resolucao_cheia_servida():
     assert proporcao_mais_perto(1500, 500) == "21:9"
     assert proporcao_mais_perto(1280, 720) == "16:9"
     assert arquivo_publico("imagem.png") and arquivo_publico("proxy.webp")
+
+
+def test_estilo_de_camada_e_luz_global(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    estilo = {"efeitos": [
+        {"tipo": "sombra", "id": "e1", "modo": "multiplicar", "opacidade": 0.75, "cor": "#000000", "angulo": 120,
+         "luz_global": True, "distancia": 10, "espalhar": 0.1, "tamanho": 12, "vazar": True},
+        {"tipo": "tracado", "id": "e2", "tamanho": 4, "posicao": "fora",
+         "tinta": {"tipo": "cor", "cor": "#ff0000"}},
+        {"tipo": "chanfro", "id": "e3", "estilo": "interno", "tecnica": "suave", "profundidade": 1, "direcao": "cima",
+         "tamanho": 6, "altitude": 30, "contorno_brilho": {"pontos": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]}},
+    ], "mesclar_se": {"canal": "cinza", "esta": [0, 0, 200, 255], "abaixo": [0, 0, 255, 255]}}
+    forma = {**clipe(None, 0, 5, id_="v1"), "midia_id": None, "vetor": {
+        "subcaminhos": [{"nos": [{"x": 0, "y": 0}, {"x": 100, "y": 0}, {"x": 100, "y": 100}], "fechado": True}],
+        "caixa": {"largura": 100, "altura": 100}, "preenchimento": {"tipo": "cor", "cor": "#3366ff"}},
+        "estilo_camada": estilo}
+    faixas = [camada("video", forma), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas, luz_global={"angulo": 135, "altitude": 40})
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["luz_global"] == {"angulo": 135, "altitude": 40}
+    guardado = aberto["faixas"][0]["clipes"][0]["estilo_camada"]
+    assert guardado["efeitos"][1] == estilo["efeitos"][1], "o efeito guarda só o que veio"
+    assert guardado["mesclar_se"]["esta"] == [0, 0, 200, 255]
+    # Faixa fora de ordem, opacidade fora de 0 a 1 e o estilo num projeto de vídeo não valem
+    errado = {**estilo, "mesclar_se": {"esta": [0, 200, 100, 255]}}
+    ruim = camada("video", {**forma, "estilo_camada": errado})
+    assert salvar(cliente, aberto, [ruim, faixas[1]]).status_code == 422
+    demais = {"efeitos": [{"tipo": "sombra", "id": "x", "opacidade": 2}]}
+    assert salvar(cliente, aberto, [camada("video", {**forma, "estilo_camada": demais}), faixas[1]]).status_code == 422

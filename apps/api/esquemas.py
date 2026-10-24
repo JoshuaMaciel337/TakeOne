@@ -948,6 +948,124 @@ class PontoEntrada(BaseModel):
     y: float = Field(ge=-LIMITE_DO_VETOR, le=LIMITE_DO_VETOR)
 
 
+# ——— Estilos de camada do editor de imagem (apps/web/src/lib/imagem/estiloDeCamada.ts, ADR 0003, onda 13.9) ———
+
+MesclagemDoEfeito = Literal["normal", "multiplicar", "tela", "somar", "escurecer", "clarear", "sobrepor", "luz_forte",
+                            "diferenca", "exclusao", "dissolver", "superexposicao_cores", "superexposicao_linear",
+                            "cor_mais_escura", "subexposicao_cores", "cor_mais_clara", "luz_suave", "luz_brilhante",
+                            "luz_linear", "luz_do_pino", "mistura_solida", "subtrair", "dividir", "matiz", "saturacao",
+                            "cor", "luminosidade"]
+
+
+class PontoDoContornoEntrada(BaseModel):
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    canto: bool = False
+
+
+class ContornoDoEfeitoEntrada(BaseModel):
+    """A curva de contorno de um efeito (o que a borda dele faz): de 2 a 32 pontos, da esquerda para a direita."""
+    nome: str = Field(default="", max_length=60)
+    pontos: list[PontoDoContornoEntrada] = Field(min_length=2, max_length=32)
+
+    @model_validator(mode="after")
+    def _em_ordem(self):
+        if any(b.x < a.x for a, b in zip(self.pontos, self.pontos[1:], strict=False)):
+            raise ValueError("Os pontos do contorno vão da esquerda para a direita.")
+        return self
+
+
+class TexturaDoChanfroEntrada(BaseModel):
+    padrao: str = Field(min_length=1, max_length=60)
+    escala: float = Field(default=1, ge=0.01, le=10)
+    profundidade: float = Field(default=1, ge=-10, le=10)
+    inverter: bool = False
+
+
+class EfeitoDeCamadaEntrada(SoOQueVeio):
+    """Um efeito do estilo de camada; cada tipo usa os campos dele (os outros ficam de fora)."""
+    tipo: Literal["sombra", "sombra_interna", "brilho_externo", "brilho_interno", "chanfro", "cetim",
+                  "sobreposicao_cor", "sobreposicao_degrade", "sobreposicao_padrao", "tracado"]
+    id: str = Field(min_length=1, max_length=40)
+    ligado: bool = True
+    modo: MesclagemDoEfeito = "normal"
+    opacidade: float = Field(default=1, ge=0, le=1)
+    cor: str | None = Field(default=None, pattern=COR)
+    tinta: TintaDaFormaEntrada | None = None
+    angulo: float | None = Field(default=None, ge=-360, le=360)
+    luz_global: bool | None = None
+    distancia: float | None = Field(default=None, ge=0, le=30000)
+    espalhar: float | None = Field(default=None, ge=0, le=1)
+    tamanho: float | None = Field(default=None, ge=0, le=2500)
+    ruido: float | None = Field(default=None, ge=0, le=1)
+    contorno: ContornoDoEfeitoEntrada | None = None
+    suavizar: bool | None = None
+    vazar: bool | None = None
+    tecnica: Literal["suave", "preciso", "cinzel_duro", "cinzel_suave"] | None = None
+    origem: Literal["centro", "borda"] | None = None
+    intervalo: float | None = Field(default=None, ge=0.01, le=1)
+    variacao: float | None = Field(default=None, ge=0, le=1)
+    posicao: Literal["fora", "dentro", "centro"] | None = None
+    estilo: Literal["externo", "interno", "entalhe", "almofada", "tracado"] | None = None
+    profundidade: float | None = Field(default=None, ge=0.01, le=10)
+    direcao: Literal["cima", "baixo"] | None = None
+    suavidade: float | None = Field(default=None, ge=0, le=250)
+    altitude: float | None = Field(default=None, ge=0, le=90)
+    contorno_brilho: ContornoDoEfeitoEntrada | None = None
+    modo_realce: MesclagemDoEfeito | None = None
+    cor_realce: str | None = Field(default=None, pattern=COR)
+    opacidade_realce: float | None = Field(default=None, ge=0, le=1)
+    modo_sombra: MesclagemDoEfeito | None = None
+    cor_sombra: str | None = Field(default=None, pattern=COR)
+    opacidade_sombra: float | None = Field(default=None, ge=0, le=1)
+    contorno_chanfro: ContornoDoEfeitoEntrada | None = None
+    intervalo_chanfro: float | None = Field(default=None, ge=0.01, le=1)
+    textura: TexturaDoChanfroEntrada | None = None
+    inverter: bool | None = None
+    escala: float | None = Field(default=None, ge=0.01, le=10)
+    alinhar: bool | None = None
+    deslocamento: PontoEntrada | None = None
+
+
+class MesclarSeEntrada(BaseModel):
+    """Opções de mesclagem › Mesclar se: o canal e as faixas (com as metades) desta camada e da de baixo, de 0 a 255."""
+    canal: Literal["cinza", "vermelho", "verde", "azul"] = "cinza"
+    esta: list[float] = Field(default=[0, 0, 255, 255], min_length=4, max_length=4)
+    abaixo: list[float] = Field(default=[0, 0, 255, 255], min_length=4, max_length=4)
+
+    @model_validator(mode="after")
+    def _faixas(self):
+        for faixa in (self.esta, self.abaixo):
+            if any(not 0 <= v <= 255 for v in faixa) or not (faixa[0] <= faixa[1] <= faixa[2] <= faixa[3]):
+                raise ValueError("As faixas do Mesclar se vão de 0 a 255, em ordem.")
+        return self
+
+
+class CanaisDaMesclagemEntrada(BaseModel):
+    vermelho: bool = True
+    verde: bool = True
+    azul: bool = True
+
+
+class EstiloDeCamadaEntrada(SoOQueVeio):
+    """O estilo de camada: os efeitos (na ordem do painel; vários do mesmo tipo valem) e as opções de mesclagem."""
+    efeitos: list[EfeitoDeCamadaEntrada] = Field(default=[], max_length=40)
+    ligado: bool = True
+    escala: float = Field(default=1, ge=0.01, le=10)
+    internos_como_grupo: bool = False
+    recortadas_como_grupo: bool = True
+    mascara_esconde_efeitos: bool = False
+    vazamento: Literal["nenhum", "raso", "profundo"] = "nenhum"
+    canais: CanaisDaMesclagemEntrada | None = None
+    mesclar_se: MesclarSeEntrada | None = None
+
+
+class LuzGlobalEntrada(BaseModel):
+    """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
+    angulo: float = Field(default=120, ge=-360, le=360)
+    altitude: float = Field(default=30, ge=0, le=90)
+
+
 class DeformacaoDoTextoEntrada(BaseModel):
     """Texto › Deformar texto (apps/web/src/lib/texto/deformar.ts): estilo, curvatura e distorções (-100 a 100)."""
     estilo: Literal["arco", "arcoInferior", "arcoSuperior", "arcada", "saliencia", "conchaInferior", "conchaSuperior",
@@ -1070,6 +1188,8 @@ class ClipeEntrada(BaseModel):
     mascara: MascaraEntrada | None = None
     # Camada de ajuste: sem mídia nem texto, muda a cor de tudo o que está embaixo
     ajuste: bool = False
+    # Só no projeto de imagem: o estilo de camada (sombra, brilhos, chanfro, cetim, sobreposições, traçado)
+    estilo_camada: EstiloDeCamadaEntrada | None = None
     # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
     pasta: bool = False
     preenchimento: float | None = Field(default=None, ge=0, le=1)
@@ -1372,6 +1492,7 @@ class ProjetoSalvarEntrada(BaseModel):
     tamanho: TamanhoEntrada | None = None
     canais: list[CanalEntrada] = Field(default=[], max_length=50)
     caminhos: list[CaminhoDoDocumento] = Field(default=[], max_length=100)
+    luz_global: LuzGlobalEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1407,6 +1528,7 @@ class ProjetoSaida(BaseModel):
     marcadores: list[MarcadorEntrada] = []
     canais: list[CanalEntrada] = []
     caminhos: list[CaminhoDoDocumento] = []
+    luz_global: LuzGlobalEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
