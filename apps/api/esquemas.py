@@ -569,9 +569,10 @@ class LutDoClipeEntrada(BaseModel):
 
 
 class RecursoEntrada(BaseModel):
-    # "degrade" (as paradas, em dados), "padrao" (o ladrilho, em imagem_png) ou "forma" (os caminhos de uma forma
-    # personalizada, em dados.subcaminhos, numa caixa de 100 × 100)
-    tipo: Literal["degrade", "padrao", "forma"]
+    # "degrade" (as paradas, em dados), "padrao" (o ladrilho, em imagem_png), "forma" (os caminhos de uma forma
+    # personalizada, em dados.subcaminhos, numa caixa de 100 × 100) ou os estilos de caractere e de parágrafo do texto
+    # do editor de imagem (em dados.estilo, conferido como o estilo de um trecho ou de um parágrafo)
+    tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)

@@ -1,5 +1,5 @@
 # -----------------------------------------------
-# TakeOne API — degradês, padrões e formas personalizadas do espaço (editor de imagem, ADR 0003, ondas 13.5 e 13.7)
+# TakeOne API — degradês, padrões, formas personalizadas e estilos de texto do espaço (editor de imagem, ADR 0003)
 #
 #   POST   /api/recursos                 um degradê (as paradas, em JSON), um padrão (o ladrilho, PNG em base64) ou uma
 #                                        forma personalizada (os caminhos, em JSON)
@@ -24,7 +24,13 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import RecursoEntrada, RecursoSaida, SubcaminhoEntrada
+from api.esquemas import (
+    EstiloDoCaractereEntrada,
+    EstiloDoParagrafoEntrada,
+    RecursoEntrada,
+    RecursoSaida,
+    SubcaminhoEntrada,
+)
 from core.config import TZ
 from core.utils import storage
 
@@ -88,6 +94,18 @@ def _conferir_forma(dados: dict) -> list[dict]:
     return [sub.model_dump() for sub in caminhos]
 
 
+def _conferir_estilo(tipo: str, dados: dict) -> dict:
+    """O estilo de caractere ou de parágrafo, conferido como o de um trecho ou de um parágrafo do texto."""
+    esquema = EstiloDoCaractereEntrada if tipo == "estilo_caractere" else EstiloDoParagrafoEntrada
+    try:
+        estilo = esquema.model_validate(dados.get("estilo") or {})
+    except (ValidationError, TypeError, AttributeError) as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O estilo veio estragado.") from erro
+    if not estilo.model_fields_set:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O estilo está vazio.")
+    return {"estilo": estilo.model_dump()}
+
+
 @router.post("", response_model=RecursoSaida, status_code=status.HTTP_201_CREATED)
 async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     limite = BYTES_DA_FORMA if dados.tipo == "forma" else BYTES_DOS_DADOS
@@ -95,6 +113,8 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Os dados passam de {limite // 1024} KB.")
     if dados.tipo == "forma":
         dados.dados = {"subcaminhos": _conferir_forma(dados.dados)}
+    if dados.tipo in ("estilo_caractere", "estilo_paragrafo"):
+        dados.dados = _conferir_estilo(dados.tipo, dados.dados)
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -122,7 +142,8 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
 
 
 @router.get("", response_model=list[RecursoSaida])
-async def listar_recursos(tipo: str = Query(pattern="^(degrade|padrao|forma)$"), usuario=Depends(usuario_atual),
+async def listar_recursos(tipo: str = Query(pattern="^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo)$"),
+                          usuario=Depends(usuario_atual),
                           db=Depends(obter_db)):
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": tipo}
     cursor = db.recursos.find(filtro).sort("criado_em", 1).limit(RECURSOS_POR_TIPO)

@@ -59,3 +59,21 @@ def test_formas_personalizadas(cliente):
     assert cliente.post("/api/recursos", json={"tipo": "forma", "nome": "V", "dados": {}}).status_code == 422
     estragado = {"subcaminhos": [{"nos": [{"x": "a"}], "fechado": True}]}
     assert cliente.post("/api/recursos", json={"tipo": "forma", "nome": "E", "dados": estragado}).status_code == 422
+
+
+def test_estilos_de_texto(cliente):
+    cadastrar(cliente)
+    titulo = {"familia": "lobster", "tamanho": 64, "cor": "#ff0000", "tracking": 50}
+    criado = cliente.post("/api/recursos", json={"tipo": "estilo_caractere", "nome": "Título",
+                                                 "dados": {"estilo": titulo}})
+    assert criado.status_code == 201, criado.text
+    assert criado.json()["dados"] == {"estilo": titulo}, "o estilo guarda só o que veio"
+    paragrafo = {"alinhamento": "justificado", "recuoPrimeira": 24}
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_paragrafo", "nome": "Corpo",
+                                               "dados": {"estilo": paragrafo}}).status_code == 201
+    assert [r["nome"] for r in cliente.get("/api/recursos?tipo=estilo_paragrafo").json()] == ["Corpo"]
+    # Vazio ou com valor fora do lugar não vale
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_caractere", "nome": "V",
+                                               "dados": {"estilo": {}}}).status_code == 422
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_paragrafo", "nome": "E",
+                                               "dados": {"estilo": {"alinhamento": "torto"}}}).status_code == 422
