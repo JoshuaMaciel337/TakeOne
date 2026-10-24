@@ -32,7 +32,7 @@ export const nomeDoEstilo = (estilo: { peso: number; italico: boolean }) => `${N
 
 // As amostras do seletor: cada família carrega como FontFace do navegador quando a linha aparece
 const amostras = new Map<string, Promise<void>>();
-function carregarAmostra(familia: FamiliaDoCatalogo): Promise<void> {
+export function carregarAmostra(familia: FamiliaDoCatalogo): Promise<void> {
   let pedido = amostras.get(familia.id);
   if (!pedido) {
     const estilo = familia.estilos.find((item) => !item.italico) ?? familia.estilos[0];

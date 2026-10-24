@@ -19,6 +19,7 @@ export const PAINEIS_DA_IMAGEM = {
   caminhos: "Caminhos",
   canais: "Canais",
   caractere: "Caractere",
+  glifos: "Glifos",
   paragrafo: "Parágrafo",
   degrades: "Degradês",
   fonteDeClonagem: "Fonte de clonagem",
@@ -510,6 +511,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: [
             { nome: "Caractere", aoEscolher: () => a.painel("caractere") },
             { nome: "Parágrafo", aoEscolher: () => a.painel("paragrafo") },
+            { nome: "Glifos", aoEscolher: () => a.painel("glifos") },
             { nome: "Estilos de texto", aoEscolher: () => a.painel("estilos") },
           ],
         },

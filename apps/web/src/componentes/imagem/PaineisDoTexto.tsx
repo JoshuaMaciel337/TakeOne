@@ -3,11 +3,12 @@
 // Os painéis Caractere e Parágrafo do editor de imagem (ADR 0003, onda 13.8). Mudam o trecho selecionado do texto em
 // edição, o texto escolhido inteiro ou, sem nenhum, o próximo texto (como a barra da ferramenta). O que varia entre os
 // caracteres escolhidos aparece em branco.
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Baseline, Bold, CaseSensitive, CaseUpper, Italic, Strikethrough, Subscript, Superscript, Underline } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Baseline, Bold, CaseSensitive, CaseUpper, Italic, Plus, Strikethrough, Subscript, Superscript, Trash2, Underline } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { eixosDoEstilo, useCatalogoDeFontes, useVersaoDasFontes } from "@/lib/texto/fontes";
+import { caracteresDoEstilo, eixosDoEstilo, useCatalogoDeFontes, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { type Alinhamento, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, type Suavizacao } from "@/lib/texto/modelo";
-import { CampoNumerico, estilosDaFamilia, nomeDoEstilo, SeletorDeFonte } from "./OpcoesDoTexto";
+import { CampoNumerico, carregarAmostra, estilosDaFamilia, nomeDoEstilo, SeletorDeFonte } from "./OpcoesDoTexto";
 
 const campo = "h-6 rounded border border-borda bg-fundo px-1.5 text-xs text-texto";
 const rotulo = "flex items-center gap-1 text-[11px] text-suave";
@@ -44,9 +45,11 @@ type PropsDoCaractere = {
   /** A suavização é da camada inteira. */
   suavizacao: Suavizacao | undefined;
   aoSuavizacao: (suavizacao: Suavizacao) => void;
+  /** Os estilos de caractere salvos (embaixo do painel). */
+  estilosSalvos?: React.ReactNode;
 };
 
-export function PainelCaractere({ estilo, aoEstilo, aoPreverFonte, kernManual, aoKern, suavizacao, aoSuavizacao }: PropsDoCaractere) {
+export function PainelCaractere({ estilo, aoEstilo, aoPreverFonte, kernManual, aoKern, suavizacao, aoSuavizacao, estilosSalvos }: PropsDoCaractere) {
   const catalogo = useCatalogoDeFontes();
   useVersaoDasFontes();
   const familia = catalogo.find((item) => item.id === estilo.familia);
@@ -222,6 +225,7 @@ export function PainelCaractere({ estilo, aoEstilo, aoPreverFonte, kernManual, a
           ))}
         </select>
       </label>
+      {estilosSalvos}
     </div>
   );
 }
@@ -296,6 +300,112 @@ export function PainelParagrafo({ paragrafo, aoParagrafo, deParagrafo }: { parag
         />
         Hifenizar
       </label>
+    </div>
+  );
+}
+
+/**
+ * Os estilos salvos do espaço (de caractere ou de parágrafo): clique aplica, "+" salva o que está escolhido com um
+ * nome, a lixeira exclui.
+ */
+export function EstilosSalvos({ titulo, estilos, aoAplicar, aoSalvar, aoExcluir }: { titulo: string; estilos: { id: string; nome: string }[]; aoAplicar: (id: string) => void; aoSalvar: (nome: string) => void; aoExcluir: (id: string) => void }) {
+  const [nome, setNome] = useState<string | null>(null);
+  return (
+    <section className="flex flex-col gap-1 border-t border-borda p-2 text-xs" aria-label={titulo}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-semibold text-suave">{titulo}</h3>
+        <button type="button" className="botao-icone size-6" title="Novo estilo com o que está escolhido" aria-label={`Novo: ${titulo}`} onClick={() => setNome(`Estilo ${estilos.length + 1}`)}>
+          <Plus className="size-3.5" aria-hidden />
+        </button>
+      </div>
+      {nome !== null ? (
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            if (nome.trim()) aoSalvar(nome.trim());
+            setNome(null);
+          }}
+        >
+          <input autoFocus aria-label="Nome do estilo" className={`${campo} min-w-0 flex-1`} value={nome} maxLength={80} onChange={(evento) => setNome(evento.currentTarget.value)} onKeyDown={(evento) => evento.stopPropagation()} />
+          <button type="submit" className="botao-principal px-2 py-0.5 text-xs">
+            Salvar
+          </button>
+        </form>
+      ) : null}
+      {estilos.length ? (
+        <ul className="flex flex-col">
+          {estilos.map((estilo) => (
+            <li key={estilo.id} className="group flex items-center rounded hover:bg-superficie-2">
+              <button type="button" className="min-w-0 flex-1 truncate px-1.5 py-1 text-left text-texto" title={`Aplicar o estilo ${estilo.nome}`} onClick={() => aoAplicar(estilo.id)}>
+                {estilo.nome}
+              </button>
+              <button type="button" className="botao-icone size-6 opacity-0 group-hover:opacity-100" title={`Excluir o estilo ${estilo.nome}`} aria-label={`Excluir o estilo ${estilo.nome}`} onClick={() => aoExcluir(estilo.id)}>
+                <Trash2 className="size-3.5" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : nome === null ? (
+        <p className="text-suave">Nenhum estilo salvo no espaço.</p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Janela › Glifos: os caracteres da fonte escolhida; o clique põe o caractere no cursor do texto em edição. Os usados
+ * por último ficam em cima.
+ */
+export function PainelGlifos({ estilo, editando, aoInserir }: { estilo: Partial<EstiloDoCaractere>; editando: boolean; aoInserir: (caractere: string) => void }) {
+  useVersaoDasFontes();
+  const catalogo = useCatalogoDeFontes();
+  const [busca, setBusca] = useState("");
+  const [recentes, setRecentes] = useState<string[]>([]);
+  const [, setAmostraPronta] = useState("");
+  const completo = { ...ESTILO_PADRAO, ...estilo } as EstiloDoCaractere;
+  // A amostra da família (a mesma do seletor de fontes) desenha os caracteres na grade
+  const familiaDoCatalogo = catalogo.find((item) => item.id === completo.familia);
+  useEffect(() => {
+    if (familiaDoCatalogo) void carregarAmostra(familiaDoCatalogo).then(() => setAmostraPronta(familiaDoCatalogo.id));
+  }, [familiaDoCatalogo]);
+  const caracteres = caracteresDoEstilo(completo);
+  const termo = busca.trim();
+  const lista = (caracteres ?? [])
+    .map((codigo) => String.fromCodePoint(codigo))
+    .filter((c) => !termo || c === termo || c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0").includes(termo.toUpperCase().replace(/^U\+/, "")))
+    .slice(0, 2000);
+  const familia = `"amostra-${completo.familia}"`;
+  const inserir = (c: string) => {
+    aoInserir(c);
+    setRecentes((atual) => [c, ...atual.filter((item) => item !== c)].slice(0, 16));
+  };
+  const botao = (c: string) => (
+    <button
+      key={c}
+      type="button"
+      disabled={!editando}
+      title={`U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}${editando ? "" : " (escreva num texto para pôr o caractere)"}`}
+      className="flex aspect-square items-center justify-center rounded border border-transparent text-lg text-texto hover:border-borda hover:bg-superficie-2 disabled:opacity-60"
+      style={{ fontFamily: familia }}
+      onClick={() => inserir(c)}
+    >
+      {c}
+    </button>
+  );
+  return (
+    <div className="flex h-full flex-col gap-2 p-2 text-xs">
+      <input aria-label="Procurar glifo" placeholder="Caractere ou código (00E9)" className={campo} value={busca} onChange={(evento) => setBusca(evento.currentTarget.value)} onKeyDown={(evento) => evento.stopPropagation()} />
+      {recentes.length ? (
+        <div className="grid grid-cols-8 gap-0.5 border-b border-borda pb-1" aria-label="Usados por último">
+          {recentes.map(botao)}
+        </div>
+      ) : null}
+      {!caracteres ? <p className="text-suave">Carregando a fonte…</p> : null}
+      <div className="grid grid-cols-8 gap-0.5 overflow-y-auto" role="list" aria-label="Glifos da fonte">
+        {lista.map(botao)}
+      </div>
+      {!editando ? <p className="text-suave">Clique num texto com a ferramenta Texto para pôr os caracteres no cursor.</p> : null}
     </div>
   );
 }

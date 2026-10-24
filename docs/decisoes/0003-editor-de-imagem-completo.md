@@ -205,7 +205,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Biblioteca grande de fontes livres, com prévia ao passar o mouse, estilos (pesos e itálicos) e envio de fontes do espaço
 - [x] Painel Caractere: fonte, estilo, tamanho, entrelinha, kerning (métrica, óptico, manual), tracking, escala vertical e horizontal, deslocamento da linha de base, cor, negrito e itálico falsos, todas maiúsculas, versalete, sobrescrito, subscrito, sublinhado, tachado, OpenType (ligaduras, alternativos, frações, ordinais), eixos de fonte variável, antisserrilhamento
 - [x] Painel Parágrafo: alinhar à esquerda, ao centro e à direita, justificar (última à esquerda, ao centro, à direita, tudo), recuos (início, fim, primeira linha), espaço antes e depois, hifenização
-- [ ] Estilos de caractere e de parágrafo; painel Glifos
+- [x] Estilos de caractere e de parágrafo; painel Glifos
 - [x] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
 - [x] Texto em caminho (e dentro de uma forma)
 - [x] Deformar texto: arco, arco inferior, arco superior, arco, saliência, concha inferior e superior, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torção

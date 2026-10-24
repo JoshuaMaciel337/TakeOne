@@ -101,7 +101,7 @@ import { JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
 import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
-import { PainelCaractere, PainelParagrafo } from "./PaineisDoTexto";
+import { EstilosSalvos, PainelCaractere, PainelGlifos, PainelParagrafo } from "./PaineisDoTexto";
 import { esperarFontes, fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { converterModo } from "@/lib/texto/converter";
 import { caminhosDoTexto } from "@/lib/texto/contornos";
@@ -388,6 +388,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoDegrade, setOpcoesDoDegrade] = useState(DEGRADE_PADRAO);
   const [editandoDegrade, setEditandoDegrade] = useState(false);
   const degradesDoEspaco = useRecursos<Degrade>("degrade");
+  // Os estilos de caractere e de parágrafo salvos no espaço
+  const estilosDeCaractere = useRecursos<{ estilo: Partial<EstiloDoCaractere> }>("estilo_caractere");
+  const estilosDeParagrafo = useRecursos<{ estilo: Partial<EstiloDoParagrafo> }>("estilo_paragrafo");
   // Os padrões do espaço vão para a lista que os seletores de padrão mostram
   const padroesDoEspaco = useRecursos("padrao");
   useEffect(() => definirPadroesDoEspaco(padroesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome }))), [padroesDoEspaco.recursos]);
@@ -2032,6 +2035,29 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     });
     setSelecao([]);
     setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x: retangulo.x0, y: retangulo.y0 }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
+  };
+  /** Janela › Glifos: o caractere no cursor do texto em edição, com o estilo de quem está antes. */
+  const inserirNoTexto = (caractere: string) => {
+    if (!edicaoDeTexto) return;
+    const de = Math.min(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate);
+    const ate = Math.max(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate);
+    const novo = substituir(edicaoDeTexto.texto, de, ate, caractere, edicaoDeTexto.estiloPendente ?? undefined);
+    const fim = de + caractere.length;
+    setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(novo), selecao: { de: fim, ate: fim } });
+  };
+  /** Salva o estilo comum do que está escolhido como um estilo do espaço (só os campos que ele tem). */
+  const salvarEstiloDeTexto = (tipo: "estilo_caractere" | "estilo_paragrafo", nome: string) => {
+    const origem: Record<string, unknown> = tipo === "estilo_caractere" ? estiloNaBarra : paragrafoNaBarra;
+    const modelo = tipo === "estilo_caractere" ? ESTILO_PADRAO : PARAGRAFO_PADRAO;
+    const estilo = Object.fromEntries(Object.entries(origem).filter(([chave, valor]) => valor !== undefined && chave in modelo));
+    criarRecurso({ tipo, nome, dados: { estilo } })
+      .then(() => (tipo === "estilo_caractere" ? estilosDeCaractere : estilosDeParagrafo).recarregar())
+      .catch((erro: unknown) => mostrarAviso(erro instanceof Error ? erro.message : "Não foi possível salvar o estilo."));
+  };
+  const excluirEstiloDeTexto = (tipo: "estilo_caractere" | "estilo_paragrafo", id: string) => {
+    excluirRecurso(id)
+      .then(() => (tipo === "estilo_caractere" ? estilosDeCaractere : estilosDeParagrafo).recarregar())
+      .catch((erro: unknown) => mostrarAviso(erro instanceof Error ? erro.message : "Não foi possível excluir o estilo."));
   };
   /** O texto no caminho: onde ele começa (fração) e de que lado fica. */
   const mudarCaminhoDoTexto = (mudanca: { inicio?: number; inverter?: boolean }) => {
@@ -4057,12 +4083,42 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoKern={(valor) => mudarKern(valor)}
           suavizacao={(edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico)?.estilo.suavizacao ?? opcoesDoTexto.estilo.suavizacao}
           aoSuavizacao={mudarSuavizacao}
+          estilosSalvos={
+            <EstilosSalvos
+              titulo="Estilos de caractere"
+              estilos={estilosDeCaractere.recursos}
+              aoAplicar={(id) => {
+                const salvo = estilosDeCaractere.recursos.find((item) => item.id === id);
+                if (salvo) mudarEstiloDoTexto(salvo.dados.estilo);
+              }}
+              aoSalvar={(nome) => salvarEstiloDeTexto("estilo_caractere", nome)}
+              aoExcluir={(id) => excluirEstiloDeTexto("estilo_caractere", id)}
+            />
+          }
         />
       ),
     },
+    glifos: {
+      nome: PAINEIS_DA_IMAGEM.glifos,
+      conteudo: <PainelGlifos estilo={estiloNaBarra} editando={Boolean(edicaoDeTexto)} aoInserir={inserirNoTexto} />,
+    },
     paragrafo: {
       nome: PAINEIS_DA_IMAGEM.paragrafo,
-      conteudo: <PainelParagrafo paragrafo={paragrafoNaBarra} aoParagrafo={mudarParagrafoDoTexto} deParagrafo={(textoDaBarra?.modo ?? "paragrafo") === "paragrafo"} />,
+      conteudo: (
+        <>
+          <PainelParagrafo paragrafo={paragrafoNaBarra} aoParagrafo={mudarParagrafoDoTexto} deParagrafo={(textoDaBarra?.modo ?? "paragrafo") === "paragrafo"} />
+          <EstilosSalvos
+            titulo="Estilos de parágrafo"
+            estilos={estilosDeParagrafo.recursos}
+            aoAplicar={(id) => {
+              const salvo = estilosDeParagrafo.recursos.find((item) => item.id === id);
+              if (salvo) mudarParagrafoDoTexto(salvo.dados.estilo);
+            }}
+            aoSalvar={(nome) => salvarEstiloDeTexto("estilo_paragrafo", nome)}
+            aoExcluir={(id) => excluirEstiloDeTexto("estilo_paragrafo", id)}
+          />
+        </>
+      ),
     },
     caminhos: {
       nome: PAINEIS_DA_IMAGEM.caminhos,

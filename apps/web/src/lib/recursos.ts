@@ -7,16 +7,18 @@ import { useCallback, useEffect, useState } from "react";
 
 import { chamarApi } from "./api";
 
+export type TipoDoRecurso = "degrade" | "padrao" | "forma" | "estilo_caractere" | "estilo_paragrafo";
+
 export type Recurso<T = Record<string, unknown>> = {
   id: string;
-  tipo: "degrade" | "padrao" | "forma";
+  tipo: TipoDoRecurso;
   nome: string;
   dados: T;
   imagem: { largura: number; altura: number } | null;
   criado_em: string;
 };
 
-export function criarRecurso<T>(dados: { tipo: "degrade" | "padrao" | "forma"; nome: string; dados?: T; imagem_png?: string }): Promise<Recurso<T>> {
+export function criarRecurso<T>(dados: { tipo: TipoDoRecurso; nome: string; dados?: T; imagem_png?: string }): Promise<Recurso<T>> {
   return chamarApi<Recurso<T>>("/recursos", { metodo: "POST", corpo: dados });
 }
 
@@ -25,7 +27,7 @@ export function excluirRecurso(id: string): Promise<void> {
 }
 
 /** Os recursos do espaço de um tipo, e um jeito de recarregar depois de criar ou excluir. */
-export function useRecursos<T>(tipo: "degrade" | "padrao" | "forma") {
+export function useRecursos<T>(tipo: TipoDoRecurso) {
   const [recursos, setRecursos] = useState<Recurso<T>[]>([]);
   const [vez, setVez] = useState(0);
   const recarregar = useCallback(() => setVez((atual) => atual + 1), []);

@@ -557,7 +557,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 13.5 Retoque e pintura avançada (carimbo, recuperação, correção, borrar, subexposição, balde, degradê, padrões; o degradê ao vivo vai com as camadas de preenchimento, na 13.9).
   - [x] 13.6 Transformação e geometria (transformação livre completa, marionete, perspectiva, tamanho da imagem e da tela, dissolver).
   - [x] 13.7 Vetores, formas, quadros e pranchetas (caneta, caminhos, formas vivas, máscara vetorial).
-  - [ ] 13.8 Texto (no navegador, parágrafo, vertical, caractere e parágrafo completos, deformar, fontes).
+  - [x] 13.8 Texto (no navegador, parágrafo, vertical, caractere e parágrafo completos, deformar, fontes).
   - [ ] 13.9 Estilos de camada e preenchimentos (os dez estilos, mesclar se, camadas de preenchimento).
   - [ ] 13.10 Ajustes (as 16 camadas de ajuste, os clássicos, os automáticos, histograma).
   - [ ] 13.11 Filtros (filtros inteligentes, a galeria com 47, todos os menus de filtro).

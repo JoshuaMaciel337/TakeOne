@@ -40,6 +40,8 @@ declare module "fontkit" {
     layout(texto: string | Glifo[], recursos?: string[] | Record<string, boolean>): Corrida;
     getVariation(eixos: Record<string, number>): Fonte;
     glyphForCodePoint(codigo: number): Glifo;
+    /** Os códigos de caractere que a fonte tem. */
+    characterSet: number[];
   }
   export function create(dados: Uint8Array, postscriptName?: string): Fonte;
 }

@@ -170,6 +170,21 @@ export function fonteDoEstilo(estilo: EstiloDoCaractere): FonteCarregada | null 
   return instancia;
 }
 
+/**
+ * Os caracteres que a fonte do estilo tem (o painel Glifos), sem os de controle e os espaços; null até o arquivo
+ * chegar.
+ */
+export function caracteresDoEstilo(estilo: EstiloDoCaractere): number[] | null {
+  const escolha = arquivoDoEstilo(estilo);
+  if (!escolha) return null;
+  const fonte = lidas.get(escolha.arquivo);
+  if (!fonte) {
+    void lerArquivo(escolha.arquivo);
+    return null;
+  }
+  return [...new Set(fonte.characterSet ?? [])].filter((codigo) => codigo > 0x20 && !(codigo >= 0x7f && codigo <= 0xa0) && !(codigo >= 0xd800 && codigo <= 0xdfff) && codigo !== 0xad).sort((a, b) => a - b);
+}
+
 export type EixoDaFonte = { tag: string; nome: string; min: number; padrao: number; max: number };
 
 /** Os eixos da fonte variável do estilo, fora o peso (largura, tamanho óptico, inclinação...); vazio até o arquivo chegar. */
