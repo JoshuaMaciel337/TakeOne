@@ -454,3 +454,30 @@ def test_guias_do_documento(cliente):
     atual = salvo.json()
     assert salvar(cliente, atual, [vazia], guias={"verticais": [1e7]}).status_code == 422
     assert salvar(cliente, atual, [vazia], guias={"verticais": [], "horizontais": []}).json()["guias"] is None
+
+
+def test_contagem_notas_e_escala_de_medida(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    pontos = [{"x": 10, "y": 20}, {"x": 30.5, "y": 40}]
+    contagem = {"grupos": [{"id": "g1", "nome": " Células ", "cor": "#00ff00", "pontos": pontos}], "ativo": "g1"}
+    notas = [{"id": "n1", "x": 100, "y": 50, "autor": "Ana", "texto": "Clarear o rosto"}]
+    escala = {"pixels": 100, "comprimento": 2.5, "unidade": "cm"}
+    salvo = salvar(cliente, projeto, [vazia], contagem=contagem, notas=notas, escala_de_medida=escala)
+    assert salvo.status_code == 200, salvo.text
+    corpo = salvo.json()
+    assert corpo["contagem"]["grupos"][0]["nome"] == "Células"
+    assert corpo["contagem"]["grupos"][0]["pontos"][1] == {"x": 30.5, "y": 40}
+    assert corpo["contagem"]["grupos"][0]["tamanho_do_rotulo"] == 12
+    assert corpo["notas"][0]["texto"] == "Clarear o rosto" and corpo["notas"][0]["cor"] == "#ffd60a"
+    assert corpo["escala_de_medida"] == escala
+    # Ids repetidos, pontos longe demais e escala sem tamanho são recusados
+    dois = {"grupos": [contagem["grupos"][0], contagem["grupos"][0]]}
+    assert salvar(cliente, corpo, [vazia], contagem=dois).status_code == 422
+    assert salvar(cliente, corpo, [vazia], notas=[notas[0], notas[0]]).status_code == 422
+    assert salvar(cliente, corpo, [vazia], notas=[{**notas[0], "x": 1e7}]).status_code == 422
+    assert salvar(cliente, corpo, [vazia], escala_de_medida={**escala, "pixels": 0}).status_code == 422
+    # Sem grupos, a contagem não é guardada; sem notas, a lista fica vazia
+    limpo = salvar(cliente, corpo, [vazia], contagem={"grupos": []}).json()
+    assert limpo["contagem"] is None and limpo["notas"] == [] and limpo["escala_de_medida"] is None

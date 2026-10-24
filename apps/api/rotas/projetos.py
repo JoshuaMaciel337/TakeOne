@@ -167,6 +167,13 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     modo = dados.modo.model_dump(exclude_none=True) if imagem and dados.modo and dados.modo.tipo != "rgb" else None
     com_guias = imagem and dados.guias and (dados.guias.verticais or dados.guias.horizontais)
     guias = dados.guias.model_dump() if com_guias else None
+    # A Contagem, as notas e a escala de medida também só existem na imagem; sem grupos, nada é guardado
+    contagem = dados.contagem.model_dump() if imagem and dados.contagem and dados.contagem.grupos else None
+    if contagem and len({g["id"] for g in contagem["grupos"]}) != len(contagem["grupos"]):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dois grupos da contagem têm o mesmo id.")
+    notas = [n.model_dump() for n in dados.notas] if imagem else []
+    if len({n["id"] for n in notas}) != len(notas):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas notas têm o mesmo id.")
     campos = {
         "nome": dados.nome,
         # Na imagem, a proporção acompanha o tamanho
@@ -182,6 +189,9 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "modo": modo,
         "variaveis": dados.variaveis.model_dump() if imagem and dados.variaveis and dados.variaveis.variaveis else None,
         "guias": guias,
+        "contagem": contagem,
+        "notas": notas,
+        "escala_de_medida": dados.escala_de_medida.model_dump() if imagem and dados.escala_de_medida else None,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
         "capa_midia_id": capa_do_projeto(faixas, "imagem" if imagem else "video"),

@@ -1430,6 +1430,72 @@ class GuiasEntrada(BaseModel):
         return valor
 
 
+def _perto_do_documento(valor: float) -> float:
+    if not -100_000 <= valor <= 100_000:
+        raise ValueError("O ponto fica longe demais do documento.")
+    return valor
+
+
+class PontoDaContagemEntrada(BaseModel):
+    """Um ponto da ferramenta Contagem, em pixels do documento."""
+    x: float
+    y: float
+
+    @field_validator("x", "y")
+    @classmethod
+    def no_alcance(cls, valor: float) -> float:
+        return _perto_do_documento(valor)
+
+
+class GrupoDaContagemEntrada(BaseModel):
+    """Um grupo da Contagem: os pontos numerados, com a cor e os tamanhos do marcador e do número."""
+    id: str = Field(min_length=1, max_length=64)
+    nome: str = Field(min_length=1, max_length=60)
+    cor: str = Field(default="#ff3b30", pattern=COR)
+    tamanho_do_marcador: int = Field(default=1, ge=0, le=10)
+    tamanho_do_rotulo: int = Field(default=12, ge=8, le=72)
+    visivel: bool = True
+    pontos: list[PontoDaContagemEntrada] = Field(default=[], max_length=5000)
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class ContagemEntrada(BaseModel):
+    """Os grupos da ferramenta Contagem e o grupo em que o clique conta."""
+    grupos: list[GrupoDaContagemEntrada] = Field(default=[], max_length=30)
+    ativo: str | None = Field(default=None, max_length=64)
+
+
+class NotaEntrada(BaseModel):
+    """Uma nota presa a um ponto do documento (ferramenta Nota)."""
+    id: str = Field(min_length=1, max_length=64)
+    x: float
+    y: float
+    autor: str = Field(default="", max_length=60)
+    texto: str = Field(default="", max_length=4000)
+    cor: str = Field(default="#ffd60a", pattern=COR)
+
+    @field_validator("x", "y")
+    @classmethod
+    def no_alcance(cls, valor: float) -> float:
+        return _perto_do_documento(valor)
+
+
+class EscalaDeMedidaEntrada(BaseModel):
+    """Imagem › Análise › Definir escala de medida: tantos pixels são tanto da unidade dada."""
+    pixels: float = Field(gt=0, le=100_000)
+    comprimento: float = Field(gt=0, le=1_000_000)
+    unidade: str = Field(min_length=1, max_length=20)
+
+    @field_validator("unidade", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1904,6 +1970,9 @@ class ProjetoSalvarEntrada(BaseModel):
     modo: ModoDeCorEntrada | None = None
     variaveis: VariaveisEntrada | None = None
     guias: GuiasEntrada | None = None
+    contagem: ContagemEntrada | None = None
+    notas: list[NotaEntrada] = Field(default=[], max_length=200)
+    escala_de_medida: EscalaDeMedidaEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1944,6 +2013,9 @@ class ProjetoSaida(BaseModel):
     modo: ModoDeCorEntrada | None = None
     variaveis: VariaveisEntrada | None = None
     guias: GuiasEntrada | None = None
+    contagem: ContagemEntrada | None = None
+    notas: list[NotaEntrada] = []
+    escala_de_medida: EscalaDeMedidaEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
