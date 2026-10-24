@@ -1,4 +1,4 @@
-// O GIF de um quadro (ADR 0003, onda 13.13): GIF89a com a paleta da imagem indexada, a transparência de um índice
+// O GIF (ADR 0003, ondas 13.13 e 13.15): GIF89a com a paleta da imagem indexada, a transparência de um índice
 // e os pixels comprimidos pelo LZW de códigos variáveis (até 12 bits), na especificação de 1989.
 import type { ImagemIndexada } from "./quantizar.ts";
 
@@ -112,6 +112,63 @@ export function codificarGif(imagem: ImagemIndexada): Uint8Array {
     e.bytes(bloco);
   }
   e.byte(0);
+  e.byte(0x3b);
+  return e.pronto();
+}
+
+/**
+ * O GIF animado: um quadro por imagem indexada, cada um com a paleta dele, o tempo (em centésimos de segundo, como o
+ * formato guarda) e, com transparência, o fundo limpo entre um e outro. `repetir` é quantas vezes a animação toca
+ * (0 é sempre; 1, uma vez, sem a extensão de repetição).
+ */
+export function codificarGifAnimado(quadros: { imagem: ImagemIndexada; atraso: number }[], repetir: number): Uint8Array {
+  if (!quadros.length) throw new Error("A animação não tem quadros.");
+  const { largura, altura } = quadros[0].imagem;
+  const e = new Escritor();
+  e.texto("GIF89a");
+  e.palavra(largura);
+  e.palavra(altura);
+  // Sem tabela global: cada quadro traz a dele
+  e.byte(0);
+  e.byte(0);
+  e.byte(0);
+  if (repetir !== 1) {
+    // NETSCAPE2.0: quantas vezes repete depois da primeira (0 é sempre)
+    e.bytes([0x21, 0xff, 0x0b]);
+    e.texto("NETSCAPE2.0");
+    e.bytes([0x03, 0x01]);
+    e.palavra(repetir === 0 ? 0 : Math.min(0xffff, repetir - 1));
+    e.byte(0);
+  }
+  for (const { imagem, atraso } of quadros) {
+    const { indices, paleta, transparente } = imagem;
+    let n = 1;
+    while (1 << n < paleta.length) n++;
+    const centesimos = Math.max(0, Math.min(0xffff, Math.round(atraso * 100)));
+    // Controle gráfico: o tempo, a transparência e o descarte (o fundo volta a limpo, para o transparente não acumular)
+    e.bytes([0x21, 0xf9, 4, ((transparente !== null ? 2 : 1) << 2) | (transparente !== null ? 1 : 0)]);
+    e.palavra(centesimos);
+    e.bytes([transparente ?? 0, 0]);
+    e.byte(0x2c);
+    e.palavra(0);
+    e.palavra(0);
+    e.palavra(imagem.largura);
+    e.palavra(imagem.altura);
+    e.byte(0x80 | (n - 1));
+    for (let i = 0; i < 1 << n; i++) {
+      const [r, g, b] = paleta[i] ?? [0, 0, 0];
+      e.bytes([r, g, b]);
+    }
+    const bitsMinimos = Math.max(2, n);
+    e.byte(bitsMinimos);
+    const dados = lzw(indices, bitsMinimos);
+    for (let i = 0; i < dados.length; i += 255) {
+      const bloco = dados.subarray(i, i + 255);
+      e.byte(bloco.length);
+      e.bytes(bloco);
+    }
+    e.byte(0);
+  }
   e.byte(0x3b);
   return e.pronto();
 }

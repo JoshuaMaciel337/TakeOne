@@ -290,7 +290,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Pesquisar (Ctrl+F): paleta com todos os comandos e ferramentas
 - [x] Atalhos de teclado personalizáveis; Menus (esconder e colorir itens); Barra de ferramentas personalizável (uma ou duas colunas, esconder ferramentas); segurar a tecla de uma ferramenta usa ela só enquanto está apertada
 - [x] Preferências (geral, interface, ferramentas, unidades, guias e grade, transparência, desempenho)
-- [ ] Linha do tempo de quadros (animação), com exportar GIF e vídeo e abrir no editor de vídeo
+- [x] Linha do tempo de quadros (animação), com exportar GIF e vídeo e abrir no editor de vídeo
 - [ ] Fatia e Seleção de fatia (fatias a partir das guias, exportação por fatia)
 - [ ] Painel Teclas modificadoras (Shift, Ctrl e Alt presos, para a tela de toque)
 - [ ] Temas da interface (cinza médio e cinza claro, além do escuro e do claro de hoje)

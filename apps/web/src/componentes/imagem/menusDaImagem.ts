@@ -30,6 +30,7 @@ export const PAINEIS_DA_IMAGEM = {
   histograma: "Histograma",
   acoes: "Ações",
   comps: "Comps de camada",
+  linhaDoTempo: "Linha do tempo",
   predefinicoes: "Predefinições de ferramenta",
   informacoes: "Informações",
   notas: "Notas",

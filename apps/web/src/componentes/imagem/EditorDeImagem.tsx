@@ -28,7 +28,7 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { type CaixaDoCorte, camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, type Canal, type Clipe, type Faixa, type GeracaoDoClipe, MASCARA_PADRAO, type Mesclagem, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Canal, type Clipe, type Faixa, type GeracaoDoClipe, MASCARA_PADRAO, type Mesclagem, PROPORCOES, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
@@ -125,6 +125,7 @@ import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { PainelComps } from "./PainelComps";
+import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
 import { type AbaDaPersonalizacao, JanelaPersonalizar } from "./JanelaPersonalizar";
 import { JanelaPreferencias } from "./JanelaPreferencias";
@@ -169,7 +170,9 @@ import {
 import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServidor, documentoVizinho, fecharDocumento, mudarDocumentos } from "@/lib/imagem/documentos";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { type CamadasEscolhidas, mesmaTecla, teclaDoEventoDaAcao } from "@/lib/imagem/acoes";
-import { atualizarComp, camadasQueSumiram, type CompDeCamada, novaComp } from "@/lib/imagem/comps";
+import { atualizarComp, camadasQueSumiram, type CompDeCamada, estadoDasCamadas, novaComp } from "@/lib/imagem/comps";
+import { type AnimacaoDaImagem, compDoQuadro, interpolar, MAXIMO_DE_QUADROS, novoQuadro } from "@/lib/imagem/animacao";
+import { gifDaAnimacao, videoDaAnimacao } from "@/lib/exportacao/animacao";
 import { opcoesParaGuardar, type ParteDasOpcoes, partesDaFerramenta, type PredefinicaoDeFerramenta } from "@/lib/imagem/predefinicoesDeFerramenta";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
@@ -526,6 +529,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [compsEmArquivos, setCompsEmArquivos] = useState(false);
   const [pesquisando, setPesquisando] = useState(false);
   const [preferindo, setPreferindo] = useState(false);
+  // A linha do tempo de quadros: o quadro escolhido e a animação tocando (só na tela)
+  const [quadroAtual, setQuadroAtual] = useState<string | null>(null);
+  const [tocandoAnimacao, setTocandoAnimacao] = useState(false);
+  const relogioDaAnimacao = useRef<number | null>(null);
   // Editar › Atalhos de teclado e menus e Barra de ferramentas (no navegador), e os itens escondidos à vista
   const [personalizacao, setPersonalizacao] = useState<Personalizacao>(carregarPersonalizacao);
   const [personalizando, setPersonalizando] = useState<AbaDaPersonalizacao | null>(null);
@@ -5366,6 +5373,95 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }}
     />
   );
+  // ——— A linha do tempo de quadros ———
+  const animacaoDoDocumento = projeto?.animacao ?? null;
+  const mudarAnimacao = (animacao: AnimacaoDaImagem | null, nome: string) => executar({ comando: "imagem.animacao", parametros: { animacao, nome } });
+  /** Escolher um quadro mostra as camadas como estão nele, sem virar passo do desfazer. */
+  const escolherQuadro = (id: string, animacao = animacaoDoDocumento) => {
+    const quadro = animacao?.quadros.find((item) => item.id === id);
+    if (!quadro) return;
+    setQuadroAtual(id);
+    executarNoProjeto({ comando: "imagem.aplicarComp", parametros: { comp: compDoQuadro(quadro) } }, { semPasso: true });
+  };
+  // O que muda nas camadas vale para o quadro escolhido (junto do passo da mudança, sem outro)
+  useEffect(() => {
+    if (!projeto?.animacao || !quadroAtual || tocandoAnimacao) return;
+    const quadro = projeto.animacao.quadros.find((item) => item.id === quadroAtual);
+    if (!quadro) return;
+    const estado = estadoDasCamadas(projeto);
+    if (JSON.stringify(estado) === JSON.stringify(quadro.camadas)) return;
+    executarNoProjeto({ comando: "imagem.animacao", parametros: { animacao: { ...projeto.animacao, quadros: projeto.animacao.quadros.map((item) => (item.id === quadro.id ? { ...item, camadas: estado } : item)) } } }, { semPasso: true });
+  }, [projeto, quadroAtual, tocandoAnimacao, executarNoProjeto]);
+  const pararAnimacao = () => {
+    if (relogioDaAnimacao.current !== null) window.clearTimeout(relogioDaAnimacao.current);
+    relogioDaAnimacao.current = null;
+    setTocandoAnimacao(false);
+    setProvisorio(null);
+  };
+  /** Tocar: cada quadro na tela pelo tempo dele, as vezes pedidas (sempre: até parar), pela mudança provisória. */
+  const tocarAnimacao = () => {
+    const animacao = animacaoDoDocumento;
+    if (!animacao?.quadros.length) return;
+    setTocandoAnimacao(true);
+    let i = Math.max(0, animacao.quadros.findIndex((quadro) => quadro.id === quadroAtual));
+    let volta = 0;
+    const passo = () => {
+      const quadro = animacao.quadros[i];
+      setProvisorio({ comando: "imagem.aplicarComp", parametros: { comp: compDoQuadro(quadro) } });
+      relogioDaAnimacao.current = window.setTimeout(() => {
+        i++;
+        if (i >= animacao.quadros.length) {
+          i = 0;
+          volta++;
+          if (animacao.repetir && volta >= animacao.repetir) return pararAnimacao();
+        }
+        passo();
+      }, Math.max(1000 / 30, quadro.atraso * 1000));
+    };
+    passo();
+  };
+  useEffect(() => () => {
+    if (relogioDaAnimacao.current !== null) window.clearTimeout(relogioDaAnimacao.current);
+  }, []);
+  /** Exportar a animação: o GIF, o MP4, ou o MP4 aberto num projeto novo do editor de vídeo. */
+  const exportarAnimacao = async (como: "gif" | "video" | "editor") => {
+    const animacao = animacaoDoDocumento;
+    if (!projeto || !animacao) return;
+    try {
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const fontes = { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros };
+      if (como === "gif") {
+        const blob = await gifDaAnimacao(atual, midias, animacao, 1, fontes, mostrarAviso);
+        baixarBlob(blob, `${edicao.nome || "animacao"}.gif`);
+        mostrarAviso("GIF animado pronto.");
+        return;
+      }
+      const escala = Math.min(1, 1920 / Math.max(largura, altura));
+      const video = await videoDaAnimacao(atual, midias, animacao, escala, fontes, mostrarAviso);
+      if (como === "video") {
+        baixarBlob(video, `${edicao.nome || "animacao"}.mp4`);
+        mostrarAviso("Vídeo pronto.");
+        return;
+      }
+      // No editor de vídeo: o MP4 sobe para a biblioteca e entra num projeto novo, no formato mais perto do documento
+      mostrarAviso("Enviando o vídeo para a biblioteca…");
+      const midia = await enviarEEsperar(iniciarEnvio, new File([video], `${edicao.nome || "Animação"}.mp4`, { type: "video/mp4" }));
+      const razao = largura / altura;
+      const proporcao = PROPORCOES.reduce((melhor, item) => {
+        const [a, b] = item.split(":").map(Number);
+        const [c, d] = melhor.split(":").map(Number);
+        return Math.abs(Math.log(a / b / razao)) < Math.abs(Math.log(c / d / razao)) ? item : melhor;
+      }, PROPORCOES[0]);
+      const novo = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome: edicao.nome || "Animação", proporcao } });
+      const comClipe = executarComando(novo, { comando: "clipe.adicionar", parametros: { midiaId: midia.id } }, contextoDasMidias(new Map([[midia.id, midia]]))).projeto;
+      await chamarApi(`/projetos/${novo.id}`, { metodo: "PUT", corpo: { versao: novo.versao, nome: novo.nome, proporcao: novo.proporcao, taxa: novo.taxa, fundo: novo.fundo, faixas: comClipe.faixas, marcadores: [] } });
+      router.push(`/app/editor/${novo.id}`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível exportar a animação.");
+    }
+  };
   // ——— A medição (Imagem › Análise): as notas, o Registro de medições e o marcador de escala ———
   const mudarNotas = (notas: Nota[], escolhida?: string) => {
     executar({ comando: "imagem.notas", parametros: { notas } });
@@ -5671,6 +5767,73 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
     },
     predefinicoes: { nome: PAINEIS_DA_IMAGEM.predefinicoes, conteudo: conteudoDasPredefinicoes },
+    linhaDoTempo: {
+      nome: PAINEIS_DA_IMAGEM.linhaDoTempo,
+      conteudo: (
+        <PainelLinhaDoTempo
+          projeto={projeto}
+          midias={midias}
+          animacao={animacaoDoDocumento}
+          atual={quadroAtual}
+          tocando={tocandoAnimacao}
+          aoCriar={() => {
+            const id = crypto.randomUUID().slice(0, 12);
+            mudarAnimacao({ quadros: [novoQuadro(projeto, id)], repetir: 0 }, "criar a animação");
+            setQuadroAtual(id);
+          }}
+          aoEscolher={(id) => {
+            if (tocandoAnimacao) pararAnimacao();
+            escolherQuadro(id);
+          }}
+          aoDuplicar={() => {
+            if (!animacaoDoDocumento) return;
+            const id = crypto.randomUUID().slice(0, 12);
+            const onde = animacaoDoDocumento.quadros.findIndex((quadro) => quadro.id === quadroAtual) + 1 || animacaoDoDocumento.quadros.length;
+            const atraso = animacaoDoDocumento.quadros[onde - 1]?.atraso ?? 0.5;
+            const quadros = [...animacaoDoDocumento.quadros.slice(0, onde), novoQuadro(projeto, id, atraso), ...animacaoDoDocumento.quadros.slice(onde)];
+            if (quadros.length > MAXIMO_DE_QUADROS) return mostrarAviso(`São no máximo ${MAXIMO_DE_QUADROS} quadros.`);
+            mudarAnimacao({ ...animacaoDoDocumento, quadros }, "duplicar o quadro");
+            setQuadroAtual(id);
+          }}
+          aoExcluir={(id) => {
+            if (!animacaoDoDocumento) return;
+            const onde = animacaoDoDocumento.quadros.findIndex((quadro) => quadro.id === id);
+            const nova = { ...animacaoDoDocumento, quadros: animacaoDoDocumento.quadros.filter((quadro) => quadro.id !== id) };
+            mudarAnimacao(nova, "excluir o quadro");
+            const vizinho = nova.quadros[Math.min(onde, nova.quadros.length - 1)];
+            if (vizinho) escolherQuadro(vizinho.id, nova);
+          }}
+          aoMover={(id, passo) => {
+            if (!animacaoDoDocumento) return;
+            const quadros = [...animacaoDoDocumento.quadros];
+            const de = quadros.findIndex((quadro) => quadro.id === id);
+            const para = de + passo;
+            if (de < 0 || para < 0 || para >= quadros.length) return;
+            [quadros[de], quadros[para]] = [quadros[para], quadros[de]];
+            mudarAnimacao({ ...animacaoDoDocumento, quadros }, "mover o quadro");
+          }}
+          aoAtraso={(id, atraso) => animacaoDoDocumento && mudarAnimacao({ ...animacaoDoDocumento, quadros: animacaoDoDocumento.quadros.map((quadro) => (quadro.id === id ? { ...quadro, atraso } : quadro)) }, "mudar o tempo do quadro")}
+          aoRepetir={(repetir) => animacaoDoDocumento && mudarAnimacao({ ...animacaoDoDocumento, repetir }, "mudar a repetição")}
+          aoTocar={tocarAnimacao}
+          aoParar={pararAnimacao}
+          aoInterpolar={(quantos) => {
+            if (!animacaoDoDocumento) return;
+            const onde = animacaoDoDocumento.quadros.findIndex((quadro) => quadro.id === quadroAtual);
+            const [a, b] = [animacaoDoDocumento.quadros[onde], animacaoDoDocumento.quadros[onde + 1]];
+            if (!a || !b) return;
+            const quadros = [...animacaoDoDocumento.quadros.slice(0, onde + 1), ...interpolar(a, b, quantos, () => crypto.randomUUID().slice(0, 12)), ...animacaoDoDocumento.quadros.slice(onde + 1)];
+            if (quadros.length > MAXIMO_DE_QUADROS) return mostrarAviso(`São no máximo ${MAXIMO_DE_QUADROS} quadros.`);
+            mudarAnimacao({ ...animacaoDoDocumento, quadros }, "interpolar");
+          }}
+          aoExportar={(como) => void exportarAnimacao(como)}
+          aoExcluirAnimacao={() => {
+            pararAnimacao();
+            mudarAnimacao(null, "excluir a animação");
+            setQuadroAtual(null);
+          }}
+        />
+      ),
+    },
     comps: {
       nome: PAINEIS_DA_IMAGEM.comps,
       conteudo: (
