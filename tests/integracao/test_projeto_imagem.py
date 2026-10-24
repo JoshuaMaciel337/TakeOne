@@ -99,6 +99,24 @@ def test_camada_vetorial(cliente):
     assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
 
 
+def test_mascara_vetorial(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    foto = criar_midia(db_limpo, cliente)
+    mascara = {"subcaminhos": [{"nos": [{"x": 0, "y": 0}, {"x": 400, "y": 0}, {"x": 200, "y": 300}], "fechado": True,
+                                "operacao": "somar"}], "base": "ocultar", "ligada": True, "vinculada": False,
+               "densidade": 0.8, "difusao": 4, "matriz": [1, 0, 0, 1, 0, 0]}
+    faixas = [camada("video", {**clipe(foto, 0, 5, id_="foto"), "mascara_vetorial": mascara}),
+              {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["mascara_vetorial"] == mascara
+    torta = {**mascara, "matriz": [1, 0, 0]}
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert salvar(cliente, aberto, [camada("video", {**faixas[0]["clipes"][0], "mascara_vetorial": torta}),
+                                    faixas[1]]).status_code == 422
+
+
 def test_caminhos_do_documento(cliente):
     cadastrar(cliente)
     projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()

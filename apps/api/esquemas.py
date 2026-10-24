@@ -845,6 +845,24 @@ class VetorEntrada(BaseModel):
         return self
 
 
+class MascaraVetorialEntrada(BaseModel):
+    """A máscara vetorial de uma camada (apps/web/src/lib/vetor/mascaraVetorial.ts), no espaço da máscara."""
+    subcaminhos: list[SubcaminhoEntrada] = Field(max_length=1000)
+    base: Literal["revelar", "ocultar"] = "revelar"
+    ligada: bool = True
+    vinculada: bool = True
+    densidade: float = Field(default=1, ge=0, le=1)
+    difusao: float = Field(default=0, ge=0, le=1000)
+    # A posição na camada (0 a 1) → o ponto na máscara (0 a 1)
+    matriz: list[float] = Field(min_length=6, max_length=6)
+
+    @model_validator(mode="after")
+    def _nos_no_limite(self):
+        if sum(len(sub.nos) for sub in self.subcaminhos) > 20_000:
+            raise ValueError("A máscara vetorial pode ter no máximo 20 mil pontos.")
+        return self
+
+
 class CaminhoDoDocumento(BaseModel):
     """Um caminho do painel Caminhos do editor de imagem, em pixels do documento (lib/vetor/caminhos.ts)."""
     id: str = Field(min_length=1, max_length=40)
@@ -921,6 +939,7 @@ class ClipeEntrada(BaseModel):
     mascara_pixels: MascaraDePixelsEntrada | None = None
     # Camada vetorial (forma ou caminho): sem mídia nem texto, desenhada pelo editor
     vetor: VetorEntrada | None = None
+    mascara_vetorial: MascaraVetorialEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)

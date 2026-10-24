@@ -172,7 +172,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
         da_imagem = any(faixa.get(campo) for campo in CAMPOS_DA_IMAGEM)
         if not imagem:
             if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None or c.get("pixels")
-                                or c.get("mascara_pixels") or c.get("vetor")
+                                or c.get("mascara_pixels") or c.get("vetor") or c.get("mascara_vetorial")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels, formas vetoriais e os modos de mesclagem"
                         " novos só existem no editor de imagem.")
