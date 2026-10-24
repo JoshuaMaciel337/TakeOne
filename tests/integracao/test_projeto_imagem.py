@@ -504,3 +504,18 @@ def test_comps_de_camada(cliente):
     ruim = {**comp, "camadas": {"f1": {"mesclagem": "inventado"}}}
     assert salvar(cliente, atual, [vazia], comps=[ruim]).status_code == 422
     assert salvar(cliente, atual, [vazia]).json()["comps"] == []
+
+
+def test_linha_do_tempo_de_quadros(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    quadros = [{"id": "q1", "atraso": 0.2, "camadas": {"f1": {"oculta": False}}},
+               {"id": "q2", "camadas": {"f1": {"oculta": True}}}]
+    salvo = salvar(cliente, projeto, [vazia], animacao={"quadros": quadros, "repetir": 3})
+    assert salvo.status_code == 200, salvo.text
+    animacao = salvo.json()["animacao"]
+    assert animacao["repetir"] == 3 and [q["atraso"] for q in animacao["quadros"]] == [0.2, 0.5]
+    atual = salvo.json()
+    assert salvar(cliente, atual, [vazia], animacao={"quadros": [{"id": "q", "atraso": 61}]}).status_code == 422
+    assert salvar(cliente, atual, [vazia], animacao={"quadros": []}).json()["animacao"] is None

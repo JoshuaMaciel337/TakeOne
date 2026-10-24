@@ -1992,6 +1992,19 @@ class CompDeCamadaEntrada(BaseModel):
         return _limpar_espacos(valor)
 
 
+class QuadroDaAnimacaoEntrada(BaseModel):
+    """Um quadro da linha do tempo de quadros: o estado das camadas (como numa comp) e quanto ele fica na tela."""
+    id: str = Field(min_length=1, max_length=64)
+    atraso: float = Field(default=0.5, ge=0, le=60)
+    camadas: dict[str, EstadoNaCompEntrada] = Field(default={}, max_length=110)
+
+
+class AnimacaoEntrada(BaseModel):
+    """A linha do tempo de quadros do editor de imagem: os quadros e quantas vezes a animação toca (0 é sempre)."""
+    quadros: list[QuadroDaAnimacaoEntrada] = Field(default=[], max_length=500)
+    repetir: int = Field(default=0, ge=0, le=1000)
+
+
 class ProjetoSalvarEntrada(BaseModel):
     versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
     nome: str = Field(min_length=1, max_length=120)
@@ -2016,6 +2029,7 @@ class ProjetoSalvarEntrada(BaseModel):
     notas: list[NotaEntrada] = Field(default=[], max_length=200)
     escala_de_medida: EscalaDeMedidaEntrada | None = None
     comps: list[CompDeCamadaEntrada] = Field(default=[], max_length=100)
+    animacao: AnimacaoEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -2060,6 +2074,7 @@ class ProjetoSaida(BaseModel):
     notas: list[NotaEntrada] = []
     escala_de_medida: EscalaDeMedidaEntrada | None = None
     comps: list[CompDeCamadaEntrada] = []
+    animacao: AnimacaoEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"

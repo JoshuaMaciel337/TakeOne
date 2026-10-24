@@ -176,6 +176,9 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas notas têm o mesmo id.")
     # As comps de camada guardam só o que a camada tem (o resto fica de fora, para a comp não inventar nada)
     comps = [c.model_dump(exclude_none=True) for c in dados.comps] if imagem else []
+    # A linha do tempo de quadros (só na imagem); sem quadros, nada é guardado
+    com_quadros = imagem and dados.animacao and dados.animacao.quadros
+    animacao = dados.animacao.model_dump(exclude_none=True) if com_quadros else None
     if len({c["id"] for c in comps}) != len(comps):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas comps de camada têm o mesmo id.")
     campos = {
@@ -196,6 +199,7 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "contagem": contagem,
         "notas": notas,
         "comps": comps,
+        "animacao": animacao,
         "escala_de_medida": dados.escala_de_medida.model_dump() if imagem and dados.escala_de_medida else None,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
