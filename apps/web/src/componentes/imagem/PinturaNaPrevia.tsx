@@ -12,6 +12,7 @@ import type { Recorte, Virar } from "@/lib/projeto/modelo";
 import { type MascaraDePixels, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, pontoNaMascara } from "@/lib/projeto/mascaraDePixels";
 import type { Selecao } from "@/lib/selecao/mascara";
 import { selecaoNaMidia } from "@/lib/selecao/naTela";
+import { pontoNoElemento } from "./pontoNaVista";
 
 /** A camada que recebe o traço, como está na prévia (sem caixa: uma camada nova, que cobre o quadro). */
 export type AlvoDaPintura = {
@@ -102,8 +103,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
   );
 
   function noQuadro(evento: { clientX: number; clientY: number }, elemento: Element): { x: number; y: number } {
-    const retangulo = elemento.getBoundingClientRect();
-    return { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
+    return pontoNoElemento(evento, elemento);
   }
 
   /** Um ponto da tela no traço: corda, espaçamento e as marcas na camada. */

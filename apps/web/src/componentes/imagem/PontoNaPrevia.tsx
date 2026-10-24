@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import type { Tamanho } from "@/lib/projeto/geometria";
+import { pontoNoElemento } from "./pontoNaVista";
 
 type Ponto = { x: number; y: number };
 
@@ -31,8 +32,8 @@ export function PontoNaPrevia({
   const escala = documento.largura / Math.max(1, quadro.largura);
   const [arrasto, setArrasto] = useState<{ de: Ponto; ate: Ponto } | null>(null);
   const paraDocumento = (evento: { clientX: number; clientY: number }, elemento: Element): Ponto => {
-    const r = elemento.getBoundingClientRect();
-    return { x: (evento.clientX - r.left) * escala, y: (evento.clientY - r.top) * escala };
+    const p = pontoNoElemento(evento, elemento);
+    return { x: p.x * escala, y: p.y * escala };
   };
   /** Com Shift, a reta fica nos múltiplos de 45°. */
   const preso = (de: Ponto, ate: Ponto, shift: boolean): Ponto => {

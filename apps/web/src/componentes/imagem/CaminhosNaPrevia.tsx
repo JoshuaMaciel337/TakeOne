@@ -11,6 +11,7 @@ import type { Tamanho } from "@/lib/projeto/geometria";
 import { achatar, svgDosCaminhos } from "@/lib/vetor/contorno";
 import { acharPonto, acharTrecho, ajustarCurvas, alcasSimetricas, caminhoDeCurvatura, converterNo, dividirTrecho, excluirNo, moverAlca, moverNos } from "@/lib/vetor/edicao";
 import type { No, Subcaminho } from "@/lib/vetor/modelo";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type FerramentaDeCaminho = "caneta" | "canetaLivre" | "canetaDeCurvatura" | "adicionarPonto" | "excluirPonto" | "converterPonto" | "selecaoDeCaminho" | "selecaoDireta";
 export type OpcoesDosCaminhos = { elastico: boolean; ajuste: number; autoAdicionar: boolean };
@@ -106,8 +107,8 @@ export function CaminhosNaPrevia({
   }
 
   function noDocumento(evento: { clientX: number; clientY: number }, elemento: Element): Ponto {
-    const r = elemento.getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, elemento);
+    return { x: p.x / escala, y: p.y / escala };
   }
   /** O ponto preso a 45° em volta de `de` (Shift). */
   const a45 = (de: Ponto, p: Ponto): Ponto => {

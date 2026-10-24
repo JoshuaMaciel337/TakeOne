@@ -25,6 +25,7 @@ import {
   type Ponto,
   textoDosPinos,
 } from "@/lib/imagem/filtros/galeria";
+import { pontoNoElemento } from "../pontoNaVista";
 
 export type Escolhido = { ferramenta: FerramentaDaGaleria; indice: number } | null;
 type Tamanho = { largura: number; altura: number };
@@ -186,8 +187,8 @@ export function GaleriaNaPrevia({
   // Do documento (%) à tela e de volta
   const naTela = (p: Ponto) => ({ x: (p.x / 100) * documento.largura * k, y: (p.y / 100) * documento.altura * k });
   const doPonteiro = (evento: React.PointerEvent) => {
-    const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-    return { x: ((evento.clientX - r.left) / k / documento.largura) * 100, y: ((evento.clientY - r.top) / k / documento.altura) * 100 };
+    const p = pontoNoElemento(evento, evento.currentTarget as HTMLElement);
+    return { x: (p.x / k / documento.largura) * 100, y: (p.y / k / documento.altura) * 100 };
   };
   const emPixels = (p: Ponto) => ({ x: (p.x / 100) * documento.largura, y: (p.y / 100) * documento.altura });
   const mudarPino = (f: FerramentaDaGaleria, indice: number, mudanca: object) => {

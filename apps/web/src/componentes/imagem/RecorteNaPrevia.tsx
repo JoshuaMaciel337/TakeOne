@@ -7,6 +7,7 @@
 import { useRef, useState } from "react";
 
 import type { CaixaDoCorte, TamanhoDaImagem } from "@/lib/projeto/imagem";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type SobreposicaoDoCorte = "nenhuma" | "tercos" | "grade" | "diagonal" | "triangulo" | "aurea" | "espiral";
 export const SOBREPOSICOES_DO_CORTE: { id: SobreposicaoDoCorte; nome: string }[] = [
@@ -143,8 +144,8 @@ export function RecorteNaPrevia({ caixa, imagem, escala, proporcao, sobreposicao
   const [linha, setLinha] = useState<{ de: { x: number; y: number }; ate: { x: number; y: number } } | null>(null);
   const [cursor, setCursor] = useState("move");
   const paraImagem = (evento: React.PointerEvent) => {
-    const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, evento.currentTarget as HTMLElement);
+    return { x: p.x / escala, y: p.y / escala };
   };
   const pegadaEm = (p: { x: number; y: number }): Pegada => {
     if (endireitando) return { tipo: "linha" };

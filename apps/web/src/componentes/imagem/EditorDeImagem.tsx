@@ -492,6 +492,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [alertaDeGama, setAlertaDeGama] = useState(false);
   // Exibir: as preferências da vista ficam no navegador (são da tela de quem edita); as guias são do documento
   const [vista, setVista] = useState<PreferenciasDaVista>(lerVista);
+  // A vista girada (R) e o pedido de enquadrar uma camada: só da tela
+  const [giroDaVista, setGiroDaVista] = useState({ angulo: 0, espelhada: false });
+  const [enquadrar, setEnquadrar] = useState<{ retangulo: RetanguloDaImagem; vez: number } | null>(null);
   const mudarVista = (mudanca: Partial<PreferenciasDaVista>) =>
     setVista((atual) => {
       const nova = { ...atual, ...mudanca };
@@ -4845,6 +4848,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
     mudarVista,
+    zoomExato: (valor) => setZoom(valor),
+    // O pixel CSS é 1/96 de polegada: o documento sai no tamanho de papel da resolução dele
+    tamanhoDeImpressao: () => setZoom(96 / (projeto?.tamanho?.resolucao ?? 72)),
+    ajustarCamadaATela: () => {
+      const retangulo = retanguloDasCamadas(escolhidas.flatMap((faixa) => (faixa.clipes[0] ? [faixa.clipes[0].id] : [])));
+      if (retangulo) setEnquadrar((atual) => ({ retangulo, vez: (atual?.vez ?? 0) + 1 }));
+    },
+    giroDaVista,
+    girarVista: (giro) => setGiroDaVista((atual) => ({ ...atual, ...giro })),
     janelaDaVista: (janela) => setJanelaDaVista(janela),
     temGuias: Boolean(projeto?.guias),
     limparGuias: () => executar({ comando: "imagem.guias", parametros: { guias: { verticais: [], horizontais: [] } } }),
@@ -5638,6 +5650,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       </header>
 
       <BarraDeOpcoes
+        giroDaVista={giroDaVista}
+        aoGirarVista={(giro) => setGiroDaVista((atual) => ({ ...atual, ...giro }))}
         ferramenta={ferramenta}
         clipe={selecionado?.clipe ?? null}
         aoExecutar={executar}
@@ -5889,6 +5903,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             </div>
           </div>
           <PreviaDaImagem
+            giroDaVista={giroDaVista}
+            aoGirarVista={(angulo) => setGiroDaVista((atual) => ({ ...atual, angulo }))}
+            enquadrar={enquadrar}
             vista={vista}
             guiasDoDocumento={projeto.guias ?? null}
             aoMudarGuias={(guias) => executar({ comando: "imagem.guias", parametros: { guias } })}

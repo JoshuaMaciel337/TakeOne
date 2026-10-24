@@ -4,14 +4,15 @@
 import { useRef } from "react";
 
 import type { Medida } from "./OpcoesDaGeometria";
+import { pontoNoElemento } from "./pontoNaVista";
 
 type Props = { medida: Medida | null; escala: number; aoMudar: (medida: Medida) => void };
 
 export function ReguaNaPrevia({ medida, escala, aoMudar }: Props) {
   const pegada = useRef<{ ponta: "de" | "ate"; fixa: { x: number; y: number } } | null>(null);
   const paraImagem = (evento: React.PointerEvent) => {
-    const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, evento.currentTarget as HTMLElement);
+    return { x: p.x / escala, y: p.y / escala };
   };
   function apertar(evento: React.PointerEvent) {
     if (evento.button !== 0) return;

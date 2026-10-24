@@ -14,6 +14,7 @@ import { fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { medirTexto } from "@/lib/texto/medida";
 import { funcaoDaDeformacao } from "@/lib/texto/contornos";
 import { type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, substituir, textoCorrido, type TextoRico } from "@/lib/texto/modelo";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type SelecaoDoTexto = { de: number; ate: number };
 
@@ -312,8 +313,8 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
   };
 
   const noTexto = (evento: { clientX: number; clientY: number }, elemento: Element) => {
-    const r = elemento.getBoundingClientRect();
-    return contas.doTexto(evento.clientX - r.left, evento.clientY - r.top);
+    const p = pontoNoElemento(evento, elemento);
+    return contas.doTexto(p.x, p.y);
   };
   const dentroDaCaixa = (p: { x: number; y: number }) => {
     const x = p.x + texto.origem.x;

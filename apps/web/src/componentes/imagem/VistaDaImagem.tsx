@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type Caixa, type Guias } from "@/lib/projeto/geometria";
 import { marcasDaRegua, type PreferenciasDaVista, UNIDADES_DA_REGUA, type UnidadeDaRegua } from "@/lib/imagem/vista";
+import { pontoNoElemento } from "./pontoNaVista";
 
 /** A espessura das réguas, em pixels da tela. */
 export const LADO_DA_REGUA = 20;
@@ -16,8 +17,8 @@ export type GuiaArrastada = { tipo: "v" | "h"; pos: number; indice: number | nul
 
 /** O ponto do ponteiro em pixels do documento, pela caixa da imagem na tela. */
 export function noDocumento(evento: { clientX: number; clientY: number }, imagem: HTMLElement, escala: number) {
-  const r = imagem.getBoundingClientRect();
-  return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+  const p = pontoNoElemento(evento, imagem);
+  return { x: p.x / escala, y: p.y / escala };
 }
 
 /** As guias, a grade, a malha de pixels e as bordas das camadas, por cima da imagem (as guias passam para a mesa). */

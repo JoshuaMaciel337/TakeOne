@@ -171,6 +171,12 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Exibir › 200%, Tamanho de impressão, Ajustar a camada à tela, Espelhar e Redefinir a vista. */
+  zoomExato: (zoom: number) => void;
+  tamanhoDeImpressao: () => void;
+  ajustarCamadaATela: () => void;
+  giroDaVista: { angulo: number; espelhada: boolean };
+  girarVista: (giro: Partial<{ angulo: number; espelhada: boolean }>) => void;
   /** Exibir: as preferências da vista (réguas, guias, grade, extras, encaixe) e as guias do documento. */
   vista: PreferenciasDaVista;
   mudarVista: (mudanca: Partial<PreferenciasDaVista>) => void;
@@ -862,6 +868,12 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Diminuir zoom", atalho: "Ctrl+-", aoEscolher: () => a.zoom("menos") },
         { nome: "Ajustar à tela", atalho: "Ctrl+0", aoEscolher: () => a.zoom("ajustar") },
         { nome: "100%", atalho: "Ctrl+1", aoEscolher: () => a.zoom(1) },
+        { nome: "200%", aoEscolher: () => a.zoomExato(2) },
+        { nome: "Tamanho de impressão", aoEscolher: a.tamanhoDeImpressao, titulo: "O documento no tamanho em que sai impresso, pela resolução dele" },
+        { nome: "Ajustar a camada à tela", desativado: semCamada, aoEscolher: a.ajustarCamadaATela },
+        "-",
+        { nome: "Espelhar a vista na horizontal", marcado: a.giroDaVista.espelhada, aoEscolher: () => a.girarVista({ espelhada: !a.giroDaVista.espelhada }) },
+        { nome: "Redefinir a vista", desativado: !a.giroDaVista.angulo && !a.giroDaVista.espelhada, aoEscolher: () => a.girarVista({ angulo: 0, espelhada: false }), titulo: "Tira o giro e o espelho da vista" },
         "-",
         { nome: "Extras", atalho: "Ctrl+H", marcado: a.vista.extras, aoEscolher: () => a.mudarVista({ extras: !a.vista.extras }), titulo: "Mostra ou esconde de uma vez as guias, a grade, as bordas e as formigas da seleção" },
         {

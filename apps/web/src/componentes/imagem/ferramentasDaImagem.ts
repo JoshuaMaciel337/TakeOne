@@ -49,6 +49,7 @@ import {
   Wand,
   WandSparkles,
   ZoomIn,
+  RotateCw,
   CircleDashed,
   Spline,
   Stamp,
@@ -132,6 +133,7 @@ export type IdFerramentaDaImagem =
   | "linha"
   | "formaPersonalizada"
   | "mao"
+  | "girarVista"
   | "zoom";
 
 export type FerramentaDaImagem = {
@@ -242,7 +244,10 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("linha", "Ferramenta Linha", "U", Minus, "Arraste para desenhar uma linha na cor do primeiro plano."),
     F("formaPersonalizada", "Ferramenta Forma personalizada", "U", Shapes, "Escolha a forma na barra de opções e arraste para desenhar."),
   ],
-  [F("mao", "Ferramenta Mão", "H", Hand, "Arraste para andar pela imagem ampliada. Espaço segura a Mão em qualquer ferramenta.")],
+  [
+    F("mao", "Ferramenta Mão", "H", Hand, "Arraste para andar pela imagem ampliada. Espaço segura a Mão em qualquer ferramenta."),
+    F("girarVista", "Ferramenta Girar vista", "R", RotateCw, "Arraste para girar a vista (a imagem não muda); Shift vai de 15° em 15°. Redefinir a vista volta ao normal."),
+  ],
   [F("zoom", "Ferramenta Zoom", "Z", ZoomIn, "Clique para aproximar; com Alt, afasta. Clique duplo na ferramenta volta a 100%.")],
 ];
 

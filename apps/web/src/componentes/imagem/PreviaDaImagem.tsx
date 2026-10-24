@@ -59,6 +59,7 @@ import { type DivisaoDaMalha, type EstadoDaTransformacao, type ModoDaTransformac
 import type { Malha } from "@/lib/transformar/deformar";
 import type { CorDoCanal } from "./PainelCanais";
 import type { FerramentaObjeto } from "./useObjeto";
+import { ATRIBUTO_DO_ESPELHO, ATRIBUTO_DO_GIRO, pontoNoElemento } from "./pontoNaVista";
 
 /** Densidade máxima de pixels do canvas, como na prévia do vídeo. */
 const DENSIDADE_MAXIMA = 2;
@@ -92,6 +93,11 @@ type Props = {
   /** Pixels de tela por pixel da imagem; null ajusta a imagem à área. */
   zoom: number | null;
   aoMudarZoom: (zoom: number | null) => void;
+  /** Girar vista (R) e Exibir › Espelhar a vista: só a tela gira; a imagem não muda. */
+  giroDaVista?: { angulo: number; espelhada: boolean };
+  aoGirarVista?: (angulo: number) => void;
+  /** Exibir › Ajustar a camada à tela: o retângulo (pixels do documento) que a vista enquadra, uma vez por pedido. */
+  enquadrar?: { retangulo: { x: number; y: number; largura: number; altura: number }; vez: number } | null;
   /** O zoom de verdade (o de ajustar, quando `zoom` é null), para a barra de status. */
   aoMedirZoom?: (zoom: number) => void;
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
@@ -297,6 +303,9 @@ export function PreviaDaImagem({
   fonteDaMascara,
   fonteDaMascaraDosFiltros,
   mascaraAVista = null,
+  giroDaVista = { angulo: 0, espelhada: false },
+  aoGirarVista,
+  enquadrar = null,
   vista = VISTA_PADRAO,
   guiasDoDocumento = null,
   aoMudarGuias,
@@ -319,6 +328,14 @@ export function PreviaDaImagem({
   const escala = Math.max(0.01, zoom ?? ajuste);
   const tamanho: Tamanho = { largura: Math.max(1, Math.round(imagem.largura * escala)), altura: Math.max(1, Math.round(imagem.altura * escala)) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A vista girada: a caixa em volta da imagem girada (a área de rolagem cabe ela)
+  const girada = giroDaVista.angulo !== 0 || giroDaVista.espelhada;
+  const radianos = (giroDaVista.angulo * Math.PI) / 180;
+  const caixaGirada = {
+    largura: Math.abs(tamanho.largura * Math.cos(radianos)) + Math.abs(tamanho.altura * Math.sin(radianos)),
+    altura: Math.abs(tamanho.largura * Math.sin(radianos)) + Math.abs(tamanho.altura * Math.cos(radianos)),
+  };
+  const girandoVista = useRef<{ base: number; inicio: number; cx: number; cy: number } | null>(null);
   // O documento na tela (as réguas e as guias se medem por ele) e a guia que está sendo arrastada
   const imagemRef = useRef<HTMLDivElement>(null);
   const [guiaArrastada, setGuiaArrastada] = useState<GuiaArrastada | null>(null);
@@ -523,6 +540,18 @@ export function PreviaDaImagem({
     }
   });
 
+  // Exibir › Ajustar a camada à tela: o zoom em que o retângulo cabe na área, com o meio dele no meio dela
+  const ultimoEnquadrar = useRef(0);
+  useLayoutEffect(() => {
+    const elemento = areaRef.current;
+    if (!enquadrar || enquadrar.vez === ultimoEnquadrar.current || !elemento) return;
+    ultimoEnquadrar.current = enquadrar.vez;
+    const { retangulo } = enquadrar;
+    const novo = Math.max(0.01, Math.min((elemento.clientWidth - MESA * 2) / Math.max(1, retangulo.largura), (elemento.clientHeight - MESA * 2) / Math.max(1, retangulo.altura)));
+    ancora.current = { fx: (retangulo.x + retangulo.largura / 2) / imagem.largura, fy: (retangulo.y + retangulo.altura / 2) / imagem.altura, px: elemento.clientWidth / 2, py: elemento.clientHeight / 2 };
+    aoMudarZoom(novo);
+  });
+
   // Depois de um zoom pelo clique, o ponto clicado volta para baixo do mouse
   useLayoutEffect(() => {
     const pedido = ancora.current;
@@ -535,8 +564,7 @@ export function PreviaDaImagem({
 
   /** O ponto do evento no quadro (pixels de tela, a partir do canto da imagem). */
   function noQuadro(evento: React.PointerEvent) {
-    const retangulo = evento.currentTarget.getBoundingClientRect();
-    return { x: evento.clientX - retangulo.left, y: evento.clientY - retangulo.top };
+    return pontoNoElemento(evento, evento.currentTarget);
   }
 
   function camadaNoPonto(ponto: { x: number; y: number }, filtro: (camada: (typeof camadas)[number]) => boolean = () => true) {
@@ -745,7 +773,7 @@ export function PreviaDaImagem({
 
   return (
     <section aria-label="Prévia da imagem" className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-fundo">
-      {vista.reguas ? (
+      {vista.reguas && !girada ? (
         <Reguas
           imagemRef={imagemRef}
           areaRef={areaRef}
@@ -760,7 +788,29 @@ export function PreviaDaImagem({
       <div
         ref={areaRef}
         className={`min-h-0 flex-1 ${ajustada ? "overflow-hidden" : "overflow-auto"}`}
-        style={vista.reguas ? { marginTop: LADO_DA_REGUA, marginLeft: LADO_DA_REGUA } : undefined}
+        style={vista.reguas && !girada ? { marginTop: LADO_DA_REGUA, marginLeft: LADO_DA_REGUA } : undefined}
+        onPointerDown={(evento) => {
+          // Girar vista: o ângulo segue o ponteiro em volta do meio da imagem
+          if (ferramenta !== "girarVista" || evento.button !== 0 || !aoGirarVista || !imagemRef.current) return;
+          evento.preventDefault();
+          evento.stopPropagation();
+          evento.currentTarget.setPointerCapture(evento.pointerId);
+          const r = imagemRef.current.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          girandoVista.current = { base: giroDaVista.angulo, inicio: Math.atan2(evento.clientY - cy, evento.clientX - cx), cx, cy };
+        }}
+        onPointerMoveCapture={(evento) => {
+          const giro = girandoVista.current;
+          if (!giro || !aoGirarVista) return;
+          const agora = Math.atan2(evento.clientY - giro.cy, evento.clientX - giro.cx);
+          let angulo = giro.base + ((agora - giro.inicio) * 180) / Math.PI;
+          angulo = ((((angulo + 180) % 360) + 360) % 360) - 180;
+          aoGirarVista(evento.shiftKey ? Math.round(angulo / 15) * 15 : Math.round(angulo * 10) / 10);
+        }}
+        onPointerUp={() => {
+          girandoVista.current = null;
+        }}
         onWheel={(evento) => {
           if (!evento.ctrlKey && !evento.altKey) return;
           evento.preventDefault();
@@ -772,14 +822,16 @@ export function PreviaDaImagem({
           style={{
             minWidth: "100%",
             minHeight: "100%",
-            width: tamanho.largura + MESA * 2,
-            height: tamanho.altura + MESA * 2,
+            width: (girada ? caixaGirada.largura : tamanho.largura) + MESA * 2,
+            height: (girada ? caixaGirada.altura : tamanho.altura) + MESA * 2,
           }}
         >
           <div
             ref={imagemRef}
             className="relative shrink-0 select-none shadow-lg shadow-black/40"
+            {...(girada ? { [ATRIBUTO_DO_GIRO]: String(giroDaVista.angulo), [ATRIBUTO_DO_ESPELHO]: giroDaVista.espelhada ? "1" : "0" } : {})}
             style={{
+              ...(girada ? { transform: `rotate(${giroDaVista.angulo}deg)${giroDaVista.espelhada ? " scaleX(-1)" : ""}` } : {}),
               width: tamanho.largura,
               height: tamanho.altura,
               background: projeto.fundo.transparente ? XADREZ : projeto.fundo.cor,
@@ -895,8 +947,7 @@ export function PreviaDaImagem({
                   if (arrasto.dx || arrasto.dy) aoDeslocar(arrasto.dx, arrasto.dy);
                   else {
                     // Um clique sem arrastar escolhe a camada do ponto, como fora da caixa
-                    const quadro = evento.currentTarget.parentElement!.getBoundingClientRect();
-                    const acima = camadaNoPonto({ x: evento.clientX - quadro.left, y: evento.clientY - quadro.top });
+                    const acima = camadaNoPonto(pontoNoElemento(evento, evento.currentTarget.parentElement!));
                     if (evento.shiftKey && acima) aoSelecionar(selecao.includes(acima.clipe.id) ? selecao.filter((id) => id !== acima.clipe.id) : [...selecao, acima.clipe.id]);
                     else aoSelecionar(acima ? [acima.clipe.id] : []);
                   }

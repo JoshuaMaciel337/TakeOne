@@ -68,7 +68,8 @@ export function OpcoesDaReguaNaBarra({ medida, aoEndireitar, aoLimpar }: { medid
   const dx = medida ? medida.ate.x - medida.de.x : 0;
   const dy = medida ? medida.ate.y - medida.de.y : 0;
   // O ângulo como lá: anti-horário positivo, a partir da horizontal
-  const angulo = medida ? (-Math.atan2(dy, dx) * 180) / Math.PI : 0;
+  // + 0 tira o zero negativo ("-0,0°")
+  const angulo = medida ? (-Math.atan2(dy, dx) * 180) / Math.PI + 0 : 0;
   const numero = (valor: number, casas = 1) => valor.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
   return (
     <>

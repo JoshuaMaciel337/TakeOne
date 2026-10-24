@@ -52,6 +52,9 @@ type Props = {
   aoMudarForma: (mudanca: Partial<OpcoesDaForma>) => void;
   primeiroPlano: string;
   aoZoom: (zoom: number | null) => void;
+  /** Girar vista: o ângulo e o espelho da vista (só da tela). */
+  giroDaVista?: { angulo: number; espelhada: boolean };
+  aoGirarVista?: (giro: Partial<{ angulo: number; espelhada: boolean }>) => void;
   aoAlinhar: (eixo: "x" | "y") => void;
   /** As opções do pincel, do lápis ou da borracha (a ferramenta escolhida). */
   pincel?: OpcoesDoPincel;
@@ -584,6 +587,33 @@ export function BarraDeOpcoes(props: Props) {
             {props.extraDoPincel}
           </>
         ) : null}
+      </>
+    );
+  } else if (ferramenta === "girarVista") {
+    const giro = props.giroDaVista ?? { angulo: 0, espelhada: false };
+    opcoes = (
+      <>
+        <label className="flex items-center gap-1">
+          Ângulo de giro:
+          <input
+            type="number"
+            className="w-16 rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-xs text-texto"
+            min={-180}
+            max={180}
+            value={Math.round(giro.angulo)}
+            aria-label="Ângulo de giro da vista"
+            onChange={(evento) => props.aoGirarVista?.({ angulo: Math.max(-180, Math.min(180, Number(evento.currentTarget.value) || 0)) })}
+          />
+          °
+        </label>
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={giro.espelhada} onChange={(evento) => props.aoGirarVista?.({ espelhada: evento.currentTarget.checked })} />
+          Espelhar a vista
+        </label>
+        <button type="button" className="botao-secundario px-2 py-0.5 text-xs" onClick={() => props.aoGirarVista?.({ angulo: 0, espelhada: false })}>
+          Redefinir a vista
+        </button>
+        <span className="text-suave">{dados.dica}</span>
       </>
     );
   } else if (ferramenta === "mao" || ferramenta === "zoom") {

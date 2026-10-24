@@ -10,6 +10,7 @@ import type { Tamanho } from "@/lib/projeto/geometria";
 import { cantosDaMalha, colunasDa, dividirMalha, inversaDoMapa, linhasDa, type Malha, malhaDoQuad, mapaDaMalha, moverPontoDaMalha } from "@/lib/transformar/deformar";
 import { reamostrar, reamostrarPeloMapa } from "@/lib/transformar/livre";
 import { homografia, type Ponto, type Quadrilatero } from "@/lib/transformar/malha";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type ModoDaTransformacao = "livre" | "escala" | "girar" | "inclinar" | "distorcer" | "perspectiva" | "deformar";
 export type EstadoDaTransformacao = { quad: Quadrilatero; malha: Malha | null };
@@ -129,8 +130,8 @@ export function TransformacaoNaPrevia({
   });
 
   const paraDocumento = (evento: { clientX: number; clientY: number }, elemento: Element): Ponto => {
-    const r = elemento.getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, elemento);
+    return { x: p.x / escala, y: p.y / escala };
   };
   /** A alça sob o ponto (em pixels da tela: 6 px de folga), ou mover dentro e girar fora. */
   const alcaEm = (p: Ponto): Alca => {

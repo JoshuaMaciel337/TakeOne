@@ -6,6 +6,7 @@
 import { useRef, useState } from "react";
 
 import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type PranchetaNaTela = { clipeId: string; nome: string; retangulo: RetanguloDaImagem; escolhida: boolean };
 
@@ -34,8 +35,8 @@ export function PranchetasNaPrevia({
   const arrasto = useRef<{ tipo: "mover" | "criar"; x: number; y: number; dx: number; dy: number } | null>(null);
   const [novo, setNovo] = useState<RetanguloDaImagem | null>(null);
   const noDocumento = (evento: React.PointerEvent, elemento: Element) => {
-    const r = elemento.getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, elemento);
+    return { x: p.x / escala, y: p.y / escala };
   };
   const pranchetaNoPonto = (p: { x: number; y: number }) => [...pranchetas].find((item) => p.x >= item.retangulo.x && p.x <= item.retangulo.x + item.retangulo.largura && p.y >= item.retangulo.y && p.y <= item.retangulo.y + item.retangulo.altura);
   return (

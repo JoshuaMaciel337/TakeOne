@@ -6,6 +6,7 @@ import { useRef } from "react";
 
 import { ajustarAsGuias, type Caixa, deslocamentoDoCentro, type Guias, type Ponto, type Tamanho } from "@/lib/projeto/geometria";
 import type { Transformacao } from "@/lib/projeto/modelo";
+import { pontoNoElemento } from "@/componentes/imagem/pontoNaVista";
 
 /** Distância, em pixels da tela, em que o ímã da prévia puxa a caixa. */
 const ALCANCE_IMA = 6;
@@ -49,8 +50,8 @@ export function ManipuladorNaPrevia({ caixa, quadro, transformacao, travado, alv
 
   /** Ponto do ponteiro em pixels do quadro (a moldura é o elemento pai do manipulador). */
   function pontoNoQuadro(evento: React.PointerEvent): Ponto {
-    const moldura = elementoRef.current!.parentElement!.getBoundingClientRect();
-    return { x: evento.clientX - moldura.left, y: evento.clientY - moldura.top };
+    // A moldura pode estar girada (a vista do editor de imagem): o ponto vem no espaço dela
+    return pontoNoElemento(evento, elementoRef.current!.parentElement!);
   }
 
   function comecar(evento: React.PointerEvent, modo: Modo) {

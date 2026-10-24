@@ -12,6 +12,7 @@ import { marcaRapida } from "@/lib/selecao/rapida";
 import type { ImagemRgba, TamanhoDaAmostra } from "@/lib/selecao/varinha";
 import { bordaComoImagem } from "@/lib/selecao/naTela";
 import type { Tamanho } from "@/lib/projeto/geometria";
+import { pontoNoElemento } from "./pontoNaVista";
 
 export type FerramentaDeSelecao = "letreiro" | "letreiroEliptico" | "linhaUnica" | "colunaUnica" | "laco" | "lacoPoligonal" | "lacoMagnetico" | "varinha" | "selecaoRapida";
 
@@ -128,8 +129,8 @@ export function SelecaoNaPrevia({
   const [ponteiro, setPonteiro] = useState<Ponto | null>(null);
 
   const paraDocumento = (evento: { clientX: number; clientY: number }, elemento: Element): Ponto => {
-    const r = elemento.getBoundingClientRect();
-    return { x: (evento.clientX - r.left) * escala, y: (evento.clientY - r.top) * escala };
+    const p = pontoNoElemento(evento, elemento);
+    return { x: p.x * escala, y: p.y * escala };
   };
   const modoDoEvento = (evento: { shiftKey: boolean; altKey: boolean }): ModoDaSelecao => (evento.shiftKey && evento.altKey ? "intersectar" : evento.shiftKey ? "somar" : evento.altKey ? "subtrair" : opcoes.modo);
 

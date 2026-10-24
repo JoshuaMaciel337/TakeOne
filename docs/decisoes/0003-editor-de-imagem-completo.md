@@ -275,7 +275,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Réguas (Ctrl+R) com unidades, guias arrastadas das réguas, Nova guia, Novo layout de guias, Novas guias a partir da forma, Bloquear e Limpar guias
 - [x] Grade, Guias inteligentes, Bordas da camada, Malha de pixels, Extras (Ctrl+H) e tudo do Mostrar
 - [x] Encaixar (Ctrl+Shift+;) e Encaixar em (guias, grade, camadas, limites). O encaixe vale ao mover as camadas e ao criar as guias
-- [ ] Girar a vista (R) e espelhar a vista; 200% e tamanho de impressão; Ajustar a camada à tela
+- [x] Girar a vista (R) e espelhar a vista; 200% e tamanho de impressão; Ajustar a camada à tela
 - [ ] Modos de tela (F); Tab esconde os painéis (Shift+Tab só os encaixados)
 - [ ] Navegador; Informações (a cor sob o ponteiro, X e Y, o tamanho da seleção) com o Amostrador de cor (I)
 - [ ] Contagem (I), Nota (I), escala de medida e Registro de medições

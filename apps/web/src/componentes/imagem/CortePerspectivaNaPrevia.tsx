@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 
 import type { TamanhoDaImagem } from "@/lib/projeto/imagem";
 import { homografia, type Ponto, type Quadrilatero } from "@/lib/transformar/malha";
+import { pontoNoElemento } from "./pontoNaVista";
 
 type Props = {
   quad: Quadrilatero | null;
@@ -34,8 +35,8 @@ export function CortePerspectivaNaPrevia({ quad, imagem, escala, grade, aoMudar,
   const pegada = useRef<Pegada | null>(null);
   const [cursor, setCursor] = useState("crosshair");
   const paraImagem = (evento: React.PointerEvent) => {
-    const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-    return { x: (evento.clientX - r.left) / escala, y: (evento.clientY - r.top) / escala };
+    const p = pontoNoElemento(evento, evento.currentTarget as HTMLElement);
+    return { x: p.x / escala, y: p.y / escala };
   };
   const cantoEm = (p: Ponto) => (quad ? quad.findIndex((c) => Math.hypot((c.x - p.x) * escala, (c.y - p.y) * escala) <= 9) : -1);
 
