@@ -1259,6 +1259,37 @@ AjusteDaImagemEntrada = Annotated[
 ]
 
 
+class FiltroInteligenteEntrada(BaseModel):
+    """
+    Um filtro da pilha de filtros inteligentes de uma camada do editor de imagem (lib/imagem/filtros): o tipo, as
+    opções (números, ligados e textos curtos, como as cores) e a mesclagem dele com o que chega.
+    """
+    id: str = Field(min_length=1, max_length=40)
+    tipo: str = Field(pattern=r"^[a-z][a-z0-9_]{1,40}$")
+    opcoes: dict[str, float | bool | str] = Field(default_factory=dict)
+    ligado: bool = True
+    modo: MesclagemDoEfeito = "normal"
+    opacidade: float = Field(default=1, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _opcoes(self):
+        if len(self.opcoes) > 80:
+            raise ValueError("Um filtro tem no máximo 80 opções.")
+        for chave, valor in self.opcoes.items():
+            if len(chave) > 40 or (isinstance(valor, str) and len(valor) > 400):
+                raise ValueError("Uma opção de filtro passou do tamanho.")
+            if isinstance(valor, float) and not -1_000_000 <= valor <= 1_000_000:
+                raise ValueError("Uma opção de filtro está fora dos limites.")
+        return self
+
+
+class FiltrosInteligentesEntrada(BaseModel):
+    """A pilha de filtros inteligentes de uma camada (de baixo para cima, na ordem em que valem) e a máscara dela."""
+    filtros: list[FiltroInteligenteEntrada] = Field(default_factory=list, max_length=30)
+    ligado: bool = True
+    mascara: MascaraDePixelsEntrada | None = None
+
+
 class PontoNoDocumentoEntrada(BaseModel):
     """Um ponto em frações do documento (pode sair dele: a alça do degradê arrastada para fora)."""
     x: float = Field(ge=-10, le=10)
@@ -1415,6 +1446,8 @@ class ClipeEntrada(BaseModel):
     estilo_camada: EstiloDeCamadaEntrada | None = None
     # Só no projeto de imagem: a camada de preenchimento (cor sólida, degradê ou padrão, cobrindo o documento)
     camada_de_preenchimento: CamadaDePreenchimentoEntrada | None = None
+    # Só no projeto de imagem: os filtros inteligentes (a pilha não destrutiva de filtros, com a máscara dela)
+    filtros_inteligentes: FiltrosInteligentesEntrada | None = None
     # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
     pasta: bool = False
     preenchimento: float | None = Field(default=None, ge=0, le=1)

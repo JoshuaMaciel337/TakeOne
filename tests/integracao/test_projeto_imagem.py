@@ -334,3 +334,31 @@ def test_ajustes_da_camada_de_ajuste(cliente):
     video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
     resposta = salvar(cliente, video, [ajuste("v", niveis), {**video["faixas"][0], "clipes": []}])
     assert resposta.status_code == 422
+
+
+def test_filtros_inteligentes(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    forma = {"subcaminhos": [{"nos": [{"x": 0, "y": 0}, {"x": 100, "y": 0}, {"x": 100, "y": 100}], "fechado": True,
+                              "operacao": "somar"}], "caixa": {"largura": 100, "altura": 100},
+             "preenchimento": {"tipo": "cor", "cor": "#ff0000"}}
+    filtros = {"filtros": [{"id": "a", "tipo": "gaussiano", "opcoes": {"raio": 4.5}},
+                           {"id": "b", "tipo": "adicionar_ruido", "opcoes": {"quantidade": 12, "monocromatico": True,
+                                                                             "distribuicao": "gaussiana"},
+                            "modo": "sobrepor", "opacidade": 0.5, "ligado": False}]}
+    camada_ = {**clipe(None, 0, 5, id_="v"), "midia_id": None, "vetor": forma, "filtros_inteligentes": filtros}
+    principal = {**projeto["faixas"][0], "clipes": []}
+    salvo = salvar(cliente, projeto, [camada("video", camada_), principal])
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    lidos = aberto["faixas"][0]["clipes"][0]["filtros_inteligentes"]["filtros"]
+    assert lidos[0]["opcoes"]["raio"] == 4.5 and lidos[1]["modo"] == "sobrepor" and lidos[1]["ligado"] is False
+    # Um tipo fora do padrão, opções demais, num ajuste ou no vídeo
+    errado = {**camada_, "filtros_inteligentes": {"filtros": [{"id": "x", "tipo": "Gaussiano!"}]}}
+    demais = {**camada_, "filtros_inteligentes": {"filtros": [{"id": "x", "tipo": "gaussiano",
+                                                               "opcoes": {f"o{i}": i for i in range(81)}}]}}
+    no_ajuste = {**clipe(None, 0, 5, id_="j"), "midia_id": None, "ajuste": True, "filtros_inteligentes": filtros}
+    for ruim in (errado, demais, no_ajuste):
+        assert salvar(cliente, aberto, [camada("video", ruim), principal]).status_code == 422
+    video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    assert salvar(cliente, video, [camada("video", camada_), {**video["faixas"][0], "clipes": []}]).status_code == 422
