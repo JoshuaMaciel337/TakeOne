@@ -764,15 +764,20 @@ class DegradeDoEditorEntrada(BaseModel):
 
 
 class TintaDaFormaEntrada(BaseModel):
-    """A tinta do preenchimento ou do traço de uma forma: nenhuma, uma cor, um degradê ou um padrão."""
-    tipo: Literal["nenhuma", "cor", "degrade", "padrao"]
+    """A tinta do preenchimento ou do traço de uma forma: nenhuma, uma cor, um degradê, um padrão ou a foto de um
+    quadro (a mídia, cobrindo ou cabendo, com o zoom e o deslocamento do meio)."""
+    tipo: Literal["nenhuma", "cor", "degrade", "padrao", "imagem"]
     cor: str | None = Field(default=None, pattern=COR)
     degrade: DegradeDoEditorEntrada | None = None
     forma: Literal["linear", "radial", "angulo", "refletido", "losango"] | None = None
     angulo: float | None = Field(default=None, ge=-360, le=360)
-    escala: float | None = Field(default=None, ge=0.01, le=10)
+    escala: float | None = Field(default=None, ge=0.01, le=20)
     inverter: bool | None = None
     padrao: str | None = Field(default=None, min_length=1, max_length=60)
+    midia_id: str | None = Field(default=None, min_length=24, max_length=24)
+    ajuste: Literal["cobrir", "conter"] | None = None
+    x: float | None = Field(default=None, ge=-10, le=10)
+    y: float | None = Field(default=None, ge=-10, le=10)
 
     @model_serializer(mode="wrap")
     def _sem_vazios(self, serializar):
@@ -782,7 +787,9 @@ class TintaDaFormaEntrada(BaseModel):
     def _completa(self):
         faltando = (self.tipo == "cor" and not self.cor) or (self.tipo == "padrao" and not self.padrao) or (
             self.tipo == "degrade" and not (self.degrade and self.forma and self.angulo is not None
-                                            and self.escala is not None))
+                                            and self.escala is not None)) or (
+            self.tipo == "imagem" and not (self.midia_id and self.ajuste and self.escala is not None
+                                           and self.x is not None and self.y is not None))
         if faltando:
             raise ValueError("A tinta da forma está incompleta.")
         return self
@@ -833,6 +840,8 @@ class VetorEntrada(BaseModel):
     traco: TracoDaFormaEntrada | None = None
     forma: FormaVivaEntrada | None = None
     margem: float | None = Field(default=None, ge=0, le=LIMITE_DO_VETOR)
+    # Um quadro (ferramenta Quadro): o preenchimento é a foto dele
+    quadro: bool | None = None
 
     @model_serializer(mode="wrap")
     def _sem_vazios(self, serializar):

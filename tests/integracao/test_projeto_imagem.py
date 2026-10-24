@@ -1,5 +1,6 @@
 # Projeto de imagem: o tamanho em pixels, camadas em qualquer ordem, fundo transparente e o que não vale nele
 import pytest
+from bson import ObjectId
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -97,6 +98,28 @@ def test_camada_vetorial(cliente):
     assert salvar(cliente, aberto, [camada("texto", forma), faixas[1]]).status_code == 422
     video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
     assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
+
+
+def test_quadro_com_foto(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    foto = criar_midia(db_limpo, cliente)
+    db_limpo.midias.update_one({"_id": ObjectId(foto)}, {"$set": {"imagem": True}})
+    video = criar_midia(db_limpo, cliente)
+    tinta = {"tipo": "imagem", "midia_id": foto, "ajuste": "cobrir", "escala": 1.5, "x": 0.1, "y": -0.2}
+    quadro = {"caixa": {"largura": 202, "altura": 102}, "margem": 1, "quadro": True, "traco": None,
+              "subcaminhos": [{"nos": [{"x": 1, "y": 1}, {"x": 201, "y": 1}, {"x": 201, "y": 101}, {"x": 1, "y": 101}],
+                               "fechado": True, "operacao": "somar"}], "preenchimento": tinta}
+    forma = {**clipe(None, 0, 5, id_="quadro"), "midia_id": None, "vetor": quadro}
+    faixas = [camada("video", forma), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["vetor"] == quadro
+    # A foto conta como usada (não sai da biblioteca) e precisa ser uma imagem
+    assert cliente.delete(f"/api/midias/{foto}").status_code == 409
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    com_video = {**forma, "vetor": {**quadro, "preenchimento": {**tinta, "midia_id": video}}}
+    assert salvar(cliente, aberto, [camada("video", com_video), faixas[1]]).status_code == 422
 
 
 def test_mascara_vetorial(cliente, db_limpo):

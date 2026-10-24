@@ -95,7 +95,16 @@ def midias_usadas(faixas: list[dict]) -> list[str]:
     cameras = {f["multicamera"]["midia_id"] for f in faixas if f.get("multicamera")}
     # A máscara de camada do editor de imagem é uma camada de pixels: conta como usada, para não ser excluída
     mascaras = {c["mascara_pixels"]["midia_id"] for f in faixas for c in f["clipes"] if c.get("mascara_pixels")}
-    return sorted({c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")} | cameras | mascaras)
+    # A foto dentro de um quadro (a tinta "imagem" de uma forma) também
+    fotos = {foto for f in faixas for c in f["clipes"] if (foto := foto_do_quadro(c))}
+    dos_clipes = {c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")}
+    return sorted(dos_clipes | cameras | mascaras | fotos)
+
+
+def foto_do_quadro(clipe: dict) -> str | None:
+    """A mídia da foto de um quadro (a tinta "imagem" da forma), ou None."""
+    tinta = (clipe.get("vetor") or {}).get("preenchimento") or {}
+    return tinta.get("midia_id") if tinta.get("tipo") == "imagem" else None
 
 
 def capa_do_projeto(faixas: list[dict], tipo: str = "video") -> str | None:
@@ -241,6 +250,9 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem:
                     return "A camada de ajuste e a forma ficam só numa faixa de sobreposição, sem mídia nem texto."
                 if clipe.get("vetor") and (clipe.get("ajuste") or clipe.get("pasta")):
                     return "Uma forma não é camada de ajuste nem pasta."
+                foto = foto_do_quadro(clipe)
+                if foto and not (midias.get(foto) or {}).get("imagem"):
+                    return "A foto de um quadro precisa ser uma imagem pronta deste espaço."
                 problema = _conferir_posicao(faixa, clipe, anterior_fim)
                 if problema:
                     return problema
