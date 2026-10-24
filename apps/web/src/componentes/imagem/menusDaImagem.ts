@@ -31,6 +31,7 @@ export const PAINEIS_DA_IMAGEM = {
   acoes: "Ações",
   comps: "Comps de camada",
   linhaDoTempo: "Linha do tempo",
+  teclasModificadoras: "Teclas modificadoras",
   predefinicoes: "Predefinições de ferramenta",
   informacoes: "Informações",
   notas: "Notas",

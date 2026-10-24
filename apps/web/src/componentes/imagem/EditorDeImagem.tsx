@@ -127,6 +127,7 @@ import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPrancheta
 import { JanelaDividirFatia, JanelaOpcoesDaFatia, OpcoesDasFatiasNaBarra } from "./JanelasDasFatias";
 import { PainelComps } from "./PainelComps";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
+import { PainelTeclasModificadoras, useTeclasPresas } from "./TeclasPresas";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
 import { type AbaDaPersonalizacao, JanelaPersonalizar } from "./JanelaPersonalizar";
 import { JanelaPreferencias } from "./JanelaPreferencias";
@@ -537,6 +538,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [fatiaEscolhida, setFatiaEscolhida] = useState<string | null>(null);
   const [janelaDaFatia, setJanelaDaFatia] = useState<"dividir" | "opcoes" | null>(null);
   const [fatiasEmArquivos, setFatiasEmArquivos] = useState(false);
+  // O painel Teclas modificadoras (Shift, Ctrl e Alt presos, para a tela de toque)
+  useTeclasPresas();
   const [tocandoAnimacao, setTocandoAnimacao] = useState(false);
   const relogioDaAnimacao = useRef<number | null>(null);
   // Editar › Atalhos de teclado e menus e Barra de ferramentas (no navegador), e os itens escondidos à vista
@@ -5787,6 +5790,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
     },
     predefinicoes: { nome: PAINEIS_DA_IMAGEM.predefinicoes, conteudo: conteudoDasPredefinicoes },
+    teclasModificadoras: { nome: PAINEIS_DA_IMAGEM.teclasModificadoras, conteudo: <PainelTeclasModificadoras /> },
     linhaDoTempo: {
       nome: PAINEIS_DA_IMAGEM.linhaDoTempo,
       conteudo: (
