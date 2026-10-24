@@ -7,7 +7,8 @@ import { caixaNoPlano, type ContextoDoFiltro, dePlanos, type ImagemDoFiltro, lim
 import { adicionarRuido } from "./nitidezRuido.ts";
 
 export type OpcoesDaLente = {
-  /** De onde vem a profundidade: nenhuma, transparencia, luz, degrade (de cima para baixo), mascara ou canal:<id>. */
+  /** De onde vem a profundidade: nenhuma, transparencia, luz, degrade (de cima para baixo), mascara, profundidade (a da
+   * foto, medida pela IA) ou canal:<id>. */
   fonte: string;
   /** A profundidade que fica nítida, de 0 a 255. */
   focal: number;
@@ -59,7 +60,7 @@ export function profundidade(imagem: ImagemDoFiltro, fonte: string, ctx: Context
     for (let y = 0; y < altura; y++) mapa.fill(limitar((ctx.origem.y + (y + 0.5) / ctx.escala) / ctx.documento.altura), y * largura, (y + 1) * largura);
     return mapa;
   }
-  if (fonte === "mascara" || fonte.startsWith("canal:")) return ctx.mapa?.(fonte) ?? new Float32Array(n);
+  if (fonte === "mascara" || fonte === "profundidade" || fonte.startsWith("canal:")) return ctx.mapa?.(fonte) ?? new Float32Array(n);
   return null;
 }
 

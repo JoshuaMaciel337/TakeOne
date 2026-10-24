@@ -34,6 +34,7 @@ import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto"
 import type { Midia } from "@/lib/tipos";
 import { JanelaPreenchimentoGenerativo } from "./ia/JanelaPreenchimentoGenerativo";
 import { JanelaSubstituirCeu } from "./ia/JanelaSubstituirCeu";
+import { type FiltroNeural, JanelaFiltroNeural } from "./ia/JanelaFiltroNeural";
 import { baseDaMascara, corDoCeuNovo, desenharCeuNovo, mascaraDoCeu, type OpcoesDoCeu } from "@/lib/imagem/substituirCeu";
 import { useMidias } from "@/lib/useMidias";
 
@@ -653,6 +654,36 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       mostrarAviso(variacoes > 1 ? `Gerando ${variacoes} variações: a primeira entra como camada quando ficar pronta (a primeira leva uns 2 min).` : "Gerando o preenchimento: ele entra como camada quando ficar pronto (uns 2 min).");
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível pedir o preenchimento.");
+    }
+  };
+  // Filtro › Filtros neurais: a janela dos que têm modelo (estilo, colorir, restaurar)
+  const [filtroNeural, setFiltroNeural] = useState<FiltroNeural | null>(null);
+  const abrirFiltroNeural = async (qual: FiltroNeural | "profundidade" | "superZoom") => {
+    if (!foto || !selecionado || selecionado.clipe.pixels) return mostrarAviso("Escolha uma foto: os filtros neurais valem em fotos.");
+    if (qual === "estilo" || qual === "colorir" || qual === "restaurar") return setFiltroNeural(qual);
+    try {
+      if (qual === "superZoom") {
+        const midia = await chamarApi<Midia>(`/midias/${foto.id}/ampliar`, { metodo: "POST", corpo: { fator: 2 } });
+        esperarMidia(midia, { trocar: [selecionado.clipe.id] });
+        return mostrarAviso("Ampliando a foto 2×: ela troca quando ficar pronta.");
+      }
+      // O desfoque de profundidade: a profundidade da foto (uma vez) e o desfoque de lente lendo ela, com o perto nítido
+      await profundidadeDaFoto(foto.id);
+      await biblioteca.recarregar();
+      aplicarFiltroDoMenu("lente", { fonte: "profundidade", focal: 255, raio: 15, iris: "circulo", curvatura: 100 });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível aplicar o filtro.");
+    }
+  };
+  const pedirFiltroNeural = async (qual: FiltroNeural, corpo: Record<string, unknown>) => {
+    setFiltroNeural(null);
+    if (!foto || !selecionado) return;
+    try {
+      const midia = await chamarApi<Midia>(`/midias/${foto.id}/${qual}`, { metodo: "POST", corpo });
+      esperarMidia(midia, { camadaDe: selecionado.faixa.id });
+      mostrarAviso(qual === "restaurar" ? "Restaurando a foto: ela entra numa camada nova quando ficar pronta." : "Gerando: o resultado entra numa camada nova quando ficar pronto (a primeira vez leva uns 2 min).");
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível pedir o filtro.");
     }
   };
   /** Mais variações do preenchimento da camada: o mesmo recorte e o mesmo texto, guardados no servidor. */
@@ -4554,6 +4585,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     filtroDoCatalogo: (tipo) => aplicarFiltroDoMenu(tipo),
     galeriaDeDesfoque: abrirGaleria,
     galeriaDeFiltros: () => void abrirGaleriaDeFiltros(),
+    filtroNeural: (qual) => void abrirFiltroNeural(qual),
     ultimoFiltro: { nome: ultimoFiltro ? (FILTRO_POR_ID.get(ultimoFiltro.tipo)?.nome ?? null) : null, aplicar: () => ultimoFiltro && aplicarFiltroDoMenu(ultimoFiltro.tipo, ultimoFiltro.opcoes, true) },
     converterParaFiltrosInteligentes,
     preenchimento: {
@@ -5698,6 +5730,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
       </div>
 
+      {filtroNeural ? <JanelaFiltroNeural tipo={filtroNeural} aoConfirmar={(corpo) => void pedirFiltroNeural(filtroNeural, corpo)} aoCancelar={() => setFiltroNeural(null)} /> : null}
       {substituindoCeu ? (
         <JanelaSubstituirCeu base={substituindoCeu.base} mascara={substituindoCeu.mascara} escala={substituindoCeu.escala} imagens={imagensProntas} aoConfirmar={(opcoes) => void confirmarSubstituicaoDoCeu(opcoes)} aoCancelar={() => setSubstituindoCeu(null)} />
       ) : null}

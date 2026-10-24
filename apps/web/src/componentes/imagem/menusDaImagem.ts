@@ -180,6 +180,8 @@ export type AcoesDosMenus = {
   filtroDoCatalogo: (tipo: string) => void;
   /** A galeria de desfoque, aberta numa ferramenta (campo, íris, inclinação, caminho ou giro). */
   galeriaDeDesfoque: (ferramenta: FerramentaDaGaleria) => void;
+  /** Filtro › Filtros neurais: os de modelo (estilo, colorir, restaurar), o desfoque de profundidade e o super zoom. */
+  filtroNeural: (qual: "estilo" | "colorir" | "restaurar" | "profundidade" | "superZoom") => void;
   /** Filtro › Galeria de filtros: os 47 efeitos numa pilha própria. */
   galeriaDeFiltros: () => void;
   ultimoFiltro: { nome: string | null; aplicar: () => void };
@@ -712,6 +714,18 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Dissolver…", atalho: "Ctrl+Shift+X", desativado: semCamada, aoEscolher: a.dissolver },
         { nome: "Ponto de fuga…", atalho: "Ctrl+Alt+V", aoEscolher: a.pontoDeFuga },
         { nome: "Galeria de filtros…", desativado: semCamada, aoEscolher: a.galeriaDeFiltros },
+        {
+          nome: "Filtros neurais",
+          desativado: semCamada,
+          itens: [
+            { nome: "Transferência de estilo…", aoEscolher: () => a.filtroNeural("estilo") },
+            { nome: "Colorir…", aoEscolher: () => a.filtroNeural("colorir") },
+            { nome: "Restaurar foto…", aoEscolher: () => a.filtroNeural("restaurar") },
+            { nome: "Desfoque de profundidade…", aoEscolher: () => a.filtroNeural("profundidade") },
+            { nome: "Super zoom (2×)", aoEscolher: () => a.filtroNeural("superZoom") },
+            { nome: "Remover artefatos de JPEG…", aoEscolher: () => a.filtroDoCatalogo("remover_jpeg") },
+          ],
+        },
         { nome: "Filtro de revelação…", desativado: semCamada, aoEscolher: () => a.filtroDoCatalogo("revelacao"), titulo: "Ctrl+Shift+A é do navegador: use o menu" },
       ],
     },

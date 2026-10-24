@@ -15,7 +15,8 @@ export type ContextoDoFiltro = {
   origem: { x: number; y: number };
   /** O tamanho do documento, em pixels (os filtros que dependem do meio dele). */
   documento: { largura: number; altura: number };
-  /** Um mapa de cinza (0 a 1) do tamanho da imagem, de fora dela: a máscara da camada ou um canal alfa (`canal:<id>`). */
+  /** Um mapa de cinza (0 a 1) do tamanho da imagem, de fora dela: a máscara da camada, a profundidade da foto
+   * (`profundidade`, 1 perto) ou um canal alfa (`canal:<id>`). */
   mapa?: (fonte: string) => Float32Array | null;
 };
 export type Planos = [Float32Array, Float32Array, Float32Array, Float32Array];

@@ -7,7 +7,7 @@ import { arquivoDaMidia } from "@/lib/api";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto } from "@/lib/projeto/modelo";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { canaisDaPilha, filtrosQueValem } from "@/lib/imagem/filtros/pilha";
+import { canaisDaPilha, filtrosQueValem, usaProfundidade } from "@/lib/imagem/filtros/pilha";
 import type { Midia } from "@/lib/tipos";
 
 import { vetorNoTamanho } from "../vetor/desenhar";
@@ -16,7 +16,7 @@ import { mascaraFinal } from "../previa/mascaraCombinada";
 import { textoNoTamanho } from "../texto/desenhar";
 import { esperarFontes } from "../texto/fontes";
 import { carregarBitmap } from "../previa/bitmaps";
-import { camadaDoCompositor, documentoDaCamada, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
+import { camadaDoCompositor, CHAVE_DA_PROFUNDIDADE, documentoDaCamada, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
 import { type ImagemDeTexto, imagemDeTextoNoLado, soltarImagensDeTexto } from "../previa/imagensDeTexto";
 
@@ -96,14 +96,18 @@ export async function exportarImagem(
   // Os canais alfa que os filtros leem (o mapa de profundidade do desfoque de lente)
   const canaisDosFiltrosDe = async (clipe: Clipe) =>
     Object.fromEntries(
-      await Promise.all(
-        canaisDaPilha(filtrosQueValem(clipe.filtros_inteligentes)).flatMap((id) => {
+      await Promise.all([
+        ...canaisDaPilha(filtrosQueValem(clipe.filtros_inteligentes)).flatMap((id) => {
           const canal = projeto.canais?.find((item) => item.id === id);
           if (!canal) return [];
           const endereco = arquivoDaMidia(canal.midia_id, arquivoDaVersao(canal.versao));
           return [carregarBitmap(endereco).then((fonte) => [id, { fonte, versao: endereco }] as const)];
         }),
-      ),
+        // A profundidade da foto (o desfoque de profundidade), quando ela já foi medida
+        ...(clipe.midia_id && usaProfundidade(filtrosQueValem(clipe.filtros_inteligentes)) && midias.get(clipe.midia_id)?.arquivos?.includes("profundidade.png")
+          ? [carregarBitmap(arquivoDaMidia(clipe.midia_id, "profundidade.png")).then((fonte) => [CHAVE_DA_PROFUNDIDADE, { fonte, versao: "p" }] as const)]
+          : []),
+      ]),
     );
   const prontas = await Promise.all(
     camadas.map(async (camada) => {

@@ -227,3 +227,14 @@ test("filtro de revelação: neutro não muda nada; exposição, gradação e vi
   const tudo = aplicarFiltro(base, "revelacao", { textura: 50, claridade: 50, nitidez: 80, mascaramento: 30, ruido_luminancia: 50, ruido_cor: 50, grao: 50, vermelho_saturacao: 40, curva_sombras: 30, vinheta: 40, vinheta_estilo: "cor" }, ctx);
   assert.equal(tudo.dados.length, base.dados.length);
 });
+
+test("remover artefatos de JPEG: tira o degrau de bloco no liso e guarda a borda forte", () => {
+  // Dois blocos de 8 px com 6 níveis de diferença (o degrau da compressão) e uma borda forte mais adiante
+  const img = imagem(32, 8, [100, 100, 100, 255]);
+  for (let y = 0; y < 8; y++) for (let x = 8; x < 16; x++) img.dados.set([106, 106, 106, 255], (y * 32 + x) * 4);
+  for (let y = 0; y < 8; y++) for (let x = 24; x < 32; x++) img.dados.set([240, 240, 240, 255], (y * 32 + x) * 4);
+  const saida = aplicarFiltro(img, "remover_jpeg", { forca: 100 }, ctx);
+  const degrau = (d: ImagemDoFiltro) => pixel(d, 8, 4)[0] - pixel(d, 7, 4)[0];
+  assert.ok(degrau(saida) < degrau(img), `degrau ${degrau(saida)}`);
+  assert.ok(pixel(saida, 26, 4)[0] > 225 && pixel(saida, 21, 4)[0] < 140);
+});

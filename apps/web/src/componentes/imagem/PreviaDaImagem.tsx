@@ -16,7 +16,8 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { canaisDaPilha, filtrosQueValem } from "@/lib/imagem/filtros/pilha";
+import { canaisDaPilha, filtrosQueValem, usaProfundidade } from "@/lib/imagem/filtros/pilha";
+import { CHAVE_DA_PROFUNDIDADE } from "@/lib/previa/camadas";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
@@ -363,11 +364,16 @@ export function PreviaDaImagem({
     return mascara ? [fonteDa(camada.clipe.midia_id), mascara] : [fonteDa(camada.clipe.midia_id)];
   });
   // Os canais alfa que os filtros leem (o mapa de profundidade do desfoque de lente)
-  const canaisDosFiltros = (clipe: Clipe) =>
-    canaisDaPilha(filtrosQueValem(clipe.filtros_inteligentes)).flatMap((id) => {
+  const canaisDosFiltros = (clipe: Clipe) => [
+    ...canaisDaPilha(filtrosQueValem(clipe.filtros_inteligentes)).flatMap((id) => {
       const canal = projeto.canais?.find((item) => item.id === id);
       return canal ? [{ id, endereco: arquivoDaMidia(canal.midia_id, arquivoDaVersao(canal.versao)) }] : [];
-    });
+    }),
+    // A profundidade da foto (o desfoque de profundidade), quando ela já foi medida
+    ...(clipe.midia_id && usaProfundidade(filtrosQueValem(clipe.filtros_inteligentes)) && midias.get(clipe.midia_id)?.arquivos?.includes("profundidade.png")
+      ? [{ id: CHAVE_DA_PROFUNDIDADE, endereco: arquivoDaMidia(clipe.midia_id, "profundidade.png") }]
+      : []),
+  ];
   const enderecosDosCanais = camadas.flatMap((camada) => canaisDosFiltros(camada.clipe).map((canal) => canal.endereco));
   const bitmaps = useBitmaps([...enderecos, ...enderecosDasMascaras, ...enderecosDosCanais]);
   const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;

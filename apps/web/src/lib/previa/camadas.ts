@@ -520,6 +520,9 @@ export function camadaDoCompositor(
   };
 }
 
+/** A chave da profundidade da foto no registro dos mapas dos filtros (os outros são os ids dos canais). */
+export const CHAVE_DA_PROFUNDIDADE = "#profundidade";
+
 /** Os filtros inteligentes que valem, com a máscara deles levada à caixa da camada (como a máscara da camada). */
 function filtrosDaCamada(
   camada: CamadaNaTela,
@@ -535,6 +538,8 @@ function filtrosDaCamada(
     lista,
     documento,
     mascara: daMascara && mascara ? { fonte: mascara.fonte, matriz: matrizEmUso(daMascara, camada.caixa, mascara.quadro), densidade: daMascara.densidade, difusao: daMascara.difusao } : null,
-    canais,
+    // A profundidade da foto vem no mesmo registro dos canais, pela chave "#profundidade"
+    canais: canais ? Object.fromEntries(Object.entries(canais).filter(([id]) => id !== CHAVE_DA_PROFUNDIDADE)) : undefined,
+    profundidade: canais?.[CHAVE_DA_PROFUNDIDADE]?.fonte ?? null,
   };
 }

@@ -253,7 +253,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Expansão generativa no Corte, com texto
 - [x] Remover fundo (ação rápida), Selecionar assunto e Céu pelos modelos que já rodam
 - [x] Substituir céu
-- [ ] Filtros neurais: transferência de estilo, colorir, remover artefatos de JPEG, desfoque de profundidade, super zoom, restaurar foto (sem os de rosto)
+- [x] Filtros neurais: transferência de estilo, colorir, remover artefatos de JPEG, desfoque de profundidade, super zoom, restaurar foto (sem os de rosto)
 - [x] Painel de variações geradas
 
 ### Onda 13.13 — Arquivos, documento e automação

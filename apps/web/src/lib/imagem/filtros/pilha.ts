@@ -18,6 +18,9 @@ export const filtrosQueValem = (pilha: FiltrosInteligentes | null | undefined): 
 export const canaisDaPilha = (filtros: FiltroInteligente[]): string[] =>
   [...new Set(filtros.flatMap((filtro) => (typeof filtro.opcoes.fonte === "string" && filtro.opcoes.fonte.startsWith("canal:") ? [filtro.opcoes.fonte.slice(6)] : [])))];
 
+/** Se algum filtro lê a profundidade da foto (o desfoque de lente com a fonte da IA). */
+export const usaProfundidade = (filtros: FiltroInteligente[]): boolean => filtros.some((filtro) => filtro.opcoes.fonte === "profundidade");
+
 /** Quanto a pilha pode passar da camada, em pixels do documento (as margens se somam). */
 export function margemDaPilha(filtros: FiltroInteligente[]): number {
   let margem = 0;

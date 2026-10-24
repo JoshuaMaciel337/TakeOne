@@ -72,6 +72,8 @@ export type Camada = {
     documento: { largura: number; altura: number };
     /** Os canais alfa que os filtros leem (do tamanho do documento), pelo id, com a versão (a chave do resultado guardado). */
     canais?: Record<string, { fonte: TexImageSource; versao: string }>;
+    /** A profundidade da foto da camada (255 perto), no tamanho da mídia: desenhada como a camada. */
+    profundidade?: TexImageSource | null;
   } | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
@@ -1877,6 +1879,14 @@ export class Compositor {
     const contexto = { escala: doDocumento * densidade, primeiroPlano: [0, 0, 0] as [number, number, number], fundo: [1, 1, 1] as [number, number, number], origem, documento: filtros.documento };
     // Os mapas de fora da camada (o desfoque de lente): a máscara dela no quadro local, ou um canal do documento
     const mapa = (fonte: string): Float32Array | null => {
+      if (fonte === "profundidade") {
+        if (!filtros.profundidade) return null;
+        // A profundidade passa pelo mesmo recorte, virada e giro da camada, no quadro local
+        const lida = lerLocal({ fonte: filtros.profundidade, recorte: camada.recorte, virar: camada.virar, caixa: caixaLocal });
+        const valores = new Float32Array(w * h);
+        for (let p = 0; p < w * h; p++) valores[p] = lida[p * 4] / 255;
+        return valores;
+      }
       if (fonte === "mascara") {
         if (!mascaraDaCamada) return null;
         const valores = new Float32Array(w * h);
@@ -1907,7 +1917,7 @@ export class Compositor {
     for (let i = 0; i < palavras.length; i++) resumo = Math.imul(resumo ^ palavras[i], 0x01000193);
     // Os mapas lidos entram na chave: a versão de cada canal e um resumo da máscara, quando um filtro a lê
     const fontes = filtros.lista.map((filtro) => filtro.opcoes.fonte).filter((fonte) => typeof fonte === "string");
-    let resumoDosMapas = fontes.map((fonte) => (String(fonte).startsWith("canal:") ? (filtros.canais?.[String(fonte).slice(6)]?.versao ?? "-") : "")).join(",");
+    let resumoDosMapas = fontes.map((fonte) => (String(fonte).startsWith("canal:") ? (filtros.canais?.[String(fonte).slice(6)]?.versao ?? "-") : fonte === "profundidade" ? (filtros.profundidade ? "p" : "-") : "")).join(",");
     if (fontes.includes("mascara") && mascaraDaCamada) {
       let r = 0x811c9dc5;
       const m = new Uint32Array(mascaraDaCamada.buffer);

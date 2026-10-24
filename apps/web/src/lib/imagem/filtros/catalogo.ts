@@ -7,6 +7,7 @@ import { hexParaRgb } from "./comum.ts";
 import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radial } from "./desfoque.ts";
 import { galeriaDasOpcoes, galeriaDeDesfoque, margemDaGaleria } from "./galeria.ts";
 import { aplicarGaleriaDeFiltros, margemDaGaleriaDeFiltros, pilhaDoTexto } from "./galeriaDeFiltros/index.ts";
+import { removerArtefatosDeJpeg } from "./jpeg.ts";
 import { desfoqueDeLente } from "./lente.ts";
 import { OPCOES_DA_REVELACAO, revelar, SECOES_DA_REVELACAO } from "./revelacao.ts";
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
@@ -97,7 +98,7 @@ export const FILTROS: DefinicaoDoFiltro[] = [
     nome: "Desfoque de lente",
     grupo: "desfoque",
     opcoes: [
-      { ...escolha("fonte", "Mapa de profundidade", [["nenhuma", "Nenhum"], ["transparencia", "A transparência"], ["luz", "A luz da camada"], ["mascara", "A máscara da camada"], ["degrade", "De cima para baixo"]]), comCanais: true },
+      { ...escolha("fonte", "Mapa de profundidade", [["nenhuma", "Nenhum"], ["transparencia", "A transparência"], ["luz", "A luz da camada"], ["mascara", "A máscara da camada"], ["profundidade", "A profundidade da foto (IA)"], ["degrade", "De cima para baixo"]]), comCanais: true },
       numero("focal", "Distância focal", 0, 255, 0),
       marcar("inverter", "Inverter"),
       escolha("iris", "Forma da íris", [["6", "Hexágono"], ["3", "Triângulo"], ["4", "Quadrado"], ["5", "Pentágono"], ["7", "Heptágono"], ["8", "Octógono"], ["circulo", "Círculo"]]),
@@ -206,6 +207,15 @@ export const FILTROS: DefinicaoDoFiltro[] = [
     secoes: SECOES_DA_REVELACAO.map((secao) => ({ nome: secao.nome, opcoes: secao.opcoes.map((opcao) => opcao.id) })),
     margem: () => 0,
     aplicar: (imagem, v, ctx) => revelar(imagem, v, ctx),
+  },
+  // ——— Filtros neurais sem modelo (Filtro › Filtros neurais) ———
+  {
+    id: "remover_jpeg",
+    nome: "Remover artefatos de JPEG",
+    grupo: "especial",
+    opcoes: [numero("forca", "Força", 0, 100, 60)],
+    margem: (v) => 2 + n(v, "forca") / 25,
+    aplicar: (imagem, v, ctx) => removerArtefatosDeJpeg(imagem, n(v, "forca"), ctx),
   },
   // ——— Galeria de filtros (fora dos submenus: Filtro › Galeria de filtros…) ———
   {
