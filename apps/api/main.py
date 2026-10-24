@@ -34,6 +34,7 @@ from api.rotas import (
     pixels,
     projetos,
     quadros,
+    recursos,
     sistema,
     som,
     textos,
@@ -155,4 +156,5 @@ app.include_router(intercambio.router)
 app.include_router(luts.router)
 app.include_router(pixels.router)
 app.include_router(pinceis.router)
+app.include_router(recursos.router)
 app.include_router(chaves.router)

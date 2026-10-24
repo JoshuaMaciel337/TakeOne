@@ -559,6 +559,24 @@ class LutDoClipeEntrada(BaseModel):
     intensidade: float = Field(default=1, ge=0, le=1)
 
 
+class RecursoEntrada(BaseModel):
+    # "degrade" (as paradas, em dados) ou "padrao" (o ladrilho, em imagem_png)
+    tipo: Literal["degrade", "padrao"]
+    nome: str = Field(min_length=1, max_length=80)
+    dados: dict = Field(default_factory=dict)
+    imagem_png: str | None = Field(default=None, max_length=6_000_000)
+
+
+class RecursoSaida(BaseModel):
+    id: str
+    tipo: str
+    nome: str
+    dados: dict
+    # O tamanho do ladrilho: {largura, altura}
+    imagem: dict | None = None
+    criado_em: datetime
+
+
 class PincelEntrada(BaseModel):
     nome: str = Field(min_length=1, max_length=80)
     # "meus" (salvo pela pessoa) ou "importados" (de um arquivo .abr)
