@@ -15,10 +15,42 @@ export type PontaDoPincel = "redonda" | IdDaPonta | IdDaPontaPersonalizada;
 export type PontoDoTraco = { x: number; y: number; pressao: number; inclinacaoX?: number; inclinacaoY?: number; giro?: number; direcao?: number };
 
 /** As ferramentas que pintam numa camada de pixels (os dois pincéis do histórico pintam com um estado anterior). */
-export type FerramentaDePintura = "pincel" | "lapis" | "borracha" | "historico" | "historicoArtistico" | "carimbo" | "carimboDePadrao" | "recuperacao" | "recuperacaoParaManchas";
+export type FerramentaDePintura =
+  | "pincel"
+  | "lapis"
+  | "borracha"
+  | "historico"
+  | "historicoArtistico"
+  | "carimbo"
+  | "carimboDePadrao"
+  | "recuperacao"
+  | "recuperacaoParaManchas"
+  | "desfoque"
+  | "nitidez"
+  | "borrar"
+  | "subexposicao"
+  | "superexposicao"
+  | "esponja"
+  | "misturador"
+  | "substituicaoDeCor"
+  | "borrachaDeFundo";
 
 /** As ferramentas que levam a camada em direção a outra imagem (a fonte): o histórico e os carimbos. */
-export const PINTAM_COM_A_FONTE: ReadonlySet<FerramentaDePintura> = new Set(["historico", "carimbo", "carimboDePadrao", "recuperacao", "recuperacaoParaManchas"]);
+export const PINTAM_COM_A_FONTE: ReadonlySet<FerramentaDePintura> = new Set([
+  "historico",
+  "carimbo",
+  "carimboDePadrao",
+  "recuperacao",
+  "recuperacaoParaManchas",
+  "desfoque",
+  "nitidez",
+  "subexposicao",
+  "superexposicao",
+  "esponja",
+]);
+
+/** As ferramentas que mexem na tela marca a marca (lib/pintura/retoque.ts): o borrar, o misturador e as de cor. */
+export const PINTAM_MARCA_A_MARCA: ReadonlySet<FerramentaDePintura> = new Set(["borrar", "misturador", "substituicaoDeCor", "borrachaDeFundo"]);
 
 /** Os estilos do pincel do histórico artístico: o comprimento e a curva dos traços pequenos. */
 export const ESTILOS_ARTISTICOS = [

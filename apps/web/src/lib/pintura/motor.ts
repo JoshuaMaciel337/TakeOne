@@ -6,7 +6,8 @@
 // traço (passar de novo no mesmo traço não escurece além dela) e o fluxo é quanto cada marca deposita.
 import { juntarTraco } from "./mesclar.ts";
 import { amostraDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
-import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, PINTAM_COM_A_FONTE, type PontoDoTraco, tracosArtisticos } from "./traco.ts";
+import type { Marca as MarcaDireta } from "./retoque.ts";
+import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, PINTAM_COM_A_FONTE, PINTAM_MARCA_A_MARCA, type PontoDoTraco, tracosArtisticos } from "./traco.ts";
 
 export type Retangulo = { x0: number; y0: number; x1: number; y1: number };
 type Rgb = [number, number, number];
@@ -168,7 +169,20 @@ export type InicioDoTraco = {
   fonteDaTinta?: HTMLCanvasElement | null;
   /** A seleção do documento levada a esta camada (o alfa, do tamanho dela): o traço só vale dentro dela. */
   limite?: HTMLCanvasElement | null;
+  /** As ferramentas marca a marca: recebe a tela debaixo de cada marca e a muda ali mesmo. */
+  porMarca?: ((marca: MarcaDireta) => void) | null;
 };
+
+/** O alfa da ponta (0 a 1), lido uma vez por canvas. */
+const ALFAS_DAS_PONTAS = new WeakMap<HTMLCanvasElement, Float32Array>();
+function alfaDaPonta(canvas: HTMLCanvasElement): Float32Array {
+  const guardado = ALFAS_DAS_PONTAS.get(canvas);
+  if (guardado) return guardado;
+  const dados = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height).data;
+  const alfa = Float32Array.from({ length: canvas.width * canvas.height }, (_, i) => dados[i * 4 + 3] / 255);
+  ALFAS_DAS_PONTAS.set(canvas, alfa);
+  return alfa;
+}
 
 export class Pintura {
   readonly largura: number;
@@ -281,6 +295,9 @@ export class Pintura {
     } else if (atual.ferramenta === "historicoArtistico") {
       this.marcarArtistico(ponto);
       return;
+    } else if (PINTAM_MARCA_A_MARCA.has(atual.ferramenta) && atual.porMarca) {
+      this.marcarDireto(ponto, atual.porMarca);
+      return;
     } else {
       this.ctxTraco.globalAlpha = 1;
       for (const marca of marcasDoPonto(opcoes, { ...ponto, pressao: ponto.pressao }, atual.diametro, this.indice++, Math.random)) {
@@ -290,6 +307,52 @@ export class Pintura {
       return;
     }
     this.ctxTraco.globalAlpha = 1;
+    this.area = unir(this.area, retangulo);
+    this.sujo = unir(this.sujo, retangulo);
+  }
+
+  /**
+   * Uma marca das ferramentas marca a marca: o quadrado da ponta redonda é lido da tela, mudado e escrito de volta (a
+   * seleção e a trava de transparência valem aqui); a ponta vai também para o traço, que guarda a área pintada.
+   */
+  private marcarDireto(ponto: PontoDoTraco, porMarca: (marca: MarcaDireta) => void) {
+    const atual = this.atual!;
+    const imagem = ponta(this.diametroEm(ponto.pressao), atual.opcoes.dureza, false);
+    const lado = imagem.width;
+    const x0 = Math.round(ponto.x - lado / 2);
+    const y0 = Math.round(ponto.y - lado / 2);
+    const ix0 = Math.max(0, x0);
+    const iy0 = Math.max(0, y0);
+    const ix1 = Math.min(this.largura, x0 + lado);
+    const iy1 = Math.min(this.altura, y0 + lado);
+    if (ix1 <= ix0 || iy1 <= iy0) return;
+    const lidos = this.ctxTela.getImageData(ix0, iy0, ix1 - ix0, iy1 - iy0);
+    const pixels = new Uint8ClampedArray(lado * lado * 4);
+    const peso = new Float32Array(lado * lado);
+    const dentro = new Uint8Array(lado * lado);
+    const alfa = alfaDaPonta(imagem);
+    for (let y = iy0; y < iy1; y++) {
+      for (let x = ix0; x < ix1; x++) {
+        const j = (y - y0) * lado + x - x0;
+        const i = ((y - iy0) * (ix1 - ix0) + x - ix0) * 4;
+        pixels.set(lidos.data.subarray(i, i + 4), j * 4);
+        dentro[j] = 1;
+        peso[j] = alfa[j] * (atual.dentro ? atual.dentro[(y * this.largura + x) * 4 + 3] / 255 : 1);
+      }
+    }
+    porMarca({ lado, pixels, peso, dentro });
+    for (let y = iy0; y < iy1; y++) {
+      for (let x = ix0; x < ix1; x++) {
+        const j = ((y - y0) * lado + x - x0) * 4;
+        const i = ((y - iy0) * (ix1 - ix0) + x - ix0) * 4;
+        const alfaAntes = lidos.data[i + 3];
+        lidos.data.set(pixels.subarray(j, j + 4), i);
+        if (atual.travarTransparencia) lidos.data[i + 3] = alfaAntes;
+      }
+    }
+    this.ctxTela.putImageData(lidos, ix0, iy0);
+    this.ctxTraco.drawImage(imagem, x0, y0);
+    const retangulo = { x0: ix0, y0: iy0, x1: ix1, y1: iy1 };
     this.area = unir(this.area, retangulo);
     this.sujo = unir(this.sujo, retangulo);
   }
@@ -426,6 +489,8 @@ export class Pintura {
     const x1 = Math.min(this.largura, sujo.x1);
     const y1 = Math.min(this.altura, sujo.y1);
     if (x1 <= x0 || y1 <= y0) return null;
+    // As marca a marca já escreveram na tela
+    if (PINTAM_MARCA_A_MARCA.has(atual.ferramenta) && atual.porMarca) return { x0, y0, x1, y1 };
     const largura = x1 - x0;
     const altura = y1 - y0;
     const fundo = this.ctxCamada.getImageData(x0, y0, largura, altura).data;

@@ -11,7 +11,7 @@ import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/t
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_RETOQUE, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import type { ModoDaTransformacao } from "./TransformacaoNaPrevia";
 
@@ -414,7 +414,7 @@ export function BarraDeOpcoes(props: Props) {
           </>
         ) : ferramenta === "historico" ? (
           <span className="text-suave">Fonte: a marcada no painel Histórico</span>
-        ) : ferramenta === "borracha" ? (
+        ) : FERRAMENTAS_DE_RETOQUE.has(ferramenta) ? null : ferramenta === "borracha" ? (
           <label className="flex items-center gap-1 text-suave">
             Modo:
             <select aria-label="Modo da borracha" className={campo} value={pincel.borracha} onChange={(evento) => mudar({ borracha: evento.currentTarget.value as OpcoesDoPincel["borracha"] })}>
@@ -442,7 +442,7 @@ export function BarraDeOpcoes(props: Props) {
           </label>
         )}
         {SEPARADOR}
-        {bloco ? null : (
+        {bloco || FERRAMENTAS_DE_RETOQUE.has(ferramenta) ? null : (
           <>
             <Numero rotulo="Opacidade" valor={porcento(pincel.opacidade)} minimo={1} maximo={100} sufixo="%" aoMudar={(valor) => mudar({ opacidade: valor / 100 })} />
             {alternar(pincel.pressaoNaOpacidade, "A pressão da caneta muda a opacidade", PenTool, () => mudar({ pressaoNaOpacidade: !pincel.pressaoNaOpacidade }))}

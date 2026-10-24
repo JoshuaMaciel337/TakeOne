@@ -2,6 +2,15 @@
 // posição da caixa de ferramentas é um grupo: o botão mostra a última usada do grupo e o botão direito abre as outras.
 import {
   Bandage,
+  Cloud,
+  Diamond,
+  Droplet,
+  Flame,
+  Palette,
+  Pointer,
+  Replace,
+  Scissors,
+  Sun,
   Combine,
   HeartPulse,
   Move3d,
@@ -44,6 +53,15 @@ import {
 import type { TipoDeForma } from "@/lib/elementos";
 
 export type IdFerramentaDaImagem =
+  | "substituicaoDeCor"
+  | "misturador"
+  | "borrachaDeFundo"
+  | "desfoque"
+  | "nitidez"
+  | "borrar"
+  | "subexposicao"
+  | "superexposicao"
+  | "esponja"
   | "mover"
   | "letreiro"
   | "letreiroEliptico"
@@ -124,6 +142,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
     F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
+    F("substituicaoDeCor", "Ferramenta Substituição de cor", "B", Replace, "Pinte sobre uma cor: ela vira a do primeiro plano (pela tolerância), com a luz de cada pixel."),
+    F("misturador", "Ferramenta Pincel misturador", "B", Palette, "Pinte misturando o primeiro plano com as cores da tela, como tinta molhada."),
   ],
   [
     F("carimbo", "Ferramenta Carimbo", "S", Stamp, "Alt + clique marca de onde copiar; pinte para copiar dali (painel Fonte de clonagem)."),
@@ -135,11 +155,22 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   ],
   [
     F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo."),
+    F("borrachaDeFundo", "Ferramenta Borracha de fundo", "E", Scissors, "Pinte em volta do que quer guardar: a cor do meio do pincel (e as parecidas) é apagada."),
     F("borrachaMagica", "Ferramenta Borracha mágica", "E", Wand, "Clique numa cor da camada de pixels para apagar os pixels parecidos (pela tolerância)."),
   ],
   [
     F("degrade", "Ferramenta Degradê", "G", Blend, "Arraste do começo ao fim do degradê (Shift prende a 45°); clique na amostra da barra para editar."),
     F("balde", "Ferramenta Balde de tinta", "G", PaintBucket, "Clique para encher a área de cor parecida com o primeiro plano ou um padrão."),
+  ],
+  [
+    F("desfoque", "Ferramenta Desfoque", "", Droplet, "Pinte para suavizar as bordas e o detalhe; passe de novo para desfocar mais."),
+    F("nitidez", "Ferramenta Nitidez", "", Diamond, "Pinte para realçar as bordas; com Proteger detalhes, sem halo nem chuvisco."),
+    F("borrar", "Ferramenta Borrar", "", Pointer, "Arraste para puxar a tinta, como o dedo na tinta molhada."),
+  ],
+  [
+    F("subexposicao", "Ferramenta Subexposição", "O", Sun, "Pinte para clarear as sombras, os meios-tons ou os realces."),
+    F("superexposicao", "Ferramenta Superexposição", "O", Flame, "Pinte para escurecer as sombras, os meios-tons ou os realces."),
+    F("esponja", "Ferramenta Esponja", "O", Cloud, "Pinte para tirar ou pôr saturação."),
   ],
   [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
   [
@@ -189,7 +220,29 @@ export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set
 export const FERRAMENTAS_DE_PONTO: ReadonlySet<IdFerramentaDaImagem> = new Set(["degrade", "balde", "borrachaMagica"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
-export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao", "recuperacao", "recuperacaoParaManchas"]);
+export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set([
+  "pincel",
+  "lapis",
+  "borracha",
+  "historico",
+  "historicoArtistico",
+  "carimbo",
+  "carimboDePadrao",
+  "recuperacao",
+  "recuperacaoParaManchas",
+  "desfoque",
+  "nitidez",
+  "borrar",
+  "subexposicao",
+  "superexposicao",
+  "esponja",
+  "misturador",
+  "substituicaoDeCor",
+  "borrachaDeFundo",
+]);
+
+/** As de pintura com opções próprias no lugar do modo, da opacidade e do fluxo do pincel (lib/pintura/retoque.ts). */
+export const FERRAMENTAS_DE_RETOQUE: ReadonlySet<IdFerramentaDaImagem> = new Set(["desfoque", "nitidez", "borrar", "subexposicao", "superexposicao", "esponja", "misturador", "substituicaoDeCor", "borrachaDeFundo"]);
 
 /** O grupo de uma ferramenta (as do mesmo grupo dividem a tecla; Shift + tecla passa à seguinte). */
 export function grupoDa(id: IdFerramentaDaImagem): FerramentaDaImagem[] {

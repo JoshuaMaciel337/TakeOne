@@ -5,7 +5,7 @@
 // tela da camada é juntada a cada quadro da animação e a prévia desenha de novo.
 import { useEffect, useRef, useState } from "react";
 
-import type { Pintura } from "@/lib/pintura/motor";
+import type { InicioDoTraco, Pintura } from "@/lib/pintura/motor";
 import { comprimentoDaCorda, copiasDaSimetria, Corda, Espacador, type FerramentaDePintura, type OpcoesDoPincel, pontoNaCamada, type PontoDoTraco, type Simetria } from "@/lib/pintura/traco";
 import type { Caixa, Tamanho } from "@/lib/projeto/geometria";
 import type { Recorte, Virar } from "@/lib/projeto/modelo";
@@ -23,6 +23,8 @@ export type AlvoDaPintura = {
   mascara?: Pick<MascaraDePixels, "vinculada" | "matriz">;
   /** Os pincéis do histórico: a camada como estava na fonte. */
   fonteDaTinta?: HTMLCanvasElement | null;
+  /** As ferramentas marca a marca (o borrar, o misturador, as de cor): o que cada marca faz na tela. */
+  porMarca?: InicioDoTraco["porMarca"];
   caixa: Caixa | null;
   recorte: Recorte;
   virar: Virar | null | undefined;
@@ -191,7 +193,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       const limite = selecao
         ? selecaoNaMidia(selecao, mascara ? matrizDaMascaraNoDocumento(mascara, caixa, quadro, documento) : matrizDaMidiaNoDocumento(caixa, alvo.recorte, alvo.virar, midia, quadro, documento), midia)
         : null;
-      const inicio = { ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia, fonteDaTinta: alvo.fonteDaTinta, limite };
+      const inicio = { ferramenta, opcoes: mascara ? { ...opcoes, dinamicaDeCor: { ...opcoes.dinamicaDeCor, ligado: false } } : opcoes, diametro, ...tinta, travarTransparencia: alvo.travarTransparencia, fonteDaTinta: alvo.fonteDaTinta, porMarca: alvo.porMarca, limite };
       alvo.pintura.iniciar(inicio, copias[0]);
       for (const copia of copias.slice(1)) alvo.pintura.marcar(copia);
       traco.corda.puxar(primeiro);

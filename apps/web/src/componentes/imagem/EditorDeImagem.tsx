@@ -69,6 +69,22 @@ import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
 import { JanelaEditorDeDegrade, PainelDegrades } from "./Degrades";
 import { MANCHAS_PADRAO, type OpcoesDasManchas, OpcoesDaCorrecaoNaBarra, OpcoesDasManchasNaBarra, OpcoesDoMoverSensivelNaBarra } from "./OpcoesDaRecuperacao";
 import { colarSemEmenda, corrigirTom, preencherBuraco } from "@/lib/pintura/recuperar";
+import {
+  alvoDoRetoque,
+  apagarFundoNaMarca,
+  borrarMarca,
+  estadoNovo,
+  type FerramentaDeAlvo,
+  type Marca as MarcaDoRetoque,
+  MISTURADOR_PADRAO,
+  misturarMarca,
+  type OpcoesDaSubstituicao,
+  type OpcoesDoRetoque,
+  RETOQUE_PADRAO,
+  SUBSTITUICAO_PADRAO,
+  substituirCorNaMarca,
+} from "@/lib/pintura/retoque";
+import { type FerramentaDoRetoque, OpcoesDaSubstituicaoNaBarra, OpcoesDoMisturadorNaBarra, OpcoesDoRetoqueNaBarra } from "./OpcoesDoRetoque";
 import { CARIMBO_PADRAO, type FonteDeClonagem, type OpcoesDoCarimbo, OpcoesDoCarimboNaBarra, PainelFonteDeClonagem } from "./FonteDeClonagem";
 import { BALDE_PADRAO, BORRACHA_MAGICA_PADRAO, DEGRADE_PADRAO, OpcoesDaBorrachaMagicaNaBarra, OpcoesDoBaldeNaBarra, OpcoesDoDegradeNaBarra } from "./OpcoesDosPontos";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
@@ -191,7 +207,29 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     carimboDePadrao: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
     recuperacao: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5 },
     recuperacaoParaManchas: { ...PINCEL_PADRAO, tamanho: 20, dureza: 0.5 },
+    desfoque: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
+    nitidez: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
+    borrar: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5, espacamento: 0.1 },
+    subexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+    superexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+    esponja: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+    misturador: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.7, espacamento: 0.1 },
+    substituicaoDeCor: { ...PINCEL_PADRAO, tamanho: 30, dureza: 1 },
+    borrachaDeFundo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 1 },
   });
+  // O retoque com pincel: as opções de cada ferramenta e o pincel do misturador (a tinta suja passa de um traço ao outro)
+  const [opcoesDoRetoque, setOpcoesDoRetoque] = useState<Record<FerramentaDoRetoque, OpcoesDoRetoque>>({
+    desfoque: RETOQUE_PADRAO,
+    nitidez: RETOQUE_PADRAO,
+    borrar: RETOQUE_PADRAO,
+    subexposicao: RETOQUE_PADRAO,
+    superexposicao: RETOQUE_PADRAO,
+    esponja: RETOQUE_PADRAO,
+  });
+  const [opcoesDoMisturador, setOpcoesDoMisturador] = useState(MISTURADOR_PADRAO);
+  const [opcoesDaSubstituicao, setOpcoesDaSubstituicao] = useState(SUBSTITUICAO_PADRAO);
+  const [opcoesDaBorrachaDeFundo, setOpcoesDaBorrachaDeFundo] = useState<OpcoesDaSubstituicao>({ ...SUBSTITUICAO_PADRAO, tolerancia: 128 });
+  const pincelDoMisturador = useRef({ estado: estadoNovo(), limpo: false });
   // O pincel de manchas, a Correção e o Mover sensível ao conteúdo: as opções, o que o traço de manchas precisa para
   // refazer a área quando solta, e o motor provisório das manchas numa foto (a IA refaz)
   const [opcoesDasManchas, setOpcoesDasManchas] = useState<OpcoesDasManchas>(MANCHAS_PADRAO);
@@ -1712,6 +1750,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         return null;
       }
     }
+    // As que só mexem no que já está pintado não criam camada
+    const soNosPixels = ferramenta === "borrar" || ferramenta === "substituicaoDeCor" || ferramenta === "borrachaDeFundo";
+    if (soNosPixels && (!selecionado?.clipe.pixels || selecionado.clipe.pixels.versao === 0)) {
+      mostrarAviso(selecionado?.clipe.pixels ? "A camada está vazia: escolha uma com pixels." : "Escolha uma camada de pixels (ou rasterize a camada: Camada › Rasterizar).");
+      return null;
+    }
     let clipeId = selecionado?.clipe.pixels ? selecionado.clipe.id : null;
     if (!clipeId) clipeId = await novaCamada();
     const achado = clipeId && projetoRef.current ? acharClipe(projetoRef.current, clipeId) : null;
@@ -1767,7 +1811,47 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         manchas.current = { chave: alvo.chave, pintura, antes: pixelsDe(pintura.camada), amostra: pixelsDe(amostra), vazia };
         fonteDaTinta = escura;
       }
-      return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia), fonteDaTinta };
+      // O retoque pelo alvo: a camada (numa vazia, o que se vê dela para baixo) com o efeito na força escolhida
+      if (ferramenta === "desfoque" || ferramenta === "nitidez" || ferramenta === "subexposicao" || ferramenta === "superexposicao" || ferramenta === "esponja") {
+        const vazia = achado.clipe.pixels.versao === 0;
+        const base = vazia ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, "atualEAbaixo"), achado.clipe, tamanhoDaCamada) : pintura.camada;
+        const escala = tamanhoDaCamada.largura / tamanhoDaImagem(projetoAgora).largura;
+        const efeito = alvoDoRetoque(ferramenta as FerramentaDeAlvo, pixelsDe(base).data, tamanhoDaCamada.largura, tamanhoDaCamada.altura, opcoesDoRetoque[ferramenta], escala);
+        const canvas = document.createElement("canvas");
+        canvas.width = tamanhoDaCamada.largura;
+        canvas.height = tamanhoDaCamada.altura;
+        canvas.getContext("2d")!.putImageData(new ImageData(efeito, canvas.width, canvas.height), 0, 0);
+        fonteDaTinta = canvas;
+      }
+      // Marca a marca: cada uma lê e muda a tela debaixo dela
+      const rgb = (cor: string) => rgbDaCor(cor).map((v) => v / 255) as [number, number, number];
+      let porMarca: ((marca: MarcaDoRetoque) => void) | undefined;
+      if (ferramenta === "borrar") {
+        const estado = estadoNovo();
+        const { forca, pinturaComDedo } = opcoesDoRetoque.borrar;
+        const cor = rgb(cores.primeiroPlano);
+        porMarca = (marca) => borrarMarca(marca, estado, forca, cor, pinturaComDedo);
+      } else if (ferramenta === "misturador") {
+        const pincel = pincelDoMisturador.current;
+        const o = opcoesDoMisturador;
+        if (o.limparDepois) pincel.estado = estadoNovo();
+        if (o.carregarDepois) {
+          pincel.estado.tinta = 1;
+          pincel.limpo = false;
+        }
+        const reservatorio = pincel.limpo ? null : rgb(cores.primeiroPlano);
+        const estado = pincel.estado;
+        porMarca = (marca) => misturarMarca(marca, estado, o, reservatorio);
+      } else if (ferramenta === "substituicaoDeCor" || ferramenta === "borrachaDeFundo") {
+        const estado = estadoNovo();
+        const primeiro = rgb(cores.primeiroPlano);
+        const fundo = rgb(cores.fundo);
+        porMarca =
+          ferramenta === "substituicaoDeCor"
+            ? (marca) => substituirCorNaMarca(marca, estado, opcoesDaSubstituicao, primeiro, fundo, 1)
+            : (marca) => apagarFundoNaMarca(marca, estado, opcoesDaBorrachaDeFundo, primeiro, fundo, 1);
+      }
+      return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia), fonteDaTinta, porMarca };
     } catch {
       mostrarAviso("Não foi possível abrir a camada para pintar. Tente de novo.");
       return null;
@@ -2574,6 +2658,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             <OpcoesDoCarimboNaBarra padrao={ferramenta === "carimboDePadrao"} opcoes={opcoesDoCarimbo} aoMudar={(mudanca) => setOpcoesDoCarimbo((atual) => ({ ...atual, ...mudanca }))} />
           ) : ferramenta === "recuperacaoParaManchas" ? (
             <OpcoesDasManchasNaBarra opcoes={opcoesDasManchas} aoMudar={(mudanca) => setOpcoesDasManchas((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "desfoque" || ferramenta === "nitidez" || ferramenta === "borrar" || ferramenta === "subexposicao" || ferramenta === "superexposicao" || ferramenta === "esponja" ? (
+            <OpcoesDoRetoqueNaBarra ferramenta={ferramenta} opcoes={opcoesDoRetoque[ferramenta]} aoMudar={(mudanca) => setOpcoesDoRetoque((atual) => ({ ...atual, [ferramenta]: { ...atual[ferramenta], ...mudanca } }))} />
+          ) : ferramenta === "misturador" ? (
+            <OpcoesDoMisturadorNaBarra
+              opcoes={opcoesDoMisturador}
+              aoMudar={(mudanca) => setOpcoesDoMisturador((atual) => ({ ...atual, ...mudanca }))}
+              aoCarregar={() => (pincelDoMisturador.current = { estado: estadoNovo(), limpo: false })}
+              aoLimpar={() => (pincelDoMisturador.current = { estado: estadoNovo(), limpo: true })}
+            />
+          ) : ferramenta === "substituicaoDeCor" ? (
+            <OpcoesDaSubstituicaoNaBarra borracha={false} opcoes={opcoesDaSubstituicao} aoMudar={(mudanca) => setOpcoesDaSubstituicao((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "borrachaDeFundo" ? (
+            <OpcoesDaSubstituicaoNaBarra borracha opcoes={opcoesDaBorrachaDeFundo} aoMudar={(mudanca) => setOpcoesDaBorrachaDeFundo((atual) => ({ ...atual, ...mudanca }))} />
           ) : undefined
         }
         opcoesProprias={

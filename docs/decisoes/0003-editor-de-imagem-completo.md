@@ -152,11 +152,11 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Correção (de origem ou de destino, colada sem emenda; o preenchimento por IA fica com o Remover)
 - [x] Mover sensível ao conteúdo (mover e estender)
 - [ ] Remover (J) com "criar camada nova" e traços que cercam um objeto
-- [ ] Pincel misturador (úmido, carregar, misturar, fluxo; limpar e carregar depois de cada traço)
-- [ ] Substituição de cor (matiz, saturação, cor, luminosidade; amostragem; limites; tolerância)
-- [ ] Desfoque, Nitidez e Borrar com pincel (força, proteger detalhes, pintura com o dedo)
-- [ ] Subexposição e Superexposição (sombras, meios-tons, realces; exposição; proteger tons) e Esponja (dessaturar, saturar; vibração)
-- [ ] Borracha de fundo (amostragem, limites, tolerância, proteger a cor do primeiro plano)
+- [x] Pincel misturador (úmido, carregar, misturar, fluxo; limpar e carregar depois de cada traço)
+- [x] Substituição de cor (matiz, saturação, cor, luminosidade; amostragem; limites; tolerância)
+- [x] Desfoque, Nitidez e Borrar com pincel (força, proteger detalhes, pintura com o dedo)
+- [x] Subexposição e Superexposição (sombras, meios-tons, realces; exposição; proteger tons) e Esponja (dessaturar, saturar; vibração)
+- [x] Borracha de fundo (amostragem, limites, tolerância, proteger a cor do primeiro plano)
 - [x] Borracha mágica
 - [x] Balde de tinta (primeiro plano ou padrão, tolerância, contígua, todas as camadas)
 - [x] Degradê (G) clássico (pinta pixels): linear, radial, ângulo, refletido, losango; inverter, pontilhar
