@@ -167,7 +167,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.6 — Transformação e geometria
 
 - [x] Transformação livre (Ctrl+T) com X, Y, L, A, giro, inclinação, ponto de referência e interpolação (pelo menu: o Ctrl+T é do navegador)
-- [ ] Transformar › Escala, Girar, Inclinar, Distorcer, Perspectiva, Deformar (malha, estilos prontos, dividir em cruz, na vertical e na horizontal), Transformar novamente (Ctrl+Shift+T), girar 180 e 90, virar
+- [x] Transformar › Escala, Girar, Inclinar, Distorcer, Perspectiva, Deformar (malha, estilos prontos, dividir em cruz, na vertical e na horizontal), Transformar novamente (Ctrl+Shift+T), girar 180 e 90, virar
 - [x] Transformação livre de uma cópia (Ctrl+Alt+T)
 - [ ] Distorção de marionete (malha, alfinetes, rígido, normal, distorcer, densidade, expansão, profundidade)
 - [ ] Deformação de perspectiva (planos, endireitar, nivelar)

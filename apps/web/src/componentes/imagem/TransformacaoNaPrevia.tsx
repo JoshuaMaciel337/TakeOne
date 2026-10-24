@@ -4,17 +4,21 @@
 // os cantos e os meios dos lados mudam o tamanho (Shift na proporção, Alt a partir do centro), fora dos cantos gira
 // (Shift de 15 em 15°), e Ctrl num canto distorce. Os modos Inclinar, Distorcer, Perspectiva e Deformar mudam o que
 // as alças fazem, como nos editores de imagem. Por baixo, a prévia do conteúdo pelo mesmo mapa da transformação final.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Tamanho } from "@/lib/projeto/geometria";
-import { bezier, desenharNaMalha, homografia, type MalhaDeDeformacao, malhaDoQuadrilatero, type Ponto, type Quadrilatero } from "@/lib/transformar/malha";
+import { cantosDaMalha, colunasDa, dividirMalha, inversaDoMapa, linhasDa, type Malha, malhaDoQuad, mapaDaMalha, moverPontoDaMalha } from "@/lib/transformar/deformar";
+import { reamostrar, reamostrarPeloMapa } from "@/lib/transformar/livre";
+import { homografia, type Ponto, type Quadrilatero } from "@/lib/transformar/malha";
 
 export type ModoDaTransformacao = "livre" | "escala" | "girar" | "inclinar" | "distorcer" | "perspectiva" | "deformar";
-export type EstadoDaTransformacao = { quad: Quadrilatero; malha: MalhaDeDeformacao | null };
+export type EstadoDaTransformacao = { quad: Quadrilatero; malha: Malha | null };
+/** O Deformar dividindo a malha: o próximo clique na caixa põe a divisão ali. */
+export type DivisaoDaMalha = "cruz" | "vertical" | "horizontal";
 
 /** O mapa do estado: a malha, quando deformada, senão a homografia dos cantos. */
 export function mapaDoEstado(estado: EstadoDaTransformacao) {
-  return estado.malha ? bezier(estado.malha) : homografia(estado.quad);
+  return estado.malha ? mapaDaMalha(estado.malha) : homografia(estado.quad);
 }
 
 const soma = (a: Ponto, b: Ponto): Ponto => ({ x: a.x + b.x, y: a.y + b.y });
@@ -71,6 +75,8 @@ export function TransformacaoNaPrevia({
   origem,
   referencia = null,
   opaco = false,
+  dividindo = null,
+  aoDividir,
   aoMudar,
   aoConfirmar,
 }: {
@@ -84,6 +90,9 @@ export function TransformacaoNaPrevia({
   referencia?: Ponto | null;
   /** A camada aparece inteira (a seleção, meio transparente). */
   opaco?: boolean;
+  /** Deformar: a divisão que o próximo clique põe na malha. */
+  dividindo?: DivisaoDaMalha | null;
+  aoDividir?: (malha: Malha) => void;
   aoMudar: (estado: EstadoDaTransformacao) => void;
   aoConfirmar: () => void;
 }) {
@@ -92,8 +101,19 @@ export function TransformacaoNaPrevia({
   const arrasto = useRef<{ alca: Alca; inicio: Ponto; estado: EstadoDaTransformacao; anguloInicial: number } | null>(null);
   const [cursor, setCursor] = useState("move");
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Os pixels da origem, lidos uma vez
+  const pixelsDaOrigem = useMemo(() => {
+    if (!origem) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(origem.largura));
+    canvas.height = Math.max(1, Math.round(origem.altura));
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(origem.imagem, 0, 0, canvas.width, canvas.height);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return { dados: pixels.data, largura: pixels.width, altura: pixels.height };
+  }, [origem]);
 
-  // A prévia do conteúdo transformado, na resolução da tela
+  // A prévia do conteúdo transformado, na resolução da tela, pela mesma reamostragem do resultado (sem emendas)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -101,9 +121,11 @@ export function TransformacaoNaPrevia({
     canvas.height = Math.max(1, Math.round(quadro.altura));
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!origem) return;
+    if (!pixelsDaOrigem) return;
     const mapa = mapaDoEstado(estado);
-    desenharNaMalha(ctx, origem.imagem, origem.largura, origem.altura, (u, v) => naTela(mapa(u, v)), 16);
+    const tela = { largura: canvas.width, altura: canvas.height };
+    const pixels = estado.malha ? reamostrarPeloMapa(pixelsDaOrigem, (u, v) => naTela(mapa(u, v)), tela, "bilinear", 24) : reamostrar(pixelsDaOrigem, estado.quad.map(naTela) as Quadrilatero, tela, "bilinear");
+    ctx.putImageData(new ImageData(pixels, tela.largura, tela.altura), 0, 0);
   });
 
   const paraDocumento = (evento: { clientX: number; clientY: number }, elemento: Element): Ponto => {
@@ -114,8 +136,8 @@ export function TransformacaoNaPrevia({
   const alcaEm = (p: Ponto): Alca => {
     const perto = (a: Ponto) => Math.hypot((a.x - p.x) * escala, (a.y - p.y) * escala) <= 7;
     if (modo === "deformar") {
-      const malha = estado.malha ?? malhaDoQuadrilatero(estado.quad);
-      const i = malha.findIndex(perto);
+      const malha = estado.malha ?? malhaDoQuad(estado.quad);
+      const i = malha.pontos.findIndex(perto);
       if (i >= 0) return { tipo: "malha", i };
     }
     const canto = estado.quad.findIndex(perto);
@@ -145,6 +167,13 @@ export function TransformacaoNaPrevia({
     }
     evento.currentTarget.setPointerCapture(evento.pointerId);
     const p = paraDocumento(evento, evento.currentTarget);
+    // Dividindo a malha: a divisão vai para o ponto da imagem debaixo do clique
+    if (modo === "deformar" && dividindo && aoDividir) {
+      const malha = estado.malha ?? malhaDoQuad(estado.quad);
+      const { u, v } = inversaDoMapa(mapaDaMalha(malha), p);
+      aoDividir(dividirMalha(malha, dividindo === "horizontal" ? null : u, dividindo === "vertical" ? null : v));
+      return;
+    }
     const centro = referencia ?? centroDe(estado.quad);
     arrasto.current = { alca: alcaEm(p), inicio: p, estado, anguloInicial: Math.atan2(p.y - centro.y, p.x - centro.x) };
   }
@@ -159,20 +188,17 @@ export function TransformacaoNaPrevia({
     }
     const d = menos(p, a.inicio);
     const q = a.estado.quad;
-    const novo = (quad: Quadrilatero, malha: MalhaDeDeformacao | null = null) => aoMudar({ quad, malha });
+    const novo = (quad: Quadrilatero, malha: Malha | null = null) => aoMudar({ quad, malha });
+    const naMalha = (f: (ponto: Ponto) => Ponto) => (a.estado.malha ? { ...a.estado.malha, pontos: a.estado.malha.pontos.map(f) } : null);
     // Mover o quadrilátero (e a malha, se houver) inteiro
     if (a.alca.tipo === "mover") {
-      novo(q.map((ponto) => soma(ponto, d)) as Quadrilatero, a.estado.malha?.map((ponto) => soma(ponto, d)) ?? null);
+      novo(q.map((ponto) => soma(ponto, d)) as Quadrilatero, naMalha((ponto) => soma(ponto, d)));
       return;
     }
     if (a.alca.tipo === "malha") {
-      const malha = [...(a.estado.malha ?? malhaDoQuadrilatero(q))];
-      malha[a.alca.i] = soma(malha[a.alca.i], d);
+      const malha = moverPontoDaMalha(a.estado.malha ?? malhaDoQuad(q), a.alca.i, d);
       // Os cantos da malha são os do quadrilátero
-      const cantos = [0, 3, 15, 12];
-      const quad = [...q] as Quadrilatero;
-      const indiceDoCanto = cantos.indexOf(a.alca.i);
-      if (indiceDoCanto >= 0) quad[indiceDoCanto] = malha[a.alca.i];
+      const quad = cantosDaMalha(malha).map((i) => malha.pontos[i]) as Quadrilatero;
       novo(quad, malha);
       return;
     }
@@ -180,7 +206,7 @@ export function TransformacaoNaPrevia({
       const centro = referencia ?? centroDe(q);
       let angulo = Math.atan2(p.y - centro.y, p.x - centro.x) - a.anguloInicial;
       if (evento.shiftKey) angulo = Math.round(angulo / (Math.PI / 12)) * (Math.PI / 12);
-      novo(q.map((ponto) => girar(ponto, centro, angulo)) as Quadrilatero, a.estado.malha?.map((ponto) => girar(ponto, centro, angulo)) ?? null);
+      novo(q.map((ponto) => girar(ponto, centro, angulo)) as Quadrilatero, naMalha((ponto) => girar(ponto, centro, angulo)));
       return;
     }
     const comCtrl = evento.ctrlKey || evento.metaKey;
@@ -225,27 +251,30 @@ export function TransformacaoNaPrevia({
   for (let k = 0; k < passos; k++) borda.push(naTela(mapa(1, k / passos)));
   for (let k = 0; k < passos; k++) borda.push(naTela(mapa(1 - k / passos, 1)));
   for (let k = 0; k < passos; k++) borda.push(naTela(mapa(0, 1 - k / passos)));
-  const linhasDaMalha: Ponto[][] = [];
-  if (modo === "deformar") {
-    for (const t of [1 / 3, 2 / 3]) {
-      linhasDaMalha.push(Array.from({ length: 25 }, (_, k) => naTela(mapa(k / 24, t))));
-      linhasDaMalha.push(Array.from({ length: 25 }, (_, k) => naTela(mapa(t, k / 24))));
-    }
+  // No Deformar: as divisões (cheias) e os terços de cada retalho (as linhas da grade)
+  const linhasDaMalha: { pontos: Ponto[]; divisao: boolean }[] = [];
+  const malhaNaTela = modo === "deformar" ? (estado.malha ?? malhaDoQuad(estado.quad)) : null;
+  if (malhaNaTela) {
+    const linhas = (cortes: number[]) => cortes.slice(0, -1).flatMap((c, k) => [c, c + (cortes[k + 1] - c) / 3, c + ((cortes[k + 1] - c) * 2) / 3].map((t, i) => ({ t, divisao: i === 0 && k > 0 }))).filter(({ t }) => t > 0);
+    for (const { t, divisao } of linhas(malhaNaTela.cortesV)) linhasDaMalha.push({ pontos: Array.from({ length: 25 }, (_, k) => naTela(mapa(k / 24, t))), divisao });
+    for (const { t, divisao } of linhas(malhaNaTela.cortesU)) linhasDaMalha.push({ pontos: Array.from({ length: 25 }, (_, k) => naTela(mapa(t, k / 24))), divisao });
   }
-  const alcas: Ponto[] = modo === "deformar" ? (estado.malha ?? malhaDoQuadrilatero(estado.quad)).map(naTela) : [...estado.quad.map(naTela), ...[0, 1, 2, 3].map((i) => naTela(meio(estado.quad[i], estado.quad[(i + 1) % 4])))];
+  const alcas: Ponto[] = malhaNaTela ? malhaNaTela.pontos.map(naTela) : [...estado.quad.map(naTela), ...[0, 1, 2, 3].map((i) => naTela(meio(estado.quad[i], estado.quad[(i + 1) % 4])))];
+  // As de ancoragem (cantos dos retalhos) são quadradas; as alças, redondas
+  const ancoragem = (i: number) => !malhaNaTela || ((i % colunasDa(malhaNaTela)) % 3 === 0 && Math.floor(i / colunasDa(malhaNaTela)) % 3 === 0 && linhasDa(malhaNaTela) > 0);
   const pontosSvg = (lista: Ponto[]) => lista.map((p) => `${p.x},${p.y}`).join(" ");
   return (
-    <div className="absolute inset-0 z-30 touch-none" style={{ cursor }} onPointerDown={aoApertar} onPointerMove={aoMover} onPointerUp={aoSoltar} aria-label="Transformação">
+    <div className="absolute inset-0 z-30 touch-none" style={{ cursor: dividindo && modo === "deformar" ? "crosshair" : cursor }} onPointerDown={aoApertar} onPointerMove={aoMover} onPointerUp={aoSoltar} aria-label="Transformação">
       <canvas ref={canvasRef} className={`pointer-events-none absolute inset-0 size-full ${opaco ? "" : "opacity-40"}`} aria-hidden />
       <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
         <polygon points={pontosSvg(borda)} fill="none" stroke="#000" strokeWidth={2} strokeOpacity={0.5} />
         <polygon points={pontosSvg(borda)} fill="none" stroke="#fff" strokeWidth={1} />
         {linhasDaMalha.map((linha, i) => (
-          <polyline key={i} points={pontosSvg(linha)} fill="none" stroke="#fff" strokeWidth={1} strokeOpacity={0.7} />
+          <polyline key={i} points={pontosSvg(linha.pontos)} fill="none" stroke="#fff" strokeWidth={linha.divisao ? 1.5 : 1} strokeOpacity={linha.divisao ? 1 : 0.6} />
         ))}
-        {alcas.map((p, i) => (
-          <rect key={i} x={p.x - 3.5} y={p.y - 3.5} width={7} height={7} fill="#fff" stroke="#000" strokeWidth={1} />
-        ))}
+        {alcas.map((p, i) =>
+          ancoragem(i) ? <rect key={i} x={p.x - 3.5} y={p.y - 3.5} width={7} height={7} fill="#fff" stroke="#000" strokeWidth={1} /> : <circle key={i} cx={p.x} cy={p.y} r={3} fill="#fff" stroke="#000" strokeWidth={1} />,
+        )}
         {referencia ? (
           <g transform={`translate(${naTela(referencia).x} ${naTela(referencia).y})`}>
             <circle r={5} fill="none" stroke="#000" strokeWidth={2} strokeOpacity={0.5} />

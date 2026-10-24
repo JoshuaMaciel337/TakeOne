@@ -14,7 +14,8 @@ import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_RETOQUE, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import type { Interpolacao, NumerosDaTransformacao, Referencia } from "@/lib/transformar/livre";
-import type { ModoDaTransformacao } from "./TransformacaoNaPrevia";
+import { type EstiloDeDeformacao, ESTILOS_DE_DEFORMACAO, type OpcoesDoEstilo } from "@/lib/transformar/deformar";
+import type { DivisaoDaMalha, ModoDaTransformacao } from "./TransformacaoNaPrevia";
 
 const MODOS_DA_TRANSFORMACAO: { id: ModoDaTransformacao; nome: string }[] = [
   { id: "livre", nome: "Livre" },
@@ -89,6 +90,11 @@ type Props = {
     aoReferencia?: (referencia: Referencia) => void;
     interpolacao?: Interpolacao;
     aoInterpolacao?: (interpolacao: Interpolacao) => void;
+    /** Deformar: o estilo pronto (null: a malha à mão) e a divisão da malha. */
+    estilo?: OpcoesDoEstilo | null;
+    aoEstilo?: (estilo: OpcoesDoEstilo | null) => void;
+    dividindo?: DivisaoDaMalha | null;
+    aoDividindo?: (divisao: DivisaoDaMalha | null) => void;
   } | null;
   /** A seleção de objeto: o localizador (o realce com o ponteiro parado) ligado ou não. */
   localizador?: boolean;
@@ -150,6 +156,54 @@ export function BarraDeOpcoes(props: Props) {
             </button>
           ))}
         </span>
+        {t.modo === "deformar" && t.aoEstilo ? (
+          <>
+            {SEPARADOR}
+            <label className="flex items-center gap-1 text-suave">
+              Deformar:
+              <select
+                className={campo}
+                value={t.estilo?.estilo ?? ""}
+                aria-label="Estilo da deformação"
+                onChange={(evento) => {
+                  const estilo = evento.currentTarget.value as EstiloDeDeformacao | "";
+                  t.aoEstilo!(estilo ? { estilo, vertical: t.estilo?.vertical ?? false, dobra: t.estilo?.dobra ?? 0.5, distorcaoH: t.estilo?.distorcaoH ?? 0, distorcaoV: t.estilo?.distorcaoV ?? 0 } : null);
+                }}
+              >
+                <option value="">Personalizada</option>
+                {ESTILOS_DE_DEFORMACAO.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {t.estilo ? (
+              <>
+                <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" title="Trocar a orientação do estilo" aria-pressed={t.estilo.vertical} onClick={() => t.aoEstilo!({ ...t.estilo!, vertical: !t.estilo!.vertical })}>
+                  {t.estilo.vertical ? "Vertical" : "Horizontal"}
+                </button>
+                <Numero rotulo="Dobra" valor={Math.round(t.estilo.dobra * 100)} minimo={-100} maximo={100} sufixo="%" aoMudar={(dobra) => t.aoEstilo!({ ...t.estilo!, dobra: dobra / 100 })} />
+                <Numero rotulo="Distorção H" valor={Math.round(t.estilo.distorcaoH * 100)} minimo={-100} maximo={100} sufixo="%" aoMudar={(distorcaoH) => t.aoEstilo!({ ...t.estilo!, distorcaoH: distorcaoH / 100 })} />
+                <Numero rotulo="Distorção V" valor={Math.round(t.estilo.distorcaoV * 100)} minimo={-100} maximo={100} sufixo="%" aoMudar={(distorcaoV) => t.aoEstilo!({ ...t.estilo!, distorcaoV: distorcaoV / 100 })} />
+              </>
+            ) : (
+              <span className="flex items-center gap-0.5" role="group" aria-label="Dividir a malha">
+                {(
+                  [
+                    ["cruz", "Dividir em cruz"],
+                    ["vertical", "Dividir na vertical"],
+                    ["horizontal", "Dividir na horizontal"],
+                  ] as const
+                ).map(([id, nome]) => (
+                  <button key={id} type="button" className={`rounded px-2 py-0.5 text-xs ${t.dividindo === id ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`} aria-pressed={t.dividindo === id} title={`${nome}: clique na caixa onde dividir`} onClick={() => t.aoDividindo?.(t.dividindo === id ? null : id)}>
+                    {nome}
+                  </button>
+                ))}
+              </span>
+            )}
+          </>
+        ) : null}
         {t.referencia && t.aoReferencia ? (
           <>
             {SEPARADOR}

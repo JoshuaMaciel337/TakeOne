@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { afimEntre, doReferencial, noReferencial, numerosDoQuad, quadDosNumeros, reamostrar, semelhanca } from "./livre.ts";
+import { afimEntre, doReferencial, noReferencial, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, semelhanca } from "./livre.ts";
 import { quadDoRetangulo, type Quadrilatero } from "./malha.ts";
 
 const perto = (a: number, b: number, tolerancia = 1e-6) => assert.ok(Math.abs(a - b) < tolerancia, `${a} != ${b}`);
@@ -83,4 +83,17 @@ test("reamostrar: no mesmo lugar sai igual; um pixel para o lado anda junto", ()
   const andado = reamostrar({ dados, largura, altura }, mesmo.map((p) => ({ x: p.x + 1, y: p.y })) as Quadrilatero, { largura: 5, altura }, "vizinho");
   assert.equal(andado[3], 0);
   assert.deepEqual([...andado.slice(4, 8)], [...dados.slice(0, 4)]);
+});
+
+test("reamostrar pelo mapa: um mapa que estica não deixa emenda (nenhum pixel meio transparente por dentro)", () => {
+  const largura = 20;
+  const altura = 10;
+  const dados = new Uint8ClampedArray(largura * altura * 4).fill(255);
+  // Uma onda: as divisões viram triângulos tortos
+  const mapa = (u: number, v: number) => ({ x: 5 + u * 60 + Math.sin(v * 3) * 4, y: 3 + v * 30 + Math.sin(u * 5) * 3 });
+  const saida = reamostrarPeloMapa({ dados, largura, altura }, mapa, { largura: 80, altura: 50 }, "vizinho", 16);
+  // Por dentro (longe da borda), todo pixel está cheio
+  let buracos = 0;
+  for (let y = 10; y < 28; y++) for (let x = 15; x < 55; x++) if (saida[(y * 80 + x) * 4 + 3] !== 255) buracos++;
+  assert.equal(buracos, 0);
 });

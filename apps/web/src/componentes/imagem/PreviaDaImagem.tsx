@@ -29,7 +29,8 @@ import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
 import { PontoNaPrevia } from "./PontoNaPrevia";
-import { type EstadoDaTransformacao, type ModoDaTransformacao, TransformacaoNaPrevia } from "./TransformacaoNaPrevia";
+import { type DivisaoDaMalha, type EstadoDaTransformacao, type ModoDaTransformacao, TransformacaoNaPrevia } from "./TransformacaoNaPrevia";
+import type { Malha } from "@/lib/transformar/deformar";
 import type { CorDoCanal } from "./PainelCanais";
 import type { FerramentaObjeto } from "./useObjeto";
 
@@ -126,6 +127,8 @@ type Props = {
     /** O ponto de referência (pixels do documento) e a camada inteira (sem a transparência da seleção). */
     referencia?: { x: number; y: number } | null;
     opaco?: boolean;
+    dividindo?: DivisaoDaMalha | null;
+    aoDividir?: (malha: Malha) => void;
     aoMudar: (estado: EstadoDaTransformacao) => void;
     aoConfirmar: () => void;
   } | null;
@@ -676,6 +679,8 @@ export function PreviaDaImagem({
                 origem={transformacao.origem}
                 referencia={transformacao.referencia}
                 opaco={transformacao.opaco}
+                dividindo={transformacao.dividindo}
+                aoDividir={transformacao.aoDividir}
                 aoMudar={transformacao.aoMudar}
                 aoConfirmar={transformacao.aoConfirmar}
               />

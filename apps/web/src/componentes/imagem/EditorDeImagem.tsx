@@ -93,9 +93,10 @@ import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, la
 import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
-import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
-import { bezier, desenharNaMalha, type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
-import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, type Referencia, semelhanca } from "@/lib/transformar/livre";
+import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
+import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
+import { type Malha, malhaDoEstilo, mapaDaMalha, type OpcoesDoEstilo } from "@/lib/transformar/deformar";
+import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, type Referencia, semelhanca } from "@/lib/transformar/livre";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
@@ -312,7 +313,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // (null: tirados da caixa) e a interpolação; numa camada, o que é preciso para gravar o resultado
   const [transformando, setTransformando] = useState<Transformando | null>(null);
   // A última transformação de camada, no referencial da caixa dela (Editar › Transformar › Transformar novamente)
-  const ultimaTransformacao = useRef<{ cantos: PontoDaMalha[]; malha: PontoDaMalha[] | null; interpolacao: Interpolacao } | null>(null);
+  const ultimaTransformacao = useRef<{ cantos: PontoDaMalha[]; malha: Malha | null; interpolacao: Interpolacao } | null>(null);
   const [pedidoAsCamadas, setPedidoAsCamadas] = useState<{ tipo: "procurar" | "isolar"; vez: number; faixaIds: string[] } | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
@@ -1177,7 +1178,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     canvas.width = largura;
     canvas.height = altura;
     const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
-    desenharNaMalha(ctx2d, transformando.fonte, transformando.fonte.width, transformando.fonte.height, mapaDoEstado(transformando.estado), 48);
+    ctx2d.putImageData(new ImageData(levarPeloEstado(transformando.fonte, transformando.estado, { largura, altura }, "bilinear"), largura, altura), 0, 0);
     const nova = selecaoDoCanvas(canvas, "alfa");
     setTransformando(null);
     if (!temAlgo(nova)) mostrarAviso("A seleção ficou sem nenhum pixel mais da metade selecionado.");
@@ -1965,7 +1966,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * camada de pixels, só o que está selecionado vai, e o resto fica. `imediata` leva a caixa do começo à final e
    * confirma na hora (girar e virar pelo menu, Transformar novamente).
    */
-  const comecarTransformacaoDaCamada = async (opcoes: { copia?: boolean; modo?: ModoDaTransformacao; imediata?: (inicial: Quadrilatero) => { quad: Quadrilatero; malha: PontoDaMalha[] | null } }) => {
+  const comecarTransformacaoDaCamada = async (opcoes: { copia?: boolean; modo?: ModoDaTransformacao; imediata?: (inicial: Quadrilatero) => { quad: Quadrilatero; malha: Malha | null } }) => {
     const atual = projetoRef.current;
     if (!atual || !selecionado || transformando || gerandoPixels) return;
     const achado = acharClipe(atual, selecionado.clipe.id);
@@ -2095,7 +2096,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (!camada || !atual) return;
     const achado = acharClipe(atual, camada.clipeId);
     if (!achado) return;
-    ultimaTransformacao.current = { cantos: noReferencial(t.inicial, t.estado.quad), malha: t.estado.malha ? noReferencial(t.inicial, t.estado.malha) : null, interpolacao: t.interpolacao };
+    ultimaTransformacao.current = { cantos: noReferencial(t.inicial, t.estado.quad), malha: t.estado.malha ? { ...t.estado.malha, pontos: noReferencial(t.inicial, t.estado.malha.pontos) } : null, interpolacao: t.interpolacao };
     const documento = tamanhoDaImagem(atual);
     const parecida = !t.estado.malha && !camada.copia && !camada.selecao ? semelhanca(t.inicial, t.estado.quad) : null;
     if (parecida) {
@@ -2121,22 +2122,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const pedaco = document.createElement("canvas");
     pedaco.width = documento.largura;
     pedaco.height = documento.altura;
-    const ctxPedaco = pedaco.getContext("2d", { willReadFrequently: true })!;
-    if (t.estado.malha) {
-      ctxPedaco.imageSmoothingEnabled = t.interpolacao !== "vizinho";
-      ctxPedaco.imageSmoothingQuality = t.interpolacao === "bicubica" ? "high" : "low";
-      desenharNaMalha(ctxPedaco, t.fonte, t.fonte.width, t.fonte.height, bezier(t.estado.malha), 64);
-    } else {
-      const origem = t.fonte.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, t.fonte.width, t.fonte.height);
-      ctxPedaco.putImageData(new ImageData(reamostrar({ dados: origem.data, largura: origem.width, altura: origem.height }, t.estado.quad, documento, t.interpolacao), documento.largura, documento.altura), 0, 0);
-    }
+    pedaco.getContext("2d")!.putImageData(new ImageData(levarPeloEstado(t.fonte, t.estado, documento, t.interpolacao), documento.largura, documento.altura), 0, 0);
     ctx2d.drawImage(pedaco, 0, 0);
     // A seleção anda junto com o pedaço
     if (camada.fonteDaSelecao) {
       const mascara = document.createElement("canvas");
       mascara.width = documento.largura;
       mascara.height = documento.altura;
-      desenharNaMalha(mascara.getContext("2d")!, camada.fonteDaSelecao, camada.fonteDaSelecao.width, camada.fonteDaSelecao.height, mapaDoEstado(t.estado), 48);
+      mascara.getContext("2d")!.putImageData(new ImageData(levarPeloEstado(camada.fonteDaSelecao, t.estado, documento, "bilinear"), documento.largura, documento.altura), 0, 0);
       const nova = selecaoDoCanvas(mascara, "alfa");
       setSelecaoDoDocumento(temAlgo(nova) ? nova : null);
     }
@@ -2162,7 +2155,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (como === "novamente") {
       const ultima = ultimaTransformacao.current;
       if (!ultima) return;
-      return void comecarTransformacaoDaCamada({ imediata: (q) => ({ quad: doReferencial(q, ultima.cantos) as Quadrilatero, malha: ultima.malha ? doReferencial(q, ultima.malha) : null }) });
+      return void comecarTransformacaoDaCamada({ imediata: (q) => ({ quad: doReferencial(q, ultima.cantos) as Quadrilatero, malha: ultima.malha ? { ...ultima.malha, pontos: doReferencial(q, ultima.malha.pontos) } : null }) });
     }
     void comecarTransformacaoDaCamada({ modo: como });
   };
@@ -3006,6 +2999,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 aoReferencia: (referencia) => setTransformando((atual) => (atual ? { ...atual, referencia, numeros: null } : atual)),
                 interpolacao: transformando.camada ? transformando.interpolacao : undefined,
                 aoInterpolacao: (interpolacao) => setTransformando((atual) => (atual ? { ...atual, interpolacao } : atual)),
+                estilo: transformando.estilo,
+                aoEstilo: (estilo) => setTransformando((atual) => (atual ? { ...atual, estilo, dividindo: null, estado: { quad: atual.estado.quad, malha: estilo ? malhaDoEstilo(atual.estado.quad, estilo) : null } } : atual)),
+                dividindo: transformando.dividindo,
+                aoDividindo: (dividindo) => setTransformando((atual) => (atual ? { ...atual, dividindo } : atual)),
               }
             : null
         }
@@ -3137,7 +3134,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     origem: transformando.previa,
                     referencia: mapaDoEstado(transformando.estado)(transformando.referencia.u, transformando.referencia.v),
                     opaco: Boolean(transformando.camada),
-                    aoMudar: (estado) => setTransformando((atual) => (atual ? { ...atual, estado, numeros: null } : atual)),
+                    dividindo: transformando.dividindo,
+                    aoDividir: (malha) => setTransformando((atual) => (atual ? { ...atual, estado: { ...atual.estado, malha }, dividindo: null, estilo: null } : atual)),
+                    // Mexer à mão numa malha de estilo a torna personalizada
+                    aoMudar: (estado) => setTransformando((atual) => (atual ? { ...atual, estado, numeros: null, estilo: null } : atual)),
                     aoConfirmar: confirmarTransformacao,
                   }
                 : null
@@ -3540,6 +3540,9 @@ type Transformando = {
   referencia: Referencia;
   numeros: NumerosDaTransformacao | null;
   interpolacao: Interpolacao;
+  /** Deformar: o estilo pronto da malha (null: à mão) e a divisão que o próximo clique põe. */
+  estilo?: OpcoesDoEstilo | null;
+  dividindo?: DivisaoDaMalha | null;
   camada?: {
     faixaId: string;
     clipeId: string;
@@ -3552,3 +3555,13 @@ type Transformando = {
     fonteDaSelecao: HTMLCanvasElement | null;
   };
 };
+
+/**
+ * O pedaço (no referencial da caixa do começo) levado à caixa final, nos pixels do documento: pela homografia inversa
+ * quando não há malha, senão pela malha do Deformar (sem emendas entre os triângulos).
+ */
+function levarPeloEstado(fonte: HTMLCanvasElement, estado: EstadoDaTransformacao, documento: { largura: number; altura: number }, interpolacao: Interpolacao): Uint8ClampedArray<ArrayBuffer> {
+  const pixels = fonte.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, fonte.width, fonte.height);
+  const origem = { dados: pixels.data, largura: pixels.width, altura: pixels.height };
+  return estado.malha ? reamostrarPeloMapa(origem, mapaDaMalha(estado.malha), documento, interpolacao, 64) : reamostrar(origem, estado.quad, documento, interpolacao);
+}
