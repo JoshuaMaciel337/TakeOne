@@ -152,3 +152,82 @@ def test_fluxo_da_imagem_e_o_do_video_com_um_quadro():
     historico = {"outputs": {"11": {"images": [salvo]}}}
     assert arquivo_gerado(historico, ".png")["filename"] == "takeone_x_00001_.png"
     assert arquivo_gerado(historico) is None
+
+
+def _recorte_com_buraco(largura=320, altura=200) -> str:
+    """Um recorte em PNG (base64): metade azul, metade laranja, com um buraco transparente no meio."""
+    import base64
+    import io
+
+    imagem = Image.new("RGBA", (largura, altura), (30, 60, 200, 255))
+    imagem.paste((240, 140, 40, 255), (largura // 2, 0, largura, altura))
+    imagem.paste((0, 0, 0, 0), (largura // 2 - 30, altura // 2 - 30, largura // 2 + 30, altura // 2 + 30))
+    saida = io.BytesIO()
+    imagem.save(saida, "PNG")
+    return "data:image/png;base64," + base64.b64encode(saida.getvalue()).decode()
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_preenchimento_gera_as_variacoes_iguais_ao_recorte_fora_da_area(cliente, db_limpo):
+    import base64
+    import io
+
+    cadastrar(cliente)
+    # Sem área a preencher, base64 estragado, variações demais
+    opaca = io.BytesIO()
+    Image.new("RGBA", (64, 64), (10, 20, 30, 255)).save(opaca, "PNG")
+    pedir = lambda corpo: cliente.post("/api/midias/preencher", json=corpo)  # noqa: E731
+    assert pedir({"imagem": base64.b64encode(opaca.getvalue()).decode()}).status_code == 422
+    assert pedir({"imagem": "nao-e-base64!!!!"}).status_code == 422
+    assert pedir({"imagem": _recorte_com_buraco(), "variacoes": 4}).status_code == 422
+    resposta = pedir({"imagem": _recorte_com_buraco(), "descricao": "Um barco, à noite", "variacoes": 2})
+    assert resposta.status_code == 201, resposta.text
+    midias = resposta.json()
+    assert len(midias) == 2 and midias[0]["nome"] == "IA · Preenchimento · Um barco"
+    assert midias[0]["status"] == "processando"
+    sementes = set()
+    for _ in midias:
+        job = pegar_proximo_job(db_limpo, ["preenchimento"], "w-teste")
+        sementes.add(job["entrada"]["semente"])
+        resultado = processar_job(db_limpo, job, "w-teste")
+        assert resultado == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+        ingestao = pegar_proximo_job(db_limpo, ["ingestao"], "w-teste")
+        assert processar_job(db_limpo, ingestao, "w-teste") == "concluido"
+    assert len(sementes) == 2
+    vista = cliente.get(f"/api/midias/{midias[0]['id']}").json()
+    assert vista["status"] == "pronta" and vista["imagem"]
+    assert (vista["video"]["largura"], vista["video"]["altura"]) == (320, 200)
+    # Uma camada só com a área (transparente fora); dentro, a cor da volta (no modo simulado)
+    org = organizacao_de(cliente)
+    doc = db_limpo.midias.find_one({"_id": ObjectId(midias[0]["id"])})
+    original = storage.caminho_local(chave_arquivo(org, doc["_id"], doc["original"]))
+    pixels = np.asarray(Image.open(original).convert("RGBA")).astype(int)
+    assert pixels[10, 10, 3] == 0 and pixels[10, 300, 3] == 0 and pixels[100, 160, 3] == 255
+    assert np.abs(pixels[100, 160, :3] - (np.array([30, 60, 200]) + np.array([240, 140, 40])) / 2).max() < 40
+    assert 0 < pixels[100, 160 - 33, 3] < 255
+    # Mais variações do mesmo recorte e do mesmo texto; de uma mídia que não é preenchimento, não
+    mais = cliente.post(f"/api/midias/{midias[0]['id']}/variacoes", json={"variacoes": 1})
+    assert mais.status_code == 201, mais.text
+    assert mais.json()[0]["nome"] == "IA · Preenchimento · Um barco" and mais.json()[0]["gerada"]["preenchimento"]
+    job = pegar_proximo_job(db_limpo, ["preenchimento"], "w-teste")
+    assert job["entrada"]["descricao"] == "Um barco, à noite"
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    imagem = enviar_imagem(db_limpo, org, "comum.png", _faixas)
+    assert cliente.post(f"/api/midias/{imagem}/variacoes", json={}).status_code == 409
+
+
+def test_fluxo_do_preenchimento_e_o_vace_com_a_mascara():
+    from core.modelos.geracao import montar_fluxo_do_preenchimento, tamanho_do_preenchimento
+
+    assert tamanho_do_preenchimento(832, 480) == (832, 480)
+    # O recorte pequeno cresce até a área do modelo, na mesma proporção
+    assert tamanho_do_preenchimento(160, 224) == (528, 752)
+    assert tamanho_do_preenchimento(2000, 1000) == (896, 448)
+    assert tamanho_do_preenchimento(4000, 500) == (1024, 128)
+    fluxo = montar_fluxo_do_preenchimento("", "entrada.png", 640, 352, 9, "takeone_y")
+    assert fluxo["1"]["inputs"]["unet_name"] == "wan2.1_vace_1.3B_fp16.safetensors"
+    assert fluxo["7"]["inputs"]["control_masks"] == ["14", 0] and fluxo["7"]["inputs"]["length"] == 1
+    assert fluxo["14"]["inputs"]["mask"] == ["12", 1] and fluxo["8"]["inputs"]["seed"] == 9
+    assert "sem pessoas" in fluxo["5"]["inputs"]["text"] and "figura humana" in fluxo["6"]["inputs"]["text"]
+    com_texto = montar_fluxo_do_preenchimento("um barco", "entrada.png", 640, 352, 9, "takeone_y")
+    assert com_texto["5"]["inputs"]["text"] == "um barco" and "figura humana" not in com_texto["6"]["inputs"]["text"]

@@ -43,6 +43,8 @@ ARQUIVO_PROXY_IMAGEM = "proxy.webp"
 ARQUIVO_MASCARA_IMAGEM = "mascara.png"
 # A de resolução cheia também: o editor de imagem exporta no navegador, no tamanho de verdade
 ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM, ARQUIVO_IMAGEM, ARQUIVO_MASCARA_IMAGEM}
+# A entrada do preenchimento generativo (o recorte com a área a preencher transparente); não é servida
+ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO = "entrada_preenchimento.png"
 # O vídeo ao contrário (tarefa "inversao"): o de resolução cheia é do render; a cópia leve, com o som, da prévia
 ARQUIVO_INVERTIDO = "invertido.mp4"
 ARQUIVO_INVERTIDO_PROXY = "invertido_proxy.mp4"

@@ -1,5 +1,6 @@
 # -----------------------------------------------
-# TakeOne — geração de vídeo e de imagem com o Wan 2.2 TI2V-5B (pelo ComfyUI)
+# TakeOne — geração de vídeo e de imagem com o Wan 2.2 TI2V-5B, e o preenchimento generativo com o Wan 2.1
+# VACE 1.3B (pelo ComfyUI)
 # Funções puras: os formatos, o fluxo que vai para o ComfyUI e quanto tempo ele deve levar.
 # Com uma imagem, ela é o primeiro quadro e o texto descreve o movimento (o mesmo modelo faz os dois).
 # A imagem é um vídeo de um quadro só, em 720p: sem os outros quadros, cabe na placa e sai em uns 3 min.
@@ -115,3 +116,64 @@ def arquivo_gerado(historico: dict, extensao: str = ".mp4") -> dict | None:
                 if isinstance(item, dict) and str(item.get("filename", "")).endswith(extensao):
                     return item
     return None
+
+
+# O preenchimento generativo (o editor de imagem): o Wan 2.1 VACE 1.3B (Apache-2.0) recebe a imagem com a área
+# a preencher em cinza e a máscara dela, e pinta só ali, no tamanho em que foi treinado (480p). O Wan 2.2 TI2V lê
+# a máscara de ruído do latente como o passo de cada pedaço (é assim que ele segura o primeiro quadro), e o buraco
+# saía em ruído colorido; o image-to-image dele refazia a imagem inteira e a emenda aparecia.
+AREA_DO_PREENCHIMENTO = 832 * 480
+LADO_MAXIMO_DO_PREENCHIMENTO = 1024
+PASSOS_DO_PREENCHIMENTO = 25
+# Medido no Nitro 5 (24/10/2026), em 832 × 464 com o modelo já carregado
+SEGUNDOS_DO_PREENCHIMENTO = 60
+# Sem texto, a pessoa quer tirar o que estava ali: o fundo continua, e gente e objetos novos vão no negativo (com o
+# texto genérico de antes, a máscara alta ao lado de alguém virava outra pessoa)
+DESCRICAO_PADRAO_DO_PREENCHIMENTO = ("o fundo da cena continuando, vazio, sem pessoas e sem objetos novos, "
+                                     "com a mesma luz e a mesma textura, fotografia realista")
+NEGATIVO_DO_FUNDO = "pessoa, pessoas, gente, rosto, corpo, mão, figura humana, silhueta, objeto novo"
+
+
+def tamanho_do_preenchimento(largura: int, altura: int) -> tuple[int, int]:
+    """O tamanho em que o recorte vai ao modelo: a mesma proporção, na área de 480p (o recorte pequeno também
+    cresce até ela: num recorte de 160 × 224 o modelo pintava borrões) e até 1024 de lado, em múltiplos de 16
+    (o que o VACE pede)."""
+    escala = min(math.sqrt(AREA_DO_PREENCHIMENTO / (largura * altura)),
+                 LADO_MAXIMO_DO_PREENCHIMENTO / max(largura, altura))
+    return max(16, round(largura * escala / 16) * 16), max(16, round(altura * escala / 16) * 16)
+
+
+def montar_fluxo_do_preenchimento(descricao: str, imagem: str, largura: int, altura: int, semente: int,
+                                  prefixo: str) -> dict:
+    """O grafo do preenchimento: a imagem (`imagem`, já no ComfyUI, com o alfa 0 na área a preencher) vira o
+    vídeo de controle de um quadro, com essa área em cinza; a máscara é a mesma área, um pouco maior."""
+    return {
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": "wan2.1_vace_1.3B_fp16.safetensors", "weight_dtype": "default"}},
+        "2": {"class_type": "CLIPLoader",
+              "inputs": {"clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan", "device": "default"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "wan_2.1_vae.safetensors"}},
+        "4": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 8}},
+        "5": {"class_type": "CLIPTextEncode",
+              "inputs": {"clip": ["2", 0], "text": descricao or DESCRICAO_PADRAO_DO_PREENCHIMENTO}},
+        "6": {"class_type": "CLIPTextEncode",
+              "inputs": {"clip": ["2", 0], "text": NEGATIVO if descricao else f"{NEGATIVO}, {NEGATIVO_DO_FUNDO}"}},
+        "12": {"class_type": "LoadImage", "inputs": {"image": imagem}},
+        "14": {"class_type": "GrowMask", "inputs": {"mask": ["12", 1], "expand": 8, "tapered_corners": True}},
+        "17": {"class_type": "EmptyImage",
+               "inputs": {"width": largura, "height": altura, "batch_size": 1, "color": 0x7F7F7F}},
+        "16": {"class_type": "ImageCompositeMasked",
+               "inputs": {"destination": ["12", 0], "source": ["17", 0], "x": 0, "y": 0, "resize_source": False,
+                          "mask": ["14", 0]}},
+        "7": {"class_type": "WanVaceToVideo",
+              "inputs": {"positive": ["5", 0], "negative": ["6", 0], "vae": ["3", 0], "width": largura,
+                         "height": altura, "length": 1, "batch_size": 1, "strength": 1.0,
+                         "control_video": ["16", 0], "control_masks": ["14", 0]}},
+        "8": {"class_type": "KSampler",
+              "inputs": {"model": ["4", 0], "positive": ["7", 0], "negative": ["7", 1], "latent_image": ["7", 2],
+                         "seed": semente, "steps": PASSOS_DO_PREENCHIMENTO, "cfg": 6, "sampler_name": "uni_pc",
+                         "scheduler": "simple", "denoise": 1}},
+        "18": {"class_type": "TrimVideoLatent", "inputs": {"samples": ["8", 0], "trim_amount": ["7", 3]}},
+        "9": {"class_type": "VAEDecode", "inputs": {"samples": ["18", 0], "vae": ["3", 0]}},
+        "11": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": prefixo}},
+    }

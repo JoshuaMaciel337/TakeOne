@@ -1,6 +1,9 @@
 # -----------------------------------------------
 # TakeOne API — mídias (a biblioteca de vídeos e áudios enviados)
 # -----------------------------------------------
+import base64
+import binascii
+import io
 import logging
 import secrets
 
@@ -18,9 +21,11 @@ from api.esquemas import (
     FluidoEntrada,
     GerarImagemEntrada,
     GerarVideoEntrada,
+    MaisVariacoesEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
     ObjetoEscondidoEntrada,
+    PreencherEntrada,
     QualidadeSaida,
     RastreioEntrada,
     RastreioSaida,
@@ -43,6 +48,7 @@ from core.modelos.geracao import nome_da_midia
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
 from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
+    ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO,
     ARQUIVO_IMAGEM_LIMPA_PROXY,
     ARQUIVO_INVERTIDO_PROXY,
     ARQUIVO_MASCARA,
@@ -76,6 +82,7 @@ from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
 from core.utils import storage
 from core.utils.mongo import agora
+from core.utils.preenchimento import EntradaInvalida, ler_entrada
 
 router = APIRouter(prefix="/api/midias", tags=["midias"])
 
@@ -184,6 +191,68 @@ async def gerar_imagem(dados: GerarImagemEntrada, usuario=Depends(usuario_atual)
     await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
     logging.info(f"[{usuario['organizacao_id']}] Imagem com IA pedida: {midia['nome']}")
     return (await para_saida(db, [{**midia, "_id": midia_id, "job_ingestao_id": job_id}]))[0]
+
+
+# O recorte do preenchimento: até 9 MB de PNG e 4096 de lado (o editor manda a área com uma folga em volta)
+BYTES_DO_PREENCHIMENTO = 9 * 1024 * 1024
+LADO_DO_PREENCHIMENTO = 4096
+
+
+@router.post("/preencher", response_model=list[MidiaSaida], status_code=status.HTTP_201_CREATED)
+async def preencher(dados: PreencherEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """O preenchimento generativo (editor de imagem): cada variação é uma mídia nova, processando, com o recorte
+    guardado; o worker de GPU pinta a área transparente pelo texto (Wan 2.1 VACE) e a imagem passa pela ingestão."""
+    try:
+        bruto = base64.b64decode(dados.imagem.split(",", 1)[-1], validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A imagem do preenchimento veio estragada.") from e
+    if len(bruto) > BYTES_DO_PREENCHIMENTO:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "A área do preenchimento é grande demais.")
+    try:
+        entrada = await run_in_threadpool(ler_entrada, io.BytesIO(bruto))
+    except EntradaInvalida as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+    if max(entrada.size) > LADO_DO_PREENCHIMENTO:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "A área do preenchimento é grande demais.")
+    descricao = " ".join(dados.descricao.split())
+    nome = nome_da_midia(descricao).replace("IA · ", "IA · Preenchimento · ", 1) if descricao else "IA · Preenchimento"
+    logging.info(f"[{usuario['organizacao_id']}] Preenchimento generativo pedido: {dados.variacoes} variações, "
+                 f"{entrada.size[0]} × {entrada.size[1]}")
+    return await _pedir_preenchimento(db, usuario, bruto, descricao, dados.variacoes, nome)
+
+
+async def _pedir_preenchimento(db, usuario, bruto: bytes, descricao: str, variacoes: int, nome: str):
+    """Uma mídia processando e um job do worker de GPU por variação, cada uma com o recorte guardado."""
+    criadas = []
+    for _ in range(variacoes):
+        midia = montar_midia(usuario["organizacao_id"], usuario["_id"], "preenchido.png", 0, "image/png")
+        midia["nome"] = midia["nome_original"] = nome
+        midia["status"] = STATUS_PROCESSANDO
+        midia["gerada"] = {"descricao": descricao, "preenchimento": True}
+        midia_id = (await db.midias.insert_one(midia)).inserted_id
+        chave = chave_arquivo(usuario["organizacao_id"], midia_id, ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO)
+        await run_in_threadpool(storage.salvar_bytes, chave, bruto)
+        job = montar_job("preenchimento", usuario["organizacao_id"],
+                         {"midia_id": str(midia_id), "descricao": descricao, "semente": secrets.randbelow(2**31)},
+                         criado_por=usuario["_id"])
+        job_id = (await db.jobs.insert_one(job)).inserted_id
+        await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})
+        criadas.append({**midia, "_id": midia_id, "job_ingestao_id": job_id})
+    return await para_saida(db, criadas)
+
+
+@router.post("/{midia_id}/variacoes", response_model=list[MidiaSaida], status_code=status.HTTP_201_CREATED)
+async def mais_variacoes(midia_id: str, dados: MaisVariacoesEntrada, usuario=Depends(usuario_atual),
+                         db=Depends(obter_db)):
+    """Mais variações de um preenchimento generativo: o mesmo recorte e o mesmo texto, com outras sementes."""
+    origem = await buscar_midia(db, midia_id, usuario)
+    gerada = origem.get("gerada") or {}
+    chave = chave_arquivo(usuario["organizacao_id"], origem["_id"], ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO)
+    if not gerada.get("preenchimento") or not storage.existe(chave):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta imagem não veio de um preenchimento generativo.")
+    bruto = await run_in_threadpool(storage.caminho_local(chave).read_bytes)
+    descricao = gerada.get("descricao") or ""
+    return await _pedir_preenchimento(db, usuario, bruto, descricao, dados.variacoes, origem["nome"])
 
 
 @router.post("/fala", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)

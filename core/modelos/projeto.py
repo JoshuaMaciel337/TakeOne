@@ -97,6 +97,8 @@ def midias_usadas(faixas: list[dict]) -> list[str]:
     mascaras = {c["mascara_pixels"]["midia_id"] for f in faixas for c in f["clipes"] if c.get("mascara_pixels")}
     mascaras |= {c["filtros_inteligentes"]["mascara"]["midia_id"] for f in faixas for c in f["clipes"]
                  if (c.get("filtros_inteligentes") or {}).get("mascara")}
+    # As variações de um preenchimento generativo também (a pessoa pode voltar a qualquer uma)
+    mascaras |= {v for f in faixas for c in f["clipes"] for v in (c.get("geracao") or {}).get("variacoes", [])}
     # A foto dentro de um quadro (a tinta "imagem" de uma forma) também
     fotos = {foto for f in faixas for c in f["clipes"] if (foto := foto_do_quadro(c))}
     dos_clipes = {c["midia_id"] for f in faixas for c in f["clipes"] if c.get("midia_id")}
@@ -186,7 +188,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
                                 or c.get("mascara_pixels") or c.get("vetor") or c.get("mascara_vetorial")
                                 or c.get("prancheta") or c.get("texto_rico") or c.get("estilo_camada")
                                 or c.get("camada_de_preenchimento") or c.get("ajuste_imagem")
-                                or c.get("filtros_inteligentes")
+                                or c.get("filtros_inteligentes") or c.get("geracao")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels, formas vetoriais e os modos de mesclagem"
                         " novos só existem no editor de imagem.")

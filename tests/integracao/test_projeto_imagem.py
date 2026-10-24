@@ -362,3 +362,22 @@ def test_filtros_inteligentes(cliente):
         assert salvar(cliente, aberto, [camada("video", ruim), principal]).status_code == 422
     video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
     assert salvar(cliente, video, [camada("video", camada_), {**video["faixas"][0], "clipes": []}]).status_code == 422
+
+
+def test_variacoes_do_preenchimento_generativo(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    escolhida = criar_midia(db_limpo, cliente)
+    outra = criar_midia(db_limpo, cliente)
+    geracao = {"descricao": "um barco", "variacoes": [escolhida, outra]}
+    faixas = [camada("video", {**clipe(escolhida, 0, 5, id_="gerada"), "geracao": geracao}),
+              {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["geracao"] == geracao
+    # A variação que não está no clipe também conta como usada
+    assert cliente.delete(f"/api/midias/{outra}").status_code == 409
+    # Só no projeto de imagem
+    video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    principal = {**video["faixas"][0], "clipes": [{**clipe(escolhida, 0, 5, id_="v"), "geracao": geracao}]}
+    assert salvar(cliente, video, [principal]).status_code == 422

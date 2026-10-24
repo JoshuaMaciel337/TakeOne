@@ -21,6 +21,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from bson import ObjectId
+from PIL import Image
 
 from core.config import COMFYUI_URL, MODO_IA
 from core.modelos.geracao import (
@@ -28,17 +29,27 @@ from core.modelos.geracao import (
     FORMATOS_DA_IMAGEM,
     FPS,
     SEGUNDOS_DA_IMAGEM,
+    SEGUNDOS_DO_PREENCHIMENTO,
     arquivo_gerado,
     montar_fluxo,
     montar_fluxo_da_imagem,
+    montar_fluxo_do_preenchimento,
     segundos_estimados,
 )
 from core.modelos.job import ErroDefinitivo, montar_job
-from core.modelos.midia import ARQUIVO_IMAGEM, PRIORIDADE_INGESTAO, STATUS_ERRO, chave_arquivo, e_imagem
+from core.modelos.midia import (
+    ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO,
+    ARQUIVO_IMAGEM,
+    PRIORIDADE_INGESTAO,
+    STATUS_ERRO,
+    chave_arquivo,
+    e_imagem,
+)
 from core.utils import storage
 from core.utils.ffmpeg import executar_ffmpeg
 from core.utils.imagem import ImagemInvalida, quadro_inicial
 from core.utils.mongo import agora
+from core.utils.preenchimento import EntradaInvalida, compor, ler_entrada, para_o_modelo, simular
 
 # Medido no Nitro 5: pico de 7,8 GB de VRAM (com parte do modelo na RAM). A RAM livre conta sem os uns 2,5 GB
 # que o ComfyUI parado já ocupa, e que ele reaproveita ao carregar o modelo
@@ -307,4 +318,54 @@ def executar_geracao_imagem(db, job: dict, reportar: Callable[[int, str], None])
     _entregar(db, job, midia, original)
     logging.info(f"[{midia['organizacao_id']}] [midia {midia_id}] Imagem gerada; ingestão na fila.")
     reportar(100, "Imagem gerada")
+    return {"midia_id": str(midia_id)}
+
+
+def executar_preenchimento(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
+    """Uma área do recorte preenchida pelo texto (o Wan 2.1 VACE, montar_fluxo_do_preenchimento): o resultado, no
+    tamanho do recorte e igual a ele fora da área, vira o original da mídia e segue para a ingestão."""
+    entrada = job["entrada"]
+    midia_id = ObjectId(entrada["midia_id"])
+    midia = db.midias.find_one({"_id": midia_id})
+    if midia is None:
+        raise ErroDefinitivo("A mídia foi excluída antes de o preenchimento ser gerado.")
+    organizacao_id = midia["organizacao_id"]
+    chave_da_entrada = chave_arquivo(organizacao_id, midia_id, ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO)
+    caminho_da_entrada = storage.caminho_local(chave_da_entrada)
+    if not caminho_da_entrada.exists():
+        raise ErroDefinitivo("A imagem do preenchimento não está mais no armazenamento. Peça de novo.")
+    try:
+        imagem = ler_entrada(caminho_da_entrada)
+    except EntradaInvalida as e:
+        raise ErroDefinitivo(str(e)) from e
+    original = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, midia["original"]))
+    parcial = original.with_name("preenchido.parcial.png")
+    temporarios = [original.with_name("preenchimento_modelo.png"), original.with_name("preenchimento_gerado.png")]
+    reportar(1, "Preparando o preenchimento")
+    existe = lambda: db.midias.count_documents({"_id": midia_id}, limit=1) > 0  # noqa: E731
+    try:
+        if MODO_IA == "real":
+            _esperar_a_placa(existe, reportar)
+            modelo = para_o_modelo(imagem)
+            modelo.save(temporarios[0], "PNG")
+            nome = _enviar_imagem(temporarios[0])
+            fluxo = montar_fluxo_do_preenchimento(entrada["descricao"], nome, *modelo.size, entrada["semente"],
+                                                  f"takeone_{uuid.uuid4().hex}")
+            _rodar_no_comfyui(fluxo, SEGUNDOS_DO_PREENCHIMENTO, ".png", "o preenchimento", temporarios[1], existe,
+                              reportar)
+            with Image.open(temporarios[1]) as gerada:
+                resultado = compor(imagem, gerada)
+        else:
+            resultado = simular(imagem)
+        resultado.save(parcial, "PNG")
+        parcial.replace(original)
+    except BaseException:
+        parcial.unlink(missing_ok=True)
+        raise
+    finally:
+        for temporario in temporarios:
+            temporario.unlink(missing_ok=True)
+    _entregar(db, job, midia, original)
+    logging.info(f"[{organizacao_id}] [midia {midia_id}] Preenchimento gerado; ingestão na fila.")
+    reportar(100, "Preenchimento gerado")
     return {"midia_id": str(midia_id)}

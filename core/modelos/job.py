@@ -26,6 +26,7 @@ TAREFAS = {
     "palavras_chave": RECURSO_GPU,
     "animacao_descrita": RECURSO_GPU,
     "geracao_imagem": RECURSO_GPU,
+    "preenchimento": RECURSO_GPU,
     "limpeza_voz": RECURSO_CPU,
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,

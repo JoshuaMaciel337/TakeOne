@@ -1290,6 +1290,16 @@ class FiltrosInteligentesEntrada(BaseModel):
     mascara: MascaraDePixelsEntrada | None = None
 
 
+class GeracaoDoClipeEntrada(BaseModel):
+    """O preenchimento generativo de onde a camada veio: o texto pedido e as variações (mídias), para trocar."""
+    descricao: str = Field(default="", max_length=800)
+    variacoes: list[Annotated[str, Field(pattern=r"^[0-9a-f]{24}$")]] = Field(default_factory=list, max_length=12)
+
+
+class MaisVariacoesEntrada(BaseModel):
+    variacoes: int = Field(default=3, ge=1, le=3)
+
+
 class PontoNoDocumentoEntrada(BaseModel):
     """Um ponto em frações do documento (pode sair dele: a alça do degradê arrastada para fora)."""
     x: float = Field(ge=-10, le=10)
@@ -1448,6 +1458,8 @@ class ClipeEntrada(BaseModel):
     camada_de_preenchimento: CamadaDePreenchimentoEntrada | None = None
     # Só no projeto de imagem: os filtros inteligentes (a pilha não destrutiva de filtros, com a máscara dela)
     filtros_inteligentes: FiltrosInteligentesEntrada | None = None
+    # Só no projeto de imagem: o preenchimento generativo de onde a camada veio (as variações para trocar)
+    geracao: GeracaoDoClipeEntrada | None = None
     # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
     pasta: bool = False
     preenchimento: float | None = Field(default=None, ge=0, le=1)
@@ -1673,6 +1685,14 @@ class FalaEntrada(BaseModel):
 class GerarImagemEntrada(BaseModel):
     descricao: str = Field(min_length=3, max_length=800)
     formato: Literal["16:9", "9:16", "1:1", "4:5"] = "1:1"
+
+
+class PreencherEntrada(BaseModel):
+    """O preenchimento generativo: o recorte em PNG (base64, com o alfa 0 na área a preencher), o texto e quantas
+    variações (cada uma vira uma mídia)."""
+    imagem: str = Field(min_length=16, max_length=12_000_000)
+    descricao: str = Field(default="", max_length=800)
+    variacoes: int = Field(default=3, ge=1, le=3)
 
 
 class GerarVideoEntrada(BaseModel):
@@ -2078,8 +2098,10 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                          if (limpa := doc.get("imagem_limpa")) else None),
         "elemento": ({k: v for k, v in elemento.items() if k != "chave"}
                      if (elemento := doc.get("elemento")) else None),
-        "gerada": ({"descricao": gerada["descricao"], "formato": gerada["formato"], "duracao": gerada.get("duracao"),
-                    "imagem_id": gerada.get("imagem_id")}
+        # O preenchimento generativo não tem formato nem duração; a marca dele só aparece nele
+        "gerada": ({"descricao": gerada["descricao"], "formato": gerada.get("formato"),
+                    "duracao": gerada.get("duracao"), "imagem_id": gerada.get("imagem_id"),
+                    **({"preenchimento": True} if gerada.get("preenchimento") else {})}
                    if (gerada := doc.get("gerada")) else None),
         "tons": {chave: {"status": tom["status"], "erro": tom.get("erro")}
                  for chave, tom in (doc.get("tons") or {}).items()},
