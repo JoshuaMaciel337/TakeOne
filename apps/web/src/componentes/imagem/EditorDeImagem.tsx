@@ -67,6 +67,7 @@ import { JanelaGaleriaDeFiltros } from "./filtros/JanelaGaleriaDeFiltros";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { documentoDaImagem, enviarEEsperar, type ImagemRecente, imagensRecentes } from "@/lib/abrirImagem";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
+import { abrirPsd, ACEITAR_PSD, avisosGuardados, ehPsd, guardarAvisos, salvarPsd } from "@/lib/psd/arquivo";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, ceuPelaProfundidade, imagemMenor } from "@/lib/selecao/cores";
 import { REFINAMENTO_PADRAO, refinarSelecao } from "@/lib/selecao/refinar";
@@ -704,10 +705,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const escolherArquivo = (destino: "documento" | "camada") => {
     const entrada = document.createElement("input");
     entrada.type = "file";
-    entrada.accept = ACEITAR_IMAGENS;
+    entrada.accept = destino === "documento" ? `${ACEITAR_IMAGENS},${ACEITAR_PSD}` : ACEITAR_IMAGENS;
     entrada.onchange = () => {
       const arquivo = entrada.files?.[0];
       if (!arquivo) return;
+      // O PSD abre com as camadas, lido aqui no navegador
+      if (destino === "documento" && ehPsd(arquivo)) {
+        mostrarAviso(`Abrindo "${arquivo.name}"…`);
+        abrirPsd(arquivo, mostrarAviso)
+          .then(({ projetoId: id, avisos }) => {
+            guardarAvisos(id, avisos);
+            router.push(`/app/imagem/${id}`);
+          })
+          .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o PSD."));
+        return;
+      }
       mostrarAviso(destino === "documento" ? `Abrindo "${arquivo.name}"…` : `Colocando "${arquivo.name}"…`);
       enviarEEsperar(iniciarEnvio, arquivo)
         .then(async (midia) => {
@@ -717,6 +729,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir a imagem."));
     };
     entrada.click();
+  };
+  // Os avisos da abertura de um PSD (o que não veio como era), uma vez, ao abrir o documento
+  useEffect(() => {
+    const avisos = avisosGuardados(projetoId);
+    if (avisos.length) mostrarAviso(avisos.join(" "));
+  }, [projetoId, mostrarAviso]);
+  /** Arquivo › Exportar › PSD: as camadas, as pastas, as máscaras, os ajustes e os efeitos com par. */
+  const exportarPsd = async () => {
+    if (!projeto) return;
+    try {
+      const avisos: string[] = [];
+      const blob = await salvarPsd(projeto, midias, { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }, mostrarAviso, avisos);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${(edicao.nome.trim() || "Imagem").replace(/[\\/:*?"<>|]+/g, "-")}.psd`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      mostrarAviso(["PSD baixado.", ...avisos].join(" "));
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível gerar o PSD.");
+    }
   };
   /** Mais variações do preenchimento da camada: o mesmo recorte e o mesmo texto, guardados no servidor. */
   const maisVariacoes = async (clipeId: string) => {
@@ -4552,6 +4586,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     grupoEscolhido: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0]?.pasta) && !escolhidas[0].clipes[0]?.prancheta,
     prancheta: (como) => novaPrancheta(como),
     exportarPranchetas: () => setExportandoPranchetas(true),
+    exportarPsd: () => void exportarPsd(),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
     desfazer: () =>
       depoisDaPintura(() => {

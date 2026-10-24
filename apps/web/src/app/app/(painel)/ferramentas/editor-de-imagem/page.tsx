@@ -10,6 +10,7 @@ import { ListaProjetos } from "@/componentes/projeto/ListaProjetos";
 import { documentoDaImagem, enviarEEsperar } from "@/lib/abrirImagem";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
+import { abrirPsd, ACEITAR_PSD, ehPsd, guardarAvisos } from "@/lib/psd/arquivo";
 import { problemaNoTamanho, TAMANHOS_PRONTOS, type TamanhoDaImagem } from "@/lib/projeto/imagem";
 
 /** O desenho de um tamanho: o retângulo na proporção, dentro de uma caixa fixa. */
@@ -40,6 +41,18 @@ export default function PaginaEditorDeImagem() {
   function abrirDoComputador(arquivo: File) {
     setCriando("abrir");
     setErro("");
+    if (ehPsd(arquivo)) {
+      abrirPsd(arquivo, () => undefined)
+        .then(({ projetoId, avisos }) => {
+          guardarAvisos(projetoId, avisos);
+          router.push(`/app/imagem/${projetoId}`);
+        })
+        .catch((e: unknown) => {
+          setErro(e instanceof Error ? e.message : "Não foi possível abrir o PSD.");
+          setCriando(null);
+        });
+      return;
+    }
     enviarEEsperar(iniciar, arquivo)
       .then((midia) => documentoDaImagem(midia.id))
       .then((id) => router.push(`/app/imagem/${id}`))
@@ -82,10 +95,10 @@ export default function PaginaEditorDeImagem() {
           >
             <span className="flex size-16 items-center justify-center">{criando === "abrir" ? <LoaderCircle className="size-6 animate-spin" aria-hidden /> : <FolderOpen className="size-8" aria-hidden />}</span>
             <span className="text-sm font-medium text-texto">Abrir do computador</span>
-            <span className="text-xs">JPG, PNG, WebP, GIF, BMP, TIFF, AVIF, SVG, HEIC</span>
+            <span className="text-xs">PSD, JPG, PNG, WebP, GIF, BMP, TIFF, AVIF, SVG, HEIC</span>
             <input
               type="file"
-              accept={ACEITAR_IMAGENS}
+              accept={`${ACEITAR_IMAGENS},${ACEITAR_PSD}`}
               className="sr-only"
               aria-label="Abrir uma imagem do computador"
               onChange={(evento) => {

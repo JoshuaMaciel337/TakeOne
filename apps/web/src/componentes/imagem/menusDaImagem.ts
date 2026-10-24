@@ -170,6 +170,8 @@ export type AcoesDosMenus = {
   grupoEscolhido: boolean;
   prancheta: (como: "nova" | "grupo" | "camadas") => void;
   exportarPranchetas: () => void;
+  /** Arquivo › Exportar › PSD com as camadas. */
+  exportarPsd: () => void;
   salvar: () => void;
   desfazer: () => void;
   refazer: () => void;
@@ -333,6 +335,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: [
             { nome: "Exportar como…", atalho: "Ctrl+Alt+Shift+W", aoEscolher: a.exportar },
             { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas },
+            { nome: "PSD com as camadas", aoEscolher: a.exportarPsd, titulo: "As camadas, as pastas, as máscaras, os modos e os ajustes, para abrir em outro editor" },
           ],
         },
       ],
