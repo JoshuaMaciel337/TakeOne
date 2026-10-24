@@ -46,6 +46,8 @@ import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } fro
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
+import { JanelaAjustarImagem, JanelaAutomatizar, type TipoDaAutomacao } from "./JanelaAutomatizar";
+import { cortarEEndireitar } from "@/lib/automatizar/executar";
 import { JanelaBitmap, JanelaCmyk, JanelaCoresIndexadas, JanelaDuotone, JanelaTabelaDeCores } from "./JanelasDoModo";
 import { SIGLAS_DOS_MODOS } from "@/lib/imagem/modos";
 import type { TipoDaProva } from "@/lib/imagem/prova";
@@ -483,6 +485,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A prova de cores e o alerta de gama são da tela (como o zoom): não entram no projeto
   const [prova, setProva] = useState<{ tipo: TipoDaProva; ligada: boolean }>({ tipo: "cmyk", ligada: false });
   const [alertaDeGama, setAlertaDeGama] = useState(false);
+  const [automatizando, setAutomatizando] = useState<TipoDaAutomacao | null>(null);
+  const [ajustandoImagem, setAjustandoImagem] = useState(false);
   const [janelaDoModo, setJanelaDoModo] = useState<"bitmap" | "duotone" | "indexadas" | "tabela" | "cmyk" | null>(null);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
@@ -751,6 +755,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  /** O fim do Automatizar: o primeiro documento criado abre (os outros ficam em Abrir recentes). */
+  const aoCriarPelaAutomacao = (ids: string[], avisos: string[]) => {
+    setAutomatizando(null);
+    if (!ids.length) return;
+    const todos = ids.length > 1 ? [`${ids.length} documentos criados: os outros estão em Arquivo › Abrir recentes.`, ...avisos] : avisos;
+    guardarAvisos(ids[0], todos);
+    router.push(`/app/imagem/${ids[0]}`);
+  };
+  /** Arquivo › Automatizar › Cortar e endireitar fotos: a imagem como se vê, procurada e cortada em documentos novos. */
+  const cortarEEndireitarFotos = async () => {
+    if (!projeto) return;
+    try {
+      mostrarAviso("Procurando as fotos…");
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const { canvas } = await pixelsDoBlob(await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
+      const dados = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height).data;
+      aoCriarPelaAutomacao(await cortarEEndireitar({ dados, largura: canvas.width, altura: canvas.height }, edicao.nome.trim() || "Foto", mostrarAviso), []);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar as fotos.");
+    }
+  };
   /** Imagem › Modo › Cores indexadas: a paleta sai da imagem como ela está agora (no RGB, numa cópia de até 1024 px). */
   const converterEmIndexadas = async (opcoes: { paleta: PaletaDaExportacao; cores: number; pontilhado: Pontilhado; quantidade: number; transparencia: boolean }) => {
     setJanelaDoModo(null);
@@ -4720,6 +4746,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    automatizar: (tipo) => setAutomatizando(tipo),
+    cortarEEndireitar: () => void cortarEEndireitarFotos(),
+    ajustarImagem: () => setAjustandoImagem(true),
     prova,
     mudarProva: (mudanca) => setProva((atual) => ({ ...atual, ...mudanca })),
     alertaDeGama,
@@ -4910,7 +4939,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -6187,6 +6216,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(informacoes) => {
             setJanelaDoArquivo(null);
             executar({ comando: "imagem.informacoes", parametros: { informacoes } });
+          }}
+        />
+      ) : null}
+      {automatizando && projeto ? (
+        <JanelaAutomatizar
+          tipo={automatizando}
+          imagens={imagensProntas}
+          ajustesDoDocumento={[...camadasDaImagem(projeto)].reverse().flatMap(({ faixa, clipe }) => (clipe.ajuste && clipe.ajuste_imagem && !faixa.oculta && clipe.ajuste_imagem.tipo !== "pesquisa" ? [clipe.ajuste_imagem] : []))}
+          modoDoDocumento={projeto.modo ?? null}
+          aoFechar={() => setAutomatizando(null)}
+          aoCriar={aoCriarPelaAutomacao}
+          aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {ajustandoImagem && projeto ? (
+        <JanelaAjustarImagem
+          antes={tamanhoDaImagem(projeto)}
+          aoFechar={() => setAjustandoImagem(false)}
+          aoConfirmar={(tamanho) => {
+            setAjustandoImagem(false);
+            void aplicarTamanhoDaImagem({ ...tamanho, resolucao: projeto.tamanho?.resolucao ?? 72, reamostrar: true, metodo: "automatica" });
           }}
         />
       ) : null}

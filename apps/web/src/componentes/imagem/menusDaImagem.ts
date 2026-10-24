@@ -174,6 +174,10 @@ export type AcoesDosMenus = {
   modoAtual: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab";
   modoDeCor: (tipo: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab") => void;
   tabelaDeCores: () => void;
+  /** Arquivo › Automatizar e Arquivo › Scripts. */
+  automatizar: (tipo: "lote" | "processador" | "pilha" | "fotomesclagem" | "hdr" | "folha") => void;
+  cortarEEndireitar: () => void;
+  ajustarImagem: () => void;
   /** Arquivo › Informações do arquivo, Arquivo › Imprimir e Imagem › Duplicar. */
   informacoesDoArquivo: () => void;
   imprimir: () => void;
@@ -354,6 +358,28 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Imprimir…", atalho: "Ctrl+P", aoEscolher: a.imprimir },
         "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
+        "-",
+        {
+          nome: "Automatizar",
+          itens: [
+            { nome: "Lote…", aoEscolher: () => a.automatizar("lote") },
+            "-",
+            { nome: "Folha de contato…", aoEscolher: () => a.automatizar("folha") },
+            { nome: "Cortar e endireitar fotos", aoEscolher: a.cortarEEndireitar, titulo: "As fotos escaneadas juntas viram documentos separados, endireitados" },
+            "-",
+            { nome: "Mesclar para HDR…", aoEscolher: () => a.automatizar("hdr") },
+            { nome: "Fotomesclagem…", aoEscolher: () => a.automatizar("fotomesclagem") },
+            "-",
+            { nome: "Ajustar imagem…", aoEscolher: a.ajustarImagem },
+          ],
+        },
+        {
+          nome: "Scripts",
+          itens: [
+            { nome: "Processador de imagens…", aoEscolher: () => a.automatizar("processador") },
+            { nome: "Carregar arquivos em pilha…", aoEscolher: () => a.automatizar("pilha") },
+          ],
+        },
         {
           nome: "Gerar",
           itens: [{ nome: "Ativos de imagem", aoEscolher: a.gerarAtivos, titulo: 'As camadas com o nome terminado numa extensão ("logo.png", "200% logo@2x.png", "foto.jpg80") viram arquivos num ZIP' }],
