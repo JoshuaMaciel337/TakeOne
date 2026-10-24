@@ -1386,6 +1386,37 @@ class ModoDeCorEntrada(BaseModel):
         return self
 
 
+class VariavelEntrada(BaseModel):
+    """Imagem › Variáveis: a camada ligada e o que muda nela."""
+    nome: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,59}$")
+    tipo: Literal["texto", "visibilidade", "imagem"]
+    faixa: str = Field(min_length=1, max_length=64)
+
+
+class ConjuntoDeDadosEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=120)
+    valores: dict[str, str] = Field(default={}, max_length=100)
+
+    @field_validator("valores")
+    @classmethod
+    def valores_curtos(cls, valor: dict[str, str]) -> dict[str, str]:
+        if any(len(v) > 2000 for v in valor.values()):
+            raise ValueError("Cada valor tem no máximo 2000 caracteres.")
+        return valor
+
+
+class VariaveisEntrada(BaseModel):
+    variaveis: list[VariavelEntrada] = Field(default=[], max_length=100)
+    conjuntos: list[ConjuntoDeDadosEntrada] = Field(default=[], max_length=1000)
+
+    @model_validator(mode="after")
+    def nomes_unicos(self):
+        nomes = [v.nome.lower() for v in self.variaveis]
+        if len(nomes) != len(set(nomes)):
+            raise ValueError("Duas variáveis têm o mesmo nome.")
+        return self
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1858,6 +1889,7 @@ class ProjetoSalvarEntrada(BaseModel):
     luz_global: LuzGlobalEntrada | None = None
     informacoes: InformacoesDoArquivoEntrada | None = None
     modo: ModoDeCorEntrada | None = None
+    variaveis: VariaveisEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1896,6 +1928,7 @@ class ProjetoSaida(BaseModel):
     luz_global: LuzGlobalEntrada | None = None
     informacoes: InformacoesDoArquivoEntrada | None = None
     modo: ModoDeCorEntrada | None = None
+    variaveis: VariaveisEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"

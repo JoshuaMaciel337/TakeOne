@@ -419,3 +419,26 @@ def test_modo_de_cor(cliente):
     assert salvar(cliente, atual, [vazia], modo={"tipo": "bitmap", "metodo": "limiar"}).status_code == 422
     assert salvar(cliente, atual, [vazia], modo={**indexadas, "paleta": [[0, 0, 300]]}).status_code == 422
     assert salvar(cliente, atual, [vazia], modo={**duotone, "tintas": duotone["tintas"] * 3}).status_code == 422
+
+
+def test_variaveis_e_conjuntos(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    variaveis = {"variaveis": [{"nome": "titulo", "tipo": "texto", "faixa": "f1"},
+                               {"nome": "logo", "tipo": "visibilidade", "faixa": "f2"}],
+                 "conjuntos": [{"nome": "Verão", "valores": {"titulo": "Liquidação", "logo": "sim"}}]}
+    salvo = salvar(cliente, projeto, [vazia], variaveis=variaveis)
+    assert salvo.status_code == 200, salvo.text
+    assert salvo.json()["variaveis"] == variaveis
+    atual = salvo.json()
+    # Nome com espaço, nomes repetidos e valor longo demais não passam
+    ruim = {"variaveis": [{"nome": "meu titulo", "tipo": "texto", "faixa": "f1"}]}
+    assert salvar(cliente, atual, [vazia], variaveis=ruim).status_code == 422
+    repetida = {"variaveis": [{"nome": "a", "tipo": "texto", "faixa": "f1"},
+                              {"nome": "A", "tipo": "texto", "faixa": "f2"}]}
+    assert salvar(cliente, atual, [vazia], variaveis=repetida).status_code == 422
+    longo = {**variaveis, "conjuntos": [{"nome": "x", "valores": {"titulo": "y" * 2001}}]}
+    assert salvar(cliente, atual, [vazia], variaveis=longo).status_code == 422
+    # Sem variáveis, não guarda nada
+    assert salvar(cliente, atual, [vazia], variaveis={"variaveis": [], "conjuntos": []}).json()["variaveis"] is None
