@@ -108,6 +108,8 @@ export type AcoesDosMenus = {
   /** Filtro › Dissolver e Editar › Distorção de marionete (na camada escolhida). */
   dissolver: () => void;
   marionete: () => void;
+  /** Editar › Deformação de perspectiva (na camada escolhida). */
+  perspectiva: () => void;
   /** Filtro › Correção de lente e Grande-angular adaptável (na camada escolhida). */
   lente: (tipo: "lente" | "grandeAngular") => void;
   /** Editar › Escala sensível ao conteúdo (na camada escolhida). */
@@ -271,6 +273,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Transformação livre de uma cópia", atalho: "Ctrl+Alt+T", desativado: semCamada, aoEscolher: () => a.transformarCamada("copia") },
         { nome: "Escala sensível ao conteúdo…", atalho: "Ctrl+Alt+Shift+C", desativado: semCamada, aoEscolher: a.escalaSensivel },
         { nome: "Distorção de marionete", desativado: semCamada, aoEscolher: a.marionete },
+        { nome: "Deformação de perspectiva", desativado: semCamada, aoEscolher: a.perspectiva },
         {
           nome: "Transformar",
           desativado: semCamada,

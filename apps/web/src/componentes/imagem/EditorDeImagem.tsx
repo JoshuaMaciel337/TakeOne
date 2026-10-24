@@ -101,6 +101,7 @@ import { redimensionar } from "@/lib/transformar/reamostragem";
 import { JanelaDissolver } from "./JanelaDissolver";
 import { JanelaMarionete } from "./JanelaMarionete";
 import { JanelaLente } from "./JanelaLente";
+import { JanelaPerspectiva } from "./JanelaPerspectiva";
 import { escalaSensivel } from "@/lib/transformar/escalaSensivel";
 import { type CaixaDaMarionete, caixaDoConteudo } from "@/lib/transformar/marionete";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
@@ -314,7 +315,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // Imagem › Tamanho da imagem, Tamanho da tela e Rotação da imagem › Arbitrária
   const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
   // Filtro › Dissolver: a camada desenhada sozinha e o plano da camada de pixels que vem dela
-  const [dissolvendo, setDissolvendo] = useState<{ tipo: "dissolver" | "marionete" | "lente" | "grandeAngular"; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
+  const [dissolvendo, setDissolvendo] = useState<{ tipo: "dissolver" | "marionete" | "lente" | "grandeAngular" | "perspectiva"; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
   // Editar › Escala sensível ao conteúdo: a camada sozinha e a caixa do conteúdo dela
   const [escalando, setEscalando] = useState<{ imagem: ImagemRgba; caixa: CaixaDaMarionete; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
   const [importandoPadroes, setImportandoPadroes] = useState(false);
@@ -1546,7 +1547,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Filtro › Dissolver e Editar › Distorção de marionete: a camada escolhida, desenhada sozinha (como no rasterizar),
    * vai para a área de trabalho; o resultado volta como camada de pixels no lugar dela.
    */
-  const abrirDissolver = async (tipo: "dissolver" | "marionete" | "lente" | "grandeAngular") => {
+  const abrirDissolver = async (tipo: "dissolver" | "marionete" | "lente" | "grandeAngular" | "perspectiva") => {
     const sozinha = await camadaSozinhaParaEditar();
     if (sozinha) setDissolvendo({ tipo, ...sozinha });
   };
@@ -2725,6 +2726,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     dissolver: () => void abrirDissolver("dissolver"),
     marionete: () => void abrirDissolver("marionete"),
     lente: (tipo) => void abrirDissolver(tipo),
+    perspectiva: () => void abrirDissolver("perspectiva"),
     escalaSensivel: () => void abrirEscalaSensivel(),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
@@ -3726,7 +3728,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               canvas.toBlob((blob) => blob && void gerarPixels(async () => blob, dados), "image/png");
             };
             if (dissolvendo.tipo === "lente" || dissolvendo.tipo === "grandeAngular") return <JanelaLente tipo={dissolvendo.tipo} imagem={dissolvendo.imagem} aoFechar={() => setDissolvendo(null)} aoConfirmar={aoConfirmar} />;
-            const Janela = dissolvendo.tipo === "marionete" ? JanelaMarionete : JanelaDissolver;
+            const Janela = dissolvendo.tipo === "marionete" ? JanelaMarionete : dissolvendo.tipo === "perspectiva" ? JanelaPerspectiva : JanelaDissolver;
             return (
               <Janela imagem={dissolvendo.imagem} aoFechar={() => setDissolvendo(null)} aoConfirmar={aoConfirmar} />
             );

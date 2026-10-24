@@ -170,7 +170,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Transformar › Escala, Girar, Inclinar, Distorcer, Perspectiva, Deformar (malha, estilos prontos, dividir em cruz, na vertical e na horizontal), Transformar novamente (Ctrl+Shift+T), girar 180 e 90, virar
 - [x] Transformação livre de uma cópia (Ctrl+Alt+T)
 - [x] Distorção de marionete (malha, alfinetes, rígido, normal, distorcer, densidade, expansão, profundidade)
-- [ ] Deformação de perspectiva (planos, endireitar, nivelar)
+- [x] Deformação de perspectiva (planos, endireitar, nivelar)
 - [x] Escala sensível ao conteúdo (Ctrl+Alt+Shift+C)
 - [x] Corte (C) completo: predefinições de proporção e de tamanho com resolução, endireitar, sobreposições (terços, grade, diagonal, triângulo, proporção áurea, espiral áurea), mostrar a área cortada, escudo, apagar os pixels cortados, preencher sensível ao conteúdo, girar arrastando fora
 - [x] Corte de perspectiva
