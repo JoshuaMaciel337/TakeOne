@@ -182,7 +182,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Dissolver (Ctrl+Shift+X): empurrar, reconstruir, suavizar, girar, contrair, inflar, deslocar, congelar e descongelar máscara
 - [x] Ponto de fuga (planos e colar em perspectiva)
 - [x] Grande-angular adaptável e Correção de lente
-- [ ] Alinhar camadas automaticamente e Mesclar camadas automaticamente (panorama e empilhamento de foco)
+- [x] Alinhar camadas automaticamente e Mesclar camadas automaticamente (panorama e empilhamento de foco)
 
 ### Onda 13.7 — Vetores, formas, quadros e pranchetas
 

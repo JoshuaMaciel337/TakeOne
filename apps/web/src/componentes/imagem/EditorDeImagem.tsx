@@ -96,7 +96,9 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
 import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
 import { preencherBuracos } from "@/lib/pintura/recuperar";
-import { JanelaEscalaSensivel, JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaEscalaSensivel, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
+import { JanelaAlinhar, JanelaEscalaSensivel, JanelaMesclarCamadas, JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaEscalaSensivel, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
+import { alinhar as alinharPelosPontos, aplicar, type ProjecaoDoAlinhamento } from "@/lib/transformar/alinhar";
+import { empilharFoco, mesclarPanorama } from "@/lib/transformar/mesclarCamadas";
 import { redimensionar } from "@/lib/transformar/reamostragem";
 import { JanelaDissolver } from "./JanelaDissolver";
 import { JanelaMarionete } from "./JanelaMarionete";
@@ -317,6 +319,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
   // Filtro › Dissolver: a camada desenhada sozinha e o plano da camada de pixels que vem dela
   const [dissolvendo, setDissolvendo] = useState<{ tipo: "dissolver" | "marionete" | "lente" | "grandeAngular" | "perspectiva"; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
+  // Editar › Alinhar e Mesclar camadas automaticamente: a janela aberta
+  const [janelaDasCamadas, setJanelaDasCamadas] = useState<"alinhar" | "mesclar" | null>(null);
   // Filtro › Ponto de fuga: a imagem inteira, por baixo dos planos
   const [pontoDeFuga, setPontoDeFuga] = useState<ImagemRgba | null>(null);
   // Editar › Escala sensível ao conteúdo: a camada sozinha e a caixa do conteúdo dela
@@ -1598,6 +1602,121 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       setGerandoPixels(false);
     }
   };
+  /** As camadas escolhidas com conteúdo, cada uma desenhada sozinha (como no rasterizar) e o plano dela. */
+  const escolhidasSozinhas = async (): Promise<{ faixa: Faixa; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> }[]> => {
+    const atual = projetoRef.current;
+    if (!atual) return [];
+    await pinturas.esperar();
+    const documento = tamanhoDaImagem(atual);
+    const saida: { faixa: Faixa; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> }[] = [];
+    // De baixo para cima, como na pilha
+    for (const { faixa, clipe } of [...camadasDaImagem(atual)].reverse()) {
+      if (!faixaIds.includes(faixa.id) || clipe.pasta || clipe.ajuste) continue;
+      let plano: PlanoDosPixels;
+      try {
+        plano = planoDosPixels(atual, clipe.mascara_pixels ? "aplicarMascara" : "transformar", [faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
+      } catch {
+        continue;
+      }
+      const { desenhar, ...dados } = plano;
+      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const canvas = document.createElement("canvas");
+      canvas.width = documento.largura;
+      canvas.height = documento.altura;
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx2d.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+      bitmap.close();
+      const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura);
+      saida.push({ faixa, imagem: { dados: pixels.data, largura: pixels.width, altura: pixels.height }, dados });
+    }
+    return saida;
+  };
+  /**
+   * Editar › Alinhar camadas automaticamente: a do meio da pilha fica e as outras vão para o lugar dela pelos pontos
+   * em comum; a tela cresce até caber todas, e as alinhadas viram camadas de pixels, num passo só.
+   */
+  const alinharCamadas = async (projecao: ProjecaoDoAlinhamento) => {
+    const atual = projetoRef.current;
+    if (!atual || gerandoPixels) return;
+    setGerandoPixels(true);
+    try {
+      const camadas = await escolhidasSozinhas();
+      if (camadas.length < 2) return mostrarAviso("Escolha duas ou mais camadas com conteúdo.");
+      const referencia = camadas[Math.floor(camadas.length / 2)];
+      const documento = tamanhoDaImagem(atual);
+      const cantos = [
+        { x: 0, y: 0 },
+        { x: documento.largura, y: 0 },
+        { x: documento.largura, y: documento.altura },
+        { x: 0, y: documento.altura },
+      ];
+      const levadas: { camada: (typeof camadas)[number]; quad: Quadrilatero }[] = [];
+      const sem: string[] = [];
+      for (const camada of camadas) {
+        if (camada === referencia) {
+          levadas.push({ camada, quad: cantos as Quadrilatero });
+          continue;
+        }
+        const achado = alinharPelosPontos(camada.imagem, referencia.imagem, projecao);
+        if (!achado) {
+          sem.push(nomeDaFaixa(camada.faixa));
+          continue;
+        }
+        levadas.push({ camada, quad: cantos.map((p) => aplicar(achado.modelo, p)) as Quadrilatero });
+      }
+      if (levadas.length < 2) return mostrarAviso(`Não achei pontos em comum que bastem${sem.length ? ` (${sem.join(", ")})` : ""}.`);
+      // A tela nova: o que cobre a de agora e todas as levadas
+      const xs = levadas.flatMap(({ quad }) => quad.map((p) => p.x));
+      const ys = levadas.flatMap(({ quad }) => quad.map((p) => p.y));
+      const x0 = Math.floor(Math.min(0, ...xs));
+      const y0 = Math.floor(Math.min(0, ...ys));
+      const largura = Math.ceil(Math.max(documento.largura, ...xs)) - x0;
+      const altura = Math.ceil(Math.max(documento.altura, ...ys)) - y0;
+      if (largura > 8192 || altura > 8192 || largura * altura > 36_000_000) return mostrarAviso("O resultado passaria de 8192 px de lado ou de 36 milhões de pixels.");
+      const trocas: (Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number })[] = [];
+      for (const { camada, quad } of levadas) {
+        const canvas = document.createElement("canvas");
+        canvas.width = largura;
+        canvas.height = altura;
+        const deslocado = quad.map((p) => ({ x: p.x - x0, y: p.y - y0 })) as Quadrilatero;
+        canvas.getContext("2d")!.putImageData(new ImageData(reamostrar(camada.imagem, deslocado, { largura, altura }, "bicubica"), largura, altura), 0, 0);
+        const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+        const midia = await criarCamadaDePixels(largura, altura, camada.dados.nome);
+        setCriadas((atuais) => new Map([...atuais, [midia.id, midia]]));
+        trocas.push({ ...camada.dados, midiaId: midia.id, versao: await enviarVersao(midia.id, blob) });
+      }
+      void biblioteca.recarregar();
+      executar({ comando: "imagem.alinhar", parametros: { retangulo: { x: x0, y: y0, largura, altura }, tamanhos: tamanhosDasMidias(), trocas } });
+      if (sem.length) mostrarAviso(`Sem pontos em comum que bastem: ${sem.join(", ")} (ficaram como estavam).`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível alinhar.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Editar › Mesclar camadas automaticamente: as escolhidas (já alinhadas) numa camada nova por cima. */
+  const mesclarCamadas = async (metodo: "panorama" | "empilhar", tonsECores: boolean) => {
+    if (gerandoPixels) return;
+    setGerandoPixels(true);
+    let blob: Blob | null = null;
+    try {
+      const camadas = await escolhidasSozinhas();
+      if (camadas.length < 2) return mostrarAviso("Escolha duas ou mais camadas com conteúdo.");
+      const { largura, altura } = camadas[0].imagem;
+      const pixels = metodo === "panorama" ? mesclarPanorama(camadas.map((c) => c.imagem), { tonsECores }) : empilharFoco(camadas.map((c) => c.imagem));
+      const canvas = document.createElement("canvas");
+      canvas.width = largura;
+      canvas.height = altura;
+      canvas.getContext("2d")!.putImageData(new ImageData(pixels, largura, altura), 0, 0);
+      blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível mesclar.");
+    } finally {
+      setGerandoPixels(false);
+    }
+    const pronto = blob;
+    if (pronto) await gerarPixels(async () => pronto, { remover: [], lugar: null, nome: metodo === "panorama" ? "Panorama" : "Imagens empilhadas", manter: { opacidade: 1, faixa: {} } });
+  };
   /** Filtro › Ponto de fuga: a imagem inteira, como se vê, vai para a área de trabalho. */
   const abrirPontoDeFuga = async () => {
     const atual = projetoRef.current;
@@ -2783,6 +2902,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     perspectiva: () => void abrirDissolver("perspectiva"),
     escalaSensivel: () => void abrirEscalaSensivel(),
     pontoDeFuga: () => void abrirPontoDeFuga(),
+    alinharCamadas: () => setJanelaDasCamadas("alinhar"),
+    mesclarCamadas: () => setJanelaDasCamadas("mesclar"),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2918,7 +3039,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3789,6 +3910,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             );
           })()
         : null}
+      {janelaDasCamadas === "alinhar" ? (
+        <JanelaAlinhar
+          aoFechar={() => setJanelaDasCamadas(null)}
+          aoConfirmar={(projecao) => {
+            setJanelaDasCamadas(null);
+            void alinharCamadas(projecao);
+          }}
+        />
+      ) : null}
+      {janelaDasCamadas === "mesclar" ? (
+        <JanelaMesclarCamadas
+          aoFechar={() => setJanelaDasCamadas(null)}
+          aoConfirmar={(metodo, tons) => {
+            setJanelaDasCamadas(null);
+            void mesclarCamadas(metodo, tons);
+          }}
+        />
+      ) : null}
       {pontoDeFuga && projeto ? (
         <JanelaPontoDeFuga
           fundo={pontoDeFuga}

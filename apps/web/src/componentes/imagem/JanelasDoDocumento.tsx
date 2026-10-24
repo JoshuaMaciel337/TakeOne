@@ -332,3 +332,56 @@ export function JanelaEscalaSensivel({
     </Moldura>
   );
 }
+
+/** Editar › Alinhar camadas automaticamente: a projeção (o tipo de movimento que pode haver entre as fotos). */
+export function JanelaAlinhar({ aoFechar, aoConfirmar }: { aoFechar: () => void; aoConfirmar: (projecao: "auto" | "perspectiva" | "colagem" | "reposicionar") => void }) {
+  const [projecao, setProjecao] = useState<"auto" | "perspectiva" | "colagem" | "reposicionar">("auto");
+  const opcoes = [
+    ["auto", "Automático", "A perspectiva, ou a colagem quando ela não acha."],
+    ["perspectiva", "Perspectiva", "Um panorama de um ponto só (as fotos podem tombar umas em relação às outras)."],
+    ["colagem", "Colagem", "Mover, girar e escalar por igual, sem tombar."],
+    ["reposicionar", "Reposicionar", "Só mover (fotos da mesma câmera parada)."],
+  ] as const;
+  return (
+    <Moldura titulo="Alinhar camadas automaticamente" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(projecao)}>
+      <p className="text-suave">A camada do meio fica parada e as outras vão para o lugar dela, pelos pontos que as fotos têm em comum. A tela cresce até caber todas.</p>
+      {opcoes.map(([id, nome, dica]) => (
+        <label key={id} className="flex items-start gap-2">
+          <input type="radio" name="projecao" checked={projecao === id} onChange={() => setProjecao(id)} className="mt-0.5" />
+          <span>
+            {nome}
+            <span className="block text-suave">{dica}</span>
+          </span>
+        </label>
+      ))}
+    </Moldura>
+  );
+}
+
+/** Editar › Mesclar camadas automaticamente: panorama ou empilhar imagens (o foco), e os tons e as cores. */
+export function JanelaMesclarCamadas({ aoFechar, aoConfirmar }: { aoFechar: () => void; aoConfirmar: (metodo: "panorama" | "empilhar", tonsECores: boolean) => void }) {
+  const [metodo, setMetodo] = useState<"panorama" | "empilhar">("panorama");
+  const [tons, setTons] = useState(true);
+  return (
+    <Moldura titulo="Mesclar camadas automaticamente" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(metodo, tons)}>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="metodo" checked={metodo === "panorama"} onChange={() => setMetodo("panorama")} className="mt-0.5" />
+        <span>
+          Panorama
+          <span className="block text-suave">As fotos alinhadas emendadas pela parte em comum.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="metodo" checked={metodo === "empilhar"} onChange={() => setMetodo("empilhar")} className="mt-0.5" />
+        <span>
+          Empilhar imagens
+          <span className="block text-suave">Da mesma cena com o foco em lugares diferentes: fica o que está nítido em cada uma.</span>
+        </span>
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={tons} disabled={metodo !== "panorama"} onChange={(evento) => setTons(evento.currentTarget.checked)} />
+        Tons e cores perfeitos
+      </label>
+    </Moldura>
+  );
+}

@@ -108,6 +108,9 @@ export type AcoesDosMenus = {
   /** Filtro › Dissolver e Editar › Distorção de marionete (na camada escolhida). */
   dissolver: () => void;
   marionete: () => void;
+  /** Editar › Alinhar e Mesclar camadas automaticamente (as escolhidas). */
+  alinharCamadas: () => void;
+  mesclarCamadas: () => void;
   /** Filtro › Ponto de fuga (a imagem inteira). */
   pontoDeFuga: () => void;
   /** Editar › Deformação de perspectiva (na camada escolhida). */
@@ -276,6 +279,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Escala sensível ao conteúdo…", atalho: "Ctrl+Alt+Shift+C", desativado: semCamada, aoEscolher: a.escalaSensivel },
         { nome: "Distorção de marionete", desativado: semCamada, aoEscolher: a.marionete },
         { nome: "Deformação de perspectiva", desativado: semCamada, aoEscolher: a.perspectiva },
+        "-",
+        { nome: "Alinhar camadas automaticamente…", desativado: a.quantas < 2, aoEscolher: a.alinharCamadas, titulo: "Escolha duas ou mais camadas" },
+        { nome: "Mesclar camadas automaticamente…", desativado: a.quantas < 2, aoEscolher: a.mesclarCamadas, titulo: "Escolha duas ou mais camadas" },
         {
           nome: "Transformar",
           desativado: semCamada,
