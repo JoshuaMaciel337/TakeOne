@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { colarSemEmenda, corrigirTom, melhorDeslocamento, preencherBuraco } from "./recuperar.ts";
+import { colarSemEmenda, corrigirTom, melhorDeslocamento, preencherBuraco, preencherBuracos } from "./recuperar.ts";
 
 /** Um degradê horizontal (de 40 a 200 de cinza) com um grão fino de xadrez (±10). */
 function imagem(largura: number, altura: number, grao = 10) {
@@ -117,4 +117,31 @@ test("colar sem emenda: a textura da fonte com a luz em volta, e nada muda fora 
   assert.ok(Math.abs((v(20, 20) + v(21, 20)) / 2 - 200) < 3, `${v(20, 20)} ${v(21, 20)}`);
   assert.ok(Math.abs((v(10, 20) + v(11, 20)) / 2 - 200) < 3, `${v(10, 20)} ${v(11, 20)}`);
   assert.ok(Math.abs(v(20, 20) - v(21, 20)) > 15);
+});
+
+test("vários buracos separados: cada um é preenchido pelo que está em volta dele", () => {
+  const largura = 90;
+  const altura = 60;
+  const dados = listras(largura, altura);
+  const original = Uint8ClampedArray.from(dados);
+  const buraco = new Uint8Array(largura * altura);
+  // Duas cunhas nos cantos de cima (como as de um corte girado)
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 10 - y; x++) {
+      buraco[y * largura + x] = 1;
+      buraco[y * largura + largura - 1 - x] = 1;
+      dados.set([0, 0, 0, 0], (y * largura + x) * 4);
+      dados.set([0, 0, 0, 0], (y * largura + largura - 1 - x) * 4);
+    }
+  }
+  assert.equal(preencherBuracos(dados, largura, altura, buraco, { jeito: "remendo", alcance: 4 }), 2);
+  let soma = 0;
+  let quantos = 0;
+  for (let i = 0; i < largura * altura; i++) {
+    if (!buraco[i]) continue;
+    assert.equal(dados[i * 4 + 3], 255);
+    soma += Math.abs(dados[i * 4] - original[i * 4]);
+    quantos++;
+  }
+  assert.ok(soma / quantos < 12, String(soma / quantos));
 });

@@ -331,3 +331,39 @@ export function preencherBuraco(dados: Uint8ClampedArray, largura: number, altur
   }
   gravar(dados, largura, x0, y0, lc, ac, canais, (i) => (buraco[i] ? 1 : 0));
 }
+
+/**
+ * Preenche cada pedaço separado do buraco (as cunhas que um corte girado deixa, por exemplo) pelo `preencherBuraco`, um
+ * de cada vez, do maior para o menor (os já preenchidos servem de contexto aos seguintes). Devolve quantos eram.
+ */
+export function preencherBuracos(dados: Uint8ClampedArray, largura: number, altura: number, buraco: Uint8Array, opcoes: { jeito?: "liso" | "textura" | "remendo"; alcance?: number } = {}): number {
+  const n = largura * altura;
+  const rotulo = new Int32Array(n).fill(-1);
+  const pedacos: number[][] = [];
+  for (let inicio = 0; inicio < n; inicio++) {
+    if (!buraco[inicio] || rotulo[inicio] >= 0) continue;
+    const pedaco: number[] = [];
+    const fila = [inicio];
+    rotulo[inicio] = pedacos.length;
+    while (fila.length) {
+      const i = fila.pop()!;
+      pedaco.push(i);
+      const x = i % largura;
+      const vizinhos = [x > 0 ? i - 1 : -1, x < largura - 1 ? i + 1 : -1, i - largura, i + largura];
+      for (const j of vizinhos) {
+        if (j < 0 || j >= n || !buraco[j] || rotulo[j] >= 0) continue;
+        rotulo[j] = pedacos.length;
+        fila.push(j);
+      }
+    }
+    pedacos.push(pedaco);
+  }
+  pedacos.sort((a, b) => b.length - a.length);
+  const mascara = new Uint8Array(n);
+  for (const pedaco of pedacos) {
+    for (const i of pedaco) mascara[i] = 1;
+    preencherBuraco(dados, largura, altura, mascara, opcoes);
+    for (const i of pedaco) mascara[i] = 0;
+  }
+  return pedacos.length;
+}

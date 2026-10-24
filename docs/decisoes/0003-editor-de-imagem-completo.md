@@ -172,7 +172,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Distorção de marionete (malha, alfinetes, rígido, normal, distorcer, densidade, expansão, profundidade)
 - [ ] Deformação de perspectiva (planos, endireitar, nivelar)
 - [ ] Escala sensível ao conteúdo (Ctrl+Alt+Shift+C)
-- [ ] Corte (C) completo: predefinições de proporção e de tamanho com resolução, endireitar, sobreposições (terços, grade, diagonal, triângulo, proporção áurea, espiral áurea), mostrar a área cortada, escudo, apagar os pixels cortados, preencher sensível ao conteúdo, girar arrastando fora
+- [x] Corte (C) completo: predefinições de proporção e de tamanho com resolução, endireitar, sobreposições (terços, grade, diagonal, triângulo, proporção áurea, espiral áurea), mostrar a área cortada, escudo, apagar os pixels cortados, preencher sensível ao conteúdo, girar arrastando fora
 - [ ] Corte de perspectiva
 - [x] Tamanho da imagem (Ctrl+Alt+I) com reamostragem (automática, preservar detalhes, bicúbica, bilinear, vizinho mais próximo, Lanczos) e resolução
 - [x] Tamanho da tela (Ctrl+Alt+C) com âncora, relativo e cor da extensão

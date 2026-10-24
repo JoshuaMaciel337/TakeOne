@@ -31,16 +31,6 @@ import type { FerramentaObjeto } from "./useObjeto";
 /** As opções da ferramenta Forma (a cor de preenchimento é a de primeiro plano). */
 export type OpcoesDaForma = { tracoCor: string; traco: number; arredondado: boolean; personalizada: "seta" | "balao" | "coracao" };
 
-export const PROPORCOES_DO_CORTE: { nome: string; valor: number | null }[] = [
-  { nome: "Proporção livre", valor: null },
-  { nome: "1:1 (quadrado)", valor: 1 },
-  { nome: "4:5 (8 × 10)", valor: 4 / 5 },
-  { nome: "9:16", valor: 9 / 16 },
-  { nome: "16:9", valor: 16 / 9 },
-  { nome: "3:2", valor: 3 / 2 },
-  { nome: "4:3", valor: 4 / 3 },
-];
-
 type Props = {
   ferramenta: IdFerramentaDaImagem;
   /** A camada escolhida (um texto muda pelas opções da ferramenta Texto). */
@@ -57,10 +47,6 @@ type Props = {
   aoMudarRemoverCercando: (valor: boolean) => void;
   removerNaCamadaNova: boolean;
   aoMudarRemoverNaCamadaNova: (valor: boolean) => void;
-  corte: { proporcao: number | null; largura: number; altura: number } | null;
-  aoMudarProporcao: (valor: number | null) => void;
-  aoConfirmarCorte: () => void;
-  aoCancelarCorte: () => void;
   forma: OpcoesDaForma;
   aoMudarForma: (mudanca: Partial<OpcoesDaForma>) => void;
   primeiroPlano: string;
@@ -428,29 +414,6 @@ export function BarraDeOpcoes(props: Props) {
         </button>
         {objeto.erro ? <span className="truncate text-erro">{objeto.erro}</span> : null}
         {!clipe ? <span className="text-suave">Clique numa foto para começar.</span> : null}
-      </>
-    );
-  } else if (ferramenta === "corte" && props.corte) {
-    opcoes = (
-      <>
-        <select aria-label="Proporção" className={campo} value={String(props.corte.proporcao)} onChange={(evento) => props.aoMudarProporcao(evento.currentTarget.value === "null" ? null : Number(evento.currentTarget.value))}>
-          {PROPORCOES_DO_CORTE.map((item) => (
-            <option key={item.nome} value={String(item.valor)}>
-              {item.nome}
-            </option>
-          ))}
-        </select>
-        <span className="tabular-nums text-suave">
-          {Math.round(props.corte.largura)} × {Math.round(props.corte.altura)} px
-        </span>
-        <span className="ml-auto flex items-center gap-1">
-          <button type="button" className="botao-icone size-6" onClick={props.aoCancelarCorte} title="Cancelar o corte (Esc)" aria-label="Cancelar o corte">
-            <X className="size-4" aria-hidden />
-          </button>
-          <button type="button" className="botao-icone size-6 text-destaque" onClick={props.aoConfirmarCorte} title="Confirmar o corte (Enter)" aria-label="Confirmar o corte">
-            <Check className="size-4" aria-hidden />
-          </button>
-        </span>
       </>
     );
   } else if (ferramenta === "contaGotas") {

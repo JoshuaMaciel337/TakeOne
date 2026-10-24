@@ -69,7 +69,8 @@ type Props = {
   /** O zoom de verdade (o de ajustar, quando `zoom` é null), para a barra de status. */
   aoMedirZoom?: (zoom: number) => void;
   /** Recortando a imagem: o retângulo por cima de tudo, no lugar das alças das camadas. */
-  recorte?: { retangulo: RetanguloDaImagem; proporcao: number | null; aoMudar: (retangulo: RetanguloDaImagem) => void } | null;
+  /** O Corte em andamento: a caixa e as opções dela (RecorteNaPrevia). */
+  recorte?: Omit<React.ComponentProps<typeof RecorteNaPrevia>, "imagem" | "escala"> | null;
   /** As ferramentas de seleção: os cliques e os traços vão para a foto escolhida, no lugar das alças. */
   objeto?: { clipeId: string; ferramenta: FerramentaObjeto; localizador?: boolean } | null;
   aoTerminarTraco?: () => void;
@@ -528,7 +529,7 @@ export function PreviaDaImagem({
                 ))}
               </>
             ) : null}
-            {recorte && tamanho.largura > 1 ? <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} /> : null}
+            {recorte && tamanho.largura > 1 ? <RecorteNaPrevia {...recorte} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
               <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} preencherCercado={preencherCercado} />
             ) : null}

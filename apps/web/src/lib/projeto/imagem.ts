@@ -700,6 +700,44 @@ export function tamanhoDaTela(projeto: Projeto, retangulo: RetanguloDaImagem, ta
 
 export type GiroDaImagem = "180" | "90" | "-90" | "virarH" | "virarV" | { graus: number };
 
+/** A caixa do Corte: o centro e as medidas em pixels da imagem e o giro dela, em graus. */
+export type CaixaDoCorte = { cx: number; cy: number; largura: number; altura: number; angulo: number };
+
+/**
+ * O Corte (C): com a caixa girada, a imagem gira ao contrário (o quadro crescendo até caber) e o retângulo dela fica; as
+ * camadas continuam editáveis. `pixels` são as camadas de pixels já cortadas (do tamanho do quadro novo, quando se pede
+ * para apagar os pixels cortados): entram no lugar delas, cobrindo o quadro.
+ */
+export function cortarImagem(projeto: Projeto, caixa: CaixaDoCorte, tamanhos: Record<string, Tamanho>, pixels: TrocaDePixels[] = []): Projeto {
+  let base = projeto;
+  let centro = { x: caixa.cx, y: caixa.cy };
+  if (Math.abs(caixa.angulo) > 1e-6) {
+    const antes = tamanhoDaImagem(projeto);
+    base = girarImagem(projeto, { graus: -caixa.angulo }, tamanhos);
+    const depois = tamanhoDaImagem(base);
+    const r = (-caixa.angulo * Math.PI) / 180;
+    const dx = caixa.cx - antes.largura / 2;
+    const dy = caixa.cy - antes.altura / 2;
+    centro = { x: depois.largura / 2 + dx * Math.cos(r) - dy * Math.sin(r), y: depois.altura / 2 + dx * Math.sin(r) + dy * Math.cos(r) };
+  }
+  const cortado = recortarImagem(base, { x: centro.x - caixa.largura / 2, y: centro.y - caixa.altura / 2, largura: caixa.largura, altura: caixa.altura }, tamanhos);
+  if (!pixels.length) return cortado;
+  const porClipe = new Map(pixels.map((troca) => [troca.id, troca]));
+  return {
+    ...cortado,
+    faixas: cortado.faixas.map((faixa) => ({
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => {
+        const troca = porClipe.get(clipe.id);
+        if (!troca || !clipe.pixels) return clipe;
+        const { virar: _virar, ...resto } = clipe;
+        void _virar;
+        return { ...resto, midia_id: troca.midiaId, pixels: { ...clipe.pixels, versao: troca.versao }, transformacao: { ...clipe.transformacao, x: 0, y: 0, escala: 1, rotacao: 0 }, recorte: RECORTE_PADRAO };
+      }),
+    })),
+  };
+}
+
 /**
  * Imagem › Rotação da imagem: a imagem inteira gira (180°, 90° para um lado ou para o outro, ou um ângulo qualquer, com
  * o quadro crescendo até caber) ou vira; cada camada gira junto, em volta do meio, e continua editável.

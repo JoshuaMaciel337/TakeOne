@@ -276,3 +276,23 @@ test("tamanho da tela com âncora e cor; tamanho da imagem troca as camadas de p
   assert.equal(camadasDaImagem(novo)[0].clipe.midia_id, "nova");
   assert.equal(novo.canais![0].midia_id, "canal2");
 });
+
+test("cortar: sem giro é o recortar; com a caixa girada, a imagem gira ao contrário e a caixa vira o quadro", () => {
+  const ctx = contexto();
+  let projeto: Projeto = { ...vazio(), tamanho: { largura: 1000, altura: 600 } };
+  const r = executarComando(projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx);
+  projeto = r.projeto;
+  const tamanhos = { foto: { largura: 1000, altura: 600 } };
+  const reto = executarComando(projeto, { comando: "imagem.cortar", parametros: { caixa: { cx: 600, cy: 300, largura: 400, altura: 300, angulo: 0 }, tamanhos } }, ctx).projeto;
+  assert.deepEqual(reto.tamanho, { largura: 400, altura: 300 });
+  const clipe = camadasDaImagem(reto)[0].clipe;
+  // A foto (o centro dela no meio da imagem, 500 × 300) fica 100 px à esquerda do meio do quadro novo
+  assert.ok(Math.abs(clipe.transformacao.x * 400 - -100) < 1e-6);
+  const girado = executarComando(projeto, { comando: "imagem.cortar", parametros: { caixa: { cx: 500, cy: 300, largura: 400, altura: 300, angulo: 10 }, tamanhos } }, ctx).projeto;
+  assert.deepEqual(girado.tamanho, { largura: 400, altura: 300 });
+  const g = camadasDaImagem(girado)[0].clipe;
+  assert.ok(Math.abs(g.transformacao.rotacao - -10) < 1e-9, String(g.transformacao.rotacao));
+  assert.ok(Math.abs(g.transformacao.x) < 1e-9 && Math.abs(g.transformacao.y) < 1e-9);
+  const caixa = caixaDoClipe(g.transformacao, g.recorte, tamanhos.foto, girado.tamanho!);
+  assert.ok(Math.abs(caixa.largura - 1000) < 1e-6, "a foto continua com 1000 px");
+});

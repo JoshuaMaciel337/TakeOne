@@ -26,7 +26,7 @@ import { executarComando } from "@/lib/projeto/comandos";
 import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
-import { camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
+import { type CaixaDoCorte, camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, type Canal, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
@@ -92,6 +92,9 @@ import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCo
 import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
 import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
+import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./OpcoesDoCorte";
+import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
+import { preencherBuracos } from "@/lib/pintura/recuperar";
 import { JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
 import { redimensionar } from "@/lib/transformar/reamostragem";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
@@ -333,7 +336,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const modeloPendente = useRef<{ modelo: ModeloDeImagem; cores: string[]; midias: Record<string, Midia> } | null>(null);
   const [aplicando, setAplicando] = useState<string | null>(null);
   const [trocando, setTrocando] = useState<string | null>(null);
-  const [recorte, setRecorte] = useState<{ retangulo: RetanguloDaImagem; proporcao: number | null } | null>(null);
+  // O Corte (C): a caixa em andamento e as opções, que ficam de um corte para o outro
+  const [recorte, setRecorte] = useState<CaixaDoCorte | null>(null);
+  const [opcoesDoCorte, setOpcoesDoCorte] = useState<OpcoesDoCorte>(CORTE_PADRAO);
   const modeloDoEndereco = useRef(false);
   // As caixas das camadas na tela (a prévia mede), para alinhar e distribuir
   const caixasRef = useRef<Map<string, CaixaNoQuadro>>(new Map());
@@ -1407,7 +1412,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (modo) objeto.setModo(modo);
     if (id === "corte" && projeto) {
       const { largura, altura } = tamanhoDaImagem(projeto);
-      setRecorte({ retangulo: { x: 0, y: 0, largura, altura }, proporcao: null });
+      setRecorte(caixaNaPredefinicao({ cx: largura / 2, cy: altura / 2, largura, altura, angulo: 0 }, opcoesDoCorte, { largura, altura }));
     } else setRecorte(null);
   };
 
@@ -1420,16 +1425,91 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     return tamanhos;
   };
-  const confirmarCorte = () => {
-    if (!recorte) return;
-    // O tamanho de cada mídia usada, para as camadas ficarem do mesmo tamanho em pixels
+  /**
+   * Confirma o corte: a imagem gira ao contrário da caixa e fica o retângulo dela. Apagando os pixels cortados, cada
+   * camada de pixels é desenhada sozinha já no quadro novo e entra no lugar dela; sensível ao conteúdo, o que ficou vazio
+   * é refeito pelo que está em volta numa camada nova; em L × A × resolução, a imagem vai para esse tamanho depois.
+   */
+  const confirmarCorte = async () => {
+    const atual = projetoRef.current;
+    if (!recorte || !atual || gerandoPixels) return;
     const tamanhos = tamanhosDasMidias();
-    const r = recorte.retangulo;
-    const retangulo = { x: Math.round(r.x), y: Math.round(r.y), largura: Math.round(r.largura), altura: Math.round(r.altura) };
-    if (executar({ comando: "imagem.recortar", parametros: { retangulo, tamanhos } })) {
-      setRecorte(null);
-      setFerramenta("mover");
+    const caixa = { ...recorte, largura: Math.round(recorte.largura), altura: Math.round(recorte.altura) };
+    const comando: Comando = { comando: "imagem.cortar", parametros: { caixa, tamanhos } };
+    let depois: Projeto;
+    try {
+      depois = executarComando(atual, comando, ctx).projeto;
+    } catch (e) {
+      return mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar.");
     }
+    const o = opcoesDoCorte;
+    setRecorte(null);
+    setFerramenta("mover");
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const pixels: { id: string; midiaId: string; versao: number }[] = [];
+      if (o.apagar) {
+        const documento = tamanhoDaImagem(depois);
+        for (const { clipe, faixa } of camadasDaImagem(depois)) {
+          // As camadas com máscara continuam inteiras (a máscara acompanha a caixa delas)
+          if (!clipe.pixels || !clipe.midia_id || clipe.mascara_pixels) continue;
+          const sozinha = projetoSoCom(depois, [faixa.id], { neutras: new Set([faixa.id]), semEstilo: true });
+          const blob = await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+          const midia = await criarCamadaDePixels(documento.largura, documento.altura, nomeDaFaixa(faixa));
+          setCriadas((atuais) => new Map([...atuais, [midia.id, midia]]));
+          pixels.push({ id: clipe.id, midiaId: midia.id, versao: await enviarVersao(midia.id, blob) });
+        }
+        if (pixels.length) void biblioteca.recarregar();
+      }
+      executar({ ...comando, parametros: { ...comando.parametros, pixels } } as Comando);
+      if (o.preencher) await preencherOVazio(depois);
+      if (o.predefinicao === "tamanho") await aplicarTamanhoDaImagem({ ...o.tamanhoFinal, reamostrar: true, metodo: "automatica" });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Sensível ao conteúdo: o que ficou sem nenhuma camada (as cunhas do giro, o que passou da imagem) é refeito. */
+  const preencherOVazio = async (depois: Projeto) => {
+    const documento = tamanhoDaImagem(depois);
+    const comTransparencia = { ...depois, fundo: { ...depois.fundo, transparente: true } };
+    const bitmap = await createImageBitmap(await exportarImagem(comTransparencia, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+    const canvas = document.createElement("canvas");
+    canvas.width = documento.largura;
+    canvas.height = documento.altura;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx2d.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura);
+    const buraco = new Uint8Array(documento.largura * documento.altura);
+    let vazios = 0;
+    for (let i = 0; i < buraco.length; i++) {
+      if (pixels.data[i * 4 + 3] < 250) {
+        buraco[i] = 1;
+        vazios++;
+      }
+    }
+    if (!vazios) return;
+    preencherBuracos(pixels.data, documento.largura, documento.altura, buraco, { jeito: "remendo", alcance: 6 });
+    // A camada nova só tem o que foi refeito
+    for (let i = 0; i < buraco.length; i++) if (!buraco[i]) pixels.data[i * 4 + 3] = 0;
+    ctx2d.putImageData(pixels, 0, 0);
+    const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+    await gerarPixels(async () => blob, { remover: [], lugar: null, nome: "Preenchimento sensível ao conteúdo", manter: { opacidade: 1, faixa: {} } });
+  };
+  /** A caixa ajustada à predefinição: a maior na proporção dentro da de agora, com o mesmo centro e o mesmo giro. */
+  const caixaNaPredefinicao = (caixa: CaixaDoCorte, opcoes: OpcoesDoCorte, documento: { largura: number; altura: number }): CaixaDoCorte => {
+    const proporcao = proporcaoDoCorte(opcoes, documento);
+    if (!proporcao) return caixa;
+    const largura = Math.min(caixa.largura, caixa.altura * proporcao);
+    return { ...caixa, largura, altura: largura / proporcao };
+  };
+  const mudarOpcoesDoCorte = (mudanca: Partial<OpcoesDoCorte>) => {
+    const novas = { ...opcoesDoCorte, ...mudanca };
+    setOpcoesDoCorte(novas);
+    if (recorte && projeto && ("predefinicao" in mudanca || "tamanhoFinal" in mudanca)) setRecorte(caixaNaPredefinicao(recorte, novas, tamanhoDaImagem(projeto)));
   };
   const cancelarCorte = () => {
     setRecorte(null);
@@ -2620,6 +2700,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       evento.preventDefault();
       return;
     }
+    if (recorte && (tecla === "X" || tecla === "O" || tecla === "H")) {
+      evento.preventDefault();
+      if (tecla === "X") setRecorte({ ...recorte, largura: recorte.altura, altura: recorte.largura });
+      else if (tecla === "H") setOpcoesDoCorte((atual) => ({ ...atual, mostrarCortada: !atual.mostrarCortada }));
+      else if (evento.shiftKey) setOpcoesDoCorte((atual) => ({ ...atual, orientacaoDaEspiral: (atual.orientacaoDaEspiral + 1) % 4 }));
+      else setOpcoesDoCorte((atual) => ({ ...atual, sobreposicao: SOBREPOSICOES_DO_CORTE[(SOBREPOSICOES_DO_CORTE.findIndex((item) => item.id === atual.sobreposicao) + 1) % SOBREPOSICOES_DO_CORTE.length].id }));
+      return;
+    }
     const comTecla = TODAS_AS_FERRAMENTAS.filter((item) => item.tecla === tecla);
     if (comTecla.length) {
       // Shift + a tecla passa à seguinte do grupo; sem Shift, volta à última usada do grupo
@@ -2651,7 +2739,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     else if (tecla === "Enter" && transformando) confirmarTransformacao();
     else if (tecla === "Escape" && transformando) setTransformando(null);
-    else if (tecla === "Enter" && recorte) confirmarCorte();
+    else if (tecla === "Enter" && recorte) void confirmarCorte();
     else if (tecla === "Escape") {
       if (recorte) cancelarCorte();
       else if (temSelecao || objeto.pontos.length) objeto.limpar();
@@ -3016,14 +3104,6 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoMudarRemoverNaCamadaNova={setRemoverNaCamadaNova}
         localizador={localizador}
         aoMudarLocalizador={setLocalizador}
-        corte={recorte ? { proporcao: recorte.proporcao, largura: recorte.retangulo.largura, altura: recorte.retangulo.altura } : null}
-        aoMudarProporcao={(proporcao) => {
-          if (!recorte) return;
-          const inteiro = { x: 0, y: 0, ...tamanho };
-          setRecorte({ proporcao, retangulo: proporcao ? encaixarProporcao(inteiro, proporcao) : recorte.retangulo });
-        }}
-        aoConfirmarCorte={confirmarCorte}
-        aoCancelarCorte={cancelarCorte}
         forma={forma}
         aoMudarForma={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
         primeiroPlano={cores.primeiroPlano}
@@ -3054,7 +3134,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "balde" ? (
+          ferramenta === "corte" && recorte ? (
+            <OpcoesDoCorteNaBarra
+              opcoes={opcoesDoCorte}
+              medidas={recorte}
+              aoMudar={mudarOpcoesDoCorte}
+              aoTrocar={() => {
+                const trocada = { ...recorte, largura: recorte.altura, altura: recorte.largura };
+                if (typeof opcoesDoCorte.predefinicao === "number") mudarOpcoesDoCorte({ predefinicao: 1 / opcoesDoCorte.predefinicao });
+                else if (opcoesDoCorte.predefinicao === "tamanho") mudarOpcoesDoCorte({ tamanhoFinal: { ...opcoesDoCorte.tamanhoFinal, largura: opcoesDoCorte.tamanhoFinal.altura, altura: opcoesDoCorte.tamanhoFinal.largura } });
+                setRecorte(trocada);
+              }}
+              aoLimpar={() => {
+                const { largura, altura } = tamanhoDaImagem(projeto!);
+                setOpcoesDoCorte((atual) => ({ ...atual, predefinicao: "livre" }));
+                setRecorte({ cx: largura / 2, cy: altura / 2, largura, altura, angulo: 0 });
+              }}
+              aoConfirmar={() => void confirmarCorte()}
+              aoCancelar={cancelarCorte}
+            />
+          ) : ferramenta === "balde" ? (
             <OpcoesDoBaldeNaBarra opcoes={opcoesDoBalde} aoMudar={(mudanca) => setOpcoesDoBalde((atual) => ({ ...atual, ...mudanca }))} />
           ) : ferramenta === "borrachaMagica" ? (
             <OpcoesDaBorrachaMagicaNaBarra opcoes={opcoesDaBorrachaMagica} aoMudar={(mudanca) => setOpcoesDaBorrachaMagica((atual) => ({ ...atual, ...mudanca }))} />
@@ -3243,7 +3342,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             zoom={zoom}
             aoMudarZoom={setZoom}
             aoMedirZoom={setZoomMedido}
-            recorte={recorte ? { ...recorte, aoMudar: (retangulo) => setRecorte({ ...recorte, retangulo }) } : null}
+            recorte={
+              recorte
+                ? {
+                    caixa: recorte,
+                    proporcao: proporcaoDoCorte(opcoesDoCorte, tamanho),
+                    sobreposicao: opcoesDoCorte.sobreposicao,
+                    orientacaoDaEspiral: opcoesDoCorte.orientacaoDaEspiral,
+                    escudo: opcoesDoCorte.escudo,
+                    mostrarCortada: opcoesDoCorte.mostrarCortada,
+                    endireitando: opcoesDoCorte.endireitando,
+                    aoMudar: setRecorte,
+                    aoEndireitar: (angulo) => {
+                      setRecorte((atual) => (atual ? { ...atual, angulo } : atual));
+                      setOpcoesDoCorte((atual) => ({ ...atual, endireitando: false }));
+                    },
+                  }
+                : null
+            }
             objeto={MODO_DA_SELECAO[ferramenta] && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto, localizador } : null}
             aoTerminarTraco={ferramenta === "remover" && removerAoSoltar ? () => window.setTimeout(() => void usarSelecaoRef.current("apagar"), 0) : undefined}
             preencherCercado={ferramenta === "remover" && removerCercando}
@@ -3512,11 +3628,12 @@ function transformacaoDaCaixa(caixa: RetanguloDaImagem, midia: Midia, quadro: { 
   };
 }
 
-/** O maior retângulo na proporção, no meio do atual (ou da imagem). */
-function encaixarProporcao(r: RetanguloDaImagem, proporcao: number): RetanguloDaImagem {
-  const largura = Math.min(r.largura, r.altura * proporcao);
-  const altura = largura / proporcao;
-  return { x: r.x + (r.largura - largura) / 2, y: r.y + (r.altura - altura) / 2, largura, altura };
+/** A proporção que o Corte prende (largura sobre altura), ou null na livre. */
+function proporcaoDoCorte(opcoes: OpcoesDoCorte, documento: { largura: number; altura: number }): number | null {
+  if (opcoes.predefinicao === "livre") return null;
+  if (opcoes.predefinicao === "original") return documento.largura / documento.altura;
+  if (opcoes.predefinicao === "tamanho") return opcoes.tamanhoFinal.largura / opcoes.tamanhoFinal.altura;
+  return opcoes.predefinicao;
 }
 
 /** Ajuda > Atalhos do teclado: as ferramentas e os atalhos dos menus. */
