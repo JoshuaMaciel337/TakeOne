@@ -22,6 +22,7 @@ from api.rotas import (
     elementos,
     eventos,
     exportacoes,
+    fontes,
     foto_ia,
     intercambio,
     jobs,
@@ -157,4 +158,5 @@ app.include_router(luts.router)
 app.include_router(pixels.router)
 app.include_router(pinceis.router)
 app.include_router(recursos.router)
+app.include_router(fontes.router)
 app.include_router(chaves.router)

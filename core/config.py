@@ -22,6 +22,9 @@ DATABASE_NAME = os.environ.get("DATABASE_NAME", "takeone")
 # -----------------------------------------------
 PASTA_ARMAZENAMENTO = Path(os.environ.get("PASTA_ARMAZENAMENTO", PASTA_RAIZ / "armazenamento"))
 
+# A biblioteca de fontes livres (core/fontes/biblioteca.json), baixada na construção das imagens
+FONTES_DA_BIBLIOTECA = Path(os.environ.get("FONTES_DA_BIBLIOTECA", PASTA_RAIZ / "core" / "fontes" / "biblioteca"))
+
 # -----------------------------------------------
 # UPLOAD (protocolo tus)
 # -----------------------------------------------

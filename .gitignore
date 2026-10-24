@@ -29,3 +29,6 @@ Thumbs.db
 
 # Log do crashpad do Chrome das sondas
 debug.log
+
+# A biblioteca de fontes (baixada por core/fontes/baixar_biblioteca.py)
+core/fontes/biblioteca/

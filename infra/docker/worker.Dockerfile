@@ -72,6 +72,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps chromium-headless-shell && chmod -R a+rX /ms-playwright
 
+# A biblioteca de fontes livres (core/fontes/biblioteca.json), conferida pelo SHA-256 de cada arquivo; antes do código,
+# para a camada da imagem só mudar quando o manifesto muda
+COPY core/fontes/biblioteca.json core/fontes/baixar_biblioteca.py /tmp/fontes/
+RUN python /tmp/fontes/baixar_biblioteca.py --manifesto /tmp/fontes/biblioteca.json --destino /app/fontes-biblioteca     && chmod -R a+rX /app/fontes-biblioteca
+ENV FONTES_DA_BIBLIOTECA=/app/fontes-biblioteca
+
 COPY core /app/core
 COPY apps/worker /app/worker
 COPY infra/backup /app/backup
