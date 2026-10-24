@@ -519,3 +519,15 @@ def test_linha_do_tempo_de_quadros(cliente):
     atual = salvo.json()
     assert salvar(cliente, atual, [vazia], animacao={"quadros": [{"id": "q", "atraso": 61}]}).status_code == 422
     assert salvar(cliente, atual, [vazia], animacao={"quadros": []}).json()["animacao"] is None
+
+
+def test_fatias(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    fatias = [{"id": "f1", "nome": "topo", "x": 0, "y": 0, "largura": 320, "altura": 60}]
+    salvo = salvar(cliente, projeto, [vazia], fatias=fatias)
+    assert salvo.status_code == 200, salvo.text
+    assert salvo.json()["fatias"] == fatias
+    ruim = [{**fatias[0], "largura": 0}]
+    assert salvar(cliente, salvo.json(), [vazia], fatias=ruim).status_code == 422

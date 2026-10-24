@@ -2005,6 +2005,16 @@ class AnimacaoEntrada(BaseModel):
     repetir: int = Field(default=0, ge=0, le=1000)
 
 
+class FatiaEntrada(BaseModel):
+    """Uma fatia do editor de imagem (ferramenta Fatia): um retângulo em pixels do documento, que sai num arquivo."""
+    id: str = Field(min_length=1, max_length=64)
+    nome: str = Field(default="", max_length=80)
+    x: int = Field(ge=-100_000, le=100_000)
+    y: int = Field(ge=-100_000, le=100_000)
+    largura: int = Field(ge=1, le=100_000)
+    altura: int = Field(ge=1, le=100_000)
+
+
 class ProjetoSalvarEntrada(BaseModel):
     versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
     nome: str = Field(min_length=1, max_length=120)
@@ -2030,6 +2040,7 @@ class ProjetoSalvarEntrada(BaseModel):
     escala_de_medida: EscalaDeMedidaEntrada | None = None
     comps: list[CompDeCamadaEntrada] = Field(default=[], max_length=100)
     animacao: AnimacaoEntrada | None = None
+    fatias: list[FatiaEntrada] = Field(default=[], max_length=500)
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -2075,6 +2086,7 @@ class ProjetoSaida(BaseModel):
     escala_de_medida: EscalaDeMedidaEntrada | None = None
     comps: list[CompDeCamadaEntrada] = []
     animacao: AnimacaoEntrada | None = None
+    fatias: list[FatiaEntrada] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
