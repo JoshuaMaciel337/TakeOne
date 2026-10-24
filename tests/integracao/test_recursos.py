@@ -44,3 +44,18 @@ def test_degrades_e_padroes(cliente, db_limpo):
     assert grande.status_code == 422
     assert cliente.delete(f"/api/recursos/{padrao.json()['id']}").status_code == 204
     assert cliente.get(f"/api/recursos/{padrao.json()['id']}/imagem.png").status_code == 404
+
+
+def test_formas_personalizadas(cliente):
+    cadastrar(cliente)
+    sub = {"nos": [{"x": 0, "y": 0}, {"x": 100, "y": 0, "ex": 80, "ey": -20}, {"x": 50, "y": 100}], "fechado": True,
+           "operacao": "somar"}
+    forma = cliente.post("/api/recursos", json={"tipo": "forma", "nome": "Gota", "dados": {"subcaminhos": [sub],
+                                                                                         "outro": 1}})
+    assert forma.status_code == 201, forma.text
+    assert forma.json()["dados"] == {"subcaminhos": [sub]}, "só os caminhos ficam, com as alças que faltam faltando"
+    assert [r["nome"] for r in cliente.get("/api/recursos?tipo=forma").json()] == ["Gota"]
+    # Sem caminhos, ou com um nó estragado, não vale
+    assert cliente.post("/api/recursos", json={"tipo": "forma", "nome": "V", "dados": {}}).status_code == 422
+    estragado = {"subcaminhos": [{"nos": [{"x": "a"}], "fechado": True}]}
+    assert cliente.post("/api/recursos", json={"tipo": "forma", "nome": "E", "dados": estragado}).status_code == 422

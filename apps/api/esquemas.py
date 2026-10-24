@@ -569,8 +569,9 @@ class LutDoClipeEntrada(BaseModel):
 
 
 class RecursoEntrada(BaseModel):
-    # "degrade" (as paradas, em dados) ou "padrao" (o ladrilho, em imagem_png)
-    tipo: Literal["degrade", "padrao"]
+    # "degrade" (as paradas, em dados), "padrao" (o ladrilho, em imagem_png) ou "forma" (os caminhos de uma forma
+    # personalizada, em dados.subcaminhos, numa caixa de 100 × 100)
+    tipo: Literal["degrade", "padrao", "forma"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)

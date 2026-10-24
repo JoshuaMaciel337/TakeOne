@@ -1,7 +1,8 @@
 # -----------------------------------------------
-# TakeOne API — degradês e padrões do espaço (editor de imagem, ADR 0003, onda 13.5)
+# TakeOne API — degradês, padrões e formas personalizadas do espaço (editor de imagem, ADR 0003, ondas 13.5 e 13.7)
 #
-#   POST   /api/recursos                 um degradê (as paradas, em JSON) ou um padrão (o ladrilho, PNG em base64)
+#   POST   /api/recursos                 um degradê (as paradas, em JSON), um padrão (o ladrilho, PNG em base64) ou uma
+#                                        forma personalizada (os caminhos, em JSON)
 #   GET    /api/recursos?tipo=degrade    os do espaço daquele tipo, na ordem em que foram criados
 #   GET    /api/recursos/{id}/imagem.png o ladrilho do padrão
 #   DELETE /api/recursos/{id}
@@ -19,10 +20,11 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from PIL import Image
+from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import RecursoEntrada, RecursoSaida
+from api.esquemas import RecursoEntrada, RecursoSaida, SubcaminhoEntrada
 from core.config import TZ
 from core.utils import storage
 
@@ -30,6 +32,9 @@ router = APIRouter(prefix="/api/recursos", tags=["recursos"])
 
 RECURSOS_POR_TIPO = 500
 BYTES_DOS_DADOS = 32 * 1024
+# Uma forma personalizada tem muitos pontos (um contorno vindo de uma seleção, por exemplo)
+BYTES_DA_FORMA = 512 * 1024
+PONTOS_DA_FORMA = 10_000
 BYTES_DA_IMAGEM = 4 * 1024 * 1024
 LADO_MAXIMO_DA_IMAGEM = 2048
 
@@ -71,10 +76,25 @@ def _conferir_imagem(dados: bytes) -> dict:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa ser um PNG.") from erro
 
 
+def _conferir_forma(dados: dict) -> list[dict]:
+    """Os caminhos da forma, conferidos como os das camadas vetoriais (apps/api/esquemas.py, SubcaminhoEntrada)."""
+    try:
+        caminhos = [SubcaminhoEntrada.model_validate(sub) for sub in dados.get("subcaminhos") or []]
+    except (ValidationError, TypeError, AttributeError) as erro:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Os caminhos da forma vieram estragados.") from erro
+    if not caminhos or sum(len(sub.nos) for sub in caminhos) > PONTOS_DA_FORMA:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"A forma precisa ter de 1 a {PONTOS_DA_FORMA} pontos.")
+    return [sub.model_dump() for sub in caminhos]
+
+
 @router.post("", response_model=RecursoSaida, status_code=status.HTTP_201_CREATED)
 async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    if len(json.dumps(dados.dados)) > BYTES_DOS_DADOS:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Os dados passam de 32 KB.")
+    limite = BYTES_DA_FORMA if dados.tipo == "forma" else BYTES_DOS_DADOS
+    if len(json.dumps(dados.dados)) > limite:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Os dados passam de {limite // 1024} KB.")
+    if dados.tipo == "forma":
+        dados.dados = {"subcaminhos": _conferir_forma(dados.dados)}
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -102,7 +122,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
 
 
 @router.get("", response_model=list[RecursoSaida])
-async def listar_recursos(tipo: str = Query(pattern="^(degrade|padrao)$"), usuario=Depends(usuario_atual),
+async def listar_recursos(tipo: str = Query(pattern="^(degrade|padrao|forma)$"), usuario=Depends(usuario_atual),
                           db=Depends(obter_db)):
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": tipo}
     cursor = db.recursos.find(filtro).sort("criado_em", 1).limit(RECURSOS_POR_TIPO)
