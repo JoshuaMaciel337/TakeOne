@@ -185,3 +185,19 @@ def executar_profundidade(db, job: dict, reportar: Callable[[int, str], None]) -
                          {"$addToSet": {"arquivos": ARQUIVO_PROFUNDIDADE}, "$set": {"atualizado_em": agora()}})
     reportar(100, "Profundidade pronta")
     return {"midia_id": str(midia["_id"]), "arquivo": ARQUIVO_PROFUNDIDADE}
+
+
+def executar_restaurar(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
+    """Restaurar foto: os riscos e as manchas finas achados pela forma (o que é muito mais claro ou mais escuro que a
+    volta, em traços finos) refeitos pela volta, o ruído tirado e o contraste devolvido (CLAHE na luz)."""
+    from core.utils.restaurar import restaurar
+
+    entrada = job["entrada"]
+    midia, origem = _midias(db, entrada)
+    foto = _foto(origem)
+    reportar(10, "Restaurando a foto")
+    resultado = restaurar(foto, float(entrada.get("forca", 60)) / 100)
+    reportar(90, "Salvando a foto")
+    _salvar_png(db, job, midia, resultado, "Foto restaurada")
+    reportar(100, "Pronto")
+    return {"midia_id": str(midia["_id"])}

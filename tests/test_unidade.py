@@ -37,9 +37,10 @@ def test_tipos_por_recursos():
                                                 "recorte_fundo", "limpeza_imagem", "animacao_html", "batidas", "fala",
                                                 "estabilizacao", "rastreio", "qualidade", "selecao", "objeto",
                                                 "quadro", "inversao", "fluido", "esconder_rostos",
-                                                "esconder_objeto", "ampliar", "expandir", "foto_3d", "profundidade"}
+                                                "esconder_objeto", "ampliar", "expandir", "foto_3d", "profundidade",
+                                                "restaurar"}
     assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video", "direcao", "palavras_chave",
-                                           "animacao_descrita", "geracao_imagem", "preenchimento"]
+                                           "animacao_descrita", "geracao_imagem", "preenchimento", "foto_neural"]
 
 
 def test_extensao_e_nome_da_midia():

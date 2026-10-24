@@ -100,3 +100,39 @@ def test_profundidade_da_foto_e_guardada_uma_vez(cliente, db_limpo):
     cinza = np.asarray(Image.open(caminho))
     # No modo simulado, o chão perto (claro, embaixo) e o céu longe (escuro, em cima)
     assert cinza.ndim == 2 and cinza[0].mean() < 20 and cinza[-1].mean() > 235
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_filtros_neurais_criam_fotos_novas(cliente, db_limpo):
+    cadastrar(cliente)
+    foto_id = str(enviar_imagem(db_limpo, organizacao_de(cliente), "Foto.jpg", _foto))
+    assert cliente.post(f"/api/midias/{foto_id}/estilo", json={"estilo": "nenhum"}).status_code == 422
+    estilo = cliente.post(f"/api/midias/{foto_id}/estilo", json={"estilo": "aquarela", "intensidade": 80})
+    assert estilo.status_code == 201, estilo.text
+    assert estilo.json()["nome"] == "Foto (aquarela)"
+    job = db_limpo.jobs.find_one({"tipo": "foto_neural"})
+    assert job["recurso"] == "gpu" and job["entrada"]["tipo"] == "estilo"
+    assert _pronta(cliente, db_limpo, "foto_neural", estilo.json()["id"])["video"]["largura"] == 800
+    colorida = cliente.post(f"/api/midias/{foto_id}/colorir", json={"descricao": "céu azul", "saturacao": 150})
+    assert colorida.status_code == 201, colorida.text
+    assert _pronta(cliente, db_limpo, "foto_neural", colorida.json()["id"])["nome"] == "Foto (colorida)"
+    restaurada = cliente.post(f"/api/midias/{foto_id}/restaurar", json={"forca": 70})
+    assert restaurada.status_code == 201, restaurada.text
+    assert _pronta(cliente, db_limpo, "restaurar", restaurada.json()["id"])["nome"] == "Foto (restaurada)"
+
+
+def test_colorir_guarda_a_luz_e_restaurar_tira_o_risco():
+    import numpy as np
+
+    from core.utils.foto_neural import colorir
+    from core.utils.restaurar import mascara_dos_riscos, restaurar
+
+    cinza = Image.new("RGB", (8, 8), (90, 90, 90))
+    pixel = colorir(cinza, Image.new("RGB", (4, 4), (200, 40, 40))).getpixel((3, 3))
+    assert abs(0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2] - 90) < 1.5 and pixel[0] > pixel[2] + 50
+    # Um risco branco fino numa foto lisa é achado e some
+    base = np.full((120, 160), 110, np.uint8)
+    base[60, 20:140] = 250
+    assert mascara_dos_riscos(base, 0.6)[60, 80] == 255 and mascara_dos_riscos(base, 0.6)[20, 20] == 0
+    restaurada = np.asarray(restaurar(Image.fromarray(base).convert("RGB"), 0.6).convert("L")).astype(int)
+    assert abs(restaurada[60, 80] - restaurada[40, 80]) < 15

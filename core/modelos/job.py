@@ -27,6 +27,7 @@ TAREFAS = {
     "animacao_descrita": RECURSO_GPU,
     "geracao_imagem": RECURSO_GPU,
     "preenchimento": RECURSO_GPU,
+    "foto_neural": RECURSO_GPU,
     "limpeza_voz": RECURSO_CPU,
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,
@@ -49,6 +50,7 @@ TAREFAS = {
     "expandir": RECURSO_CPU,
     "foto_3d": RECURSO_CPU,
     "profundidade": RECURSO_CPU,
+    "restaurar": RECURSO_CPU,
 }
 
 

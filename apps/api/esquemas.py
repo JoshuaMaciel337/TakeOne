@@ -1640,6 +1640,22 @@ class AmpliarEntrada(BaseModel):
     fator: Literal[2, 4] = 2
 
 
+class EstiloEntrada(BaseModel):
+    """A transferência de estilo: um estilo pronto (core/modelos/geracao.py) ou o texto, e a mistura com a foto."""
+    estilo: str = Field(default="oleo", pattern=r"^[a-z_]{1,20}$")
+    descricao: str = Field(default="", max_length=400)
+    intensidade: int = Field(default=100, ge=10, le=100)
+
+
+class ColorirEntrada(BaseModel):
+    descricao: str = Field(default="", max_length=400)
+    saturacao: int = Field(default=100, ge=0, le=200)
+
+
+class RestaurarEntrada(BaseModel):
+    forca: int = Field(default=60, ge=0, le=100)
+
+
 class ExpandirEntrada(BaseModel):
     """A proporção da foto expandida, como "9:16" ou o tamanho do quadro ("1080:1350"), de 1:4 a 4:1."""
     proporcao: str = Field(pattern=r"^[1-9][0-9]{0,4}:[1-9][0-9]{0,4}$")

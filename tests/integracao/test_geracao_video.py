@@ -229,5 +229,10 @@ def test_fluxo_do_preenchimento_e_o_vace_com_a_mascara():
     assert fluxo["7"]["inputs"]["control_masks"] == ["14", 0] and fluxo["7"]["inputs"]["length"] == 1
     assert fluxo["14"]["inputs"]["mask"] == ["12", 1] and fluxo["8"]["inputs"]["seed"] == 9
     assert "sem pessoas" in fluxo["5"]["inputs"]["text"] and "figura humana" in fluxo["6"]["inputs"]["text"]
+    from core.modelos.geracao import montar_fluxo_do_vace_inteiro
+
+    inteiro = montar_fluxo_do_vace_inteiro("aquarela", "foto.png", 640, 352, 3, "takeone_z", "neon")
+    assert inteiro["14"]["class_type"] == "SolidMask" and inteiro["7"]["inputs"]["control_video"] == ["12", 0]
+    assert "16" not in inteiro and inteiro["6"]["inputs"]["text"].endswith(", neon")
     com_texto = montar_fluxo_do_preenchimento("um barco", "entrada.png", 640, 352, 9, "takeone_y")
     assert com_texto["5"]["inputs"]["text"] == "um barco" and "figura humana" not in com_texto["6"]["inputs"]["text"]

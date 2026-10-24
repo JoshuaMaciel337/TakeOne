@@ -4,17 +4,30 @@
 #   POST /api/midias/{id}/ampliar    a foto 2 ou 4 vezes maior (até 4096 px no lado maior)
 #   POST /api/midias/{id}/expandir   a foto numa tela de outra proporção, com o que falta inventado em volta
 #   POST /api/midias/{id}/foto-3d    um vídeo da foto com a câmera andando pela profundidade dela
+#   POST /api/midias/{id}/estilo     a foto num estilo (pintura, desenho...), pelo VACE no worker de GPU
+#   POST /api/midias/{id}/colorir    a foto em cinza com cor, pelo VACE (só a cor muda)
+#   POST /api/midias/{id}/restaurar  os riscos e as manchas tirados, sem ruído e com o contraste de volta
 #
 # Cada pedido cria uma mídia nova na biblioteca (processando), como o "apagar objeto": a foto de origem não muda.
 # -----------------------------------------------
 import logging
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import AmpliarEntrada, ExpandirEntrada, Foto3dEntrada, MidiaSaida
+from api.esquemas import (
+    AmpliarEntrada,
+    ColorirEntrada,
+    EstiloEntrada,
+    ExpandirEntrada,
+    Foto3dEntrada,
+    MidiaSaida,
+    RestaurarEntrada,
+)
 from api.rotas.midias import para_saida
 from api.rotas.objetos import _foto_pronta
+from core.modelos.geracao import ESTILOS
 from core.modelos.job import montar_job
 from core.modelos.midia import STATUS_PROCESSANDO, montar_midia
 from core.utils.foto_ia import LADO_MAXIMO, conferir_expansao
@@ -72,3 +85,31 @@ async def foto_em_3d(midia_id: str, dados: Foto3dEntrada, usuario=Depends(usuari
     origem = await _foto_pronta(db, midia_id, usuario)
     return await _pedir(db, usuario, origem, "foto_3d", "foto3d.mp4", "video/mp4", "foto em 3D",
                         {"movimento": dados.movimento, "duracao": dados.duracao})
+
+
+@router.post("/{midia_id}/estilo", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def estilo_da_foto(midia_id: str, dados: EstiloEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    origem = await _foto_pronta(db, midia_id, usuario)
+    descricao = " ".join(dados.descricao.split())
+    if dados.estilo not in ESTILOS and not descricao:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Escolha um estilo ou descreva o que quer.")
+    nome = ESTILOS[dados.estilo][0].lower() if dados.estilo in ESTILOS and not descricao else "estilo"
+    return await _pedir(db, usuario, origem, "foto_neural", "estilizada.png", "image/png", nome,
+                        {"tipo": "estilo", "estilo": dados.estilo, "descricao": descricao,
+                         "intensidade": dados.intensidade, "semente": secrets.randbelow(2**31)})
+
+
+@router.post("/{midia_id}/colorir", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def colorir_foto(midia_id: str, dados: ColorirEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    origem = await _foto_pronta(db, midia_id, usuario)
+    return await _pedir(db, usuario, origem, "foto_neural", "colorida.png", "image/png", "colorida",
+                        {"tipo": "colorir", "descricao": " ".join(dados.descricao.split()),
+                         "saturacao": dados.saturacao, "semente": secrets.randbelow(2**31)})
+
+
+@router.post("/{midia_id}/restaurar", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def restaurar_foto(midia_id: str, dados: RestaurarEntrada, usuario=Depends(usuario_atual),
+                         db=Depends(obter_db)):
+    origem = await _foto_pronta(db, midia_id, usuario)
+    return await _pedir(db, usuario, origem, "restaurar", "restaurada.png", "image/png", "restaurada",
+                        {"forca": dados.forca})

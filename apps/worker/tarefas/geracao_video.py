@@ -25,15 +25,19 @@ from PIL import Image
 
 from core.config import COMFYUI_URL, MODO_IA
 from core.modelos.geracao import (
+    DESCRICAO_DO_COLORIR,
+    ESTILOS,
     FORMATOS,
     FORMATOS_DA_IMAGEM,
     FPS,
+    NEGATIVO_DO_COLORIR,
     SEGUNDOS_DA_IMAGEM,
     SEGUNDOS_DO_PREENCHIMENTO,
     arquivo_gerado,
     montar_fluxo,
     montar_fluxo_da_imagem,
     montar_fluxo_do_preenchimento,
+    montar_fluxo_do_vace_inteiro,
     segundos_estimados,
 )
 from core.modelos.job import ErroDefinitivo, montar_job
@@ -47,6 +51,8 @@ from core.modelos.midia import (
 )
 from core.utils import storage
 from core.utils.ffmpeg import executar_ffmpeg
+from core.utils.foto_neural import colorir, estilizar, para_o_vace
+from core.utils.foto_neural import simular as simular_neural
 from core.utils.imagem import ImagemInvalida, quadro_inicial
 from core.utils.mongo import agora
 from core.utils.preenchimento import EntradaInvalida, compor, ler_entrada, para_o_modelo, simular
@@ -369,3 +375,59 @@ def executar_preenchimento(db, job: dict, reportar: Callable[[int, str], None]) 
     logging.info(f"[{organizacao_id}] [midia {midia_id}] Preenchimento gerado; ingestão na fila.")
     reportar(100, "Preenchimento gerado")
     return {"midia_id": str(midia_id)}
+
+
+def executar_foto_neural(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
+    """Os filtros neurais de uma foto pelo VACE: a transferência de estilo (a foto e o estilo em texto) e o colorir (a
+    foto em cinza; volta só a cor). O resultado, no tamanho da foto, vira uma mídia nova; a foto não muda."""
+    entrada = job["entrada"]
+    midia = db.midias.find_one({"_id": ObjectId(entrada["midia_id"])})
+    origem = db.midias.find_one({"_id": ObjectId(entrada["origem_id"])})
+    if midia is None or origem is None:
+        raise ErroDefinitivo("A foto foi excluída antes de o filtro terminar.")
+    caminho = storage.caminho_local(chave_arquivo(origem["organizacao_id"], origem["_id"], ARQUIVO_IMAGEM))
+    if not caminho.is_file():
+        raise ErroDefinitivo("A imagem da foto não foi encontrada.")
+    with Image.open(caminho) as aberta:
+        foto = aberta.convert("RGBA")
+    tipo = entrada["tipo"]
+    if tipo == "colorir":
+        descricao = ", ".join(filter(None, [DESCRICAO_DO_COLORIR, entrada.get("descricao") or ""]))
+    else:
+        descricao = entrada.get("descricao") or ESTILOS.get(entrada.get("estilo") or "", ("", ""))[1]
+    original = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], midia["original"]))
+    original.parent.mkdir(parents=True, exist_ok=True)
+    temporarios = [original.with_name("neural_modelo.png"), original.with_name("neural_gerada.png")]
+    parcial = original.with_name("neural.parcial.png")
+    existe = lambda: db.midias.count_documents({"_id": midia["_id"]}, limit=1) > 0  # noqa: E731
+    reportar(1, "Preparando o filtro")
+    try:
+        if MODO_IA == "real":
+            _esperar_a_placa(existe, reportar)
+            modelo = para_o_vace(foto, cinza=tipo == "colorir")
+            modelo.save(temporarios[0], "PNG")
+            nome = _enviar_imagem(temporarios[0])
+            fluxo = montar_fluxo_do_vace_inteiro(descricao, nome, *modelo.size, entrada["semente"],
+                                                 f"takeone_{uuid.uuid4().hex}",
+                                                 NEGATIVO_DO_COLORIR if tipo == "colorir" else "")
+            _rodar_no_comfyui(fluxo, SEGUNDOS_DO_PREENCHIMENTO, ".png", "o filtro", temporarios[1], existe, reportar)
+            with Image.open(temporarios[1]) as aberta:
+                gerada = aberta.convert("RGB")
+        else:
+            gerada = simular_neural(foto, tipo)
+        if tipo == "colorir":
+            resultado = colorir(foto, gerada, float(entrada.get("saturacao", 100)) / 100)
+        else:
+            resultado = estilizar(foto, gerada, float(entrada.get("intensidade", 100)) / 100)
+        resultado.save(parcial, "PNG")
+        parcial.replace(original)
+    except BaseException:
+        parcial.unlink(missing_ok=True)
+        raise
+    finally:
+        for temporario in temporarios:
+            temporario.unlink(missing_ok=True)
+    _entregar(db, job, midia, original)
+    logging.info(f"[{midia['organizacao_id']}] [midia {midia['_id']}] Filtro neural ({tipo}) pronto; ingestão na fila.")
+    reportar(100, "Filtro pronto")
+    return {"midia_id": str(midia["_id"])}

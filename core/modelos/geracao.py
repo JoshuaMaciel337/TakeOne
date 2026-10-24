@@ -177,3 +177,35 @@ def montar_fluxo_do_preenchimento(descricao: str, imagem: str, largura: int, alt
         "9": {"class_type": "VAEDecode", "inputs": {"samples": ["18", 0], "vae": ["3", 0]}},
         "11": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": prefixo}},
     }
+
+
+# Os filtros neurais do editor de imagem pelo mesmo VACE: a foto inteira como vídeo de controle e a máscara toda
+# acesa, com o texto dizendo o que mudar. Na transferência de estilo a foto vai colorida e o texto é o estilo; no
+# colorir, vai em cinza e só a cor do resultado volta (core/utils/foto_neural.py).
+ESTILOS = {
+    "oleo": ("Pintura a óleo", "pintura a óleo impressionista, pinceladas grossas e visíveis, tela de pintura"),
+    "aquarela": ("Aquarela", "pintura em aquarela, manchas de tinta suaves, papel de aquarela, bordas que escorrem"),
+    "lapis": ("Desenho a lápis", "desenho a lápis grafite em papel, traços e sombreado à mão, preto e branco"),
+    "quadrinhos": ("Quadrinhos",
+                   "ilustração de história em quadrinhos, contornos pretos fortes, cores chapadas, retícula"),
+    "anime": ("Anime", "ilustração em estilo anime, cores limpas, contornos finos, céu pintado à mão"),
+    "pop": ("Pop art", "pop art, cores primárias saturadas, contornos grossos, pontos de retícula"),
+    "vitral": ("Vitral", "vitral de igreja, pedaços de vidro colorido, contornos de chumbo"),
+    "mosaico": ("Mosaico", "mosaico de pastilhas de cerâmica, peças pequenas e coloridas"),
+    "digital": ("Arte digital", "arte digital pintada, luz cinematográfica, cores vibrantes, detalhes nítidos"),
+}
+DESCRICAO_DO_COLORIR = "fotografia colorida com cores naturais e realistas"
+# Sem isto, o colorir saía em neon (roxo e amarelo fortes) mesmo com o texto pedindo cores naturais
+NEGATIVO_DO_COLORIR = "cores saturadas demais, neon, cores artificiais, roxo e amarelo fortes"
+
+
+def montar_fluxo_do_vace_inteiro(descricao: str, imagem: str, largura: int, altura: int, semente: int,
+                                 prefixo: str, negativo_extra: str = "") -> dict:
+    """O VACE guiado pela foto inteira (`imagem`, já no ComfyUI): sem área a preencher, a máscara toda acesa."""
+    fluxo = montar_fluxo_do_preenchimento(descricao, imagem, largura, altura, semente, prefixo)
+    if negativo_extra:
+        fluxo["6"]["inputs"]["text"] = f"{NEGATIVO}, {negativo_extra}"
+    fluxo["14"] = {"class_type": "SolidMask", "inputs": {"value": 1.0, "width": largura, "height": altura}}
+    fluxo["7"]["inputs"]["control_video"] = ["12", 0]
+    del fluxo["16"], fluxo["17"]
+    return fluxo
