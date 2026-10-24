@@ -5,6 +5,7 @@
 import type { ContextoDoFiltro, ImagemDoFiltro } from "./comum.ts";
 import { hexParaRgb } from "./comum.ts";
 import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radial } from "./desfoque.ts";
+import { desfoqueDeLente } from "./lente.ts";
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
 import { coresNtsc, desentrelacar, difusao, encontrarBordas, entalhe, extrusao, ladrilhos, pinturaAOleo, solarizar, tracarContorno, vento } from "./estilizacao.ts";
 import { cristalizar, fragmentar, kuwahara, meiaTinta, meioTomEmCores, mosaico, pontilhismo } from "./pixelizacao.ts";
@@ -32,7 +33,7 @@ export type ValorDaOpcao = number | boolean | string;
 export type Valores = Record<string, ValorDaOpcao>;
 export type Opcao =
   | { id: string; nome: string; tipo: "numero"; minimo: number; maximo: number; passo?: number; padrao: number; sufixo?: string }
-  | { id: string; nome: string; tipo: "escolha"; opcoes: { id: string; nome: string }[]; padrao: string }
+  | { id: string; nome: string; tipo: "escolha"; opcoes: { id: string; nome: string }[]; padrao: string; comCanais?: boolean }
   | { id: string; nome: string; tipo: "marcar"; padrao: boolean }
   | { id: string; nome: string; tipo: "cor"; padrao: string }
   | { id: string; nome: string; tipo: "matriz"; padrao: string };
@@ -62,7 +63,7 @@ export type DefinicaoDoFiltro = {
 };
 
 const numero = (id: string, nome: string, minimo: number, maximo: number, padrao: number, sufixo = "", passo?: number): Opcao => ({ id, nome, tipo: "numero", minimo, maximo, padrao, sufixo, passo });
-const escolha = (id: string, nome: string, opcoes: [string, string][], padrao?: string): Opcao => ({ id, nome, tipo: "escolha", opcoes: opcoes.map(([valor, rotulo]) => ({ id: valor, nome: rotulo })), padrao: padrao ?? opcoes[0][0] });
+const escolha = (id: string, nome: string, opcoes: [string, string][], padrao?: string): Extract<Opcao, { tipo: "escolha" }> => ({ id, nome, tipo: "escolha", opcoes: opcoes.map(([valor, rotulo]) => ({ id: valor, nome: rotulo })), padrao: padrao ?? opcoes[0][0] });
 const marcar = (id: string, nome: string, padrao = false): Opcao => ({ id, nome, tipo: "marcar", padrao });
 const n = (v: Valores, id: string) => Number(v[id]);
 const s = (v: Valores, id: string) => String(v[id]);
@@ -81,6 +82,45 @@ export const FILTROS: DefinicaoDoFiltro[] = [
   { id: "mais_desfoque", nome: "Mais desfoque", grupo: "desfoque", opcoes: [], semJanela: true, margem: () => 5, aplicar: (imagem, v, ctx) => desfoques.mais_desfoque(imagem, v, ctx) },
   { id: "caixa", nome: "Desfoque de caixa", grupo: "desfoque", opcoes: [numero("raio", "Raio", 1, 2000, 10, "px")], margem: (v) => n(v, "raio"), aplicar: (imagem, v, ctx) => caixa(imagem, n(v, "raio") * ctx.escala) },
   { id: "gaussiano", nome: "Desfoque gaussiano", grupo: "desfoque", opcoes: [numero("raio", "Raio", 0.1, 1000, 3, "px", 0.1)], margem: (v) => 3 * n(v, "raio"), aplicar: (imagem, v, ctx) => gaussiano(imagem, n(v, "raio") * ctx.escala) },
+  {
+    id: "lente",
+    nome: "Desfoque de lente",
+    grupo: "desfoque",
+    opcoes: [
+      { ...escolha("fonte", "Mapa de profundidade", [["nenhuma", "Nenhum"], ["transparencia", "A transparência"], ["luz", "A luz da camada"], ["mascara", "A máscara da camada"], ["degrade", "De cima para baixo"]]), comCanais: true },
+      numero("focal", "Distância focal", 0, 255, 0),
+      marcar("inverter", "Inverter"),
+      escolha("iris", "Forma da íris", [["6", "Hexágono"], ["3", "Triângulo"], ["4", "Quadrado"], ["5", "Pentágono"], ["7", "Heptágono"], ["8", "Octógono"], ["circulo", "Círculo"]]),
+      numero("raio", "Raio", 0, 100, 15, "px"),
+      numero("curvatura", "Curvatura das lâminas", 0, 100, 0),
+      numero("rotacao", "Rotação", 0, 360, 0, "°"),
+      numero("brilho", "Brilho especular", 0, 100, 0),
+      numero("limiar", "Limiar especular", 0, 255, 255),
+      numero("ruido", "Ruído", 0, 100, 0),
+      escolha("distribuicao", "Distribuição do ruído", [["uniforme", "Uniforme"], ["gaussiana", "Gaussiana"]]),
+      marcar("monocromatico", "Ruído monocromático"),
+    ],
+    margem: (v) => n(v, "raio"),
+    aplicar: (imagem, v, ctx) =>
+      desfoqueDeLente(
+        imagem,
+        {
+          fonte: s(v, "fonte"),
+          focal: n(v, "focal"),
+          inverter: Boolean(v.inverter),
+          iris: s(v, "iris"),
+          raio: n(v, "raio") * ctx.escala,
+          curvatura: n(v, "curvatura"),
+          rotacao: n(v, "rotacao"),
+          brilho: n(v, "brilho"),
+          limiar: n(v, "limiar"),
+          ruido: n(v, "ruido"),
+          distribuicao: s(v, "distribuicao"),
+          monocromatico: Boolean(v.monocromatico),
+        },
+        ctx,
+      ),
+  },
   {
     id: "movimento",
     nome: "Desfoque de movimento",
@@ -328,7 +368,7 @@ export const FILTROS: DefinicaoDoFiltro[] = [
     nome: "Reflexo de lente",
     grupo: "renderizacao",
     opcoes: [numero("brilho", "Brilho", 10, 300, 100, "%"), numero("centro_x", "Centro (horizontal)", 0, 100, 30, "%"), numero("centro_y", "Centro (vertical)", 0, 100, 30, "%"), escolha("tipo", "Tipo de lente", [["zoom", "Zoom de 50 a 300 mm"], ["35mm", "35 mm"], ["105mm", "105 mm"], ["filme", "De filme"]])],
-    aplicar: (imagem, v, ctx) => reflexoDeLente(imagem, n(v, "brilho"), noFiltro(v, ctx, "centro_x", "centro_y"), s(v, "tipo"), ctx),
+    aplicar: (imagem, v, ctx) => reflexoDeLente(imagem, n(v, "brilho"), noFiltro(v, ctx, "centro_x", "centro_y"), s(v, "tipo")),
   },
   {
     id: "efeitos_de_iluminacao",
@@ -509,7 +549,7 @@ export function valoresDoFiltro(definicao: DefinicaoDoFiltro, v: Valores = {}): 
     const dado = v[opcao.id];
     if (opcao.tipo === "numero") saida[opcao.id] = typeof dado === "number" && Number.isFinite(dado) ? Math.min(opcao.maximo, Math.max(opcao.minimo, dado)) : opcao.padrao;
     else if (opcao.tipo === "marcar") saida[opcao.id] = typeof dado === "boolean" ? dado : opcao.padrao;
-    else if (opcao.tipo === "escolha") saida[opcao.id] = typeof dado === "string" && opcao.opcoes.some((item) => item.id === dado) ? dado : opcao.padrao;
+    else if (opcao.tipo === "escolha") saida[opcao.id] = typeof dado === "string" && (opcao.opcoes.some((item) => item.id === dado) || (opcao.comCanais && /^canal:[\w-]{1,64}$/.test(dado))) ? dado : opcao.padrao;
     else saida[opcao.id] = typeof dado === "string" ? dado : opcao.padrao;
   }
   return saida;

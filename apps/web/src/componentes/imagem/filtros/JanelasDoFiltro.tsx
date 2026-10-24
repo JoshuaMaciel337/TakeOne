@@ -18,9 +18,11 @@ export function JanelaDoFiltroInteligente({
   aoPrever,
   aoConfirmar,
   aoCancelar,
+  canais,
 }: {
   tipo: string;
   inicial: Valores;
+  canais?: { id: string; nome: string }[];
   /** O filtro com as opções da vez (null: sem o Visualizar, como estava). */
   aoPrever: (valores: Valores | null) => void;
   aoConfirmar: (valores: Valores) => void;
@@ -44,7 +46,7 @@ export function JanelaDoFiltroInteligente({
       }
     >
       <div className="p-3 text-xs">
-        <OpcoesDoFiltro definicao={definicao} valores={valores} aoPrever={setValores} aoMudar={setValores} />
+        <OpcoesDoFiltro definicao={definicao} valores={valores} aoPrever={setValores} aoMudar={setValores} canais={canais} />
       </div>
     </JanelaFlutuante>
   );

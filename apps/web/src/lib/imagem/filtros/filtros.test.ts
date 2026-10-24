@@ -109,3 +109,34 @@ test("encontrar bordas deixa o liso branco", () => {
   const img = imagem(5, 5, [80, 120, 40, 255]);
   assert.deepEqual(pixel(aplicarFiltro(img, "encontrar_bordas", {}, ctx), 2, 2), [255, 255, 255, 255]);
 });
+
+test("desfoque de lente: a íris vale 1 nos cantos e no meio dos lados, e a curvatura 100 é o círculo", async () => {
+  const { normaDaIris } = await import("./lente.ts");
+  const hexagono = normaDaIris(6, 0, 0);
+  // Os cantos ficam no círculo de raio 1; o meio dos lados, no apótema
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 2;
+    assert.ok(Math.abs(hexagono(Math.cos(a), Math.sin(a)) - 1) < 1e-9);
+  }
+  assert.ok(Math.abs(hexagono(Math.cos(Math.PI / 6 - Math.PI / 2) * Math.cos(Math.PI / 6), Math.sin(Math.PI / 6 - Math.PI / 2) * Math.cos(Math.PI / 6)) - 1) < 1e-9);
+  assert.ok(Math.abs(normaDaIris(5, 100, 30)(0.3, 0.4) - 0.5) < 1e-9);
+});
+
+test("desfoque de lente sem mapa espalha o ponto num disco, sem perder a soma", () => {
+  const ponto = imagem(41, 41, [0, 0, 0, 0], [[20, 20, [255, 255, 255, 255]]]);
+  const saida = aplicarFiltro(ponto, "lente", { fonte: "nenhuma", raio: 6, iris: "circulo" }, ctx);
+  assert.ok(Math.abs(soma(saida, 3) - 255) <= 40, `alfa somou ${soma(saida, 3)}`);
+  assert.ok(pixel(saida, 24, 20)[3] > 0 && pixel(saida, 30, 20)[3] === 0);
+});
+
+test("desfoque de lente com mapa: o nítido fica, e não vaza para o fundo borrado", () => {
+  // Fundo preto; à esquerda (profundidade 0, no foco) um ponto branco; à direita (profundidade 1) borrado
+  const img = imagem(30, 21, [0, 0, 0, 255], [[13, 10, [255, 255, 255, 255]], [24, 10, [255, 255, 255, 255]]]);
+  const mapa = new Float32Array(30 * 21).map((_, p) => (p % 30 >= 15 ? 1 : 0));
+  const saida = aplicarFiltro(img, "lente", { fonte: "mascara", raio: 6, focal: 0, iris: "circulo" }, { ...ctx, mapa: () => mapa });
+  assert.deepEqual(pixel(saida, 13, 10), [255, 255, 255, 255]);
+  // Logo depois da divisa, no borrado, o ponto nítido não chega
+  assert.deepEqual(pixel(saida, 16, 10), [0, 0, 0, 255]);
+  // O ponto do borrado se espalha e perde força
+  assert.ok(pixel(saida, 24, 10)[0] < 128 && pixel(saida, 27, 10)[0] > 0);
+});

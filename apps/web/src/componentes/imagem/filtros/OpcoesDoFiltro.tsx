@@ -8,7 +8,20 @@ import { type DefinicaoDoFiltro, type ValorDaOpcao, type Valores, valoresDoFiltr
 
 const caixa = "rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-texto";
 
-export function OpcoesDoFiltro({ definicao, valores, aoPrever, aoMudar }: { definicao: DefinicaoDoFiltro; valores: Valores; aoPrever: (valores: Valores) => void; aoMudar: (valores: Valores) => void }) {
+export function OpcoesDoFiltro({
+  definicao,
+  valores,
+  aoPrever,
+  aoMudar,
+  canais = [],
+}: {
+  definicao: DefinicaoDoFiltro;
+  valores: Valores;
+  aoPrever: (valores: Valores) => void;
+  aoMudar: (valores: Valores) => void;
+  /** Os canais alfa do documento (o mapa de profundidade do desfoque de lente). */
+  canais?: { id: string; nome: string }[];
+}) {
   const v = valoresDoFiltro(definicao, valores);
   const com = (id: string, valor: ValorDaOpcao) => ({ ...v, [id]: valor });
   if (!definicao.opcoes.length) return <p className="text-suave">Este filtro não tem opções.</p>;
@@ -34,7 +47,7 @@ export function OpcoesDoFiltro({ definicao, valores, aoPrever, aoMudar }: { defi
             <label key={opcao.id} className="flex items-center gap-2 text-suave">
               {opcao.nome}:
               <select className={`${caixa} flex-1`} value={String(v[opcao.id])} aria-label={opcao.nome} onChange={(evento) => aoMudar(com(opcao.id, evento.currentTarget.value))}>
-                {opcao.opcoes.map((item) => (
+                {[...opcao.opcoes, ...(opcao.comCanais ? canais.map((canal) => ({ id: `canal:${canal.id}`, nome: `Canal: ${canal.nome}` })) : [])].map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.nome}
                   </option>

@@ -94,8 +94,11 @@ export function JanelaDeAjusteNosPixels({
   aoVisualizar,
   aoConfirmar,
   aoCancelar,
+  canais,
 }: {
   operacao: OperacaoDosPixels;
+  /** Os canais alfa do documento (o mapa de profundidade do desfoque de lente). */
+  canais?: { id: string; nome: string }[];
   visualizar: boolean;
   /** Os pixels da camada, pequenos (o histograma e os automáticos). */
   imagem: ImagemRgba | null;
@@ -139,7 +142,7 @@ export function JanelaDeAjusteNosPixels({
     const definicao = FILTRO_POR_ID.get(operacao.filtro);
     conteudo = definicao ? (
       <div className="p-3 text-xs">
-        <OpcoesDoFiltro definicao={definicao} valores={operacao.opcoes} aoPrever={(opcoes) => aoMudar({ ...operacao, opcoes })} aoMudar={(opcoes) => aoMudar({ ...operacao, opcoes })} />
+        <OpcoesDoFiltro definicao={definicao} valores={operacao.opcoes} aoPrever={(opcoes) => aoMudar({ ...operacao, opcoes })} aoMudar={(opcoes) => aoMudar({ ...operacao, opcoes })} canais={canais} />
       </div>
     ) : null;
   } else if (operacao.tipo === "sombrasRealces") {

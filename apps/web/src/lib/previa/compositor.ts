@@ -66,7 +66,13 @@ export type Camada = {
    * Os filtros inteligentes (editor de imagem): os ligados, a máscara deles (a mesma forma da máscara da camada) e o
    * tamanho do documento, em que as medidas dos filtros são dadas.
    */
-  filtros?: { lista: FiltroInteligente[]; mascara?: Camada["mascaraDaCamada"]; documento: { largura: number; altura: number } } | null;
+  filtros?: {
+    lista: FiltroInteligente[];
+    mascara?: Camada["mascaraDaCamada"];
+    documento: { largura: number; altura: number };
+    /** Os canais alfa que os filtros leem (do tamanho do documento), pelo id, com a versão (a chave do resultado guardado). */
+    canais?: Record<string, { fonte: TexImageSource; versao: string }>;
+  } | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
   /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
@@ -1869,14 +1875,49 @@ export class Compositor {
     // A origem do quadro local no documento (o ruído e as texturas ficam presos ao documento)
     const origem = { x: (caixa.cx - quadroLocal.largura / 2) / doDocumento, y: (caixa.cy - quadroLocal.altura / 2) / doDocumento };
     const contexto = { escala: doDocumento * densidade, primeiroPlano: [0, 0, 0] as [number, number, number], fundo: [1, 1, 1] as [number, number, number], origem, documento: filtros.documento };
+    // Os mapas de fora da camada (o desfoque de lente): a máscara dela no quadro local, ou um canal do documento
+    const mapa = (fonte: string): Float32Array | null => {
+      if (fonte === "mascara") {
+        if (!mascaraDaCamada) return null;
+        const valores = new Float32Array(w * h);
+        for (let p = 0; p < w * h; p++) valores[p] = mascaraDaCamada[p * 4 + 3] / 255;
+        return valores;
+      }
+      const canal = fonte.startsWith("canal:") ? filtros.canais?.[fonte.slice(6)] : undefined;
+      if (!canal) return null;
+      const escala = contexto.escala;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      const fonteLargura = (canal.fonte as { width: number }).width;
+      const fonteAltura = (canal.fonte as { height: number }).height;
+      const kx = fonteLargura / filtros.documento.largura;
+      const ky = fonteAltura / filtros.documento.altura;
+      // A janela do quadro local no canal (o que fica fora do documento é zero)
+      ctx2d.drawImage(canal.fonte as CanvasImageSource, origem.x * kx, origem.y * ky, (w / escala) * kx, (h / escala) * ky, 0, 0, w, h);
+      const lidos = ctx2d.getImageData(0, 0, w, h).data;
+      const valores = new Float32Array(w * h);
+      for (let p = 0; p < w * h; p++) valores[p] = (lidos[p * 4] / 255) * (lidos[p * 4 + 3] / 255);
+      return valores;
+    };
     // Um resumo dos pixels (FNV-1a nas palavras de 4 bytes), dos filtros e do lugar
     const palavras = new Uint32Array(antes.buffer);
     let resumo = 0x811c9dc5;
     for (let i = 0; i < palavras.length; i++) resumo = Math.imul(resumo ^ palavras[i], 0x01000193);
-    const chave = `${w}x${h}:${resumo >>> 0}:${JSON.stringify([filtros.lista, contexto])}`;
+    // Os mapas lidos entram na chave: a versão de cada canal e um resumo da máscara, quando um filtro a lê
+    const fontes = filtros.lista.map((filtro) => filtro.opcoes.fonte).filter((fonte) => typeof fonte === "string");
+    let resumoDosMapas = fontes.map((fonte) => (String(fonte).startsWith("canal:") ? (filtros.canais?.[String(fonte).slice(6)]?.versao ?? "-") : "")).join(",");
+    if (fontes.includes("mascara") && mascaraDaCamada) {
+      let r = 0x811c9dc5;
+      const m = new Uint32Array(mascaraDaCamada.buffer);
+      for (let i = 0; i < m.length; i++) r = Math.imul(r ^ m[i], 0x01000193);
+      resumoDosMapas += `:m${r >>> 0}`;
+    }
+    const chave = `${w}x${h}:${resumo >>> 0}:${resumoDosMapas}:${JSON.stringify([filtros.lista, contexto])}`;
     let filtrada = this.filtradosGuardados.get(chave);
     if (!filtrada) {
-      filtrada = aplicarPilha({ largura: w, altura: h, dados: antes }, filtros.lista, contexto);
+      filtrada = aplicarPilha({ largura: w, altura: h, dados: antes }, filtros.lista, { ...contexto, mapa });
       if (this.filtradosGuardados.size > 8) this.filtradosGuardados.delete(this.filtradosGuardados.keys().next().value!);
       this.filtradosGuardados.set(chave, filtrada);
     }

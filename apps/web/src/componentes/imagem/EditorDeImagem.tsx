@@ -1549,6 +1549,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   useEffect(() => {
     if (arquivoDoObjeto) levarObjeto(arquivoDoObjeto);
   }, [arquivoDoObjeto]);
+  /** A máscara de camada pintável levada ao documento (o cinza dela em cada pixel do documento). */
+  const mascaraNoDocumento = async (clipe: Clipe): Promise<Selecao | null> => {
+    const mascara = clipe.mascara_pixels;
+    const medida = caixasRef.current.get(clipe.id);
+    if (!mascara || !medida?.bruta || !medida.quadro) return null;
+    const documento = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    const imagem = pinturas.fonteDaMascara(clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
+    // A máscara tem o tamanho do documento de quando foi feita: o pixel dela vai para o documento pela matriz
+    const escala: Afim = [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0];
+    return imagemNoDocumento(imagem, compor(matrizDaMascaraNoDocumento(mascara, medida.bruta, medida.quadro, documento), escala), documento, "cinza");
+  };
   /** Ctrl + clique na miniatura: a seleção pela transparência da camada (sozinha) ou pelo cinza da máscara dela. */
   const selecionarDaCamada = async (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara", inverter = false) => {
     const atual = projetoRef.current;
@@ -1559,13 +1570,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       await pinturas.esperar();
       let nova: Selecao;
       if (de === "mascara") {
-        const mascara = achado.clipe.mascara_pixels;
-        const medida = caixasRef.current.get(clipeId);
-        if (!mascara || !medida?.bruta || !medida.quadro) return;
-        const imagem = pinturas.fonteDaMascara(achado.clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
-        // A máscara tem o tamanho do documento de quando foi feita: o pixel dela vai para o documento pela matriz
-        const escala: Afim = [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0];
-        nova = imagemNoDocumento(imagem, compor(matrizDaMascaraNoDocumento(mascara, medida.bruta, medida.quadro, documento), escala), documento, "cinza");
+        const daMascara = await mascaraNoDocumento(achado.clipe);
+        if (!daMascara) return;
+        nova = daMascara;
       } else {
         const sozinha = projetoSoCom(atual, [achado.faixa.id], { neutras: new Set([achado.faixa.id]), semEstilo: true, semMascara: true });
         const imagem = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte }));
@@ -2120,6 +2127,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     operacao: OperacaoDosPixels;
     visualizar: boolean;
   } | null>(null);
+  // Os mapas do documento que os filtros nos pixels leem (o desfoque de lente), pela fonte e pela versão
+  const mapasDosFiltros = useRef(new Map<string, Selecao>());
+  const [mapasProntos, setMapasProntos] = useState(0);
+  const chaveDoMapa = (fonte: string, clipeId?: string) => {
+    const atual = projetoRef.current;
+    if (fonte.startsWith("canal:")) {
+      const canal = atual?.canais?.find((item) => item.id === fonte.slice(6));
+      return canal ? `${fonte}@${canal.versao}` : fonte;
+    }
+    const mascara = atual && clipeId ? acharClipe(atual, clipeId)?.clipe.mascara_pixels : null;
+    return mascara ? `mascara:${clipeId}@${mascara.midia_id}:${mascara.versao}` : `mascara:${clipeId}`;
+  };
   const [estatisticasDaOrigem, setEstatisticasDaOrigem] = useState<{ origem: string; estatisticas: Estatisticas | null } | null>(null);
   /** A camada sozinha (ou o documento, com `null`) desenhada pequena: o histograma e a cor de origem. */
   const imagemPequena = async (faixaId: string | null): Promise<ImagemRgba | null> => {
@@ -2147,7 +2166,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       aplicarAjusteNosPixels(dados, compilarAjuste(ajuste, daPesquisa), sessao.cobertura);
       return dados;
     }
-    if (operacao.tipo === "filtro") return filtrarPixelsRetos(sessao.original, sessao.largura, sessao.altura, operacao.filtro, operacao.opcoes, sessao.cobertura);
+    if (operacao.tipo === "filtro") return filtrarPixelsRetos(sessao.original, sessao.largura, sessao.altura, operacao.filtro, operacao.opcoes, sessao.cobertura, inverter(sessao.matriz), sessao.clipeId);
     if (operacao.tipo === "sombrasRealces") sombrasRealces(dados, sessao.largura, sessao.altura, operacao.opcoes);
     else if (operacao.tipo === "hdr") tonalizacaoHdr(dados, sessao.largura, sessao.altura, operacao.opcoes);
     else if (operacao.tipo === "substituir") substituirCor(dados, operacao.opcoes);
@@ -2169,8 +2188,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       pinturas.avisarQuadro();
     }, 60);
     return () => window.clearTimeout(espera);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a conta lê a sessão e a origem, que estão nas dependências
-  }, [nosPixels, estatisticasDaOrigem]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a conta lê a sessão, a origem e os mapas, que estão nas dependências
+  }, [nosPixels, estatisticasDaOrigem, mapasProntos]);
+  // O mapa de profundidade do desfoque de lente nos pixels: o canal ou a máscara da camada, carregado uma vez por versão
+  const fonteDaLente = nosPixels?.operacao.tipo === "filtro" && nosPixels.operacao.filtro === "lente" ? String(nosPixels.operacao.opcoes.fonte ?? "") : "";
+  const chaveDaLente = fonteDaLente === "mascara" || fonteDaLente.startsWith("canal:") ? chaveDoMapa(fonteDaLente, nosPixels?.clipeId) : "";
+  useEffect(() => {
+    if (!chaveDaLente || mapasDosFiltros.current.has(chaveDaLente)) return;
+    const atual = projetoRef.current;
+    const canal = fonteDaLente.startsWith("canal:") ? atual?.canais?.find((item) => item.id === fonteDaLente.slice(6)) : undefined;
+    const achado = atual && nosPixels ? acharClipe(atual, nosPixels.clipeId) : null;
+    const carregar = canal ? selecaoDoCanal(canal) : achado ? mascaraNoDocumento(achado.clipe) : Promise.resolve(null);
+    carregar
+      .then((mapa) => {
+        if (!mapa) return;
+        mapasDosFiltros.current.set(chaveDaLente, mapa);
+        setMapasProntos((n) => n + 1);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave já diz a fonte, a camada e a versão
+  }, [chaveDaLente]);
   // A cor da origem do Corresponder cor, desenhada pequena quando muda
   const origemDoCorresponder = nosPixels?.operacao.tipo === "corresponder" ? nosPixels.operacao.origem : null;
   useEffect(() => {
@@ -2306,7 +2343,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     [filtroAberto, pilhaComFiltro],
   );
   /** O filtro em pixels pré-multiplicados (como o compositor) sobre a camada de pixels em cor reta, com a seleção. */
-  const filtrarPixelsRetos = (original: Uint8ClampedArray, largura: number, altura: number, tipo: string, opcoes: Valores, cobertura: Uint8ClampedArray | Uint8Array | null): Uint8ClampedArray => {
+  const filtrarPixelsRetos = (original: Uint8ClampedArray, largura: number, altura: number, tipo: string, opcoes: Valores, cobertura: Uint8ClampedArray | Uint8Array | null, paraDocumento?: Afim, clipeId?: string): Uint8ClampedArray => {
     const documento = tamanhoDaImagem(projetoRef.current ?? projeto!);
     const pre = new Uint8ClampedArray(original.length);
     for (let i = 0; i < pre.length; i += 4) {
@@ -2320,6 +2357,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       fundo: corEmRgb(cores.fundo),
       origem: { x: 0, y: 0 },
       documento,
+      // O mapa de profundidade do desfoque de lente: um canal ou a máscara da camada, já carregados, lidos no documento
+      mapa: (fonte) => {
+        const doc = mapasDosFiltros.current.get(chaveDoMapa(fonte, clipeId));
+        if (!doc || !paraDocumento) return null;
+        const mapa = new Float32Array(largura * altura);
+        const [a, b, c, d, e, f] = paraDocumento;
+        for (let y = 0, p = 0; y < altura; y++) {
+          for (let x = 0; x < largura; x++, p++) {
+            const dx = Math.floor(a * (x + 0.5) + c * (y + 0.5) + e);
+            const dy = Math.floor(b * (x + 0.5) + d * (y + 0.5) + f);
+            mapa[p] = dx >= 0 && dy >= 0 && dx < doc.largura && dy < doc.altura ? doc.dados[dy * doc.largura + dx] / 255 : 0;
+          }
+        }
+        return mapa;
+      },
     }).dados;
     const dados = new Uint8ClampedArray(original.length);
     for (let p = 0, i = 0; i < dados.length; p++, i += 4) {
@@ -5423,6 +5475,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoVisualizar={(visualizar) => setNosPixels((atual) => (atual ? { ...atual, visualizar } : atual))}
           aoConfirmar={confirmarNosPixels}
           aoCancelar={cancelarNosPixels}
+          canais={projeto.canais ?? []}
         />
       ) : null}
       {filtroAberto ? (
@@ -5431,6 +5484,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           tipo={filtroAberto.tipo}
           inicial={filtroAberto.inicial}
           aoPrever={preverFiltro}
+          canais={projeto?.canais ?? []}
           aoConfirmar={(valores) => {
             const filtros = pilhaComFiltro(valores);
             setProvisorio(null);

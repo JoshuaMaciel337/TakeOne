@@ -455,6 +455,8 @@ export function camadaDoCompositor(
   documento?: { luz?: LuzGlobal | null; fundo?: string | null; tamanho?: { largura: number; altura: number } } | null,
   /** A máscara dos filtros inteligentes (a imagem dela e o quadro em que a caixa foi medida), como a da camada. */
   mascaraDosFiltros?: { fonte: TexImageSource; quadro: Tamanho } | null,
+  /** Os canais alfa que os filtros leem (o desfoque de lente), pelo id, com a versão. */
+  canaisDosFiltros?: Record<string, { fonte: TexImageSource; versao: string }>,
 ): Camada {
   const mascara = camada.clipe.mascara_pixels;
   // O estilo de camada do editor de imagem fica no lugar do contorno e da sombra de antes
@@ -514,12 +516,17 @@ export function camadaDoCompositor(
     chroma: camada.clipe.texto ? null : camada.clipe.chroma,
     chaveLuma: camada.clipe.texto ? null : camada.clipe.chave_luma,
     mascaraDoFundo,
-    filtros: filtrosDaCamada(camada, documento?.tamanho, mascaraDosFiltros),
+    filtros: filtrosDaCamada(camada, documento?.tamanho, mascaraDosFiltros, canaisDosFiltros),
   };
 }
 
 /** Os filtros inteligentes que valem, com a máscara deles levada à caixa da camada (como a máscara da camada). */
-function filtrosDaCamada(camada: CamadaNaTela, documento: { largura: number; altura: number } | undefined, mascara: { fonte: TexImageSource; quadro: Tamanho } | null | undefined): Camada["filtros"] {
+function filtrosDaCamada(
+  camada: CamadaNaTela,
+  documento: { largura: number; altura: number } | undefined,
+  mascara: { fonte: TexImageSource; quadro: Tamanho } | null | undefined,
+  canais: Record<string, { fonte: TexImageSource; versao: string }> | undefined,
+): Camada["filtros"] {
   const pilha = camada.clipe.filtros_inteligentes;
   const lista = filtrosQueValem(pilha);
   if (!lista.length || !documento) return null;
@@ -528,5 +535,6 @@ function filtrosDaCamada(camada: CamadaNaTela, documento: { largura: number; alt
     lista,
     documento,
     mascara: daMascara && mascara ? { fonte: mascara.fonte, matriz: matrizEmUso(daMascara, camada.caixa, mascara.quadro), densidade: daMascara.densidade, difusao: daMascara.difusao } : null,
+    canais,
   };
 }

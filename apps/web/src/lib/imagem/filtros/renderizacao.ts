@@ -84,7 +84,7 @@ export function fibras(imagem: ImagemDoFiltro, frente: Rgb, fundo: Rgb, varianci
 }
 
 /** Reflexo de lente: o brilho no centro e os fantasmas na reta até o meio da imagem, somados em "tela". */
-export function reflexoDeLente(imagem: ImagemDoFiltro, brilho: number, centro: { x: number; y: number }, tipo: string, ctx: ContextoDoFiltro): ImagemDoFiltro {
+export function reflexoDeLente(imagem: ImagemDoFiltro, brilho: number, centro: { x: number; y: number }, tipo: string): ImagemDoFiltro {
   const { largura, altura } = imagem;
   const forca = brilho / 100;
   const escala = Math.min(largura, altura) / 600;

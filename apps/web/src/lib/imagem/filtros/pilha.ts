@@ -14,6 +14,10 @@ export type FiltrosInteligentes = { filtros: FiltroInteligente[]; ligado?: boole
 export const filtrosQueValem = (pilha: FiltrosInteligentes | null | undefined): FiltroInteligente[] =>
   pilha && pilha.ligado !== false ? pilha.filtros.filter((filtro) => filtro.ligado && FILTRO_POR_ID.has(filtro.tipo)) : [];
 
+/** Os canais alfa que os filtros leem (o mapa de profundidade do desfoque de lente), pelo id. */
+export const canaisDaPilha = (filtros: FiltroInteligente[]): string[] =>
+  [...new Set(filtros.flatMap((filtro) => (typeof filtro.opcoes.fonte === "string" && filtro.opcoes.fonte.startsWith("canal:") ? [filtro.opcoes.fonte.slice(6)] : [])))];
+
 /** Quanto a pilha pode passar da camada, em pixels do documento (as margens se somam). */
 export function margemDaPilha(filtros: FiltroInteligente[]): number {
   let margem = 0;
