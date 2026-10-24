@@ -175,6 +175,9 @@ export type AcoesDosMenus = {
   grupoEscolhido: boolean;
   prancheta: (como: "nova" | "grupo" | "camadas") => void;
   exportarPranchetas: () => void;
+  /** Arquivo › Exportar › Camadas em arquivos e Arquivo › Gerar › Ativos de imagem. */
+  camadasEmArquivos: () => void;
+  gerarAtivos: () => void;
   /** Arquivo › Exportar › PSD com as camadas. */
   exportarPsd: () => void;
   salvar: () => void;
@@ -334,6 +337,10 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Colocar incorporado…", aoEscolher: a.colocarIncorporado, titulo: "Uma imagem do computador entra como camada neste documento" },
         "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
+        {
+          nome: "Gerar",
+          itens: [{ nome: "Ativos de imagem", aoEscolher: a.gerarAtivos, titulo: 'As camadas com o nome terminado numa extensão ("logo.png", "200% logo@2x.png", "foto.jpg80") viram arquivos num ZIP' }],
+        },
         "-",
         {
           nome: "Exportar",
@@ -343,7 +350,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Salvar para web…", atalho: "Ctrl+Alt+Shift+S", aoEscolher: a.salvarParaWeb, titulo: "GIF, PNG-8, JPG e WebP com a original e a otimizada lado a lado" },
             { nome: "Preferências de exportação…", aoEscolher: a.preferenciasDeExportacao },
             "-",
-            { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas },
+            { nome: "Camadas em arquivos…", aoEscolher: a.camadasEmArquivos, titulo: "Cada camada sozinha num arquivo (num ZIP)" },
+            { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas, titulo: "Cada prancheta num arquivo, ou todas num PDF" },
             { nome: "PSD com as camadas", aoEscolher: a.exportarPsd, titulo: "As camadas, as pastas, as máscaras, os modos e os ajustes, para abrir em outro editor" },
           ],
         },

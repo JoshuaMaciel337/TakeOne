@@ -262,7 +262,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Abrir e salvar PSD com as camadas (grupos, máscaras, mesclagens, textos e ajustes quando der). Os textos vão e voltam como pixels (com o nome da camada): o texto do arquivo depende das fontes de quem o fez
 - [x] Colocar incorporado (do computador ou da biblioteca)
 - [x] Exportar como (PNG, JPG com qualidade, WebP com e sem perda, GIF, TIFF, AVIF, BMP, ICO, PDF), Exportação rápida, Salvar para web (GIF e PNG-8 com paleta), Preferências de exportação
-- [ ] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem
+- [x] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem (as comps em arquivos vêm com as comps de camada, na 13.15)
 - [ ] Duplicar documento; Informações do arquivo; Imprimir
 - [ ] Modo: Escala de cinza, Bitmap (limiar, pontilhado, meio-tom), Duotone, Cores indexadas (paletas, pontilhado, tabela de cores); CMYK e Lab na prova e na exportação; 16 e 32 bits desligados com o motivo
 - [ ] Prova de cores e alerta de gama; simulação de daltonismo

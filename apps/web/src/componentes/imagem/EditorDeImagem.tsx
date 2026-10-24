@@ -45,7 +45,7 @@ import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, 
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
-import { baixarBlob, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO } from "@/lib/exportacao/exportarComo";
+import { baixarBlob, caixaDoConteudo as caixaDoDesenho, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
 import { PainelFotoIA } from "./PainelFotoIA";
@@ -109,7 +109,8 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
 import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
-import { JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { JanelaCamadasEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { gerarAtivos } from "@/lib/exportacao/varios";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
 import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
@@ -471,6 +472,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [selecao, definirSelecao] = useState<string[]>([]);
   const [exportando, setExportando] = useState<false | "exportar" | "web">(false);
   const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
+  const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
@@ -738,6 +740,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  /** Arquivo › Gerar › Ativos de imagem: os pedidos dos nomes das camadas, num ZIP. */
+  const gerarAtivosDaImagem = async () => {
+    if (!projeto) return;
+    try {
+      await pinturas.esperar();
+      const { nome, blob } = await gerarAtivos(projetoRef.current ?? projeto, midias, { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }, mostrarAviso);
+      baixarBlob(blob, nome);
+      mostrarAviso(`Ativos baixados (${formatarBytes(blob.size)}).`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível gerar os ativos.");
+    }
+  };
   /** Arquivo › Exportar › Exportação rápida: o formato das preferências, no tamanho do documento, direto para o download. */
   const exportacaoRapida = async () => {
     if (!projeto) return;
@@ -3382,7 +3396,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     return x1 > x0 ? { x: Math.floor(x0), y: Math.floor(y0), largura: Math.ceil(x1 - x0), altura: Math.ceil(y1 - y0) } : null;
   };
   /** Camada › Novo › Prancheta: uma nova (à direita das que já existem), a partir do grupo ou das camadas escolhidas. */
-  const novaPrancheta = (como: "nova" | "grupo" | "camadas", retangulo?: RetanguloDaImagem) => {
+  const novaPrancheta = async (como: "nova" | "grupo" | "camadas", retangulo?: RetanguloDaImagem) => {
     const atual = projetoRef.current;
     if (!atual) return;
     const existentes = pranchetasDoProjeto(atual);
@@ -3397,7 +3411,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     const faixas = como === "grupo" ? escolhidas.slice(0, 1) : escolhidas;
     const ids = faixas.flatMap((faixa) => comDescendentes(atual, faixa.id).flatMap((item) => (item.clipes[0] ? [item.clipes[0].id] : [])));
-    const lugar = retanguloDasCamadas(ids) ?? { x: 0, y: 0, ...tamanhoDaImagem(atual) };
+    // O retângulo do que as camadas desenham: a camada de pixels cobre o documento, mas a prancheta fica em volta do
+    // conteúdo dela (como nos editores); sem conteúdo, a caixa das camadas
+    let lugar = retanguloDasCamadas(ids) ?? { x: 0, y: 0, ...tamanhoDaImagem(atual) };
+    try {
+      await pinturas.esperar();
+      const desenho = await exportarImagem(projetoSoCom(atual, faixas.map((faixa) => faixa.id)), midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      const conteudo = caixaDoDesenho((await pixelsDoBlob(desenho)).canvas);
+      if (conteudo) lugar = conteudo;
+    } catch {
+      // Sem o desenho, fica a caixa das camadas
+    }
+    if (projetoRef.current !== atual) return;
     if (como === "grupo") executar({ comando: "imagem.pranchetaDoGrupo", parametros: { faixaId: faixas[0].id, retangulo: lugar, fundo, tamanhos: tamanhosDasMidias() } });
     else executar({ comando: "imagem.pranchetaDeCamadas", parametros: { faixaIds: faixas.map((faixa) => faixa.id), retangulo: lugar, nome, fundo, tamanhos: tamanhosDasMidias() } });
   };
@@ -4606,8 +4631,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     preferenciasDeExportacao: () => setPreferenciasDeExportacao(true),
     temPranchetas: Boolean(projeto?.faixas.some((faixa) => faixa.clipes[0]?.prancheta)),
     grupoEscolhido: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0]?.pasta) && !escolhidas[0].clipes[0]?.prancheta,
-    prancheta: (como) => novaPrancheta(como),
+    prancheta: (como) => void novaPrancheta(como),
     exportarPranchetas: () => setExportandoPranchetas(true),
+    camadasEmArquivos: () => setCamadasEmArquivos(true),
+    gerarAtivos: () => void gerarAtivosDaImagem(),
     exportarPsd: () => void exportarPsd(),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
     desfazer: () =>
@@ -4785,7 +4812,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5856,7 +5883,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoPreparar={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
           fonteDosPixels={pinturas.fonte}
           fonteDaMascara={pinturas.fonteDaMascara}
+          fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
+          aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {camadasEmArquivos && projeto ? (
+        <JanelaCamadasEmArquivos
+          midias={midias}
+          aoPreparar={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
+          fonteDosPixels={pinturas.fonte}
+          fonteDaMascara={pinturas.fonteDaMascara}
+          fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
+          aoFechar={() => setCamadasEmArquivos(false)}
           aoAvisar={mostrarAviso}
         />
       ) : null}
