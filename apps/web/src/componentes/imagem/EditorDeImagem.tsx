@@ -96,10 +96,12 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
 import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
 import { preencherBuracos } from "@/lib/pintura/recuperar";
-import { JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
+import { JanelaEscalaSensivel, JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaEscalaSensivel, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
 import { redimensionar } from "@/lib/transformar/reamostragem";
 import { JanelaDissolver } from "./JanelaDissolver";
 import { JanelaMarionete } from "./JanelaMarionete";
+import { escalaSensivel } from "@/lib/transformar/escalaSensivel";
+import { type CaixaDaMarionete, caixaDoConteudo } from "@/lib/transformar/marionete";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
@@ -312,6 +314,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
   // Filtro › Dissolver: a camada desenhada sozinha e o plano da camada de pixels que vem dela
   const [dissolvendo, setDissolvendo] = useState<{ tipo: "dissolver" | "marionete"; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
+  // Editar › Escala sensível ao conteúdo: a camada sozinha e a caixa do conteúdo dela
+  const [escalando, setEscalando] = useState<{ imagem: ImagemRgba; caixa: CaixaDaMarionete; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
   const [importandoPadroes, setImportandoPadroes] = useState(false);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
@@ -1542,16 +1546,31 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * vai para a área de trabalho; o resultado volta como camada de pixels no lugar dela.
    */
   const abrirDissolver = async (tipo: "dissolver" | "marionete") => {
+    const sozinha = await camadaSozinhaParaEditar();
+    if (sozinha) setDissolvendo({ tipo, ...sozinha });
+  };
+  /**
+   * A camada escolhida desenhada sozinha no tamanho da imagem (como no rasterizar, sem o estilo; com a máscara aplicada,
+   * se houver) e o plano da camada de pixels que entra no lugar dela: o Dissolver, a Marionete e a Escala sensível.
+   */
+  const camadaSozinhaParaEditar = async (): Promise<{ imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null> => {
     const atual = projetoRef.current;
-    if (!atual || !selecionado || gerandoPixels) return;
+    if (!atual || !selecionado || gerandoPixels) return null;
     const achado = acharClipe(atual, selecionado.clipe.id);
-    if (!achado || achado.clipe.pasta || achado.clipe.ajuste) return mostrarAviso("Escolha uma camada com conteúdo para dissolver.");
-    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) return mostrarAviso("A camada está travada.");
+    if (!achado || achado.clipe.pasta || achado.clipe.ajuste) {
+      mostrarAviso("Escolha uma camada com conteúdo.");
+      return null;
+    }
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) {
+      mostrarAviso("A camada está travada.");
+      return null;
+    }
     let plano: PlanoDosPixels;
     try {
       plano = planoDosPixels(atual, achado.clipe.mascara_pixels ? "aplicarMascara" : "transformar", [achado.faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
     } catch (e) {
-      return mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o Dissolver.");
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir a camada.");
+      return null;
     }
     const { desenhar, ...dados } = plano;
     setGerandoPixels(true);
@@ -1566,9 +1585,65 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       ctx2d.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
       bitmap.close();
       const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura);
-      setDissolvendo({ tipo, imagem: { dados: pixels.data, largura: pixels.width, altura: pixels.height }, dados });
+      return { imagem: { dados: pixels.data, largura: pixels.width, altura: pixels.height }, dados };
     } catch (e) {
-      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o Dissolver.");
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir a camada.");
+      return null;
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  const abrirEscalaSensivel = async () => {
+    const sozinha = await camadaSozinhaParaEditar();
+    if (!sozinha) return;
+    const caixa = caixaDoConteudo(sozinha.imagem.dados, sozinha.imagem.largura, sozinha.imagem.altura, 0);
+    if (!caixa) return mostrarAviso("A camada está vazia.");
+    setEscalando({ ...sozinha, caixa });
+  };
+  /**
+   * A escala sensível: o retângulo do conteúdo vai para o tamanho novo pelas costuras (com a proteção recortada nele) e
+   * volta para a camada com o mesmo centro, como camada de pixels.
+   */
+  const aplicarEscalaSensivel = async (nova: NovaEscalaSensivel) => {
+    if (!escalando) return;
+    const { imagem, caixa, dados } = escalando;
+    setEscalando(null);
+    setGerandoPixels(true);
+    try {
+      const l = caixa.x1 - caixa.x0;
+      const a = caixa.y1 - caixa.y0;
+      const recorte = new Uint8ClampedArray(l * a * 4);
+      for (let y = 0; y < a; y++) recorte.set(imagem.dados.subarray(((y + caixa.y0) * imagem.largura + caixa.x0) * 4, ((y + caixa.y0) * imagem.largura + caixa.x1) * 4), y * l * 4);
+      // A proteção: a seleção ou um canal (o claro protege), no mesmo recorte
+      let protecaoDoDocumento: ArrayLike<number> | null = null;
+      if (nova.protecao === "selecao" && selecaoNoDocumento) protecaoDoDocumento = selecaoNoDocumento.dados;
+      else if (nova.protecao !== "nenhuma") {
+        const canal = (projetoRef.current?.canais ?? []).find((item) => item.id === nova.protecao);
+        if (canal) {
+          const pintura = await pinturas.preparar(alvoDoCanal(canal), imagem);
+          const cinza = pintura.camada.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, imagem.largura, imagem.altura).data;
+          protecaoDoDocumento = Uint8Array.from({ length: imagem.largura * imagem.altura }, (_, i) => cinza[i * 4]);
+        }
+      }
+      let protecao: Uint8Array | null = null;
+      if (protecaoDoDocumento) {
+        protecao = new Uint8Array(l * a);
+        for (let y = 0; y < a; y++) for (let x = 0; x < l; x++) protecao[y * l + x] = protecaoDoDocumento[(y + caixa.y0) * imagem.largura + x + caixa.x0];
+      }
+      const pixels = escalaSensivel({ dados: recorte, largura: l, altura: a }, nova.largura, nova.altura, { protecao, protegerPele: nova.pele, quantidade: nova.quantidade });
+      const pedaco = document.createElement("canvas");
+      pedaco.width = nova.largura;
+      pedaco.height = nova.altura;
+      pedaco.getContext("2d")!.putImageData(new ImageData(pixels, nova.largura, nova.altura), 0, 0);
+      const canvas = document.createElement("canvas");
+      canvas.width = imagem.largura;
+      canvas.height = imagem.altura;
+      canvas.getContext("2d")!.drawImage(pedaco, Math.round((caixa.x0 + caixa.x1 - nova.largura) / 2), Math.round((caixa.y0 + caixa.y1 - nova.altura) / 2));
+      const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+      setGerandoPixels(false);
+      await gerarPixels(async () => blob, dados);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível mudar a escala.");
     } finally {
       setGerandoPixels(false);
     }
@@ -2648,6 +2723,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     revelarTudo,
     dissolver: () => void abrirDissolver("dissolver"),
     marionete: () => void abrirDissolver("marionete"),
+    escalaSensivel: () => void abrirEscalaSensivel(),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2783,7 +2859,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3656,6 +3732,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             );
           })()
         : null}
+      {escalando ? (
+        <JanelaEscalaSensivel
+          antes={{ largura: escalando.caixa.x1 - escalando.caixa.x0, altura: escalando.caixa.y1 - escalando.caixa.y0 }}
+          canais={(projeto?.canais ?? []).map((canal) => ({ id: canal.id, nome: canal.nome }))}
+          temSelecao={Boolean(selecaoNoDocumento)}
+          aoFechar={() => setEscalando(null)}
+          aoConfirmar={(nova) => void aplicarEscalaSensivel(nova)}
+        />
+      ) : null}
       {janelaDoDocumento === "imagem" && projeto ? (
         <JanelaTamanhoDaImagem
           antes={{ ...tamanhoDaImagem(projeto), resolucao: projeto.tamanho?.resolucao ?? 72 }}

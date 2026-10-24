@@ -250,3 +250,85 @@ export function JanelaTamanhoDaTela({
     </Moldura>
   );
 }
+
+export type NovaEscalaSensivel = { largura: number; altura: number; protecao: string; pele: boolean; quantidade: number };
+
+/**
+ * Editar › Escala sensível ao conteúdo: o tamanho novo do que tem conteúdo na camada (em % ou pixels, ligados ou não),
+ * o que proteger (a seleção ou um canal), os tons de pele e a quantidade (100% é toda pelas costuras).
+ */
+export function JanelaEscalaSensivel({
+  antes,
+  canais,
+  temSelecao,
+  aoFechar,
+  aoConfirmar,
+}: {
+  antes: { largura: number; altura: number };
+  canais: { id: string; nome: string }[];
+  temSelecao: boolean;
+  aoFechar: () => void;
+  aoConfirmar: (nova: NovaEscalaSensivel) => void;
+}) {
+  const [largura, setLargura] = useState(antes.largura);
+  const [altura, setAltura] = useState(antes.altura);
+  const [unidade, setUnidade] = useState<Unidade>("pct");
+  const [ligado, setLigado] = useState(false);
+  const [protecao, setProtecao] = useState(temSelecao ? "selecao" : "nenhuma");
+  const [pele, setPele] = useState(false);
+  const [quantidade, setQuantidade] = useState(100);
+  const mudar = (eixo: "largura" | "altura", valor: number) => {
+    const total = eixo === "largura" ? antes.largura : antes.altura;
+    const pixels = Math.max(1, paraPixels(valor, unidade, 72, total));
+    if (eixo === "largura") {
+      setLargura(pixels);
+      if (ligado) setAltura((pixels * antes.altura) / antes.largura);
+    } else {
+      setAltura(pixels);
+      if (ligado) setLargura((pixels * antes.largura) / antes.altura);
+    }
+  };
+  return (
+    <Moldura titulo="Escala sensível ao conteúdo" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar({ largura: Math.round(largura), altura: Math.round(altura), protecao, pele, quantidade: quantidade / 100 })}>
+      <p className="text-suave">
+        O que tem conteúdo na camada: {antes.largura} × {antes.altura} px. Novo: {Math.round(largura)} × {Math.round(altura)} px. O que é liso (céu, parede, chão) cede primeiro; o que tem detalhe fica.
+      </p>
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1.5">
+          <Medida rotulo="Largura" valor={daUnidade(largura, unidade, 72, antes.largura)} unidade={unidade} aoMudar={(valor) => mudar("largura", valor)} />
+          <Medida rotulo="Altura" valor={daUnidade(altura, unidade, 72, antes.altura)} unidade={unidade} aoMudar={(valor) => mudar("altura", valor)} />
+        </div>
+        <button type="button" className="botao-icone" onClick={() => setLigado((atual) => !atual)} aria-pressed={ligado} title={ligado ? "Proporção ligada" : "Proporção solta"} aria-label="Manter a proporção">
+          {ligado ? <Link2 className="size-4" aria-hidden /> : <Link2Off className="size-4" aria-hidden />}
+        </button>
+        <select className={campo} value={unidade} onChange={(evento) => setUnidade(evento.currentTarget.value as Unidade)} aria-label="Unidade">
+          <option value="pct">Porcentagem</option>
+          <option value="px">Pixels</option>
+        </select>
+      </div>
+      <label className="flex items-center gap-2">
+        <span className="text-suave">Proteger:</span>
+        <select className={`${campo} flex-1`} value={protecao} onChange={(evento) => setProtecao(evento.currentTarget.value)} aria-label="Proteger">
+          <option value="nenhuma">Nenhum</option>
+          {temSelecao ? <option value="selecao">A seleção</option> : null}
+          {canais.map((canal) => (
+            <option key={canal.id} value={canal.id}>
+              {canal.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={pele} onChange={(evento) => setPele(evento.currentTarget.checked)} />
+        Proteger tons de pele
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="flex justify-between">
+          <span>Quantidade</span>
+          <span className="tabular-nums text-suave">{quantidade}%</span>
+        </span>
+        <input type="range" min={0} max={100} value={quantidade} onChange={(evento) => setQuantidade(Number(evento.currentTarget.value))} aria-label="Quantidade" />
+      </label>
+    </Moldura>
+  );
+}
