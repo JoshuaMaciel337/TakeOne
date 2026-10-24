@@ -6,7 +6,7 @@
 // - uma tabela pela luminância (256 tons, a cor inteira): limiar e mapa de degradê, também exata;
 // - uma função da cor, que vira a LUT 3D de 33 pontos que o compositor já lê para a cor dos clipes (o resto).
 // As medidas seguem os painéis de lá: 0 a 255 nos níveis, -100 a 100 nos deslizantes de porcentagem, graus no matiz.
-import { lerLut, PONTOS_DA_LUT, type PontoDaCurva, valorDaCurva } from "../projeto/cor.ts";
+import { PONTOS_DA_LUT, type PontoDaCurva, valorDaCurva } from "../projeto/cor.ts";
 import type { LutImportada } from "../projeto/lutImportada.ts";
 import { aplicarLutImportada } from "../projeto/lutImportada.ts";
 
@@ -462,6 +462,44 @@ export function lutDaFuncao(funcao: (c: Rgb) => Rgb): Float32Array {
   return dados;
 }
 
+/**
+ * A leitura tetraédrica de lerLut (cor.ts), sem criar listas: escreve em `saida`. As fotos inteiras passam por aqui
+ * (Imagem › Ajustes), milhões de pixels, e a versão com listas levava segundos.
+ */
+export function lerLutRapido(dados: Float32Array, r: number, g: number, b: number, saida: Float64Array) {
+  const n = PONTOS_DA_LUT;
+  const sr = Math.min(Math.max(r, 0), 1) * (n - 1);
+  const sg = Math.min(Math.max(g, 0), 1) * (n - 1);
+  const sb = Math.min(Math.max(b, 0), 1) * (n - 1);
+  const pr = Math.floor(sr);
+  const pg = Math.floor(sg);
+  const pb = Math.floor(sb);
+  const qr = Math.min(pr + 1, n - 1);
+  const qg = Math.min(pg + 1, n - 1);
+  const qb = Math.min(pb + 1, n - 1);
+  const dr = sr - pr;
+  const dg = sg - pg;
+  const db = sb - pb;
+  const indice = (x: number, y: number, z: number) => ((z * n + y) * n + x) * 4;
+  const c000 = indice(pr, pg, pb);
+  const c111 = indice(qr, qg, qb);
+  let p1: number;
+  let p2: number;
+  let w0: number;
+  let w1: number;
+  let w2: number;
+  let w3: number;
+  // As mesmas seis escolhas de lerLut, pela ordem das frações
+  if (dr > dg) {
+    if (dg > db) [w0, w1, w2, w3, p1, p2] = [1 - dr, dr - dg, dg - db, db, indice(qr, pg, pb), indice(qr, qg, pb)];
+    else if (dr > db) [w0, w1, w2, w3, p1, p2] = [1 - dr, dr - db, db - dg, dg, indice(qr, pg, pb), indice(qr, pg, qb)];
+    else [w0, w1, w2, w3, p1, p2] = [1 - db, db - dr, dr - dg, dg, indice(pr, pg, qb), indice(qr, pg, qb)];
+  } else if (db > dg) [w0, w1, w2, w3, p1, p2] = [1 - db, db - dg, dg - dr, dr, indice(pr, pg, qb), indice(pr, qg, qb)];
+  else if (db > dr) [w0, w1, w2, w3, p1, p2] = [1 - dg, dg - db, db - dr, dr, indice(pr, qg, pb), indice(pr, qg, qb)];
+  else [w0, w1, w2, w3, p1, p2] = [1 - dg, dg - dr, dr - db, db, indice(pr, qg, pb), indice(qr, qg, pb)];
+  for (let k = 0; k < 3; k++) saida[k] = w0 * dados[c000 + k] + w1 * dados[p1 + k] + w2 * dados[p2 + k] + w3 * dados[c111 + k];
+}
+
 /** O índice da tabela pela luminância, o mesmo do shader (o tom de 8 bits mais perto). */
 export const indiceDaLuma = (c: Rgb) => Math.min(255, Math.max(0, Math.floor(luma(c) * 255 + 0.5)));
 
@@ -470,20 +508,25 @@ export const indiceDaLuma = (c: Rgb) => Math.min(255, Math.max(0, Math.floor(lum
  * ajuste: a tabela tom a tom, ou a mesma LUT 3D lida pela leitura tetraédrica do shader. `cobertura` (0 a 1 por
  * pixel, a seleção) mistura com o de antes.
  */
-export function aplicarAjusteNosPixels(dados: Uint8ClampedArray, compilado: AjusteCompilado, cobertura?: Float32Array | Uint8Array | null) {
+export function aplicarAjusteNosPixels(dados: Uint8ClampedArray, compilado: AjusteCompilado, cobertura?: Float32Array | Uint8Array | Uint8ClampedArray | null) {
   if (compilado.tipo === "nada") return;
   const lut = compilado.tipo === "funcao" ? lutDaFuncao(compilado.funcao) : null;
   const t = compilado.tipo === "tabela" ? compilado.tabela : null;
-  const escalaDaCobertura = cobertura instanceof Uint8Array ? 1 / 255 : 1;
+  const escalaDaCobertura = cobertura instanceof Uint8Array || cobertura instanceof Uint8ClampedArray ? 1 / 255 : 1;
+  const saida = new Float64Array(3);
   for (let p = 0, i = 0; i < dados.length; p++, i += 4) {
     const peso = cobertura ? cobertura[p] * escalaDaCobertura : 1;
     if (peso <= 0) continue;
-    let saida: Rgb;
-    if (t?.modo === "canais") saida = [t.dados[dados[i] * 4], t.dados[dados[i + 1] * 4 + 1], t.dados[dados[i + 2] * 4 + 2]];
-    else if (t) {
-      const j = indiceDaLuma([dados[i] / 255, dados[i + 1] / 255, dados[i + 2] / 255]) * 4;
-      saida = [t.dados[j], t.dados[j + 1], t.dados[j + 2]];
-    } else saida = lerLut(lut!, [dados[i] / 255, dados[i + 1] / 255, dados[i + 2] / 255]);
+    if (t?.modo === "canais") {
+      saida[0] = t.dados[dados[i] * 4];
+      saida[1] = t.dados[dados[i + 1] * 4 + 1];
+      saida[2] = t.dados[dados[i + 2] * 4 + 2];
+    } else if (t) {
+      const j = Math.min(255, Math.floor((0.299 * dados[i] + 0.587 * dados[i + 1] + 0.114 * dados[i + 2]) / 255 * 255 + 0.5)) * 4;
+      saida[0] = t.dados[j];
+      saida[1] = t.dados[j + 1];
+      saida[2] = t.dados[j + 2];
+    } else lerLutRapido(lut!, dados[i] / 255, dados[i + 1] / 255, dados[i + 2] / 255, saida);
     for (let k = 0; k < 3; k++) dados[i + k] = Math.round((dados[i + k] / 255 + (saida[k] - dados[i + k] / 255) * peso) * 255);
   }
 }

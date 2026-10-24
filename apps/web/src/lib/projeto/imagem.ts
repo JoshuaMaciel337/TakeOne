@@ -468,9 +468,11 @@ export function trocarVersaoDosPixels(projeto: Projeto, clipeId: string, versao:
 }
 
 /** Uma camada de ajuste acima da escolhida (ou de todas): muda a cor do que está embaixo dela. */
-export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null, ajuste?: AjusteDaImagem | null): { projeto: Projeto; clipeId: string } {
+export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null, ajuste?: AjusteDaImagem | null, recortada = false): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), ajuste ? { ajuste: true, ajuste_imagem: ajuste } : { ajuste: true });
-  return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
+  // Presa à de baixo, o ajuste vale só para ela (Imagem › Ajustes numa camada que não é de pixels)
+  const faixa = faixaNova(ctx, "video", clipe);
+  return { projeto: porNoTopo(projeto, recortada ? { ...faixa, recortada: true } : faixa, acima), clipeId: clipe.id };
 }
 
 /** Camada › Nova camada de preenchimento: uma cor, um degradê ou um padrão cobrindo o documento, acima da escolhida. */

@@ -192,7 +192,7 @@ export type Comando =
   | { comando: "clipe.esticar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
-  | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null; ajuste?: AjusteDaImagem | null } }
+  | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null; ajuste?: AjusteDaImagem | null; recortada?: boolean } }
   | { comando: "imagem.ajuste"; parametros: { clipeId: string; ajuste: AjusteDaImagem } }
   | { comando: "imagem.adicionarPreenchimento"; parametros: { preenchimento: CamadaDePreenchimento; acima?: string | null } }
   | { comando: "imagem.preenchimento"; parametros: { clipeId: string; preenchimento: CamadaDePreenchimento } }
@@ -513,7 +513,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarAjuste": {
-      const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima, parametros.ajuste);
+      const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima, parametros.ajuste, parametros.recortada);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarPreenchimento": {

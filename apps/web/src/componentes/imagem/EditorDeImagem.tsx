@@ -112,8 +112,26 @@ import { PainelEstilosDeCamada } from "./PainelEstilosDeCamada";
 import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
 import { JanelaCamadaDePreenchimento, preenchimentoNovo } from "./JanelaCamadaDePreenchimento";
 import { PropriedadesDoAjuste } from "./ajustes/PropriedadesDoAjuste";
+import { JanelaDeAjusteNosPixels, type OperacaoDosPixels } from "./ajustes/JanelaDeAjusteNosPixels";
+import {
+  CORRESPONDER_PADRAO,
+  corresponderCor,
+  dessaturar,
+  equalizar,
+  estatisticasDaCor,
+  type Estatisticas,
+  HDR_PADRAO,
+  misturarComCobertura,
+  SOMBRAS_REALCES_PADRAO,
+  sombrasRealces,
+  SUBSTITUIR_PADRAO,
+  substituirCor,
+  tonalizacaoHdr,
+} from "@/lib/imagem/ajustesNosPixels";
+import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
+import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
-import { type AjusteDaImagem, ajustePadrao, type Rgb } from "@/lib/imagem/ajustes";
+import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
@@ -2053,17 +2071,203 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const imagemAbaixo = useImagemAbaixo(projeto, midias, ajusteEscolhido?.faixa.id ?? null, Boolean(ajusteEscolhido));
   // O pedido vale só para o ajuste que pediu: trocar de camada desiste dele
   const [pedidoDeAmostra, setPedidoDeAmostra] = useState<{ clipeId: string; receber: (cor: Rgb) => void } | null>(null);
-  const amostraDoAjuste = pedidoDeAmostra && pedidoDeAmostra.clipeId === ajusteEscolhido?.clipe.id ? pedidoDeAmostra.receber : null;
-  /** A cor da imagem embaixo do ajuste no ponto clicado (pixels do documento). */
+  const amostraDoAjuste = pedidoDeAmostra && (pedidoDeAmostra.clipeId === ajusteEscolhido?.clipe.id || pedidoDeAmostra.clipeId === "janela") ? pedidoDeAmostra.receber : null;
+  /** A cor da imagem embaixo do ajuste (ou da camada, na janela de Imagem › Ajustes) no ponto clicado (pixels do documento). */
   const amostrarAbaixo = (ponto: { x: number; y: number }) => {
     const receber = amostraDoAjuste;
     setPedidoDeAmostra(null);
-    if (!receber || !imagemAbaixo || !projeto) return;
+    if (!receber) return;
+    if (pedidoDeAmostra?.clipeId === "janela" && nosPixels) {
+      // Os pixels de antes da camada, no ponto levado a ela
+      const [a, b, c, d, e, f] = nosPixels.matriz;
+      const x = Math.min(nosPixels.largura - 1, Math.max(0, Math.floor(a * ponto.x + c * ponto.y + e)));
+      const y = Math.min(nosPixels.altura - 1, Math.max(0, Math.floor(b * ponto.x + d * ponto.y + f)));
+      const i = (y * nosPixels.largura + x) * 4;
+      receber([nosPixels.original[i] / 255, nosPixels.original[i + 1] / 255, nosPixels.original[i + 2] / 255]);
+      return;
+    }
+    if (!imagemAbaixo || !projeto) return;
     const documento = tamanhoDaImagem(projeto);
     const x = Math.min(imagemAbaixo.largura - 1, Math.max(0, Math.floor((ponto.x / documento.largura) * imagemAbaixo.largura)));
     const y = Math.min(imagemAbaixo.altura - 1, Math.max(0, Math.floor((ponto.y / documento.altura) * imagemAbaixo.altura)));
     const i = (y * imagemAbaixo.largura + x) * 4;
     receber([imagemAbaixo.dados[i] / 255, imagemAbaixo.dados[i + 1] / 255, imagemAbaixo.dados[i + 2] / 255]);
+  };
+  // ——— Imagem › Ajustes: o ajuste gravado nos pixels da camada de pixels escolhida ———
+  /**
+   * A sessão da janela: o canvas vivo da camada, os pixels de antes (o cancelar volta a eles), a seleção levada à
+   * camada, uma cópia pequena (o histograma) e a operação da vez. A prévia escreve no canvas, sem subir nada.
+   */
+  const [nosPixels, setNosPixels] = useState<{
+    clipeId: string;
+    chave: string;
+    canvas: HTMLCanvasElement;
+    largura: number;
+    altura: number;
+    original: Uint8ClampedArray;
+    cobertura: Uint8ClampedArray | null;
+    pequena: ImagemRgba;
+    matriz: Afim;
+    operacao: OperacaoDosPixels;
+    visualizar: boolean;
+  } | null>(null);
+  const [estatisticasDaOrigem, setEstatisticasDaOrigem] = useState<{ origem: string; estatisticas: Estatisticas | null } | null>(null);
+  /** A camada sozinha (ou o documento, com `null`) desenhada pequena: o histograma e a cor de origem. */
+  const imagemPequena = async (faixaId: string | null): Promise<ImagemRgba | null> => {
+    const atual = projetoRef.current;
+    if (!atual) return null;
+    const documento = tamanhoDaImagem(atual);
+    const desenhar = faixaId ? projetoSoCom(atual, [faixaId], { neutras: new Set([faixaId]), semEstilo: true, semMascara: true }) : atual;
+    const blob = await exportarImagem(desenhar, midias, { formato: "png", escala: Math.min(1, 512 / Math.max(documento.largura, documento.altura)), fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx2d.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return { largura: canvas.width, altura: canvas.height, dados: ctx2d.getImageData(0, 0, canvas.width, canvas.height).data };
+  };
+  /** O resultado da operação sobre os pixels de antes (com a seleção). */
+  const pixelsDaOperacao = (sessao: NonNullable<typeof nosPixels>): Uint8ClampedArray => {
+    const dados = sessao.original.slice();
+    const operacao = sessao.operacao;
+    if (operacao.tipo === "ajuste") {
+      const ajuste = operacao.ajuste;
+      const daPesquisa = ajuste.tipo === "pesquisa" && ajuste.lut ? lutGuardada(ajuste.lut.id) : null;
+      aplicarAjusteNosPixels(dados, compilarAjuste(ajuste, daPesquisa), sessao.cobertura);
+      return dados;
+    }
+    if (operacao.tipo === "sombrasRealces") sombrasRealces(dados, sessao.largura, sessao.altura, operacao.opcoes);
+    else if (operacao.tipo === "hdr") tonalizacaoHdr(dados, sessao.largura, sessao.altura, operacao.opcoes);
+    else if (operacao.tipo === "substituir") substituirCor(dados, operacao.opcoes);
+    else {
+      const origem = estatisticasDaOrigem?.origem === operacao.origem ? estatisticasDaOrigem.estatisticas : null;
+      const alvo = estatisticasDaCor(sessao.original);
+      if (!origem || !alvo) return dados;
+      corresponderCor(dados, alvo, origem, operacao.opcoes);
+    }
+    misturarComCobertura(sessao.original, dados, sessao.cobertura);
+    return dados;
+  };
+  // A prévia: o resultado (ou os pixels de antes, sem o Visualizar) no canvas da camada, um pouco depois de mexer
+  useEffect(() => {
+    if (!nosPixels) return;
+    const espera = window.setTimeout(() => {
+      const dados = nosPixels.visualizar ? pixelsDaOperacao(nosPixels) : nosPixels.original;
+      nosPixels.canvas.getContext("2d", { willReadFrequently: true })!.putImageData(new ImageData(new Uint8ClampedArray(dados), nosPixels.largura, nosPixels.altura), 0, 0);
+      pinturas.avisarQuadro();
+    }, 60);
+    return () => window.clearTimeout(espera);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a conta lê a sessão e a origem, que estão nas dependências
+  }, [nosPixels, estatisticasDaOrigem]);
+  // A cor da origem do Corresponder cor, desenhada pequena quando muda
+  const origemDoCorresponder = nosPixels?.operacao.tipo === "corresponder" ? nosPixels.operacao.origem : null;
+  useEffect(() => {
+    if (!origemDoCorresponder) return;
+    let cancelado = false;
+    imagemPequena(origemDoCorresponder === "documento" ? null : origemDoCorresponder)
+      .then((imagem) => !cancelado && setEstatisticasDaOrigem({ origem: origemDoCorresponder, estatisticas: imagem ? estatisticasDaCor(imagem.dados) : null }))
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando a origem muda
+  }, [origemDoCorresponder]);
+  /**
+   * Abre a janela numa camada de pixels. Noutra camada, os dezesseis ajustes entram como camada de ajuste presa a ela
+   * (o mesmo resultado, sem perder a camada); os clássicos pedem que ela vire pixels antes.
+   */
+  const abrirNosPixels = async (operacao: OperacaoDosPixels) => {
+    const atual = projetoRef.current;
+    if (!atual || !selecionado || gerandoPixels) return mostrarAviso("Escolha uma camada.");
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado) return;
+    if (!achado.clipe.pixels || !achado.clipe.midia_id) {
+      if (operacao.tipo === "ajuste" && !achado.clipe.pasta && !achado.clipe.ajuste) {
+        if (executar({ comando: "imagem.adicionarAjuste", parametros: { acima: achado.faixa.id, ajuste: operacao.ajuste, recortada: true } })) {
+          area.abrir("propriedades");
+          mostrarAviso(`${NOMES_DOS_AJUSTES[operacao.ajuste.tipo]} entrou como camada de ajuste presa a esta camada (para gravar nos pixels, Camada › Rasterizar).`);
+        }
+        return;
+      }
+      return mostrarAviso("Este ajuste vale para camadas de pixels: use Camada › Rasterizar antes.");
+    }
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) return mostrarAviso("Os pixels desta camada estão travados.");
+    const alvo = alvoDosPixels(achado.clipe)!;
+    const documento = tamanhoDaImagem(atual);
+    const tamanho = midias.get(achado.clipe.midia_id)?.camada_pixels ?? documento;
+    await pinturas.esperar();
+    const pintura = await pinturas.preparar(alvo, tamanho);
+    const dados = pintura.camada.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, tamanho.largura, tamanho.altura).data;
+    // A cópia pequena (o histograma e os automáticos), pelo vizinho mais perto
+    const escala = Math.min(1, 512 / Math.max(tamanho.largura, tamanho.altura));
+    const pl = Math.max(1, Math.round(tamanho.largura * escala));
+    const pa = Math.max(1, Math.round(tamanho.altura * escala));
+    const pequena = new Uint8ClampedArray(pl * pa * 4);
+    for (let y = 0; y < pa; y++) {
+      for (let x = 0; x < pl; x++) {
+        const j = (Math.min(tamanho.altura - 1, Math.floor(y / escala)) * tamanho.largura + Math.min(tamanho.largura - 1, Math.floor(x / escala))) * 4;
+        pequena.set(dados.subarray(j, j + 4), (y * pl + x) * 4);
+      }
+    }
+    setNosPixels({
+      clipeId: achado.clipe.id,
+      chave: alvo.chave,
+      canvas: pintura.camada,
+      largura: tamanho.largura,
+      altura: tamanho.altura,
+      original: dados.slice(),
+      cobertura: selecaoNoDocumento ? coberturaNaCamada(achado.clipe, tamanho, selecaoNoDocumento, documento) : null,
+      pequena: { largura: pl, altura: pa, dados: pequena },
+      matriz: inverter(matrizDaCamada(achado.clipe, tamanho, documento)),
+      operacao,
+      visualizar: true,
+    });
+  };
+  const confirmarNosPixels = () => {
+    if (!nosPixels) return;
+    const dados = pixelsDaOperacao(nosPixels);
+    nosPixels.canvas.getContext("2d", { willReadFrequently: true })!.putImageData(new ImageData(new Uint8ClampedArray(dados), nosPixels.largura, nosPixels.altura), 0, 0);
+    pinturas.soltar(nosPixels.chave);
+    pinturas.avisarQuadro();
+    setNosPixels(null);
+    setPedidoDeAmostra(null);
+  };
+  const cancelarNosPixels = () => {
+    if (!nosPixels) return;
+    nosPixels.canvas.getContext("2d", { willReadFrequently: true })!.putImageData(new ImageData(new Uint8ClampedArray(nosPixels.original), nosPixels.largura, nosPixels.altura), 0, 0);
+    pinturas.avisarQuadro();
+    setNosPixels(null);
+    setPedidoDeAmostra(null);
+  };
+  /** Os que não têm janela: Inverter, Dessaturar, Equalizar e os automáticos, direto nos pixels (ou presos, como ajuste). */
+  const ajusteInstantaneo = async (qual: "inverter" | "dessaturar" | "equalizar" | "tom" | "contraste" | "cor") => {
+    const atual = projetoRef.current;
+    if (!atual || !selecionado) return mostrarAviso("Escolha uma camada.");
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado) return;
+    if (!achado.clipe.pixels) {
+      if (qual === "equalizar" || achado.clipe.pasta || achado.clipe.ajuste) return mostrarAviso("Este ajuste vale para camadas de pixels: use Camada › Rasterizar antes.");
+      let ajuste: AjusteDaImagem;
+      if (qual === "inverter") ajuste = { tipo: "inverter" };
+      else if (qual === "dessaturar") ajuste = { ...(ajustePadrao("matiz_saturacao") as Extract<AjusteDaImagem, { tipo: "matiz_saturacao" }>), mestre: { matiz: 0, saturacao: -100, luminosidade: 0 } };
+      else {
+        const imagem = await imagemPequena(achado.faixa.id);
+        if (!imagem) return;
+        ajuste = { tipo: "niveis", canais: niveisAutomaticos(histogramas(imagem.dados), qual) };
+      }
+      if (executar({ comando: "imagem.adicionarAjuste", parametros: { acima: achado.faixa.id, ajuste, recortada: true } })) area.abrir("propriedades");
+      return;
+    }
+    void editarPixels((dados, cobertura, camada) => {
+      const antes = dados.slice();
+      if (qual === "dessaturar") dessaturar(dados);
+      else if (qual === "equalizar") equalizar(dados, camada.largura, camada.altura, cobertura);
+      else if (qual === "inverter") aplicarAjusteNosPixels(dados, compilarAjuste({ tipo: "inverter" }));
+      else aplicarAjusteNosPixels(dados, compilarAjuste({ tipo: "niveis", canais: niveisAutomaticos(histogramas(dados), qual) }));
+      misturarComCobertura(antes, dados, cobertura);
+    });
   };
   // ——— A ferramenta Texto (texto desenhado no navegador) ———
   const textoEscolhido = !edicaoDeTexto && selecionado?.clipe.texto_rico ? selecionado.clipe : null;
@@ -3818,6 +4022,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     ferramenta: escolherFerramenta,
     ajuste: criarAjuste,
+    ajusteNosPixels: (tipo) => (tipo === "inverter" ? void ajusteInstantaneo("inverter") : void abrirNosPixels({ tipo: "ajuste", ajuste: ajustePadrao(tipo, cores.primeiroPlano, cores.fundo) })),
+    classico: (qual) => {
+      if (qual === "dessaturar" || qual === "equalizar") return void ajusteInstantaneo(qual);
+      if (qual === "sombrasRealces") return void abrirNosPixels({ tipo: "sombrasRealces", opcoes: SOMBRAS_REALCES_PADRAO });
+      if (qual === "hdr") return void abrirNosPixels({ tipo: "hdr", opcoes: HDR_PADRAO });
+      if (qual === "corresponder") return void abrirNosPixels({ tipo: "corresponder", opcoes: CORRESPONDER_PADRAO, origem: "documento" });
+      void abrirNosPixels({ tipo: "substituir", opcoes: SUBSTITUIR_PADRAO });
+    },
+    automatico: (jeito) => void ajusteInstantaneo(jeito),
     preenchimento: {
       escolhido: Boolean(escolhidoNaTela?.clipe.camada_de_preenchimento),
       nova: novoPreenchimento,
@@ -5016,6 +5229,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             setProvisorio(null);
             setEstiloAberto(null);
           }}
+        />
+      ) : null}
+      {nosPixels && projeto ? (
+        <JanelaDeAjusteNosPixels
+          operacao={nosPixels.operacao}
+          visualizar={nosPixels.visualizar}
+          imagem={nosPixels.pequena}
+          origens={[{ id: "documento", nome: "O documento inteiro" }, ...camadasDaImagem(projeto).filter(({ clipe }) => clipe.id !== nosPixels.clipeId && !clipe.pasta && !clipe.ajuste).map(({ faixa }) => ({ id: faixa.id, nome: nomeDaFaixa(faixa) }))]}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          degradesDoEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+          amostrando={pedidoDeAmostra?.clipeId === "janela"}
+          aoPedirAmostra={(receber) => setPedidoDeAmostra(receber ? { clipeId: "janela", receber } : null)}
+          aoMudar={(operacao) => setNosPixels((atual) => (atual ? { ...atual, operacao } : atual))}
+          aoVisualizar={(visualizar) => setNosPixels((atual) => (atual ? { ...atual, visualizar } : atual))}
+          aoConfirmar={confirmarNosPixels}
+          aoCancelar={cancelarNosPixels}
         />
       ) : null}
       {preenchendo ? (

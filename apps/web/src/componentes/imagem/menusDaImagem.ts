@@ -6,6 +6,7 @@ import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
 import { NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
+import type { TipoDoAjuste } from "@/lib/imagem/ajustes";
 import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
@@ -168,6 +169,10 @@ export type AcoesDosMenus = {
   alternarUltimoEstado: () => void;
   ferramenta: (id: IdFerramentaDaImagem) => void;
   ajuste: (ajuste: Ajuste) => void;
+  /** Imagem › Ajustes: grava nos pixels da camada escolhida (noutras camadas, entra como ajuste preso a ela). */
+  ajusteNosPixels: (tipo: TipoDoAjuste) => void;
+  classico: (qual: "sombrasRealces" | "hdr" | "dessaturar" | "corresponder" | "substituir" | "equalizar") => void;
+  automatico: (jeito: "tom" | "contraste" | "cor") => void;
   /** Camada › Nova camada de preenchimento, Opções do conteúdo e Alterar o conteúdo (da escolhida, se for uma). */
   preenchimento: { escolhido: boolean; nova: (tipo: "cor" | "degrade" | "padrao") => void; editar: (tipo?: "cor" | "degrade" | "padrao") => void };
   documento: () => void;
@@ -376,7 +381,24 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Imagem",
       itens: [
-        { nome: "Ajustes", itens: AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, atalho: ajuste.atalho, aoEscolher: () => a.ajuste(ajuste) })) },
+        {
+          nome: "Ajustes",
+          itens: [
+            ...AJUSTES.map((ajuste) => ({ nome: ajuste.id === "inverter" ? ajuste.nome : `${ajuste.nome}…`, atalho: ajuste.atalho, aoEscolher: () => a.ajusteNosPixels(ajuste.id) })),
+            "-",
+            { nome: "Sombras/Realces…", aoEscolher: () => a.classico("sombrasRealces") },
+            { nome: "Tonalização HDR…", aoEscolher: () => a.classico("hdr") },
+            "-",
+            { nome: "Dessaturar", atalho: "Ctrl+Shift+U", aoEscolher: () => a.classico("dessaturar") },
+            { nome: "Corresponder cor…", aoEscolher: () => a.classico("corresponder") },
+            { nome: "Substituir cor…", aoEscolher: () => a.classico("substituir") },
+            { nome: "Equalizar", aoEscolher: () => a.classico("equalizar") },
+          ],
+        },
+        "-",
+        { nome: "Tom automático", atalho: "Ctrl+Shift+L", aoEscolher: () => a.automatico("tom") },
+        { nome: "Contraste automático", atalho: "Ctrl+Alt+Shift+L", aoEscolher: () => a.automatico("contraste") },
+        { nome: "Cor automática", atalho: "Ctrl+Shift+B", aoEscolher: () => a.automatico("cor") },
         "-",
         { nome: "Tamanho da imagem…", atalho: "Ctrl+Alt+I", aoEscolher: a.tamanhoDaImagem },
         { nome: "Tamanho da tela…", atalho: "Ctrl+Alt+C", aoEscolher: a.tamanhoDaTela },

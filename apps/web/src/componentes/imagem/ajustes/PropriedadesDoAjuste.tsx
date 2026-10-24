@@ -367,7 +367,8 @@ function Pesquisa({ ajuste, mudancas }: { ajuste: De<"pesquisa">; mudancas: Muda
 
 export type Props = {
   clipeId: string;
-  faixa: Faixa;
+  /** Sem a faixa, o painel fica sem o rodapé (a janela de Imagem › Ajustes, que aplica nos pixels). */
+  faixa?: Faixa | null;
   ajuste: AjusteDaImagem;
   /** O que está embaixo da camada (o histograma, os conta-gotas e os automáticos). */
   imagem: ImagemRgba | null;
@@ -380,11 +381,15 @@ export type Props = {
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => unknown;
   /** Enquanto aperta o olho de "ver sem o ajuste". */
-  aoVerSem: (ver: boolean) => void;
-  aoExcluir: () => void;
+  aoVerSem?: (ver: boolean) => void;
+  aoExcluir?: () => void;
+  /** No lugar dos comandos: a janela de Imagem › Ajustes guarda o ajuste nela e prevê nos pixels. */
+  mudancasLocais?: Mudancas<AjusteDaImagem>;
+  /** Sem o título (a janela já tem o dela). */
+  semTitulo?: boolean;
 };
 
-export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroPlano, fundo, degradesDoEspaco, aoPedirAmostra, amostrando, aoPrever, aoExecutar, aoVerSem, aoExcluir }: Props) {
+export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroPlano, fundo, degradesDoEspaco, aoPedirAmostra, amostrando, aoPrever, aoExecutar, aoVerSem, aoExcluir, mudancasLocais, semTitulo }: Props) {
   const [qualAmostra, setQualAmostra] = useState<string | null>(null);
   const [predefinicao, setPredefinicao] = useState("");
   const vendoSem = useRef(false);
@@ -393,10 +398,12 @@ export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroP
   const mudancas: Mudancas<AjusteDaImagem> = {
     prever: (novo) => {
       setPredefinicao("");
-      aoPrever(comando(novo));
+      if (mudancasLocais) mudancasLocais.prever(novo);
+      else aoPrever(comando(novo));
     },
     confirmar: (novo) => {
       setPredefinicao("");
+      if (mudancasLocais) return mudancasLocais.confirmar(novo);
       aoPrever(null);
       aoExecutar(comando(novo));
     },
@@ -429,7 +436,7 @@ export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroP
   return (
     <div className="flex flex-col gap-3 p-3 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{NOMES_DOS_AJUSTES[ajuste.tipo]}</h3>
+        {semTitulo ? <span /> : <h3 className="font-semibold">{NOMES_DOS_AJUSTES[ajuste.tipo]}</h3>}
         {ajuste.tipo === "niveis" || ajuste.tipo === "curvas" ? (
           <select className={caixa} aria-label="Automático" value="" disabled={!hist} onChange={(evento) => evento.currentTarget.value && automatico(evento.currentTarget.value as "tom" | "contraste" | "cor")}>
             <option value="">Automático…</option>
@@ -537,6 +544,7 @@ export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroP
       ) : null}
       {ajuste.tipo === "mapa_degrade" ? <MapaDeDegrade ajuste={ajuste} mudancas={mudancas} primeiroPlano={primeiroPlano} fundo={fundo} degradesDoEspaco={degradesDoEspaco} /> : null}
       {ajuste.tipo === "cor_seletiva" ? <CorSeletiva ajuste={ajuste} mudancas={mudancas} /> : null}
+      {faixa ? (
       <div className="flex items-center gap-1 border-t border-borda pt-2">
         <button
           type="button"
@@ -555,16 +563,16 @@ export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroP
           aria-label="Ver sem o ajuste"
           onPointerDown={() => {
             vendoSem.current = true;
-            aoVerSem(true);
+            aoVerSem?.(true);
           }}
           onPointerUp={() => {
             vendoSem.current = false;
-            aoVerSem(false);
+            aoVerSem?.(false);
           }}
           onPointerLeave={() => {
             if (!vendoSem.current) return;
             vendoSem.current = false;
-            aoVerSem(false);
+            aoVerSem?.(false);
           }}
         >
           <EyeOff className="size-4" aria-hidden />
@@ -585,6 +593,7 @@ export function PropriedadesDoAjuste({ clipeId, faixa, ajuste, imagem, primeiroP
           <Trash2 className="size-4" aria-hidden />
         </button>
       </div>
+      ) : null}
     </div>
   );
 }

@@ -26,12 +26,12 @@ export function corDoClipeEmPixels(cor: Cor | null | undefined): ((rgb: [number,
 const KR = 0.2126;
 const KB = 0.0722;
 
-function paraYcc(r: number, g: number, b: number): [number, number, number] {
+export function paraYcc(r: number, g: number, b: number): [number, number, number] {
   const y = KR * r + (1 - KR - KB) * g + KB * b;
   return [y, (b - y) / (2 * (1 - KB)), (r - y) / (2 * (1 - KR))];
 }
 
-function deYcc(y: number, cb: number, cr: number): [number, number, number] {
+export function deYcc(y: number, cb: number, cr: number): [number, number, number] {
   const r = y + 2 * (1 - KR) * cr;
   const b = y + 2 * (1 - KB) * cb;
   const g = (y - KR * r - KB * b) / (1 - KR - KB);

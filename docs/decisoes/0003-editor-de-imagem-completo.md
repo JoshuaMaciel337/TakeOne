@@ -226,8 +226,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.10 — Ajustes
 
 - [x] As 16 camadas de ajuste com as propriedades de lá: Brilho/Contraste (com o antigo), Níveis (por canal, conta-gotas de preto, cinza e branco), Curvas (por canal, ponto e lápis), Exposição (exposição, deslocamento, gama), Vibração, Matiz/Saturação (com Colorir e a faixa por cor com conta-gotas), Equilíbrio de cores (sombras, meios-tons, realces, preservar luminosidade), Preto e branco (seis cores e tonalizar), Filtro de fotos (filtros prontos e cor, densidade), Mixer de canais (monocromático), Pesquisa de cores, Inverter, Posterizar, Limiar, Mapa de degradê, Cor seletiva
-- [ ] Os clássicos que vão direto nos pixels: Sombras/Realces, Tonalização HDR, Dessaturar (Ctrl+Shift+U), Corresponder cor, Substituir cor, Equalizar
-- [ ] Tom, Contraste e Cor automáticos (Ctrl+Shift+L, Ctrl+Alt+Shift+L, Ctrl+Shift+B)
+- [x] Os clássicos que vão direto nos pixels: Sombras/Realces, Tonalização HDR, Dessaturar (Ctrl+Shift+U), Corresponder cor, Substituir cor, Equalizar
+- [x] Tom, Contraste e Cor automáticos (Ctrl+Shift+L, Ctrl+Alt+Shift+L, Ctrl+Shift+B)
 - [x] Painel Ajustes com predefinições de cada tipo; máscara da camada de ajuste e recorte na de baixo
 - [ ] Painel Histograma (por canal, média, desvio, mediana, pixels)
 

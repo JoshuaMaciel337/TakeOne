@@ -9,6 +9,8 @@ import {
   compilarAjuste,
   deHsl,
   emHsl,
+  lerLutRapido,
+  lutDaFuncao,
   pesoDaFaixa,
   quantidadesDaSeletiva,
   type Rgb,
@@ -119,4 +121,17 @@ test("a seleção mistura com o de antes", () => {
   const dados = new Uint8ClampedArray([100, 100, 100, 255, 100, 100, 100, 255]);
   aplicarAjusteNosPixels(dados, compilarAjuste({ tipo: "inverter" }), new Float32Array([1, 0.5]));
   assert.deepEqual([...dados], [155, 155, 155, 255, 128, 128, 128, 255]);
+});
+
+test("a leitura rápida da LUT é a de lerLut", async () => {
+  const { lerLut } = await import("../projeto/cor.ts");
+  const lut = lutDaFuncao(([r, g, b]) => [r * r, Math.sqrt(g), (r + b) / 2]);
+  const saida = new Float64Array(3);
+  let semente = 7;
+  const sorteio = () => ((semente = (semente * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 500; i++) {
+    const cor: Rgb = [sorteio(), sorteio(), sorteio()];
+    lerLutRapido(lut, cor[0], cor[1], cor[2], saida);
+    lerLut(lut, cor).forEach((v, k) => perto(saida[k], v, 1e-9));
+  }
 });
