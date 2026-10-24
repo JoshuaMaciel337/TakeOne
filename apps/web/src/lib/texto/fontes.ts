@@ -7,39 +7,82 @@
 import { create, type Fonte as FonteDoFontkit } from "fontkit";
 import { useEffect, useState } from "react";
 
-import { chamarApi } from "../api";
+import { chamarApi, ErroApi, mensagemPadrao } from "../api";
 import { adaptarFonte } from "./fontkit";
 import type { FonteCarregada } from "./layout";
 import type { EstiloDoCaractere, TextoRico } from "./modelo";
 import { estiloDe } from "./modelo";
 
-export type EstiloDoCatalogo = { arquivo: string; italico: boolean; eixos: string[]; peso: number };
+/** Um arquivo da família; nas fontes do espaço, o id (para excluir) e o nome do estilo. */
+export type EstiloDoCatalogo = { arquivo: string; italico: boolean; eixos: string[]; peso: number; id?: string; estilo?: string };
 export type FamiliaDoCatalogo = { id: string; nome: string; categoria: string; licenca: string; estilos: EstiloDoCatalogo[] };
 
 let catalogo: FamiliaDoCatalogo[] | null = null;
 let pedidoDoCatalogo: Promise<FamiliaDoCatalogo[]> | null = null;
 
+/** O catálogo: as do servidor, as que o espaço enviou e a biblioteca (as do espaço faltam sem sessão). */
 export function carregarCatalogo(): Promise<FamiliaDoCatalogo[]> {
   if (catalogo) return Promise.resolve(catalogo);
-  pedidoDoCatalogo ??= chamarApi<FamiliaDoCatalogo[]>("/fontes").then((lista) => {
-    catalogo = lista;
+  pedidoDoCatalogo ??= Promise.all([chamarApi<FamiliaDoCatalogo[]>("/fontes"), chamarApi<FamiliaDoCatalogo[]>("/fontes/espaco").catch(() => [])]).then(([todas, doEspaco]) => {
+    const doServidor = todas.filter((familia) => ["inter", "montserrat", "caveat"].includes(familia.id));
+    catalogo = [...doServidor, ...doEspaco, ...todas.filter((familia) => !doServidor.includes(familia))];
     avisar();
-    return lista;
+    return catalogo;
   });
   return pedidoDoCatalogo;
 }
 
-/** O catálogo (vazio até chegar). */
+/** Pede o catálogo de novo (depois de enviar ou excluir uma fonte do espaço). */
+export function recarregarCatalogo(): Promise<FamiliaDoCatalogo[]> {
+  catalogo = null;
+  pedidoDoCatalogo = null;
+  return carregarCatalogo();
+}
+
+/** O catálogo (vazio até chegar; muda quando ele é pedido de novo). */
 export function useCatalogoDeFontes(): FamiliaDoCatalogo[] {
-  const [lista, setLista] = useState<FamiliaDoCatalogo[]>(catalogo ?? []);
+  useVersaoDasFontes();
+  const [, setPronto] = useState(false);
   useEffect(() => {
     let ativo = true;
-    void carregarCatalogo().then((itens) => ativo && setLista(itens));
+    void carregarCatalogo().then(() => ativo && setPronto(true));
     return () => {
       ativo = false;
     };
   }, []);
-  return lista;
+  return catalogo ?? [];
+}
+
+/** O endereço do arquivo de uma fonte (as do espaço pedem a sessão). */
+export const enderecoDaFonte = (arquivo: string) => (arquivo.startsWith("espaco/") ? `/api/fontes/espaco/arquivo/${encodeURIComponent(arquivo.slice(7))}` : `/api/fontes/arquivo/${encodeURIComponent(arquivo)}`);
+
+/** Envia uma fonte .ttf ou .otf para o espaço; devolve o id da família dela no catálogo. */
+export async function enviarFonte(arquivo: File): Promise<string> {
+  if (arquivo.size > 10 * 1024 * 1024) throw new ErroApi(413, "O arquivo passa de 10 MB.");
+  let resposta: Response;
+  try {
+    resposta = await fetch(`/api/fontes/espaco?nome=${encodeURIComponent(arquivo.name.slice(0, 200))}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: await arquivo.arrayBuffer(),
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ErroApi(0, "Sem conexão com o servidor. Verifique sua internet.");
+  }
+  const dados = await resposta.json().catch(() => null);
+  if (!resposta.ok) throw new ErroApi(resposta.status, typeof dados?.detail === "string" ? dados.detail : mensagemPadrao(resposta.status));
+  await recarregarCatalogo();
+  return (dados as { familia_id: string }).familia_id;
+}
+
+/** Exclui as fontes de uma família do espaço (a API recusa a última de uma família em uso). */
+export async function excluirFamiliaDoEspaco(familia: FamiliaDoCatalogo): Promise<void> {
+  try {
+    for (const estilo of familia.estilos) if (estilo.id) await chamarApi(`/fontes/espaco/${estilo.id}`, { metodo: "DELETE" });
+  } finally {
+    await recarregarCatalogo();
+  }
 }
 
 // ——— Quem espera as fontes ———
@@ -71,7 +114,7 @@ const pedidas = new Map<string, Promise<FonteDoFontkit | null>>();
 function lerArquivo(arquivo: string): Promise<FonteDoFontkit | null> {
   let pedido = pedidas.get(arquivo);
   if (!pedido) {
-    pedido = fetch(`/api/fontes/arquivo/${encodeURIComponent(arquivo)}`)
+    pedido = fetch(enderecoDaFonte(arquivo), { credentials: "same-origin" })
       .then((resposta) => (resposta.ok ? resposta.arrayBuffer() : Promise.reject(new Error(`A fonte ${arquivo} não carregou.`))))
       .then((dados) => {
         const fonte = create(new Uint8Array(dados));

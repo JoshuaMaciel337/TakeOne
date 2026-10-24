@@ -3,11 +3,11 @@
 // A barra da ferramenta Texto do editor de imagem (ADR 0003, onda 13.8): a direção, a fonte (com a amostra de cada uma
 // e a prévia ao passar o mouse), o estilo, o tamanho, o alinhamento e a cor. Vale para o que está selecionado no texto
 // em edição, para o texto escolhido inteiro ou, sem nenhum, para o próximo texto.
-import { AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, Check, ChevronDown, Search, Spline, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, Check, ChevronDown, Search, Spline, Trash2, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { type FamiliaDoCatalogo, useCatalogoDeFontes } from "@/lib/texto/fontes";
+import { enderecoDaFonte, enviarFonte, excluirFamiliaDoEspaco, type FamiliaDoCatalogo, useCatalogoDeFontes } from "@/lib/texto/fontes";
 import type { Alinhamento, EstiloDoCaractere, TextoRico } from "@/lib/texto/modelo";
 
 const campo = "h-6 rounded border border-borda bg-fundo px-1.5 text-xs text-texto";
@@ -15,7 +15,7 @@ const SEPARADOR = <span className="mx-1 h-4 w-px bg-borda" aria-hidden />;
 
 export const NOMES_DOS_PESOS: Record<number, string> = { 100: "Fina", 200: "Extra leve", 300: "Leve", 400: "Normal", 500: "Média", 600: "Seminegrito", 700: "Negrito", 800: "Extra negrito", 900: "Preta" };
 const TAMANHOS = [6, 8, 9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60, 72, 96, 120, 144, 200, 288];
-const CATEGORIAS: Record<string, string> = { "sem-serifa": "Sem serifa", serifa: "Com serifa", decorativa: "Decorativas", manuscrita: "Manuscritas", monoespacada: "Monoespaçadas" };
+const CATEGORIAS: Record<string, string> = { espaco: "Do espaço", "sem-serifa": "Sem serifa", serifa: "Com serifa", decorativa: "Decorativas", manuscrita: "Manuscritas", monoespacada: "Monoespaçadas" };
 
 /** Os estilos (peso e itálico) que uma família oferece: a variável vai de 100 a 900 nos pesos que o eixo cobre. */
 export function estilosDaFamilia(familia: FamiliaDoCatalogo | undefined): { peso: number; italico: boolean }[] {
@@ -36,7 +36,7 @@ function carregarAmostra(familia: FamiliaDoCatalogo): Promise<void> {
   let pedido = amostras.get(familia.id);
   if (!pedido) {
     const estilo = familia.estilos.find((item) => !item.italico) ?? familia.estilos[0];
-    const face = new FontFace(`amostra-${familia.id}`, `url(/api/fontes/arquivo/${encodeURIComponent(estilo.arquivo)})`);
+    const face = new FontFace(`amostra-${familia.id}`, `url(${enderecoDaFonte(estilo.arquivo)})`);
     pedido = face.load().then(
       (carregada) => void document.fonts.add(carregada),
       () => undefined,
@@ -46,7 +46,7 @@ function carregarAmostra(familia: FamiliaDoCatalogo): Promise<void> {
   return pedido;
 }
 
-function LinhaDaFonte({ familia, escolhida, aoEscolher, aoPrever }: { familia: FamiliaDoCatalogo; escolhida: boolean; aoEscolher: () => void; aoPrever: (ligado: boolean) => void }) {
+function LinhaDaFonte({ familia, escolhida, aoEscolher, aoPrever, aoExcluir }: { familia: FamiliaDoCatalogo; escolhida: boolean; aoEscolher: () => void; aoPrever: (ligado: boolean) => void; aoExcluir?: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [pronta, setPronta] = useState(amostras.has(familia.id));
   useEffect(() => {
@@ -61,21 +61,28 @@ function LinhaDaFonte({ familia, escolhida, aoEscolher, aoPrever }: { familia: F
     return () => observador.disconnect();
   }, [familia]);
   return (
-    <button
-      ref={ref}
-      type="button"
-      role="option"
-      aria-selected={escolhida}
-      className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left hover:bg-superficie-2 ${escolhida ? "bg-superficie-2" : ""}`}
-      onClick={aoEscolher}
-      onMouseEnter={() => aoPrever(true)}
-      onMouseLeave={() => aoPrever(false)}
-    >
-      <span className="w-36 shrink-0 truncate text-xs text-texto">{familia.nome}</span>
-      <span className="truncate text-base text-texto" style={{ fontFamily: pronta ? `"amostra-${familia.id}"` : undefined, opacity: pronta ? 1 : 0.3 }} aria-hidden>
-        Texto de exemplo
-      </span>
-    </button>
+    <div className={`group flex items-center rounded hover:bg-superficie-2 ${escolhida ? "bg-superficie-2" : ""}`}>
+      <button
+        ref={ref}
+        type="button"
+        role="option"
+        aria-selected={escolhida}
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
+        onClick={aoEscolher}
+        onMouseEnter={() => aoPrever(true)}
+        onMouseLeave={() => aoPrever(false)}
+      >
+        <span className="w-36 shrink-0 truncate text-xs text-texto">{familia.nome}</span>
+        <span className="truncate text-base text-texto" style={{ fontFamily: pronta ? `"amostra-${familia.id}"` : undefined, opacity: pronta ? 1 : 0.3 }} aria-hidden>
+          Texto de exemplo
+        </span>
+      </button>
+      {aoExcluir ? (
+        <button type="button" className="botao-icone mr-1 size-6 opacity-0 group-hover:opacity-100" title={`Excluir a fonte ${familia.nome} do espaço`} aria-label={`Excluir a fonte ${familia.nome}`} onClick={aoExcluir}>
+          <Trash2 className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -86,6 +93,9 @@ export function SeletorDeFonte({ valor, aoEscolher, aoPrever }: { valor: string 
   const listaRef = useRef<HTMLDivElement>(null);
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const arquivoRef = useRef<HTMLInputElement>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const atual = catalogo.find((familia) => familia.id === valor);
   const lista = useMemo(() => {
@@ -149,6 +159,14 @@ export function SeletorDeFonte({ valor, aoEscolher, aoPrever }: { valor: string 
                 key={familia.id}
                 familia={familia}
                 escolhida={familia.id === valor}
+                aoExcluir={
+                  familia.categoria === "espaco"
+                    ? () => {
+                        setAviso(null);
+                        excluirFamiliaDoEspaco(familia).catch((erro: unknown) => setAviso(erro instanceof Error ? erro.message : "Não foi possível excluir a fonte."));
+                      }
+                    : undefined
+                }
                 aoPrever={(ligado) => aoPrever(ligado ? familia.id : null)}
                 aoEscolher={() => {
                   aoPrever(null);
@@ -158,6 +176,34 @@ export function SeletorDeFonte({ valor, aoEscolher, aoPrever }: { valor: string 
               />
             ))}
             {!lista.length ? <p className="p-2 text-xs text-suave">{catalogo.length ? "Nenhuma fonte com esse nome." : "Carregando as fontes…"}</p> : null}
+          </div>
+          <div className="flex items-center gap-2 border-t border-borda pt-1.5">
+            <button type="button" className="botao-secundario px-2 py-0.5 text-xs" disabled={enviando} onClick={() => arquivoRef.current?.click()} title="Uma fonte .ttf ou .otf (até 10 MB) para os textos do espaço">
+              {enviando ? "Enviando…" : "Enviar fonte…"}
+            </button>
+            {aviso ? <span className="truncate text-xs text-suave" role="status">{aviso}</span> : null}
+            <input
+              ref={arquivoRef}
+              type="file"
+              accept=".ttf,.otf,font/ttf,font/otf"
+              className="hidden"
+              aria-label="Arquivo da fonte"
+              onChange={(evento) => {
+                const arquivo = evento.currentTarget.files?.[0];
+                evento.currentTarget.value = "";
+                if (!arquivo) return;
+                setEnviando(true);
+                setAviso(null);
+                enviarFonte(arquivo)
+                  .then((familiaId) => {
+                    setAviso(`${arquivo.name} entrou nas fontes do espaço.`);
+                    setCategoria("espaco");
+                    aoEscolher(familiaId);
+                  })
+                  .catch((erro: unknown) => setAviso(erro instanceof Error ? erro.message : "Não foi possível enviar a fonte."))
+                  .finally(() => setEnviando(false));
+              }}
+            />
           </div>
         </div>,
         document.body,
