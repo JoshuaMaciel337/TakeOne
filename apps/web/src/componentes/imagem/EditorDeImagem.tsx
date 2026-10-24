@@ -126,6 +126,7 @@ import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas, JanelaFatiasEmArquivos } from "./JanelaExportarPranchetas";
 import { JanelaDividirFatia, JanelaOpcoesDaFatia, OpcoesDasFatiasNaBarra } from "./JanelasDasFatias";
 import { PainelComps } from "./PainelComps";
+import { OpcoesDaVarinhaVetorialNaBarra } from "./OpcoesDaVarinhaVetorial";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
 import { PainelTeclasModificadoras, useTeclasPresas } from "./TeclasPresas";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
@@ -177,6 +178,7 @@ import { atualizarComp, camadasQueSumiram, type CompDeCamada, estadoDasCamadas, 
 import { type AnimacaoDaImagem, compDoQuadro, interpolar, MAXIMO_DE_QUADROS, novoQuadro } from "@/lib/imagem/animacao";
 import { gifDaAnimacao, videoDaAnimacao } from "@/lib/exportacao/animacao";
 import { dividirFatia, type Fatia, fatiasDasGuias, MAXIMO_DE_FATIAS } from "@/lib/imagem/fatias";
+import { camadasParecidas, type OpcoesDaVarinhaVetorial, VARINHA_VETORIAL_PADRAO } from "@/lib/vetor/varinhaVetorial";
 import { opcoesParaGuardar, type ParteDasOpcoes, partesDaFerramenta, type PredefinicaoDeFerramenta } from "@/lib/imagem/predefinicoesDeFerramenta";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
@@ -537,6 +539,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [quadroAtual, setQuadroAtual] = useState<string | null>(null);
   // As fatias: a escolhida pela Seleção de fatia e as janelas
   const [fatiaEscolhida, setFatiaEscolhida] = useState<string | null>(null);
+  const [opcoesDaVarinhaVetorial, setOpcoesDaVarinhaVetorial] = useState<OpcoesDaVarinhaVetorial>(VARINHA_VETORIAL_PADRAO);
   const [janelaDaFatia, setJanelaDaFatia] = useState<"dividir" | "opcoes" | null>(null);
   const [fatiasEmArquivos, setFatiasEmArquivos] = useState(false);
   // O painel Teclas modificadoras (Shift, Ctrl e Alt presos, para a tela de toque)
@@ -6430,6 +6433,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "varinhaVetorial" ? (
+            <OpcoesDaVarinhaVetorialNaBarra opcoes={opcoesDaVarinhaVetorial} aoMudar={setOpcoesDaVarinhaVetorial} />
           ) : ferramenta === "fatia" || ferramenta === "selecaoDeFatia" ? (
             <OpcoesDasFatiasNaBarra
               total={fatiasDoDocumento.length}
@@ -6738,6 +6743,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            aoVarinhaVetorial={(clipeId, modo) => {
+              const achadas = clipeId ? camadasParecidas(projeto, clipeId, opcoesDaVarinhaVetorial) : [];
+              setSelecao(modo === "somar" ? [...new Set([...selecaoValida, ...achadas])] : modo === "subtrair" ? selecaoValida.filter((id) => !achadas.includes(id)) : achadas);
+            }}
             fatias={{
               fatias: fatiasDoDocumento,
               ferramenta: ferramenta === "fatia" || ferramenta === "selecaoDeFatia" ? ferramenta : null,

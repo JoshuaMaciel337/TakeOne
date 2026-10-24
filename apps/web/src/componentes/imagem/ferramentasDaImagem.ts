@@ -50,6 +50,8 @@ import {
   WandSparkles,
   ZoomIn,
   Crosshair,
+  BoxSelect,
+  LassoSelect,
   Slice,
   SquareMousePointer,
   Hash,
@@ -107,6 +109,9 @@ export type IdFerramentaDaImagem =
   | "amostradorDeCor"
   | "contagem"
   | "fatia"
+  | "selecaoDeGrupo"
+  | "lacoVetorial"
+  | "varinhaVetorial"
   | "selecaoDeFatia"
   | "nota"
   | "remover"
@@ -161,6 +166,7 @@ const F = (id: IdFerramentaDaImagem, nome: string, tecla: string, icone: LucideI
 export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("mover", "Ferramenta Mover", "V", Move, "Clique para escolher a camada; arraste para mover, as alças mudam o tamanho e o giro."),
+    F("selecaoDeGrupo", "Ferramenta Seleção de grupo", "V", BoxSelect, "Clique numa camada para escolhê-la mesmo dentro de um grupo; clicar de novo escolhe o grupo em volta, e o de fora dele. Shift soma."),
     F("prancheta", "Ferramenta Prancheta", "V", LayoutTemplate, "Arraste no vazio para pôr uma prancheta; clique numa para escolher e arraste para movê-la com o que está nela."),
   ],
   [
@@ -250,6 +256,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("selecaoDeCaminho", "Ferramenta Seleção de caminho", "A", MousePointer2, "Clique num componente do caminho para escolhê-lo e arraste para mover; Shift soma, Alt arrastando duplica, Delete apaga."),
     F("selecaoDireta", "Ferramenta Seleção direta", "A", MousePointer, "Clique nos pontos (ou arraste em volta) e arraste para mover; as alças mudam a curva (Alt quebra). Delete apaga, as setas empurram."),
+    F("lacoVetorial", "Ferramenta Laço vetorial", "A", LassoSelect, "Arraste em volta dos pontos do caminho para escolhê-los (Shift soma); depois, arraste um deles para mover os escolhidos."),
+    F("varinhaVetorial", "Ferramenta Varinha mágica vetorial", "A", Sparkle, "Clique numa camada para escolher as parecidas com ela (a cor do preenchimento, por padrão; as outras medidas na barra). Shift soma, Alt tira."),
   ],
   [
     F("retangulo", "Ferramenta Retângulo", "U", Square, "Arraste para desenhar um retângulo na cor do primeiro plano."),
@@ -273,7 +281,7 @@ export function ferramenta(id: IdFerramentaDaImagem): FerramentaDaImagem {
 }
 
 /** As ferramentas de caminho (componentes/imagem/CaminhosNaPrevia.tsx). */
-export const FERRAMENTAS_DE_CAMINHO: ReadonlySet<IdFerramentaDaImagem> = new Set(["caneta", "canetaLivre", "canetaDeCurvatura", "adicionarPonto", "excluirPonto", "converterPonto", "selecaoDeCaminho", "selecaoDireta"]);
+export const FERRAMENTAS_DE_CAMINHO: ReadonlySet<IdFerramentaDaImagem> = new Set(["caneta", "canetaLivre", "canetaDeCurvatura", "adicionarPonto", "excluirPonto", "converterPonto", "selecaoDeCaminho", "selecaoDireta", "lacoVetorial"]);
 
 /** As ferramentas que desenham uma forma vetorial viva, e o tipo dela (lib/vetor/arrasto.ts). */
 export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, TipoDaFormaViva>> = {

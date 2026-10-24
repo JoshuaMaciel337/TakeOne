@@ -13,7 +13,7 @@ import { acharPonto, acharTrecho, ajustarCurvas, alcasSimetricas, caminhoDeCurva
 import type { No, Subcaminho } from "@/lib/vetor/modelo";
 import { pontoNoElemento } from "./pontoNaVista";
 
-export type FerramentaDeCaminho = "caneta" | "canetaLivre" | "canetaDeCurvatura" | "adicionarPonto" | "excluirPonto" | "converterPonto" | "selecaoDeCaminho" | "selecaoDireta";
+export type FerramentaDeCaminho = "caneta" | "canetaLivre" | "canetaDeCurvatura" | "adicionarPonto" | "excluirPonto" | "converterPonto" | "selecaoDeCaminho" | "selecaoDireta" | "lacoVetorial";
 export type OpcoesDosCaminhos = { elastico: boolean; ajuste: number; autoAdicionar: boolean };
 
 type Ponto = { x: number; y: number };
@@ -26,7 +26,19 @@ type Arrasto =
   | { tipo: "componentes"; inicio: Ponto; antes: Subcaminho[]; subs: number[]; moveu: boolean }
   | { tipo: "alca"; antes: Subcaminho[]; sub: number; no: number; lado: "e" | "s"; quebrar: boolean }
   | { tipo: "converter"; antes: Subcaminho[]; sub: number; no: number; inicio: Ponto; moveu: boolean }
-  | { tipo: "letreiro"; inicio: Ponto; fim: Ponto; somar: boolean };
+  | { tipo: "letreiro"; inicio: Ponto; fim: Ponto; somar: boolean }
+  | { tipo: "laco"; pontos: Ponto[]; somar: boolean };
+
+/** O ponto está dentro do polígono (a regra par-ímpar). */
+function dentroDoPoligono(pontos: Ponto[], p: Ponto): boolean {
+  let dentro = false;
+  for (let i = 0, j = pontos.length - 1; i < pontos.length; j = i++) {
+    const a = pontos[i];
+    const b = pontos[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) dentro = !dentro;
+  }
+  return dentro;
+}
 
 /** O caminho sendo desenhado pela caneta (os nós) ou pela de curvatura (os pontos). */
 type Construcao = { nos: No[]; curvatura: (Ponto & { canto?: boolean })[] | null };
@@ -118,7 +130,7 @@ export function CaminhosNaPrevia({
   };
   const comAlcas = (sub: number, no: number) => {
     if (ferramenta === "converterPonto") return true;
-    if (ferramenta !== "selecaoDireta" && ferramenta !== "caneta") return false;
+    if (ferramenta !== "selecaoDireta" && ferramenta !== "lacoVetorial" && ferramenta !== "caneta") return false;
     // As alças do nó escolhido e as dos vizinhos dele
     const n = lista[sub]?.nos.length ?? 0;
     return selecionados.has(chave(sub, no)) || selecionados.has(chave(sub, (no + 1) % n)) || selecionados.has(chave(sub, (no + n - 1) % n));
@@ -205,7 +217,7 @@ export function CaminhosNaPrevia({
       else if (alvo) setArrasto({ tipo: "converter", antes: lista, sub: alvo.sub, no: alvo.no, inicio: p, moveu: false });
       return;
     }
-    if (ferramenta === "selecaoDireta") {
+    if (ferramenta === "selecaoDireta" || ferramenta === "lacoVetorial") {
       if (alvo && alvo.parte !== "ancora") {
         setArrasto({ tipo: "alca", antes: lista, sub: alvo.sub, no: alvo.no, lado: alvo.parte, quebrar: evento.altKey });
         return;
@@ -223,7 +235,9 @@ export function CaminhosNaPrevia({
         const n = lista[trecho.sub].nos.length;
         escolha = new Set([chave(trecho.sub, trecho.trecho), chave(trecho.sub, (trecho.trecho + 1) % n)]);
       } else {
-        setArrasto({ tipo: "letreiro", inicio: p, fim: p, somar: evento.shiftKey });
+        // No vazio: o letreiro escolhe os pontos de dentro (o Laço vetorial, um traço livre)
+        if (ferramenta === "lacoVetorial") setArrasto({ tipo: "laco", pontos: [p], somar: evento.shiftKey });
+        else setArrasto({ tipo: "letreiro", inicio: p, fim: p, somar: evento.shiftKey });
         if (!evento.shiftKey) setSelecionados(new Set());
         return;
       }
@@ -309,6 +323,9 @@ export function CaminhosNaPrevia({
       prever(arrasto.antes.map((sub, i) => (i === arrasto.sub ? { ...sub, nos } : sub)));
     } else if (arrasto.tipo === "letreiro") {
       setArrasto({ ...arrasto, fim: p });
+    } else if (arrasto.tipo === "laco") {
+      const ultimo = arrasto.pontos[arrasto.pontos.length - 1];
+      if (Math.hypot(p.x - ultimo.x, p.y - ultimo.y) * escala >= 3) setArrasto({ ...arrasto, pontos: [...arrasto.pontos, p] });
     }
   }
 
@@ -335,6 +352,10 @@ export function CaminhosNaPrevia({
     } else if (a.tipo === "converter") {
       if (a.moveu && final) aoMudar(final, false);
       else aoMudar(a.antes.map((sub, i) => (i === a.sub ? converterNo(sub, a.no) : sub)), false);
+    } else if (a.tipo === "laco") {
+      const novos = new Set(a.somar ? selecionados : []);
+      if (a.pontos.length >= 3) lista.forEach((sub, i) => sub.nos.forEach((no, j) => dentroDoPoligono(a.pontos, no) && novos.add(chave(i, j))));
+      setSelecionados(novos);
     } else if (a.tipo === "letreiro") {
       const x0 = Math.min(a.inicio.x, a.fim.x);
       const x1 = Math.max(a.inicio.x, a.fim.x);
@@ -366,7 +387,7 @@ export function CaminhosNaPrevia({
         if (construcao.curvatura) setConstrucao(construcao.curvatura.length > 1 ? { ...construcao, curvatura: construcao.curvatura.slice(0, -1) } : null);
         else setConstrucao(construcao.nos.length > 1 ? { ...construcao, nos: construcao.nos.slice(0, -1) } : null);
         tratou = true;
-      } else if ((evento.key === "Delete" || evento.key === "Backspace") && ferramenta === "selecaoDireta" && selecionados.size) {
+      } else if ((evento.key === "Delete" || evento.key === "Backspace") && (ferramenta === "selecaoDireta" || ferramenta === "lacoVetorial") && selecionados.size) {
         // Do último para o primeiro, para os índices não mudarem
         let novo = lista;
         for (const k of [...selecionados].sort((a, b) => Number(b.split(":")[1]) - Number(a.split(":")[1]))) {
@@ -381,12 +402,12 @@ export function CaminhosNaPrevia({
         aoMudar(lista.filter((_, i) => !componentes.has(i)), false);
         escolherComponentes(new Set());
         tratou = true;
-      } else if (evento.key.startsWith("Arrow") && (ferramenta === "selecaoDireta" ? selecionados.size : ferramenta === "selecaoDeCaminho" ? componentes.size : 0)) {
+      } else if (evento.key.startsWith("Arrow") && (ferramenta === "selecaoDireta" || ferramenta === "lacoVetorial" ? selecionados.size : ferramenta === "selecaoDeCaminho" ? componentes.size : 0)) {
         const passo = evento.shiftKey ? 10 : 1;
         const dx = evento.key === "ArrowLeft" ? -passo : evento.key === "ArrowRight" ? passo : 0;
         const dy = evento.key === "ArrowUp" ? -passo : evento.key === "ArrowDown" ? passo : 0;
         const alvos =
-          ferramenta === "selecaoDireta"
+          ferramenta === "selecaoDireta" || ferramenta === "lacoVetorial"
             ? [...selecionados].map((k) => ({ sub: Number(k.split(":")[0]), no: Number(k.split(":")[1]) }))
             : [...componentes].flatMap((sub) => (lista[sub]?.nos ?? []).map((_, no) => ({ sub, no })));
         aoMudar(moverNos(lista, alvos, dx, dy), false);
@@ -461,6 +482,9 @@ export function CaminhosNaPrevia({
               </g>
             ))
           : null}
+        {arrasto?.tipo === "laco" ? (
+          <polyline points={arrasto.pontos.map((ponto) => `${ponto.x},${ponto.y}`).join(" ")} fill="none" stroke="#fff" strokeDasharray="4 3" strokeWidth={1} vectorEffect="non-scaling-stroke" style={{ filter: "drop-shadow(0 0 1px #000)" }} data-laco-vetorial />
+        ) : null}
         {arrasto?.tipo === "letreiro" ? (
           <rect
             x={Math.min(arrasto.inicio.x, arrasto.fim.x)}

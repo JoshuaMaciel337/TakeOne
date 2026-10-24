@@ -10,7 +10,7 @@ import { camadaDoCompositor, documentoDaCamada, camadasDaImagem, camadasEmArvore
 import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { type CaixaNoQuadro, caixaNoQuadro, unidadesDaSelecao } from "@/lib/projeto/alinhar";
-import { posicaoTravada } from "@/lib/projeto/arvore";
+import { ancestrais, posicaoTravada } from "@/lib/projeto/arvore";
 import { type Caixa, contemPonto, type Guias, limitesDaCaixa, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
@@ -98,6 +98,8 @@ type Props = {
   aoMudarZoom: (zoom: number | null) => void;
   /** O Amostrador de cor (I): os pontos (pixels do documento) e se a ferramenta está ativa. */
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
+  /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
+  aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
   /** As fatias (ferramentas Fatia e Seleção de fatia, C). */
   fatias?: Omit<React.ComponentProps<typeof FatiasNaPrevia>, "escala" | "documento"> | null;
   /** A Contagem e as notas (ferramentas Contagem e Nota, I). */
@@ -323,6 +325,7 @@ export function PreviaDaImagem({
   contagem = null,
   notas = null,
   fatias = null,
+  aoVarinhaVetorial,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -746,6 +749,21 @@ export function PreviaDaImagem({
         return Boolean(midia?.imagem && !midia.elemento && !midia.camada_pixels && !midia.animacao);
       });
       if (foto) aoSelecionar([foto.clipe.id]);
+      return;
+    }
+    if (ferramenta === "selecaoDeGrupo") {
+      // A camada do ponto, mesmo dentro de um grupo; clicar de novo sobe para o grupo em volta, e o de fora dele
+      const acima = camadaNoPonto(ponto);
+      if (!acima) return aoSelecionar(evento.shiftKey ? selecao : []);
+      const cadeia = [acima.faixa, ...ancestrais(projeto, acima.faixa)].flatMap((faixa) => (faixa.clipes[0] ? [faixa.clipes[0].id] : []));
+      // Com a própria camada fora da seleção, o clique a escolhe; com ela escolhida, sobe a partir do grupo mais de fora
+      const nivel = selecao.includes(cadeia[0]) ? cadeia.reduce((mais, id, i) => (selecao.includes(id) ? i : mais), 0) + 1 : 0;
+      const proximo = cadeia[Math.min(cadeia.length - 1, nivel)];
+      aoSelecionar(evento.shiftKey ? [...new Set([...selecao.filter((id) => !cadeia.includes(id)), proximo])] : [proximo]);
+      return;
+    }
+    if (ferramenta === "varinhaVetorial" && aoVarinhaVetorial) {
+      aoVarinhaVetorial(camadaNoPonto(ponto)?.clipe.id ?? null, evento.shiftKey ? "somar" : evento.altKey ? "subtrair" : "nova");
       return;
     }
     const acima = camadaNoPonto(ponto);
