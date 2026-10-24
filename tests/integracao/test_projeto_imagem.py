@@ -481,3 +481,26 @@ def test_contagem_notas_e_escala_de_medida(cliente):
     # Sem grupos, a contagem não é guardada; sem notas, a lista fica vazia
     limpo = salvar(cliente, corpo, [vazia], contagem={"grupos": []}).json()
     assert limpo["contagem"] is None and limpo["notas"] == [] and limpo["escala_de_medida"] is None
+
+
+def test_comps_de_camada(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    estado = {"oculta": True, "transformacao": {"x": 0.1, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 0.5},
+              "mesclagem": "multiplicar", "preenchimento": 0.8}
+    comp = {"id": "c1", "nome": " Versão A ", "comentario": "Para o cliente", "aparencia": False,
+            "camadas": {"f1": estado, "f2": {"oculta": False}}}
+    salvo = salvar(cliente, projeto, [vazia], comps=[comp])
+    assert salvo.status_code == 200, salvo.text
+    guardada = salvo.json()["comps"][0]
+    assert guardada["nome"] == "Versão A" and guardada["aparencia"] is False and guardada["visibilidade"] is True
+    assert guardada["camadas"]["f1"]["mesclagem"] == "multiplicar"
+    # Só o que veio fica (o estilo e a transformação da f2 não aparecem)
+    assert guardada["camadas"]["f2"] == {"oculta": False, "estilo_camada": None, "mesclagem": None,
+                                         "preenchimento": None, "transformacao": None}
+    atual = salvo.json()
+    assert salvar(cliente, atual, [vazia], comps=[comp, comp]).status_code == 422
+    ruim = {**comp, "camadas": {"f1": {"mesclagem": "inventado"}}}
+    assert salvar(cliente, atual, [vazia], comps=[ruim]).status_code == 422
+    assert salvar(cliente, atual, [vazia]).json()["comps"] == []

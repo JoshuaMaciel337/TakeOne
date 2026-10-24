@@ -174,6 +174,10 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     notas = [n.model_dump() for n in dados.notas] if imagem else []
     if len({n["id"] for n in notas}) != len(notas):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas notas têm o mesmo id.")
+    # As comps de camada guardam só o que a camada tem (o resto fica de fora, para a comp não inventar nada)
+    comps = [c.model_dump(exclude_none=True) for c in dados.comps] if imagem else []
+    if len({c["id"] for c in comps}) != len(comps):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas comps de camada têm o mesmo id.")
     campos = {
         "nome": dados.nome,
         # Na imagem, a proporção acompanha o tamanho
@@ -191,6 +195,7 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "guias": guias,
         "contagem": contagem,
         "notas": notas,
+        "comps": comps,
         "escala_de_medida": dados.escala_de_medida.model_dump() if imagem and dados.escala_de_medida else None,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,

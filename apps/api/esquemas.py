@@ -2,7 +2,7 @@
 # TakeOne API — formatos de entrada e saída
 # -----------------------------------------------
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_serializer, model_validator
 
@@ -1957,6 +1957,39 @@ class CanalEntrada(BaseModel):
         return _limpar_espacos(valor)
 
 
+class EstadoNaCompEntrada(BaseModel):
+    """Como uma camada estava numa comp de camada: o olho, a posição e a aparência (o que a comp guarda)."""
+    oculta: bool | None = None
+    transformacao: TransformacaoEntrada | None = None
+    mesclagem: str | None = None
+    preenchimento: float | None = Field(default=None, ge=0, le=1)
+    estilo_camada: EstiloDeCamadaEntrada | None = None
+
+    @field_validator("mesclagem")
+    @classmethod
+    def mesclagem_conhecida(cls, valor: str | None) -> str | None:
+        if valor is not None and valor not in get_args(ClipeEntrada.model_fields["mesclagem"].annotation):
+            raise ValueError("Modo de mesclagem desconhecido.")
+        return valor
+
+
+class CompDeCamadaEntrada(BaseModel):
+    """Uma comp de camada do editor de imagem: o estado das camadas, e o que dele vale ao aplicar."""
+    id: str = Field(min_length=1, max_length=64)
+    nome: str = Field(min_length=1, max_length=80)
+    comentario: str = Field(default="", max_length=500)
+    visibilidade: bool = True
+    posicao: bool = True
+    aparencia: bool = True
+    # Pela faixa da camada (a imagem tem até 100 camadas, com as pastas)
+    camadas: dict[str, EstadoNaCompEntrada] = Field(default={}, max_length=110)
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
 class ProjetoSalvarEntrada(BaseModel):
     versao: int = Field(ge=1, description="A versão que o editor abriu. Outra versão no banco responde 409.")
     nome: str = Field(min_length=1, max_length=120)
@@ -1980,6 +2013,7 @@ class ProjetoSalvarEntrada(BaseModel):
     contagem: ContagemEntrada | None = None
     notas: list[NotaEntrada] = Field(default=[], max_length=200)
     escala_de_medida: EscalaDeMedidaEntrada | None = None
+    comps: list[CompDeCamadaEntrada] = Field(default=[], max_length=100)
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -2023,6 +2057,7 @@ class ProjetoSaida(BaseModel):
     contagem: ContagemEntrada | None = None
     notas: list[NotaEntrada] = []
     escala_de_medida: EscalaDeMedidaEntrada | None = None
+    comps: list[CompDeCamadaEntrada] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
