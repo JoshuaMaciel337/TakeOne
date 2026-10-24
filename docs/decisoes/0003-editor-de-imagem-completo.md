@@ -287,7 +287,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Ações: gravar, tocar, parar, inserir pausa, conjuntos, salvar e carregar (os traços de pincel e os pixels pintados não entram, como lá; no Lote, a ação vale pelas camadas de ajuste e pelo modo de cor)
 - [x] Comps de camada (e Comps de camada em arquivos)
 - [x] Predefinições de ferramenta e Redefinir ferramenta
-- [ ] Pesquisar (Ctrl+F): paleta com todos os comandos e ferramentas
+- [x] Pesquisar (Ctrl+F): paleta com todos os comandos e ferramentas
 - [ ] Atalhos de teclado personalizáveis; Menus (esconder e colorir itens); Barra de ferramentas personalizável (uma ou duas colunas, esconder ferramentas); segurar a tecla de uma ferramenta usa ela só enquanto está apertada
 - [ ] Preferências (geral, interface, ferramentas, unidades, guias e grade, transparência, desempenho)
 - [ ] Linha do tempo de quadros (animação), com exportar GIF e vídeo e abrir no editor de vídeo

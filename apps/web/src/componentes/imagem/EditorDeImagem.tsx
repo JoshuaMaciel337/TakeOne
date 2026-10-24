@@ -125,6 +125,8 @@ import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { PainelComps } from "./PainelComps";
+import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
+import { achatarMenus } from "@/lib/pesquisa";
 import { PredefinicoesDeFerramenta } from "./PredefinicoesDeFerramenta";
 import { gerarAtivos } from "@/lib/exportacao/varios";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
@@ -516,6 +518,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
   // As comps de camada: a aplicada por último e a última posição do documento (o estado de antes), só na sessão
   const [compsEmArquivos, setCompsEmArquivos] = useState(false);
+  const [pesquisando, setPesquisando] = useState(false);
   const [compAplicada, setCompAplicada] = useState<string | null>(null);
   const [ultimaPosicao, setUltimaPosicao] = useState<CompDeCamada | null>(null);
   const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
@@ -5009,6 +5012,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     temComps: Boolean(projeto?.comps?.length),
+    pesquisar: () => setPesquisando(true),
     compsEmArquivos: () => setCompsEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
@@ -5405,7 +5409,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -6689,6 +6693,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {pesquisando ? (
+        <JanelaPesquisar
+          aoFechar={() => setPesquisando(false)}
+          itens={[
+            ...achatarMenus(menusDaImagem(acoes)),
+            // As ferramentas (cada uma uma vez; algumas aparecem em dois grupos)
+            ...[...new Map(TODAS_AS_FERRAMENTAS.map((item) => [item.id, item])).values()].map((item) => ({ nome: item.nome, caminho: "Ferramentas", atalho: item.tecla || undefined, tipo: "ferramenta" as const, acao: () => escolherFerramenta(item.id) })),
+          ]}
         />
       ) : null}
       {compsEmArquivos && projeto ? (

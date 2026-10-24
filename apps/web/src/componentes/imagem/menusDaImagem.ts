@@ -190,6 +190,8 @@ export type AcoesDosMenus = {
   documentoVizinho: (sentido: 1 | -1) => void;
   fecharDocumento: (id?: string) => void;
   fecharTodos: () => void;
+  /** Editar › Pesquisar (Ctrl+F): a caixa que procura nos comandos e nas ferramentas. */
+  pesquisar: () => void;
   /** Imagem › Análise: a escala de medida, o registro e o marcador de escala. */
   temEscalaDeMedida: boolean;
   escalaDeMedidaPadrao: () => void;
@@ -465,6 +467,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
         { nome: "Avançar um passo", desativado: !a.podeRefazer, aoEscolher: a.refazer, titulo: "O mesmo que refazer (Ctrl+Shift+Z)" },
         { nome: "Voltar um passo", desativado: !a.podeDesfazer, aoEscolher: a.desfazer, titulo: "O mesmo que desfazer (Ctrl+Z)" },
+        { nome: "Pesquisar…", atalho: "Ctrl+F", aoEscolher: a.pesquisar, titulo: "Procurar um comando ou uma ferramenta" },
         "-",
         { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
         { nome: "Copiar", atalho: "Ctrl+C", desativado: !a.temCamada, aoEscolher: () => a.copiar(false) },
