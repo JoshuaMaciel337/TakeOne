@@ -283,7 +283,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.15 — Organização e fluxo
 
-- [ ] Histórico completo (avançar e voltar passos, instantâneos, documento novo a partir de um estado, opções)
+- [x] Histórico completo (avançar e voltar passos, instantâneos, documento novo a partir de um estado, opções)
 - [ ] Ações: gravar, tocar, parar, inserir pausa, conjuntos, salvar e carregar
 - [ ] Comps de camada
 - [ ] Predefinições de ferramenta e Redefinir ferramenta

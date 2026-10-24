@@ -456,6 +456,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
         { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z", desativado: !a.podeRefazer, aoEscolher: a.refazer },
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
+        { nome: "Avançar um passo", desativado: !a.podeRefazer, aoEscolher: a.refazer, titulo: "O mesmo que refazer (Ctrl+Shift+Z)" },
+        { nome: "Voltar um passo", desativado: !a.podeDesfazer, aoEscolher: a.desfazer, titulo: "O mesmo que desfazer (Ctrl+Z)" },
         "-",
         { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
         { nome: "Copiar", atalho: "Ctrl+C", desativado: !a.temCamada, aoEscolher: () => a.copiar(false) },

@@ -46,6 +46,7 @@ import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } fro
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
+import { JanelaNovoInstantaneo, JanelaOpcoesDoHistorico, type OrigemDoInstantaneo } from "./JanelasDoHistorico";
 import { JanelaAjustarImagem, JanelaAutomatizar, type TipoDaAutomacao } from "./JanelaAutomatizar";
 import { JanelaConjuntos, JanelaDefinirVariaveis } from "./JanelasDasVariaveis";
 import { JanelaGrade, JanelaLayoutDeGuias, JanelaNovaGuia } from "./JanelasDaVista";
@@ -160,6 +161,7 @@ import {
 } from "@/lib/imagem/ajustesNosPixels";
 import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServidor, documentoVizinho, fecharDocumento, mudarDocumentos } from "@/lib/imagem/documentos";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
+import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
@@ -405,6 +407,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [sobreposicaoDaFonte, setSobreposicaoDaFonte] = useState<HTMLCanvasElement | null>(null);
   // Os instantâneos do Histórico (da sessão, como nos editores de imagem) e a fonte dos pincéis do histórico
   const [instantaneos, setInstantaneos] = useState<{ id: string; nome: string; projeto: Projeto }[]>([]);
+  // As opções do Histórico (no navegador) e as janelas do instantâneo novo e das opções
+  const [opcoesDoHistorico, setOpcoesDoHistorico] = useState<OpcoesDoHistorico>(carregarOpcoesDoHistorico);
+  const [janelaDoHistorico, setJanelaDoHistorico] = useState<"instantaneo" | "opcoes" | null>(null);
+  // O primeiro instantâneo, com o nome do documento, ao abrir (uma vez, quando o projeto chega)
+  const [primeiroInstantaneoFeito, setPrimeiroInstantaneoFeito] = useState(false);
+  if (projeto && !primeiroInstantaneoFeito) {
+    setPrimeiroInstantaneoFeito(true);
+    if (opcoesDoHistorico.primeiroInstantaneo) setInstantaneos((atual) => [{ id: "abertura", nome: edicao.nome || "Abertura", projeto }, ...atual]);
+  }
   const [fonteDoHistorico, setFonteDoHistorico] = useState("passo:0");
   // O último passo do Ctrl+Alt+Z (alternar o último estado): desfeito, para refazer na próxima
   const ultimoFoiDesfazer = useRef(false);
@@ -598,12 +609,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }, []);
   const executar = useCallback(
     (comando: Comando) => {
-      const resultado = executarNoProjeto(comando);
+      // Mostrar e esconder camadas só vira passo quando as opções do Histórico mandam
+      const soVisibilidade = comando.comando === "imagem.soEsta" || (comando.comando === "imagem.camada" && Object.keys(comando.parametros.mudanca).every((chave) => chave === "oculta"));
+      const resultado = executarNoProjeto(comando, { semPasso: soVisibilidade && !opcoesDoHistorico.visibilidadeDesfazivel });
       if (resultado?.selecao) setSelecao(resultado.selecao);
       return resultado;
     },
-    [executarNoProjeto, setSelecao],
+    [executarNoProjeto, setSelecao, opcoesDoHistorico.visibilidadeDesfazivel],
   );
+  const { configurarHistorico } = edicao;
+  useEffect(() => {
+    configurarHistorico({ limite: opcoesDoHistorico.estados, naoLinear: opcoesDoHistorico.naoLinear });
+  }, [configurarHistorico, opcoesDoHistorico.estados, opcoesDoHistorico.naoLinear]);
   const pinturas = usePinturas({ executar, aoAvisar: mostrarAviso });
   // O projeto mais novo, para quem espera a pintura subir (a exportação) ler o que veio depois
   const projetoRef = useRef(projeto);
@@ -884,13 +901,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
   };
   /** Imagem › Duplicar: um documento novo com uma cópia deste (as camadas de pixels continuam nas mesmas mídias). */
-  const duplicarDocumento = async (nome: string, mescladas: boolean) => {
+  const duplicarDocumento = async (nome: string, mescladas: boolean, origem?: Projeto) => {
     setJanelaDoArquivo(null);
     if (!projeto) return;
     try {
       mostrarAviso("Duplicando…");
       await pinturas.esperar();
-      const atual = projetoRef.current ?? projeto;
+      // A origem: o estado de agora, ou um instantâneo do Histórico (Documento novo a partir do estado)
+      const atual = origem ?? projetoRef.current ?? projeto;
       const { largura, altura } = tamanhoDaImagem(atual);
       const novo = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome, tamanho: { largura, altura } } });
       let faixas = atual.faixas;
@@ -5156,6 +5174,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
+  /** Um instantâneo do Histórico: o documento inteiro, a imagem como aparece numa camada só, ou só a camada escolhida. */
+  const criarInstantaneo = async (nome: string, de: OrigemDoInstantaneo) => {
+    if (!projeto) return;
+    const id = crypto.randomUUID().slice(0, 8);
+    try {
+      let estado: Projeto = projetoRef.current ?? projeto;
+      if (de === "camada" && selecionado) estado = projetoSoCom(estado, [selecionado.faixa.id]);
+      else if (de === "mescladas") {
+        await pinturas.esperar();
+        estado = projetoRef.current ?? projeto;
+        const { largura, altura } = tamanhoDaImagem(estado);
+        const midia = await criarCamadaDePixels(largura, altura, nome);
+        const png = await exportarImagem(estado, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+        const versao = await enviarVersao(midia.id, png);
+        const vazio = { ...estado, faixas: estado.faixas.filter((faixa) => faixa.tipo === "principal").map((faixa) => ({ ...faixa, clipes: [] })) };
+        estado = executarComando(vazio, { comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome: "Camadas mescladas", versao } }, ctx).projeto;
+      }
+      setInstantaneos((atual) => [...atual, { id, nome, projeto: estado }]);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o instantâneo.");
+    }
+  };
   // ——— A medição (Imagem › Análise): as notas, o Registro de medições e o marcador de escala ———
   const mudarNotas = (notas: Nota[], escolhida?: string) => {
     executar({ comando: "imagem.notas", parametros: { notas } });
@@ -5214,7 +5254,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5767,11 +5807,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoIr={edicao.irParaPasso}
           extras={{
             instantaneos,
-            aoCriarInstantaneo: () => {
-              if (!projeto) return;
-              const id = crypto.randomUUID().slice(0, 8);
-              setInstantaneos((atual) => [...atual, { id, nome: `Instantâneo ${atual.length + 1}`, projeto }]);
+            aoCriarInstantaneo: (comJanela) => {
+              if (comJanela || opcoesDoHistorico.janelaDoInstantaneo) setJanelaDoHistorico("instantaneo");
+              else void criarInstantaneo(`Instantâneo ${instantaneos.length + 1}`, "documento");
             },
+            aoRenomearInstantaneo: (id, nome) => setInstantaneos((atual) => atual.map((item) => (item.id === id ? { ...item, nome } : item))),
+            aoExcluirInstantaneo: (id) => setInstantaneos((atual) => atual.filter((item) => item.id !== id)),
+            aoDocumentoNovo: (id) => {
+              const instantaneo = id ? instantaneos.find((item) => item.id === id) : null;
+              void duplicarDocumento(`${instantaneo?.nome ?? edicao.nome} (cópia)`, false, instantaneo?.projeto);
+            },
+            aoExcluirEstado: () => depoisDaPintura(edicao.excluirEstado),
+            aoOpcoes: () => setJanelaDoHistorico("opcoes"),
             aoRestaurarInstantaneo: (id) => {
               const instantaneo = instantaneos.find((item) => item.id === id);
               if (instantaneo) depoisDaPintura(() => executar({ comando: "projeto.restaurar", parametros: { projeto: instantaneo.projeto } }));
@@ -6361,6 +6408,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       </div>
 
+      {janelaDoHistorico === "instantaneo" ? (
+        <JanelaNovoInstantaneo
+          nome={`Instantâneo ${instantaneos.length + 1}`}
+          temCamada={Boolean(selecionado)}
+          aoFechar={() => setJanelaDoHistorico(null)}
+          aoConfirmar={(nome, de) => {
+            setJanelaDoHistorico(null);
+            void criarInstantaneo(nome, de);
+          }}
+        />
+      ) : null}
+      {janelaDoHistorico === "opcoes" ? (
+        <JanelaOpcoesDoHistorico
+          opcoes={opcoesDoHistorico}
+          aoFechar={() => setJanelaDoHistorico(null)}
+          aoConfirmar={(opcoes) => {
+            setJanelaDoHistorico(null);
+            setOpcoesDoHistorico(opcoes);
+            guardarOpcoesDoHistorico(opcoes);
+          }}
+        />
+      ) : null}
       {janelaDaMedicao === "escala" ? (
         <JanelaEscalaDeMedida
           escala={projeto.escala_de_medida}
