@@ -249,6 +249,8 @@ export type AcoesDosMenus = {
   exportarPranchetas: () => void;
   /** Arquivo › Exportar › Camadas em arquivos e Arquivo › Gerar › Ativos de imagem. */
   camadasEmArquivos: () => void;
+  /** Arquivo › Exportar › Fatias em arquivos. */
+  fatiasEmArquivos: () => void;
   /** Arquivo › Exportar › Comps de camada em arquivos. */
   temComps: boolean;
   compsEmArquivos: () => void;
@@ -458,6 +460,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             "-",
             { nome: "Camadas em arquivos…", aoEscolher: a.camadasEmArquivos, titulo: "Cada camada sozinha num arquivo (num ZIP)" },
             { nome: "Comps de camada em arquivos…", desativado: !a.temComps, aoEscolher: a.compsEmArquivos, titulo: "O documento com cada comp de camada, um arquivo por comp (num ZIP)" },
+            { nome: "Fatias em arquivos…", aoEscolher: a.fatiasEmArquivos, titulo: "Cada fatia num arquivo (num ZIP)" },
             { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas, titulo: "Cada prancheta num arquivo, ou todas num PDF" },
             { nome: "PSD com as camadas", aoEscolher: a.exportarPsd, titulo: "As camadas, as pastas, as máscaras, os modos e os ajustes, para abrir em outro editor" },
           ],
@@ -965,6 +968,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Guias inteligentes", marcado: a.vista.guiasInteligentes, aoEscolher: () => a.mudarVista({ guiasInteligentes: !a.vista.guiasInteligentes }) },
             { nome: "Notas", marcado: a.vista.notas, aoEscolher: () => a.mudarVista({ notas: !a.vista.notas }) },
             { nome: "Contagem", marcado: a.vista.contagem, aoEscolher: () => a.mudarVista({ contagem: !a.vista.contagem }) },
+            { nome: "Fatias", marcado: a.vista.fatias, aoEscolher: () => a.mudarVista({ fatias: !a.vista.fatias }) },
             { nome: "Malha de pixels", marcado: a.vista.malhaDePixels, aoEscolher: () => a.mudarVista({ malhaDePixels: !a.vista.malhaDePixels }), titulo: "Um quadriculado em cada pixel, com o zoom a partir de 800%" },
             "-",
             { nome: "Configurar a grade…", aoEscolher: () => a.janelaDaVista("grade") },

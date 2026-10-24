@@ -50,6 +50,8 @@ import {
   WandSparkles,
   ZoomIn,
   Crosshair,
+  Slice,
+  SquareMousePointer,
   Hash,
   StickyNote,
   RotateCw,
@@ -104,6 +106,8 @@ export type IdFerramentaDaImagem =
   | "contaGotas"
   | "amostradorDeCor"
   | "contagem"
+  | "fatia"
+  | "selecaoDeFatia"
   | "nota"
   | "remover"
   | "recuperacaoParaManchas"
@@ -178,6 +182,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("corte", "Ferramenta Corte", "C", Crop, "Arraste a caixa e os cantos; fora dela gira. Enter corta, Esc cancela."),
     F("corteDePerspectiva", "Ferramenta Corte de perspectiva", "C", Scan, "Arraste um retângulo e leve os cantos aos do que deveria ser reto; Enter endireita e corta."),
+    F("fatia", "Ferramenta Fatia", "C", Slice, "Arraste para desenhar uma fatia; cada fatia sai num arquivo (Arquivo › Exportar › Fatias em arquivos)."),
+    F("selecaoDeFatia", "Ferramenta Seleção de fatia", "C", SquareMousePointer, "Clique para escolher uma fatia; arraste para mover, os cantos mudam o tamanho, Delete exclui e o duplo clique abre as opções."),
   ],
   [F("quadro", "Ferramenta Quadro", "K", Frame, "Arraste para desenhar um quadro (retangular ou elíptico) e ponha uma foto nele: com o quadro escolhido, clique numa foto da biblioteca.")],
   [

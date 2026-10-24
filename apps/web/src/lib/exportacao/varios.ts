@@ -4,6 +4,7 @@
 // tamanho do documento ou cortada no conteúdo), Pranchetas em arquivos (em qualquer formato, ou todas num PDF) e Gerar
 // ativos de imagem (as camadas e grupos com o nome terminado numa extensão). Um arquivo só baixa direto; vários, um ZIP.
 import { aplicarComp, type CompDeCamada } from "../imagem/comps";
+import { fatiasAutomaticas, nomeDaFatia } from "../imagem/fatias";
 import { comDescendentes } from "../projeto/arvore";
 import { tamanhoDaImagem } from "../projeto/imagem";
 import type { Faixa, Projeto } from "../projeto/modelo";
@@ -67,6 +68,31 @@ export async function exportarCamadas(projeto: Projeto, midias: ReadonlyMap<stri
     arquivos.push({ nome: nome(`${opcoes.prefixo}${numero} ${nomeDaFaixa(faixa)}`.trim(), extensao), blob: await codificarCanvas(canvas, exportacao, ppi, comPpi) });
   }
   return pacote(arquivos, "camadas.zip");
+}
+
+/**
+ * Fatias em arquivos: o documento desenhado uma vez na escala pedida e cada fatia recortada dele (com as automáticas,
+ * se pedido), um arquivo por fatia, com o nome dela ou o do documento com o número.
+ */
+export async function exportarFatias(projeto: Projeto, midias: ReadonlyMap<string, Midia>, opcoes: { exportacao: OpcoesDeExportacao; automaticas: boolean; documento: string }, fontes: FontesDaExportacao, aoProgresso: (texto: string) => void): Promise<Arquivo> {
+  const doc = tamanhoDaImagem(projeto);
+  const daPessoa = projeto.fatias ?? [];
+  const todas = [...daPessoa, ...(opcoes.automaticas || !daPessoa.length ? fatiasAutomaticas(daPessoa, doc).map((r) => ({ ...r, nome: "" })) : [])];
+  const exportacao: OpcoesDeExportacao = { ...opcoes.exportacao, informacoes: projeto.informacoes ?? null, modo: projeto.modo ?? null };
+  const { escala } = exportacao;
+  const ppi = (projeto.tamanho?.resolucao ?? 72) * escala;
+  const comPpi = projeto.tamanho?.resolucao ? ppi : null;
+  aoProgresso("Desenhando o documento…");
+  const canvas = await desenhar(projeto, midias, escala, fontes);
+  const nome = nomesSemRepetir();
+  const extensao = formatoDe(opcoes.exportacao.formato).extensao;
+  const arquivos: Arquivo[] = [];
+  for (const [indice, fatia] of todas.entries()) {
+    aoProgresso(`Exportando a fatia ${indice + 1} de ${todas.length}…`);
+    const pedaco = recortarCanvas(canvas, { x: fatia.x * escala, y: fatia.y * escala, largura: fatia.largura * escala, altura: fatia.altura * escala });
+    arquivos.push({ nome: nome(nomeDaFatia(fatia, opcoes.documento, indice + 1, todas.length), extensao), blob: await codificarCanvas(pedaco, exportacao, ppi, comPpi) });
+  }
+  return pacote(arquivos, "fatias.zip");
 }
 
 /** Comps de camada em arquivos: o documento com cada comp aplicada, um arquivo por comp, num ZIP. */

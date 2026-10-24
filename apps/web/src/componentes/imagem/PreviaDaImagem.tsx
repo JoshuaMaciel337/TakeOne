@@ -53,6 +53,7 @@ import { CortePerspectivaNaPrevia } from "./CortePerspectivaNaPrevia";
 import { GaleriaNaPrevia } from "./filtros/Galeria";
 import { AmostradoresNaPrevia } from "./AmostradoresNaPrevia";
 import { ContagemNaPrevia, NotasNaPrevia } from "./MedicaoNaPrevia";
+import { FatiasNaPrevia } from "./FatiasNaPrevia";
 import { ReguaNaPrevia } from "./ReguaNaPrevia";
 import { mudarVistaAoVivo, registrarRolagem } from "./vistaAoVivo";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
@@ -97,6 +98,8 @@ type Props = {
   aoMudarZoom: (zoom: number | null) => void;
   /** O Amostrador de cor (I): os pontos (pixels do documento) e se a ferramenta está ativa. */
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
+  /** As fatias (ferramentas Fatia e Seleção de fatia, C). */
+  fatias?: Omit<React.ComponentProps<typeof FatiasNaPrevia>, "escala" | "documento"> | null;
   /** A Contagem e as notas (ferramentas Contagem e Nota, I). */
   contagem?: Omit<React.ComponentProps<typeof ContagemNaPrevia>, "escala"> | null;
   notas?: Omit<React.ComponentProps<typeof NotasNaPrevia>, "escala"> | null;
@@ -319,6 +322,7 @@ export function PreviaDaImagem({
   amostradores = null,
   contagem = null,
   notas = null,
+  fatias = null,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -973,6 +977,9 @@ export function PreviaDaImagem({
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia {...recorte} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {cortePerspectiva && tamanho.largura > 1 ? <CortePerspectivaNaPrevia {...cortePerspectiva} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {regua && tamanho.largura > 1 ? <ReguaNaPrevia {...regua} escala={tamanho.largura / imagem.largura} /> : null}
+            {fatias && (fatias.ferramenta || (vista.extras && vista.fatias && fatias.fatias.length)) && tamanho.largura > 1 ? (
+              <FatiasNaPrevia {...fatias} escala={tamanho.largura / imagem.largura} documento={imagem} />
+            ) : null}
             {contagem && (contagem.ativo || (vista.extras && vista.contagem && contagem.contagem?.grupos.length)) && tamanho.largura > 1 ? (
               <ContagemNaPrevia {...contagem} escala={tamanho.largura / imagem.largura} />
             ) : null}

@@ -5,7 +5,7 @@
 import { useState } from "react";
 
 import { baixarBlob, type FontesDaExportacao, formatoDe, FORMATOS_DE_EXPORTACAO, type FormatoDeExportacao, OPCOES_PADRAO_DE_EXPORTACAO } from "@/lib/exportacao/exportarComo";
-import { exportarCamadas, exportarComps, exportarPranchetasComo } from "@/lib/exportacao/varios";
+import { exportarCamadas, exportarComps, exportarFatias, exportarPranchetasComo } from "@/lib/exportacao/varios";
 import type { CompDeCamada } from "@/lib/imagem/comps";
 import type { Projeto } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
@@ -77,6 +77,36 @@ export function JanelaExportarPranchetas({ quantas, midias, aoPreparar, aoFechar
         {opcoes.formato === "pdf" ? "As pranchetas saem num PDF, uma página cada, no tamanho delas." : quantas === 1 ? "A prancheta sai num arquivo." : `As ${quantas} pranchetas saem num ZIP, um arquivo por prancheta, com o nome dela.`}
       </p>
       <CamposDoFormato formato={opcoes.formato} escala={opcoes.escala} qualidade={opcoes.qualidade} comPdf aoMudar={(mudanca) => setOpcoes({ ...opcoes, ...mudanca })} />
+      {gerando ? <p className="text-suave">{gerando}</p> : null}
+    </Moldura>
+  );
+}
+
+/** Arquivo › Exportar › Fatias em arquivos. */
+export function JanelaFatiasEmArquivos({ midias, documento, aoPreparar, aoFechar, aoAvisar, ...fontes }: Props & { documento: string }) {
+  const [opcoes, setOpcoes] = useState({ ...OPCOES_PADRAO_DE_EXPORTACAO });
+  const [automaticas, setAutomaticas] = useState(true);
+  const [gerando, setGerando] = useState("");
+  const exportar = async () => {
+    setGerando("Gerando…");
+    try {
+      const { nome, blob } = await exportarFatias(await aoPreparar(), midias, { exportacao: opcoes, automaticas, documento }, fontes, setGerando);
+      baixarBlob(blob, nome);
+      aoFechar();
+    } catch (e) {
+      aoAvisar(e instanceof Error ? e.message : "Não foi possível exportar as fatias.");
+    } finally {
+      setGerando("");
+    }
+  };
+  return (
+    <Moldura titulo="Fatias em arquivos" aoFechar={aoFechar} aoConfirmar={() => void exportar()}>
+      <p className="text-suave">Cada fatia sai num arquivo, com o nome dela (ou o do documento e o número), num ZIP.</p>
+      <CamposDoFormato formato={opcoes.formato} escala={opcoes.escala} qualidade={opcoes.qualidade} comPdf={false} aoMudar={(mudanca) => setOpcoes({ ...opcoes, ...mudanca })} />
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={automaticas} onChange={(evento) => setAutomaticas(evento.currentTarget.checked)} />
+        Também as fatias automáticas (o resto do documento)
+      </label>
       {gerando ? <p className="text-suave">{gerando}</p> : null}
     </Moldura>
   );

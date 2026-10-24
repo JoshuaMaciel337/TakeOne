@@ -123,7 +123,8 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
 import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
-import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas, JanelaFatiasEmArquivos } from "./JanelaExportarPranchetas";
+import { JanelaDividirFatia, JanelaOpcoesDaFatia, OpcoesDasFatiasNaBarra } from "./JanelasDasFatias";
 import { PainelComps } from "./PainelComps";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
@@ -173,6 +174,7 @@ import { type CamadasEscolhidas, mesmaTecla, teclaDoEventoDaAcao } from "@/lib/i
 import { atualizarComp, camadasQueSumiram, type CompDeCamada, estadoDasCamadas, novaComp } from "@/lib/imagem/comps";
 import { type AnimacaoDaImagem, compDoQuadro, interpolar, MAXIMO_DE_QUADROS, novoQuadro } from "@/lib/imagem/animacao";
 import { gifDaAnimacao, videoDaAnimacao } from "@/lib/exportacao/animacao";
+import { dividirFatia, type Fatia, fatiasDasGuias, MAXIMO_DE_FATIAS } from "@/lib/imagem/fatias";
 import { opcoesParaGuardar, type ParteDasOpcoes, partesDaFerramenta, type PredefinicaoDeFerramenta } from "@/lib/imagem/predefinicoesDeFerramenta";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
@@ -531,6 +533,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [preferindo, setPreferindo] = useState(false);
   // A linha do tempo de quadros: o quadro escolhido e a animação tocando (só na tela)
   const [quadroAtual, setQuadroAtual] = useState<string | null>(null);
+  // As fatias: a escolhida pela Seleção de fatia e as janelas
+  const [fatiaEscolhida, setFatiaEscolhida] = useState<string | null>(null);
+  const [janelaDaFatia, setJanelaDaFatia] = useState<"dividir" | "opcoes" | null>(null);
+  const [fatiasEmArquivos, setFatiasEmArquivos] = useState(false);
   const [tocandoAnimacao, setTocandoAnimacao] = useState(false);
   const relogioDaAnimacao = useRef<number | null>(null);
   // Editar › Atalhos de teclado e menus e Barra de ferramentas (no navegador), e os itens escondidos à vista
@@ -5036,6 +5042,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     personalizar: setPersonalizando,
     preferencias: () => setPreferindo(true),
     compsEmArquivos: () => setCompsEmArquivos(true),
+    fatiasEmArquivos: () => setFatiasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
     mudarVista,
@@ -5373,6 +5380,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }}
     />
   );
+  // ——— As fatias ———
+  const fatiasDoDocumento = projeto?.fatias ?? [];
+  const mudarFatias = (fatias: Fatia[], nome: string) => {
+    if (fatias.length > MAXIMO_DE_FATIAS) return mostrarAviso(`São no máximo ${MAXIMO_DE_FATIAS} fatias.`);
+    executar({ comando: "imagem.fatias", parametros: { fatias, nome } });
+  };
+  const fatiaDaVez = fatiasDoDocumento.find((fatia) => fatia.id === fatiaEscolhida) ?? null;
+  const excluirFatia = () => {
+    if (!fatiaDaVez) return;
+    mudarFatias(fatiasDoDocumento.filter((fatia) => fatia.id !== fatiaDaVez.id), "excluir a fatia");
+    setFatiaEscolhida(null);
+  };
   // ——— A linha do tempo de quadros ———
   const animacaoDoDocumento = projeto?.animacao ?? null;
   const mudarAnimacao = (animacao: AnimacaoDaImagem | null, nome: string) => executar({ comando: "imagem.animacao", parametros: { animacao, nome } });
@@ -5520,7 +5539,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || preferindo || personalizando !== null || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || fatiasEmArquivos || janelaDaFatia !== null || preferindo || personalizando !== null || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5594,7 +5613,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (recorte) cancelarCorte();
       else if (temSelecao || objeto.pontos.length) objeto.limpar();
       else setSelecao([]);
-    } else if ((tecla === "Delete" || tecla === "Backspace") && selecaoNoDocumento && selecionado?.clipe.pixels) limpar();
+    } else if ((tecla === "Delete" || tecla === "Backspace") && ferramenta === "selecaoDeFatia" && fatiaEscolhida) excluirFatia();
+    else if ((tecla === "Delete" || tecla === "Backspace") && selecaoNoDocumento && selecionado?.clipe.pixels) limpar();
     else if ((tecla === "Delete" || tecla === "Backspace") && escolhidas.length && !escolhidas.some((faixa) => faixa.travada)) executar({ comando: "imagem.apagarVarias", parametros: { faixaIds } });
     else if (escolhidas.length && evento.key.startsWith("Arrow")) {
       // Um pixel da imagem por toque (dez com Shift), em frações do quadro, com as pastas e as vinculadas
@@ -6399,6 +6419,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "fatia" || ferramenta === "selecaoDeFatia" ? (
+            <OpcoesDasFatiasNaBarra
+              total={fatiasDoDocumento.length}
+              temGuias={Boolean(projeto.guias?.verticais.length || projeto.guias?.horizontais.length)}
+              escolhida={fatiaDaVez}
+              aoDasGuias={() => projeto.guias && mudarFatias([...fatiasDoDocumento, ...fatiasDasGuias(projeto.guias, tamanhoDaImagem(projeto), () => crypto.randomUUID().slice(0, 12))], "fatias a partir das guias")}
+              aoDividir={() => setJanelaDaFatia("dividir")}
+              aoOpcoes={() => setJanelaDaFatia("opcoes")}
+              aoExcluir={excluirFatia}
+              aoLimpar={() => {
+                mudarFatias([], "limpar as fatias");
+                setFatiaEscolhida(null);
+              }}
+            />
           ) : ferramenta === "contagem" ? (
             <OpcoesDaContagemNaBarra
               contagem={projeto.contagem ?? null}
@@ -6693,6 +6727,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            fatias={{
+              fatias: fatiasDoDocumento,
+              ferramenta: ferramenta === "fatia" || ferramenta === "selecaoDeFatia" ? ferramenta : null,
+              escolhida: fatiaEscolhida,
+              mostrarAutomaticas: true,
+              aoEscolher: setFatiaEscolhida,
+              aoCriar: (retangulo) => {
+                const id = crypto.randomUUID().slice(0, 12);
+                mudarFatias([...fatiasDoDocumento, { id, nome: "", ...retangulo }], "criar a fatia");
+                setFatiaEscolhida(id);
+              },
+              aoMudar: (id, retangulo) => mudarFatias(fatiasDoDocumento.map((fatia) => (fatia.id === id ? { ...fatia, ...retangulo } : fatia)), "mudar a fatia"),
+              aoAbrirOpcoes: (id) => {
+                setFatiaEscolhida(id);
+                setJanelaDaFatia("opcoes");
+              },
+            }}
             contagem={{
               contagem: projeto.contagem ?? null,
               ativo: ferramenta === "contagem",
@@ -6934,6 +6985,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             // As ferramentas (cada uma uma vez; algumas aparecem em dois grupos)
             ...[...new Map(TODAS_AS_FERRAMENTAS.map((item) => [item.id, item])).values()].map((item) => ({ nome: item.nome, caminho: "Ferramentas", atalho: teclaDaFerramenta(item, personalizacao) || undefined, tipo: "ferramenta" as const, acao: () => escolherFerramenta(item.id) })),
           ]}
+        />
+      ) : null}
+      {fatiasEmArquivos && projeto ? (
+        <JanelaFatiasEmArquivos
+          midias={midias}
+          documento={edicao.nome}
+          aoPreparar={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
+          fonteDosPixels={pinturas.fonte}
+          fonteDaMascara={pinturas.fonteDaMascara}
+          fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
+          aoFechar={() => setFatiasEmArquivos(false)}
+          aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {janelaDaFatia === "dividir" && fatiaDaVez ? (
+        <JanelaDividirFatia
+          aoFechar={() => setJanelaDaFatia(null)}
+          aoConfirmar={(colunas, linhas) => {
+            setJanelaDaFatia(null);
+            const partes = dividirFatia(fatiaDaVez, colunas, linhas, () => crypto.randomUUID().slice(0, 12));
+            const onde = fatiasDoDocumento.findIndex((fatia) => fatia.id === fatiaDaVez.id);
+            mudarFatias([...fatiasDoDocumento.slice(0, onde), ...partes, ...fatiasDoDocumento.slice(onde + 1)], "dividir a fatia");
+          }}
+        />
+      ) : null}
+      {janelaDaFatia === "opcoes" && fatiaDaVez ? (
+        <JanelaOpcoesDaFatia
+          fatia={fatiaDaVez}
+          documento={tamanhoDaImagem(projeto)}
+          aoFechar={() => setJanelaDaFatia(null)}
+          aoConfirmar={(nova) => {
+            setJanelaDaFatia(null);
+            mudarFatias(fatiasDoDocumento.map((fatia) => (fatia.id === nova.id ? nova : fatia)), "mudar a fatia");
+          }}
         />
       ) : null}
       {compsEmArquivos && projeto ? (

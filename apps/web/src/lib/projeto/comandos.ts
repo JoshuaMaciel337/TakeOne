@@ -13,6 +13,7 @@ import type { Guias } from "./geometria.ts";
 import type { Contagem, EscalaDeMedida, Nota } from "../imagem/medicao.ts";
 import { aplicarComp, type CompDeCamada } from "../imagem/comps.ts";
 import type { AnimacaoDaImagem } from "../imagem/animacao.ts";
+import type { Fatia } from "../imagem/fatias.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -283,6 +284,7 @@ export type Comando =
   | { comando: "imagem.comps"; parametros: { comps: CompDeCamada[]; nome?: string } }
   | { comando: "imagem.aplicarComp"; parametros: { comp: CompDeCamada } }
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
+  | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
   | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
@@ -440,6 +442,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.comps": "mudar as comps de camada",
   "imagem.aplicarComp": "aplicar a comp de camada",
   "imagem.animacao": "mudar a animação",
+  "imagem.fatias": "mudar as fatias",
   "imagem.escalaDeMedida": "definir a escala de medida",
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
@@ -833,6 +836,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, comps: parametros.comps } };
     case "imagem.aplicarComp":
       return { projeto: aplicarComp(projeto, parametros.comp) };
+    case "imagem.fatias":
+      return { projeto: { ...projeto, fatias: parametros.fatias } };
     case "imagem.animacao":
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":

@@ -214,6 +214,8 @@ export type PreferenciasDaVista = {
   /** Exibir › Mostrar › Notas e Contagem. */
   notas: boolean;
   contagem: boolean;
+  /** Exibir › Mostrar › Fatias. */
+  fatias: boolean;
   encaixar: boolean;
   // Editar › Preferências: as guias e a grade, a transparência, a roda, o cursor de pintura, a nitidez da prévia, as
   // dicas da barra de status, o Shift para trocar de ferramenta e a resolução dos documentos novos
@@ -246,6 +248,7 @@ export const VISTA_PADRAO: PreferenciasDaVista = {
   malhaDePixels: true,
   notas: true,
   contagem: true,
+  fatias: true,
   encaixar: true,
   encaixarEm: ENCAIXAR_EM_TUDO,
   corDasGuias: "#22d3ee",
