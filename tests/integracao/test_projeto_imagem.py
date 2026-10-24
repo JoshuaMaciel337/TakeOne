@@ -63,6 +63,42 @@ def test_resolucao_da_imagem(cliente):
     assert salvar(cliente, aberto, aberto["faixas"], tamanho=zero).status_code == 422
 
 
+def test_camada_vetorial(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    vetor = {
+        "caixa": {"largura": 124, "altura": 74},
+        "subcaminhos": [{"nos": [{"x": 12, "y": 12}, {"x": 112, "y": 12, "sx": 120, "sy": 12},
+                                 {"x": 112, "y": 62, "ex": 112, "ey": 50}], "fechado": True, "operacao": "somar"},
+                        {"nos": [{"x": 30, "y": 30}, {"x": 40, "y": 30}, {"x": 40, "y": 40}], "fechado": True,
+                         "operacao": "subtrair"}],
+        "preenchimento": {"tipo": "degrade", "forma": "radial", "angulo": 90, "escala": 1, "inverter": False,
+                          "degrade": {"nome": "", "tipo": "solido", "cores": [
+                              {"posicao": 0, "cor": "#ff0000", "meio": 0.5},
+                              {"posicao": 1, "cor": "#0000ff", "meio": 0.5}],
+                              "opacidades": [{"posicao": 0, "opacidade": 1, "meio": 0.5}],
+                              "suavidade": 1, "aspereza": 0.5, "semente": 1}},
+        "traco": {"tinta": {"tipo": "cor", "cor": "#000000"}, "largura": 10, "alinhamento": "fora", "tipo": "tracejado",
+                  "pontas": "redonda", "cantos": "redondo", "mitra": 4},
+        "forma": {"tipo": "retangulo", "largura": 100, "altura": 50, "raios": [0, 4, 8, 0]},
+        "margem": 12,
+    }
+    forma = {**clipe(None, 0, 5, id_="forma"), "midia_id": None, "vetor": vetor}
+    faixas = [camada("video", forma), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    guardado = aberto["faixas"][0]["clipes"][0]["vetor"]
+    assert guardado == vetor, "as alças que faltam continuam faltando"
+
+    # Sem a tinta inteira, numa faixa de texto, ou no projeto de vídeo, não vale
+    incompleta = {**vetor, "preenchimento": {"tipo": "cor"}}
+    assert salvar(cliente, aberto, [camada("video", {**forma, "vetor": incompleta}), faixas[1]]).status_code == 422
+    assert salvar(cliente, aberto, [camada("texto", forma), faixas[1]]).status_code == 422
+    video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
+    assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
+
+
 def test_tamanho_fora_dos_limites_e_o_video_continua_igual(cliente):
     cadastrar(cliente)
     assert cliente.post("/api/projetos", json={"tamanho": {"largura": 9000, "altura": 100}}).status_code == 422

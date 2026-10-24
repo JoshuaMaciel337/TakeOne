@@ -715,6 +715,135 @@ class MascaraDePixelsEntrada(BaseModel):
     matriz: list[float] = Field(min_length=6, max_length=6)
 
 
+LIMITE_DO_VETOR = 1_000_000
+Coordenada = Annotated[float, Field(ge=-LIMITE_DO_VETOR, le=LIMITE_DO_VETOR)]
+
+
+class NoDoCaminho(BaseModel):
+    """Um nó do caminho (apps/web/src/lib/vetor/modelo.ts): a âncora e as alças absolutas, que podem faltar."""
+    x: Coordenada
+    y: Coordenada
+    ex: Coordenada | None = None
+    ey: Coordenada | None = None
+    sx: Coordenada | None = None
+    sy: Coordenada | None = None
+
+    @model_serializer(mode="wrap")
+    def _sem_alcas_vazias(self, serializar):
+        return {chave: valor for chave, valor in serializar(self).items() if valor is not None}
+
+
+class SubcaminhoEntrada(BaseModel):
+    nos: list[NoDoCaminho] = Field(min_length=1, max_length=5000)
+    fechado: bool = False
+    operacao: Literal["somar", "subtrair", "intersectar", "excluir"] = "somar"
+
+
+class ParadaDeCorEntrada(BaseModel):
+    posicao: float = Field(ge=0, le=1)
+    cor: str = Field(pattern=COR)
+    meio: float = Field(default=0.5, ge=0, le=1)
+
+
+class ParadaDeOpacidadeEntrada(BaseModel):
+    posicao: float = Field(ge=0, le=1)
+    opacidade: float = Field(ge=0, le=1)
+    meio: float = Field(default=0.5, ge=0, le=1)
+
+
+class DegradeDoEditorEntrada(BaseModel):
+    """Um degradê do editor de imagem (apps/web/src/lib/pintura/degrade.ts), já com as cores resolvidas."""
+    nome: str = Field(default="", max_length=80)
+    tipo: Literal["solido", "ruido"] = "solido"
+    cores: list[ParadaDeCorEntrada] = Field(min_length=1, max_length=64)
+    opacidades: list[ParadaDeOpacidadeEntrada] = Field(min_length=1, max_length=64)
+    suavidade: float = Field(default=1, ge=0, le=1)
+    aspereza: float = Field(default=0.5, ge=0, le=1)
+    semente: int = Field(default=1, ge=0, le=2**31)
+
+
+class TintaDaFormaEntrada(BaseModel):
+    """A tinta do preenchimento ou do traço de uma forma: nenhuma, uma cor, um degradê ou um padrão."""
+    tipo: Literal["nenhuma", "cor", "degrade", "padrao"]
+    cor: str | None = Field(default=None, pattern=COR)
+    degrade: DegradeDoEditorEntrada | None = None
+    forma: Literal["linear", "radial", "angulo", "refletido", "losango"] | None = None
+    angulo: float | None = Field(default=None, ge=-360, le=360)
+    escala: float | None = Field(default=None, ge=0.01, le=10)
+    inverter: bool | None = None
+    padrao: str | None = Field(default=None, min_length=1, max_length=60)
+
+    @model_serializer(mode="wrap")
+    def _sem_vazios(self, serializar):
+        return {chave: valor for chave, valor in serializar(self).items() if valor is not None}
+
+    @model_validator(mode="after")
+    def _completa(self):
+        faltando = (self.tipo == "cor" and not self.cor) or (self.tipo == "padrao" and not self.padrao) or (
+            self.tipo == "degrade" and not (self.degrade and self.forma and self.angulo is not None
+                                            and self.escala is not None))
+        if faltando:
+            raise ValueError("A tinta da forma está incompleta.")
+        return self
+
+
+class TracoDaFormaEntrada(BaseModel):
+    tinta: TintaDaFormaEntrada
+    largura: float = Field(ge=0, le=1000)
+    alinhamento: Literal["dentro", "centro", "fora"] = "dentro"
+    tipo: Literal["solido", "tracejado", "pontilhado"] = "solido"
+    pontas: Literal["reta", "redonda", "quadrada"] = "reta"
+    cantos: Literal["vivo", "redondo", "chanfrado"] = "vivo"
+    mitra: float = Field(default=4, ge=1, le=100)
+
+
+class FormaVivaEntrada(BaseModel):
+    """As medidas de uma forma viva; os campos que valem dependem do tipo (lib/vetor/modelo.ts, FormaViva)."""
+    tipo: Literal["retangulo", "elipse", "triangulo", "poligono", "linha"]
+    largura: Coordenada | None = None
+    altura: Coordenada | None = None
+    raios: list[Annotated[float, Field(ge=0, le=LIMITE_DO_VETOR)]] | None = Field(default=None, min_length=4,
+                                                                                  max_length=4)
+    raio: float | None = Field(default=None, ge=0, le=LIMITE_DO_VETOR)
+    lados: int | None = Field(default=None, ge=3, le=100)
+    estrela: float | None = Field(default=None, ge=0, le=0.99)
+    comprimento: float | None = Field(default=None, ge=0, le=LIMITE_DO_VETOR)
+    angulo: float | None = Field(default=None, ge=-360, le=360)
+    # Os nomes são os do editor
+    setaInicio: bool | None = None  # noqa: N815
+    setaFim: bool | None = None  # noqa: N815
+    tamanhoDaSeta: float | None = Field(default=None, ge=0, le=50)  # noqa: N815
+
+    @model_serializer(mode="wrap")
+    def _sem_vazios(self, serializar):
+        return {chave: valor for chave, valor in serializar(self).items() if valor is not None}
+
+
+class TamanhoDoVetor(BaseModel):
+    largura: float = Field(gt=0, le=65536)
+    altura: float = Field(gt=0, le=65536)
+
+
+class VetorEntrada(BaseModel):
+    """A camada vetorial do editor de imagem (lib/vetor/modelo.ts): caminhos combinados, preenchimento e traço."""
+    caixa: TamanhoDoVetor
+    subcaminhos: list[SubcaminhoEntrada] = Field(max_length=1000)
+    preenchimento: TintaDaFormaEntrada
+    traco: TracoDaFormaEntrada | None = None
+    forma: FormaVivaEntrada | None = None
+    margem: float | None = Field(default=None, ge=0, le=LIMITE_DO_VETOR)
+
+    @model_serializer(mode="wrap")
+    def _sem_vazios(self, serializar):
+        return {chave: valor for chave, valor in serializar(self).items() if valor is not None or chave == "traco"}
+
+    @model_validator(mode="after")
+    def _nos_no_limite(self):
+        if sum(len(sub.nos) for sub in self.subcaminhos) > 20_000:
+            raise ValueError("A forma pode ter no máximo 20 mil pontos.")
+        return self
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -774,6 +903,8 @@ class ClipeEntrada(BaseModel):
     # Camada de pixels: a versão do PNG da mídia que o clipe mostra (0 é a camada vazia)
     pixels: PixelsDoClipe | None = None
     mascara_pixels: MascaraDePixelsEntrada | None = None
+    # Camada vetorial (forma ou caminho): sem mídia nem texto, desenhada pelo editor
+    vetor: VetorEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
