@@ -108,6 +108,8 @@ export type AcoesDosMenus = {
   /** Filtro › Dissolver e Editar › Distorção de marionete (na camada escolhida). */
   dissolver: () => void;
   marionete: () => void;
+  /** Filtro › Correção de lente e Grande-angular adaptável (na camada escolhida). */
+  lente: (tipo: "lente" | "grandeAngular") => void;
   /** Editar › Escala sensível ao conteúdo (na camada escolhida). */
   escalaSensivel: () => void;
   /** Imagem › Tamanho da imagem, Tamanho da tela, Rotação da imagem e Revelar tudo. */
@@ -487,6 +489,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: grupo.itens.map((item) => ({ nome: item.nome, titulo: nomeDoFiltro(item.efeito), aoEscolher: () => a.filtro(item.efeito) })),
         })),
         "-",
+        { nome: "Grande-angular adaptável…", atalho: "Ctrl+Alt+Shift+A", desativado: semCamada, aoEscolher: () => a.lente("grandeAngular") },
+        { nome: "Correção de lente…", desativado: semCamada, aoEscolher: () => a.lente("lente"), titulo: "Ctrl+Shift+R é do navegador: use o menu" },
         { nome: "Dissolver…", atalho: "Ctrl+Shift+X", desativado: semCamada, aoEscolher: a.dissolver },
         { nome: "Galeria de filtros…", aoEscolher: () => a.painel("filtros") },
       ],
