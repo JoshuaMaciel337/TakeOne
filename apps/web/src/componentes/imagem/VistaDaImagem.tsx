@@ -11,7 +11,6 @@ import { pontoNoElemento } from "./pontoNaVista";
 
 /** A espessura das réguas, em pixels da tela. */
 export const LADO_DA_REGUA = 20;
-const COR_DA_GUIA = "#22d3ee";
 
 export type GuiaArrastada = { tipo: "v" | "h"; pos: number; indice: number | null };
 
@@ -45,6 +44,10 @@ export function GuiasEGrade({
   aoComecar: (guia: GuiaArrastada, evento: React.PointerEvent) => void;
 }) {
   const extras = vista.extras;
+  // A cor e o estilo das guias e da grade (Editar › Preferências › Guias e grade)
+  const corDaGuia = vista.corDasGuias;
+  const tracoDaGuia = (lado: "v" | "h") => (vista.estiloDasGuias === "tracejado" ? `repeating-linear-gradient(${lado === "v" ? "180deg" : "90deg"}, ${corDaGuia} 0 4px, transparent 4px 8px)` : corDaGuia);
+  const tracosDaGrade = vista.estiloDaGrade === "tracejado" ? "4 3" : vista.estiloDaGrade === "pontos" ? "1 3" : undefined;
   const passoGrande = vista.espacoDaGrade * escala;
   const passoPequeno = passoGrande / Math.max(1, vista.subdivisoes);
   const comMalha = extras && vista.malhaDePixels && escala >= 8;
@@ -57,11 +60,11 @@ export function GuiasEGrade({
         <svg className="pointer-events-none absolute inset-0 size-full overflow-hidden" aria-hidden>
           <defs>
             <pattern id="to-grade-pequena" width={passoPequeno} height={passoPequeno} patternUnits="userSpaceOnUse">
-              <path d={`M ${passoPequeno} 0 L 0 0 0 ${passoPequeno}`} fill="none" stroke="rgba(128,128,128,0.35)" strokeWidth={1} strokeDasharray="2 2" />
+              <path d={`M ${passoPequeno} 0 L 0 0 0 ${passoPequeno}`} fill="none" stroke={vista.corDaGrade} strokeOpacity={0.4} strokeWidth={1} strokeDasharray="2 2" />
             </pattern>
             <pattern id="to-grade" width={passoGrande} height={passoGrande} patternUnits="userSpaceOnUse">
               <rect width={passoGrande} height={passoGrande} fill="url(#to-grade-pequena)" />
-              <path d={`M ${passoGrande} 0 L 0 0 0 ${passoGrande}`} fill="none" stroke="rgba(128,128,128,0.7)" strokeWidth={1} />
+              <path d={`M ${passoGrande} 0 L 0 0 0 ${passoGrande}`} fill="none" stroke={vista.corDaGrade} strokeOpacity={0.8} strokeWidth={1} strokeDasharray={tracosDaGrade} />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#to-grade)" />
@@ -103,7 +106,7 @@ export function GuiasEGrade({
                   aoComecar({ tipo, pos, indice }, evento);
                 }}
               >
-                <span className="absolute" style={tipo === "v" ? { left: 3, top: 0, bottom: 0, width: 1, background: COR_DA_GUIA } : { top: 3, left: 0, right: 0, height: 1, background: COR_DA_GUIA }} />
+                <span className="absolute" style={tipo === "v" ? { left: 3, top: 0, bottom: 0, width: 1, background: tracoDaGuia("v") } : { top: 3, left: 0, right: 0, height: 1, background: tracoDaGuia("h") }} />
               </div>
             )),
           )
@@ -112,7 +115,7 @@ export function GuiasEGrade({
         <span
           className="pointer-events-none absolute"
           aria-hidden
-          style={guiaNova.tipo === "v" ? { left: guiaNova.pos * escala, top: -mesa, width: 1, height: tamanho.altura + 2 * mesa, background: COR_DA_GUIA } : { top: guiaNova.pos * escala, left: -mesa, height: 1, width: tamanho.largura + 2 * mesa, background: COR_DA_GUIA }}
+          style={guiaNova.tipo === "v" ? { left: guiaNova.pos * escala, top: -mesa, width: 1, height: tamanho.altura + 2 * mesa, background: tracoDaGuia("v") } : { top: guiaNova.pos * escala, left: -mesa, height: 1, width: tamanho.largura + 2 * mesa, background: tracoDaGuia("h") }}
         />
       ) : null}
     </>

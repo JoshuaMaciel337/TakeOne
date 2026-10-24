@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 
 import { ManipuladorNaPrevia } from "@/componentes/editor/ManipuladorNaPrevia";
 import { arquivoDaMidia } from "@/lib/api";
@@ -21,7 +21,7 @@ import { CHAVE_DA_PROFUNDIDADE } from "@/lib/previa/camadas";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { aplicarModo } from "@/lib/imagem/modos";
-import { alvosDoEncaixe, encaixarValor, type PreferenciasDaVista, type UnidadeDaRegua, VISTA_PADRAO } from "@/lib/imagem/vista";
+import { alvosDoEncaixe, encaixarValor, fundoDoXadrez, type PreferenciasDaVista, type UnidadeDaRegua, VISTA_PADRAO } from "@/lib/imagem/vista";
 import { type GuiaArrastada, GuiasEGrade, LADO_DA_REGUA, noDocumento, Reguas } from "./VistaDaImagem";
 import { aplicarProva, type TipoDaProva } from "@/lib/imagem/prova";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
@@ -69,7 +69,6 @@ const DENSIDADE_MAXIMA = 2;
 /** O maior lado do canvas em pixels de tela (o zoom alto reduz a densidade para caber). */
 const LADO_MAXIMO_DO_CANVAS = 8192;
 /** O xadrez que aparece atrás da imagem sem fundo. */
-const XADREZ = "repeating-conic-gradient(#d6d8de 0% 25%, #ffffff 0% 50%) 50% / 20px 20px";
 /** A folga em volta da imagem ampliada (a "mesa" onde ela fica). */
 const MESA = 48;
 /** Os degraus do zoom, como nos programas de imagem. */
@@ -463,7 +462,8 @@ export function PreviaDaImagem({
     };
   }, []);
 
-  const densidade = Math.min((typeof window === "undefined" ? 1 : window.devicePixelRatio) || 1, DENSIDADE_MAXIMA, LADO_MAXIMO_DO_CANVAS / Math.max(tamanho.largura, tamanho.altura));
+  // Editar › Preferências › Desempenho: a prévia econômica desenha um pixel do canvas por pixel da página
+  const densidade = Math.min((typeof window === "undefined" ? 1 : window.devicePixelRatio) || 1, vista.prevaEconomica ? 1 : DENSIDADE_MAXIMA, LADO_MAXIMO_DO_CANVAS / Math.max(tamanho.largura, tamanho.altura));
 
   // Desenha a cada mudança (a imagem é parada: não há laço de quadros)
   useLayoutEffect(() => {
@@ -592,6 +592,21 @@ export function PreviaDaImagem({
     });
     return () => registrarRolagem(null);
   });
+
+  // A roda com Ctrl (ou Alt, ou sozinha com a preferência "zoom com a roda") aproxima e afasta. O ouvinte é do
+  // navegador e não passivo: o do React é passivo, não segura a rolagem nem o zoom da página
+  const rodar = useEffectEvent((evento: WheelEvent) => {
+    if (!evento.ctrlKey && !evento.altKey && !vista.zoomComRoda) return;
+    evento.preventDefault();
+    aoMudarZoom(proximoZoom(escala, evento.deltaY < 0 ? 1 : -1));
+  });
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const ouvir = (evento: WheelEvent) => rodar(evento);
+    area.addEventListener("wheel", ouvir, { passive: false });
+    return () => area.removeEventListener("wheel", ouvir);
+  }, [areaRef]);
 
   // Exibir › Ajustar a camada à tela: o zoom em que o retângulo cabe na área, com o meio dele no meio dela
   const ultimoEnquadrar = useRef(0);
@@ -888,11 +903,6 @@ export function PreviaDaImagem({
         }}
         onPointerLeave={() => mudarVistaAoVivo({ ponteiro: null })}
         onScroll={medirVisivel}
-        onWheel={(evento) => {
-          if (!evento.ctrlKey && !evento.altKey) return;
-          evento.preventDefault();
-          aoMudarZoom(proximoZoom(escala, evento.deltaY < 0 ? 1 : -1));
-        }}
       >
         <div
           className="flex items-center justify-center"
@@ -911,7 +921,7 @@ export function PreviaDaImagem({
               ...(girada ? { transform: `rotate(${giroDaVista.angulo}deg)${giroDaVista.espelhada ? " scaleX(-1)" : ""}` } : {}),
               width: tamanho.largura,
               height: tamanho.altura,
-              background: projeto.fundo.transparente ? XADREZ : projeto.fundo.cor,
+              background: projeto.fundo.transparente ? fundoDoXadrez(vista) : projeto.fundo.cor,
               cursor,
             }}
             onPointerDown={aoApertar}
@@ -1160,6 +1170,7 @@ export function PreviaDaImagem({
             ) : null}
             {pintura && !maoAtiva && !recorte && tamanho.largura > 1 ? (
               <PinturaNaPrevia
+                preciso={vista.cursorDePintura === "preciso"}
                 ferramenta={pintura.ferramenta}
                 opcoes={pintura.opcoes}
                 cores={pintura.cores}

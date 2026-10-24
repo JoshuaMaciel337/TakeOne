@@ -192,6 +192,8 @@ export type AcoesDosMenus = {
   fecharTodos: () => void;
   /** Editar › Atalhos de teclado e menus e Barra de ferramentas: a janela da personalização, na aba pedida. */
   personalizar: (aba: "atalhos" | "menus" | "ferramentas") => void;
+  /** Editar › Preferências (Ctrl+K). */
+  preferencias: () => void;
   /** Editar › Pesquisar (Ctrl+F): a caixa que procura nos comandos e nas ferramentas. */
   pesquisar: () => void;
   /** Imagem › Análise: a escala de medida, o registro e o marcador de escala. */
@@ -472,6 +474,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Pesquisar…", atalho: "Ctrl+F", aoEscolher: a.pesquisar, titulo: "Procurar um comando ou uma ferramenta" },
         { nome: "Atalhos de teclado e menus…", atalho: "Ctrl+Alt+Shift+K", aoEscolher: () => a.personalizar("atalhos") },
         { nome: "Barra de ferramentas…", aoEscolher: () => a.personalizar("ferramentas") },
+        { nome: "Preferências…", atalho: "Ctrl+K", aoEscolher: a.preferencias },
         "-",
         { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
         { nome: "Copiar", atalho: "Ctrl+C", desativado: !a.temCamada, aoEscolher: () => a.copiar(false) },

@@ -33,6 +33,8 @@ export type AlvoDaPintura = {
 };
 
 type Props = {
+  /** Editar › Preferências › Ferramentas: o cursor de pintura em mira, sem o círculo do pincel. */
+  preciso?: boolean;
   ferramenta: FerramentaDePintura;
   opcoes: OpcoesDoPincel;
   cores: { primeiroPlano: string; fundo: string };
@@ -85,7 +87,7 @@ function daCaneta(evento: PointerEvent | React.PointerEvent): Omit<PontoDoTraco,
   return { pressao: evento.pressure > 0 ? evento.pressure : 1, inclinacaoX: (evento.tiltX ?? 0) / 90, inclinacaoY: (evento.tiltY ?? 0) / 90, giro: evento.twist ?? 0 };
 }
 
-export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false, selecao = null, aoAltClique }: Props) {
+export function PinturaNaPrevia({ preciso = false, ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false, selecao = null, aoAltClique }: Props) {
   const centro = { x: quadro.largura / 2, y: quadro.altura / 2 };
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const tracoRef = useRef<Traco | null>(null);
@@ -244,7 +246,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
   }
 
   const diametroNaTela = opcoes.tamanho * escalaDaImagem;
-  const comCirculo = diametroNaTela >= 6;
+  const comCirculo = !preciso && diametroNaTela >= 6;
   return (
     <div
       className="absolute inset-0 touch-none"

@@ -172,6 +172,33 @@ export function encaixarValor(valor: number, alvos: number[], tolerancia: number
 }
 
 // ——— As preferências de exibição (por navegador: são da tela de quem edita) ———
+export type EstiloDaLinha = "linhas" | "tracejado" | "pontos";
+export const ESTILOS_DA_LINHA: { id: EstiloDaLinha; nome: string }[] = [
+  { id: "linhas", nome: "Linhas" },
+  { id: "tracejado", nome: "Tracejado" },
+  { id: "pontos", nome: "Pontos" },
+];
+export type TamanhoDoXadrez = "nenhum" | "pequeno" | "medio" | "grande";
+export const TAMANHOS_DO_XADREZ: { id: TamanhoDoXadrez; nome: string; lado: number }[] = [
+  { id: "nenhum", nome: "Nenhum", lado: 0 },
+  { id: "pequeno", nome: "Pequeno", lado: 5 },
+  { id: "medio", nome: "Médio", lado: 10 },
+  { id: "grande", nome: "Grande", lado: 20 },
+];
+export type CoresDoXadrez = "claro" | "medio" | "escuro";
+export const CORES_DO_XADREZ: { id: CoresDoXadrez; nome: string; cores: [string, string] }[] = [
+  { id: "claro", nome: "Claro", cores: ["#ffffff", "#d6d8de"] },
+  { id: "medio", nome: "Médio", cores: ["#cccccc", "#999999"] },
+  { id: "escuro", nome: "Escuro", cores: ["#666666", "#404040"] },
+];
+
+/** O fundo atrás da imagem sem fundo: o xadrez das preferências (ou branco, sem ele). */
+export function fundoDoXadrez(vista: Pick<PreferenciasDaVista, "xadrez" | "coresDoXadrez">): string {
+  const lado = TAMANHOS_DO_XADREZ.find((x) => x.id === vista.xadrez)?.lado ?? 10;
+  const [claro, escuro] = CORES_DO_XADREZ.find((x) => x.id === vista.coresDoXadrez)?.cores ?? CORES_DO_XADREZ[0].cores;
+  return lado ? `repeating-conic-gradient(${escuro} 0% 25%, ${claro} 0% 50%) 50% / ${lado * 2}px ${lado * 2}px` : claro;
+}
+
 export type PreferenciasDaVista = {
   reguas: boolean;
   unidade: UnidadeDaRegua;
@@ -188,6 +215,20 @@ export type PreferenciasDaVista = {
   notas: boolean;
   contagem: boolean;
   encaixar: boolean;
+  // Editar › Preferências: as guias e a grade, a transparência, a roda, o cursor de pintura, a nitidez da prévia, as
+  // dicas da barra de status, o Shift para trocar de ferramenta e a resolução dos documentos novos
+  corDasGuias: string;
+  estiloDasGuias: EstiloDaLinha;
+  corDaGrade: string;
+  estiloDaGrade: EstiloDaLinha;
+  xadrez: TamanhoDoXadrez;
+  coresDoXadrez: CoresDoXadrez;
+  zoomComRoda: boolean;
+  cursorDePintura: "pincel" | "preciso";
+  prevaEconomica: boolean;
+  dicas: boolean;
+  shiftTrocaFerramenta: boolean;
+  resolucaoPadrao: number;
   encaixarEm: EncaixarEm;
 };
 
@@ -207,6 +248,18 @@ export const VISTA_PADRAO: PreferenciasDaVista = {
   contagem: true,
   encaixar: true,
   encaixarEm: ENCAIXAR_EM_TUDO,
+  corDasGuias: "#22d3ee",
+  estiloDasGuias: "linhas",
+  corDaGrade: "#808080",
+  estiloDaGrade: "linhas",
+  xadrez: "medio",
+  coresDoXadrez: "claro",
+  zoomComRoda: false,
+  cursorDePintura: "pincel",
+  prevaEconomica: false,
+  dicas: true,
+  shiftTrocaFerramenta: true,
+  resolucaoPadrao: 72,
 };
 
 const CHAVE_DA_VISTA = "takeone-vista-imagem";
@@ -219,6 +272,17 @@ export function lerVista(): PreferenciasDaVista {
     if (!UNIDADES_DA_REGUA.some((u) => u.id === vista.unidade)) vista.unidade = "px";
     if (!(vista.espacoDaGrade >= 1 && vista.espacoDaGrade <= 4096)) vista.espacoDaGrade = VISTA_PADRAO.espacoDaGrade;
     if (!(vista.subdivisoes >= 1 && vista.subdivisoes <= 32)) vista.subdivisoes = VISTA_PADRAO.subdivisoes;
+    // As preferências: o que não serve volta ao padrão
+    const cor = /^#[0-9a-f]{6}$/i;
+    if (!cor.test(String(vista.corDasGuias))) vista.corDasGuias = VISTA_PADRAO.corDasGuias;
+    if (!cor.test(String(vista.corDaGrade))) vista.corDaGrade = VISTA_PADRAO.corDaGrade;
+    if (!ESTILOS_DA_LINHA.some((e) => e.id === vista.estiloDasGuias) || vista.estiloDasGuias === "pontos") vista.estiloDasGuias = VISTA_PADRAO.estiloDasGuias;
+    if (!ESTILOS_DA_LINHA.some((e) => e.id === vista.estiloDaGrade)) vista.estiloDaGrade = VISTA_PADRAO.estiloDaGrade;
+    if (!TAMANHOS_DO_XADREZ.some((x) => x.id === vista.xadrez)) vista.xadrez = VISTA_PADRAO.xadrez;
+    if (!CORES_DO_XADREZ.some((x) => x.id === vista.coresDoXadrez)) vista.coresDoXadrez = VISTA_PADRAO.coresDoXadrez;
+    if (vista.cursorDePintura !== "preciso") vista.cursorDePintura = "pincel";
+    for (const chave of ["zoomComRoda", "prevaEconomica", "dicas", "shiftTrocaFerramenta"] as const) if (typeof vista[chave] !== "boolean") vista[chave] = VISTA_PADRAO[chave];
+    if (!(Number.isInteger(vista.resolucaoPadrao) && vista.resolucaoPadrao >= 1 && vista.resolucaoPadrao <= 10000)) vista.resolucaoPadrao = VISTA_PADRAO.resolucaoPadrao;
     return vista;
   } catch {
     return VISTA_PADRAO;

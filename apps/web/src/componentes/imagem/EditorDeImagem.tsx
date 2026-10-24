@@ -127,6 +127,7 @@ import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPrancheta
 import { PainelComps } from "./PainelComps";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
 import { type AbaDaPersonalizacao, JanelaPersonalizar } from "./JanelaPersonalizar";
+import { JanelaPreferencias } from "./JanelaPreferencias";
 import { carregarPersonalizacao, guardarPersonalizacao, type Personalizacao, personalizarMenus, teclaDaFerramenta } from "@/lib/imagem/personalizacao";
 import { achatarMenus } from "@/lib/pesquisa";
 import { PredefinicoesDeFerramenta } from "./PredefinicoesDeFerramenta";
@@ -524,6 +525,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // As comps de camada: a aplicada por último e a última posição do documento (o estado de antes), só na sessão
   const [compsEmArquivos, setCompsEmArquivos] = useState(false);
   const [pesquisando, setPesquisando] = useState(false);
+  const [preferindo, setPreferindo] = useState(false);
   // Editar › Atalhos de teclado e menus e Barra de ferramentas (no navegador), e os itens escondidos à vista
   const [personalizacao, setPersonalizacao] = useState<Personalizacao>(carregarPersonalizacao);
   const [personalizando, setPersonalizando] = useState<AbaDaPersonalizacao | null>(null);
@@ -5025,6 +5027,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     temComps: Boolean(projeto?.comps?.length),
     pesquisar: () => setPesquisando(true),
     personalizar: setPersonalizando,
+    preferencias: () => setPreferindo(true),
     compsEmArquivos: () => setCompsEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
@@ -5421,7 +5424,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || personalizando !== null || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || preferindo || personalizando !== null || pesquisando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5465,7 +5468,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       let id = ultima && comTecla.some((item) => item.id === ultima) ? ultima : comTecla[0].id;
       // Shift passa só pelas do grupo com a mesma tecla (o letreiro de linha única não tem tecla, como lá)
       const comAMesma = grupo.filter((item) => teclaDaFerramenta(item, personalizacao) === tecla);
-      if (evento.shiftKey && atualNoGrupo) id = comAMesma[(comAMesma.findIndex((item) => item.id === ferramenta) + 1) % comAMesma.length].id;
+      // Sem o Shift para trocar (Editar › Preferências), a mesma tecla de novo já passa à seguinte
+      if ((evento.shiftKey || !vista.shiftTrocaFerramenta) && atualNoGrupo) id = comAMesma[(comAMesma.findIndex((item) => item.id === ferramenta) + 1) % comAMesma.length].id;
       if (id !== ferramenta) mola.current = { tecla, anterior: ferramenta, inicio: performance.now() };
       escolherFerramenta(id);
     } else if (tecla === "D") setCores((atual) => ({ ...atual, primeiroPlano: "#000000", fundo: "#ffffff" }));
@@ -6637,7 +6641,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 Gravando a ação
               </span>
             ) : null}
-            <span className="min-w-0 truncate max-md:hidden">{dadosDa(ferramenta).dica}</span>
+            {vista.dicas ? <span className="min-w-0 truncate max-md:hidden">{dadosDa(ferramenta).dica}</span> : null}
           </footer>
         </main>
 
@@ -6727,6 +6731,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {preferindo ? (
+        <JanelaPreferencias
+          vista={vista}
+          estadosDoHistorico={opcoesDoHistorico.estados}
+          aoFechar={() => setPreferindo(false)}
+          aoConfirmar={(nova, estados) => {
+            setPreferindo(false);
+            mudarVista(nova);
+            if (estados !== opcoesDoHistorico.estados) {
+              const opcoes = { ...opcoesDoHistorico, estados };
+              setOpcoesDoHistorico(opcoes);
+              guardarOpcoesDoHistorico(opcoes);
+            }
+          }}
         />
       ) : null}
       {personalizando ? (

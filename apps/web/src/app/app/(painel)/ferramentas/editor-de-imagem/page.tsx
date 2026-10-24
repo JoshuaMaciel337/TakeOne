@@ -11,6 +11,7 @@ import { documentoDaImagem, enviarEEsperar } from "@/lib/abrirImagem";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
 import { abrirPsd, ACEITAR_PSD, ehPsd, guardarAvisos } from "@/lib/psd/arquivo";
+import { lerVista } from "@/lib/imagem/vista";
 import { problemaNoTamanho, TAMANHOS_PRONTOS, type TamanhoDaImagem } from "@/lib/projeto/imagem";
 
 /** O desenho de um tamanho: o retângulo na proporção, dentro de uma caixa fixa. */
@@ -70,9 +71,11 @@ export default function PaginaEditorDeImagem() {
     }
     setCriando(id);
     setErro("");
+    // A resolução dos documentos novos (Editar › Preferências do editor de imagem)
+    const { resolucaoPadrao } = lerVista();
     chamarApi<{ id: string }>("/projetos", {
       metodo: "POST",
-      corpo: { tamanho },
+      corpo: { tamanho: resolucaoPadrao !== 72 ? { ...tamanho, resolucao: resolucaoPadrao } : tamanho },
     })
       .then((projeto) => router.push(`/app/imagem/${projeto.id}`))
       .catch((e) => {
