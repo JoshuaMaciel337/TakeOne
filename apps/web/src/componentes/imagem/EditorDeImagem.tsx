@@ -108,6 +108,7 @@ import { LOREM_IPSUM, ocorrencias, type OpcoesDaBusca, substituirTodas } from "@
 import { estiloNoIndice, nomeDoTexto, substituir } from "@/lib/texto/modelo";
 import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
 import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
+import { PainelEstilosDeCamada } from "./PainelEstilosDeCamada";
 import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
@@ -183,7 +184,7 @@ const AREAS: Record<string, EstadoDaArea> = {
   },
   grafico: {
     direita: [
-      { id: "g-cor", abas: ["cor", "amostras"], ativa: "cor", altura: 190 },
+      { id: "g-cor", abas: ["cor", "amostras", "estilosDeCamada"], ativa: "cor", altura: 190 },
       { id: "g-propriedades", abas: ["propriedades", "caractere", "paragrafo", "estilos", "formas", "modelos"], ativa: "propriedades", altura: 340 },
       { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico", "biblioteca"], ativa: "camadas" },
     ],
@@ -392,6 +393,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // Os estilos de caractere e de parágrafo salvos no espaço
   const estilosDeCaractere = useRecursos<{ estilo: Partial<EstiloDoCaractere> }>("estilo_caractere");
   const estilosDeParagrafo = useRecursos<{ estilo: Partial<EstiloDoParagrafo> }>("estilo_paragrafo");
+  const estilosDeCamadaDoEspaco = useRecursos<{ estilo: EstiloDeCamada; preenchimento: number }>("estilo_camada");
   // Os padrões do espaço vão para a lista que os seletores de padrão mostram
   const padroesDoEspaco = useRecursos("padrao");
   useEffect(() => definirPadroesDoEspaco(padroesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome }))), [padroesDoEspaco.recursos]);
@@ -4147,6 +4149,32 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               aoExcluir={(id) => excluirEstiloDeTexto("estilo_caractere", id)}
             />
           }
+        />
+      ),
+    },
+    estilosDeCamada: {
+      nome: PAINEIS_DA_IMAGEM.estilosDeCamada,
+      conteudo: (
+        <PainelEstilosDeCamada
+          doEspaco={estilosDeCamadaDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, estilo: recurso.dados.estilo, preenchimento: recurso.dados.preenchimento ?? 1 }))}
+          podeAplicar={escolhidas.some((faixa) => !faixa.clipes[0].pasta && !faixa.clipes[0].ajuste)}
+          podeGuardar={Boolean(escolhidoNaTela?.clipe.estilo_camada?.efeitos.length)}
+          aoAplicar={(estilo, preenchimento) => {
+            const ids = escolhidas.map((faixa) => faixa.clipes[0]).filter((clipe) => !clipe.pasta && !clipe.ajuste).map((clipe) => clipe.id);
+            if (ids.length) executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: ids, estilo, camada: { preenchimento } } });
+          }}
+          aoGuardar={(nome) => {
+            const clipe = escolhidoNaTela?.clipe;
+            if (!clipe?.estilo_camada) return;
+            criarRecurso({ tipo: "estilo_camada", nome, dados: { estilo: clipe.estilo_camada, preenchimento: clipe.preenchimento ?? 1 } })
+              .then(() => estilosDeCamadaDoEspaco.recarregar())
+              .catch((erro: unknown) => mostrarAviso(erro instanceof Error ? erro.message : "Não foi possível salvar o estilo."));
+          }}
+          aoExcluir={(id) => {
+            excluirRecurso(id)
+              .then(() => estilosDeCamadaDoEspaco.recarregar())
+              .catch((erro: unknown) => mostrarAviso(erro instanceof Error ? erro.message : "Não foi possível excluir o estilo."));
+          }}
         />
       ),
     },

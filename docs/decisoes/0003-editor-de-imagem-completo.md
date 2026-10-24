@@ -220,7 +220,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Traçado (fora, dentro, centro; cor, degradê, padrão), Sombra interna, Brilho interno, Cetim, Sobreposição de cor, de degradê e de padrão, Brilho externo, Sombra projetada (o contorno e a sombra de hoje viram estes)
 - [x] Vários efeitos do mesmo tipo; contornos personalizados
 - [x] Luz global; Copiar, Colar e Limpar estilo; Ocultar todos os efeitos; Dimensionar efeitos; Criar camadas a partir dos efeitos
-- [ ] Painel Estilos com predefinições
+- [x] Painel Estilos com predefinições
 - [ ] Camadas de preenchimento: cor sólida, degradê (com as opções do degradê e as alças na tela: o degradê ao vivo da 13.5) e padrão
 
 ### Onda 13.10 — Ajustes

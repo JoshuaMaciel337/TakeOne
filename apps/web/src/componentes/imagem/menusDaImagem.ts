@@ -27,6 +27,7 @@ export const PAINEIS_DA_IMAGEM = {
   configuracoesDoPincel: "Configurações do pincel",
   cor: "Cor",
   estilos: "Estilos de texto",
+  estilosDeCamada: "Estilos",
   filtros: "Filtros",
   fotoIA: "Foto com IA",
   formas: "Formas",
