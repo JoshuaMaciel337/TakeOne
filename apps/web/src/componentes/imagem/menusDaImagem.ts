@@ -26,6 +26,7 @@ export const PAINEIS_DA_IMAGEM = {
   formas: "Formas",
   historico: "Histórico",
   modelos: "Modelos",
+  padroes: "Padrões",
   pinceis: "Pincéis",
   propriedades: "Propriedades",
 } as const;
@@ -106,6 +107,8 @@ export type AcoesDosMenus = {
   transformarSelecao: () => void;
   /** Editar › Definir predefinição de pincel (a seleção vira a ponta). */
   definirPincel: () => void;
+  /** Editar › Definir padrão (a seleção retangular, ou a imagem inteira, vira um padrão do espaço). */
+  definirPadrao: () => void;
   /** Selecionar › Encontrar camadas e Isolar camadas. */
   camadasNoPainel: (como: "procurar" | "isolar") => void;
   /** O modo Máscara rápida (Q). */
@@ -251,6 +254,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         },
         { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.ferramenta("mover") },
         { nome: "Definir predefinição de pincel…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.definirPincel },
+        { nome: "Definir padrão…", aoEscolher: a.definirPadrao },
         "-",
         { nome: "Atalhos do teclado…", aoEscolher: a.atalhos },
       ],

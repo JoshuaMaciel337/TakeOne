@@ -2,7 +2,7 @@
 
 // O painel Fonte de clonagem e as opções do carimbo na barra (ADR 0003, onda 13.5): até cinco fontes (cada uma com o
 // ponto marcado por Alt + clique e o deslocamento), a escala e o giro do que é copiado, e a sobreposição.
-import { type IdDoPadrao, PADROES } from "@/lib/pintura/padroes";
+import { type IdDoPadrao, usePadroes } from "@/lib/pintura/padroes";
 
 export type AmostraDoCarimbo = "atual" | "atualEAbaixo" | "todas";
 export type FonteDeClonagem = { ponto: { x: number; y: number }; deslocamento: { x: number; y: number } | null };
@@ -22,11 +22,12 @@ const campo = "rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-xs tex
 
 /** O alinhado e a amostra (carimbo), ou o padrão e o alinhado (carimbo de padrão), na barra. */
 export function OpcoesDoCarimboNaBarra({ padrao, opcoes, aoMudar }: { padrao: boolean; opcoes: OpcoesDoCarimbo; aoMudar: (mudanca: Partial<OpcoesDoCarimbo>) => void }) {
+  const padroes = usePadroes();
   return (
     <>
       {padrao ? (
         <select className={campo} value={opcoes.padrao} onChange={(evento) => aoMudar({ padrao: evento.currentTarget.value as IdDoPadrao })} aria-label="Padrão">
-          {PADROES.map((item) => (
+          {padroes.map((item) => (
             <option key={item.id} value={item.id}>
               {item.nome}
             </option>

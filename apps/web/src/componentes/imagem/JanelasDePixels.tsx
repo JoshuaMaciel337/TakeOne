@@ -4,7 +4,7 @@
 import { X } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 
-import { type IdDoPadrao, PADROES } from "@/lib/pintura/padroes";
+import { type IdDoPadrao, usePadroes } from "@/lib/pintura/padroes";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 
@@ -93,6 +93,7 @@ function ModoEOpacidade({ modo, opacidade, preservar, aoMudar, semPreservar = fa
 /** Editar › Preencher (Shift+F5): o conteúdo, o modo, a opacidade e o preservar transparência. */
 export function JanelaPreencher({ inicial, comFoto, aoFechar, aoConfirmar }: { inicial: Preenchimento; comFoto: boolean; aoFechar: () => void; aoConfirmar: (preenchimento: Preenchimento) => void }) {
   const [p, setP] = useState(inicial);
+  const padroes = usePadroes();
   const mudar = (mudanca: Partial<Preenchimento>) => setP((atual) => ({ ...atual, ...mudanca }));
   const sensivel = p.conteudo === "sensivel";
   return (
@@ -123,7 +124,7 @@ export function JanelaPreencher({ inicial, comFoto, aoFechar, aoConfirmar }: { i
         <label className="flex items-center gap-2">
           Padrão:
           <select className={`${campo} flex-1`} value={p.padrao} onChange={(evento) => mudar({ padrao: evento.currentTarget.value as IdDoPadrao })}>
-            {PADROES.map((padrao) => (
+            {padroes.map((padrao) => (
               <option key={padrao.id} value={padrao.id}>
                 {padrao.nome}
               </option>

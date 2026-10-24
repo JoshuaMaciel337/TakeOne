@@ -4,7 +4,7 @@
 import { Fragment } from "react";
 
 import { type Degrade, DEGRADES_PRONTOS, type FormaDoDegrade, FORMAS_DO_DEGRADE } from "@/lib/pintura/degrade";
-import { type IdDoPadrao, PADROES } from "@/lib/pintura/padroes";
+import { type IdDoPadrao, usePadroes } from "@/lib/pintura/padroes";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 
@@ -74,6 +74,7 @@ function Amostragem({ tolerancia, suavizar, contigua, todasAsCamadas, aoMudar }:
 }
 
 export function OpcoesDoBaldeNaBarra({ opcoes, aoMudar }: { opcoes: OpcoesDoBalde; aoMudar: (mudanca: Partial<OpcoesDoBalde>) => void }) {
+  const padroes = usePadroes();
   return (
     <>
       <label className="flex items-center gap-1 text-suave">
@@ -85,7 +86,7 @@ export function OpcoesDoBaldeNaBarra({ opcoes, aoMudar }: { opcoes: OpcoesDoBald
       </label>
       {opcoes.preencher === "padrao" ? (
         <select className={campo} value={opcoes.padrao} onChange={(evento) => aoMudar({ padrao: evento.currentTarget.value as IdDoPadrao })} aria-label="Padrão">
-          {PADROES.map((padrao) => (
+          {padroes.map((padrao) => (
             <option key={padrao.id} value={padrao.id}>
               {padrao.nome}
             </option>

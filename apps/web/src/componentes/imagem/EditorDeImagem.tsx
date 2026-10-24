@@ -89,7 +89,9 @@ import { CARIMBO_PADRAO, type FonteDeClonagem, type OpcoesDoCarimbo, OpcoesDoCar
 import { BALDE_PADRAO, BORRACHA_MAGICA_PADRAO, DEGRADE_PADRAO, OpcoesDaBorrachaMagicaNaBarra, OpcoesDoBaldeNaBarra, OpcoesDoDegradeNaBarra } from "./OpcoesDosPontos";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCor } from "@/lib/pintura/operacoes";
-import { ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
+import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
+import { lerPat } from "@/lib/pintura/pat";
+import { PainelPadroes } from "./Padroes";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { desenharNaMalha } from "@/lib/transformar/malha";
@@ -290,6 +292,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoDegrade, setOpcoesDoDegrade] = useState(DEGRADE_PADRAO);
   const [editandoDegrade, setEditandoDegrade] = useState(false);
   const degradesDoEspaco = useRecursos<Degrade>("degrade");
+  // Os padrões do espaço vão para a lista que os seletores de padrão mostram
+  const padroesDoEspaco = useRecursos("padrao");
+  useEffect(() => definirPadroesDoEspaco(padroesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome }))), [padroesDoEspaco.recursos]);
+  const [nomeDoPadrao, setNomeDoPadrao] = useState(false);
+  const [importandoPadroes, setImportandoPadroes] = useState(false);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
   // do sistema (para reconhecer a própria cópia ao colar e colar no mesmo lugar)
@@ -810,8 +817,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   /** O Balde de tinta: a área de cor parecida cheia com o primeiro plano ou o padrão. */
   const usarBalde = (ponto: { x: number; y: number }) => {
     const o = opcoesDoBalde;
-    regiaoDaCor(ponto, o)
-      .then((regiao) =>
+    Promise.all([regiaoDaCor(ponto, o), o.preencher === "padrao" ? esperarLadrilho(o.padrao) : null])
+      .then(([regiao]) =>
         editarPixels(
           (dados, cobertura, camada) => {
             const tinta = o.preencher === "padrao" ? ladrilhar(ladrilhoDoPadrao(o.padrao, cores.primeiroPlano, cores.fundo), camada.largura, camada.altura) : rgbDaCor(cores.primeiroPlano);
@@ -935,6 +942,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     void editarPixels(
       async (dados, cobertura, camada) => {
         let tinta: [number, number, number] | Uint8ClampedArray = rgbDaCor(cor);
+        if (p.conteudo === "padrao") await esperarLadrilho(p.padrao);
         if (p.conteudo === "padrao") tinta = ladrilhar(ladrilhoDoPadrao(p.padrao, cores.primeiroPlano, cores.fundo), camada.largura, camada.altura);
         if (p.conteudo === "historico") {
           const fonte = await fonteDoHistoricoPara(camada.clipe, camada);
@@ -1192,6 +1200,57 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         mostrarAviso(`"${nome}" está em Meus pincéis.`);
       })
       .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o pincel."));
+  };
+  /**
+   * Editar › Definir padrão: o retângulo da seleção (ou a imagem inteira), como se vê com todas as camadas, vira um
+   * padrão do espaço.
+   */
+  const definirPadrao = (nome: string) => {
+    imagemParaSelecao(true)
+      .then(async (imagem) => {
+        const caixa = (selecaoNoDocumento && limites(selecaoNoDocumento)) || { x0: 0, y0: 0, x1: imagem.largura, y1: imagem.altura };
+        const largura = caixa.x1 - caixa.x0;
+        const altura = caixa.y1 - caixa.y0;
+        if (largura > 2048 || altura > 2048) throw new Error("O padrão pode ter até 2048 px de lado: selecione um retângulo menor.");
+        const canvas = document.createElement("canvas");
+        canvas.width = largura;
+        canvas.height = altura;
+        const pixels = new ImageData(largura, altura);
+        for (let y = 0; y < altura; y++) pixels.data.set(imagem.dados.subarray(((y + caixa.y0) * imagem.largura + caixa.x0) * 4, ((y + caixa.y0) * imagem.largura + caixa.x1) * 4), y * largura * 4);
+        canvas.getContext("2d")!.putImageData(pixels, 0, 0);
+        const recurso = await criarRecurso({ tipo: "padrao", nome, imagem_png: canvas.toDataURL("image/png").split(",")[1] });
+        padroesDoEspaco.recarregar();
+        escolherPadrao(`espaco:${recurso.id}`);
+        mostrarAviso(`"${nome}" está nos padrões do espaço.`);
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível definir o padrão."));
+  };
+  /** Importar um .pat: cada padrão do arquivo (até 50) vira um do espaço. */
+  const importarPadroes = async (arquivo: File) => {
+    setImportandoPadroes(true);
+    try {
+      const lidos = lerPat(await arquivo.arrayBuffer(), 50).filter((padrao) => padrao.largura <= 2048 && padrao.altura <= 2048);
+      if (!lidos.length) throw new Error("O arquivo não tem padrões em cores que o editor lê (tons de cinza, indexadas, RGB ou CMYK).");
+      for (const padrao of lidos) {
+        const canvas = document.createElement("canvas");
+        canvas.width = padrao.largura;
+        canvas.height = padrao.altura;
+        canvas.getContext("2d")!.putImageData(new ImageData(padrao.rgba, padrao.largura, padrao.altura), 0, 0);
+        await criarRecurso({ tipo: "padrao", nome: padrao.nome.slice(0, 80), imagem_png: canvas.toDataURL("image/png").split(",")[1] });
+      }
+      padroesDoEspaco.recarregar();
+      mostrarAviso(lidos.length === 1 ? "1 padrão importado." : `${lidos.length} padrões importados.`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível importar os padrões.");
+    } finally {
+      setImportandoPadroes(false);
+    }
+  };
+  /** O padrão escolhido no painel vale para o Balde, o Carimbo de padrão e o Preencher. */
+  const escolherPadrao = (id: IdDoPadrao) => {
+    setOpcoesDoBalde((atual) => ({ ...atual, padrao: id }));
+    setOpcoesDoCarimbo((atual) => ({ ...atual, padrao: id }));
+    setUltimoPreenchimento((atual) => ({ ...atual, padrao: id }));
   };
   /** Selecionar › Luminosidade (Ctrl+Alt+2): a luz da imagem inteira vira a seleção (o claro mais selecionado). */
   const selecionarLuminosidade = () => {
@@ -1525,6 +1584,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       return saida;
     };
     if (ferramenta === "carimboDePadrao") {
+      await esperarLadrilho(opcoesDoCarimbo.padrao);
       const doc = document.createElement("canvas");
       doc.width = documento.largura;
       doc.height = documento.altura;
@@ -2104,6 +2164,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     alternarMascaraRapida,
     temCanais: canais.length > 0,
     definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
+    definirPadrao: () => setNomeDoPadrao(true),
     transformarSelecao,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2239,7 +2300,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -2448,6 +2509,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoEscolher={setFonteAtiva}
           aoMudar={(mudanca) => setOpcoesDoCarimbo((atual) => ({ ...atual, ...mudanca }))}
           aoMudarDeslocamento={(deslocamento) => setFontesDeClonagem((atual) => atual.map((item, i) => (i === fonteAtiva && item ? { ...item, deslocamento } : item)))}
+        />
+      ),
+    },
+    padroes: {
+      nome: PAINEIS_DA_IMAGEM.padroes,
+      conteudo: (
+        <PainelPadroes
+          doEspaco={padroesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome }))}
+          escolhido={opcoesDoBalde.padrao}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          importando={importandoPadroes}
+          aoEscolher={escolherPadrao}
+          aoExcluir={(id) => void excluirRecurso(id).then(padroesDoEspaco.recarregar)}
+          aoDefinir={() => setNomeDoPadrao(true)}
+          aoImportar={(arquivo) => void importarPadroes(arquivo)}
         />
       ),
     },
@@ -2987,6 +3064,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           temCamada={Boolean(refinando.clipeId)}
           aoFechar={() => setRefinando(null)}
           aoConfirmar={(resultado) => void saidaDoRefinamento(resultado)}
+        />
+      ) : null}
+      {nomeDoPadrao ? (
+        <JanelaDeNome
+          titulo="Nome do padrão"
+          rotulo="Nome"
+          inicial={`Padrão ${padroesDoEspaco.recursos.length + 1}`}
+          aoFechar={() => setNomeDoPadrao(false)}
+          aoConfirmar={(nome) => {
+            setNomeDoPadrao(false);
+            definirPadrao(nome);
+          }}
         />
       ) : null}
       {nomeDoPincel ? (

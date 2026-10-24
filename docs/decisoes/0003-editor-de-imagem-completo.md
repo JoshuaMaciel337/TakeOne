@@ -162,7 +162,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Degradê (G) clássico (pinta pixels): linear, radial, ângulo, refletido, losango; inverter, pontilhar
 - [ ] Degradê ao vivo (camada de preenchimento com alças na tela)
 - [x] Editor de degradês (paradas de cor e de opacidade, ponto médio, ruído) e painel Degradês com predefinições
-- [ ] Painel Padrões com predefinições, Definir padrão, importar .pat
+- [x] Painel Padrões com predefinições, Definir padrão, importar .pat
 
 ### Onda 13.6 — Transformação e geometria
 
