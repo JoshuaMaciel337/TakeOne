@@ -37,7 +37,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
@@ -64,6 +64,10 @@ import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./Janela
 import { selecaoEmCinza } from "./MascaraRapida";
 import { JanelaAparar, JanelaAtenuar, JanelaPreencher, JanelaTracado, type Preenchimento, type Tracado } from "./JanelasDePixels";
 import { juntarTraco } from "@/lib/pintura/mesclar";
+import { type Degrade, pixelsDoDegrade, tabelaDoDegrade } from "@/lib/pintura/degrade";
+import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
+import { JanelaEditorDeDegrade, PainelDegrades } from "./Degrades";
+import { BALDE_PADRAO, BORRACHA_MAGICA_PADRAO, DEGRADE_PADRAO, OpcoesDaBorrachaMagicaNaBarra, OpcoesDoBaldeNaBarra, OpcoesDoDegradeNaBarra } from "./OpcoesDosPontos";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCor } from "@/lib/pintura/operacoes";
 import { ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
@@ -75,7 +79,7 @@ import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
 import { Pintura } from "@/lib/pintura/motor";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { type Afim, compor, IDENTIDADE, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
+import { type Afim, compor, IDENTIDADE, inverter, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 import { borda, cheia, combinar, limites, vazia, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
 import { imagemDoBlob, imagemNoDocumento, selecaoDoCanvas, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
@@ -221,6 +225,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // levado, a conta do deslocamento do documento para a camada e o arrasto ainda abrindo
   const flutuante = useRef<{ chave: string; pintura: Pintura; base: ImageData; peca: HTMLCanvasElement; inversa: Afim; selecao: Selecao } | null>(null);
   const flutuanteAbrindo = useRef<Promise<void> | null>(null);
+  // O Balde de tinta, a Borracha mágica e o Degradê: as opções da barra, os degradês do espaço e o editor aberto
+  const [opcoesDoBalde, setOpcoesDoBalde] = useState(BALDE_PADRAO);
+  const [opcoesDaBorrachaMagica, setOpcoesDaBorrachaMagica] = useState(BORRACHA_MAGICA_PADRAO);
+  const [opcoesDoDegrade, setOpcoesDoDegrade] = useState(DEGRADE_PADRAO);
+  const [editandoDegrade, setEditandoDegrade] = useState(false);
+  const degradesDoEspaco = useRecursos<Degrade>("degrade");
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
   // do sistema (para reconhecer a própria cópia ao colar e colar no mesmo lugar)
@@ -710,6 +720,68 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }
       setSelecaoDoDocumento(temAlgo(andada) ? andada : null);
     });
+  };
+  /** A região da cor parecida com a do ponto (a varinha), na camada de pixels ou na imagem inteira, dentro da seleção. */
+  const regiaoDaCor = async (ponto: { x: number; y: number }, opcoes: { tolerancia: number; contigua: boolean; suavizar: boolean; todasAsCamadas: boolean }) => {
+    const imagem = await imagemParaSelecao(opcoes.todasAsCamadas || !selecionado?.clipe.pixels);
+    const regiao = varinha(imagem, ponto.x, ponto.y, { tolerancia: opcoes.tolerancia, contigua: opcoes.contigua, suavizar: opcoes.suavizar, amostra: 1 });
+    return selecaoNoDocumento ? (combinar(selecaoNoDocumento, regiao, "intersectar") ?? regiao) : regiao;
+  };
+  /** O Balde de tinta: a área de cor parecida cheia com o primeiro plano ou o padrão. */
+  const usarBalde = (ponto: { x: number; y: number }) => {
+    const o = opcoesDoBalde;
+    regiaoDaCor(ponto, o)
+      .then((regiao) =>
+        editarPixels(
+          (dados, cobertura, camada) => {
+            const tinta = o.preencher === "padrao" ? ladrilhar(ladrilhoDoPadrao(o.padrao, cores.primeiroPlano, cores.fundo), camada.largura, camada.altura) : rgbDaCor(cores.primeiroPlano);
+            preencherPixels(dados, camada.largura, cobertura, tinta, { modo: o.modo, opacidade: o.opacidade, preservar: Boolean(camada.faixa.travas?.transparencia) });
+          },
+          { criar: true, selecao: regiao },
+        ),
+      )
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível encher a área."));
+  };
+  /** A Borracha mágica: os pixels de cor parecida na camada de pixels ficam transparentes (na opacidade). */
+  const usarBorrachaMagica = (ponto: { x: number; y: number }) => {
+    if (!selecionado?.clipe.pixels) return mostrarAviso("Escolha uma camada de pixels para apagar.");
+    const o = opcoesDaBorrachaMagica;
+    regiaoDaCor(ponto, o)
+      .then((regiao) =>
+        editarPixels(
+          (dados, cobertura, camada) => {
+            const parcial = cobertura ? Uint8ClampedArray.from(cobertura, (v) => v * o.opacidade) : null;
+            limparPixels(dados, parcial, camada.faixa.travas?.transparencia || camada.faixa.fundo ? rgbDaCor(cores.fundo) : null);
+          },
+          { selecao: regiao },
+        ),
+      )
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível apagar."));
+  };
+  /** O Degradê: de `de` a `ate` (pixels do documento), pintado na camada de pixels (sem uma, nasce), dentro da seleção. */
+  const aplicarDegrade = (de: { x: number; y: number }, ate: { x: number; y: number }) => {
+    const o = opcoesDoDegrade;
+    const degrade = o.transparencia ? o.degrade : { ...o.degrade, opacidades: o.degrade.opacidades.map((p) => ({ ...p, opacidade: 1 })) };
+    const tabela = tabelaDoDegrade(degrade, cores.primeiroPlano, cores.fundo);
+    void editarPixels(
+      (dados, cobertura, camada) => {
+        // Os pontos do documento vão para a camada pela conta inversa da caixa dela
+        const m = inverter(matrizDaCamada(camada.clipe, camada, tamanhoDaImagem(projetoRef.current ?? projeto!)));
+        const naCamada = (p: { x: number; y: number }) => ({ x: m[0] * p.x + m[2] * p.y + m[4], y: m[1] * p.x + m[3] * p.y + m[5] });
+        const pixels = pixelsDoDegrade(camada.largura, camada.altura, naCamada(de), naCamada(ate), o.forma, tabela, { inverter: o.inverter, pontilhar: o.pontilhar });
+        preencherPixels(dados, camada.largura, cobertura, pixels, { modo: o.modo, opacidade: o.opacidade, preservar: Boolean(camada.faixa.travas?.transparencia) });
+      },
+      { criar: true },
+    );
+  };
+  /** Salva o degradê no espaço (painel Degradês). */
+  const salvarDegrade = (degrade: Degrade) => {
+    criarRecurso({ tipo: "degrade", nome: degrade.nome || "Degradê", dados: degrade })
+      .then(() => {
+        degradesDoEspaco.recarregar();
+        mostrarAviso(`"${degrade.nome}" está no painel Degradês.`);
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível salvar o degradê."));
   };
   /** Editar › Atenuar: o último passo de pixels misturado com o estado de antes dele, na opacidade e no modo. */
   const atenuar = async (opacidade: number, modo: ModoDaPintura) => {
@@ -1780,7 +1852,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null || janelaDePixels !== null;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -1979,6 +2051,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       ),
     },
+    degrades: {
+      nome: PAINEIS_DA_IMAGEM.degrades,
+      conteudo: (
+        <PainelDegrades
+          doEspaco={degradesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, degrade: recurso.dados }))}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          aoEscolher={(degrade) => {
+            setOpcoesDoDegrade((atual) => ({ ...atual, degrade }));
+            escolherFerramenta("degrade");
+          }}
+          aoExcluir={(id) => void excluirRecurso(id).then(degradesDoEspaco.recarregar)}
+        />
+      ),
+    },
     canais: {
       nome: PAINEIS_DA_IMAGEM.canais,
       conteudo: (
@@ -2166,6 +2253,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoMudarPincel={mudarPincel}
         simetria={simetria}
         aoMudarSimetria={setSimetria}
+        opcoesProprias={
+          ferramenta === "balde" ? (
+            <OpcoesDoBaldeNaBarra opcoes={opcoesDoBalde} aoMudar={(mudanca) => setOpcoesDoBalde((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "borrachaMagica" ? (
+            <OpcoesDaBorrachaMagicaNaBarra opcoes={opcoesDaBorrachaMagica} aoMudar={(mudanca) => setOpcoesDaBorrachaMagica((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "degrade" ? (
+            <OpcoesDoDegradeNaBarra
+              opcoes={opcoesDoDegrade}
+              doEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+              primeiroPlano={cores.primeiroPlano}
+              fundo={cores.fundo}
+              aoMudar={(mudanca) => setOpcoesDoDegrade((atual) => ({ ...atual, ...mudanca }))}
+              aoEditar={() => setEditandoDegrade(true)}
+            />
+          ) : null
+        }
         transformacao={
           transformando
             ? {
@@ -2261,6 +2364,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   : null
             }
             corAVista={canalDaVez ? null : corAVista}
+            ponto={
+              FERRAMENTAS_DE_PONTO.has(ferramenta)
+                ? ferramenta === "degrade"
+                  ? { modo: "arrasto", aoArrastar: aplicarDegrade }
+                  : { modo: "clique", aoClicar: (p) => (ferramenta === "balde" ? usarBalde(p) : usarBorrachaMagica(p)) }
+                : null
+            }
             moverPixels={
               ferramenta === "mover" && selecaoNoDocumento && selecionado?.clipe.pixels && limites(selecaoNoDocumento)
                 ? {
@@ -2391,6 +2501,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             setUltimoTracado(t);
             tracar(t);
           }}
+        />
+      ) : null}
+      {editandoDegrade ? (
+        <JanelaEditorDeDegrade
+          inicial={opcoesDoDegrade.degrade}
+          doEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          aoFechar={() => setEditandoDegrade(false)}
+          aoConfirmar={(degrade) => {
+            setEditandoDegrade(false);
+            setOpcoesDoDegrade((atual) => ({ ...atual, degrade }));
+          }}
+          aoSalvar={salvarDegrade}
         />
       ) : null}
       {janelaDePixels === "atenuar" ? (

@@ -2,6 +2,7 @@
 // posição da caixa de ferramentas é um grupo: o botão mostra a última usada do grupo e o botão direito abre as outras.
 import {
   Bandage,
+  Blend,
   Brush,
   Circle,
   Crop,
@@ -15,6 +16,7 @@ import {
   Minus,
   Move,
   Pencil,
+  PaintBucket,
   Pentagon,
   Pipette,
   Sparkles,
@@ -26,6 +28,7 @@ import {
   SquareDashedMousePointer,
   Triangle,
   Type,
+  Wand,
   WandSparkles,
   ZoomIn,
   CircleDashed,
@@ -52,6 +55,9 @@ export type IdFerramentaDaImagem =
   | "pincel"
   | "lapis"
   | "borracha"
+  | "borrachaMagica"
+  | "degrade"
+  | "balde"
   | "historico"
   | "historicoArtistico"
   | "texto"
@@ -105,7 +111,14 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("historico", "Ferramenta Pincel do histórico", "Y", History, "Pinte para voltar a camada ao estado marcado como fonte no Histórico."),
     F("historicoArtistico", "Ferramenta Pincel do histórico artístico", "Y", Feather, "Pinte traços soltos com as cores do estado marcado como fonte no Histórico."),
   ],
-  [F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo.")],
+  [
+    F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo."),
+    F("borrachaMagica", "Ferramenta Borracha mágica", "E", Wand, "Clique numa cor da camada de pixels para apagar os pixels parecidos (pela tolerância)."),
+  ],
+  [
+    F("degrade", "Ferramenta Degradê", "G", Blend, "Arraste do começo ao fim do degradê (Shift prende a 45°); clique na amostra da barra para editar."),
+    F("balde", "Ferramenta Balde de tinta", "G", PaintBucket, "Clique para encher a área de cor parecida com o primeiro plano ou um padrão."),
+  ],
   [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
   [
     F("retangulo", "Ferramenta Retângulo", "U", Square, "Arraste para desenhar um retângulo na cor do primeiro plano."),
@@ -149,6 +162,9 @@ export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "clique" | "p
 
 /** As ferramentas que desenham a seleção do documento (lib/selecao). */
 export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set(["letreiro", "letreiroEliptico", "linhaUnica", "colunaUnica", "laco", "lacoPoligonal", "lacoMagnetico", "varinha", "selecaoRapida"]);
+
+/** As ferramentas que agem num clique ou num arrasto da imagem (PontoNaPrevia). */
+export const FERRAMENTAS_DE_PONTO: ReadonlySet<IdFerramentaDaImagem> = new Set(["degrade", "balde", "borrachaMagica"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
 export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico"]);

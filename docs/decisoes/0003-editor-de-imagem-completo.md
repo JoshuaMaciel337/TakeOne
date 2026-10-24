@@ -156,10 +156,12 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Substituição de cor (matiz, saturação, cor, luminosidade; amostragem; limites; tolerância)
 - [ ] Desfoque, Nitidez e Borrar com pincel (força, proteger detalhes, pintura com o dedo)
 - [ ] Subexposição e Superexposição (sombras, meios-tons, realces; exposição; proteger tons) e Esponja (dessaturar, saturar; vibração)
-- [ ] Borracha de fundo (amostragem, limites, tolerância, proteger a cor do primeiro plano) e Borracha mágica
-- [ ] Balde de tinta (primeiro plano ou padrão, tolerância, contígua, todas as camadas)
-- [ ] Degradê (G) ao vivo (camada de preenchimento com alças na tela) e clássico (pinta pixels): linear, radial, ângulo, refletido, losango; inverter, pontilhar
-- [ ] Editor de degradês (paradas de cor e de opacidade, ponto médio, ruído) e painel Degradês com predefinições
+- [ ] Borracha de fundo (amostragem, limites, tolerância, proteger a cor do primeiro plano)
+- [x] Borracha mágica
+- [x] Balde de tinta (primeiro plano ou padrão, tolerância, contígua, todas as camadas)
+- [x] Degradê (G) clássico (pinta pixels): linear, radial, ângulo, refletido, losango; inverter, pontilhar
+- [ ] Degradê ao vivo (camada de preenchimento com alças na tela)
+- [x] Editor de degradês (paradas de cor e de opacidade, ponto médio, ruído) e painel Degradês com predefinições
 - [ ] Painel Padrões com predefinições, Definir padrão, importar .pat
 
 ### Onda 13.6 — Transformação e geometria

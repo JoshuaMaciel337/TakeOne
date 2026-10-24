@@ -64,6 +64,8 @@ type Props = {
   aoMudarSimetria?: (simetria: Simetria | null) => void;
   /** As ferramentas da seleção do documento: as opções, se há seleção (e numa foto) e o Desmarcar. */
   selecaoDoDocumento?: { opcoes: OpcoesDaSelecao; aoMudar: (mudanca: Partial<OpcoesDaSelecao>) => void; temSelecao: boolean; naFoto: boolean; aoDesmarcar: () => void };
+  /** As opções que o editor monta (Degradê, Balde de tinta, Borracha mágica): ficam no lugar das daqui. */
+  opcoesProprias?: React.ReactNode;
   /** A transformação livre em andamento: os modos, confirmar (Enter) e cancelar (Esc). */
   transformacao?: { modo: ModoDaTransformacao; aoModo: (modo: ModoDaTransformacao) => void; aoConfirmar: () => void; aoCancelar: () => void } | null;
   /** A seleção de objeto: o localizador (o realce com o ponteiro parado) ligado ou não. */
@@ -114,7 +116,8 @@ export function BarraDeOpcoes(props: Props) {
   const selecao = MODO_DA_SELECAO[ferramenta];
 
   let opcoes: React.ReactNode = null;
-  if (props.transformacao) {
+  if (props.opcoesProprias && !props.transformacao) opcoes = props.opcoesProprias;
+  else if (props.transformacao) {
     const t = props.transformacao;
     opcoes = (
       <>

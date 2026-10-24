@@ -28,6 +28,7 @@ import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
+import { PontoNaPrevia } from "./PontoNaPrevia";
 import { type EstadoDaTransformacao, type ModoDaTransformacao, TransformacaoNaPrevia } from "./TransformacaoNaPrevia";
 import type { CorDoCanal } from "./PainelCanais";
 import type { FerramentaObjeto } from "./useObjeto";
@@ -108,6 +109,8 @@ type Props = {
    * selecionados (Alt leva uma cópia). Os deslocamentos vão em pixels do documento, desde o começo do arrasto.
    */
   moverPixels?: { caixa: { x0: number; y0: number; x1: number; y1: number }; aoComecar: (duplicar: boolean) => void; aoMover: (dx: number, dy: number) => void; aoSoltar: (dx: number, dy: number) => void } | null;
+  /** O Degradê, o Balde de tinta e a Borracha mágica: um clique ou um arrasto em pixels do documento. */
+  ponto?: { modo: "clique" | "arrasto"; aoClicar?: (ponto: { x: number; y: number }, teclas: { shift: boolean; alt: boolean }) => void; aoArrastar?: (de: { x: number; y: number }, ate: { x: number; y: number }) => void } | null;
   /** A transformação livre em andamento (a da seleção): a caixa com as alças, por cima de tudo. */
   transformacao?: {
     estado: EstadoDaTransformacao;
@@ -181,6 +184,7 @@ export function PreviaDaImagem({
   corAVista = null,
   transformacao = null,
   moverPixels = null,
+  ponto = null,
 }: Props) {
   const arrastandoPixels = useRef<{ x: number; y: number } | null>(null);
   const imagem = tamanhoDaImagem(projeto);
@@ -576,6 +580,7 @@ export function PreviaDaImagem({
               />
             ) : null}
             {veu && tamanho.largura > 1 ? <VeuDaMascaraRapida fonte={veu.fonte} tamanho={tamanho} quadro={veu.quadro} cinza={veu.cinza} /> : null}
+            {ponto && !transformacao && !maoAtiva && !recorte && tamanho.largura > 1 ? <PontoNaPrevia modo={ponto.modo} quadro={tamanho} documento={imagem} aoClicar={ponto.aoClicar} aoArrastar={ponto.aoArrastar} /> : null}
             {moverPixels && !transformacao && !maoAtiva && tamanho.largura > 1 ? (
               <div
                 className="absolute z-20 cursor-move touch-none"

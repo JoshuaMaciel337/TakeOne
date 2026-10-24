@@ -16,6 +16,7 @@ export const PAINEIS_DA_IMAGEM = {
   biblioteca: "Biblioteca",
   camadas: "Camadas",
   canais: "Canais",
+  degrades: "Degradês",
   configuracoesDoPincel: "Configurações do pincel",
   cor: "Cor",
   estilos: "Estilos de texto",
