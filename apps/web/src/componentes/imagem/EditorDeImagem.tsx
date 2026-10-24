@@ -37,7 +37,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
@@ -93,6 +93,9 @@ import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, la
 import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
 import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./OpcoesDoCorte";
+import { JanelaCriarForma, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
+import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
+import { deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
 import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
 import { preencherBuracos } from "@/lib/pintura/recuperar";
@@ -207,7 +210,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ferramenta, setFerramenta] = useState<IdFerramentaDaImagem>("mover");
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
   const [cores, setCores] = useState<{ primeiroPlano: string; fundo: string; editando: "primeiroPlano" | "fundo" }>({ primeiroPlano: "#000000", fundo: "#ffffff", editando: "primeiroPlano" });
-  const [forma, setForma] = useState<OpcoesDaForma>({ tracoCor: "#000000", traco: 0, arredondado: false, personalizada: "seta" });
+  const [forma, setForma] = useState<OpcoesDaForma>({ ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "seta" });
+  // O clique sem arrastar de uma ferramenta de forma: a janela com as medidas
+  const [criandoForma, setCriandoForma] = useState<{ tipo: TipoDaFormaViva; ponto: { x: number; y: number } } | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomMedido, setZoomMedido] = useState(1);
   const [removerAoSoltar, setRemoverAoSoltar] = useState(true);
@@ -1898,12 +1903,37 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const resultado = executar({ comando: "imagem.adicionarTexto", parametros: { texto: base, transformacao: onde } });
     if (resultado) abrirAba("texto");
   };
-  const desenharForma = (caixa: RetanguloDaImagem) => {
-    const tipo = ferramenta === "formaPersonalizada" ? forma.personalizada : ferramenta === "retangulo" && forma.arredondado ? "arredondado" : FORMA_DA_FERRAMENTA[ferramenta];
+  /** A forma viva do arrasto, com os caminhos já em pixels da imagem (para o contorno na prévia e para juntar). */
+  const formaDoArrasto = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
+    const { vetor, centro } = camadaDoArrasto(tipo, arrasto, forma, cores.primeiroPlano);
+    return { vetor, centro, naImagem: deslocarCaminhos(vetor.subcaminhos, centro.x - vetor.caixa.largura / 2, centro.y - vetor.caixa.altura / 2) };
+  };
+  /** Desenha a forma viva: numa camada nova, ou junta à camada de forma escolhida (as operações da barra). */
+  const criarFormaViva = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
+    const { vetor, centro, naImagem } = formaDoArrasto(tipo, arrasto);
+    if (forma.operacao !== "nova" && selecionado?.clipe.vetor) {
+      executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos: naImagem, operacao: forma.operacao } });
+      return;
+    }
+    const base = NOME_DA_FORMA[tipo];
+    const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1;
+    executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `${base} ${numero}`, acima: escolhidas[0]?.id ?? null } });
+  };
+  const desenharForma = (arrasto: ArrastoDaForma, clique: boolean) => {
+    const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
+    if (viva) {
+      if (clique) setCriandoForma({ tipo: viva, ponto: arrasto.de });
+      else criarFormaViva(viva, arrasto);
+      return;
+    }
+    const tipo = ferramenta === "formaPersonalizada" ? forma.personalizada : FORMA_DA_FERRAMENTA[ferramenta];
     if (!tipo) return;
-    // A linha é fina: a proporção é a do arrasto (com um mínimo, para a imagem não sumir)
+    // Um clique sem arrastar desenha uma forma de um quarto do lado menor da imagem, no ponto
+    const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
+    const caixa: RetanguloDaImagem = clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto;
     const proporcao = Math.min(20, Math.max(0.05, caixa.largura / Math.max(1, caixa.altura)));
-    criarForma({ tipo, cor: cores.primeiroPlano, contorno_cor: forma.tracoCor, contorno: forma.traco, proporcao })
+    const contorno = forma.traco.tinta.tipo === "cor" ? forma.traco.tinta.cor : "#000000";
+    criarForma({ tipo, cor: cores.primeiroPlano, contorno_cor: contorno, contorno: forma.traco.tinta.tipo === "nenhuma" ? 0 : 0.02, proporcao })
       .then((midia) => esperarMidia(midia, { caixa }))
       .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível desenhar a forma agora."));
   };
@@ -3189,6 +3219,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoExecutar={executar}
           pedidoDeAba={pedidoDeAba}
           semSelecao={<PropriedadesDoDocumento projeto={projetoNaTela} aoPrever={preverDoPainel} aoExecutar={executar} />}
+          formas={{ quadro: tamanho, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, degrades: degradesDoEspaco.recursos.map((recurso) => recurso.dados) }}
           className="h-full"
         />
         ),
@@ -3495,7 +3526,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "regua" ? (
+          FORMA_VIVA_DA_FERRAMENTA[ferramenta] ? (
+            <OpcoesDaFormaNaBarra
+              tipo={FORMA_VIVA_DA_FERRAMENTA[ferramenta]!}
+              opcoes={forma}
+              primeiroPlano={cores.primeiroPlano}
+              fundo={cores.fundo}
+              doEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+              comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
+              aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
+            />
+          ) : ferramenta === "regua" ? (
             <OpcoesDaReguaNaBarra
               medida={medida}
               aoLimpar={() => setMedida(null)}
@@ -3756,6 +3797,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             preencherCercado={ferramenta === "remover" && removerCercando}
             aoClicarTexto={(x, y) => porTexto(undefined, { x: x / tamanho.largura - 0.5, y: y / tamanho.altura - 0.5 })}
             aoDesenharForma={desenharForma}
+            caminhoDoArrasto={(arrasto) => {
+              const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
+              return viva ? formaDoArrasto(viva, arrasto).naImagem : null;
+            }}
             aoPegarCor={(cor, paraOFundo) => setCores((atual) => ({ ...atual, [paraOFundo ? "fundo" : "primeiroPlano"]: cor }))}
           />
           <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-borda bg-painel px-2 text-[11px] text-suave">
@@ -3925,6 +3970,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(metodo, tons) => {
             setJanelaDasCamadas(null);
             void mesclarCamadas(metodo, tons);
+          }}
+        />
+      ) : null}
+      {criandoForma ? (
+        <JanelaCriarForma
+          tipo={criandoForma.tipo}
+          aoFechar={() => setCriandoForma(null)}
+          aoConfirmar={({ largura, altura, doMeio }) => {
+            const { tipo, ponto } = criandoForma;
+            setCriandoForma(null);
+            // A linha: o comprimento e o ângulo; as outras: a largura e a altura
+            const fim = tipo === "linha" ? { x: ponto.x + Math.cos((altura * Math.PI) / 180) * largura, y: ponto.y + Math.sin((altura * Math.PI) / 180) * largura } : { x: ponto.x + largura, y: ponto.y + altura };
+            const inicio = doMeio ? { x: ponto.x - (fim.x - ponto.x) / 2, y: ponto.y - (fim.y - ponto.y) / 2 } : ponto;
+            const ate = doMeio ? { x: ponto.x + (fim.x - ponto.x) / 2, y: ponto.y + (fim.y - ponto.y) / 2 } : fim;
+            criarFormaViva(tipo, arrastoDaForma(inicio, ate));
           }}
         />
       ) : null}

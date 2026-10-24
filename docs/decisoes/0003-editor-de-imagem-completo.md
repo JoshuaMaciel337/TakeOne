@@ -189,7 +189,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Caneta (P), Caneta de forma livre (ajuste de curva), Caneta de curvatura, Adicionar, Excluir e Converter ponto
 - [ ] Seleção de caminho e Seleção direta (A), com as setas empurrando pontos
 - [ ] Painel Caminhos: caminho de trabalho, salvar, duplicar, excluir, fazer seleção (Ctrl+Enter), seleção para caminho, preencher, traçar com qualquer ferramenta de pintura (pressão simulada), caminho de recorte
-- [ ] Formas vivas (retângulo com raio por canto, elipse, triângulo com raio, polígono com lados e estrela, linha com espessura e pontas de seta): preenchimento e traçado (cor, degradê, padrão), opções de traçado (sólido, tracejado, pontilhado, pontas, cantos, limite de mitra, alinhado dentro, no centro ou fora)
+- [x] Formas vivas (retângulo com raio por canto, elipse, triângulo com raio, polígono com lados e estrela, linha com espessura e pontas de seta): preenchimento e traçado (cor, degradê, padrão), opções de traçado (sólido, tracejado, pontilhado, pontas, cantos, limite de mitra, alinhado dentro, no centro ou fora)
 - [ ] Forma personalizada com uma biblioteca grande e Definir forma personalizada
 - [ ] Combinar formas (unir, subtrair, intersectar, excluir sobreposição, mesclar componentes)
 - [ ] Máscara vetorial (revelar tudo, ocultar tudo, caminho atual, ativar, vincular, excluir)

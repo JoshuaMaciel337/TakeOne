@@ -53,6 +53,8 @@ import {
 } from "lucide-react";
 
 import type { TipoDeForma } from "@/lib/elementos";
+import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
+
 
 export type IdFerramentaDaImagem =
   | "corteDePerspectiva"
@@ -200,6 +202,15 @@ export const TODAS_AS_FERRAMENTAS = GRUPOS_DE_FERRAMENTAS.flat();
 export function ferramenta(id: IdFerramentaDaImagem): FerramentaDaImagem {
   return TODAS_AS_FERRAMENTAS.find((item) => item.id === id)!;
 }
+
+/** As ferramentas que desenham uma forma vetorial viva, e o tipo dela (lib/vetor/arrasto.ts). */
+export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, TipoDaFormaViva>> = {
+  retangulo: "retangulo",
+  elipse: "elipse",
+  triangulo: "triangulo",
+  poligono: "poligono",
+  linha: "linha",
+};
 
 /** As ferramentas que desenham uma forma, e a forma do servidor de cada uma. */
 export const FORMA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, TipoDeForma>> = {

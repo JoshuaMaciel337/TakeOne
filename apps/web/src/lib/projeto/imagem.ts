@@ -11,6 +11,7 @@ import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO,
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
+import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
 export const DURACAO_DA_CAMADA = segundosParaTicks(5);
@@ -39,6 +40,9 @@ export const TAMANHOS_PRONTOS: {
   { id: "apresentacao", nome: "Slide", largura: 1920, altura: 1080 },
   { id: "a4", nome: "Folha A4 (impressão)", largura: 2480, altura: 3508 },
 ];
+
+/** O tamanho da fonte de uma camada: o da mídia (por quem chama) ou a caixa da forma vetorial. */
+const tamanhoDaFonte = (clipe: Clipe, tamanhos: Record<string, Tamanho>): Tamanho | undefined => clipe.vetor?.caixa ?? (clipe.midia_id ? tamanhos[clipe.midia_id] : undefined);
 
 export function ehImagem(projeto: Pick<Projeto, "tipo">): boolean {
   return projeto.tipo === "imagem";
@@ -156,6 +160,98 @@ function mudarClipeDaCamada(projeto: Projeto, clipeId: string, mudar: (clipe: Cl
   });
   if (!achou) throw new ErroEdicao("Essa camada não existe mais.");
   return { ...projeto, faixas };
+}
+
+/** Pixels da imagem por unidade da caixa da forma (com a escala da camada). */
+function pixelsPorUnidade(caixa: Tamanho, escala: number, quadro: Tamanho): number {
+  return Math.min(quadro.largura / caixa.largura, quadro.altura / caixa.altura) * escala;
+}
+
+/** Uma forma vetorial nova acima da escolhida, com 1 unidade da caixa = 1 pixel da imagem e o meio em `centro`. */
+export function adicionarCamadaVetorial(projeto: Projeto, ctx: Contexto, vetor: CamadaVetorial, centro: { x: number; y: number }, nome: string, acima?: string | null): { projeto: Projeto; clipeId: string } {
+  const quadro = tamanhoDaImagem(projeto);
+  const escala = 1 / pixelsPorUnidade(vetor.caixa, 1, quadro);
+  const transformacao = { ...TRANSFORMACAO_PADRAO, x: (centro.x - quadro.largura / 2) / quadro.largura, y: (centro.y - quadro.altura / 2) / quadro.altura, escala };
+  const clipe = clipeDaCamada(ctx.novoId(), { vetor, transformacao });
+  return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
+}
+
+/**
+ * Troca a forma de uma camada sem tirá-la do lugar: o ponto (x, y) da forma antiga vira (x + d.x, y + d.y) na nova, e
+ * fica no mesmo pixel da imagem; a escala muda para 1 unidade continuar valendo os mesmos pixels. Sem `d`, o canto de
+ * cima à esquerda dos caminhos (sem a margem do traço) fica onde estava.
+ */
+export function mudarVetor(projeto: Projeto, clipeId: string, vetor: CamadaVetorial, d?: { x: number; y: number }): Projeto {
+  const quadro = tamanhoDaImagem(projeto);
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    const antigo = clipe.vetor;
+    if (!antigo) throw new ErroEdicao("Esta camada não é uma forma.");
+    const t = clipe.transformacao;
+    const k = pixelsPorUnidade(antigo.caixa, t.escala, quadro);
+    const deslocamento = d ?? (() => {
+      const a = caixaDosCaminhos(antigo.subcaminhos);
+      const b = caixaDosCaminhos(vetor.subcaminhos);
+      return a && b ? { x: b.x0 - a.x0, y: b.y0 - a.y0 } : { x: 0, y: 0 };
+    })();
+    // O meio novo: C' = C + R·F·k·(S'/2 − d − S/2), com F a virada (o espelho vem antes do giro)
+    let ux = (vetor.caixa.largura / 2 - deslocamento.x - antigo.caixa.largura / 2) * k;
+    let uy = (vetor.caixa.altura / 2 - deslocamento.y - antigo.caixa.altura / 2) * k;
+    if (clipe.virar?.horizontal) ux = -ux;
+    if (clipe.virar?.vertical) uy = -uy;
+    const r = (t.rotacao * Math.PI) / 180;
+    const cx = quadro.largura / 2 + t.x * quadro.largura + ux * Math.cos(r) - uy * Math.sin(r);
+    const cy = quadro.altura / 2 + t.y * quadro.altura + ux * Math.sin(r) + uy * Math.cos(r);
+    const escala = k / pixelsPorUnidade(vetor.caixa, 1, quadro);
+    return { ...clipe, vetor, recorte: { ...RECORTE_PADRAO }, transformacao: { ...t, x: (cx - quadro.largura / 2) / quadro.largura, y: (cy - quadro.altura / 2) / quadro.altura, escala } };
+  });
+}
+
+/** Um ponto da imagem nas unidades da caixa da forma da camada (a volta do caminho da camada até a imagem). */
+export function pontoNaForma(clipe: Clipe, ponto: { x: number; y: number }, quadro: Tamanho): { x: number; y: number } {
+  const vetor = clipe.vetor!;
+  const t = clipe.transformacao;
+  const k = pixelsPorUnidade(vetor.caixa, t.escala, quadro);
+  const dx = ponto.x - (quadro.largura / 2 + t.x * quadro.largura);
+  const dy = ponto.y - (quadro.altura / 2 + t.y * quadro.altura);
+  const r = (-t.rotacao * Math.PI) / 180;
+  let ux = (dx * Math.cos(r) - dy * Math.sin(r)) / k;
+  let uy = (dx * Math.sin(r) + dy * Math.cos(r)) / k;
+  if (clipe.virar?.horizontal) ux = -ux;
+  if (clipe.virar?.vertical) uy = -uy;
+  return { x: ux + vetor.caixa.largura / 2, y: uy + vetor.caixa.altura / 2 };
+}
+
+/**
+ * Junta caminhos (em pixels da imagem) à forma da camada, com a operação (somar, subtrair, intersectar, excluir):
+ * a forma deixa de ser viva (vira um caminho comum) e a caixa cresce até caber tudo, sem mexer no que já estava.
+ */
+export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subcaminho[], operacao: OperacaoDoCaminho): Projeto {
+  const quadro = tamanhoDaImagem(projeto);
+  const clipe = projeto.faixas.flatMap((faixa) => faixa.clipes).find((item) => item.id === clipeId);
+  if (!clipe?.vetor) throw new ErroEdicao("Escolha uma camada de forma para juntar a forma nova.");
+  const levar = (p: { x: number; y: number }) => pontoNaForma(clipe, p, quadro);
+  const novos = caminhos.map((sub) => ({
+    ...sub,
+    operacao,
+    nos: sub.nos.map((no) => {
+      const a = levar(no);
+      const e = no.ex !== undefined && no.ey !== undefined ? levar({ x: no.ex, y: no.ey }) : null;
+      const s = no.sx !== undefined && no.sy !== undefined ? levar({ x: no.sx, y: no.sy }) : null;
+      return { x: a.x, y: a.y, ...(e ? { ex: e.x, ey: e.y } : {}), ...(s ? { sx: s.x, sy: s.y } : {}) };
+    }),
+  }));
+  const todos = [...clipe.vetor.subcaminhos, ...novos];
+  const caixa = caixaDosCaminhos(todos)!;
+  const margem = margemDoTraco(clipe.vetor.traco, null);
+  const d = { x: margem - caixa.x0, y: margem - caixa.y0 };
+  const vetor: CamadaVetorial = {
+    ...clipe.vetor,
+    forma: null,
+    margem,
+    subcaminhos: deslocar(todos, d.x, d.y),
+    caixa: { largura: Math.max(1, caixa.x1 - caixa.x0) + 2 * margem, altura: Math.max(1, caixa.y1 - caixa.y0) + 2 * margem },
+  };
+  return mudarVetor(projeto, clipeId, vetor, d);
 }
 
 /** Põe, troca ou tira (null) a máscara de camada pintável. */
@@ -640,8 +736,8 @@ export function recortarImagem(projeto: Projeto, retangulo: RetanguloDaImagem, t
       const cy = antes.altura / 2 + t.y * antes.altura - retangulo.y;
       let escala = t.escala;
       if (clipe.texto) escala = (t.escala * ladoAntes) / ladoDepois;
-      else if (clipe.midia_id && tamanhos[clipe.midia_id]) {
-        const midia = tamanhos[clipe.midia_id];
+      else if (tamanhoDaFonte(clipe, tamanhos)) {
+        const midia = tamanhoDaFonte(clipe, tamanhos)!;
         const largura = midia.largura * clipe.recorte.largura;
         const altura = midia.altura * clipe.recorte.altura;
         const caberAntes = Math.min(antes.largura / largura, antes.altura / altura);
@@ -778,8 +874,8 @@ export function girarImagem(projeto: Projeto, giro: GiroDaImagem, tamanhos: Reco
       // A escala é relativa ao quadro: refeita para o tamanho em pixels continuar o mesmo
       let escala = t.escala;
       if (clipe.texto) escala = (t.escala * ladoAntes) / ladoDepois;
-      else if (clipe.midia_id && tamanhos[clipe.midia_id]) {
-        const midia = tamanhos[clipe.midia_id];
+      else if (tamanhoDaFonte(clipe, tamanhos)) {
+        const midia = tamanhoDaFonte(clipe, tamanhos)!;
         const largura = midia.largura * clipe.recorte.largura;
         const altura = midia.altura * clipe.recorte.altura;
         escala = (t.escala * Math.min(antes.largura / largura, antes.altura / altura)) / Math.min(depois.largura / largura, depois.altura / altura);

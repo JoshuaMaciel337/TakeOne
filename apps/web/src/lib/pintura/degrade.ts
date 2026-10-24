@@ -197,3 +197,9 @@ export function pixelsDoDegrade(
   }
   return saida;
 }
+
+/** O degradê com as cores de primeiro plano e de fundo trocadas pelas da vez (para guardar numa forma). */
+export function degradeComCores(degrade: Degrade, primeiroPlano: string, fundo: string): Degrade {
+  const hex = ([r, g, b]: Rgb) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  return { ...degrade, cores: degrade.cores.map((parada) => ({ ...parada, cor: hex(rgbDe(parada.cor, primeiroPlano, fundo)) })) };
+}

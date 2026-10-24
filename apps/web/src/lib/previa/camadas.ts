@@ -315,6 +315,12 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
       camadas.push({ ...comum, chave: `texto:${clipe.id}`, caixa, caixaBase: caixa, imagem: imagem.bitmap });
       continue;
     }
+    if (clipe.vetor) {
+      // A forma: a caixa dela faz o papel do tamanho da mídia, e quem desenha pede o desenho no tamanho da tela
+      const caixa = caixaDoClipe(clipe.transformacao, clipe.recorte, clipe.vetor.caixa, quadro);
+      camadas.push({ ...comum, chave: `vetor:${clipe.id}`, caixa, caixaBase: caixa });
+      continue;
+    }
     const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
     const tamanhoMidia = midia?.status === "pronta" ? tamanhoDaMidia(midia) : null;
     if (!tamanhoMidia) continue;

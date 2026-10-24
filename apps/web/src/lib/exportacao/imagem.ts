@@ -9,6 +9,7 @@ import type { Clipe, Projeto } from "@/lib/projeto/modelo";
 import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
+import { vetorNoTamanho } from "../vetor/desenhar";
 import { carregarBitmap } from "../previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
@@ -79,6 +80,12 @@ export async function exportarImagem(
     camadas.map(async (camada) => {
       if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe))] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
+      if (camada.clipe.vetor) {
+        // A forma desenhada no tamanho em que sai (a caixa já está em pixels do arquivo)
+        const { caixa, recorte } = camada;
+        const fonte = vetorNoTamanho(camada.clipe.id, camada.clipe.vetor, caixa.largura / recorte.largura, caixa.altura / recorte.altura);
+        return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const;
+      }
       if (camada.clipe.pixels) {
         // A camada de pixels: o canvas que está sendo pintado, ou o PNG da versão do clipe (a 0 é vazia)
         const { versao } = camada.clipe.pixels;

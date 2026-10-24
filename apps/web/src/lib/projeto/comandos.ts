@@ -138,7 +138,11 @@ import {
   type TamanhoDaImagem,
   trocarImagemDaCamada,
   vincularCamadas,
+  adicionarCamadaVetorial,
+  juntarAoVetor,
+  mudarVetor,
 } from "./imagem.ts";
+import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
 import { type PlanoDosPixels, substituirPorPixels } from "./rasterizar.ts";
@@ -235,6 +239,9 @@ export type Comando =
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.transformarCamada"; parametros: { clipeId: string; transformacao: Partial<Transformacao>; virar?: Virar } }
+  | { comando: "imagem.adicionarVetor"; parametros: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string; acima?: string | null } }
+  | { comando: "imagem.mudarVetor"; parametros: { clipeId: string; vetor: CamadaVetorial; deslocamento?: { x: number; y: number } } }
+  | { comando: "imagem.juntarAoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[]; operacao: OperacaoDoCaminho } }
   | { comando: "imagem.tamanhoComPixels"; parametros: { tamanho: TamanhoDaImagem; pixels: TrocaDePixels[]; canais: TrocaDePixels[] } }
   | { comando: "imagem.tamanhoDaTela"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho>; fundo: { cor: string; transparente: boolean } | null } }
   | { comando: "imagem.girar"; parametros: { giro: GiroDaImagem; tamanhos: Record<string, Tamanho> } }
@@ -357,6 +364,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
   "imagem.transformarCamada": "transformar a camada",
+  "imagem.adicionarVetor": "desenhar a forma",
+  "imagem.mudarVetor": "mudar a forma",
+  "imagem.juntarAoVetor": "juntar à forma",
   "imagem.tamanhoComPixels": "mudar o tamanho da imagem",
   "imagem.tamanhoDaTela": "mudar o tamanho da tela",
   "imagem.girar": "girar a imagem",
@@ -622,6 +632,14 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: recortarImagem(projeto, parametros.retangulo, parametros.tamanhos) };
     case "imagem.transformarCamada":
       return { projeto: transformarCamada(projeto, parametros.clipeId, parametros.transformacao, parametros.virar) };
+    case "imagem.adicionarVetor": {
+      const resultado = adicionarCamadaVetorial(projeto, ctx, parametros.vetor, parametros.centro, parametros.nome, parametros.acima);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.mudarVetor":
+      return { projeto: mudarVetor(projeto, parametros.clipeId, parametros.vetor, parametros.deslocamento) };
+    case "imagem.juntarAoVetor":
+      return { projeto: juntarAoVetor(projeto, parametros.clipeId, parametros.caminhos, parametros.operacao) };
     case "imagem.tamanhoComPixels":
       return { projeto: tamanhoComPixels(projeto, parametros.tamanho, parametros.pixels, parametros.canais) };
     case "imagem.tamanhoDaTela":

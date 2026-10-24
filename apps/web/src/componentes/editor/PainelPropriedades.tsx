@@ -49,6 +49,7 @@ import { Multicamera } from "./Multicamera";
 import { BotaoSeguirObjeto } from "./SeguirObjeto";
 import { SecaoExpressoes } from "./SecaoExpressoes";
 import { SecaoForma } from "./SecaoForma";
+import { type ContextoDasFormas, SecaoDaFormaVetorial } from "../imagem/SecaoDaFormaVetorial";
 import { SeguirRosto } from "./SeguirRosto";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
@@ -165,11 +166,13 @@ type Props = {
   tipoDeSom?: TipoDeSom;
   /** Sem nada escolhido, no lugar do aviso (as propriedades do documento, no editor de imagem). */
   semSelecao?: React.ReactNode;
+  /** No editor de imagem: o quadro e as cores para a seção Forma das camadas vetoriais. */
+  formas?: ContextoDasFormas;
   className?: string;
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, formas, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -333,6 +336,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             aoExecutar={aoExecutar}
             modo={modo}
             aoTrocarImagem={aoTrocarImagem}
+            formas={formas}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
@@ -435,7 +439,7 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, formas }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void; formas?: ContextoDasFormas }) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -615,6 +619,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             ))}
           </select>
         </label>
+        {clipe.vetor && formas ? <SecaoDaFormaVetorial clipe={clipe} travada={travada} contexto={formas} aoExecutar={aoExecutar} /> : null}
         <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {!clipe.ajuste ? <SilhuetaDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} /> : null}
         <MascaraDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />

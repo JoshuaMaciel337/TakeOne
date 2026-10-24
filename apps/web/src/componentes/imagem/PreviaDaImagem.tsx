@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ManipuladorNaPrevia } from "@/componentes/editor/ManipuladorNaPrevia";
-import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaMascaraDaImagem } from "@/lib/exportacao/imagem";
 import { useBitmaps } from "@/lib/previa/bitmaps";
@@ -17,6 +16,10 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
+import { vetorNoTamanho } from "@/lib/vetor/desenhar";
+import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
+import { svgDosCaminhos } from "@/lib/vetor/contorno";
+import type { Subcaminho } from "@/lib/vetor/modelo";
 import type { MapaDeBordas } from "@/lib/selecao/magnetico";
 import type { ImagemRgba } from "@/lib/selecao/varinha";
 import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
@@ -84,8 +87,13 @@ type Props = {
   preencherCercado?: boolean;
   /** Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels). */
   aoClicarTexto?: (x: number, y: number) => void;
-  /** Ferramentas de forma: o retângulo arrastado, em pixels da imagem. */
-  aoDesenharForma?: (retangulo: RetanguloDaImagem) => void;
+  /**
+   * Ferramentas de forma: o arrasto (com Shift prendendo a proporção e Alt saindo do meio), em pixels da imagem;
+   * `clique` quando a pessoa só clicou (sem arrastar), no ponto.
+   */
+  aoDesenharForma?: (arrasto: ArrastoDaForma, clique: boolean) => void;
+  /** O contorno da forma que está sendo arrastada, em pixels da imagem (sem ele, um retângulo tracejado). */
+  caminhoDoArrasto?: (arrasto: ArrastoDaForma) => Subcaminho[] | null;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
   aoPegarCor?: (cor: string, paraOFundo: boolean) => void;
   /** Pincel, lápis e borracha: o traço por cima da prévia, numa camada de pixels. */
@@ -210,6 +218,7 @@ export function PreviaDaImagem({
   preencherCercado,
   aoClicarTexto,
   aoDesenharForma,
+  caminhoDoArrasto,
   aoPegarCor,
   pintura = null,
   fonteDosPixels,
@@ -235,7 +244,7 @@ export function PreviaDaImagem({
   const [guias, setGuias] = useState<Guias | null>(null);
   const [semWebgl, setSemWebgl] = useState(false);
   const [espaco, setEspaco] = useState(false);
-  const [desenho, setDesenho] = useState<{ inicio: { x: number; y: number }; fim: { x: number; y: number } } | null>(null);
+  const [desenho, setDesenho] = useState<{ inicio: { x: number; y: number }; fim: { x: number; y: number }; shift: boolean; alt: boolean } | null>(null);
   const andando = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [arrastandoMao, setArrastandoMao] = useState(false);
   const ancora = useRef<{ fx: number; fy: number; px: number; py: number } | null>(null);
@@ -338,6 +347,12 @@ export function PreviaDaImagem({
       camadas.flatMap((camada) => {
         if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada))] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        if (camada.clipe.vetor) {
+          // A forma desenhada no tamanho da tela, para ficar nítida em qualquer zoom
+          const { caixa, recorte } = camada;
+          const fonte = vetorNoTamanho(camada.clipe.id, camada.clipe.vetor, (caixa.largura * densidade) / recorte.largura, (caixa.altura * densidade) / recorte.altura);
+          return [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada))] as const];
+        }
         if (camada.clipe.pixels) {
           const endereco = versaoDosPixels(camada.clipe);
           const pixels = fonteDosPixels?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
@@ -422,7 +437,7 @@ export function PreviaDaImagem({
     }
     if (FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada") {
       evento.currentTarget.setPointerCapture(evento.pointerId);
-      setDesenho({ inicio: ponto, fim: ponto });
+      setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
     }
     if (MODO_DA_SELECAO[ferramenta]) {
@@ -446,7 +461,7 @@ export function PreviaDaImagem({
       areaRef.current.scrollTop = andando.current.top - (evento.clientY - andando.current.y);
       return;
     }
-    if (desenho) setDesenho({ ...desenho, fim: noQuadro(evento) });
+    if (desenho) setDesenho({ ...desenho, fim: noQuadro(evento), shift: evento.shiftKey, alt: evento.altKey });
   }
 
   function aoSoltar() {
@@ -454,19 +469,22 @@ export function PreviaDaImagem({
     setArrastandoMao(false);
     if (!desenho) return;
     setDesenho(null);
-    const x = Math.min(desenho.inicio.x, desenho.fim.x) / escala;
-    const y = Math.min(desenho.inicio.y, desenho.fim.y) / escala;
-    const largura = Math.abs(desenho.fim.x - desenho.inicio.x) / escala;
-    const altura = Math.abs(desenho.fim.y - desenho.inicio.y) / escala;
-    // Um clique sem arrastar desenha uma forma de um quarto do lado menor da imagem, no ponto
-    const lado = Math.min(imagem.largura, imagem.altura) / 4;
-    aoDesenharForma?.(largura < 4 && altura < 4 ? { x: x - lado / 2, y: y - lado / 2, largura: lado, altura: lado } : { x, y, largura: Math.max(1, largura), altura: Math.max(1, altura) });
+    const arrasto = arrastoNaImagem(desenho);
+    // Um clique sem arrastar: quem desenha pergunta as medidas, com o ponto
+    const clique = Math.hypot(desenho.fim.x - desenho.inicio.x, desenho.fim.y - desenho.inicio.y) < 4;
+    aoDesenharForma?.(clique ? arrastoDaForma(arrasto.de, arrasto.de) : arrasto, clique);
+  }
+  function arrastoNaImagem(atual: NonNullable<typeof desenho>) {
+    const naImagem = (p: { x: number; y: number }) => ({ x: p.x / escala, y: p.y / escala });
+    return arrastoDaForma(naImagem(atual.inicio), naImagem(atual.fim), { proporcional: atual.shift, doMeio: atual.alt, linha: ferramenta === "linha" });
   }
 
   const ajustada = zoom === null;
   const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
-  const retanguloDoDesenho = desenho
+  const arrastoDoDesenho = desenho ? arrastoNaImagem(desenho) : null;
+  const caminhoDoDesenho = arrastoDoDesenho ? (caminhoDoArrasto?.(arrastoDoDesenho) ?? null) : null;
+  const retanguloDoDesenho = desenho && !caminhoDoDesenho
     ? {
         left: Math.min(desenho.inicio.x, desenho.fim.x),
         top: Math.min(desenho.inicio.y, desenho.fim.y),
@@ -731,6 +749,14 @@ export function PreviaDaImagem({
               />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}
+            {caminhoDoDesenho ? (
+              <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+                <g transform={`scale(${escala})`}>
+                  <path d={svgDosCaminhos(caminhoDoDesenho)} fill="none" stroke="#000000" strokeOpacity={0.6} strokeWidth={3} vectorEffect="non-scaling-stroke" />
+                  <path d={svgDosCaminhos(caminhoDoDesenho)} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                </g>
+              </svg>
+            ) : null}
             {camadas.length === 0 ? (
               <p className="pointer-events-none absolute inset-0 flex items-center justify-center p-[10%] text-center text-xs text-black/50 mix-blend-difference">
                 Ponha uma imagem pelo painel Biblioteca, ou use as ferramentas Texto e Forma.

@@ -27,9 +27,10 @@ const MODOS_DA_TRANSFORMACAO: { id: ModoDaTransformacao; nome: string }[] = [
   { id: "deformar", nome: "Deformar" },
 ];
 import type { FerramentaObjeto } from "./useObjeto";
+import type { OpcoesDasFormas } from "@/lib/vetor/arrasto";
 
-/** As opções da ferramenta Forma (a cor de preenchimento é a de primeiro plano). */
-export type OpcoesDaForma = { tracoCor: string; traco: number; arredondado: boolean; personalizada: "seta" | "balao" | "coracao" };
+/** As opções das ferramentas de forma (lib/vetor/arrasto.ts) e a forma da Forma personalizada. */
+export type OpcoesDaForma = OpcoesDasFormas & { personalizada: "seta" | "balao" | "coracao" };
 
 type Props = {
   ferramenta: IdFerramentaDaImagem;
@@ -607,23 +608,6 @@ export function BarraDeOpcoes(props: Props) {
           Preenchimento:
           <span className="size-5 rounded border border-white/40" style={{ background: props.primeiroPlano }} title="A cor de primeiro plano" />
         </span>
-        <label className="flex items-center gap-1 text-suave">
-          Traçado:
-          <input type="color" value={props.forma.tracoCor} onChange={(evento) => props.aoMudarForma({ tracoCor: evento.currentTarget.value })} className="h-5 w-8 cursor-pointer rounded border border-borda" aria-label="Cor do traçado" />
-          <select aria-label="Espessura do traçado" className={campo} value={props.forma.traco} onChange={(evento) => props.aoMudarForma({ traco: Number(evento.currentTarget.value) })}>
-            {[0, 0.01, 0.02, 0.04, 0.06].map((valor) => (
-              <option key={valor} value={valor}>
-                {valor === 0 ? "Sem traçado" : `${Math.round(valor * 100)}%`}
-              </option>
-            ))}
-          </select>
-        </label>
-        {ferramenta === "retangulo" ? (
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={props.forma.arredondado} onChange={(evento) => props.aoMudarForma({ arredondado: evento.currentTarget.checked })} />
-            Cantos arredondados
-          </label>
-        ) : null}
         {ferramenta === "formaPersonalizada" ? (
           <label className="flex items-center gap-1 text-suave">
             Forma:

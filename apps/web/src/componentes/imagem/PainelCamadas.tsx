@@ -13,6 +13,8 @@ import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
+import { svgDosCaminhos } from "@/lib/vetor/contorno";
+import type { CamadaVetorial, TintaDaForma } from "@/lib/vetor/modelo";
 
 type Props = {
   projeto: Projeto;
@@ -53,7 +55,19 @@ export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, f
   if (clipe.pasta) return "Grupo";
   if (clipe.texto) return clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto";
   if (clipe.ajuste) return "Camada de ajuste";
+  if (clipe.vetor) return "Forma";
   return (clipe.midia_id ? midias.get(clipe.midia_id)?.nome : undefined) ?? "Imagem";
+}
+
+/** A miniatura da forma: o caminho no tamanho da caixa, com a cor do preenchimento (ou do traço) quando é uma cor. */
+function MiniaturaDoVetor({ vetor }: { vetor: CamadaVetorial }) {
+  const cor = (tinta: TintaDaForma) => (tinta.tipo === "cor" ? tinta.cor : tinta.tipo === "nenhuma" ? "none" : "#9aa0aa");
+  const traco = vetor.traco ? cor(vetor.traco.tinta) : "none";
+  return (
+    <svg viewBox={`0 0 ${vetor.caixa.largura} ${vetor.caixa.altura}`} className="size-full" style={{ background: "repeating-conic-gradient(#c8cad0 0% 25%, #ffffff 0% 50%) 50% / 8px 8px" }} aria-hidden>
+      <path d={svgDosCaminhos(vetor.subcaminhos)} fill={cor(vetor.preenchimento)} fillRule="evenodd" stroke={traco} strokeWidth={vetor.traco?.largura ?? 0} />
+    </svg>
+  );
 }
 
 /** O tipo da camada, para o filtro do painel. */
@@ -96,7 +110,7 @@ function tipoDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>): TipoDaC
   if (clipe.pasta) return "grupo";
   if (clipe.texto) return "texto";
   if (clipe.ajuste) return "ajuste";
-  return clipe.midia_id && midias.get(clipe.midia_id)?.elemento ? "forma" : "imagem";
+  return clipe.vetor || (clipe.midia_id && midias.get(clipe.midia_id)?.elemento) ? "forma" : "imagem";
 }
 
 /** As travas parciais, na ordem dos editores de imagem (a de tudo vem depois, pelo `travada` da faixa). */
@@ -608,6 +622,8 @@ export function PainelCamadas({
                       <Type className="size-3.5 text-suave" aria-hidden />
                     ) : clipe.ajuste ? (
                       <SlidersHorizontal className="size-3.5 text-suave" aria-hidden />
+                    ) : clipe.vetor ? (
+                      <MiniaturaDoVetor vetor={clipe.vetor} />
                     ) : midia?.elemento ? (
                       <Shapes className="size-3.5 text-suave" aria-hidden />
                     ) : midia ? (
