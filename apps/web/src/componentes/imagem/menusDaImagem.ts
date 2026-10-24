@@ -168,6 +168,8 @@ export type AcoesDosMenus = {
   alternarUltimoEstado: () => void;
   ferramenta: (id: IdFerramentaDaImagem) => void;
   ajuste: (ajuste: Ajuste) => void;
+  /** Camada › Nova camada de preenchimento, Opções do conteúdo e Alterar o conteúdo (da escolhida, se for uma). */
+  preenchimento: { escolhido: boolean; nova: (tipo: "cor" | "degrade" | "padrao") => void; editar: (tipo?: "cor" | "degrade" | "padrao") => void };
   documento: () => void;
   painel: (painel: IdPainelDaImagem) => void;
   alternarPainel: (painel: IdPainelDaImagem) => void;
@@ -418,7 +420,25 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: semCamada || !a.temSelecaoDoDocumento, aoEscolher: () => a.camadaVia(true) },
           ],
         },
+        {
+          nome: "Nova camada de preenchimento",
+          itens: [
+            { nome: "Cor sólida…", aoEscolher: () => a.preenchimento.nova("cor") },
+            { nome: "Degradê…", aoEscolher: () => a.preenchimento.nova("degrade") },
+            { nome: "Padrão…", aoEscolher: () => a.preenchimento.nova("padrao") },
+          ],
+        },
         { nome: "Nova camada de ajuste", itens: AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => a.ajuste(ajuste) })) },
+        { nome: "Opções do conteúdo da camada…", desativado: !a.preenchimento.escolhido, aoEscolher: () => a.preenchimento.editar() },
+        {
+          nome: "Alterar o conteúdo da camada",
+          desativado: !a.preenchimento.escolhido,
+          itens: [
+            { nome: "Cor sólida…", aoEscolher: () => a.preenchimento.editar("cor") },
+            { nome: "Degradê…", aoEscolher: () => a.preenchimento.editar("degrade") },
+            { nome: "Padrão…", aoEscolher: () => a.preenchimento.editar("padrao") },
+          ],
+        },
         { nome: a.quantas > 1 ? "Duplicar camadas" : "Duplicar camada", desativado: semCamada, aoEscolher: a.duplicar },
         {
           nome: "Excluir",

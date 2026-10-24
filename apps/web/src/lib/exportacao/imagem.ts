@@ -10,6 +10,7 @@ import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
 import { vetorNoTamanho } from "../vetor/desenhar";
+import { preenchimentoNoTamanho } from "../imagem/desenharPreenchimento";
 import { mascaraFinal } from "../previa/mascaraCombinada";
 import { textoNoTamanho } from "../texto/desenhar";
 import { esperarFontes } from "../texto/fontes";
@@ -85,6 +86,10 @@ export async function exportarImagem(
     camadas.map(async (camada) => {
       if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe), documentoDaCamada(projeto))] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
+      if (camada.clipe.camada_de_preenchimento) {
+        const fonte = preenchimentoNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.camada_de_preenchimento, tamanho.largura, tamanho.altura, escala);
+        return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe), documentoDaCamada(projeto))] as const;
+      }
       if (camada.clipe.texto_rico) {
         const { caixa, recorte } = camada;
         const fonte = textoNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.texto_rico, caixa.largura / recorte.largura, caixa.altura / recorte.altura);

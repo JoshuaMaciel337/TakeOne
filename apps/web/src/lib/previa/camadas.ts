@@ -312,6 +312,11 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
       camadas.push(camadaDeAjuste(clipe, faixa, 0, quadro));
       continue;
     }
+    if (clipe.camada_de_preenchimento) {
+      // Cobre o quadro como a de ajuste; quem desenha pede o preenchimento no tamanho da tela
+      camadas.push({ ...camadaDeAjuste(clipe, faixa, 0, quadro), chave: `preenchimento:${clipe.id}` });
+      continue;
+    }
     const comum = { clipe, faixa, recorte: clipe.recorte, ...corDoClipe(clipe), desvio: desvioDeCor(clipe.efeito, 0), segundos: 0 };
     if (clipe.texto) {
       const imagem = imagensDeTexto.get(clipe.id);

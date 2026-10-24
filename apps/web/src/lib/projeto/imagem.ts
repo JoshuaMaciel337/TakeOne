@@ -14,6 +14,7 @@ import type { Texto } from "./texto.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
 import { type EstiloDeCamada, estiloFazAlgo, type LuzGlobal } from "../imagem/estiloDeCamada.ts";
+import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -472,6 +473,20 @@ export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?:
   return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
 }
 
+/** Camada › Nova camada de preenchimento: uma cor, um degradê ou um padrão cobrindo o documento, acima da escolhida. */
+export function adicionarCamadaDePreenchimento(projeto: Projeto, ctx: Contexto, preenchimento: CamadaDePreenchimento, acima?: string | null): { projeto: Projeto; clipeId: string } {
+  const clipe = clipeDaCamada(ctx.novoId(), { camada_de_preenchimento: preenchimento });
+  return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
+}
+
+/** Muda a tinta (ou as alças do degradê) de uma camada de preenchimento. */
+export function mudarCamadaDePreenchimento(projeto: Projeto, clipeId: string, preenchimento: CamadaDePreenchimento): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (!clipe.camada_de_preenchimento) throw new ErroEdicao("Essa camada não é de preenchimento.");
+    return { ...clipe, camada_de_preenchimento: preenchimento };
+  });
+}
+
 /** `transformacao`: onde o texto entra (o clique da ferramenta Texto), no lugar do meio. */
 export function adicionarCamadaDeTexto(projeto: Projeto, ctx: Contexto, texto: Texto, transformacao?: Partial<Transformacao>, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { texto });
@@ -892,6 +907,12 @@ export function recortarImagem(projeto: Projeto, retangulo: RetanguloDaImagem, t
     const clipes = faixa.clipes.map((clipe) => {
       // A camada de ajuste cobre o quadro, qualquer que seja ele
       if (clipe.ajuste) return clipe;
+      // A de preenchimento também; as alças do degradê ficam no mesmo lugar em pixels
+      const preenchimento = clipe.camada_de_preenchimento;
+      if (preenchimento) {
+        const noNovo = (p: { x: number; y: number }) => ({ x: (p.x * antes.largura - retangulo.x) / depois.largura, y: (p.y * antes.altura - retangulo.y) / depois.altura });
+        return preenchimento.de && preenchimento.ate ? { ...clipe, camada_de_preenchimento: { ...preenchimento, de: noNovo(preenchimento.de), ate: noNovo(preenchimento.ate) } } : clipe;
+      }
       const t = clipe.transformacao;
       const cx = antes.largura / 2 + t.x * antes.largura - retangulo.x;
       const cy = antes.altura / 2 + t.y * antes.altura - retangulo.y;
@@ -1085,7 +1106,7 @@ export function girarImagem(projeto: Projeto, giro: GiroDaImagem, tamanhos: Reco
   const faixas = projeto.faixas.map((faixa) => {
     if (faixa.tipo === "principal") return faixa;
     const clipes = faixa.clipes.map((clipe) => {
-      if (clipe.ajuste) return clipe;
+      if (clipe.ajuste || clipe.camada_de_preenchimento) return clipe;
       const t = clipe.transformacao;
       // O centro da camada a partir do meio do quadro, em pixels
       const dx = t.x * antes.largura;

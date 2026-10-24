@@ -15,12 +15,18 @@ export function PontoNaPrevia({
   documento,
   aoClicar,
   aoArrastar,
+  aoArrastando,
+  alcas,
 }: {
   modo: "clique" | "arrasto";
   quadro: Tamanho;
   documento: Tamanho;
   aoClicar?: (ponto: Ponto, teclas: { shift: boolean; alt: boolean }) => void;
   aoArrastar?: (de: Ponto, ate: Ponto) => void;
+  /** A cada movimento do arrasto (o degradê da camada de preenchimento muda ao vivo). */
+  aoArrastando?: (de: Ponto, ate: Ponto) => void;
+  /** A linha que já existe (as alças do degradê da camada de preenchimento), em pixels do documento. */
+  alcas?: { de: Ponto; ate: Ponto } | null;
 }) {
   const escala = documento.largura / Math.max(1, quadro.largura);
   const [arrasto, setArrasto] = useState<{ de: Ponto; ate: Ponto } | null>(null);
@@ -53,7 +59,9 @@ export function PontoNaPrevia({
       }}
       onPointerMove={(evento) => {
         if (!arrasto) return;
-        setArrasto({ ...arrasto, ate: preso(arrasto.de, paraDocumento(evento, evento.currentTarget), evento.shiftKey) });
+        const ate = preso(arrasto.de, paraDocumento(evento, evento.currentTarget), evento.shiftKey);
+        setArrasto({ ...arrasto, ate });
+        if (Math.hypot(ate.x - arrasto.de.x, ate.y - arrasto.de.y) >= 1) aoArrastando?.(arrasto.de, ate);
       }}
       onPointerUp={(evento) => {
         if (!arrasto) return;
@@ -62,14 +70,17 @@ export function PontoNaPrevia({
         if (Math.hypot(ate.x - arrasto.de.x, ate.y - arrasto.de.y) >= 1) aoArrastar?.(arrasto.de, ate);
       }}
     >
-      {arrasto ? (
-        <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
-          <line x1={arrasto.de.x / escala} y1={arrasto.de.y / escala} x2={arrasto.ate.x / escala} y2={arrasto.ate.y / escala} stroke="#000" strokeWidth={3} strokeOpacity={0.5} />
-          <line x1={arrasto.de.x / escala} y1={arrasto.de.y / escala} x2={arrasto.ate.x / escala} y2={arrasto.ate.y / escala} stroke="#fff" strokeWidth={1} />
-          <circle cx={arrasto.de.x / escala} cy={arrasto.de.y / escala} r={3} fill="#fff" stroke="#000" />
-          <circle cx={arrasto.ate.x / escala} cy={arrasto.ate.y / escala} r={3} fill="#fff" stroke="#000" />
-        </svg>
-      ) : null}
+      {(() => {
+        const linha = arrasto ?? alcas;
+        return linha ? (
+          <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+            <line x1={linha.de.x / escala} y1={linha.de.y / escala} x2={linha.ate.x / escala} y2={linha.ate.y / escala} stroke="#000" strokeWidth={3} strokeOpacity={0.5} />
+            <line x1={linha.de.x / escala} y1={linha.de.y / escala} x2={linha.ate.x / escala} y2={linha.ate.y / escala} stroke="#fff" strokeWidth={1} />
+            <circle cx={linha.de.x / escala} cy={linha.de.y / escala} r={3} fill="#fff" stroke="#000" />
+            <circle cx={linha.ate.x / escala} cy={linha.ate.y / escala} r={3} fill="#fff" stroke="#000" />
+          </svg>
+        ) : null;
+      })()}
     </div>
   );
 }

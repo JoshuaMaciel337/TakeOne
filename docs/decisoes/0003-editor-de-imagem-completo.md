@@ -221,7 +221,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Vários efeitos do mesmo tipo; contornos personalizados
 - [x] Luz global; Copiar, Colar e Limpar estilo; Ocultar todos os efeitos; Dimensionar efeitos; Criar camadas a partir dos efeitos
 - [x] Painel Estilos com predefinições
-- [ ] Camadas de preenchimento: cor sólida, degradê (com as opções do degradê e as alças na tela: o degradê ao vivo da 13.5) e padrão
+- [x] Camadas de preenchimento: cor sólida, degradê (com as opções do degradê e as alças na tela: o degradê ao vivo da 13.5) e padrão
 
 ### Onda 13.10 — Ajustes
 

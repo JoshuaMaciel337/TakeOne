@@ -558,7 +558,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 13.6 Transformação e geometria (transformação livre completa, marionete, perspectiva, tamanho da imagem e da tela, dissolver).
   - [x] 13.7 Vetores, formas, quadros e pranchetas (caneta, caminhos, formas vivas, máscara vetorial).
   - [x] 13.8 Texto (no navegador, parágrafo, vertical, caractere e parágrafo completos, deformar, fontes).
-  - [ ] 13.9 Estilos de camada e preenchimentos (os dez estilos, mesclar se, camadas de preenchimento).
+  - [x] 13.9 Estilos de camada e preenchimentos (os dez estilos, mesclar se, camadas de preenchimento).
   - [ ] 13.10 Ajustes (as 16 camadas de ajuste, os clássicos, os automáticos, histograma).
   - [ ] 13.11 Filtros (filtros inteligentes, a galeria com 47, todos os menus de filtro).
   - [ ] 13.12 IA (preenchimento e expansão generativos, céu, filtros neurais).

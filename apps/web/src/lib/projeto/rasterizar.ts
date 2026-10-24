@@ -230,7 +230,7 @@ export function planoDosPixels(
       // transformada: a camada desenhada sozinha, sem o estilo, que continua editável na camada nova
       if (escolhidas.length !== 1) throw new ErroEdicao("Escolha uma camada para transformar.");
       const clipe = primeira.clipes[0];
-      if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Grupos e camadas de ajuste não se transformam assim.");
+      if (clipe.pasta || clipe.ajuste || clipe.camada_de_preenchimento) throw new ErroEdicao("Grupos, camadas de ajuste e de preenchimento não se transformam assim.");
       if (clipe.mascara_pixels || clipe.mascara_vetorial) throw new ErroEdicao("Aplique ou exclua a máscara da camada antes de distorcer.");
       const manter = propriedadesDe(primeira, true);
       const fator = alturaDaCaixa(primeira) ?? 1;

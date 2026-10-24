@@ -100,6 +100,7 @@ import {
 import type { Animacoes } from "./animacao.ts";
 import {
   adicionarCamadaDeAjuste,
+  adicionarCamadaDePreenchimento,
   adicionarCamadaDeMidia,
   adicionarCamadaDeTexto,
   agruparCamadas,
@@ -148,6 +149,7 @@ import {
   pranchetaDoGrupo,
   adicionarTextoRico,
   mudarTextoRico,
+  mudarCamadaDePreenchimento,
   textoEmForma,
   mudarTextosRicos,
   definirEstiloDeCamada,
@@ -155,6 +157,7 @@ import {
   dimensionarEfeitos,
 } from "./imagem.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
+import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -188,6 +191,8 @@ export type Comando =
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
   | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null } }
+  | { comando: "imagem.adicionarPreenchimento"; parametros: { preenchimento: CamadaDePreenchimento; acima?: string | null } }
+  | { comando: "imagem.preenchimento"; parametros: { clipeId: string; preenchimento: CamadaDePreenchimento } }
   | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
   | { comando: "linha.dividir"; parametros: { tempo: Tick; clipeIds: string[] } }
   | { comando: "clipe.apagar"; parametros: { clipeIds: string[]; fecharEspaco?: boolean } }
@@ -327,6 +332,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.deslizar": "deslizar o conteúdo",
   "clipe.adicionarAjuste": "pôr a camada de ajuste",
   "imagem.adicionarAjuste": "pôr a camada de ajuste",
+  "imagem.adicionarPreenchimento": "pôr a camada de preenchimento",
+  "imagem.preenchimento": "mudar o preenchimento",
   "clipe.moverCorte": "mover o corte",
   "linha.dividir": "dividir",
   "clipe.apagar": "apagar",
@@ -505,6 +512,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.adicionarPreenchimento": {
+      const resultado = adicionarCamadaDePreenchimento(projeto, ctx, parametros.preenchimento, parametros.acima);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.preenchimento":
+      return { projeto: mudarCamadaDePreenchimento(projeto, parametros.clipeId, parametros.preenchimento) };
     case "clipe.deslizar":
       return { projeto: deslizarConteudo(projeto, ctx, parametros.clipeId, parametros.deslocamento) };
     case "clipe.moverCorte":

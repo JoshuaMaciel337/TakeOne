@@ -2,6 +2,7 @@
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Contorno, Sombra } from "./silhueta.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
+import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -294,6 +295,8 @@ export type Clipe = {
   vetor?: CamadaVetorial | null;
   /** Só no projeto de imagem: o estilo de camada (lib/imagem/estiloDeCamada.ts), no lugar do contorno e da sombra. */
   estilo_camada?: EstiloDeCamada | null;
+  /** Só no projeto de imagem: a camada de preenchimento (cor, degradê ou padrão cobrindo o documento), sem mídia. */
+  camada_de_preenchimento?: CamadaDePreenchimento | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

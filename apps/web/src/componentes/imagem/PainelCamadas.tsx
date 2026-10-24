@@ -18,6 +18,8 @@ import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import type { CamadaVetorial, TintaDaForma } from "@/lib/vetor/modelo";
 import type { MascaraVetorial } from "@/lib/vetor/mascaraVetorial";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
+import { NOMES_DO_PREENCHIMENTO } from "@/lib/imagem/camadaDePreenchimento";
+import { AmostraDaTinta } from "./OpcoesDaForma";
 
 type Props = {
   projeto: Projeto;
@@ -28,6 +30,9 @@ type Props = {
   aoExecutar: (comando: Comando) => void;
   /** Uma camada de ajuste nova, do tipo escolhido no botão de ajuste. */
   aoCriarAjuste: (ajuste: Ajuste) => void;
+  /** Uma camada de preenchimento nova (cor sólida, degradê ou padrão), e a janela dela com o clique duplo na miniatura. */
+  aoCriarPreenchimento?: (tipo: "cor" | "degrade" | "padrao") => void;
+  aoEditarPreenchimento?: (clipeId: string) => void;
   /** Um estilo de camada novo: abre o painel Propriedades na parte dele. */
   aoAbrirPropriedades: () => void;
   /** A janela Estilo de camada da escolhida, aberta num efeito (ou nas opções de mesclagem). */
@@ -64,6 +69,7 @@ export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, f
   if (clipe.pasta) return "Grupo";
   if (clipe.texto) return clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto";
   if (clipe.ajuste) return "Camada de ajuste";
+  if (clipe.camada_de_preenchimento) return NOMES_DO_PREENCHIMENTO[clipe.camada_de_preenchimento.tinta.tipo];
   if (clipe.vetor) return "Forma";
   if (clipe.texto_rico) return clipe.texto_rico.paragrafos.map((paragrafo) => paragrafo.trechos.map((trecho) => trecho.texto).join("")).join(" ").replace(/\s+/g, " ").trim() || "Texto";
   return (clipe.midia_id ? midias.get(clipe.midia_id)?.nome : undefined) ?? "Imagem";
@@ -130,7 +136,7 @@ const FILTROS: { grupo: string; itens: { id: string; nome: string }[] }[] = [
 function tipoDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>): TipoDaCamada {
   if (clipe.pasta) return "grupo";
   if (clipe.texto || clipe.texto_rico) return "texto";
-  if (clipe.ajuste) return "ajuste";
+  if (clipe.ajuste || clipe.camada_de_preenchimento) return "ajuste";
   return clipe.vetor || (clipe.midia_id && midias.get(clipe.midia_id)?.elemento) ? "forma" : "imagem";
 }
 
@@ -248,6 +254,8 @@ export function PainelCamadas({
   aoSelecionar,
   aoExecutar,
   aoCriarAjuste,
+  aoCriarPreenchimento,
+  aoEditarPreenchimento,
   aoAbrirPropriedades,
   aoAbrirEstilo,
   aoNovaCamada,
@@ -622,6 +630,12 @@ export function PainelCamadas({
                   <span
                     className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-borda bg-painel-3"
                     title={clipe.pasta ? undefined : "Ctrl + clique: seleciona pela transparência da camada (Shift soma, Alt subtrai)"}
+                    onDoubleClick={(evento) => {
+                      // O clique duplo na miniatura do preenchimento abre a janela dele (no nome, renomeia)
+                      if (!clipe.camada_de_preenchimento || !aoEditarPreenchimento) return;
+                      evento.stopPropagation();
+                      aoEditarPreenchimento(clipe.id);
+                    }}
                     onClick={(evento) => {
                       if (!(evento.ctrlKey || evento.metaKey) || clipe.pasta || !aoSelecionarDaCamada) return;
                       evento.stopPropagation();
@@ -649,6 +663,10 @@ export function PainelCamadas({
                       <Type className="size-3.5 text-suave" aria-hidden />
                     ) : clipe.ajuste ? (
                       <SlidersHorizontal className="size-3.5 text-suave" aria-hidden />
+                    ) : clipe.camada_de_preenchimento ? (
+                      <span title="Clique duplo: muda o preenchimento" className="block size-full">
+                        <AmostraDaTinta tinta={clipe.camada_de_preenchimento.tinta} className="size-full" />
+                      </span>
                     ) : clipe.vetor ? (
                       <MiniaturaDoVetor vetor={clipe.vetor} />
                     ) : midia?.elemento ? (
@@ -834,9 +852,19 @@ export function PainelCamadas({
           <SquareDashed className="size-3.5" aria-hidden />
         </button>
         <BotaoComLista
-          titulo="Criar uma camada de ajuste"
+          titulo="Criar uma camada de preenchimento ou de ajuste"
           rotulo={<SlidersHorizontal className="size-3.5" aria-hidden />}
-          itens={AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => aoCriarAjuste(ajuste) }))}
+          itens={[
+            ...(aoCriarPreenchimento
+              ? ([
+                  { nome: "Cor sólida…", aoEscolher: () => aoCriarPreenchimento("cor") },
+                  { nome: "Degradê…", aoEscolher: () => aoCriarPreenchimento("degrade") },
+                  { nome: "Padrão…", aoEscolher: () => aoCriarPreenchimento("padrao") },
+                  "-",
+                ] as Item[])
+              : []),
+            ...AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, aoEscolher: () => aoCriarAjuste(ajuste) })),
+          ]}
         />
         <button type="button" className="botao-icone size-6" title="Criar uma camada (Ctrl+Shift+N)" aria-label="Criar uma camada" onClick={aoNovaCamada}>
           <SquarePlus className="size-3.5" aria-hidden />

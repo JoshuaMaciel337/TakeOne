@@ -110,6 +110,8 @@ import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
 import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
 import { PainelEstilosDeCamada } from "./PainelEstilosDeCamada";
 import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
+import { JanelaCamadaDePreenchimento, preenchimentoNovo } from "./JanelaCamadaDePreenchimento";
+import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
@@ -444,6 +446,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoEstilo, setJanelaDoEstilo] = useState<"luz" | "dimensionar" | null>(null);
   // Texto › Deformar texto: a deformação de antes (para o Cancelar) enquanto a janela está aberta
   const [deformando, setDeformando] = useState<{ clipeId: string; antes: Deformacao | null } | null>(null);
+  /** A janela da camada de preenchimento: a nova (sem clipe, acima da escolhida) ou a de uma que já existe. */
+  const [preenchendo, setPreenchendo] = useState<{ clipeId: string | null; acima: string | null; inicial: CamadaDePreenchimento } | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
   const pendentes = useRef(new Map<string, Pendente>());
@@ -1008,6 +1012,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       { criar: true },
     );
   };
+  /**
+   * Com uma camada de preenchimento de degradê escolhida, a ferramenta Degradê leva o começo e o fim dela (ao vivo),
+   * em vez de pintar: a linha atual aparece na tela.
+   */
+  const degradeDoPreenchimento = (() => {
+    const clipe = selecionado?.clipe;
+    const preenchimento = clipe?.camada_de_preenchimento;
+    if (!clipe || !preenchimento || preenchimento.tinta.tipo !== "degrade" || !projeto) return null;
+    const documento = tamanhoDaImagem(projeto);
+    const { de, ate } = alcasDoDegrade(preenchimento, documento);
+    const noDocumento = (p: { x: number; y: number }) => ({ x: p.x * documento.largura, y: p.y * documento.altura });
+    const fracao = (p: { x: number; y: number }) => ({ x: p.x / documento.largura, y: p.y / documento.altura });
+    return {
+      alcas: { de: noDocumento(de), ate: noDocumento(ate) },
+      comando: (novoDe: { x: number; y: number }, novoAte: { x: number; y: number }): Comando => ({
+        comando: "imagem.preenchimento",
+        parametros: { clipeId: clipe.id, preenchimento: { ...preenchimento, de: fracao(novoDe), ate: fracao(novoAte) } },
+      }),
+    };
+  })();
   /** Salva o degradê no espaço (painel Degradês). */
   const salvarDegrade = (degrade: Degrade) => {
     criarRecurso({ tipo: "degrade", nome: degrade.nome || "Degradê", dados: degrade })
@@ -1624,7 +1648,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       await pinturas.esperar();
       const trocas: (Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number })[] = [];
       for (const { clipe, faixa } of camadasDaImagem(atual)) {
-        if (clipe.pasta || clipe.ajuste) continue;
+        if (clipe.pasta || clipe.ajuste || clipe.camada_de_preenchimento) continue;
         let plano: PlanoDosPixels;
         try {
           plano = planoDosPixels(atual, clipe.mascara_pixels ? "aplicarMascara" : "transformar", [faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
@@ -1718,7 +1742,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const saida: { faixa: Faixa; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> }[] = [];
     // De baixo para cima, como na pilha
     for (const { faixa, clipe } of [...camadasDaImagem(atual)].reverse()) {
-      if (!faixaIds.includes(faixa.id) || clipe.pasta || clipe.ajuste) continue;
+      if (!faixaIds.includes(faixa.id) || clipe.pasta || clipe.ajuste || clipe.camada_de_preenchimento) continue;
       let plano: PlanoDosPixels;
       try {
         plano = planoDosPixels(atual, clipe.mascara_pixels ? "aplicarMascara" : "transformar", [faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
@@ -1994,6 +2018,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     usarSelecaoRef.current = usarSelecao;
   });
 
+  // ——— As camadas de preenchimento ———
+  const novoPreenchimento = (tipo: CamadaDePreenchimento["tinta"]["tipo"]) => {
+    terminarTexto();
+    setPreenchendo({ clipeId: null, acima: selecionado?.faixa.id ?? null, inicial: preenchimentoNovo(tipo, cores.primeiroPlano, cores.fundo) });
+  };
+  /** A janela de uma camada de preenchimento; com outro tipo, é o "Alterar o conteúdo da camada". */
+  const editarPreenchimento = (clipeId: string, tipo?: CamadaDePreenchimento["tinta"]["tipo"]) => {
+    const atual = projeto ? acharClipe(projeto, clipeId)?.clipe.camada_de_preenchimento : null;
+    if (!atual) return;
+    setPreenchendo({ clipeId, acima: null, inicial: tipo && tipo !== atual.tinta.tipo ? preenchimentoNovo(tipo, cores.primeiroPlano, cores.fundo) : atual });
+  };
+  const comandoDoPreenchimento = useCallback(
+    (preenchimento: CamadaDePreenchimento): Comando | null =>
+      !preenchendo
+        ? null
+        : preenchendo.clipeId
+          ? { comando: "imagem.preenchimento", parametros: { clipeId: preenchendo.clipeId, preenchimento } }
+          : { comando: "imagem.adicionarPreenchimento", parametros: { preenchimento, acima: preenchendo.acima } },
+    [preenchendo],
+  );
+  const preverPreenchimento = useCallback((preenchimento: CamadaDePreenchimento) => setProvisorio(comandoDoPreenchimento(preenchimento)), [comandoDoPreenchimento]);
   const criarAjuste = (ajuste: Ajuste) => {
     const resultado = executar({ comando: "imagem.adicionarAjuste", parametros: {} });
     const id = resultado?.selecao?.[0];
@@ -3412,7 +3457,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     let x1 = antes.largura;
     let y1 = antes.altura;
     for (const { clipe } of camadasDaImagem(atual)) {
-      if (clipe.ajuste || clipe.pasta) continue;
+      if (clipe.ajuste || clipe.pasta || clipe.camada_de_preenchimento) continue;
       const medida = caixasRef.current.get(clipe.id);
       if (!medida?.bruta || !medida.quadro) continue;
       const k = antes.largura / medida.quadro.largura;
@@ -3753,6 +3798,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     ferramenta: escolherFerramenta,
     ajuste: criarAjuste,
+    preenchimento: {
+      escolhido: Boolean(escolhidoNaTela?.clipe.camada_de_preenchimento),
+      nova: novoPreenchimento,
+      editar: (tipo) => escolhidoNaTela && editarPreenchimento(escolhidoNaTela.clipe.id, tipo),
+    },
     documento: () => {
       setSelecao([]);
       area.abrir("propriedades");
@@ -4262,7 +4312,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoAbrirEstilo={abrirEstiloDeCamada} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoCriarPreenchimento={novoPreenchimento} aoEditarPreenchimento={(clipeId) => editarPreenchimento(clipeId)} aoAbrirPropriedades={() => abrirAba("basico")} aoAbrirEstilo={abrirEstiloDeCamada} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
             setMascaraVetorialEmFoco(clipeId);
             if (clipeId) {
               setMascaraEmFoco(null);
@@ -4713,7 +4763,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             ponto={
               FERRAMENTAS_DE_PONTO.has(ferramenta)
                 ? ferramenta === "degrade"
-                  ? { modo: "arrasto", aoArrastar: aplicarDegrade }
+                  ? degradeDoPreenchimento
+                    ? {
+                        modo: "arrasto",
+                        alcas: degradeDoPreenchimento.alcas,
+                        aoArrastando: (de, ate) => setProvisorio(degradeDoPreenchimento.comando(de, ate)),
+                        aoArrastar: (de, ate) => {
+                          setProvisorio(null);
+                          executar(degradeDoPreenchimento.comando(de, ate));
+                        },
+                      }
+                    : { modo: "arrasto", aoArrastar: aplicarDegrade }
                   : { modo: "clique", aoClicar: (p) => (ferramenta === "balde" ? usarBalde(p) : usarBorrachaMagica(p)) }
                 : null
             }
@@ -4916,6 +4976,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoCancelar={() => {
             setProvisorio(null);
             setEstiloAberto(null);
+          }}
+        />
+      ) : null}
+      {preenchendo ? (
+        <JanelaCamadaDePreenchimento
+          key={`${preenchendo.clipeId}:${preenchendo.inicial.tinta.tipo}`}
+          inicial={preenchendo.inicial}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          degradesDoEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+          aoPrever={preverPreenchimento}
+          aoConfirmar={(preenchimento) => {
+            const comando = comandoDoPreenchimento(preenchimento);
+            setProvisorio(null);
+            setPreenchendo(null);
+            if (comando) executar(comando);
+          }}
+          aoCancelar={() => {
+            setProvisorio(null);
+            setPreenchendo(null);
           }}
         />
       ) : null}

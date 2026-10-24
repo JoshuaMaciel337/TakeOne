@@ -17,6 +17,7 @@ import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
+import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { textoNoTamanho } from "@/lib/texto/desenhar";
 import { useVersaoDasFontes } from "@/lib/texto/fontes";
@@ -175,7 +176,7 @@ type Props = {
   /** O ponto da fonte de clonagem (pixels do documento), marcado com uma cruz. */
   pontoDaFonte?: { x: number; y: number } | null;
   /** O Degradê, o Balde de tinta e a Borracha mágica: um clique ou um arrasto em pixels do documento. */
-  ponto?: { modo: "clique" | "arrasto"; aoClicar?: (ponto: { x: number; y: number }, teclas: { shift: boolean; alt: boolean }) => void; aoArrastar?: (de: { x: number; y: number }, ate: { x: number; y: number }) => void } | null;
+  ponto?: { modo: "clique" | "arrasto"; aoClicar?: (ponto: { x: number; y: number }, teclas: { shift: boolean; alt: boolean }) => void; aoArrastar?: (de: { x: number; y: number }, ate: { x: number; y: number }) => void; aoArrastando?: (de: { x: number; y: number }, ate: { x: number; y: number }) => void; alcas?: { de: { x: number; y: number }; ate: { x: number; y: number } } | null } | null;
   /** A transformação livre em andamento (a da seleção): a caixa com as alças, por cima de tudo. */
   transformacao?: {
     estado: EstadoDaTransformacao;
@@ -335,7 +336,7 @@ export function PreviaDaImagem({
   const enderecos = camadas.flatMap((camada) => {
     const tintaDoQuadro = camada.clipe.vetor?.preenchimento;
     if (tintaDoQuadro?.tipo === "imagem") return [fonteDa(tintaDoQuadro.midia_id)];
-    if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste) return [];
+    if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste || camada.clipe.camada_de_preenchimento) return [];
     if (camada.clipe.pixels) {
       const versao = fonteDosPixels?.(camada.clipe) ? null : versaoDosPixels(camada.clipe);
       return versao ? [versao] : [];
@@ -400,6 +401,11 @@ export function PreviaDaImagem({
       camadas.flatMap((camada) => {
         if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada), documentoDaCamada(projeto))] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        if (camada.clipe.camada_de_preenchimento) {
+          // A cor, o degradê ou o padrão no tamanho da tela
+          const fonte = preenchimentoNoTamanho(camada.clipe.id, camada.clipe.camada_de_preenchimento, tamanho.largura * densidade, tamanho.altura * densidade, (tamanho.largura * densidade) / tamanhoDaImagem(projeto).largura);
+          return [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada), documentoDaCamada(projeto))] as const];
+        }
         if (camada.clipe.texto_rico) {
           // O texto desenhado no tamanho da tela (some até as fontes chegarem)
           const { caixa, recorte } = camada;
@@ -767,7 +773,7 @@ export function PreviaDaImagem({
                 })()}
               </svg>
             ) : null}
-            {ponto && !transformacao && !maoAtiva && !recorte && tamanho.largura > 1 ? <PontoNaPrevia modo={ponto.modo} quadro={tamanho} documento={imagem} aoClicar={ponto.aoClicar} aoArrastar={ponto.aoArrastar} /> : null}
+            {ponto && !transformacao && !maoAtiva && !recorte && tamanho.largura > 1 ? <PontoNaPrevia modo={ponto.modo} quadro={tamanho} documento={imagem} aoClicar={ponto.aoClicar} aoArrastar={ponto.aoArrastar} aoArrastando={ponto.aoArrastando} alcas={ponto.alcas} /> : null}
             {moverPixels && !transformacao && !maoAtiva && tamanho.largura > 1 ? (
               <div
                 className="absolute z-20 cursor-move touch-none"
