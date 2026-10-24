@@ -1,19 +1,22 @@
 // O TIFF (ADR 0003, onda 13.13): o básico da especificação 6.0, em little-endian, RGB ou RGBA de 8 bits (o alfa não
 // associado), numa faixa só, sem compressão ou com a Deflate (o código 8, que os editores leem) e o previsor
-// horizontal (a diferença para o vizinho comprime melhor), com a resolução em pixels por polegada.
+// horizontal (a diferença para o vizinho comprime melhor), com a resolução em pixels por polegada e, quando vierem,
+// as etiquetas de texto e o XMP das informações do arquivo.
 import { temTransparencia, zlib } from "./comum.ts";
 
 export type CompressaoDoTiff = "nenhuma" | "deflate";
 
-type Campo = { tag: number; tipo: 3 | 4 | 5; valores: number[] };
+/** Os números (curtos, longos e racionais em pares) ou os bytes crus (BYTE e ASCII, já com o nulo do fim). */
+type Campo = { tag: number; tipo: 3 | 4 | 5; valores: number[] } | { tag: number; tipo: 1 | 2; bytes: Uint8Array };
 
-const bytesDoCampo = (c: Campo) => (c.tipo === 3 ? 2 : c.tipo === 4 ? 4 : 4) * c.valores.length;
+const bytesDoCampo = (c: Campo) => ("bytes" in c ? c.bytes.length : (c.tipo === 3 ? 2 : 4) * c.valores.length);
+const contagem = (c: Campo) => ("bytes" in c ? c.bytes.length : c.tipo === 5 ? c.valores.length / 2 : c.valores.length);
 
 export async function codificarTiff(
   rgba: Uint8ClampedArray | Uint8Array,
   largura: number,
   altura: number,
-  { compressao = "deflate", ppi = 72 }: { compressao?: CompressaoDoTiff; ppi?: number | null } = {},
+  { compressao = "deflate", ppi = 72, etiquetas = [] }: { compressao?: CompressaoDoTiff; ppi?: number | null; etiquetas?: { tag: number; tipo: 1 | 2; bytes: Uint8Array }[] } = {},
 ): Promise<Uint8Array> {
   const alfa = temTransparencia(rgba);
   const canais = alfa ? 4 : 3;
@@ -48,7 +51,10 @@ export async function codificarTiff(
     { tag: 296, tipo: 3, valores: [2] },
     ...(compressao === "deflate" ? [{ tag: 317, tipo: 3 as const, valores: [2] }] : []),
     ...(alfa ? [{ tag: 338, tipo: 3 as const, valores: [2] }] : []),
+    ...etiquetas,
   ];
+  // O diretório vai em ordem crescente das etiquetas
+  campos.sort((a, b) => a.tag - b.tag);
   const inicioDoDiretorio = 8 + dados.length + (dados.length & 1);
   let fim = inicioDoDiretorio + 2 + campos.length * 12 + 4;
   // Os valores que não cabem nos 4 bytes do campo vão depois do diretório
@@ -56,7 +62,7 @@ export async function codificarTiff(
   for (const campo of campos)
     if (bytesDoCampo(campo) > 4) {
       fora.set(campo, fim);
-      fim += bytesDoCampo(campo);
+      fim += bytesDoCampo(campo) + (bytesDoCampo(campo) & 1);
     }
   const saida = new Uint8Array(fim);
   const v = new DataView(saida.buffer);
@@ -64,13 +70,15 @@ export async function codificarTiff(
   v.setUint32(4, inicioDoDiretorio, true);
   saida.set(dados, 8);
   v.setUint16(inicioDoDiretorio, campos.length, true);
-  const escrever = (pos: number, campo: Campo) =>
-    campo.valores.forEach((valor, i) => (campo.tipo === 3 ? v.setUint16(pos + i * 2, valor, true) : v.setUint32(pos + i * 4, valor, true)));
+  const escrever = (pos: number, campo: Campo) => {
+    if ("bytes" in campo) saida.set(campo.bytes, pos);
+    else campo.valores.forEach((valor, i) => (campo.tipo === 3 ? v.setUint16(pos + i * 2, valor, true) : v.setUint32(pos + i * 4, valor, true)));
+  };
   campos.forEach((campo, i) => {
     const pos = inicioDoDiretorio + 2 + i * 12;
     v.setUint16(pos, campo.tag, true);
     v.setUint16(pos + 2, campo.tipo, true);
-    v.setUint32(pos + 4, campo.tipo === 5 ? campo.valores.length / 2 : campo.valores.length, true);
+    v.setUint32(pos + 4, contagem(campo), true);
     const longe = fora.get(campo);
     if (longe !== undefined) {
       v.setUint32(pos + 8, longe, true);

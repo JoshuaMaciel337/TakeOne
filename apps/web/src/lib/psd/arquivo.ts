@@ -18,6 +18,7 @@ import { matrizDaMascaraNoDocumento } from "@/lib/projeto/mascaraDePixels";
 import type { Clipe, Faixa, Projeto } from "@/lib/projeto/modelo";
 import { projetoSoCom } from "@/lib/projeto/rasterizar";
 import { arquivoDaVersao, criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
+import { temInformacoes, xmpDasInformacoes } from "@/lib/exportacao/metadados";
 import type { Midia } from "@/lib/tipos";
 
 import {
@@ -350,9 +351,11 @@ export async function salvarPsd(projeto: Projeto, midias: ReadonlyMap<string, Mi
     height: altura,
     children: filhosDaRaiz,
     canvas: inteira,
-    ...(resolucao
-      ? { imageResources: { resolutionInfo: { horizontalResolution: resolucao, horizontalResolutionUnit: "PPI", widthUnit: "Inches", verticalResolution: resolucao, verticalResolutionUnit: "PPI", heightUnit: "Inches" } } }
-      : {}),
+    imageResources: {
+      ...(resolucao ? { resolutionInfo: { horizontalResolution: resolucao, horizontalResolutionUnit: "PPI", widthUnit: "Inches", verticalResolution: resolucao, verticalResolutionUnit: "PPI", heightUnit: "Inches" } } : {}),
+      // As informações do arquivo, no XMP que os editores leem
+      ...(temInformacoes(projeto.informacoes) ? { xmpMetadata: xmpDasInformacoes(projeto.informacoes) } : {}),
+    },
   };
   const bytes = writePsd(psd, { generateThumbnail: true });
   return new Blob([bytes], { type: "image/vnd.adobe.photoshop" });

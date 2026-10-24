@@ -204,7 +204,7 @@ test("o PDF tem a tabela de posições certa e a página do tamanho da imagem", 
       { largura: 300, altura: 150, ppi: 300, imagem: { tipo: "jpeg", bytes: Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]) }, alfa: Uint8Array.from([1, 2]) },
       { largura: 72, altura: 72, ppi: 72, imagem: { tipo: "flate", bytes: Uint8Array.from([9]) } },
     ],
-    "Ação",
+    { titulo: "Ação", autor: "Eu" },
   );
   const texto = Buffer.from(pdf).toString("latin1");
   assert.ok(texto.startsWith("%PDF-1.4"));
@@ -216,4 +216,5 @@ test("o PDF tem a tabela de posições certa e a página do tamanho da imagem", 
   const linhas = texto.slice(inicioDoXref).split("\n").slice(3).filter((l) => / n $/.test(l));
   linhas.forEach((linha, i) => assert.ok(texto.slice(Number(linha.slice(0, 10))).startsWith(`${i + 1} 0 obj`), `objeto ${i + 1}`));
   assert.ok(texto.includes("/Title <FEFF004100E700E3006F>"));
+  assert.ok(texto.includes("/Author <FEFF00450075>"));
 });

@@ -17,6 +17,7 @@ import { codificarPng8 } from "./formatos/png8";
 import { indexar, type OpcoesDaPaleta, OPCOES_PADRAO_DA_PALETA } from "./formatos/quantizar";
 import { type CompressaoDoTiff, codificarTiff } from "./formatos/tiff";
 import { exportarImagem } from "./imagem";
+import { comInformacoes, etiquetasDoTiff, type InformacoesDoArquivo, temInformacoes } from "./metadados";
 import { comResolucao } from "./resolucao";
 
 export type FormatoDeExportacao = "png" | "png8" | "jpeg" | "webp" | "webp_sem_perda" | "gif" | "avif" | "tiff" | "bmp" | "ico" | "pdf";
@@ -49,6 +50,8 @@ export type OpcoesDeExportacao = {
   icone: number[];
   /** O PDF com a imagem em JPEG (menor) ou sem perda. */
   pdf: "jpeg" | "sem_perda";
+  /** As informações do arquivo que vão nos metadados (null: sem elas). */
+  informacoes: InformacoesDoArquivo | null;
 };
 
 export const OPCOES_PADRAO_DE_EXPORTACAO: OpcoesDeExportacao = {
@@ -59,6 +62,7 @@ export const OPCOES_PADRAO_DE_EXPORTACAO: OpcoesDeExportacao = {
   tiff: "deflate",
   icone: [16, 32, 48, 256],
   pdf: "jpeg",
+  informacoes: null,
 };
 
 export { TAMANHOS_DO_ICONE };
@@ -168,33 +172,39 @@ export async function paginaDoPdf(canvas: HTMLCanvasElement, dados: Uint8Clamped
  * TIFF, BMP e o tamanho da página do PDF), multiplicada pela escala para a medida em centímetros ficar a mesma.
  */
 export async function gerarArquivo(projeto: Projeto, midias: ReadonlyMap<string, Midia>, opcoes: OpcoesDeExportacao, fontes: FontesDaExportacao): Promise<Blob> {
-  const { formato, escala, qualidade } = opcoes;
+  const { escala } = opcoes;
   const base = tamanhoDaImagem(projeto);
   if (Math.max(base.largura, base.altura) * escala > LADO_MAXIMO_DA_EXPORTACAO + 0.5) throw new Error(`O lado maior passa de ${LADO_MAXIMO_DA_EXPORTACAO} pixels.`);
   const ppi = (projeto.tamanho?.resolucao ?? 72) * escala;
   const comPpi = projeto.tamanho?.resolucao ? ppi : null;
-  if (formato === "png" || formato === "jpeg" || formato === "webp" || formato === "webp_sem_perda") {
-    let blob = await exportarImagem(projeto, midias, { formato: formato === "webp_sem_perda" ? "webp" : formato, qualidade: formato === "webp_sem_perda" ? 1 : qualidade, escala, ...fontes });
-    if (comPpi && (formato === "png" || formato === "jpeg")) blob = blobDeBytes(comResolucao(new Uint8Array(await blob.arrayBuffer()), formato, comPpi), blob.type);
-    return blob;
-  }
-  const png = await exportarImagem(projeto, midias, { formato: "png", escala, ...fontes });
-  if (formato === "avif") return avifPelaApi(png, qualidade);
-  const { canvas } = await pixelsDoBlob(png);
+  const { canvas } = await pixelsDoBlob(await exportarImagem(projeto, midias, { formato: "png", escala, ...fontes }));
   return codificarCanvas(canvas, opcoes, ppi, comPpi);
+}
+
+/** A resolução e as informações do arquivo nos bytes do PNG, do JPG e do WebP. */
+async function comOQueFalta(blob: Blob, formato: "png" | "jpeg" | "webp", opcoes: OpcoesDeExportacao, comPpi: number | null, tamanho: { largura: number; altura: number }): Promise<Blob> {
+  const info = temInformacoes(opcoes.informacoes) ? opcoes.informacoes : null;
+  if (!info && !(comPpi && formato !== "webp")) return blob;
+  let bytes: Uint8Array = new Uint8Array(await blob.arrayBuffer());
+  if (comPpi && formato !== "webp") bytes = comResolucao(bytes, formato, comPpi);
+  if (info) bytes = comInformacoes(bytes, formato, info, tamanho);
+  return blobDeBytes(bytes, blob.type);
 }
 
 /**
  * Um canvas (a imagem, uma camada, uma prancheta) no formato pedido. `ppi` é a resolução que o arquivo leva quando
- * tem onde; `comPpi`, a mesma só quando o documento tem uma (o PNG e o JPG sem ela ficam sem o bloco).
+ * tem onde; `comPpi`, a mesma só quando o documento tem uma (o PNG e o JPG sem ela ficam sem o bloco). As informações
+ * do arquivo (quando as opções trazem) vão no PNG, no PNG-8, no JPG, no WebP, no TIFF e no PDF.
  */
 export async function codificarCanvas(canvas: HTMLCanvasElement, opcoes: OpcoesDeExportacao, ppi = 72, comPpi: number | null = null): Promise<Blob> {
   const { formato, qualidade } = opcoes;
   const { width: largura, height: altura } = canvas;
+  const tamanho = { largura, altura };
+  const info = temInformacoes(opcoes.informacoes) ? opcoes.informacoes : null;
   if (formato === "png" || formato === "webp" || formato === "webp_sem_perda" || formato === "avif") {
     const blob = await blobDoCanvas(canvas, formato === "png" || formato === "avif" ? "image/png" : "image/webp", formato === "webp_sem_perda" ? 1 : qualidade);
     if (formato === "avif") return avifPelaApi(blob, qualidade);
-    return formato === "png" && comPpi ? blobDeBytes(comResolucao(new Uint8Array(await blob.arrayBuffer()), "png", comPpi), "image/png") : blob;
+    return comOQueFalta(blob, formato === "png" ? "png" : "webp", opcoes, comPpi, tamanho);
   }
   if (formato === "jpeg") {
     // O JPG não tem transparência: o que for transparente sai branco
@@ -205,24 +215,28 @@ export async function codificarCanvas(canvas: HTMLCanvasElement, opcoes: OpcoesD
     contexto.fillStyle = "#ffffff";
     contexto.fillRect(0, 0, largura, altura);
     contexto.drawImage(canvas, 0, 0);
-    const blob = await blobDoCanvas(branco, "image/jpeg", qualidade);
-    return comPpi ? blobDeBytes(comResolucao(new Uint8Array(await blob.arrayBuffer()), "jpeg", comPpi), "image/jpeg") : blob;
+    return comOQueFalta(await blobDoCanvas(branco, "image/jpeg", qualidade), "jpeg", opcoes, comPpi, tamanho);
   }
   const dados = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, largura, altura).data;
   switch (formato) {
     case "png8":
-      return blobDeBytes(await codificarPng8(indexar(dados, largura, altura, opcoes.paleta), comPpi), "image/png");
+      return comOQueFalta(blobDeBytes(await codificarPng8(indexar(dados, largura, altura, opcoes.paleta), comPpi), "image/png"), "png", opcoes, null, tamanho);
     case "gif":
       return blobDeBytes(codificarGif(indexar(dados, largura, altura, opcoes.paleta)), "image/gif");
     case "tiff":
-      return blobDeBytes(await codificarTiff(dados, largura, altura, { compressao: opcoes.tiff, ppi }), "image/tiff");
+      return blobDeBytes(await codificarTiff(dados, largura, altura, { compressao: opcoes.tiff, ppi, etiquetas: info ? etiquetasDoTiff(info) : [] }), "image/tiff");
     case "bmp":
       return blobDeBytes(codificarBmp(dados, largura, altura, ppi), "image/bmp");
     case "ico":
       return blobDeBytes(await icone(canvas, opcoes.icone), "image/x-icon");
     case "pdf":
-      return blobDeBytes(codificarPdf([await paginaDoPdf(canvas, dados, ppi, opcoes.pdf, qualidade)], ""), "application/pdf");
+      return blobDeBytes(codificarPdf([await paginaDoPdf(canvas, dados, ppi, opcoes.pdf, qualidade)], infoDoPdf(info)), "application/pdf");
   }
+}
+
+/** As informações do arquivo no dicionário do PDF. */
+export function infoDoPdf(info: InformacoesDoArquivo | null) {
+  return info ? { titulo: info.titulo, autor: info.autor, assunto: info.descricao, palavras: info.palavras_chave.join(", ") } : {};
 }
 
 /** O retângulo do que não é transparente (null quando é tudo transparente). */

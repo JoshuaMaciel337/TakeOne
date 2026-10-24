@@ -10,7 +10,8 @@ import { projetoSoCom } from "../projeto/rasterizar";
 import type { Midia } from "../tipos";
 
 import { pedidosDoNome, tamanhoDoAtivo } from "./ativos";
-import { caixaDoConteudo, codificarCanvas, type FontesDaExportacao, formatoDe, nomesSemRepetir, OPCOES_PADRAO_DE_EXPORTACAO, type OpcoesDeExportacao, paginaDoPdf, pixelsDoBlob, recortarCanvas } from "./exportarComo";
+import { caixaDoConteudo, codificarCanvas, type FontesDaExportacao, formatoDe, infoDoPdf, nomesSemRepetir, OPCOES_PADRAO_DE_EXPORTACAO, type OpcoesDeExportacao, paginaDoPdf, pixelsDoBlob, recortarCanvas } from "./exportarComo";
+import { temInformacoes } from "./metadados";
 import { codificarPdf } from "./formatos/pdf";
 import { exportarImagem } from "./imagem";
 import { pranchetasDoProjeto, soAPrancheta } from "./pranchetas";
@@ -44,7 +45,8 @@ export async function exportarCamadas(projeto: Projeto, midias: ReadonlyMap<stri
     return faixa.tipo !== "principal" && clipe && !clipe.pasta && !clipe.ajuste && (!opcoes.soVisiveis || !faixa.oculta);
   });
   if (!camadas.length) throw new Error(opcoes.soVisiveis ? "Nenhuma camada visível para exportar." : "Nenhuma camada para exportar.");
-  const { escala } = opcoes.exportacao;
+  const exportacao: OpcoesDeExportacao = { ...opcoes.exportacao, informacoes: projeto.informacoes ?? null };
+  const { escala } = exportacao;
   const ppi = (projeto.tamanho?.resolucao ?? 72) * escala;
   const comPpi = projeto.tamanho?.resolucao ? ppi : null;
   const nome = nomesSemRepetir();
@@ -60,13 +62,14 @@ export async function exportarCamadas(projeto: Projeto, midias: ReadonlyMap<stri
       canvas = recortarCanvas(canvas, caixa);
     }
     const numero = String(indice + 1).padStart(String(camadas.length).length, "0");
-    arquivos.push({ nome: nome(`${opcoes.prefixo}${numero} ${nomeDaFaixa(faixa)}`.trim(), extensao), blob: await codificarCanvas(canvas, opcoes.exportacao, ppi, comPpi) });
+    arquivos.push({ nome: nome(`${opcoes.prefixo}${numero} ${nomeDaFaixa(faixa)}`.trim(), extensao), blob: await codificarCanvas(canvas, exportacao, ppi, comPpi) });
   }
   return pacote(arquivos, "camadas.zip");
 }
 
 /** Pranchetas em arquivos: cada prancheta sozinha no formato pedido, ou todas num PDF, uma página cada. */
-export async function exportarPranchetasComo(projeto: Projeto, midias: ReadonlyMap<string, Midia>, exportacao: OpcoesDeExportacao, fontes: FontesDaExportacao, aoProgresso: (texto: string) => void): Promise<Arquivo> {
+export async function exportarPranchetasComo(projeto: Projeto, midias: ReadonlyMap<string, Midia>, pedidas: OpcoesDeExportacao, fontes: FontesDaExportacao, aoProgresso: (texto: string) => void): Promise<Arquivo> {
+  const exportacao: OpcoesDeExportacao = { ...pedidas, informacoes: projeto.informacoes ?? null };
   const pranchetas = pranchetasDoProjeto(projeto);
   if (!pranchetas.length) throw new Error("O documento não tem pranchetas.");
   const { escala } = exportacao;
@@ -85,7 +88,7 @@ export async function exportarPranchetasComo(projeto: Projeto, midias: ReadonlyM
       paginas.push(await paginaDoPdf(canvas, dados, ppi, exportacao.pdf, exportacao.qualidade));
     } else arquivos.push({ nome: nome(prancheta.nome, formatoDe(exportacao.formato).extensao), blob: await codificarCanvas(canvas, exportacao, ppi, comPpi) });
   }
-  if (exportacao.formato === "pdf") return { nome: "pranchetas.pdf", blob: new Blob([codificarPdf(paginas, "Pranchetas") as Uint8Array<ArrayBuffer>], { type: "application/pdf" }) };
+  if (exportacao.formato === "pdf") return { nome: "pranchetas.pdf", blob: new Blob([codificarPdf(paginas, { ...infoDoPdf(temInformacoes(projeto.informacoes) ? projeto.informacoes : null), titulo: projeto.informacoes?.titulo || "Pranchetas" }) as Uint8Array<ArrayBuffer>], { type: "application/pdf" }) };
   return pacote(arquivos, "pranchetas.zip");
 }
 
@@ -127,7 +130,7 @@ export async function gerarAtivos(projeto: Projeto, midias: ReadonlyMap<string, 
       const contexto = final.getContext("2d")!;
       contexto.imageSmoothingQuality = "high";
       contexto.drawImage(recorte, 0, 0, medida.largura, medida.altura);
-      const exportacao: OpcoesDeExportacao = { ...OPCOES_PADRAO_DE_EXPORTACAO, formato: pedido.formato, qualidade: pedido.qualidade ?? OPCOES_PADRAO_DE_EXPORTACAO.qualidade };
+      const exportacao: OpcoesDeExportacao = { ...OPCOES_PADRAO_DE_EXPORTACAO, formato: pedido.formato, qualidade: pedido.qualidade ?? OPCOES_PADRAO_DE_EXPORTACAO.qualidade, informacoes: projeto.informacoes ?? null };
       arquivos.push({ nome: pedido.arquivo, blob: await codificarCanvas(final, exportacao) });
     }
   }

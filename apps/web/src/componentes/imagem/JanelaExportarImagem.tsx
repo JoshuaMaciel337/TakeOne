@@ -20,6 +20,7 @@ import {
   TAMANHOS_DO_ICONE,
 } from "@/lib/exportacao/exportarComo";
 import { exportarImagem } from "@/lib/exportacao/imagem";
+import { temInformacoes } from "@/lib/exportacao/metadados";
 import type { PaletaDaExportacao, Pontilhado } from "@/lib/exportacao/formatos/quantizar";
 import { useEnvios } from "@/lib/envios";
 import { formatarBytes } from "@/lib/formatar";
@@ -64,7 +65,7 @@ const CAMPO = "rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-sm te
 /** Exportar como: o formato, o tamanho e as opções de cada um; baixar o arquivo ou mandar para a biblioteca. */
 export function JanelaExportarImagem({ projeto, nome, midias, modo = "exportar", aoFechar, aoAvisar, aoPrepararPintura, fonteDosPixels, fonteDaMascara, fonteDaMascaraDosFiltros }: Props) {
   const { iniciar } = useEnvios();
-  const [opcoes, setOpcoes] = useState<OpcoesDeExportacao>({ ...OPCOES_PADRAO_DE_EXPORTACAO, formato: modo === "web" ? "png8" : "png" });
+  const [opcoes, setOpcoes] = useState<OpcoesDeExportacao>({ ...OPCOES_PADRAO_DE_EXPORTACAO, formato: modo === "web" ? "png8" : "png", informacoes: temInformacoes(projeto.informacoes) ? projeto.informacoes : null });
   const [gerando, setGerando] = useState<"baixar" | "biblioteca" | "previa" | null>(null);
   const [erro, setErro] = useState("");
   // O último arquivo gerado, com as opções dele: baixar de novo com as mesmas opções não gera outra vez
@@ -341,6 +342,12 @@ export function JanelaExportarImagem({ projeto, nome, midias, modo = "exportar",
                   </label>
                 ))}
               </fieldset>
+            ) : null}
+            {temInformacoes(projeto.informacoes) && ["png", "png8", "jpeg", "webp", "webp_sem_perda", "tiff", "pdf"].includes(opcoes.formato) ? (
+              <label className="flex items-center gap-1.5 text-xs text-suave">
+                <input type="checkbox" checked={opcoes.informacoes !== null} onChange={(evento) => mudar({ informacoes: evento.currentTarget.checked ? projeto.informacoes! : null })} />
+                Incluir as informações do arquivo (título, autor, direitos)
+              </label>
             ) : null}
             {projeto.fundo.transparente && !formato.transparencia ? <p className="text-[11px] text-aviso">O {formato.nome} não guarda transparência: o fundo sai branco.</p> : null}
             {modo === "exportar" && atual ? (

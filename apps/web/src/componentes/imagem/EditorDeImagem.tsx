@@ -45,6 +45,8 @@ import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, 
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
+import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
+import { imprimirImagem, type OpcoesDaImpressao } from "@/lib/exportacao/imprimir";
 import { baixarBlob, caixaDoConteudo as caixaDoDesenho, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
@@ -473,6 +475,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [exportando, setExportando] = useState<false | "exportar" | "web">(false);
   const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
   const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
+  const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
@@ -740,6 +743,60 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  /** Imagem › Duplicar: um documento novo com uma cópia deste (as camadas de pixels continuam nas mesmas mídias). */
+  const duplicarDocumento = async (nome: string, mescladas: boolean) => {
+    setJanelaDoArquivo(null);
+    if (!projeto) return;
+    try {
+      mostrarAviso("Duplicando…");
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const novo = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome, tamanho: { largura, altura } } });
+      let faixas = atual.faixas;
+      if (mescladas) {
+        // A imagem como aparece, numa camada de pixels só
+        const midia = await criarCamadaDePixels(largura, altura, nome);
+        const png = await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+        const versao = await enviarVersao(midia.id, png);
+        faixas = executarComando(novo, { comando: "imagem.adicionarPixels", parametros: { midiaId: midia.id, nome: "Fundo", versao } }, ctx).projeto.faixas;
+      }
+      await chamarApi(`/projetos/${novo.id}`, {
+        metodo: "PUT",
+        corpo: {
+          versao: novo.versao,
+          nome,
+          proporcao: atual.proporcao,
+          taxa: atual.taxa,
+          fundo: atual.fundo,
+          faixas,
+          marcadores: [],
+          canais: mescladas ? [] : (atual.canais ?? []),
+          caminhos: mescladas ? [] : (atual.caminhos ?? []),
+          luz_global: atual.luz_global ?? undefined,
+          informacoes: atual.informacoes ?? undefined,
+          tamanho: atual.tamanho ?? { largura, altura },
+        },
+      });
+      router.push(`/app/imagem/${novo.id}`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível duplicar a imagem.");
+    }
+  };
+  /** Arquivo › Imprimir: a imagem como aparece, na janela de impressão do navegador. */
+  const imprimir = async (opcoes: OpcoesDaImpressao) => {
+    setJanelaDoArquivo(null);
+    if (!projeto) return;
+    try {
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const png = await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      await imprimirImagem(png, edicao.nome, opcoes, largura, altura, atual.tamanho?.resolucao ?? 72);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível imprimir.");
+    }
+  };
   /** Arquivo › Gerar › Ativos de imagem: os pedidos dos nomes das camadas, num ZIP. */
   const gerarAtivosDaImagem = async () => {
     if (!projeto) return;
@@ -760,7 +817,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       mostrarAviso(`Exportando em ${formatoDe(formato).nome}…`);
       await pinturas.esperar();
       const atual = projetoRef.current ?? projeto;
-      const blob = await gerarArquivo(atual, midias, { ...OPCOES_PADRAO_DE_EXPORTACAO, formato, qualidade }, { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      const blob = await gerarArquivo(atual, midias, { ...OPCOES_PADRAO_DE_EXPORTACAO, formato, qualidade, informacoes: atual.informacoes ?? null }, { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
       baixarBlob(blob, nomeDoArquivo(edicao.nome, formato));
       mostrarAviso(`Imagem baixada (${formatarBytes(blob.size)}).`);
     } catch (e) {
@@ -4634,6 +4691,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     prancheta: (como) => void novaPrancheta(como),
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
+    informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    imprimir: () => setJanelaDoArquivo("imprimir"),
+    duplicarDocumento: () => setJanelaDoArquivo("duplicar"),
     gerarAtivos: () => void gerarAtivosDaImagem(),
     exportarPsd: () => void exportarPsd(),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
@@ -4812,7 +4872,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -6073,6 +6133,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascara={pinturas.fonteDaMascara}
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
         />
+      ) : null}
+      {janelaDoArquivo === "informacoes" && projeto ? (
+        <JanelaInformacoesDoArquivo
+          inicial={projeto.informacoes}
+          resumo={[
+            { rotulo: "Tamanho", valor: `${tamanhoDaImagem(projeto).largura} × ${tamanhoDaImagem(projeto).altura} px` },
+            { rotulo: "Resolução", valor: `${Math.round(projeto.tamanho?.resolucao ?? 72)} ppp` },
+            { rotulo: "Modo de cor", valor: "RGB, 8 bits por canal" },
+            { rotulo: "Camadas", valor: String(projeto.faixas.filter((faixa) => faixa.tipo !== "principal" && faixa.clipes[0] && !faixa.clipes[0].pasta).length) },
+          ]}
+          aoFechar={() => setJanelaDoArquivo(null)}
+          aoConfirmar={(informacoes) => {
+            setJanelaDoArquivo(null);
+            executar({ comando: "imagem.informacoes", parametros: { informacoes } });
+          }}
+        />
+      ) : null}
+      {janelaDoArquivo === "duplicar" ? <JanelaDuplicarDocumento nome={edicao.nome} aoFechar={() => setJanelaDoArquivo(null)} aoConfirmar={(nome, mescladas) => void duplicarDocumento(nome, mescladas)} /> : null}
+      {janelaDoArquivo === "imprimir" && projeto ? (
+        <JanelaImprimir tamanho={tamanhoDaImagem(projeto)} ppi={projeto.tamanho?.resolucao ?? 72} aoFechar={() => setJanelaDoArquivo(null)} aoConfirmar={(opcoes) => void imprimir(opcoes)} />
       ) : null}
       {preferenciasDeExportacao ? <JanelaPreferenciasDeExportacao aoFechar={() => setPreferenciasDeExportacao(false)} aoAvisar={mostrarAviso} /> : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}

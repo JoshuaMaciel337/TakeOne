@@ -29,7 +29,10 @@ function textoDoPdf(s: string): string {
 
 const numero = (v: number) => (Math.round(v * 1000) / 1000).toString();
 
-export function codificarPdf(paginas: PaginaDoPdf[], titulo = ""): Uint8Array {
+/** O dicionário de informações do PDF (o título, o autor, o assunto e as palavras-chave). */
+export type InfoDoPdf = { titulo?: string; autor?: string; assunto?: string; palavras?: string };
+
+export function codificarPdf(paginas: PaginaDoPdf[], info: InfoDoPdf = {}): Uint8Array {
   const objetos: Uint8Array[] = [];
   // Os números dos objetos: 1 catálogo, 2 páginas, 3 informações, e de 4 em diante, cada página com os seus
   const reservar = () => objetos.push(new Uint8Array(0));
@@ -66,7 +69,8 @@ export function codificarPdf(paginas: PaginaDoPdf[], titulo = ""): Uint8Array {
   }
   definir(1, ["<< /Type /Catalog /Pages 2 0 R >>"]);
   definir(2, [`<< /Type /Pages /Kids [${filhas.map((n) => `${n} 0 R`).join(" ")}] /Count ${filhas.length} >>`]);
-  definir(3, [`<< /Producer ${textoDoPdf("TakeOne")}${titulo ? ` /Title ${textoDoPdf(titulo)}` : ""} >>`]);
+  const campos: [string, string | undefined][] = [["Title", info.titulo], ["Author", info.autor], ["Subject", info.assunto], ["Keywords", info.palavras]];
+  definir(3, [`<< /Producer ${textoDoPdf("TakeOne")}${campos.map(([chave, valor]) => (valor ? ` /${chave} ${textoDoPdf(valor)}` : "")).join("")} >>`]);
   // O cabeçalho com bytes acima de 127 avisa que o arquivo é binário
   const cabecalho = juntar([textoEmBytes("%PDF-1.4\n%"), Uint8Array.from([0xe2, 0xe3, 0xcf, 0xd3]), textoEmBytes("\n")]);
   const posicoes: number[] = [];

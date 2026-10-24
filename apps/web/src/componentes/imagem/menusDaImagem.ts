@@ -164,6 +164,10 @@ export type AcoesDosMenus = {
   abrirRecente: (id: string) => void;
   /** Arquivo › Colocar incorporado: uma imagem do computador como camada. */
   colocarIncorporado: () => void;
+  /** Arquivo › Informações do arquivo, Arquivo › Imprimir e Imagem › Duplicar. */
+  informacoesDoArquivo: () => void;
+  imprimir: () => void;
+  duplicarDocumento: () => void;
   exportar: () => void;
   /** Arquivo › Exportar: Salvar para web, Exportação rápida (no formato das preferências) e as preferências. */
   salvarParaWeb: () => void;
@@ -336,6 +340,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Colocar incorporado…", aoEscolher: a.colocarIncorporado, titulo: "Uma imagem do computador entra como camada neste documento" },
         "-",
+        { nome: "Informações do arquivo…", atalho: "Ctrl+Alt+Shift+I", aoEscolher: a.informacoesDoArquivo, titulo: "Título, autor, palavras-chave e direitos, que vão nos metadados dos arquivos exportados" },
+        { nome: "Imprimir…", atalho: "Ctrl+P", aoEscolher: a.imprimir },
+        "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
         {
           nome: "Gerar",
@@ -450,6 +457,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Tom automático", atalho: "Ctrl+Shift+L", aoEscolher: () => a.automatico("tom") },
         { nome: "Contraste automático", atalho: "Ctrl+Alt+Shift+L", aoEscolher: () => a.automatico("contraste") },
         { nome: "Cor automática", atalho: "Ctrl+Shift+B", aoEscolher: () => a.automatico("cor") },
+        "-",
+        { nome: "Duplicar…", aoEscolher: a.duplicarDocumento, titulo: "Uma cópia deste documento, com as camadas ou achatada" },
         "-",
         { nome: "Tamanho da imagem…", atalho: "Ctrl+Alt+I", aoEscolher: a.tamanhoDaImagem },
         { nome: "Tamanho da tela…", atalho: "Ctrl+Alt+C", aoEscolher: a.tamanhoDaTela },
