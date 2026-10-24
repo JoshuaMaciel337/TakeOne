@@ -3,6 +3,7 @@
 import type { Contorno, Sombra } from "./silhueta.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
+import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -410,6 +411,8 @@ export type Projeto = {
   marcadores?: Marcador[];
   /** Os canais alfa do editor de imagem: as seleções guardadas (painel Canais). */
   canais?: Canal[];
+  /** Os caminhos do painel Caminhos (lib/vetor/caminhos.ts), em pixels do documento. */
+  caminhos?: CaminhoDoDocumento[];
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

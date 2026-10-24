@@ -15,6 +15,7 @@ export const PAINEIS_DA_IMAGEM = {
   amostras: "Amostras",
   biblioteca: "Biblioteca",
   camadas: "Camadas",
+  caminhos: "Caminhos",
   canais: "Canais",
   degrades: "Degradês",
   fonteDeClonagem: "Fonte de clonagem",
@@ -89,6 +90,10 @@ export type AcoesDosMenus = {
   temSelecao: boolean;
   /** A seleção do documento (letreiros, laços): tem algo, há uma anterior para selecionar de novo, as bordas à vista. */
   temSelecaoDoDocumento: boolean;
+  /** O caminho escolhido no painel Caminhos (ou o da forma escolhida) tem área: vira seleção (Ctrl+Enter). */
+  temCaminho: boolean;
+  caminhoComoSelecao: () => void;
+  caminhoDaSelecao: () => void;
   podeSelecionarNovamente: boolean;
   bordasVisiveis: boolean;
   selecaoDoDocumento: (acao: "tudo" | "desmarcar" | "novamente" | "inverter" | "bordas") => void;
@@ -488,6 +493,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Carregar seleção…", aoEscolher: () => a.canalDaSelecao("carregar") },
         { nome: "Salvar seleção…", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.canalDaSelecao("salvar") },
+        "-",
+        { nome: "Carregar o caminho como seleção", atalho: "Ctrl+Enter", desativado: !a.temCaminho, aoEscolher: a.caminhoComoSelecao },
+        { nome: "Criar caminho de trabalho…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.caminhoDaSelecao },
         { nome: "Luminosidade", atalho: "Ctrl+Alt+2", aoEscolher: () => a.canalDaSelecao("luminosidade") },
       ],
     },

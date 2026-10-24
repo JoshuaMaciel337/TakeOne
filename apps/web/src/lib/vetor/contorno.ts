@@ -3,7 +3,7 @@
 // de uma forma com vários componentes segue e o que "Mesclar componentes da forma" guarda.
 import polygonClipping, { type MultiPolygon, type Ring } from "polygon-clipping";
 
-import type { No, Subcaminho } from "./modelo.ts";
+import { type No, type Subcaminho, temArea } from "./modelo.ts";
 
 type Ponto = { x: number; y: number };
 
@@ -103,7 +103,7 @@ export function caminhosDaRegiao(regiao: MultiPolygon): Subcaminho[] {
 
 /** Se os caminhos fechados se combinam de um jeito que só a região diz (mais de um componente). */
 export function precisaDaRegiao(subcaminhos: Subcaminho[]): boolean {
-  return subcaminhos.filter((sub) => sub.fechado && sub.nos.length > 2).length > 1;
+  return subcaminhos.filter((sub) => sub.fechado && temArea(sub)).length > 1;
 }
 
 const n = (v: number) => Math.round(v * 100) / 100;
@@ -124,4 +124,28 @@ export function svgDosCaminhos(subcaminhos: Subcaminho[]): string {
       return sub.fechado ? `${d}Z` : d;
     })
     .join("");
+}
+
+/**
+ * Pontos a cada `passo` pixels ao longo do caminho, com a fração do comprimento (0 no começo, 1 no fim): o "Traçar
+ * caminho" leva o pincel por eles, e a pressão simulada vem da fração.
+ */
+export function pontosAoLongo(sub: Subcaminho, passo = 1): { x: number; y: number; fracao: number }[] {
+  const pontos = achatar(sub, 0.1);
+  if (sub.fechado && pontos.length) pontos.push({ ...pontos[0] });
+  if (pontos.length < 2) return pontos.map((p) => ({ ...p, fracao: 0 }));
+  const acumulado = [0];
+  for (let i = 1; i < pontos.length; i++) acumulado.push(acumulado[i - 1] + Math.hypot(pontos[i].x - pontos[i - 1].x, pontos[i].y - pontos[i - 1].y));
+  const total = acumulado[acumulado.length - 1];
+  const saida: { x: number; y: number; fracao: number }[] = [];
+  let k = 0;
+  const n = Math.max(1, Math.ceil(total / passo));
+  for (let s = 0; s <= n; s++) {
+    const d = (total * s) / n;
+    while (k < pontos.length - 2 && acumulado[k + 1] < d) k++;
+    const trecho = acumulado[k + 1] - acumulado[k] || 1;
+    const t = Math.min(1, Math.max(0, (d - acumulado[k]) / trecho));
+    saida.push({ x: pontos[k].x + (pontos[k + 1].x - pontos[k].x) * t, y: pontos[k].y + (pontos[k + 1].y - pontos[k].y) * t, fracao: total ? d / total : 0 });
+  }
+  return saida;
 }

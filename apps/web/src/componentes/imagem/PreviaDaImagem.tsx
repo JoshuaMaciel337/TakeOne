@@ -19,6 +19,7 @@ import { arquivoDaVersao } from "@/lib/pixels";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
+import { CaminhosNaPrevia, type FerramentaDeCaminho, type OpcoesDosCaminhos } from "./CaminhosNaPrevia";
 import type { Subcaminho } from "@/lib/vetor/modelo";
 import type { MapaDeBordas } from "@/lib/selecao/magnetico";
 import type { ImagemRgba } from "@/lib/selecao/varinha";
@@ -92,6 +93,8 @@ type Props = {
    * `clique` quando a pessoa só clicou (sem arrastar), no ponto.
    */
   aoDesenharForma?: (arrasto: ArrastoDaForma, clique: boolean) => void;
+  /** As ferramentas de caminho (canetas, pontos e seleções de caminho), com o caminho editado e o que fazer com ele. */
+  caminhos?: { ferramenta: FerramentaDeCaminho; caminhos: Subcaminho[] | null; opcoes: OpcoesDosCaminhos; aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void; aoCriar: (sub: Subcaminho) => void } | null;
   /** O contorno da forma que está sendo arrastada, em pixels da imagem (sem ele, um retângulo tracejado). */
   caminhoDoArrasto?: (arrasto: ArrastoDaForma) => Subcaminho[] | null;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
@@ -218,6 +221,7 @@ export function PreviaDaImagem({
   preencherCercado,
   aoClicarTexto,
   aoDesenharForma,
+  caminhos = null,
   caminhoDoArrasto,
   aoPegarCor,
   pintura = null,
@@ -747,6 +751,9 @@ export function PreviaDaImagem({
                 emCinza={pintura.emCinza}
                 selecao={veu ? null : selecaoDoDocumento?.selecao}
               />
+            ) : null}
+            {caminhos && !maoAtiva && !transformacao && !recorte && tamanho.largura > 1 ? (
+              <CaminhosNaPrevia ferramenta={caminhos.ferramenta} caminhos={caminhos.caminhos} quadro={tamanho} documento={imagem} opcoes={caminhos.opcoes} aoMudar={caminhos.aoMudar} aoCriar={caminhos.aoCriar} />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}
             {caminhoDoDesenho ? (

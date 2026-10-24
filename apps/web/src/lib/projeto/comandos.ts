@@ -141,7 +141,9 @@ import {
   adicionarCamadaVetorial,
   juntarAoVetor,
   mudarVetor,
+  trocarCaminhosDoVetor,
 } from "./imagem.ts";
+import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
@@ -242,6 +244,8 @@ export type Comando =
   | { comando: "imagem.adicionarVetor"; parametros: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string; acima?: string | null } }
   | { comando: "imagem.mudarVetor"; parametros: { clipeId: string; vetor: CamadaVetorial; deslocamento?: { x: number; y: number } } }
   | { comando: "imagem.juntarAoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[]; operacao: OperacaoDoCaminho } }
+  | { comando: "imagem.caminhosDoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[] } }
+  | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.tamanhoComPixels"; parametros: { tamanho: TamanhoDaImagem; pixels: TrocaDePixels[]; canais: TrocaDePixels[] } }
   | { comando: "imagem.tamanhoDaTela"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho>; fundo: { cor: string; transparente: boolean } | null } }
   | { comando: "imagem.girar"; parametros: { giro: GiroDaImagem; tamanhos: Record<string, Tamanho> } }
@@ -367,6 +371,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.adicionarVetor": "desenhar a forma",
   "imagem.mudarVetor": "mudar a forma",
   "imagem.juntarAoVetor": "juntar à forma",
+  "imagem.caminhosDoVetor": "editar o caminho da forma",
+  "imagem.caminhos": "mudar os caminhos",
   "imagem.tamanhoComPixels": "mudar o tamanho da imagem",
   "imagem.tamanhoDaTela": "mudar o tamanho da tela",
   "imagem.girar": "girar a imagem",
@@ -640,6 +646,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mudarVetor(projeto, parametros.clipeId, parametros.vetor, parametros.deslocamento) };
     case "imagem.juntarAoVetor":
       return { projeto: juntarAoVetor(projeto, parametros.clipeId, parametros.caminhos, parametros.operacao) };
+    case "imagem.caminhosDoVetor":
+      return { projeto: trocarCaminhosDoVetor(projeto, parametros.clipeId, parametros.caminhos) };
+    case "imagem.caminhos":
+      return { projeto: { ...projeto, caminhos: parametros.caminhos } };
     case "imagem.tamanhoComPixels":
       return { projeto: tamanhoComPixels(projeto, parametros.tamanho, parametros.pixels, parametros.canais) };
     case "imagem.tamanhoDaTela":

@@ -221,26 +221,52 @@ export function pontoNaForma(clipe: Clipe, ponto: { x: number; y: number }, quad
   return { x: ux + vetor.caixa.largura / 2, y: uy + vetor.caixa.altura / 2 };
 }
 
-/**
- * Junta caminhos (em pixels da imagem) à forma da camada, com a operação (somar, subtrair, intersectar, excluir):
- * a forma deixa de ser viva (vira um caminho comum) e a caixa cresce até caber tudo, sem mexer no que já estava.
- */
-export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subcaminho[], operacao: OperacaoDoCaminho): Projeto {
-  const quadro = tamanhoDaImagem(projeto);
-  const clipe = projeto.faixas.flatMap((faixa) => faixa.clipes).find((item) => item.id === clipeId);
-  if (!clipe?.vetor) throw new ErroEdicao("Escolha uma camada de forma para juntar a forma nova.");
-  const levar = (p: { x: number; y: number }) => pontoNaForma(clipe, p, quadro);
-  const novos = caminhos.map((sub) => ({
+/** Um ponto das unidades da caixa da forma na imagem (o caminho da camada até a imagem). */
+export function pontoDaForma(clipe: Clipe, ponto: { x: number; y: number }, quadro: Tamanho): { x: number; y: number } {
+  const vetor = clipe.vetor!;
+  const t = clipe.transformacao;
+  const k = pixelsPorUnidade(vetor.caixa, t.escala, quadro);
+  let ux = (ponto.x - vetor.caixa.largura / 2) * k;
+  let uy = (ponto.y - vetor.caixa.altura / 2) * k;
+  if (clipe.virar?.horizontal) ux = -ux;
+  if (clipe.virar?.vertical) uy = -uy;
+  const r = (t.rotacao * Math.PI) / 180;
+  return { x: quadro.largura / 2 + t.x * quadro.largura + ux * Math.cos(r) - uy * Math.sin(r), y: quadro.altura / 2 + t.y * quadro.altura + ux * Math.sin(r) + uy * Math.cos(r) };
+}
+
+/** Os pontos (e as alças) de cada caminho levados por `f`. */
+function levarCaminhos(caminhos: Subcaminho[], f: (p: { x: number; y: number }) => { x: number; y: number }): Subcaminho[] {
+  return caminhos.map((sub) => ({
     ...sub,
-    operacao,
     nos: sub.nos.map((no) => {
-      const a = levar(no);
-      const e = no.ex !== undefined && no.ey !== undefined ? levar({ x: no.ex, y: no.ey }) : null;
-      const s = no.sx !== undefined && no.sy !== undefined ? levar({ x: no.sx, y: no.sy }) : null;
+      const a = f(no);
+      const e = no.ex !== undefined && no.ey !== undefined ? f({ x: no.ex, y: no.ey }) : null;
+      const s = no.sx !== undefined && no.sy !== undefined ? f({ x: no.sx, y: no.sy }) : null;
       return { x: a.x, y: a.y, ...(e ? { ex: e.x, ey: e.y } : {}), ...(s ? { sx: s.x, sy: s.y } : {}) };
     }),
   }));
-  const todos = [...clipe.vetor.subcaminhos, ...novos];
+}
+
+/** Os caminhos da forma da camada em pixels da imagem (para as ferramentas de caminho). */
+export function caminhosDoVetorNaImagem(clipe: Clipe, quadro: Tamanho): Subcaminho[] {
+  return clipe.vetor ? levarCaminhos(clipe.vetor.subcaminhos, (p) => pontoDaForma(clipe, p, quadro)) : [];
+}
+
+/**
+ * Troca os caminhos da forma da camada pelos dados em pixels da imagem (a seleção direta, a caneta somando): a forma
+ * deixa de ser viva e a caixa muda até caber tudo, sem tirar do lugar o que não mudou.
+ */
+export function trocarCaminhosDoVetor(projeto: Projeto, clipeId: string, caminhos: Subcaminho[]): Projeto {
+  const quadro = tamanhoDaImagem(projeto);
+  const clipe = projeto.faixas.flatMap((faixa) => faixa.clipes).find((item) => item.id === clipeId);
+  if (!clipe?.vetor) throw new ErroEdicao("Esta camada não é uma forma.");
+  if (!caminhos.some((sub) => sub.nos.length >= 2)) throw new ErroEdicao("A forma ficaria vazia. Para tirá-la, apague a camada.");
+  return trocarCaminhosLocais(projeto, clipe, levarCaminhos(caminhos, (p) => pontoNaForma(clipe, p, quadro)));
+}
+
+/** A forma com os caminhos já nas unidades da caixa antiga: normaliza a caixa e acerta o lugar. */
+function trocarCaminhosLocais(projeto: Projeto, clipe: Clipe, todos: Subcaminho[]): Projeto {
+  if (!clipe.vetor) throw new ErroEdicao("Esta camada não é uma forma.");
   const caixa = caixaDosCaminhos(todos)!;
   const margem = margemDoTraco(clipe.vetor.traco, null);
   const d = { x: margem - caixa.x0, y: margem - caixa.y0 };
@@ -251,7 +277,19 @@ export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subca
     subcaminhos: deslocar(todos, d.x, d.y),
     caixa: { largura: Math.max(1, caixa.x1 - caixa.x0) + 2 * margem, altura: Math.max(1, caixa.y1 - caixa.y0) + 2 * margem },
   };
-  return mudarVetor(projeto, clipeId, vetor, d);
+  return mudarVetor(projeto, clipe.id, vetor, d);
+}
+
+/**
+ * Junta caminhos (em pixels da imagem) à forma da camada, com a operação (somar, subtrair, intersectar, excluir):
+ * a forma deixa de ser viva (vira um caminho comum) e a caixa cresce até caber tudo, sem mexer no que já estava.
+ */
+export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subcaminho[], operacao: OperacaoDoCaminho): Projeto {
+  const quadro = tamanhoDaImagem(projeto);
+  const clipe = projeto.faixas.flatMap((faixa) => faixa.clipes).find((item) => item.id === clipeId);
+  if (!clipe?.vetor) throw new ErroEdicao("Escolha uma camada de forma para juntar a forma nova.");
+  const novos = levarCaminhos(caminhos, (p) => pontoNaForma(clipe, p, quadro)).map((sub) => ({ ...sub, operacao }));
+  return trocarCaminhosLocais(projeto, clipe, [...clipe.vetor.subcaminhos, ...novos]);
 }
 
 /** Põe, troca ou tira (null) a máscara de camada pintável. */

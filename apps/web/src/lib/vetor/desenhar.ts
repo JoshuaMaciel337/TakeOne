@@ -5,7 +5,7 @@
 import { ladrilhoDoPadrao } from "../pintura/padroes.ts";
 import { pixelsDoDegrade, tabelaDoDegrade } from "../pintura/degrade.ts";
 import { caminhosDaRegiao, precisaDaRegiao, regiaoDosCaminhos } from "./contorno.ts";
-import type { CamadaVetorial, Subcaminho, TintaDaForma, TracoDaForma } from "./modelo.ts";
+import { type CamadaVetorial, type Subcaminho, temArea, type TintaDaForma, type TracoDaForma } from "./modelo.ts";
 
 type Contexto = CanvasRenderingContext2D;
 
@@ -159,6 +159,23 @@ function mascaraDoTraco(camada: CamadaVetorial, traco: TracoDaForma, transformar
   return canvas;
 }
 
+/**
+ * A região dos caminhos em branco opaco (com a borda suave) num canvas: cada caminho entra com a composição dele (o
+ * primeiro sempre soma), e os abertos fecham sozinhos. A seleção a partir de um caminho sai daqui também.
+ */
+export function regiaoNoCanvas(subcaminhos: Subcaminho[], largura: number, altura: number, escala = { x: 1, y: 1 }): HTMLCanvasElement {
+  const [canvas, ctx] = novoCanvas(largura, altura);
+  ctx.setTransform(escala.x, 0, 0, escala.y, 0, 0);
+  ctx.fillStyle = "#ffffff";
+  subcaminhos
+    .filter(temArea)
+    .forEach((sub, i) => {
+      ctx.globalCompositeOperation = i === 0 ? "source-over" : COMPOSICAO[sub.operacao];
+      ctx.fill(path2dDe([sub]));
+    });
+  return canvas;
+}
+
 /** A camada desenhada num canvas de `largura` × `altura` (a caixa dela esticada até esse tamanho). */
 export function desenharVetor(camada: CamadaVetorial, largura: number, altura: number): HTMLCanvasElement {
   const pl = Math.max(1, Math.round(largura));
@@ -167,15 +184,8 @@ export function desenharVetor(camada: CamadaVetorial, largura: number, altura: n
   const transformar = (ctx: Contexto) => ctx.setTransform(escala.x, 0, 0, escala.y, 0, 0);
   const [saida, sctx] = novoCanvas(pl, pa);
 
-  // A região: cada caminho fechado entra com a composição dele (o primeiro sempre soma); os abertos fecham sozinhos
-  const [regiaoCanvas, rctx] = novoCanvas(pl, pa);
-  transformar(rctx);
-  rctx.fillStyle = "#ffffff";
-  const comArea = camada.subcaminhos.filter((sub) => sub.nos.length > 2);
-  comArea.forEach((sub, i) => {
-    rctx.globalCompositeOperation = i === 0 ? "source-over" : COMPOSICAO[sub.operacao];
-    rctx.fill(path2dDe([sub]));
-  });
+  const regiaoCanvas = regiaoNoCanvas(camada.subcaminhos, pl, pa, escala);
+  const comArea = camada.subcaminhos.filter(temArea);
   const regiao = path2dDe(camada.subcaminhos.filter((sub) => sub.fechado));
 
   if (camada.preenchimento.tipo !== "nenhuma" && comArea.length) {

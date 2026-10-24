@@ -50,6 +50,14 @@ import {
   Spline,
   Stamp,
   Grid3x3,
+  PenTool,
+  Signature,
+  SplinePointer,
+  DiamondPlus,
+  DiamondMinus,
+  ChevronUp,
+  MousePointer2,
+  MousePointer,
 } from "lucide-react";
 
 import type { TipoDeForma } from "@/lib/elementos";
@@ -97,6 +105,14 @@ export type IdFerramentaDaImagem =
   | "carimboDePadrao"
   | "historicoArtistico"
   | "texto"
+  | "caneta"
+  | "canetaLivre"
+  | "canetaDeCurvatura"
+  | "adicionarPonto"
+  | "excluirPonto"
+  | "converterPonto"
+  | "selecaoDeCaminho"
+  | "selecaoDireta"
   | "retangulo"
   | "elipse"
   | "triangulo"
@@ -184,7 +200,19 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("superexposicao", "Ferramenta Superexposição", "O", Flame, "Pinte para escurecer as sombras, os meios-tons ou os realces."),
     F("esponja", "Ferramenta Esponja", "O", Cloud, "Pinte para tirar ou pôr saturação."),
   ],
+  [
+    F("caneta", "Ferramenta Caneta", "P", PenTool, "Clique para pôr cantos e arraste para curvas; o primeiro ponto fecha, Enter ou Esc terminam. Shift prende a 45°, Alt quebra a alça e converte o ponto."),
+    F("canetaLivre", "Ferramenta Caneta de forma livre", "P", Signature, "Arraste para desenhar à mão: o traço vira curvas pelo ajuste de curva da barra. Terminar perto do começo fecha."),
+    F("canetaDeCurvatura", "Ferramenta Caneta de curvatura", "P", SplinePointer, "Clique os pontos e o caminho passa por eles, curvo. Clique duplo num ponto vira canto; arraste um ponto para mudar."),
+    F("adicionarPonto", "Ferramenta Adicionar ponto de ancoragem", "", DiamondPlus, "Clique num trecho do caminho para pôr um ponto, sem mudar a curva."),
+    F("excluirPonto", "Ferramenta Excluir ponto de ancoragem", "", DiamondMinus, "Clique num ponto do caminho para tirá-lo."),
+    F("converterPonto", "Ferramenta Converter ponto", "", ChevronUp, "Clique num ponto liso para virar canto; arraste de um canto para puxar alças. Arrastar uma alça move só ela."),
+  ],
   [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
+  [
+    F("selecaoDeCaminho", "Ferramenta Seleção de caminho", "A", MousePointer2, "Clique num componente do caminho para escolhê-lo e arraste para mover; Shift soma, Alt arrastando duplica, Delete apaga."),
+    F("selecaoDireta", "Ferramenta Seleção direta", "A", MousePointer, "Clique nos pontos (ou arraste em volta) e arraste para mover; as alças mudam a curva (Alt quebra). Delete apaga, as setas empurram."),
+  ],
   [
     F("retangulo", "Ferramenta Retângulo", "U", Square, "Arraste para desenhar um retângulo na cor do primeiro plano."),
     F("elipse", "Ferramenta Elipse", "U", Circle, "Arraste para desenhar uma elipse na cor do primeiro plano."),
@@ -202,6 +230,9 @@ export const TODAS_AS_FERRAMENTAS = GRUPOS_DE_FERRAMENTAS.flat();
 export function ferramenta(id: IdFerramentaDaImagem): FerramentaDaImagem {
   return TODAS_AS_FERRAMENTAS.find((item) => item.id === id)!;
 }
+
+/** As ferramentas de caminho (componentes/imagem/CaminhosNaPrevia.tsx). */
+export const FERRAMENTAS_DE_CAMINHO: ReadonlySet<IdFerramentaDaImagem> = new Set(["caneta", "canetaLivre", "canetaDeCurvatura", "adicionarPonto", "excluirPonto", "converterPonto", "selecaoDeCaminho", "selecaoDireta"]);
 
 /** As ferramentas que desenham uma forma vetorial viva, e o tipo dela (lib/vetor/arrasto.ts). */
 export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, TipoDaFormaViva>> = {

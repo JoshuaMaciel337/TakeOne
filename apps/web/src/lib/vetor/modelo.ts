@@ -48,6 +48,12 @@ export type CamadaVetorial = {
 
 export const TRACO_PADRAO: TracoDaForma = { tinta: { tipo: "cor", cor: "#000000" }, largura: 3, alinhamento: "dentro", tipo: "solido", pontas: "reta", cantos: "vivo", mitra: 4 };
 
+/** Se o caminho cerca uma área: três nós ou mais, ou dois nós fechados com curva (a elipse de duas metades). */
+export function temArea(sub: Subcaminho): boolean {
+  if (sub.nos.length >= 3) return true;
+  return sub.nos.length === 2 && sub.fechado && sub.nos.some((no) => no.ex !== undefined || no.sx !== undefined);
+}
+
 /** O quanto da curva de Bézier vai nas alças para um quarto de círculo. */
 export const KAPPA = 0.5522847498;
 
@@ -225,4 +231,19 @@ export function redimensionar(camada: CamadaVetorial, largura: number, altura: n
   const sx = atual.largura > 1e-9 ? largura / atual.largura : 1;
   const sy = atual.altura > 1e-9 ? altura / atual.altura : 1;
   return refazerForma({ ...camada, forma: null, subcaminhos: escalar(camada.subcaminhos, sx, sy) }, {});
+}
+
+/** A camada de caminhos quaisquer (em pixels da imagem) e o meio dela na imagem: a caneta no modo Forma. */
+export function camadaDosCaminhos(subcaminhos: Subcaminho[], preenchimento: TintaDaForma, traco: TracoDaForma | null): { vetor: CamadaVetorial; centro: { x: number; y: number } } {
+  const caixa = caixaDosCaminhos(subcaminhos) ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
+  const margem = margemDoTraco(traco, null);
+  const vetor: CamadaVetorial = {
+    caixa: { largura: Math.max(1, caixa.x1 - caixa.x0) + 2 * margem, altura: Math.max(1, caixa.y1 - caixa.y0) + 2 * margem },
+    subcaminhos: deslocar(subcaminhos, margem - caixa.x0, margem - caixa.y0),
+    preenchimento,
+    traco,
+    forma: null,
+    margem,
+  };
+  return { vetor, centro: { x: caixa.x0 + Math.max(1, caixa.x1 - caixa.x0) / 2, y: caixa.y0 + Math.max(1, caixa.y1 - caixa.y0) / 2 } };
 }

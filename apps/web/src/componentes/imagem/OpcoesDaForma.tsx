@@ -363,3 +363,160 @@ export function JanelaCriarForma({ tipo, aoFechar, aoConfirmar }: { tipo: TipoDa
     </Moldura>
   );
 }
+
+export type OpcoesDaCaneta = { modo: "forma" | "caminho"; elastico: boolean; ajuste: number; autoAdicionar: boolean };
+export const CANETA_PADRAO: OpcoesDaCaneta = { modo: "caminho", elastico: true, ajuste: 2, autoAdicionar: true };
+
+/** A barra das canetas e das seleções de caminho: o modo, as tintas (no modo Forma) e o que criar do caminho. */
+export function OpcoesDaCanetaNaBarra({
+  ferramenta,
+  caneta,
+  formas,
+  primeiroPlano,
+  fundo,
+  doEspaco,
+  comFormaEscolhida,
+  comCaminho,
+  aoMudarCaneta,
+  aoMudarFormas,
+  aoCriarSelecao,
+  aoCriarForma,
+}: {
+  ferramenta: string;
+  caneta: OpcoesDaCaneta;
+  formas: OpcoesDasFormas;
+  primeiroPlano: string;
+  fundo: string;
+  doEspaco: Degrade[];
+  comFormaEscolhida: boolean;
+  /** Se há um caminho do painel escolhido (para os botões Seleção e Forma). */
+  comCaminho: boolean;
+  aoMudarCaneta: (mudanca: Partial<OpcoesDaCaneta>) => void;
+  aoMudarFormas: (mudanca: Partial<OpcoesDasFormas>) => void;
+  aoCriarSelecao: () => void;
+  aoCriarForma: () => void;
+}) {
+  const ehCaneta = ferramenta === "caneta" || ferramenta === "canetaLivre" || ferramenta === "canetaDeCurvatura";
+  return (
+    <>
+      {ehCaneta ? (
+        <label className="flex items-center gap-1 text-suave">
+          Modo:
+          <select className={campo} value={caneta.modo} onChange={(evento) => aoMudarCaneta({ modo: evento.currentTarget.value as OpcoesDaCaneta["modo"] })} aria-label="Modo da caneta">
+            <option value="caminho">Caminho</option>
+            <option value="forma">Forma</option>
+          </select>
+        </label>
+      ) : null}
+      {ehCaneta && caneta.modo === "forma" ? (
+        <>
+          {SEPARADOR}
+          <label className="flex items-center gap-1 text-suave">
+            Operação:
+            <select className={campo} value={comFormaEscolhida ? formas.operacao : "nova"} disabled={!comFormaEscolhida} onChange={(evento) => aoMudarFormas({ operacao: evento.currentTarget.value as OpcoesDasFormas["operacao"] })} aria-label="Operação da forma">
+              <option value="nova">Nova camada</option>
+              <option value="somar">Combinar formas</option>
+              <option value="subtrair">Subtrair a forma da frente</option>
+              <option value="intersectar">Intersectar as áreas</option>
+              <option value="excluir">Excluir a sobreposição</option>
+            </select>
+          </label>
+          {SEPARADOR}
+          <TintasDaForma
+            preenchimento={formas.preenchimento ?? { tipo: "cor", cor: primeiroPlano }}
+            traco={formas.traco}
+            primeiroPlano={primeiroPlano}
+            fundo={fundo}
+            doEspaco={doEspaco}
+            aoMudarPreenchimento={(preenchimento) => aoMudarFormas({ preenchimento })}
+            aoMudarTraco={(traco) => aoMudarFormas({ traco })}
+          />
+        </>
+      ) : null}
+      {!ehCaneta || caneta.modo === "caminho" ? (
+        <>
+          {ehCaneta ? SEPARADOR : null}
+          <span className="text-suave">Criar:</span>
+          <button type="button" className={`${campo} hover:text-texto disabled:opacity-50`} disabled={!comCaminho} onClick={aoCriarSelecao} title="O caminho escolhido vira a seleção (Ctrl+Enter)">
+            Seleção
+          </button>
+          <button type="button" className={`${campo} hover:text-texto disabled:opacity-50`} disabled={!comCaminho} onClick={aoCriarForma} title="O caminho escolhido vira uma camada de forma, com o preenchimento e o traçado das formas">
+            Forma
+          </button>
+        </>
+      ) : null}
+      {ferramenta === "caneta" ? (
+        <>
+          {SEPARADOR}
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={caneta.elastico} onChange={(evento) => aoMudarCaneta({ elastico: evento.currentTarget.checked })} />
+            Elástico
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={caneta.autoAdicionar} onChange={(evento) => aoMudarCaneta({ autoAdicionar: evento.currentTarget.checked })} />
+            Adicionar e excluir automaticamente
+          </label>
+        </>
+      ) : null}
+      {ferramenta === "canetaLivre" ? (
+        <>
+          {SEPARADOR}
+          <NumeroDaForma rotulo="Ajuste de curva" valor={caneta.ajuste} minimo={0.5} maximo={10} sufixo="px" aoMudar={(ajuste) => aoMudarCaneta({ ajuste })} largura="w-10" />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** O "Traçar caminho": a ferramenta de pintura (com as opções dela) e a pressão simulada. */
+export function JanelaTracarCaminho({ aoFechar, aoConfirmar }: { aoFechar: () => void; aoConfirmar: (ferramenta: FerramentaDoTracado, simular: boolean) => void }) {
+  const [ferramenta, setFerramenta] = useState<FerramentaDoTracado>("pincel");
+  const [simular, setSimular] = useState(false);
+  return (
+    <Moldura titulo="Traçar caminho" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(ferramenta, simular)}>
+      <label className="flex items-center gap-2">
+        Ferramenta:
+        <select className={`${campo} flex-1`} value={ferramenta} onChange={(evento) => setFerramenta(evento.currentTarget.value as FerramentaDoTracado)} aria-label="Ferramenta do traçado">
+          {FERRAMENTAS_DO_TRACADO.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-1.5">
+        <input type="checkbox" checked={simular} onChange={(evento) => setSimular(evento.currentTarget.checked)} />
+        Simular pressão
+      </label>
+      <p className="text-[11px] text-suave">O traço usa o tamanho e as opções da ferramenta escolhida.</p>
+    </Moldura>
+  );
+}
+
+export const FERRAMENTAS_DO_TRACADO = [
+  { id: "lapis", nome: "Lápis" },
+  { id: "pincel", nome: "Pincel" },
+  { id: "borracha", nome: "Borracha" },
+  { id: "misturador", nome: "Pincel misturador" },
+  { id: "substituicaoDeCor", nome: "Substituição de cor" },
+  { id: "carimbo", nome: "Carimbo" },
+  { id: "carimboDePadrao", nome: "Carimbo de padrão" },
+  { id: "historico", nome: "Pincel do histórico" },
+  { id: "desfoque", nome: "Desfoque" },
+  { id: "nitidez", nome: "Nitidez" },
+  { id: "borrar", nome: "Borrar" },
+  { id: "subexposicao", nome: "Subexposição" },
+  { id: "superexposicao", nome: "Superexposição" },
+  { id: "esponja", nome: "Esponja" },
+] as const;
+export type FerramentaDoTracado = (typeof FERRAMENTAS_DO_TRACADO)[number]["id"];
+
+/** O "Criar caminho de trabalho" da seleção: a tolerância (quanto o caminho pode se afastar da borda). */
+export function JanelaCaminhoDaSelecao({ aoFechar, aoConfirmar }: { aoFechar: () => void; aoConfirmar: (tolerancia: number) => void }) {
+  const [tolerancia, setTolerancia] = useState(2);
+  return (
+    <Moldura titulo="Criar caminho de trabalho" aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(tolerancia)}>
+      <NumeroDaForma rotulo="Tolerância" valor={tolerancia} minimo={0.5} maximo={10} sufixo="pixels" aoMudar={setTolerancia} largura="w-14" />
+    </Moldura>
+  );
+}

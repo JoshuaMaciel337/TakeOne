@@ -37,7 +37,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
@@ -93,7 +93,16 @@ import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, la
 import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
 import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./OpcoesDoCorte";
-import { JanelaCriarForma, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
+import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
+import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
+import { PainelCaminhos } from "./PainelCaminhos";
+import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
+import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
+import { caminhosDaMascara } from "@/lib/vetor/edicao";
+import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
+import { camadaDosCaminhos, type Subcaminho, temArea } from "@/lib/vetor/modelo";
+import { caminhosDoVetorNaImagem } from "@/lib/projeto/imagem";
+import { caixaDoClipe } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
@@ -139,21 +148,21 @@ const AREAS: Record<string, EstadoDaArea> = {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras", "formas"], ativa: "cor", altura: 190 },
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "biblioteca", "modelos"], ativa: "propriedades", altura: 340 },
-      { id: "g-camadas", abas: ["camadas", "canais", "historico"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico"], ativa: "camadas" },
     ],
   },
   fotografia: {
     direita: [
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "filtros"], ativa: "propriedades", altura: 360 },
       { id: "g-biblioteca", abas: ["biblioteca", "fotoIA"], ativa: "biblioteca", altura: 220 },
-      { id: "g-camadas", abas: ["camadas", "canais", "historico"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico"], ativa: "camadas" },
     ],
   },
   grafico: {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras"], ativa: "cor", altura: 190 },
       { id: "g-propriedades", abas: ["propriedades", "estilos", "formas", "modelos"], ativa: "propriedades", altura: 340 },
-      { id: "g-camadas", abas: ["camadas", "canais", "historico", "biblioteca"], ativa: "camadas" },
+      { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico", "biblioteca"], ativa: "camadas" },
     ],
   },
 };
@@ -213,6 +222,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [forma, setForma] = useState<OpcoesDaForma>({ ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "seta" });
   // O clique sem arrastar de uma ferramenta de forma: a janela com as medidas
   const [criandoForma, setCriandoForma] = useState<{ tipo: TipoDaFormaViva; ponto: { x: number; y: number } } | null>(null);
+  // O painel Caminhos: o caminho escolhido (a caneta soma nele; null, um caminho de trabalho novo), as opções das canetas
+  // e as janelas de traçar, preencher e criar da seleção
+  const [caminhoEscolhido, setCaminhoEscolhido] = useState<string | null>(null);
+  const [caneta, setCaneta] = useState<OpcoesDaCaneta>(CANETA_PADRAO);
+  const [janelaDoCaminho, setJanelaDoCaminho] = useState<{ tipo: "tracar" | "preencher"; id: string } | { tipo: "daSelecao" } | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomMedido, setZoomMedido] = useState(1);
   const [removerAoSoltar, setRemoverAoSoltar] = useState(true);
@@ -981,7 +995,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
   };
   /** Editar › Preencher: a cor, o padrão ou o estado do histórico, com o modo, a opacidade e o preservar transparência. */
-  const preencher = (p: Preenchimento) => {
+  const preencher = (p: Preenchimento, selecaoDoCaminho?: Selecao) => {
     if (p.conteudo === "sensivel") return void usarSelecao("apagar");
     const cor = p.conteudo === "primeiroPlano" ? cores.primeiroPlano : p.conteudo === "fundo" ? cores.fundo : p.conteudo === "preto" ? "#000000" : p.conteudo === "cinza" ? "#808080" : p.conteudo === "branco" ? "#ffffff" : p.cor;
     void editarPixels(
@@ -996,7 +1010,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         }
         preencherPixels(dados, camada.largura, cobertura, tinta, { modo: p.modo, opacidade: p.opacidade, preservar: p.preservar || Boolean(camada.faixa.travas?.transparencia) });
       },
-      { criar: true },
+      selecaoDoCaminho ? { criar: true, selecao: selecaoDoCaminho } : { criar: true },
     );
   };
   /** Editar › Limpar (Delete com seleção): fica transparente; com a transparência travada (ou no fundo), a cor de fundo. */
@@ -1919,6 +1933,92 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1;
     executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `${base} ${numero}`, acima: escolhidas[0]?.id ?? null } });
   };
+  const caminhosDoDocumento = projetoNaTela?.caminhos ?? [];
+  const caminhoDaVez = caminhoEscolhido ? (caminhosDoDocumento.find((caminho) => caminho.id === caminhoEscolhido) ?? null) : null;
+  const ferramentaDeCaminho = FERRAMENTAS_DE_CAMINHO.has(ferramenta) ? (ferramenta as FerramentaDeCaminho) : null;
+  // O que as ferramentas de caminho editam: o caminho escolhido no painel, ou o da camada de forma escolhida
+  const formaEmEdicao = !caminhoDaVez && escolhidoNaTela?.clipe.vetor ? escolhidoNaTela.clipe : null;
+  const caminhosEditaveis = caminhoDaVez ? caminhoDaVez.subcaminhos : formaEmEdicao && projetoNaTela ? caminhosDoVetorNaImagem(formaEmEdicao, tamanhoDaImagem(projetoNaTela)) : null;
+  const mudarCaminhos = (subcaminhos: Subcaminho[], provisorio: boolean) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const comando: Comando | null = caminhoDaVez
+      ? { comando: "imagem.caminhos", parametros: { caminhos: comCaminho(atual.caminhos ?? [], { ...caminhoDaVez, subcaminhos }) } }
+      : formaEmEdicao
+        ? { comando: "imagem.caminhosDoVetor", parametros: { clipeId: formaEmEdicao.id, caminhos: subcaminhos } }
+        : null;
+    if (!comando) return;
+    if (provisorio) setProvisorio(comando);
+    else {
+      setProvisorio(null);
+      executar(comando);
+    }
+  };
+  /** Uma forma (camada vetorial) com os caminhos, nas tintas das formas. */
+  const formaDosCaminhos = (subcaminhos: Subcaminho[]) => {
+    const preenchimento = forma.preenchimento ?? { tipo: "cor" as const, cor: cores.primeiroPlano };
+    const { vetor, centro } = camadaDosCaminhos(subcaminhos, preenchimento, forma.traco.tinta.tipo === "nenhuma" ? null : forma.traco);
+    const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith("Forma")).length ?? 0) + 1;
+    executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `Forma ${numero}`, acima: escolhidas[0]?.id ?? null } });
+  };
+  /** O caminho que uma caneta acabou de desenhar: uma forma (modo Forma) ou o caminho escolhido / de trabalho. */
+  const criarCaminho = (sub: Subcaminho) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    if (caneta.modo === "forma") {
+      if (forma.operacao !== "nova" && selecionado?.clipe.vetor && !caminhoDaVez) executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos: [sub], operacao: forma.operacao } });
+      else formaDosCaminhos([sub]);
+      return;
+    }
+    if (!caminhoDaVez && formaEmEdicao) {
+      // Com uma forma escolhida e nenhum caminho do painel, a caneta no modo Caminho soma na forma
+      executar({ comando: "imagem.caminhosDoVetor", parametros: { clipeId: formaEmEdicao.id, caminhos: [...(caminhosEditaveis ?? []), sub] } });
+      return;
+    }
+    const { caminhos, id } = porNoCaminho(atual.caminhos ?? [], caminhoEscolhido, sub, () => crypto.randomUUID().slice(0, 12));
+    if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) setCaminhoEscolhido(id);
+  };
+  /** A seleção dos caminhos (a região deles, com a borda suave). */
+  const selecaoDosCaminhos = (subcaminhos: Subcaminho[]): Selecao | null => {
+    const atual = projetoRef.current;
+    if (!atual || !subcaminhos.some(temArea)) return null;
+    const { largura, altura } = tamanhoDaImagem(atual);
+    return selecaoDoCanvas(regiaoNoCanvas(subcaminhos, largura, altura), "alfa");
+  };
+  /** Ctrl+Enter: o caminho escolhido (ou o da forma) vira a seleção, com o modo (Shift soma, Alt subtrai). */
+  const caminhoComoSelecao = (subcaminhos: Subcaminho[] | null = caminhosEditaveis, modo: ModoDaSelecao = "nova") => {
+    const lida = subcaminhos ? selecaoDosCaminhos(subcaminhos) : null;
+    if (!lida) return void mostrarAviso("O caminho precisa ter área (três pontos ou mais) para virar seleção.");
+    setSelecaoDoDocumento(combinar(selecaoNoDocumento, lida, modo));
+    setBordasDaSelecao(true);
+  };
+  /** Criar caminho de trabalho: os contornos da seleção num caminho de trabalho novo (a seleção sai, como lá). */
+  const caminhoDaSelecao = (tolerancia: number) => {
+    const atual = projetoRef.current;
+    if (!atual || !selecaoNoDocumento) return;
+    const subcaminhos = caminhosDaMascara(selecaoNoDocumento, tolerancia);
+    if (!subcaminhos.length) return void mostrarAviso("A seleção não tem pixels selecionados mais da metade.");
+    const id = crypto.randomUUID().slice(0, 12);
+    const caminhos = [...(atual.caminhos ?? []).filter((caminho) => !caminho.trabalho), { id, nome: NOME_DO_TRABALHO, subcaminhos, trabalho: true }];
+    if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) {
+      setCaminhoEscolhido(id);
+      setSelecaoDoDocumento(null);
+    }
+  };
+  /** Traçar caminho: a ferramenta de pintura anda pelos componentes, na camada de pixels (ou numa nova). */
+  const tracarCaminho = async (subcaminhos: Subcaminho[], qual: FerramentaDoTracado, simular: boolean) => {
+    const tracos = tracosDoCaminho(subcaminhos, simular);
+    if (!tracos.length || !tracos[0].length) return;
+    const alvo = await alvoDaPintura(tracos[0][0], qual);
+    const atual = projetoRef.current;
+    if (!alvo || !atual) return;
+    const documento = tamanhoDaImagem(atual);
+    const achado = alvo.mascara ? null : acharClipe(atual, alvo.clipeId);
+    const caixa = achado ? caixaDoClipe(achado.clipe.transformacao, achado.clipe.recorte, { largura: alvo.pintura.largura, altura: alvo.pintura.altura }, documento) : null;
+    const mudou = tracarNoAlvo({ ...alvo, caixa }, tracos, { ferramenta: qual, opcoes: pinceis[qual], cores, documento, selecao: selecaoNoDocumento });
+    pinturas.avisarQuadro();
+    if (mudou) pinturas.soltar(alvo.chave);
+  };
   const desenharForma = (arrasto: ArrastoDaForma, clique: boolean) => {
     const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
     if (viva) {
@@ -2220,12 +2320,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível corrigir.");
     }
   };
-  const alvoDaPintura = async (inicio: { x: number; y: number }): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
+  const alvoDaPintura = async (inicio: { x: number; y: number }, qual: IdFerramentaDaImagem = ferramenta): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
     // O pincel de manchas numa foto, sensível ao conteúdo: o traço vai num motor do documento só para virar a
     // seleção que a IA refaz (a foto é trocada, sem camada nova)
-    if (ferramenta === "recuperacaoParaManchas" && opcoesDasManchas.tipo === "sensivel" && selecionado && !selecionado.clipe.pixels && foto) {
+    if (qual === "recuperacaoParaManchas" && opcoesDasManchas.tipo === "sensivel" && selecionado && !selecionado.clipe.pixels && foto) {
       const { largura, altura } = tamanhoDaImagem(atual);
       const pintura = new Pintura(largura, altura);
       setMotorDasManchas({ pintura, clipeId: selecionado.clipe.id });
@@ -2248,7 +2348,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }
     }
     // Os pincéis do histórico pintam na camada de pixels escolhida, com ela como estava na fonte
-    if (ferramenta === "historico" || ferramenta === "historicoArtistico") {
+    if (qual === "historico" || qual === "historicoArtistico") {
       const achado = selecionado?.clipe.pixels ? acharClipe(atual, selecionado.clipe.id) : null;
       if (!achado?.clipe.midia_id || !achado.clipe.pixels) {
         mostrarAviso("Escolha uma camada de pixels para pintar com o histórico.");
@@ -2288,7 +2388,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       }
     }
     // As que só mexem no que já está pintado não criam camada
-    const soNosPixels = ferramenta === "borrar" || ferramenta === "substituicaoDeCor" || ferramenta === "borrachaDeFundo";
+    const soNosPixels = qual === "borrar" || qual === "substituicaoDeCor" || qual === "borrachaDeFundo";
     if (soNosPixels && (!selecionado?.clipe.pixels || selecionado.clipe.pixels.versao === 0)) {
       mostrarAviso(selecionado?.clipe.pixels ? "A camada está vazia: escolha uma com pixels." : "Escolha uma camada de pixels (ou rasterize a camada: Camada › Rasterizar).");
       return null;
@@ -2314,13 +2414,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const pintura = await pinturas.preparar(alvo, tamanhoDaCamada);
       // Os carimbos pintam em direção à fonte deles (como o pincel do histórico)
       let fonteDaTinta: HTMLCanvasElement | undefined;
-      if (ferramenta === "carimbo" || ferramenta === "carimboDePadrao") {
+      if (qual === "carimbo" || qual === "carimboDePadrao") {
         const fonte = await fonteDoCarimbo(inicio, achado.clipe, pintura, tamanhoDaCamada);
         if (!fonte) return null;
         fonteDaTinta = fonte;
       }
       // O pincel de recuperação: a textura copiada da fonte, com a luz e a cor de onde pinta
-      if (ferramenta === "recuperacao") {
+      if (qual === "recuperacao") {
         const fonte = await fonteDoCarimbo(inicio, achado.clipe, pintura, tamanhoDaCamada);
         if (!fonte) return null;
         const destino = achado.clipe.pixels.versao === 0 ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, "atualEAbaixo"), achado.clipe, tamanhoDaCamada) : pintura.camada;
@@ -2334,7 +2434,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         fonteDaTinta = canvas;
       }
       // O pincel de manchas: o traço aparece escurecido; ao soltar, a área é refeita pelo que está em volta
-      if (ferramenta === "recuperacaoParaManchas") {
+      if (qual === "recuperacaoParaManchas") {
         const vazia = achado.clipe.pixels.versao === 0;
         const amostra = vazia || opcoesDasManchas.todasAsCamadas ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, vazia ? "atualEAbaixo" : "todas"), achado.clipe, tamanhoDaCamada) : pintura.camada;
         const escura = document.createElement("canvas");
@@ -2349,11 +2449,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         fonteDaTinta = escura;
       }
       // O retoque pelo alvo: a camada (numa vazia, o que se vê dela para baixo) com o efeito na força escolhida
-      if (ferramenta === "desfoque" || ferramenta === "nitidez" || ferramenta === "subexposicao" || ferramenta === "superexposicao" || ferramenta === "esponja") {
+      if (qual === "desfoque" || qual === "nitidez" || qual === "subexposicao" || qual === "superexposicao" || qual === "esponja") {
         const vazia = achado.clipe.pixels.versao === 0;
         const base = vazia ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, "atualEAbaixo"), achado.clipe, tamanhoDaCamada) : pintura.camada;
         const escala = tamanhoDaCamada.largura / tamanhoDaImagem(projetoAgora).largura;
-        const efeito = alvoDoRetoque(ferramenta as FerramentaDeAlvo, pixelsDe(base).data, tamanhoDaCamada.largura, tamanhoDaCamada.altura, opcoesDoRetoque[ferramenta], escala);
+        const efeito = alvoDoRetoque(qual as FerramentaDeAlvo, pixelsDe(base).data, tamanhoDaCamada.largura, tamanhoDaCamada.altura, opcoesDoRetoque[qual], escala);
         const canvas = document.createElement("canvas");
         canvas.width = tamanhoDaCamada.largura;
         canvas.height = tamanhoDaCamada.altura;
@@ -2363,12 +2463,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       // Marca a marca: cada uma lê e muda a tela debaixo dela
       const rgb = (cor: string) => rgbDaCor(cor).map((v) => v / 255) as [number, number, number];
       let porMarca: ((marca: MarcaDoRetoque) => void) | undefined;
-      if (ferramenta === "borrar") {
+      if (qual === "borrar") {
         const estado = estadoNovo();
         const { forca, pinturaComDedo } = opcoesDoRetoque.borrar;
         const cor = rgb(cores.primeiroPlano);
         porMarca = (marca) => borrarMarca(marca, estado, forca, cor, pinturaComDedo);
-      } else if (ferramenta === "misturador") {
+      } else if (qual === "misturador") {
         const pincel = pincelDoMisturador.current;
         const o = opcoesDoMisturador;
         if (o.limparDepois) pincel.estado = estadoNovo();
@@ -2379,12 +2479,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         const reservatorio = pincel.limpo ? null : rgb(cores.primeiroPlano);
         const estado = pincel.estado;
         porMarca = (marca) => misturarMarca(marca, estado, o, reservatorio);
-      } else if (ferramenta === "substituicaoDeCor" || ferramenta === "borrachaDeFundo") {
+      } else if (qual === "substituicaoDeCor" || qual === "borrachaDeFundo") {
         const estado = estadoNovo();
         const primeiro = rgb(cores.primeiroPlano);
         const fundo = rgb(cores.fundo);
         porMarca =
-          ferramenta === "substituicaoDeCor"
+          qual === "substituicaoDeCor"
             ? (marca) => substituirCorNaMarca(marca, estado, opcoesDaSubstituicao, primeiro, fundo, 1)
             : (marca) => apagarFundoNaMarca(marca, estado, opcoesDaBorrachaDeFundo, primeiro, fundo, 1);
       }
@@ -2933,6 +3033,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     escalaSensivel: () => void abrirEscalaSensivel(),
     pontoDeFuga: () => void abrirPontoDeFuga(),
     alinharCamadas: () => setJanelaDasCamadas("alinhar"),
+    temCaminho: Boolean(caminhosEditaveis?.some(temArea)),
+    caminhoComoSelecao: () => caminhoComoSelecao(),
+    caminhoDaSelecao: () => setJanelaDoCaminho({ tipo: "daSelecao" }),
     mesclarCamadas: () => setJanelaDasCamadas("mesclar"),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
@@ -3322,6 +3425,43 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ),
     },
+    caminhos: {
+      nome: PAINEIS_DA_IMAGEM.caminhos,
+      conteudo: (
+        <PainelCaminhos
+          caminhos={caminhosDoDocumento}
+          documento={tamanho}
+          escolhido={caminhoDaVez?.id ?? null}
+          aoEscolher={setCaminhoEscolhido}
+          aoRenomear={(id, nome) => {
+            const atual = projetoRef.current?.caminhos ?? [];
+            const caminho = atual.find((item) => item.id === id);
+            if (caminho) executar({ comando: "imagem.caminhos", parametros: { caminhos: caminho.trabalho ? salvarTrabalho(atual, id, nome) : comCaminho(atual, { ...caminho, nome }) } });
+          }}
+          aoExcluir={(id) => {
+            if (executar({ comando: "imagem.caminhos", parametros: { caminhos: (projetoRef.current?.caminhos ?? []).filter((item) => item.id !== id) } })) setCaminhoEscolhido(null);
+          }}
+          aoDuplicar={(id) => {
+            const atual = projetoRef.current?.caminhos ?? [];
+            const caminho = atual.find((item) => item.id === id);
+            if (!caminho) return;
+            const novo = { ...structuredClone(caminho), id: crypto.randomUUID().slice(0, 12), nome: `${caminho.nome} cópia`.slice(0, 60), recorte: false, trabalho: false };
+            if (executar({ comando: "imagem.caminhos", parametros: { caminhos: [...atual, novo] } })) setCaminhoEscolhido(novo.id);
+          }}
+          aoNovo={() => {
+            const atual = projetoRef.current?.caminhos ?? [];
+            const novo = { id: crypto.randomUUID().slice(0, 12), nome: nomeLivre(atual), subcaminhos: [] };
+            if (executar({ comando: "imagem.caminhos", parametros: { caminhos: [...atual, novo] } })) setCaminhoEscolhido(novo.id);
+          }}
+          aoRecorte={(id) => executar({ comando: "imagem.caminhos", parametros: { caminhos: caminhoDeRecorte(projetoRef.current?.caminhos ?? [], id) } })}
+          aoPreencher={(id) => setJanelaDoCaminho({ tipo: "preencher", id })}
+          aoTracar={(id) => setJanelaDoCaminho({ tipo: "tracar", id })}
+          aoCarregar={(id, modo) => caminhoComoSelecao(caminhosDoDocumento.find((item) => item.id === id)?.subcaminhos ?? null, modo)}
+          aoDaSelecao={() => setJanelaDoCaminho({ tipo: "daSelecao" })}
+          temSelecao={Boolean(selecaoNoDocumento)}
+        />
+      ),
+    },
     canais: {
       nome: PAINEIS_DA_IMAGEM.canais,
       conteudo: (
@@ -3526,7 +3666,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          FORMA_VIVA_DA_FERRAMENTA[ferramenta] ? (
+          ferramentaDeCaminho ? (
+            <OpcoesDaCanetaNaBarra
+              ferramenta={ferramenta}
+              caneta={caneta}
+              formas={forma}
+              primeiroPlano={cores.primeiroPlano}
+              fundo={cores.fundo}
+              doEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+              comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
+              comCaminho={Boolean(caminhoDaVez?.subcaminhos.length)}
+              aoMudarCaneta={(mudanca) => setCaneta((atual) => ({ ...atual, ...mudanca }))}
+              aoMudarFormas={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
+              aoCriarSelecao={() => caminhoComoSelecao(caminhoDaVez?.subcaminhos ?? null)}
+              aoCriarForma={() => caminhoDaVez && formaDosCaminhos(caminhoDaVez.subcaminhos)}
+            />
+          ) : FORMA_VIVA_DA_FERRAMENTA[ferramenta] ? (
             <OpcoesDaFormaNaBarra
               tipo={FORMA_VIVA_DA_FERRAMENTA[ferramenta]!}
               opcoes={forma}
@@ -3797,6 +3952,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             preencherCercado={ferramenta === "remover" && removerCercando}
             aoClicarTexto={(x, y) => porTexto(undefined, { x: x / tamanho.largura - 0.5, y: y / tamanho.altura - 0.5 })}
             aoDesenharForma={desenharForma}
+            caminhos={
+              ferramentaDeCaminho
+                ? {
+                    ferramenta: ferramentaDeCaminho,
+                    caminhos: caminhosEditaveis,
+                    opcoes: caneta,
+                    aoMudar: mudarCaminhos,
+                    aoCriar: criarCaminho,
+                  }
+                : null
+            }
             caminhoDoArrasto={(arrasto) => {
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
               return viva ? formaDoArrasto(viva, arrasto).naImagem : null;
@@ -3970,6 +4136,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(metodo, tons) => {
             setJanelaDasCamadas(null);
             void mesclarCamadas(metodo, tons);
+          }}
+        />
+      ) : null}
+      {janelaDoCaminho?.tipo === "tracar" ? (
+        <JanelaTracarCaminho
+          aoFechar={() => setJanelaDoCaminho(null)}
+          aoConfirmar={(qual, simular) => {
+            const caminho = caminhosDoDocumento.find((item) => item.id === janelaDoCaminho.id);
+            setJanelaDoCaminho(null);
+            if (caminho) void tracarCaminho(caminho.subcaminhos, qual, simular);
+          }}
+        />
+      ) : null}
+      {janelaDoCaminho?.tipo === "preencher" ? (
+        <JanelaPreencher
+          inicial={ultimoPreenchimento}
+          comFoto={false}
+          aoFechar={() => setJanelaDoCaminho(null)}
+          aoConfirmar={(p) => {
+            const caminho = caminhosDoDocumento.find((item) => item.id === janelaDoCaminho.id);
+            setJanelaDoCaminho(null);
+            const selecao = caminho ? selecaoDosCaminhos(caminho.subcaminhos) : null;
+            if (!selecao) return void mostrarAviso("O caminho precisa ter área (três pontos ou mais) para ser preenchido.");
+            setUltimoPreenchimento(p);
+            preencher(p, selecao);
+          }}
+        />
+      ) : null}
+      {janelaDoCaminho?.tipo === "daSelecao" ? (
+        <JanelaCaminhoDaSelecao
+          aoFechar={() => setJanelaDoCaminho(null)}
+          aoConfirmar={(tolerancia) => {
+            setJanelaDoCaminho(null);
+            caminhoDaSelecao(tolerancia);
           }}
         />
       ) : null}
