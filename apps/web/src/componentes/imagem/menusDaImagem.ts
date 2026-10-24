@@ -1,5 +1,6 @@
 // Os menus do editor de imagem (ADR 0002), na ordem e com os nomes e os atalhos dos editores de imagem
 // profissionais. Os atalhos que o navegador não deixa a página pegar (Ctrl+N, Ctrl+T, Ctrl+W) ficam de fora.
+import { PROVAS, type TipoDaProva } from "@/lib/imagem/prova";
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
 import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
 import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
@@ -164,6 +165,11 @@ export type AcoesDosMenus = {
   abrirRecente: (id: string) => void;
   /** Arquivo › Colocar incorporado: uma imagem do computador como camada. */
   colocarIncorporado: () => void;
+  /** Exibir › Configuração da prova, Cores de prova e Alerta de gama (só na tela). */
+  prova: { tipo: TipoDaProva; ligada: boolean };
+  mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
+  alertaDeGama: boolean;
+  alternarAlertaDeGama: () => void;
   /** Imagem › Modo: o modo de cor do documento e a tabela de cores (nas cores indexadas). */
   modoAtual: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab";
   modoDeCor: (tipo: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab") => void;
@@ -372,7 +378,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       nome: "Editar",
       itens: [
         { nome: a.podeDesfazer ? `Desfazer ${a.podeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !a.podeDesfazer, aoEscolher: a.desfazer },
-        { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z ou Ctrl+Y", desativado: !a.podeRefazer, aoEscolher: a.refazer },
+        { nome: a.podeRefazer ? `Refazer ${a.podeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z", desativado: !a.podeRefazer, aoEscolher: a.refazer },
         { nome: "Alternar o último estado", atalho: "Ctrl+Alt+Z", desativado: !a.podeDesfazer && !a.podeRefazer, aoEscolher: a.alternarUltimoEstado },
         "-",
         { nome: "Recortar", atalho: "Ctrl+X", desativado: !a.temCamada, aoEscolher: a.recortarPixels },
@@ -800,6 +806,13 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Diminuir zoom", atalho: "Ctrl+-", aoEscolher: () => a.zoom("menos") },
         { nome: "Ajustar à tela", atalho: "Ctrl+0", aoEscolher: () => a.zoom("ajustar") },
         { nome: "100%", atalho: "Ctrl+1", aoEscolher: () => a.zoom(1) },
+        "-",
+        {
+          nome: "Configuração da prova",
+          itens: PROVAS.map((prova) => ({ nome: prova.nome, marcado: a.prova.tipo === prova.id, aoEscolher: () => a.mudarProva({ tipo: prova.id, ligada: true }) })),
+        },
+        { nome: "Cores de prova", atalho: "Ctrl+Y", marcado: a.prova.ligada, aoEscolher: () => a.mudarProva({ ligada: !a.prova.ligada }), titulo: "A tela mostra a imagem como na prova escolhida; os arquivos não mudam" },
+        { nome: "Alerta de gama", atalho: "Ctrl+Shift+Y", marcado: a.alertaDeGama, aoEscolher: a.alternarAlertaDeGama, titulo: "Pinta de cinza o que a impressão em CMYK não alcança" },
         "-",
         { nome: "Bordas da seleção", atalho: "Ctrl+H", marcado: a.bordasVisiveis, aoEscolher: () => a.selecaoDoDocumento("bordas") },
       ],

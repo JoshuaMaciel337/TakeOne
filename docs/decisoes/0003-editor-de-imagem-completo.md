@@ -265,7 +265,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem (as comps em arquivos vêm com as comps de camada, na 13.15)
 - [x] Duplicar documento; Informações do arquivo; Imprimir
 - [x] Modo: Escala de cinza, Bitmap (limiar, pontilhado, meio-tom), Duotone, Cores indexadas (paletas, pontilhado, tabela de cores); CMYK e Lab na prova e na exportação; 16 e 32 bits desligados com o motivo. O CMYK é uma aproximação sem perfil ICC (não há perfil de gráfica com licença livre para redistribuir)
-- [ ] Prova de cores e alerta de gama; simulação de daltonismo
+- [x] Prova de cores e alerta de gama; simulação de daltonismo
 - [ ] Automatizar: Lote, Processador de imagens, Folha de contato, Ajustar imagem, Cortar e endireitar fotos, Fotomesclagem, Mesclar para HDR, Carregar arquivos em pilha (com os modos de pilha)
 - [ ] Scripts úteis: excluir camadas vazias, achatar todos os efeitos, achatar todas as máscaras
 - [ ] Variáveis e conjuntos de dados

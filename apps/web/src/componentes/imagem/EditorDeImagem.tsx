@@ -48,6 +48,7 @@ import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaEx
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
 import { JanelaBitmap, JanelaCmyk, JanelaCoresIndexadas, JanelaDuotone, JanelaTabelaDeCores } from "./JanelasDoModo";
 import { SIGLAS_DOS_MODOS } from "@/lib/imagem/modos";
+import type { TipoDaProva } from "@/lib/imagem/prova";
 import { indexar, type PaletaDaExportacao, type Pontilhado } from "@/lib/exportacao/formatos/quantizar";
 import { imprimirImagem, type OpcoesDaImpressao } from "@/lib/exportacao/imprimir";
 import { baixarBlob, caixaDoConteudo as caixaDoDesenho, codificarCanvas, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
@@ -479,6 +480,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
   const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
   const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
+  // A prova de cores e o alerta de gama são da tela (como o zoom): não entram no projeto
+  const [prova, setProva] = useState<{ tipo: TipoDaProva; ligada: boolean }>({ tipo: "cmyk", ligada: false });
+  const [alertaDeGama, setAlertaDeGama] = useState(false);
   const [janelaDoModo, setJanelaDoModo] = useState<"bitmap" | "duotone" | "indexadas" | "tabela" | "cmyk" | null>(null);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
@@ -4716,6 +4720,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    prova,
+    mudarProva: (mudanca) => setProva((atual) => ({ ...atual, ...mudanca })),
+    alertaDeGama,
+    alternarAlertaDeGama: () => setAlertaDeGama((atual) => !atual),
     modoAtual: projeto?.modo?.tipo ?? "rgb",
     modoDeCor: (tipo) => {
       if (tipo === "rgb" || tipo === "cinza" || tipo === "lab") executar({ comando: "imagem.modo", parametros: { modo: { tipo } } });
@@ -5778,6 +5786,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             fonteDaMascara={pinturas.fonteDaMascara}
             fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
             mascaraAVista={mascaraAVista}
+            prova={prova.ligada ? prova.tipo : null}
+            alertaDeGama={alertaDeGama}
             veu={
               motorDasManchas
                 ? { fonte: motorDasManchas.pintura.fonte, quadro: quadroDasManchas, cinza: true }

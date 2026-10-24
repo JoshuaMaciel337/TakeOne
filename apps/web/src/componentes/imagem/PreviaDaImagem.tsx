@@ -21,6 +21,7 @@ import { CHAVE_DA_PROFUNDIDADE } from "@/lib/previa/camadas";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { aplicarModo } from "@/lib/imagem/modos";
+import { aplicarProva, type TipoDaProva } from "@/lib/imagem/prova";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { textoNoTamanho } from "@/lib/texto/desenhar";
 import { useVersaoDasFontes } from "@/lib/texto/fontes";
@@ -169,6 +170,9 @@ type Props = {
   fonteDaMascaraDosFiltros?: (clipe: Clipe) => HTMLCanvasElement | null;
   /** Alt + clique na miniatura da máscara: a prévia mostra só a máscara desta camada (o clipe), em cinza. */
   mascaraAVista?: string | null;
+  /** Exibir › Cores de prova (a prova ligada) e Alerta de gama: só na tela. */
+  prova?: TipoDaProva | null;
+  alertaDeGama?: boolean;
   /**
    * O véu por cima da prévia: a máscara rápida (Q, em vermelho) ou o canal alfa à vista (em cinza), com a imagem que
    * os pincéis pintam e o quadro do traço (o véu desenha de novo quando muda).
@@ -286,6 +290,8 @@ export function PreviaDaImagem({
   fonteDaMascara,
   fonteDaMascaraDosFiltros,
   mascaraAVista = null,
+  prova = null,
+  alertaDeGama = false,
   selecaoDoDocumento = null,
   veu = null,
   corAVista = null,
@@ -304,7 +310,7 @@ export function PreviaDaImagem({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // A camada do modo de cor: fora do RGB (e do Lab, que não muda a tela), a prévia mostra a imagem no modo
   const modoCanvasRef = useRef<HTMLCanvasElement>(null);
-  const modoAtivo = Boolean(projeto.modo && projeto.modo.tipo !== "rgb" && projeto.modo.tipo !== "lab" && !mascaraAVista);
+  const modoAtivo = Boolean(((projeto.modo && projeto.modo.tipo !== "rgb" && projeto.modo.tipo !== "lab") || prova || alertaDeGama) && !mascaraAVista);
   const compositor = useRef<Compositor | null>(null);
   const [guias, setGuias] = useState<Guias | null>(null);
   const [semWebgl, setSemWebgl] = useState(false);
@@ -497,6 +503,8 @@ export function PreviaDaImagem({
       contexto.drawImage(origem, 0, 0);
       const pixels = contexto.getImageData(0, 0, sobre.width, sobre.height);
       aplicarModo(pixels.data, sobre.width, sobre.height, projeto.modo, ((projeto.tamanho?.resolucao ?? 72) * sobre.width) / tamanhoDaImagem(projeto).largura);
+      // A prova de cores e o alerta de gama, só na tela
+      if (prova || alertaDeGama) aplicarProva(pixels.data, prova ?? null, Boolean(alertaDeGama), projeto.modo);
       contexto.putImageData(pixels, 0, 0);
     }
   });

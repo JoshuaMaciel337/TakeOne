@@ -227,6 +227,39 @@ export function cmykNaTela(c: number, m: number, y: number, k: number): Rgb {
   return saida;
 }
 
+const equilibrios = new Map<string, Float64Array[]>();
+
+/**
+ * A prova de uma cor (0 a 255) na tela: a separação, as tintas impressas e o equilíbrio de cinza (cada canal da prova
+ * levado de volta para que os cinzas saiam cinzas, do papel ao preto mais escuro que as tintas fazem, como a
+ * compensação de ponto preto). Sem ele, as tintas tingiam os neutros e o preto saía cinza-escuro.
+ */
+export function provaCmyk(r: number, g: number, b: number, cmyk: { preto: GeracaoDoPreto; limite: number }): Rgb {
+  const chave = `${cmyk.preto}:${cmyk.limite}`;
+  let tabelas = equilibrios.get(chave);
+  if (!tabelas) {
+    const cinzas = Array.from({ length: 256 }, (_, v) => {
+      const [c, m, y, k] = rgbParaCmyk(v / 255, v / 255, v / 255, cmyk.preto, cmyk.limite);
+      return cmykNaTela(c, m, y, k);
+    });
+    tabelas = [0, 1, 2].map((e) => {
+      const tabela = new Float64Array(256);
+      let i = 0;
+      for (let x = 0; x < 256; x++) {
+        while (i < 254 && cinzas[i + 1][e] < x) i++;
+        const x0 = cinzas[i][e];
+        const x1 = cinzas[i + 1][e];
+        tabela[x] = x <= cinzas[0][e] ? 0 : x >= cinzas[255][e] ? 255 : i + (x - x0) / Math.max(1e-6, x1 - x0);
+      }
+      return tabela;
+    });
+    equilibrios.set(chave, tabelas);
+  }
+  const [c, m, y, k] = rgbParaCmyk(r / 255, g / 255, b / 255, cmyk.preto, cmyk.limite);
+  const tinta = cmykNaTela(c, m, y, k);
+  return [0, 1, 2].map((e) => Math.round(Math.min(255, Math.max(0, tabelas![e][tinta[e]])))) as Rgb;
+}
+
 const paraLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 const fLab = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
 
@@ -298,8 +331,7 @@ export function aplicarModo(dados: Uint8ClampedArray, largura: number, altura: n
     }
     case "cmyk":
       for (let p = 0; p < total; p++) {
-        const [c, m, y, k] = rgbParaCmyk(dados[p * 4] / 255, dados[p * 4 + 1] / 255, dados[p * 4 + 2] / 255, modo.preto, modo.limite);
-        const [r, g, b] = cmykNaTela(c, m, y, k);
+        const [r, g, b] = provaCmyk(dados[p * 4], dados[p * 4 + 1], dados[p * 4 + 2], modo);
         dados[p * 4] = r;
         dados[p * 4 + 1] = g;
         dados[p * 4 + 2] = b;

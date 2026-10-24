@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { aplicarModo, amostrasDoEspaco, BITMAP_PADRAO, cmykNaTela, CURVA_LINEAR, type FormaDoPonto, rgbParaCmyk, rgbParaLab, tabelaDoDuotone } from "./modos.ts";
+import { aplicarModo, amostrasDoEspaco, BITMAP_PADRAO, cmykNaTela, CURVA_LINEAR, type FormaDoPonto, provaCmyk, rgbParaCmyk, rgbParaLab, tabelaDoDuotone } from "./modos.ts";
 
 const liso = (l: number, a: number, cor: [number, number, number, number]) => {
   const dados = new Uint8ClampedArray(l * a * 4);
@@ -64,10 +64,10 @@ test("a separação CMYK: branco, preto, vermelho, a geração de preto e o limi
   const limitado = rgbParaCmyk(0, 0, 0, "nenhuma", 240);
   assert.ok(Math.abs(limitado[0] - 0.8) < 1e-9 && limitado[3] === 0);
   assert.deepEqual(cmykNaTela(0, 0, 0, 0), [255, 255, 255]);
-  // A prova tira a saturação do verde puro da tela (fora do que as tintas imprimem)
-  const [c, m, y, k] = rgbParaCmyk(0, 1, 0, "media", 300);
-  const prova = cmykNaTela(c, m, y, k);
+  // A prova tira a saturação do verde puro da tela (fora do que as tintas imprimem) e deixa os cinzas cinzas
+  const prova = provaCmyk(0, 255, 0, { preto: "media", limite: 300 });
   assert.ok(prova[1] < 200 && prova[0] < 60, `verde na prova: ${prova}`);
+  for (const v of [0, 64, 128, 200, 255]) assert.deepEqual(provaCmyk(v, v, v, { preto: "media", limite: 300 }), [v, v, v], `cinza ${v}`);
 });
 
 test("Lab: o branco, o preto e o cinza neutro; as amostras com sinal", () => {
