@@ -48,6 +48,24 @@ def _sobre_fundo(imagem: Image.Image) -> Image.Image:
     return fundo
 
 
+def _heif_pelo_ffmpeg(caminho: Path) -> Image.Image:
+    """A foto HEIC (a grade de ladrilhos das fotos do celular, que o FFmpeg 7.1 junta) num PNG temporário."""
+    import subprocess
+    import tempfile
+
+    from core.config import FFMPEG
+
+    with tempfile.TemporaryDirectory() as pasta:
+        destino = Path(pasta) / "quadro.png"
+        processo = subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(caminho), "-frames:v", "1", str(destino)],
+                                  capture_output=True, timeout=120)
+        if processo.returncode != 0 or not destino.is_file():
+            raise ImagemInvalida("A foto HEIC não pôde ser lida. Exporte como JPG no celular e envie de novo.")
+        with Image.open(destino) as arquivo:
+            arquivo.load()
+            return arquivo.convert("RGBA" if arquivo.mode in ("RGBA", "LA") else "RGB")
+
+
 def abrir_imagem(caminho: Path) -> Image.Image:
     """A imagem já girada pelo EXIF, em RGB ou RGBA (CMYK, paleta e 16 bits viram RGB/RGBA). O SVG é desenhado
     pelo Chromium do worker (core/utils/svg.py), em RGBA."""
@@ -58,6 +76,8 @@ def abrir_imagem(caminho: Path) -> Image.Image:
             return rasterizar_svg(caminho.read_bytes())
         except SvgInvalido as e:
             raise ImagemInvalida(str(e)) from e
+    if caminho.suffix.lower() in (".heic", ".heif"):
+        return _heif_pelo_ffmpeg(caminho)
     try:
         with Image.open(caminho) as arquivo:
             if arquivo.width * arquivo.height > PIXELS_MAXIMOS:

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     ProjetoCriarEntrada,
+    ProjetoDaImagemEntrada,
     ProjetoResumoSaida,
     ProjetoSaida,
     ProjetoSalvarEntrada,
@@ -20,17 +21,25 @@ from api.esquemas import (
     projeto_para_saida,
 )
 from api.rotas.exportacoes import apagar_exportacoes
-from core.modelos.midia import STATUS_PRONTA
+from core.modelos.midia import STATUS_PRONTA, e_imagem
 from core.modelos.projeto import (
+    FAIXA_VIDEO,
     capa_do_projeto,
     conferir_linha_do_tempo,
     duracao_do_projeto,
+    faixa_vazia,
     midias_usadas,
     montar_projeto,
+    novo_id,
     problema_nos_caminhos,
     proporcao_mais_perto,
+    tamanho_para_documento,
 )
 from core.utils.mongo import agora
+from core.utils.tempo import TICKS_POR_SEGUNDO
+
+# Cada camada do documento é um clipe de 5 s (DURACAO_DA_CAMADA no site)
+DURACAO_DA_CAMADA = 5 * TICKS_POR_SEGUNDO
 
 router = APIRouter(prefix="/api/projetos", tags=["projetos"])
 
@@ -89,6 +98,37 @@ async def criar_projeto(dados: ProjetoCriarEntrada, usuario=Depends(usuario_atua
     resultado = await db.projetos.insert_one(projeto)
     projeto["_id"] = resultado.inserted_id
     logging.info(f"[{usuario['organizacao_id']}] Projeto criado: {projeto['nome']}")
+    return projeto_para_saida(projeto)
+
+
+@router.post("/da-imagem", response_model=ProjetoSaida, status_code=status.HTTP_201_CREATED)
+async def projeto_da_imagem(dados: ProjetoDaImagemEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Arquivo › Abrir: a imagem da biblioteca vira um documento do tamanho dela, com ela como a camada única (e o
+    fundo transparente quando ela tem transparência)."""
+    midia = await db.midias.find_one({"_id": ObjectId(dados.midia_id), "organizacao_id": usuario["organizacao_id"]})
+    if midia is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Imagem não encontrada.")
+    if not e_imagem(midia) or midia.get("status") != STATUS_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A imagem ainda está sendo preparada.")
+    video = midia.get("video") or {}
+    tamanho = tamanho_para_documento(int(video.get("largura") or 1080), int(video.get("altura") or 1080))
+    nome = (midia.get("nome") or "Imagem").rsplit(".", 1)[0][:120] or "Imagem"
+    projeto = montar_projeto(usuario["organizacao_id"], usuario["_id"], nome, None, tamanho)
+    if video.get("transparente"):
+        projeto["fundo"] = {"cor": "#ffffff", "transparente": True}
+    camada = faixa_vazia(FAIXA_VIDEO)
+    duracao = DURACAO_DA_CAMADA
+    camada["clipes"] = [{
+        "id": novo_id(), "midia_id": str(midia["_id"]), "inicio": 0, "duracao": duracao, "entrada": 0,
+        "velocidade": 1, "volume": 1, "fade_entrada": 0, "fade_saida": 0,
+        "transformacao": {"x": 0, "y": 0, "escala": 1, "rotacao": 0, "opacidade": 1},
+        "recorte": {"x": 0, "y": 0, "largura": 1, "altura": 1},
+    }]
+    projeto["faixas"] = [camada, *projeto["faixas"]]
+    projeto["midias_usadas"] = [str(midia["_id"])]
+    projeto["duracao"] = duracao
+    projeto["_id"] = (await db.projetos.insert_one(projeto)).inserted_id
+    logging.info(f"[{usuario['organizacao_id']}] Imagem aberta como documento: {nome}")
     return projeto_para_saida(projeto)
 
 

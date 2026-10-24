@@ -56,6 +56,12 @@ def faixa_vazia(tipo: str) -> dict:
     return {"id": novo_id(), "tipo": tipo, "oculta": False, "muda": False, "travada": False, "clipes": []}
 
 
+def tamanho_para_documento(largura: int, altura: int) -> dict:
+    """O tamanho de um documento aberto de uma imagem: o dela, reduzido na proporção se passar dos limites."""
+    escala = min(1.0, LADO_MAXIMO_DA_IMAGEM / max(largura, altura), (AREA_MAXIMA_DA_IMAGEM / (largura * altura)) ** 0.5)
+    return {"largura": max(16, int(largura * escala)), "altura": max(16, int(altura * escala))}
+
+
 def montar_projeto(organizacao_id: str, usuario_id: str, nome: str | None = None,
                    proporcao: str | None = None, tamanho: dict | None = None) -> dict:
     """Com `tamanho` ({largura, altura} em pixels), um projeto de imagem."""

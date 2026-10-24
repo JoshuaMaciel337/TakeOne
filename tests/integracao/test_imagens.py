@@ -165,3 +165,60 @@ def test_logo_transparente_deixa_ver_o_que_esta_embaixo(cliente, db_limpo):
     for ponto in ((60, 60), (660, 360), (360, 680)):
         obtido = quadro[ponto[1], ponto[0]]
         assert max(abs(int(a) - b) for a, b in zip(obtido, FUNDO, strict=True)) < 40, (ponto, obtido)
+
+
+def test_bmp_gif_animado_e_tiff_de_16_bits_entram_como_fotos(cliente, db_limpo):
+    import numpy as np
+
+    from tests.integracao.test_exportacoes import organizacao_de
+
+    cadastrar(cliente)
+    org = organizacao_de(cliente)
+
+    def bmp(caminho):
+        Image.new("RGB", (64, 48), (200, 30, 30)).save(caminho, "BMP")
+
+    def gif(caminho):
+        quadros = [Image.new("RGB", (40, 30), cor) for cor in ((0, 200, 0), (0, 0, 200))]
+        quadros[0].save(caminho, "GIF", save_all=True, append_images=quadros[1:], duration=100)
+
+    def tiff(caminho):
+        Image.fromarray(np.full((20, 30), 40000, np.uint16)).save(caminho, "TIFF")
+
+    for nome, criar, tamanho in (("a.bmp", bmp, (64, 48)), ("b.gif", gif, (40, 30)), ("c.tif", tiff, (30, 20))):
+        midia = cliente.get(f"/api/midias/{enviar_imagem(db_limpo, org, nome, criar)}").json()
+        assert midia["status"] == "pronta" and midia["imagem"], (nome, midia.get("erro"))
+        assert (midia["video"]["largura"], midia["video"]["altura"]) == tamanho, nome
+
+
+def test_imagem_aberta_como_documento(cliente, db_limpo):
+    from tests.integracao.test_exportacoes import organizacao_de
+
+    cadastrar(cliente)
+    org = organizacao_de(cliente)
+
+    def foto(caminho):
+        Image.new("RGBA", (300, 200), (10, 120, 230, 128)).save(caminho, "PNG")
+
+    midia_id = str(enviar_imagem(db_limpo, org, "Logo da loja.png", foto))
+    aberta = cliente.post("/api/projetos/da-imagem", json={"midia_id": midia_id})
+    assert aberta.status_code == 201, aberta.text
+    projeto = aberta.json()
+    assert projeto["tipo"] == "imagem" and projeto["nome"] == "Logo da loja"
+    assert projeto["tamanho"] == {"largura": 300, "altura": 200} and projeto["fundo"]["transparente"]
+    camada = projeto["faixas"][0]["clipes"][0]
+    assert camada["midia_id"] == midia_id and camada["transformacao"]["escala"] == 1
+    # O documento abre e salva como qualquer outro
+    campos = ("versao", "nome", "proporcao", "taxa", "fundo", "tamanho", "faixas")
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json={k: projeto[k] for k in campos})
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.delete(f"/api/midias/{midia_id}").status_code == 409
+
+
+def test_tamanho_do_documento_aberto():
+    from core.modelos.projeto import tamanho_para_documento
+
+    assert tamanho_para_documento(300, 200) == {"largura": 300, "altura": 200}
+    assert tamanho_para_documento(16000, 4000)["largura"] == 8192
+    grande = tamanho_para_documento(9000, 9000)
+    assert grande["largura"] * grande["altura"] <= 36_000_000

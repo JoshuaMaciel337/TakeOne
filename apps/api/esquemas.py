@@ -1739,6 +1739,11 @@ class ImagemTextoEntrada(BaseModel):
     lado_menor: int = Field(default=1080, ge=100, le=2160, description="Lado menor do quadro, em pixels")
 
 
+class ProjetoDaImagemEntrada(BaseModel):
+    """Arquivo › Abrir do editor de imagem: a imagem enviada vira um documento do tamanho dela."""
+    midia_id: str = Field(pattern=r"^[0-9a-f]{24}$")
+
+
 class ProjetoCriarEntrada(BaseModel):
     nome: str | None = Field(default=None, min_length=1, max_length=120)
     proporcao: Literal["9:16", "16:9", "1:1", "4:5", "3:4", "21:9"] | None = None
