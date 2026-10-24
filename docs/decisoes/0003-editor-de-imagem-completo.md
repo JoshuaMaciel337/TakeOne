@@ -203,15 +203,15 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Texto de ponto e de parágrafo (caixa com quebra automática), um convertido no outro
 - [ ] Texto vertical e as máscaras de texto horizontal e vertical
 - [ ] Biblioteca grande de fontes livres, com prévia ao passar o mouse, estilos (pesos e itálicos) e envio de fontes do espaço
-- [ ] Painel Caractere: fonte, estilo, tamanho, entrelinha, kerning (métrica, óptico, manual), tracking, escala vertical e horizontal, deslocamento da linha de base, cor, negrito e itálico falsos, todas maiúsculas, versalete, sobrescrito, subscrito, sublinhado, tachado, OpenType (ligaduras, alternativos, frações, ordinais), eixos de fonte variável, antisserrilhamento
-- [ ] Painel Parágrafo: alinhar à esquerda, ao centro e à direita, justificar (última à esquerda, ao centro, à direita, tudo), recuos (início, fim, primeira linha), espaço antes e depois, hifenização
+- [x] Painel Caractere: fonte, estilo, tamanho, entrelinha, kerning (métrica, óptico, manual), tracking, escala vertical e horizontal, deslocamento da linha de base, cor, negrito e itálico falsos, todas maiúsculas, versalete, sobrescrito, subscrito, sublinhado, tachado, OpenType (ligaduras, alternativos, frações, ordinais), eixos de fonte variável, antisserrilhamento
+- [x] Painel Parágrafo: alinhar à esquerda, ao centro e à direita, justificar (última à esquerda, ao centro, à direita, tudo), recuos (início, fim, primeira linha), espaço antes e depois, hifenização
 - [ ] Estilos de caractere e de parágrafo; painel Glifos
 - [x] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
 - [ ] Texto em caminho (e dentro de uma forma)
 - [ ] Deformar texto: arco, arco inferior, arco superior, arco, saliência, concha inferior e superior, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torção
 - [ ] Converter em forma, Criar caminho de trabalho, Rasterizar
 - [ ] Localizar e substituir texto; Colar Lorem Ipsum; Atualizar todas as camadas de texto
-- [ ] Atalhos de formatação (Ctrl+Shift+K, U, B, I e /; Alt + setas para a entrelinha e o tracking)
+- [x] Atalhos de formatação (Ctrl+Shift+K, U, B, I e /; Alt + setas para a entrelinha e o tracking)
 
 ### Onda 13.9 — Estilos de camada e preenchimentos
 

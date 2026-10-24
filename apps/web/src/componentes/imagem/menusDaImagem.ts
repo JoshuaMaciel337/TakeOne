@@ -17,6 +17,8 @@ export const PAINEIS_DA_IMAGEM = {
   camadas: "Camadas",
   caminhos: "Caminhos",
   canais: "Canais",
+  caractere: "Caractere",
+  paragrafo: "Parágrafo",
   degrades: "Degradês",
   fonteDeClonagem: "Fonte de clonagem",
   configuracoesDoPincel: "Configurações do pincel",

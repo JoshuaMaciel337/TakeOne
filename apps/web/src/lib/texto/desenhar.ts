@@ -4,7 +4,7 @@
 // caixa do texto, no tamanho em que ela aparece (nítido em qualquer zoom), com o itálico e o negrito falsos e os
 // sublinhados e tachados. No de parágrafo, o que passa da caixa não aparece.
 import { type Disposicao, disporTexto } from "./layout";
-import type { TextoRico } from "./modelo";
+import type { Suavizacao, TextoRico } from "./modelo";
 import { fonteDoEstilo } from "./fontes";
 
 const CAMINHOS = new Map<string, Path2D>();
@@ -20,7 +20,9 @@ function caminhoDo(chave: string, svg: () => string): Path2D {
 }
 
 /** Desenha a disposição: `escala` pixels do canvas por pixel do documento, com a origem do texto em `origem`. */
-export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Disposicao, origem: { x: number; y: number }, escala: number) {
+export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Disposicao, origem: { x: number; y: number }, escala: number, suavizacao: Suavizacao = "nitida") {
+  // A suavização da camada: forte engrossa as letras um pouco; suave desfoca um terço de pixel do documento
+  if (suavizacao === "suave") ctx.filter = `blur(${(0.35 * escala).toFixed(3)}px)`;
   for (const g of disposicao.glifos) {
     if (g.glifo.caixa.x1 <= g.glifo.caixa.x0) continue;
     const caminho = caminhoDo(`${g.fonte.chave}#${g.glifo.id}`, g.glifo.caminho);
@@ -31,10 +33,10 @@ export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Di
     ctx.scale(g.escalaX, -g.escalaY);
     ctx.fillStyle = g.cor;
     ctx.fill(caminho);
-    if (g.negrito) {
+    if (g.negrito || suavizacao === "forte") {
       ctx.strokeStyle = g.cor;
       ctx.lineJoin = "round";
-      ctx.lineWidth = g.fonte.unidades * 0.035;
+      ctx.lineWidth = g.fonte.unidades * ((g.negrito ? 0.035 : 0) + (suavizacao === "forte" ? 0.012 : 0));
       ctx.stroke(caminho);
     }
     ctx.restore();
@@ -43,6 +45,7 @@ export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Di
     ctx.fillStyle = r.cor;
     ctx.fillRect((r.x0 + origem.x) * escala, (r.y - r.espessura / 2 + origem.y) * escala, (r.x1 - r.x0) * escala, r.espessura * escala);
   }
+  ctx.filter = "none";
 }
 
 const DESENHADOS = new Map<string, { chave: string; canvas: HTMLCanvasElement }>();
@@ -71,7 +74,13 @@ export function textoNoTamanho(id: string, texto: TextoRico, largura: number, al
     ctx.rect(0, 0, pl, pa);
     ctx.clip();
   }
-  desenharDisposicao(ctx, disposicao, texto.origem, escala);
+  desenharDisposicao(ctx, disposicao, texto.origem, escala, texto.estilo.suavizacao);
+  // Sem suavização, cada pixel fica inteiro ou vazio (a cor de quem fica é a das letras)
+  if (texto.estilo.suavizacao === "nenhuma") {
+    const dados = ctx.getImageData(0, 0, pl, pa);
+    for (let i = 3; i < dados.data.length; i += 4) dados.data[i] = dados.data[i] >= 128 ? 255 : 0;
+    ctx.putImageData(dados, 0, 0);
+  }
   DESENHADOS.delete(id);
   DESENHADOS.set(id, { chave, canvas });
   while (DESENHADOS.size > 64) DESENHADOS.delete(DESENHADOS.keys().next().value!);

@@ -12,7 +12,7 @@ import type { Virar } from "@/lib/projeto/modelo";
 import { type Disposicao, disporTexto } from "@/lib/texto/layout";
 import { fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { medirTexto } from "@/lib/texto/medida";
-import { type EstiloDoCaractere, substituir, textoCorrido, type TextoRico } from "@/lib/texto/modelo";
+import { type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, substituir, textoCorrido, type TextoRico } from "@/lib/texto/modelo";
 
 export type SelecaoDoTexto = { de: number; ate: number };
 
@@ -28,6 +28,11 @@ type Props = {
   /** O texto mudou (já medido). */
   aoMudar: (texto: TextoRico) => void;
   aoTerminar: () => void;
+  /** Os atalhos de formatação: uma mudança no que está escolhido (ou no que for digitado). */
+  aoEstilo?: (mudanca: Partial<EstiloDoCaractere>) => void;
+  aoParagrafo?: (mudanca: Partial<EstiloDoParagrafo>) => void;
+  /** Alt + setas com o cursor entre dois caracteres: soma ao kerning do par. */
+  aoKern?: (delta: number) => void;
 };
 
 /** O texto com a caixa e a origem medidas de novo (depois de cada mudança). */
@@ -113,7 +118,7 @@ export function trechoEmVolta(texto: string, disposicao: Disposicao, indice: num
   return { de, ate };
 }
 
-export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecionar, estiloPendente, aoMudar, aoTerminar }: Props) {
+export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecionar, estiloPendente, aoMudar, aoTerminar, aoEstilo, aoParagrafo, aoKern }: Props) {
   useVersaoDasFontes();
   const campoRef = useRef<HTMLTextAreaElement>(null);
   const arrasto = useRef<{ ancora: number } | null>(null);
@@ -197,6 +202,56 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
     aoSelecionar({ de: campo.selectionStart, ate: campo.selectionEnd });
   };
 
+  /**
+   * Os atalhos de formatação: Ctrl+Shift+K (maiúsculas), H (versalete), U (sublinhado), B e I (negrito e itálico
+   * falsos), / (tachado), = (sobrescrito; com Alt, subscrito), > e < (tamanho), L, C, R, J e F (alinhamento); Alt + setas
+   * para os lados mexem no tracking (com seleção) ou no kerning do par, e para cima e para baixo na entrelinha (com
+   * Ctrl, de 5 em 5 vezes).
+   */
+  const formatar = (evento: React.KeyboardEvent): boolean => {
+    const comando = evento.ctrlKey || evento.metaKey;
+    const comum = { ...texto.estilo, ...estiloComum(texto, selecao.de, selecao.ate), ...estiloPendente };
+    if (comando && evento.shiftKey) {
+      const mudancas: Record<string, Partial<EstiloDoCaractere>> = {
+        KeyK: { caixa: comum.caixa === "maiusculas" ? "normal" : "maiusculas" },
+        KeyH: { caixa: comum.caixa === "versalete" ? "normal" : "versalete" },
+        KeyU: { sublinhado: !comum.sublinhado },
+        KeyB: { negritoFalso: !comum.negritoFalso },
+        KeyI: { italicoFalso: !comum.italicoFalso },
+        Slash: { tachado: !comum.tachado },
+        IntlRo: { tachado: !comum.tachado },
+        Equal: evento.altKey ? { posicao: comum.posicao === "subscrito" ? "normal" : "subscrito" } : { posicao: comum.posicao === "sobrescrito" ? "normal" : "sobrescrito" },
+        Period: { tamanho: Math.min(5000, Math.round((comum.tamanho ?? 12) * 1.1 + 1)) },
+        Comma: { tamanho: Math.max(1, Math.round((comum.tamanho ?? 12) / 1.1 - 1)) },
+      };
+      const alinhamentos: Record<string, EstiloDoParagrafo["alinhamento"]> = { KeyL: "esquerda", KeyC: "centro", KeyR: "direita", KeyJ: "justificado-esquerda", KeyF: "justificado" };
+      if (mudancas[evento.code] && aoEstilo) {
+        aoEstilo(mudancas[evento.code]);
+        return true;
+      }
+      if (alinhamentos[evento.code] && aoParagrafo) {
+        aoParagrafo({ alinhamento: alinhamentos[evento.code] });
+        return true;
+      }
+      return false;
+    }
+    if (evento.altKey && !evento.shiftKey && evento.key.startsWith("Arrow")) {
+      const passo = comando ? 100 : 20;
+      if (evento.key === "ArrowLeft" || evento.key === "ArrowRight") {
+        const delta = evento.key === "ArrowRight" ? passo : -passo;
+        if (selecao.de === selecao.ate) aoKern?.(delta);
+        else aoEstilo?.({ tracking: Math.max(-1000, Math.min(10000, (comum.tracking ?? 0) + delta)) });
+        return true;
+      }
+      // A entrelinha automática começa dos 120% do tamanho; Alt + seta para cima aperta, para baixo abre
+      const entrelinha = comum.entrelinha ?? (comum.tamanho ?? 12) * 1.2;
+      const delta = (evento.key === "ArrowDown" ? 1 : -1) * (comando ? 10 : 2);
+      aoEstilo?.({ entrelinha: Math.max(0, Math.round(entrelinha + delta)) });
+      return true;
+    }
+    return false;
+  };
+
   /** As setas para cima e para baixo, Home e End, pelas linhas desenhadas (o campo escondido tem outras). */
   const aoTeclar = (evento: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (evento.key === "Escape" || (evento.key === "Enter" && (evento.ctrlKey || evento.metaKey))) {
@@ -207,6 +262,10 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
     }
     // As teclas do editor (atalhos de ferramenta, Delete da camada) não valem enquanto se digita
     evento.stopPropagation();
+    if (formatar(evento)) {
+      evento.preventDefault();
+      return;
+    }
     const linhaAcima = evento.key === (vertical ? "ArrowRight" : "ArrowUp");
     const linhaAbaixo = evento.key === (vertical ? "ArrowLeft" : "ArrowDown");
     if (!linhaAcima && !linhaAbaixo && evento.key !== "Home" && evento.key !== "End") return;

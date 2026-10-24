@@ -127,6 +127,22 @@ export function fonteDoEstilo(estilo: EstiloDoCaractere): FonteCarregada | null 
   return instancia;
 }
 
+export type EixoDaFonte = { tag: string; nome: string; min: number; padrao: number; max: number };
+
+/** Os eixos da fonte variável do estilo, fora o peso (largura, tamanho óptico, inclinação...); vazio até o arquivo chegar. */
+export function eixosDoEstilo(estilo: EstiloDoCaractere): EixoDaFonte[] {
+  const escolha = arquivoDoEstilo(estilo);
+  if (!escolha) return [];
+  const fonte = lidas.get(escolha.arquivo);
+  if (!fonte) {
+    void lerArquivo(escolha.arquivo);
+    return [];
+  }
+  return Object.entries(fonte.variationAxes ?? {})
+    .filter(([tag]) => tag !== "wght")
+    .map(([tag, eixo]) => ({ tag, nome: eixo.name, min: eixo.min, padrao: eixo.default, max: eixo.max }));
+}
+
 /** Espera o catálogo e as fontes de todos os trechos (a exportação, antes de desenhar). */
 export async function esperarFontes(textos: TextoRico[]): Promise<void> {
   await carregarCatalogo();

@@ -101,8 +101,9 @@ import { JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
 import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
+import { PainelCaractere, PainelParagrafo } from "./PaineisDoTexto";
 import { esperarFontes, useVersaoDasFontes } from "@/lib/texto/fontes";
-import { type Alinhamento as AlinhamentoDoTexto, aplicarEstilo, aplicarParagrafo, type EstiloDoCaractere, estiloComum, estiloEmTudo, estiloDoParagrafo, paragrafoDoIndice, paragrafoEmTudo, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
+import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
 import { novoId } from "@/componentes/editor/contexto";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
 import { type AcaoDaMascaraVetorial, PropriedadesDaMascaraVetorial } from "./PropriedadesDaMascaraVetorial";
@@ -161,7 +162,7 @@ const AREAS: Record<string, EstadoDaArea> = {
   essenciais: {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras", "formas"], ativa: "cor", altura: 190 },
-      { id: "g-propriedades", abas: ["propriedades", "ajustes", "biblioteca", "modelos"], ativa: "propriedades", altura: 340 },
+      { id: "g-propriedades", abas: ["propriedades", "caractere", "paragrafo", "ajustes", "biblioteca", "modelos"], ativa: "propriedades", altura: 340 },
       { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico"], ativa: "camadas" },
     ],
   },
@@ -175,7 +176,7 @@ const AREAS: Record<string, EstadoDaArea> = {
   grafico: {
     direita: [
       { id: "g-cor", abas: ["cor", "amostras"], ativa: "cor", altura: 190 },
-      { id: "g-propriedades", abas: ["propriedades", "estilos", "formas", "modelos"], ativa: "propriedades", altura: 340 },
+      { id: "g-propriedades", abas: ["propriedades", "caractere", "paragrafo", "estilos", "formas", "modelos"], ativa: "propriedades", altura: 340 },
       { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico", "biblioteca"], ativa: "camadas" },
     ],
   },
@@ -422,7 +423,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
   const [edicaoDeTexto, setEdicaoDeTexto] = useState<EdicaoDeTexto | null>(null);
   // As opções da ferramenta Texto para o próximo texto, e a fonte sob o mouse no seletor (a prévia mostra nela)
-  const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; alinhamento: AlinhamentoDoTexto; orientacao: TextoRico["orientacao"] }>({ estilo: {}, alinhamento: "esquerda", orientacao: "horizontal" });
+  const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo>; orientacao: TextoRico["orientacao"] }>({ estilo: {}, paragrafo: {}, orientacao: "horizontal" });
   const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
@@ -1989,7 +1990,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const documento = tamanhoDaImagem(projeto);
     const estilo = { tamanho: Math.max(12, Math.round(Math.min(documento.largura, documento.altura) / 18)), ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
     const base = textoNovo("", estilo, caixa ? "paragrafo" : "ponto");
-    const texto = textoMedido({ ...base, orientacao: opcoesDoTexto.orientacao, paragrafo: { ...base.paragrafo, alinhamento: opcoesDoTexto.alinhamento }, caixa: caixa ?? base.caixa });
+    const texto = textoMedido({ ...base, orientacao: opcoesDoTexto.orientacao, paragrafo: { ...base.paragrafo, ...opcoesDoTexto.paragrafo }, caixa: caixa ?? base.caixa });
     setSelecao([]);
     setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x, y }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
   };
@@ -2039,7 +2040,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, ...mudanca } }));
   };
-  const mudarParagrafoDoTexto = (mudanca: { alinhamento: AlinhamentoDoTexto }) => {
+  const mudarParagrafoDoTexto = (mudanca: Partial<EstiloDoParagrafo>) => {
     if (edicaoDeTexto) {
       setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(aplicarParagrafo(edicaoDeTexto.texto, edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate, mudanca)) });
       return;
@@ -2048,7 +2049,33 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido(paragrafoEmTudo(textoEscolhido.texto_rico, mudanca)) } });
       return;
     }
-    setOpcoesDoTexto((atual) => ({ ...atual, ...mudanca }));
+    setOpcoesDoTexto((atual) => ({ ...atual, paragrafo: { ...atual.paragrafo, ...mudanca } }));
+  };
+  /**
+   * O kerning manual: com o cursor entre dois caracteres, o par deles (o kern do de antes); com uma seleção, cada par
+   * dela; no texto escolhido, todos. `delta` soma ao que havia (Alt + setas).
+   */
+  const mudarKern = (valor: number, delta = false) => {
+    const limitar = (kern: number) => Math.max(-1000, Math.min(1000, kern));
+    if (edicaoDeTexto) {
+      const { de, ate } = edicaoDeTexto.selecao;
+      const a = de === ate ? de - 1 : Math.min(de, ate);
+      const b = de === ate ? de : Math.max(de, ate);
+      if (a < 0) return;
+      const atual = estiloComum(edicaoDeTexto.texto, a, b).kern ?? 0;
+      setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(aplicarEstilo(edicaoDeTexto.texto, a, b, { kern: limitar(delta ? atual + valor : valor) })) });
+      return;
+    }
+    if (textoEscolhido?.texto_rico) {
+      const atual = estiloComum(textoEscolhido.texto_rico, 0, textoCorrido(textoEscolhido.texto_rico).length).kern ?? 0;
+      executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido(estiloEmTudo(textoEscolhido.texto_rico, { kern: limitar(delta ? atual + valor : valor) })) } });
+    }
+  };
+  /** A suavização das bordas é da camada inteira. */
+  const mudarSuavizacao = (suavizacao: Suavizacao) => {
+    if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: estiloEmTudo(edicaoDeTexto.texto, { suavizacao }) });
+    else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: estiloEmTudo(textoEscolhido.texto_rico, { suavizacao }) } });
+    else setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, suavizacao } }));
   };
   const mudarOrientacaoDoTexto = (orientacao: TextoRico["orientacao"]) => {
     if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, orientacao }) });
@@ -2060,9 +2087,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     ? { ...estiloComum(edicaoDeTexto.texto, edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate), ...edicaoDeTexto.estiloPendente }
     : textoEscolhido?.texto_rico
       ? estiloComum(textoEscolhido.texto_rico, 0, textoCorrido(textoEscolhido.texto_rico).length)
-      : { familia: "inter", peso: 400, italico: false, tamanho: tamanhoDoDocumento ? Math.max(12, Math.round(Math.min(tamanhoDoDocumento.largura, tamanhoDoDocumento.altura) / 18)) : 48, ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
+      : { ...ESTILO_PADRAO, tamanho: tamanhoDoDocumento ? Math.max(12, Math.round(Math.min(tamanhoDoDocumento.largura, tamanhoDoDocumento.altura) / 18)) : 48, ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
   const textoDaBarra = edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico ?? null;
-  const alinhamentoNaBarra = textoDaBarra ? estiloDoParagrafo(textoDaBarra, textoDaBarra.paragrafos[paragrafoDoIndice(textoDaBarra, edicaoDeTexto?.selecao.ate ?? 0)]).alinhamento : opcoesDoTexto.alinhamento;
+  // O parágrafo: o comum dos parágrafos que a seleção toca (no texto escolhido, de todos)
+  const paragrafoNaBarra: Partial<EstiloDoParagrafo> = (() => {
+    if (!textoDaBarra) return { ...PARAGRAFO_PADRAO, ...opcoesDoTexto.paragrafo };
+    const de = edicaoDeTexto ? paragrafoDoIndice(textoDaBarra, Math.min(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate)) : 0;
+    const ate = edicaoDeTexto ? paragrafoDoIndice(textoDaBarra, Math.max(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate)) : textoDaBarra.paragrafos.length - 1;
+    const estilos = textoDaBarra.paragrafos.slice(de, ate + 1).map((paragrafo) => estiloDoParagrafo(textoDaBarra, paragrafo));
+    const comum: Partial<EstiloDoParagrafo> = { ...estilos[0] };
+    for (const estilo of estilos.slice(1)) for (const chave of Object.keys(comum) as (keyof EstiloDoParagrafo)[]) if (comum[chave] !== estilo[chave]) delete comum[chave];
+    return comum;
+  })();
+  const alinhamentoNaBarra = paragrafoNaBarra.alinhamento;
+  // O kerning manual do par do cursor (com seleção, em branco)
+  const kernNoCursor = edicaoDeTexto && edicaoDeTexto.selecao.de === edicaoDeTexto.selecao.ate && edicaoDeTexto.selecao.de > 0 ? (estiloComum(edicaoDeTexto.texto, edicaoDeTexto.selecao.de - 1, edicaoDeTexto.selecao.de).kern ?? 0) : null;
   // Trocar de ferramenta termina a edição
   useEffect(() => {
     if (ferramenta !== "texto" && edicaoDeTexto) terminarTexto();
@@ -3751,6 +3790,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ),
     },
+    caractere: {
+      nome: PAINEIS_DA_IMAGEM.caractere,
+      conteudo: (
+        <PainelCaractere
+          estilo={estiloNaBarra}
+          aoEstilo={mudarEstiloDoTexto}
+          aoPreverFonte={setFonteEmPrevia}
+          kernManual={kernNoCursor}
+          aoKern={(valor) => mudarKern(valor)}
+          suavizacao={(edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico)?.estilo.suavizacao ?? opcoesDoTexto.estilo.suavizacao}
+          aoSuavizacao={mudarSuavizacao}
+        />
+      ),
+    },
+    paragrafo: {
+      nome: PAINEIS_DA_IMAGEM.paragrafo,
+      conteudo: <PainelParagrafo paragrafo={paragrafoNaBarra} aoParagrafo={mudarParagrafoDoTexto} deParagrafo={(textoDaBarra?.modo ?? "paragrafo") === "paragrafo"} />,
+    },
     caminhos: {
       nome: PAINEIS_DA_IMAGEM.caminhos,
       conteudo: (
@@ -4008,6 +4065,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               aoAlinhamento={(alinhamento) => mudarParagrafoDoTexto({ alinhamento })}
               aoOrientacao={mudarOrientacaoDoTexto}
               edicao={edicaoDeTexto ? { aoConfirmar: () => terminarTexto(), aoCancelar: () => terminarTexto(true) } : null}
+              aoPaineis={() => area.abrir("caractere")}
             />
           ) : ferramenta === "prancheta" ? (
             <OpcoesDaPranchetaNaBarra
@@ -4345,6 +4403,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     aoSelecionar: (selecao) => setEdicaoDeTexto((atual) => (atual ? { ...atual, selecao, estiloPendente: selecao.de === atual.selecao.de && selecao.ate === atual.selecao.ate ? atual.estiloPendente : null } : atual)),
                     aoMudar: (texto) => setEdicaoDeTexto((atual) => (atual ? { ...atual, texto } : atual)),
                     aoTerminar: () => terminarTexto(),
+                    aoEstilo: mudarEstiloDoTexto,
+                    aoParagrafo: mudarParagrafoDoTexto,
+                    aoKern: (delta) => mudarKern(delta, true),
                   }
                 : null
             }
