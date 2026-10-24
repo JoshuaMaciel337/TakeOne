@@ -872,6 +872,19 @@ class MascaraVetorialEntrada(BaseModel):
         return self
 
 
+class FundoDaPrancheta(BaseModel):
+    cor: str = Field(default="#ffffff", pattern=COR)
+    transparente: bool = False
+
+
+class PranchetaEntrada(BaseModel):
+    """Uma prancheta do editor de imagem (numa pasta da raiz): o tamanho em pixels do documento e o fundo; o meio é o
+    da transformação do clipe."""
+    largura: float = Field(ge=1, le=8192)
+    altura: float = Field(ge=1, le=8192)
+    fundo: FundoDaPrancheta = Field(default_factory=FundoDaPrancheta)
+
+
 class CaminhoDoDocumento(BaseModel):
     """Um caminho do painel Caminhos do editor de imagem, em pixels do documento (lib/vetor/caminhos.ts)."""
     id: str = Field(min_length=1, max_length=40)
@@ -949,6 +962,7 @@ class ClipeEntrada(BaseModel):
     # Camada vetorial (forma ou caminho): sem mídia nem texto, desenhada pelo editor
     vetor: VetorEntrada | None = None
     mascara_vetorial: MascaraVetorialEntrada | None = None
+    prancheta: PranchetaEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)

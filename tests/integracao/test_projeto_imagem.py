@@ -100,6 +100,26 @@ def test_camada_vetorial(cliente):
     assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
 
 
+def test_pranchetas(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    foto = criar_midia(db_limpo, cliente)
+    prancheta = {"largura": 400, "altura": 300, "fundo": {"cor": "#ff4040", "transparente": False}}
+    pasta = {**clipe(None, 0, 5, id_="p1"), "midia_id": None, "pasta": True, "mesclagem": "normal",
+             "prancheta": prancheta}
+    dentro = {**camada("video", clipe(foto, 0, 5, id_="foto")), "pai": "f-p1"}
+    faixas = [{**camada("video", pasta), "nome": "Capa"}, dentro, {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["prancheta"] == prancheta
+    # A prancheta é um grupo da raiz: numa camada comum, ou dentro de outra pasta, não vale
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    comum = {**clipe(foto, 0, 5, id_="c2"), "prancheta": prancheta}
+    assert salvar(cliente, aberto, [camada("video", comum), faixas[2]]).status_code == 422
+    aninhada = {**camada("video", {**pasta, "id": "p2"}), "pai": "f-p1"}
+    assert salvar(cliente, aberto, [faixas[0], aninhada, faixas[2]]).status_code == 422
+
+
 def test_quadro_com_foto(cliente, db_limpo):
     cadastrar(cliente)
     projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()

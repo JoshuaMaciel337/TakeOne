@@ -182,6 +182,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
         if not imagem:
             if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None or c.get("pixels")
                                 or c.get("mascara_pixels") or c.get("vetor") or c.get("mascara_vetorial")
+                                or c.get("prancheta")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels, formas vetoriais e os modos de mesclagem"
                         " novos só existem no editor de imagem.")
@@ -192,6 +193,8 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
             return "A pasta fica numa faixa de sobreposição, sem mídia nem texto."
         if clipe and clipe.get("mesclagem") == "passagem" and not clipe.get("pasta"):
             return "Só uma pasta usa a mesclagem Passagem."
+        if clipe and clipe.get("prancheta") and (not clipe.get("pasta") or faixa.get("pai")):
+            return "A prancheta é um grupo da raiz, fora das outras pastas."
         if faixa.get("fundo"):
             da_raiz = [f for f in faixas if f.get("tipo") != FAIXA_PRINCIPAL and f.get("clipes") and not f.get("pai")]
             if not (clipe and clipe.get("pixels")) or faixa.get("pai") or not da_raiz or da_raiz[-1] is not faixa:
