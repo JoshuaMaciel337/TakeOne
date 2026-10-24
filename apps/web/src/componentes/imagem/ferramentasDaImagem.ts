@@ -33,6 +33,8 @@ import {
   ZoomIn,
   CircleDashed,
   Spline,
+  Stamp,
+  Grid3x3,
 } from "lucide-react";
 
 import type { TipoDeForma } from "@/lib/elementos";
@@ -59,6 +61,8 @@ export type IdFerramentaDaImagem =
   | "degrade"
   | "balde"
   | "historico"
+  | "carimbo"
+  | "carimboDePadrao"
   | "historicoArtistico"
   | "texto"
   | "retangulo"
@@ -106,6 +110,10 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
     F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
+  ],
+  [
+    F("carimbo", "Ferramenta Carimbo", "S", Stamp, "Alt + clique marca de onde copiar; pinte para copiar dali (painel Fonte de clonagem)."),
+    F("carimboDePadrao", "Ferramenta Carimbo de padrão", "S", Grid3x3, "Pinte com o padrão escolhido na barra."),
   ],
   [
     F("historico", "Ferramenta Pincel do histórico", "Y", History, "Pinte para voltar a camada ao estado marcado como fonte no Histórico."),
@@ -167,7 +175,7 @@ export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set
 export const FERRAMENTAS_DE_PONTO: ReadonlySet<IdFerramentaDaImagem> = new Set(["degrade", "balde", "borrachaMagica"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
-export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico"]);
+export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao"]);
 
 /** O grupo de uma ferramenta (as do mesmo grupo dividem a tecla; Shift + tecla passa à seguinte). */
 export function grupoDa(id: IdFerramentaDaImagem): FerramentaDaImagem[] {

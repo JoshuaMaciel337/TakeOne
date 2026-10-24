@@ -15,7 +15,10 @@ export type PontaDoPincel = "redonda" | IdDaPonta | IdDaPontaPersonalizada;
 export type PontoDoTraco = { x: number; y: number; pressao: number; inclinacaoX?: number; inclinacaoY?: number; giro?: number; direcao?: number };
 
 /** As ferramentas que pintam numa camada de pixels (os dois pincéis do histórico pintam com um estado anterior). */
-export type FerramentaDePintura = "pincel" | "lapis" | "borracha" | "historico" | "historicoArtistico";
+export type FerramentaDePintura = "pincel" | "lapis" | "borracha" | "historico" | "historicoArtistico" | "carimbo" | "carimboDePadrao";
+
+/** As ferramentas que levam a camada em direção a outra imagem (a fonte): o histórico e os carimbos. */
+export const PINTAM_COM_A_FONTE: ReadonlySet<FerramentaDePintura> = new Set(["historico", "carimbo", "carimboDePadrao"]);
 
 /** Os estilos do pincel do histórico artístico: o comprimento e a curva dos traços pequenos. */
 export const ESTILOS_ARTISTICOS = [

@@ -146,8 +146,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.5 — Retoque e pintura avançada
 
-- [ ] Carimbo (S) e Carimbo de padrão, com alinhado e amostra (camada atual, atual e abaixo, todas)
-- [ ] Painel Fonte de clonagem (fontes, sobreposição, deslocamento, escala e giro)
+- [x] Carimbo (S) e Carimbo de padrão, com alinhado e amostra (camada atual, atual e abaixo, todas)
+- [x] Painel Fonte de clonagem (fontes, sobreposição, deslocamento, escala e giro)
 - [ ] Pincel de recuperação (com a correspondência de tom) e Pincel de recuperação para manchas (sensível ao conteúdo, criar textura, correspondência por proximidade)
 - [ ] Correção (normal, de origem ou de destino; sensível ao conteúdo, com estrutura e cor)
 - [ ] Mover sensível ao conteúdo (mover e estender)

@@ -67,6 +67,7 @@ import { juntarTraco } from "@/lib/pintura/mesclar";
 import { type Degrade, pixelsDoDegrade, tabelaDoDegrade } from "@/lib/pintura/degrade";
 import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
 import { JanelaEditorDeDegrade, PainelDegrades } from "./Degrades";
+import { CARIMBO_PADRAO, type FonteDeClonagem, type OpcoesDoCarimbo, OpcoesDoCarimboNaBarra, PainelFonteDeClonagem } from "./FonteDeClonagem";
 import { BALDE_PADRAO, BORRACHA_MAGICA_PADRAO, DEGRADE_PADRAO, OpcoesDaBorrachaMagicaNaBarra, OpcoesDoBaldeNaBarra, OpcoesDoDegradeNaBarra } from "./OpcoesDosPontos";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCor } from "@/lib/pintura/operacoes";
@@ -184,7 +185,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     borracha: { ...PINCEL_PADRAO, tamanho: 40 },
     historico: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
     historicoArtistico: { ...PINCEL_PADRAO, tamanho: 6, dureza: 0.6, fluxo: 0.85 },
+    carimbo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+    carimboDePadrao: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
   });
+  // O carimbo: as cinco fontes de clonagem (o ponto do Alt + clique e o deslocamento), a da vez e as opções
+  const [fontesDeClonagem, setFontesDeClonagem] = useState<(FonteDeClonagem | null)[]>([null, null, null, null, null]);
+  const [fonteAtiva, setFonteAtiva] = useState(0);
+  const [opcoesDoCarimbo, setOpcoesDoCarimbo] = useState<OpcoesDoCarimbo>(CARIMBO_PADRAO);
+  const [sobreposicaoDaFonte, setSobreposicaoDaFonte] = useState<HTMLCanvasElement | null>(null);
   // Os instantâneos do Histórico (da sessão, como nos editores de imagem) e a fonte dos pincéis do histórico
   const [instantaneos, setInstantaneos] = useState<{ id: string; nome: string; projeto: Projeto }[]>([]);
   const [fonteDoHistorico, setFonteDoHistorico] = useState("passo:0");
@@ -1386,7 +1394,109 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     imagem.close();
     return canvas;
   };
-  const alvoDaPintura = async (): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
+  /** A imagem de onde o carimbo copia, no documento: a camada (pelo motor dela), a camada e as de baixo, ou todas. */
+  const imagemDaAmostra = async (clipe: Clipe, pintura: Pintura, tamanho: { largura: number; altura: number }): Promise<HTMLCanvasElement> => {
+    const atual = projetoRef.current!;
+    const documento = tamanhoDaImagem(atual);
+    const canvas = document.createElement("canvas");
+    canvas.width = documento.largura;
+    canvas.height = documento.altura;
+    const ctx2d = canvas.getContext("2d")!;
+    // Numa camada de pixels ainda vazia (a que nasce ao carimbar sobre uma foto), a camada atual não tem o que copiar
+    const amostra = opcoesDoCarimbo.amostra === "atual" && clipe.pixels?.versao === 0 ? "atualEAbaixo" : opcoesDoCarimbo.amostra;
+    if (amostra === "atual") {
+      ctx2d.setTransform(...matrizDaCamada(clipe, tamanho, documento));
+      ctx2d.drawImage(pintura.camada, 0, 0);
+      return canvas;
+    }
+    let projetoDaAmostra = atual;
+    if (amostra === "atualEAbaixo") {
+      // As camadas acima da escolhida ficam escondidas
+      const ordem = faixasEmOrdem(atual);
+      const indice = ordem.findIndex((faixa) => faixa.clipes[0]?.id === clipe.id);
+      const acima = new Set(ordem.slice(0, Math.max(0, indice)).map((faixa) => faixa.id));
+      projetoDaAmostra = { ...atual, faixas: atual.faixas.map((faixa) => (acima.has(faixa.id) ? { ...faixa, oculta: true } : faixa)) };
+    }
+    const imagem = await createImageBitmap(await exportarImagem(projetoDaAmostra, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+    ctx2d.drawImage(imagem, 0, 0, documento.largura, documento.altura);
+    imagem.close();
+    return canvas;
+  };
+  /** O que o carimbo pinta, no documento: a fonte levada ao destino (o deslocamento, a escala e o giro). */
+  const fonteTransformada = (imagem: CanvasImageSource, fonte: FonteDeClonagem, deslocamento: { x: number; y: number }, documento: { largura: number; altura: number }) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = documento.largura;
+    canvas.height = documento.altura;
+    const ctx2d = canvas.getContext("2d")!;
+    ctx2d.translate(fonte.ponto.x + deslocamento.x, fonte.ponto.y + deslocamento.y);
+    ctx2d.rotate((opcoesDoCarimbo.angulo * Math.PI) / 180);
+    ctx2d.scale(opcoesDoCarimbo.escalaX, opcoesDoCarimbo.escalaY);
+    ctx2d.translate(-fonte.ponto.x, -fonte.ponto.y);
+    ctx2d.drawImage(imagem, 0, 0);
+    return canvas;
+  };
+  /**
+   * A fonte da tinta do carimbo na camada (do tamanho dela): o padrão ladrilhado (alinhado ao documento, ou ao começo
+   * do traço), ou a amostra copiada da fonte de clonagem pelo deslocamento (alinhado: o do primeiro traço; senão, o
+   * deste traço).
+   */
+  const fonteDoCarimbo = async (inicio: { x: number; y: number }, clipe: Clipe, pintura: Pintura, tamanho: { largura: number; altura: number }): Promise<HTMLCanvasElement | null> => {
+    const documento = tamanhoDaImagem(projetoRef.current!);
+    const naCamada = (doc: HTMLCanvasElement) => {
+      const saida = document.createElement("canvas");
+      saida.width = tamanho.largura;
+      saida.height = tamanho.altura;
+      const ctx2d = saida.getContext("2d")!;
+      ctx2d.setTransform(...inverter(matrizDaCamada(clipe, tamanho, documento)));
+      ctx2d.drawImage(doc, 0, 0);
+      return saida;
+    };
+    if (ferramenta === "carimboDePadrao") {
+      const doc = document.createElement("canvas");
+      doc.width = documento.largura;
+      doc.height = documento.altura;
+      const ctx2d = doc.getContext("2d")!;
+      const padrao = ctx2d.createPattern(ladrilhoDoPadrao(opcoesDoCarimbo.padrao, cores.primeiroPlano, cores.fundo), "repeat")!;
+      if (!opcoesDoCarimbo.alinhado) padrao.setTransform(new DOMMatrix().translate(inicio.x, inicio.y));
+      ctx2d.fillStyle = padrao;
+      ctx2d.fillRect(0, 0, documento.largura, documento.altura);
+      return naCamada(doc);
+    }
+    const fonte = fontesDeClonagem[fonteAtiva];
+    if (!fonte) {
+      mostrarAviso("Marque de onde copiar: Alt + clique com o carimbo.");
+      return null;
+    }
+    const deslocamento = opcoesDoCarimbo.alinhado && fonte.deslocamento ? fonte.deslocamento : { x: inicio.x - fonte.ponto.x, y: inicio.y - fonte.ponto.y };
+    setFontesDeClonagem((atual) => atual.map((item, i) => (i === fonteAtiva && item ? { ...item, deslocamento } : item)));
+    return naCamada(fonteTransformada(await imagemDaAmostra(clipe, pintura, tamanho), fonte, deslocamento, documento));
+  };
+  // A sobreposição da fonte de clonagem: a imagem inteira levada pelo deslocamento da fonte da vez
+  const fonteDaVez = fontesDeClonagem[fonteAtiva];
+  const chaveDaSobreposicao = ferramenta === "carimbo" && opcoesDoCarimbo.sobreposicao && fonteDaVez?.deslocamento ? JSON.stringify([fonteDaVez, opcoesDoCarimbo.escalaX, opcoesDoCarimbo.escalaY, opcoesDoCarimbo.angulo]) : null;
+  const lerSobreposicao = useEffectEvent((vivo: { atual: boolean }) => {
+    const fonte = fontesDeClonagem[fonteAtiva];
+    if (!fonte?.deslocamento || !projeto) return;
+    const deslocamento = fonte.deslocamento;
+    imagemParaSelecao(true)
+      .then((imagem) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = imagem.largura;
+        canvas.height = imagem.altura;
+        canvas.getContext("2d")!.putImageData(new ImageData(Uint8ClampedArray.from(imagem.dados), imagem.largura, imagem.altura), 0, 0);
+        if (vivo.atual) setSobreposicaoDaFonte(fonteTransformada(canvas, fonte, deslocamento, tamanhoDaImagem(projeto)));
+      })
+      .catch(() => undefined);
+  });
+  useEffect(() => {
+    if (!chaveDaSobreposicao) return;
+    const vivo = { atual: true };
+    lerSobreposicao(vivo);
+    return () => {
+      vivo.atual = false;
+    };
+  }, [chaveDaSobreposicao]);
+  const alvoDaPintura = async (inicio: { x: number; y: number }): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
     // Na máscara rápida, todo pincel pinta a seleção (do tamanho do documento, parada no lugar)
@@ -1464,7 +1574,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (!alvo) return null;
     try {
       const pintura = await pinturas.preparar(alvo, tamanhoDaCamada);
-      return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia) };
+      // Os carimbos pintam em direção à fonte deles (como o pincel do histórico)
+      let fonteDaTinta: HTMLCanvasElement | undefined;
+      if (ferramenta === "carimbo" || ferramenta === "carimboDePadrao") {
+        const fonte = await fonteDoCarimbo(inicio, achado.clipe, pintura, tamanhoDaCamada);
+        if (!fonte) return null;
+        fonteDaTinta = fonte;
+      }
+      return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia), fonteDaTinta };
     } catch {
       mostrarAviso("Não foi possível abrir a camada para pintar. Tente de novo.");
       return null;
@@ -2051,6 +2168,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       ),
     },
+    fonteDeClonagem: {
+      nome: PAINEIS_DA_IMAGEM.fonteDeClonagem,
+      conteudo: (
+        <PainelFonteDeClonagem
+          fontes={fontesDeClonagem}
+          ativa={fonteAtiva}
+          opcoes={opcoesDoCarimbo}
+          aoEscolher={setFonteAtiva}
+          aoMudar={(mudanca) => setOpcoesDoCarimbo((atual) => ({ ...atual, ...mudanca }))}
+          aoMudarDeslocamento={(deslocamento) => setFontesDeClonagem((atual) => atual.map((item, i) => (i === fonteAtiva && item ? { ...item, deslocamento } : item)))}
+        />
+      ),
+    },
     degrades: {
       nome: PAINEIS_DA_IMAGEM.degrades,
       conteudo: (
@@ -2253,6 +2383,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         aoMudarPincel={mudarPincel}
         simetria={simetria}
         aoMudarSimetria={setSimetria}
+        extraDoPincel={
+          ferramenta === "carimbo" || ferramenta === "carimboDePadrao" ? (
+            <OpcoesDoCarimboNaBarra padrao={ferramenta === "carimboDePadrao"} opcoes={opcoesDoCarimbo} aoMudar={(mudanca) => setOpcoesDoCarimbo((atual) => ({ ...atual, ...mudanca }))} />
+          ) : undefined
+        }
         opcoesProprias={
           ferramenta === "balde" ? (
             <OpcoesDoBaldeNaBarra opcoes={opcoesDoBalde} aoMudar={(mudanca) => setOpcoesDoBalde((atual) => ({ ...atual, ...mudanca }))} />
@@ -2340,6 +2475,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     opcoes: pinceis[ferramentaDePintura],
                     cores,
                     aoPedirAlvo: alvoDaPintura,
+                    aoAltClique:
+                      ferramenta === "carimbo"
+                        ? (ponto) => {
+                            setFontesDeClonagem((atual) => atual.map((item, i) => (i === fonteAtiva ? { ponto, deslocamento: null } : item)));
+                            setSobreposicaoDaFonte(null);
+                          }
+                        : undefined,
                     aoQuadro: mascaraRapida ? () => setQuadroDaRapida((atual) => atual + 1) : pinturas.avisarQuadro,
                     aoSoltar: (clipeId) => (clipeId === CHAVE_DA_MASCARA_RAPIDA ? setQuadroDaRapida((atual) => atual + 1) : pinturas.soltar(clipeId)),
                     aoAjustar: mudarPincel,
@@ -2364,6 +2506,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   : null
             }
             corAVista={canalDaVez ? null : corAVista}
+            sobreposicao={chaveDaSobreposicao && sobreposicaoDaFonte ? { imagem: sobreposicaoDaFonte, opacidade: opcoesDoCarimbo.opacidadeDaSobreposicao } : null}
+            pontoDaFonte={ferramenta === "carimbo" ? (fonteDaVez?.ponto ?? null) : null}
             ponto={
               FERRAMENTAS_DE_PONTO.has(ferramenta)
                 ? ferramenta === "degrade"

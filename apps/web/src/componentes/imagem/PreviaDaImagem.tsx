@@ -84,7 +84,8 @@ type Props = {
     opcoes: OpcoesDoPincel;
     cores: { primeiroPlano: string; fundo: string };
     /** A camada do traço (a caixa vem daqui, da prévia); null quando não dá para pintar. */
-    aoPedirAlvo: () => Promise<Omit<AlvoDaPintura, "caixa"> | null>;
+    aoPedirAlvo: (inicio: { x: number; y: number }) => Promise<Omit<AlvoDaPintura, "caixa"> | null>;
+    aoAltClique?: (ponto: { x: number; y: number }) => void;
     aoQuadro: () => void;
     aoSoltar: (clipeId: string) => void;
     aoAjustar: (mudanca: Partial<OpcoesDoPincel>) => void;
@@ -109,6 +110,10 @@ type Props = {
    * selecionados (Alt leva uma cópia). Os deslocamentos vão em pixels do documento, desde o começo do arrasto.
    */
   moverPixels?: { caixa: { x0: number; y0: number; x1: number; y1: number }; aoComecar: (duplicar: boolean) => void; aoMover: (dx: number, dy: number) => void; aoSoltar: (dx: number, dy: number) => void } | null;
+  /** A sobreposição da fonte de clonagem: a imagem que o carimbo pinta, meio transparente sobre o documento. */
+  sobreposicao?: { imagem: HTMLCanvasElement; opacidade: number } | null;
+  /** O ponto da fonte de clonagem (pixels do documento), marcado com uma cruz. */
+  pontoDaFonte?: { x: number; y: number } | null;
   /** O Degradê, o Balde de tinta e a Borracha mágica: um clique ou um arrasto em pixels do documento. */
   ponto?: { modo: "clique" | "arrasto"; aoClicar?: (ponto: { x: number; y: number }, teclas: { shift: boolean; alt: boolean }) => void; aoArrastar?: (de: { x: number; y: number }, ate: { x: number; y: number }) => void } | null;
   /** A transformação livre em andamento (a da seleção): a caixa com as alças, por cima de tudo. */
@@ -131,6 +136,19 @@ type Props = {
     aoVarinha: (ponto: { x: number; y: number }, modo: ModoDaSelecao) => void;
   } | null;
 };
+
+/** A imagem da fonte de clonagem sobre a prévia (do tamanho do documento, esticada para o quadro). */
+function SobreposicaoDaFonte({ imagem, opacidade, tamanho }: { imagem: HTMLCanvasElement; opacidade: number; tamanho: Tamanho }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    canvas.width = Math.max(1, Math.round(tamanho.largura));
+    canvas.height = Math.max(1, Math.round(tamanho.altura));
+    canvas.getContext("2d")!.drawImage(imagem, 0, 0, canvas.width, canvas.height);
+  }, [imagem, tamanho.largura, tamanho.altura]);
+  return <canvas ref={ref} className="pointer-events-none absolute inset-0 size-full" style={{ opacity: opacidade }} aria-hidden />;
+}
 
 /** O tamanho da área livre da prévia. */
 function useArea() {
@@ -185,6 +203,8 @@ export function PreviaDaImagem({
   transformacao = null,
   moverPixels = null,
   ponto = null,
+  sobreposicao = null,
+  pontoDaFonte = null,
 }: Props) {
   const arrastandoPixels = useRef<{ x: number; y: number } | null>(null);
   const imagem = tamanhoDaImagem(projeto);
@@ -580,6 +600,21 @@ export function PreviaDaImagem({
               />
             ) : null}
             {veu && tamanho.largura > 1 ? <VeuDaMascaraRapida fonte={veu.fonte} tamanho={tamanho} quadro={veu.quadro} cinza={veu.cinza} /> : null}
+            {sobreposicao && tamanho.largura > 1 ? <SobreposicaoDaFonte imagem={sobreposicao.imagem} opacidade={sobreposicao.opacidade} tamanho={tamanho} /> : null}
+            {pontoDaFonte && tamanho.largura > 1 ? (
+              <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+                {(() => {
+                  const x = (pontoDaFonte.x * tamanho.largura) / imagem.largura;
+                  const y = (pontoDaFonte.y * tamanho.altura) / imagem.altura;
+                  return (
+                    <g stroke="#fff" strokeWidth={1} style={{ filter: "drop-shadow(0 0 1px #000)" }}>
+                      <line x1={x - 8} y1={y} x2={x + 8} y2={y} />
+                      <line x1={x} y1={y - 8} x2={x} y2={y + 8} />
+                    </g>
+                  );
+                })()}
+              </svg>
+            ) : null}
             {ponto && !transformacao && !maoAtiva && !recorte && tamanho.largura > 1 ? <PontoNaPrevia modo={ponto.modo} quadro={tamanho} documento={imagem} aoClicar={ponto.aoClicar} aoArrastar={ponto.aoArrastar} /> : null}
             {moverPixels && !transformacao && !maoAtiva && tamanho.largura > 1 ? (
               <div
@@ -659,8 +694,9 @@ export function PreviaDaImagem({
                 cores={pintura.cores}
                 quadro={tamanho}
                 escalaDaImagem={tamanho.largura / imagem.largura}
-                aoPedirAlvo={() =>
-                  pintura.aoPedirAlvo().then((alvo) => (alvo ? { ...alvo, caixa: camadas.find((camada) => camada.clipe.id === alvo.clipeId)?.caixa ?? null } : null))
+                aoAltClique={pintura.aoAltClique}
+                aoPedirAlvo={(inicio) =>
+                  pintura.aoPedirAlvo(inicio).then((alvo) => (alvo ? { ...alvo, caixa: camadas.find((camada) => camada.clipe.id === alvo.clipeId)?.caixa ?? null } : null))
                 }
                 aoQuadro={pintura.aoQuadro}
                 aoSoltar={pintura.aoSoltar}

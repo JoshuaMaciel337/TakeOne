@@ -36,8 +36,11 @@ type Props = {
   /** O quadro na tela, em pixels, e quantos pixels da tela há num pixel da imagem. */
   quadro: Tamanho;
   escalaDaImagem: number;
-  /** A camada do traço (a de pixels escolhida, ou uma nova); null quando não dá para pintar (o aviso já saiu). */
-  aoPedirAlvo: () => Promise<AlvoDaPintura | null>;
+  /** A camada do traço (a de pixels escolhida, ou uma nova); null quando não dá para pintar (o aviso já saiu). Recebe o
+   * começo do traço em pixels do documento (o carimbo acha o deslocamento por ele). */
+  aoPedirAlvo: (inicio: { x: number; y: number }) => Promise<AlvoDaPintura | null>;
+  /** Alt + clique (o carimbo): o ponto em pixels do documento, sem pintar. */
+  aoAltClique?: (ponto: { x: number; y: number }) => void;
   aoQuadro: () => void;
   aoSoltar: (clipeId: string) => void;
   /** Alt + botão direito arrastando: para os lados muda o tamanho, para cima e para baixo a dureza. */
@@ -79,7 +82,7 @@ function daCaneta(evento: PointerEvent | React.PointerEvent): Omit<PontoDoTraco,
   return { pressao: evento.pressure > 0 ? evento.pressure : 1, inclinacaoX: (evento.tiltX ?? 0) / 90, inclinacaoY: (evento.tiltY ?? 0) / 90, giro: evento.twist ?? 0 };
 }
 
-export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false, selecao = null }: Props) {
+export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaImagem, aoPedirAlvo, aoQuadro, aoSoltar, aoAjustar, simetria, emCinza = false, selecao = null, aoAltClique }: Props) {
   const centro = { x: quadro.largura / 2, y: quadro.altura / 2 };
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const tracoRef = useRef<Traco | null>(null);
@@ -145,6 +148,11 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
     }
     if (evento.button !== 0) return;
     evento.stopPropagation();
+    if (evento.altKey && aoAltClique) {
+      const p = noQuadro(evento, evento.currentTarget);
+      aoAltClique({ x: p.x / escalaDaImagem, y: p.y / escalaDaImagem });
+      return;
+    }
     evento.currentTarget.setPointerCapture(evento.pointerId);
     const ponto = { ...noQuadro(evento, evento.currentTarget), ...daCaneta(evento) };
     // A lápis e a borracha de lápis não suavizam: o pixel vai onde o mouse está
@@ -158,7 +166,7 @@ export function PinturaNaPrevia({ ferramenta, opcoes, cores, quadro, escalaDaIma
       ultimasMarcas: [],
     };
     tracoRef.current = traco;
-    void aoPedirAlvo().then((alvo) => {
+    void aoPedirAlvo({ x: ponto.x / escalaDaImagem, y: ponto.y / escalaDaImagem }).then((alvo) => {
       if (tracoRef.current !== traco && !traco.soltou) return;
       if (!alvo) {
         tracoRef.current = null;

@@ -64,6 +64,8 @@ type Props = {
   aoMudarSimetria?: (simetria: Simetria | null) => void;
   /** As ferramentas da seleção do documento: as opções, se há seleção (e numa foto) e o Desmarcar. */
   selecaoDoDocumento?: { opcoes: OpcoesDaSelecao; aoMudar: (mudanca: Partial<OpcoesDaSelecao>) => void; temSelecao: boolean; naFoto: boolean; aoDesmarcar: () => void };
+  /** As opções próprias de uma ferramenta de pintura (o carimbo: alinhado e amostra), depois das do pincel. */
+  extraDoPincel?: React.ReactNode;
   /** As opções que o editor monta (Degradê, Balde de tinta, Borracha mágica): ficam no lugar das daqui. */
   opcoesProprias?: React.ReactNode;
   /** A transformação livre em andamento: os modos, confirmar (Enter) e cancelar (Esc). */
@@ -379,7 +381,7 @@ export function BarraDeOpcoes(props: Props) {
     ) : (
       <span className="text-suave">Clique na imagem para escrever; o texto sai na cor de primeiro plano. Clique num texto para mudar a fonte, o tamanho e a cor.</span>
     );
-  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha" || ferramenta === "historico" || ferramenta === "historicoArtistico") && props.pincel && props.aoMudarPincel) {
+  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha" || ferramenta === "historico" || ferramenta === "historicoArtistico" || ferramenta === "carimbo" || ferramenta === "carimboDePadrao") && props.pincel && props.aoMudarPincel) {
     const pincel = props.pincel;
     const mudar = props.aoMudarPincel;
     const porcento = (valor: number) => Math.round(valor * 100);
@@ -483,6 +485,12 @@ export function BarraDeOpcoes(props: Props) {
             {props.simetria && (props.simetria.tipo === "radial" || props.simetria.tipo === "mandala") ? (
               <Numero rotulo="Segmentos" valor={props.simetria.segmentos} minimo={2} maximo={12} largura="w-9" aoMudar={(segmentos) => props.aoMudarSimetria!({ ...props.simetria!, segmentos: Math.round(segmentos) })} />
             ) : null}
+          </>
+        ) : null}
+        {props.extraDoPincel ? (
+          <>
+            {SEPARADOR}
+            {props.extraDoPincel}
           </>
         ) : null}
       </>

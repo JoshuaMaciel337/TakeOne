@@ -6,7 +6,7 @@
 // traço (passar de novo no mesmo traço não escurece além dela) e o fluxo é quanto cada marca deposita.
 import { juntarTraco } from "./mesclar.ts";
 import { amostraDaPonta, type IdDaTextura, ladrilhoDaTextura } from "./pontas.ts";
-import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, type PontoDoTraco, tracosArtisticos } from "./traco.ts";
+import { type FerramentaDePintura, type Marca, marcasDoPonto, type OpcoesDoPincel, PINTAM_COM_A_FONTE, type PontoDoTraco, tracosArtisticos } from "./traco.ts";
 
 export type Retangulo = { x0: number; y0: number; x1: number; y1: number };
 type Rgb = [number, number, number];
@@ -234,7 +234,7 @@ export class Pintura {
     const colorido = (inicio.opcoes.dinamicaDeCor.ligado && !borracha) || artistico;
     // A fonte dos pincéis do histórico, lida uma vez por traço
     let fonte: Uint8ClampedArray | null = null;
-    if (inicio.fonteDaTinta && (ferramenta === "historico" || artistico)) {
+    if (inicio.fonteDaTinta && (PINTAM_COM_A_FONTE.has(ferramenta) || artistico)) {
       const ctxFonte = inicio.fonteDaTinta.getContext("2d", { willReadFrequently: true })!;
       fonte = ctxFonte.getImageData(0, 0, this.largura, this.altura).data;
     }
@@ -449,7 +449,7 @@ export class Pintura {
     const saida = this.ctxTela.createImageData(largura, altura);
     // O pincel do histórico vai em direção à fonte (o retângulo dela)
     let substituirPor: Uint8ClampedArray | undefined;
-    if (atual.ferramenta === "historico" && atual.fonte) {
+    if (PINTAM_COM_A_FONTE.has(atual.ferramenta) && atual.fonte) {
       substituirPor = new Uint8ClampedArray(largura * altura * 4);
       for (let y = 0; y < altura; y++) {
         const inicio = ((y0 + y) * this.largura + x0) * 4;
