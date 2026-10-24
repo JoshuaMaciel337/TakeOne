@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { chamarApi } from "./api";
 
-export type TipoDoRecurso = "degrade" | "padrao" | "forma" | "estilo_caractere" | "estilo_paragrafo" | "estilo_camada";
+export type TipoDoRecurso = "degrade" | "padrao" | "forma" | "estilo_caractere" | "estilo_paragrafo" | "estilo_camada" | "acoes";
 
 export type Recurso<T = Record<string, unknown>> = {
   id: string;

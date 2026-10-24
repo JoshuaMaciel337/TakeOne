@@ -23,7 +23,7 @@ import type { EstadoDaArea } from "@/lib/areaDeTrabalho";
 import { enderecoDoProjeto } from "@/lib/hub";
 import { useMarca } from "@/lib/marca";
 import type { Comando } from "@/lib/projeto/comandos";
-import { executarComando } from "@/lib/projeto/comandos";
+import { executarComando, NOMES_DOS_COMANDOS } from "@/lib/projeto/comandos";
 import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
@@ -161,12 +161,15 @@ import {
 } from "@/lib/imagem/ajustesNosPixels";
 import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServidor, documentoVizinho, fecharDocumento, mudarDocumentos } from "@/lib/imagem/documentos";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
+import { type CamadasEscolhidas, mesmaTecla, teclaDoEventoDaAcao } from "@/lib/imagem/acoes";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
 import { PainelHistograma } from "./ajustes/PainelHistograma";
 import { PainelInformacoes, PainelNavegador } from "./PaineisDaVista";
+import { JanelaParadaAoTocar, PainelAcoes } from "./PainelAcoes";
+import { useAcoes } from "./useAcoes";
 import { JanelaEscalaDeMedida, JanelaMarcadorDeEscala, OpcoesDaContagemNaBarra, OpcoesDaNotaNaBarra, type OpcoesDoMarcador, PainelNotas, PainelRegistro } from "./PaineisDaMedicao";
 import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, corEmRgb, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
@@ -607,12 +610,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (ativo instanceof HTMLElement && ativo.matches("input, textarea, select")) ativo.blur();
     definirSelecao(ids);
   }, []);
+  // A gravação de uma ação (painel Ações) recebe cada comando feito, com as camadas escolhidas antes e depois
+  const registrarNaAcao = useRef<((comando: Comando, nome: string, antes: CamadasEscolhidas, depois: CamadasEscolhidas) => void) | null>(null);
+  const selecaoAtual = useRef<string[]>([]);
   const executar = useCallback(
     (comando: Comando) => {
       // Mostrar e esconder camadas só vira passo quando as opções do Histórico mandam
       const soVisibilidade = comando.comando === "imagem.soEsta" || (comando.comando === "imagem.camada" && Object.keys(comando.parametros.mudanca).every((chave) => chave === "oculta"));
+      const antesDoComando = selecaoAtual.current;
       const resultado = executarNoProjeto(comando, { semPasso: soVisibilidade && !opcoesDoHistorico.visibilidadeDesfazivel });
       if (resultado?.selecao) setSelecao(resultado.selecao);
+      if (resultado && registrarNaAcao.current) {
+        const faixas = (clipes: string[]) => clipes.flatMap((id) => resultado.projeto.faixas.find((faixa) => faixa.clipes.some((clipe) => clipe.id === id))?.id ?? []);
+        const depois = resultado.selecao ?? antesDoComando;
+        registrarNaAcao.current(comando, NOMES_DOS_COMANDOS[comando.comando], { clipes: antesDoComando, faixas: faixas(antesDoComando) }, { clipes: depois, faixas: faixas(depois) });
+      }
       return resultado;
     },
     [executarNoProjeto, setSelecao, opcoesDoHistorico.visibilidadeDesfazivel],
@@ -621,6 +633,51 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   useEffect(() => {
     configurarHistorico({ limite: opcoesDoHistorico.estados, naoLinear: opcoesDoHistorico.naoLinear });
   }, [configurarHistorico, opcoesDoHistorico.estados, opcoesDoHistorico.naoLinear]);
+  // As Ações: a parada que espera a resposta ao tocar, os conjuntos e a gravação
+  const [paradaDaAcao, setParadaDaAcao] = useState<{ mensagem: string; continuar: boolean; responder: (seguir: boolean) => void } | null>(null);
+  const acoesDoEspaco = useAcoes({
+    executar,
+    escolhidas: () => {
+      const atual = projetoRef.current;
+      const clipes = selecaoAtual.current;
+      return { clipes, faixas: atual ? clipes.flatMap((id) => atual.faixas.find((faixa) => faixa.clipes.some((clipe) => clipe.id === id))?.id ?? []) : [] };
+    },
+    faixasDosClipes: (clipes) => {
+      const atual = projetoRef.current;
+      return atual ? clipes.flatMap((id) => atual.faixas.find((faixa) => faixa.clipes.some((clipe) => clipe.id === id))?.id ?? []) : [];
+    },
+    perguntar: (mensagem, continuar) =>
+      new Promise<boolean>((resolver) =>
+        setParadaDaAcao({
+          mensagem,
+          continuar,
+          responder: (seguir) => {
+            setParadaDaAcao(null);
+            resolver(seguir);
+          },
+        }),
+      ),
+    aoAvisar: mostrarAviso,
+    novoId: () => crypto.randomUUID().slice(0, 12),
+  });
+  useEffect(() => {
+    registrarNaAcao.current = acoesDoEspaco.gravacao ? acoesDoEspaco.registrar : null;
+  });
+  // As teclas de função das ações (F2, F3, F4, F9, F10, com Shift ou Ctrl)
+  const teclaDaAcao = useEffectEvent((evento: KeyboardEvent) => {
+    if (evento.defaultPrevented || janelaAberta) return;
+    const tecla = teclaDoEventoDaAcao(evento);
+    if (!tecla) return;
+    const acao = acoesDoEspaco.conjuntos.flatMap((conjunto) => conjunto.acoes).find((item) => mesmaTecla(item.tecla, tecla));
+    if (!acao) return;
+    evento.preventDefault();
+    if (!acoesDoEspaco.gravacao) void acoesDoEspaco.tocar(acao);
+  });
+  useEffect(() => {
+    const ouvir = (evento: KeyboardEvent) => teclaDaAcao(evento);
+    window.addEventListener("keydown", ouvir);
+    return () => window.removeEventListener("keydown", ouvir);
+  }, []);
   const pinturas = usePinturas({ executar, aoAvisar: mostrarAviso });
   // O projeto mais novo, para quem espera a pintura subir (a exportação) ler o que veio depois
   const projetoRef = useRef(projeto);
@@ -1030,6 +1087,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   }, [projeto]);
 
   const selecaoValida = projeto ? selecao.filter((id) => acharClipe(projeto, id)) : [];
+  useEffect(() => {
+    selecaoAtual.current = selecaoValida;
+  });
   const escolhidoNaTela = projetoNaTela && selecaoValida.length === 1 ? acharClipe(projetoNaTela, selecaoValida[0]) : null;
   // Uma pasta não tem imagem: as propriedades, os filtros e as fotos valem só para as outras camadas
   const selecionado = escolhidoNaTela?.clipe.pasta ? null : escolhidoNaTela;
@@ -5254,7 +5314,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5479,6 +5539,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     navegador: {
       nome: PAINEIS_DA_IMAGEM.navegador,
       conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
+    },
+    acoes: {
+      nome: PAINEIS_DA_IMAGEM.acoes,
+      conteudo: <PainelAcoes acoes={acoesDoEspaco} aoAvisar={mostrarAviso} />,
     },
     histograma: {
       nome: PAINEIS_DA_IMAGEM.histograma,
@@ -6399,6 +6463,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             <span className="tabular-nums">
               {tamanho.largura} px × {tamanho.altura} px ({projeto.tamanho?.resolucao ?? 72} ppp)
             </span>
+            {acoesDoEspaco.gravacao ? (
+              <span className="flex shrink-0 items-center gap-1 text-red-400" role="status">
+                <span className="size-2 rounded-full bg-red-500" aria-hidden />
+                Gravando a ação
+              </span>
+            ) : null}
             <span className="min-w-0 truncate max-md:hidden">{dadosDa(ferramenta).dica}</span>
           </footer>
         </main>
@@ -6408,6 +6478,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       </div>
 
+      {paradaDaAcao ? <JanelaParadaAoTocar mensagem={paradaDaAcao.mensagem} continuar={paradaDaAcao.continuar} aoResponder={paradaDaAcao.responder} /> : null}
       {janelaDoHistorico === "instantaneo" ? (
         <JanelaNovoInstantaneo
           nome={`Instantâneo ${instantaneos.length + 1}`}
@@ -6772,6 +6843,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           imagens={imagensProntas}
           ajustesDoDocumento={[...camadasDaImagem(projeto)].reverse().flatMap(({ faixa, clipe }) => (clipe.ajuste && clipe.ajuste_imagem && !faixa.oculta && clipe.ajuste_imagem.tipo !== "pesquisa" ? [clipe.ajuste_imagem] : []))}
           modoDoDocumento={projeto.modo ?? null}
+          acoes={acoesDoEspaco.conjuntos.flatMap((conjunto) => conjunto.acoes.map((acao) => ({ id: `${conjunto.id}/${acao.id}`, nome: `${conjunto.nome} › ${acao.nome}`, acao })))}
           aoFechar={() => setAutomatizando(null)}
           aoCriar={aoCriarPelaAutomacao}
           aoAvisar={mostrarAviso}

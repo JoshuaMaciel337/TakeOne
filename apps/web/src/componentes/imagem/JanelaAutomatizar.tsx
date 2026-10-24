@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { arquivoDaMidia } from "@/lib/api";
+import { type Acao, ajustesDaAcao } from "@/lib/imagem/acoes";
 import { carregarEmPilha, type FonteDaAutomacao, folhaDeContato, fotomesclagem, mesclarParaHdr } from "@/lib/automatizar/executar";
 import { OPCOES_PADRAO_DA_FOLHA, type OpcoesDaFolha, paginasDaFolha } from "@/lib/automatizar/folha";
 import { OPCOES_PADRAO_DO_HDR } from "@/lib/automatizar/hdr";
@@ -46,6 +47,8 @@ type Props = {
   /** As camadas de ajuste visíveis deste documento e o modo dele (o Lote pode aplicá-los). */
   ajustesDoDocumento: AjusteDaImagem[];
   modoDoDocumento: ModoDeCor | null;
+  /** As ações do painel Ações: no Lote, valem as camadas de ajuste e o modo de cor delas. */
+  acoes?: { id: string; nome: string; acao: Acao }[];
   aoFechar: () => void;
   /** O documento criado (o primeiro, quando são vários) e os avisos; os outros aparecem em Abrir recentes. */
   aoCriar: (ids: string[], avisos: string[]) => void;
@@ -54,7 +57,7 @@ type Props = {
 
 const FORMATOS_DO_LOTE = FORMATOS_DE_EXPORTACAO.filter((item) => item.id !== "ico");
 
-export function JanelaAutomatizar({ tipo, imagens, ajustesDoDocumento, modoDoDocumento, aoFechar, aoCriar, aoAvisar }: Props) {
+export function JanelaAutomatizar({ tipo, imagens, ajustesDoDocumento, modoDoDocumento, acoes = [], aoFechar, aoCriar, aoAvisar }: Props) {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [daBiblioteca, setDaBiblioteca] = useState<string[]>([]);
   const [progresso, setProgresso] = useState("");
@@ -72,6 +75,7 @@ export function JanelaAutomatizar({ tipo, imagens, ajustesDoDocumento, modoDoDoc
   const [saidas, setSaidas] = useState<SaidaDoLote[]>([{ formato: "jpeg", qualidade: 0.85, caber: { largura: 2048, altura: 2048 } }]);
   const [passos, setPassos] = useState<PassosDoLote>({ tom: false, contraste: false, cor: false, ajustes: [], modo: null });
   const [padrao, setPadrao] = useState("{nome}");
+  const [acaoDoLote, setAcaoDoLote] = useState("");
 
   useEffect(() => {
     const fechar = (evento: KeyboardEvent) => {
@@ -95,9 +99,14 @@ export function JanelaAutomatizar({ tipo, imagens, ajustesDoDocumento, modoDoDoc
     setProgresso("Começando…");
     try {
       if (tipo === "lote" || tipo === "processador") {
-        const { nome, blob } = await processarLote(fontes, { saidas, passos: tipo === "lote" ? passos : { tom: false, contraste: false, cor: false, ajustes: [], modo: null }, padrao }, setProgresso);
+        // A ação escolhida soma as camadas de ajuste dela e o modo dela aos passos
+        const daAcao = tipo === "lote" && acaoDoLote ? acoes.find((item) => item.id === acaoDoLote) : null;
+        const extra = daAcao ? ajustesDaAcao(daAcao.acao) : null;
+        const doLote = extra ? { ...passos, ajustes: [...passos.ajustes, ...extra.ajustes], modo: extra.modo ?? passos.modo } : passos;
+        const { nome, blob } = await processarLote(fontes, { saidas, passos: tipo === "lote" ? doLote : { tom: false, contraste: false, cor: false, ajustes: [], modo: null }, padrao }, setProgresso);
         baixarBlob(blob, nome);
-        aoAvisar(`${fontes.length} ${fontes.length === 1 ? "imagem processada" : "imagens processadas"}.`);
+        const pulados = extra?.pulados ? ` Da ação, ${extra.pulados} ${extra.pulados === 1 ? "passo que não é ajuste nem modo ficou" : "passos que não são ajuste nem modo ficaram"} de fora.` : "";
+        aoAvisar(`${fontes.length} ${fontes.length === 1 ? "imagem processada" : "imagens processadas"}.${pulados}`);
         aoFechar();
         return;
       }
@@ -283,6 +292,18 @@ export function JanelaAutomatizar({ tipo, imagens, ajustesDoDocumento, modoDoDoc
                       <input type="checkbox" checked={passos.modo !== null} disabled={!modoDoDocumento} onChange={(e) => setPassos({ ...passos, modo: e.currentTarget.checked ? modoDoDocumento : null })} />
                       O modo de cor deste documento
                     </label>
+                    <label className="flex items-center gap-2">
+                      Ação:
+                      <select className={CAMPO} value={acaoDoLote} disabled={!acoes.length} onChange={(e) => setAcaoDoLote(e.currentTarget.value)} aria-label="Ação do lote">
+                        <option value="">Nenhuma</option>
+                        {acoes.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {acaoDoLote ? <p className="text-suave">Da ação, valem as camadas de ajuste e o modo de cor (o lote trabalha nos pixels de cada imagem).</p> : null}
                   </fieldset>
                 ) : null}
                 <fieldset className="flex flex-col gap-1.5">

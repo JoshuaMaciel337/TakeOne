@@ -284,7 +284,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.15 — Organização e fluxo
 
 - [x] Histórico completo (avançar e voltar passos, instantâneos, documento novo a partir de um estado, opções)
-- [ ] Ações: gravar, tocar, parar, inserir pausa, conjuntos, salvar e carregar
+- [x] Ações: gravar, tocar, parar, inserir pausa, conjuntos, salvar e carregar (os traços de pincel e os pixels pintados não entram, como lá; no Lote, a ação vale pelas camadas de ajuste e pelo modo de cor)
 - [ ] Comps de camada
 - [ ] Predefinições de ferramenta e Redefinir ferramenta
 - [ ] Pesquisar (Ctrl+F): paleta com todos os comandos e ferramentas
