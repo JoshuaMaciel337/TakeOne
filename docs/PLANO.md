@@ -563,7 +563,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 13.11 Filtros (filtros inteligentes, a galeria com 47, todos os menus de filtro).
   - [x] 13.12 IA (preenchimento e expansão generativos, céu, filtros neurais).
   - [x] 13.13 Arquivos, documento e automação (abrir e salvar PSD, exportações, modos, lote).
-  - [ ] 13.14 Visualização e medição (réguas e guias, grade, navegador, informações).
+  - [x] 13.14 Visualização e medição (réguas e guias, grade, navegador, informações).
   - [ ] 13.15 Organização e fluxo (histórico, ações, comps, atalhos, preferências, linha do tempo, fatias).
   - [ ] 13.16 Ferramentas vetoriais da suíte (as do editor vetorial).
   - [ ] Para o dono decidir: o tema padrão dos editores (o escuro de hoje, com o destaque do TakeOne, ou o cinza médio dos programas) e a área de trabalho padrão do vídeo (Edição, como está, ou Montagem).

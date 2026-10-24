@@ -3,7 +3,7 @@
 import { Check, ChevronLeft, Download, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
 import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
@@ -158,6 +158,7 @@ import {
   substituirCor,
   tonalizacaoHdr,
 } from "@/lib/imagem/ajustesNosPixels";
+import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServidor, documentoVizinho, fecharDocumento, mudarDocumentos } from "@/lib/imagem/documentos";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
@@ -507,6 +508,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [medicoes, setMedicoes] = useState<Medicao[]>([]);
   const medicoesFeitas = useRef(0);
   const [janelaDaMedicao, setJanelaDaMedicao] = useState<"escala" | "marcador" | null>(null);
+  // Os documentos abertos em abas (a lista fica no navegador): este entra com o nome dele ao abrir e ao renomear
+  const abertos = useSyncExternalStore(assinarDocumentos, documentosAbertos, documentosNoServidor);
+  const nomeDoDocumento = edicao.nome;
+  useEffect(() => {
+    if (projeto?.tipo === "imagem") mudarDocumentos(abrirDocumento(documentosAbertos(), { id: projetoId, nome: nomeDoDocumento }));
+  }, [projeto?.tipo, projetoId, nomeDoDocumento]);
+  const abas = abertos.some((documento) => documento.id === projetoId) ? abertos : [...abertos, { id: projetoId, nome: nomeDoDocumento }];
+  const fecharAba = (id = projetoId) => {
+    const { lista, proximo } = fecharDocumento(documentosAbertos(), id);
+    mudarDocumentos(lista);
+    if (id === projetoId) router.push(proximo ? `/app/imagem/${proximo}` : "/app/ferramentas/editor-de-imagem");
+  };
   // Exibir › Modo de tela (F) e os painéis escondidos pelo Tab (todos) ou pelo Shift+Tab (só os da direita)
   const [modoDeTela, setModoDeTela] = useState<ModoDeTela>("padrao");
   const [paineisOcultos, setPaineisOcultos] = useState<"nenhum" | "todos" | "encaixados">("nenhum");
@@ -4917,6 +4930,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     girarVista: (giro) => setGiroDaVista((atual) => ({ ...atual, ...giro })),
     modoDeTela,
     mudarModoDeTela,
+    documentosAbertos: abas,
+    documentoAtual: projetoId,
+    irParaDocumento: (id) => id !== projetoId && router.push(`/app/imagem/${id}`),
+    documentoVizinho: (sentido) => {
+      const id = documentoVizinho(abas, projetoId, sentido);
+      if (id) router.push(`/app/imagem/${id}`);
+    },
+    fecharDocumento: fecharAba,
+    fecharTodos: () => {
+      mudarDocumentos([]);
+      router.push("/app/ferramentas/editor-de-imagem");
+    },
     temEscalaDeMedida: Boolean(projeto?.escala_de_medida),
     escalaDeMedidaPadrao: () => executar({ comando: "imagem.escalaDeMedida", parametros: { escala: null } }),
     janelaDaMedicao: setJanelaDaMedicao,
@@ -6059,8 +6084,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col max-md:h-[62vh]">
-          <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end border-b border-borda bg-painel-2 ${modoDeTela === "padrao" ? "flex" : "hidden"}`}>
-            <div role="tab" aria-selected className="flex h-full max-w-full items-center gap-1 border-r border-borda bg-fundo px-2 text-[11px]">
+          <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b border-borda bg-painel-2 ${modoDeTela === "padrao" ? "flex" : "hidden"}`}>
+            {abas.map((documento) =>
+              documento.id === projetoId ? (
+            <div key={documento.id} role="tab" aria-selected className="flex h-full max-w-full shrink-0 items-center gap-1 border-r border-borda bg-fundo px-2 text-[11px]">
               <input
                 id="nome-projeto"
                 value={edicao.nome}
@@ -6073,7 +6100,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               <span className="shrink-0 truncate text-suave">
                 @ {porcentagem(zoomNaTela)} ({escolhidoNaTela ? nomeDaCamada(escolhidoNaTela.clipe, midias, escolhidoNaTela.faixa) : escolhidas.length > 1 ? `${escolhidas.length} camadas` : "Fundo"}, {SIGLAS_DOS_MODOS[projeto?.modo?.tipo ?? "rgb"]}/8)
               </span>
+              <button type="button" className="botao-icone size-4 shrink-0" onClick={() => fecharAba()} aria-label={`Fechar ${edicao.nome || "a imagem"}`} title="Fechar">
+                <X className="size-3" aria-hidden />
+              </button>
             </div>
+              ) : (
+                <div key={documento.id} role="tab" aria-selected={false} className="group flex h-full shrink-0 items-center gap-1 border-r border-borda px-2 text-[11px] text-suave hover:bg-fundo/60 hover:text-texto">
+                  <button type="button" className="max-w-48 truncate" onClick={() => router.push(`/app/imagem/${documento.id}`)} title={documento.nome}>
+                    {documento.nome || "Imagem sem título"}
+                  </button>
+                  <button type="button" className="botao-icone size-4 shrink-0 opacity-60 group-hover:opacity-100" onClick={() => fecharAba(documento.id)} aria-label={`Fechar ${documento.nome || "a imagem"}`} title="Fechar">
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </div>
+              ),
+            )}
           </div>
           <PreviaDaImagem
             telaCheia={modoDeTela === "cheia"}

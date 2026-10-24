@@ -2,6 +2,7 @@
 // profissionais. Os atalhos que o navegador não deixa a página pegar (Ctrl+N, Ctrl+T, Ctrl+W) ficam de fora.
 import { type PreferenciasDaVista, UNIDADES_DA_REGUA } from "@/lib/imagem/vista";
 import { PROVAS, type TipoDaProva } from "@/lib/imagem/prova";
+import type { DocumentoAberto } from "@/lib/imagem/documentos";
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
 import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
 import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
@@ -179,6 +180,13 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Os documentos abertos em abas: Arquivo › Fechar e Fechar tudo, Janela › Documentos abertos (Ctrl+F6). */
+  documentosAbertos: DocumentoAberto[];
+  documentoAtual: string;
+  irParaDocumento: (id: string) => void;
+  documentoVizinho: (sentido: 1 | -1) => void;
+  fecharDocumento: (id?: string) => void;
+  fecharTodos: () => void;
   /** Imagem › Análise: a escala de medida, o registro e o marcador de escala. */
   temEscalaDeMedida: boolean;
   escalaDeMedidaPadrao: () => void;
@@ -393,6 +401,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Informações do arquivo…", atalho: "Ctrl+Alt+Shift+I", aoEscolher: a.informacoesDoArquivo, titulo: "Título, autor, palavras-chave e direitos, que vão nos metadados dos arquivos exportados" },
         { nome: "Imprimir…", atalho: "Ctrl+P", aoEscolher: a.imprimir },
         "-",
+        { nome: "Fechar", aoEscolher: () => a.fecharDocumento(), titulo: "Fecha a aba deste documento (ele continua salvo nas imagens); o Ctrl+W é do navegador" },
+        { nome: "Fechar tudo", aoEscolher: a.fecharTodos },
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
         "-",
         {
@@ -984,6 +994,16 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             ...Object.entries(AREAS_DA_IMAGEM).map(([id, nome]): ItemDeMenu => ({ nome, marcado: a.area === id, aoEscolher: () => a.area_(id) })),
             "-",
             { nome: `Redefinir ${AREAS_DA_IMAGEM[a.area as keyof typeof AREAS_DA_IMAGEM] ?? ""}`.trim(), aoEscolher: a.restaurarArea },
+          ],
+        },
+        "-",
+        {
+          nome: "Documentos abertos",
+          itens: [
+            { nome: "Próximo documento", atalho: "Ctrl+F6", desativado: a.documentosAbertos.length < 2, aoEscolher: () => a.documentoVizinho(1), titulo: "O Ctrl+Tab é do navegador" },
+            { nome: "Documento anterior", atalho: "Ctrl+Shift+F6", desativado: a.documentosAbertos.length < 2, aoEscolher: () => a.documentoVizinho(-1) },
+            "-",
+            ...a.documentosAbertos.map((documento): ItemDeMenu => ({ nome: documento.nome || "Imagem sem título", marcado: documento.id === a.documentoAtual, aoEscolher: () => a.irParaDocumento(documento.id) })),
           ],
         },
         "-",

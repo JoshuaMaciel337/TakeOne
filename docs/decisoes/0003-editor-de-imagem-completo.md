@@ -279,7 +279,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Modos de tela (F); Tab esconde os painéis (Shift+Tab só os encaixados)
 - [x] Navegador; Informações (a cor sob o ponteiro, X e Y, o tamanho da seleção) com o Amostrador de cor (I)
 - [x] Contagem (I), Nota (I), escala de medida e Registro de medições
-- [ ] Vários documentos abertos em abas, com Ctrl+Tab
+- [x] Vários documentos abertos em abas, com Ctrl+F6 (o Ctrl+Tab é do navegador)
 
 ### Onda 13.15 — Organização e fluxo
 
