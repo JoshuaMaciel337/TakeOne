@@ -572,11 +572,18 @@ class RecursoEntrada(BaseModel):
     # "degrade" (as paradas, em dados), "padrao" (o ladrilho, em imagem_png), "forma" (os caminhos de uma forma
     # personalizada, em dados.subcaminhos, numa caixa de 100 × 100) ou os estilos de caractere e de parágrafo do texto
     # do editor de imagem (em dados.estilo, conferido como o estilo de um trecho ou de um parágrafo), ou um estilo de
-    # camada (em dados.estilo, conferido como o da camada, e o preenchimento em dados.preenchimento)
-    tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo", "estilo_camada"]
+    # camada (em dados.estilo, conferido como o da camada, e o preenchimento em dados.preenchimento), ou um conjunto
+    # de ações (em dados.acoes: cada uma com id, nome e os passos gravados, que são do editor e a API só guarda)
+    tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo", "estilo_camada", "acoes"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)
+
+
+class RecursoAtualizacao(BaseModel):
+    """Só os conjuntos de ações mudam depois de criados (gravar mais passos, renomear)."""
+    nome: str | None = Field(default=None, min_length=1, max_length=80)
+    dados: dict | None = None
 
 
 class RecursoSaida(BaseModel):

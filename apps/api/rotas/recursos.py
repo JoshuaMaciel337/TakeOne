@@ -5,6 +5,7 @@
 #                                        forma personalizada (os caminhos, em JSON)
 #   GET    /api/recursos?tipo=degrade    os do espaço daquele tipo, na ordem em que foram criados
 #   GET    /api/recursos/{id}/imagem.png o ladrilho do padrão
+#   PUT    /api/recursos/{id}            só os conjuntos de ações: o nome e as ações gravadas
 #   DELETE /api/recursos/{id}
 #
 # Como os pincéis do espaço: os dados são do editor (lib/pintura/degrade.ts) e a API só guarda.
@@ -28,6 +29,7 @@ from api.esquemas import (
     EstiloDeCamadaEntrada,
     EstiloDoCaractereEntrada,
     EstiloDoParagrafoEntrada,
+    RecursoAtualizacao,
     RecursoEntrada,
     RecursoSaida,
     SubcaminhoEntrada,
@@ -42,6 +44,10 @@ BYTES_DOS_DADOS = 32 * 1024
 # Uma forma personalizada tem muitos pontos (um contorno vindo de uma seleção, por exemplo)
 BYTES_DA_FORMA = 512 * 1024
 PONTOS_DA_FORMA = 10_000
+# Um conjunto de ações guarda os comandos gravados (uma forma ou um texto num passo pesam)
+BYTES_DAS_ACOES = 1024 * 1024
+ACOES_POR_CONJUNTO = 200
+PASSOS_POR_ACAO = 1000
 BYTES_DA_IMAGEM = 4 * 1024 * 1024
 LADO_MAXIMO_DA_IMAGEM = 2048
 
@@ -116,15 +122,41 @@ def _conferir_estilo(tipo: str, dados: dict) -> dict:
     return {"estilo": estilo.model_dump()}
 
 
+def _conferir_acoes(dados: dict) -> dict:
+    """As ações do conjunto: cada uma com id, nome e uma lista de passos (os passos são do editor)."""
+    acoes = dados.get("acoes")
+    if not isinstance(acoes, list) or len(acoes) > ACOES_POR_CONJUNTO:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"O conjunto precisa de uma lista de até {ACOES_POR_CONJUNTO} ações.")
+    for acao in acoes:
+        if (not isinstance(acao, dict) or not isinstance(acao.get("id"), str) or not isinstance(acao.get("nome"), str)
+                or not acao["nome"].strip() or len(acao["nome"]) > 80 or not isinstance(acao.get("passos"), list)):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Uma ação do conjunto veio estragada.")
+        if len(acao["passos"]) > PASSOS_POR_ACAO:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                f"Uma ação pode ter até {PASSOS_POR_ACAO} passos.")
+        if any(not isinstance(passo, dict) for passo in acao["passos"]):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Um passo da ação veio estragado.")
+    if len({acao["id"] for acao in acoes}) != len(acoes):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Duas ações do conjunto têm o mesmo id.")
+    return {"acoes": acoes}
+
+
+def _limite_dos_dados(tipo: str) -> int:
+    return BYTES_DA_FORMA if tipo == "forma" else BYTES_DAS_ACOES if tipo == "acoes" else BYTES_DOS_DADOS
+
+
 @router.post("", response_model=RecursoSaida, status_code=status.HTTP_201_CREATED)
 async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    limite = BYTES_DA_FORMA if dados.tipo == "forma" else BYTES_DOS_DADOS
+    limite = _limite_dos_dados(dados.tipo)
     if len(json.dumps(dados.dados)) > limite:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Os dados passam de {limite // 1024} KB.")
     if dados.tipo == "forma":
         dados.dados = {"subcaminhos": _conferir_forma(dados.dados)}
     if dados.tipo in ("estilo_caractere", "estilo_paragrafo", "estilo_camada"):
         dados.dados = _conferir_estilo(dados.tipo, dados.dados)
+    if dados.tipo == "acoes":
+        dados.dados = _conferir_acoes(dados.dados)
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -151,7 +183,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
     return para_saida(doc)
 
 
-TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada)$"
+TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes)$"
 
 
 @router.get("", response_model=list[RecursoSaida])
@@ -172,6 +204,27 @@ async def imagem_do_recurso(recurso_id: str, usuario=Depends(usuario_atual), db=
     conteudo = await run_in_threadpool(caminho.read_bytes)
     # O ladrilho nunca muda: outro ladrilho é outro padrão
     return Response(conteudo, media_type="image/png", headers={"Cache-Control": "private, max-age=31536000, immutable"})
+
+
+@router.put("/{recurso_id}", response_model=RecursoSaida)
+async def atualizar_recurso(recurso_id: str, dados: RecursoAtualizacao, usuario=Depends(usuario_atual),
+                            db=Depends(obter_db)):
+    recurso = await buscar_recurso(db, recurso_id, usuario)
+    if recurso["tipo"] != "acoes":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Só os conjuntos de ações mudam depois de criados.")
+    campos: dict = {}
+    if dados.nome is not None:
+        if not dados.nome.strip():
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O nome não pode ficar vazio.")
+        campos["nome"] = dados.nome.strip()
+    if dados.dados is not None:
+        if len(json.dumps(dados.dados)) > BYTES_DAS_ACOES:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                                f"Os dados passam de {BYTES_DAS_ACOES // 1024} KB.")
+        campos["dados"] = _conferir_acoes(dados.dados)
+    if campos:
+        await db.recursos.update_one({"_id": recurso["_id"]}, {"$set": campos})
+    return para_saida({**recurso, **campos})
 
 
 @router.delete("/{recurso_id}", status_code=status.HTTP_204_NO_CONTENT)

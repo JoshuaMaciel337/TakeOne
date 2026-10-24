@@ -92,3 +92,34 @@ def test_estilos_de_camada(cliente):
     sem_efeito = {"estilo": {"efeitos": []}}
     assert cliente.post("/api/recursos", json={"tipo": "estilo_camada", "nome": "V",
                                                "dados": sem_efeito}).status_code == 422
+
+
+def test_conjuntos_de_acoes(cliente, db_limpo):
+    cadastrar(cliente)
+    comando = {"comando": "imagem.fundo", "parametros": {"cor": "#ff0000"}}
+    passo = {"tipo": "comando", "comando": comando, "ligado": True}
+    acoes = {"acoes": [{"id": "a1", "nome": "Fundo vermelho", "passos": [passo]}]}
+    criado = cliente.post("/api/recursos", json={"tipo": "acoes", "nome": "Ações padrão", "dados": acoes})
+    assert criado.status_code == 201, criado.text
+    conjunto = criado.json()
+    assert conjunto["dados"] == acoes
+    # Gravar mais um passo e renomear
+    parada = {"tipo": "parada", "mensagem": "Confira"}
+    mais = {"acoes": [{"id": "a1", "nome": "Fundo vermelho", "passos": [passo, parada]}]}
+    atualizado = cliente.put(f"/api/recursos/{conjunto['id']}", json={"nome": " Minhas ações ", "dados": mais})
+    assert atualizado.status_code == 200, atualizado.text
+    assert atualizado.json()["nome"] == "Minhas ações" and len(atualizado.json()["dados"]["acoes"][0]["passos"]) == 2
+    lista = cliente.get("/api/recursos?tipo=acoes").json()
+    assert [(r["nome"], len(r["dados"]["acoes"][0]["passos"])) for r in lista] == [("Minhas ações", 2)]
+    # Estragados: sem lista, ação sem nome, ids repetidos, passo que não é objeto
+    url = f"/api/recursos/{conjunto['id']}"
+    assert cliente.put(url, json={"dados": {"acoes": "x"}}).status_code == 422
+    assert cliente.put(url, json={"dados": {"acoes": [{"id": "a", "nome": " ", "passos": []}]}}).status_code == 422
+    dois = {"acoes": [{"id": "a", "nome": "A", "passos": []}, {"id": "a", "nome": "B", "passos": []}]}
+    assert cliente.put(url, json={"dados": dois}).status_code == 422
+    assert cliente.put(url, json={"dados": {"acoes": [{"id": "a", "nome": "A", "passos": [1]}]}}).status_code == 422
+    # Só os conjuntos de ações mudam
+    degrade = cliente.post("/api/recursos", json={"tipo": "degrade", "nome": "D", "dados": {"cores": []}}).json()
+    assert cliente.put(f"/api/recursos/{degrade['id']}", json={"nome": "Outro"}).status_code == 422
+    assert cliente.delete(url).status_code == 204
+    assert cliente.get("/api/recursos?tipo=acoes").json() == []
