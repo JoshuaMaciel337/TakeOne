@@ -9,6 +9,7 @@ import { arvoreDaImagem, camadaVisivel, type NoDaCamada, paiDaCamada } from "@/l
 import type { Comando } from "@/lib/projeto/comandos";
 import { CORES_DOS_ROTULOS, type Clipe, type Faixa, MESCLAGENS_DA_IMAGEM, type Mesclagem, nomeDaMesclagem, type Projeto, type TravasDaCamada } from "@/lib/projeto/modelo";
 import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
+import { NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
@@ -29,6 +30,8 @@ type Props = {
   aoCriarAjuste: (ajuste: Ajuste) => void;
   /** Um estilo de camada novo: abre o painel Propriedades na parte dele. */
   aoAbrirPropriedades: () => void;
+  /** A janela Estilo de camada da escolhida, aberta num efeito (ou nas opções de mesclagem). */
+  aoAbrirEstilo?: (foco: TipoDoEfeito | "mesclagem") => void;
   /** Uma camada de pixels vazia acima da escolhida (Ctrl+Shift+N). */
   aoNovaCamada: () => void;
   /** Camada a partir do fundo (duplo clique na linha do fundo). */
@@ -246,6 +249,7 @@ export function PainelCamadas({
   aoExecutar,
   aoCriarAjuste,
   aoAbrirPropriedades,
+  aoAbrirEstilo,
   aoNovaCamada,
   aoCamadaDoFundo,
   mascaraEmFoco,
@@ -526,7 +530,7 @@ export function PainelCamadas({
           const midia = clipe.midia_id ? midias.get(clipe.midia_id) : undefined;
           const nome = nomeDaCamada(clipe, midias, faixa);
           const marcada = selecao.includes(clipe.id);
-          const comEstilo = Boolean(clipe.contorno || clipe.sombra);
+          const comEstilo = Boolean(clipe.contorno || clipe.sombra || clipe.estilo_camada?.efeitos.length);
           const mesclagem = clipe.pasta ? (clipe.mesclagem && clipe.mesclagem !== "passagem" ? nomeDaMesclagem(clipe.mesclagem) : null) : clipe.mesclagem && clipe.mesclagem !== "normal" ? nomeDaMesclagem(clipe.mesclagem) : null;
           const visivel = camadaVisivel(projeto, faixa);
           const rotulo = faixa.rotulo ? CORES_DOS_ROTULOS.find((cor) => cor.id === faixa.rotulo)?.cor : undefined;
@@ -798,22 +802,26 @@ export function PainelCamadas({
           titulo="Adicionar um estilo de camada"
           rotulo={<span className="font-serif text-[13px] italic">fx</span>}
           desativado={escolhidas.length !== 1 || algumaTravada || temPasta}
-          itens={[
-            {
-              nome: "Contorno…",
-              aoEscolher: () => {
-                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, contorno: primeira?.clipes[0].contorno ?? CONTORNO_PADRAO } });
-                aoAbrirPropriedades();
-              },
-            },
-            {
-              nome: "Sombra projetada…",
-              aoEscolher: () => {
-                aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, sombra: primeira?.clipes[0].sombra ?? SOMBRA_PADRAO } });
-                aoAbrirPropriedades();
-              },
-            },
-          ]}
+          itens={
+            aoAbrirEstilo
+              ? [{ nome: "Opções de mesclagem…", aoEscolher: () => aoAbrirEstilo("mesclagem") }, ...NOMES_DOS_EFEITOS.map(({ tipo, nome }) => ({ nome: `${nome}…`, aoEscolher: () => aoAbrirEstilo(tipo) }))]
+              : [
+                  {
+                    nome: "Contorno…",
+                    aoEscolher: () => {
+                      aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, contorno: primeira?.clipes[0].contorno ?? CONTORNO_PADRAO } });
+                      aoAbrirPropriedades();
+                    },
+                  },
+                  {
+                    nome: "Sombra projetada…",
+                    aoEscolher: () => {
+                      aoExecutar({ comando: "clipe.silhueta", parametros: { clipeIds, sombra: primeira?.clipes[0].sombra ?? SOMBRA_PADRAO } });
+                      aoAbrirPropriedades();
+                    },
+                  },
+                ]
+          }
         />
         <button
           type="button"

@@ -217,7 +217,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 - [ ] Opções de mesclagem: modo, opacidade, preenchimento, Mesclar se (esta camada e a de baixo, por canal, com as metades), avançadas (vazamento, mesclar os efeitos internos como grupo, as camadas recortadas como grupo, a máscara esconde os efeitos), canais
 - [ ] Chanfro e entalhe (externo, interno, entalhe, almofada, de traçado; suave, cinzel duro e macio; profundidade, direção, tamanho, suavizar, ângulo, altitude, contorno de brilho, realce e sombra; contorno; textura)
-- [ ] Traçado (fora, dentro, centro; cor, degradê, padrão), Sombra interna, Brilho interno, Cetim, Sobreposição de cor, de degradê e de padrão, Brilho externo, Sombra projetada (o contorno e a sombra de hoje viram estes)
+- [x] Traçado (fora, dentro, centro; cor, degradê, padrão), Sombra interna, Brilho interno, Cetim, Sobreposição de cor, de degradê e de padrão, Brilho externo, Sombra projetada (o contorno e a sombra de hoje viram estes)
 - [ ] Vários efeitos do mesmo tipo; contornos personalizados
 - [ ] Luz global; Copiar, Colar e Limpar estilo; Ocultar todos os efeitos; Dimensionar efeitos; Criar camadas a partir dos efeitos
 - [ ] Painel Estilos com predefinições

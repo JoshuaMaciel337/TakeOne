@@ -83,12 +83,12 @@ export async function exportarImagem(
   };
   const prontas = await Promise.all(
     camadas.map(async (camada) => {
-      if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe))] as const;
+      if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe), projeto.luz_global)] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
       if (camada.clipe.texto_rico) {
         const { caixa, recorte } = camada;
         const fonte = textoNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.texto_rico, caixa.largura / recorte.largura, caixa.altura / recorte.altura);
-        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const) : null;
+        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe), projeto.luz_global)] as const) : null;
       }
       if (camada.clipe.vetor) {
         // A forma desenhada no tamanho em que sai (a caixa já está em pixels do arquivo)
@@ -98,21 +98,21 @@ export async function exportarImagem(
         const daFoto = tinta.tipo === "imagem" ? midias.get(tinta.midia_id) : undefined;
         const foto = daFoto ? await fonteDa(daFoto) : null;
         const fonte = vetorNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.vetor, caixa.largura / recorte.largura, caixa.altura / recorte.altura, { imagem: () => foto });
-        return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const;
+        return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe), projeto.luz_global)] as const;
       }
       if (camada.clipe.pixels) {
         // A camada de pixels: o canvas que está sendo pintado, ou o PNG da versão do clipe (a 0 é vazia)
         const { versao } = camada.clipe.pixels;
         const local = fonteDosPixels?.(camada.clipe);
         const fonte = local ?? (versao > 0 ? await carregarBitmap(arquivoDaMidia(camada.clipe.midia_id!, arquivoDaVersao(versao))) : null);
-        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const) : null;
+        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe), projeto.luz_global)] as const) : null;
       }
       const midia = midias.get(camada.clipe.midia_id!)!;
       const fonte = await fonteDa(midia);
       const mascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midia) : null;
       // Como o render do vídeo: sem a máscara pronta, o arquivo sairia com o fundo que a pessoa pediu para tirar
       if (camada.clipe.remover_fundo && !mascara) throw new Error(`O fundo de "${midia.nome}" ainda está sendo recortado. Espere terminar ou desligue "Remover o fundo".`);
-      return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null, await mascaraDe(camada.clipe))] as const;
+      return [camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ? await carregarBitmap(mascara) : null, await mascaraDe(camada.clipe), projeto.luz_global)] as const;
     }),
   );
   const arvore = camadasEmArvore(projeto, new Map(prontas.filter((item) => item !== null)), tamanho);

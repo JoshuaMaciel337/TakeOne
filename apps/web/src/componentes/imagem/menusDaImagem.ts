@@ -5,6 +5,7 @@ import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
 import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
+import { NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
@@ -214,7 +215,8 @@ export type AcoesDosMenus = {
   camadaVizinha: (sentido: 1 | -1) => void;
   esconder: () => void;
   bloquear: () => void;
-  estilo: (qual: "contorno" | "sombra") => void;
+  /** Camada › Estilo de camada: a janela, aberta num efeito (ou nas opções de mesclagem). */
+  estilo: (foco: TipoDoEfeito | "mesclagem") => void;
   mascara: () => void;
   viaRecorte: () => void;
   /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
@@ -417,8 +419,9 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           nome: "Estilo de camada",
           desativado: semCamada,
           itens: [
-            { nome: "Traçado…", aoEscolher: () => a.estilo("contorno") },
-            { nome: "Sombra projetada…", aoEscolher: () => a.estilo("sombra") },
+            { nome: "Opções de mesclagem…", aoEscolher: () => a.estilo("mesclagem") },
+            "-",
+            ...NOMES_DOS_EFEITOS.map(({ tipo, nome }) => ({ nome: `${nome}…`, aoEscolher: () => a.estilo(tipo) })),
           ],
         },
         {

@@ -13,6 +13,7 @@ import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
+import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -228,6 +229,21 @@ export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: Texto
   const transformacao = { ...TRANSFORMACAO_PADRAO, x: (centro.x - quadro.largura / 2) / quadro.largura, y: (centro.y - quadro.altura / 2) / quadro.altura, escala };
   const clipe = clipeDaCamada(id ?? ctx.novoId(), { texto_rico: texto, transformacao });
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
+}
+
+/**
+ * O estilo de camada das camadas (null tira), e a luz global do documento quando um efeito com "usar a luz global"
+ * mudou o ângulo ou a altitude (a luz vale para todos os efeitos que a usam).
+ */
+export function definirEstiloDeCamada(projeto: Projeto, clipeIds: string[], estilo: EstiloDeCamada | null, luz?: LuzGlobal): Projeto {
+  let resultado = projeto;
+  for (const clipeId of clipeIds) {
+    resultado = mudarClipeDaCamada(resultado, clipeId, (clipe) => {
+      if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Pastas e camadas de ajuste não têm estilo de camada.");
+      return { ...clipe, estilo_camada: estilo && estilo.efeitos.length ? estilo : null };
+    });
+  }
+  return luz ? { ...resultado, luz_global: luz } : resultado;
 }
 
 /** Vários textos trocados de uma vez (Substituir tudo, Atualizar todas as camadas de texto): um passo só. */

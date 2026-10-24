@@ -23,6 +23,7 @@ import {
 } from "@/lib/projeto/efeitos";
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
 import { temSilhueta } from "@/lib/projeto/silhueta";
+import { efeitosLigados, LUZ_GLOBAL_PADRAO, type LuzGlobal } from "@/lib/imagem/estiloDeCamada";
 import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
@@ -409,9 +410,13 @@ export function camadaDoCompositor(
    * (lib/previa/mascaraCombinada.ts).
    */
   mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho; matriz?: [number, number, number, number, number, number]; densidade?: number; difusao?: number } | null,
+  /** A luz global do documento (editor de imagem), que os efeitos com "usar a luz global" seguem. */
+  luzGlobal?: LuzGlobal | null,
 ): Camada {
   const mascara = camada.clipe.mascara_pixels;
-  const comEstilos = temSilhueta(camada.clipe) && !camada.clipe.ajuste;
+  // O estilo de camada do editor de imagem fica no lugar do contorno e da sombra de antes
+  const efeitos = camada.clipe.ajuste ? [] : efeitosLigados(camada.clipe.estilo_camada);
+  const comEstilos = !efeitos.length && temSilhueta(camada.clipe) && !camada.clipe.ajuste;
   const preenchimento = Math.min(1, Math.max(0, camada.clipe.preenchimento ?? 1));
   return {
     fonte,
@@ -427,7 +432,8 @@ export function camadaDoCompositor(
         : null,
     // O preenchimento (só na imagem) esconde a camada sem os estilos; sem estilos, é mais uma opacidade
     silhueta: comEstilos ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra, preenchimento } : undefined,
-    caixa: comEstilos || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
+    estiloDeCamada: efeitos.length ? { efeitos, escala: camada.clipe.estilo_camada?.escala ?? 1, luz: luzGlobal ?? LUZ_GLOBAL_PADRAO, preenchimento } : undefined,
+    caixa: comEstilos || efeitos.length || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
     lut: camada.lut,
     vinheta: camada.vinheta,
     revelado: camada.revelado,

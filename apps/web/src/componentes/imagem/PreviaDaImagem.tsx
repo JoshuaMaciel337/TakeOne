@@ -398,13 +398,13 @@ export function PreviaDaImagem({
     // As camadas de cada faixa, prontas para o compositor; a árvore junta as pastas e os recortes
     const porFaixa = new Map(
       camadas.flatMap((camada) => {
-        if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada))] as const];
+        if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada), projeto.luz_global)] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
         if (camada.clipe.texto_rico) {
           // O texto desenhado no tamanho da tela (some até as fontes chegarem)
           const { caixa, recorte } = camada;
           const fonte = textoNoTamanho(camada.clipe.id, camada.clipe.texto_rico, (caixa.largura * densidade) / recorte.largura, (caixa.altura * densidade) / recorte.altura, versaoDasFontes);
-          return fonte ? [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada))] as const] : [];
+          return fonte ? [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada), projeto.luz_global)] as const] : [];
         }
         if (camada.clipe.vetor) {
           // A forma desenhada no tamanho da tela, para ficar nítida em qualquer zoom
@@ -413,19 +413,19 @@ export function PreviaDaImagem({
             imagem: (midiaId) => bitmaps.get(fonteDa(midiaId)) ?? null,
             marcador: true,
           });
-          return [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada))] as const];
+          return [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada), projeto.luz_global)] as const];
         }
         if (camada.clipe.pixels) {
           const endereco = versaoDosPixels(camada.clipe);
           const pixels = fonteDosPixels?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
-          return pixels ? [[camada.faixa.id, camadaDoCompositor(camada, pixels, null, mascaraDe(camada))] as const] : [];
+          return pixels ? [[camada.faixa.id, camadaDoCompositor(camada, pixels, null, mascaraDe(camada), projeto.luz_global)] as const] : [];
         }
         const fonte = bitmaps.get(fonteDa(camada.clipe.midia_id!));
         if (!fonte) return [];
         const enderecoDaMascara = camada.clipe.remover_fundo ? arquivoDaMascaraDaImagem(midias.get(camada.clipe.midia_id!)) : null;
         const mascara = enderecoDaMascara ? bitmaps.get(enderecoDaMascara) : null;
         if (enderecoDaMascara && !mascara) return [];
-        return [[camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ?? null, mascaraDe(camada))] as const];
+        return [[camada.faixa.id, camadaDoCompositor(camada, fonte, mascara ?? null, mascaraDe(camada), projeto.luz_global)] as const];
       }),
     );
     if (caixasRef) caixasRef.current = new Map(camadas.map((camada) => [camada.clipe.id, { ...caixaNoQuadro(camada.caixa, tamanho), bruta: camada.caixa, quadro: tamanho }]));

@@ -12,6 +12,9 @@ import type { Cortes } from "../projeto/letras.ts";
 import { type Cantos, type ChaveLuma, type Chroma, type MascaraDeForma, type Mesclagem, PONTOS_MAXIMOS_DO_DESENHO, type Recorte, type Virar } from "../projeto/modelo.ts";
 import { REVELADO_INTEIRO, type Revelado } from "../projeto/transicao.ts";
 import { type Contorno, deslocamentoDaSombra, LIMIAR_DO_CONTORNO, margemDaSilhueta, rampaDoContorno, type Sombra } from "../projeto/silhueta.ts";
+import { type Campo, campoDoEfeito, contextoDoAlfa, margemDosEfeitos } from "../imagem/efeitos.ts";
+import type { Efeito, LuzGlobal, TipoDoEfeito } from "../imagem/estiloDeCamada.ts";
+import { camadaDoEfeito, pixelsDaTinta, retanguloDoConteudo, tabelaDaTinta } from "../imagem/tintaDoEfeito.ts";
 
 /** A fonte da camada de ajuste: o que já foi desenhado embaixo dela (uma cópia do canvas). */
 export const FUNDO = "fundo" as const;
@@ -23,6 +26,11 @@ export type Camada = {
   texturaPronta?: { textura: WebGLTexture; largura: number; altura: number };
   /** Contorno e sombra em volta do que aparece (lib/projeto/silhueta.ts). */
   silhueta?: { contorno?: Contorno | null; sombra?: Sombra | null; preenchimento?: number };
+  /**
+   * Estilo de camada do editor de imagem (lib/imagem/estiloDeCamada.ts): os efeitos ligados, a escala deles, a luz
+   * global do documento e o preenchimento (a opacidade do conteúdo sem os efeitos).
+   */
+  estiloDeCamada?: { efeitos: Efeito[]; escala: number; luz: LuzGlobal; preenchimento: number };
   /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
   virar?: Virar | null;
@@ -1120,6 +1128,7 @@ export class Compositor {
   private desenharNo(camada: Camada) {
     if (camada.recortadas?.length) this.desenharComRecorte(camada);
     else if (camada.pasta) this.desenharPasta(camada);
+    else if (camada.estiloDeCamada?.efeitos.length && camada.fonte !== FUNDO) this.desenharComEstilo(camada, this.proximaFolha++);
     else if (camada.silhueta && camada.fonte !== FUNDO) this.desenharComSilhueta(camada, this.proximaFolha++);
     else this.desenharCamada(camada, this.proximaFolha++);
   }
@@ -1538,6 +1547,136 @@ export class Compositor {
       },
       indice,
     );
+  }
+
+  /**
+   * Estilo de camada (lib/imagem/efeitos.ts): a camada sozinha, sem giro e opaca, num framebuffer com a margem dos
+   * efeitos; o alfa dela vai para a CPU, e cada efeito vira uma textura (a tinta vezes a cobertura) que entra como uma
+   * camada com o giro da camada, a opacidade e o modo do efeito: os de fora por baixo do conteúdo (no preenchimento) e
+   * os de dentro por cima, na ordem dos editores de imagem. As contas ficam guardadas enquanto a camada e o estilo
+   * não mudam.
+   */
+  private desenharComEstilo(camada: Camada, indice: number) {
+    const gl = this.gl;
+    const tela = this.destino;
+    const { caixa } = camada;
+    const estilo = camada.estiloDeCamada!;
+    if (caixa.opacidade <= 0 || caixa.largura <= 0 || caixa.altura <= 0) return;
+    const escala = tela.largura / tela.quadro.largura;
+    const escalaDosEfeitos = escala * estilo.escala;
+    const margem = margemDosEfeitos(estilo.efeitos, escalaDosEfeitos);
+    const quadroLocal = { largura: caixa.largura + (2 * margem) / escala, altura: caixa.altura + (2 * margem) / escala };
+    const w = Math.max(1, Math.round(quadroLocal.largura * escala));
+    const h = Math.max(1, Math.round(quadroLocal.altura * escala));
+    const local = this.alvo(ALVO_DA_SILHUETA, w, h);
+    this.destino = { buffer: local.buffer, largura: w, altura: h, quadro: quadroLocal };
+    this.irAoDestino();
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    this.desenharCamada(
+      { ...camada, estiloDeCamada: undefined, silhueta: undefined, mesclagem: "normal", recortada: false, caixa: { ...caixa, cx: quadroLocal.largura / 2, cy: quadroLocal.altura / 2, rotacao: 0, opacidade: 1 } },
+      indice,
+    );
+    const pixels = new Uint8Array(w * h * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, local.buffer);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    this.destino = tela;
+    this.irAoDestino();
+    const camadas = this.camadasDosEfeitos(pixels, w, h, estilo, caixa.rotacao);
+    const comoCamada = (dados: Uint8Array, opacidade: number, mesclagem: Mesclagem) => {
+      const textura = gl.createTexture()!;
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, textura);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, dados);
+      // As linhas da CPU vêm de cima para baixo, como uma imagem
+      this.desenharCamada(
+        {
+          fonte: camada.fonte,
+          texturaPronta: { textura, largura: w, altura: h },
+          recorte: RECORTE_INTEIRO,
+          virar: { horizontal: false, vertical: false },
+          caixa: { ...caixa, largura: quadroLocal.largura, altura: quadroLocal.altura, opacidade: caixa.opacidade * opacidade },
+          mesclagem,
+          recortada: camada.recortada,
+        },
+        indice,
+      );
+      gl.deleteTexture(textura);
+    };
+    for (const efeito of camadas.abaixo) comoCamada(efeito.dados, efeito.opacidade, efeito.modo);
+    // O conteúdo, no preenchimento; a textura do framebuffer vem de baixo para cima
+    this.desenharCamada(
+      {
+        fonte: camada.fonte,
+        texturaPronta: { textura: local.textura, largura: w, altura: h },
+        recorte: RECORTE_INTEIRO,
+        virar: { horizontal: false, vertical: true },
+        caixa: { ...caixa, largura: quadroLocal.largura, altura: quadroLocal.altura, opacidade: caixa.opacidade * estilo.preenchimento },
+        mesclagem: camada.mesclagem,
+        recortada: camada.recortada,
+      },
+      indice,
+    );
+    for (const efeito of camadas.acima) comoCamada(efeito.dados, efeito.opacidade, efeito.modo);
+  }
+
+  /** As contas dos efeitos guardadas: o mesmo alfa com o mesmo estilo dá as mesmas camadas. */
+  private efeitosGuardados = new Map<string, ReturnType<Compositor["calcularEfeitos"]>>();
+
+  private camadasDosEfeitos(pixels: Uint8Array, w: number, h: number, estilo: NonNullable<Camada["estiloDeCamada"]>, giro: number) {
+    // Um resumo dos pixels (FNV-1a de 32 bits nas palavras de 4 bytes) e do estilo
+    const palavras = new Uint32Array(pixels.buffer);
+    let resumo = 0x811c9dc5;
+    for (let i = 0; i < palavras.length; i++) resumo = Math.imul(resumo ^ palavras[i], 0x01000193) >>> 0;
+    const chave = `${w}x${h}:${resumo}:${giro}:${JSON.stringify(estilo)}`;
+    let pronto = this.efeitosGuardados.get(chave);
+    if (!pronto) {
+      pronto = this.calcularEfeitos(pixels, w, h, estilo, giro);
+      this.efeitosGuardados.set(chave, pronto);
+      while (this.efeitosGuardados.size > 24) this.efeitosGuardados.delete(this.efeitosGuardados.keys().next().value!);
+    }
+    return pronto;
+  }
+
+  private calcularEfeitos(pixels: Uint8Array, w: number, h: number, estilo: NonNullable<Camada["estiloDeCamada"]>, giro: number) {
+    // O alfa da camada, com as linhas de cima para baixo
+    const alfa: Campo = { largura: w, altura: h, dados: new Float32Array(w * h) };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) alfa.dados[y * w + x] = pixels[((h - 1 - y) * w + x) * 4 + 3] / 255;
+    const escala = (this.destino.largura / this.destino.quadro.largura) * estilo.escala;
+    const ctx = contextoDoAlfa(alfa, escala, giro, estilo.luz);
+    const retangulo = retanguloDoConteudo(alfa);
+    type Feita = { dados: Uint8Array; opacidade: number; modo: Mesclagem; tipo: TipoDoEfeito };
+    const feitas: Feita[] = [];
+    for (const efeito of estilo.efeitos) {
+      const campo = campoDoEfeito(efeito, ctx);
+      const modo = efeito.modo;
+      if (efeito.tipo === "chanfro") {
+        if (campo.sombra) feitas.push({ tipo: "chanfro", dados: camadaDoEfeito(campo.sombra, { cor: efeito.cor_sombra ?? "#000000" }), opacidade: (efeito.opacidade_sombra ?? 0.75) * efeito.opacidade, modo: efeito.modo_sombra ?? "multiplicar" });
+        if (campo.realce) feitas.push({ tipo: "chanfro", dados: camadaDoEfeito(campo.realce, { cor: efeito.cor_realce ?? "#ffffff" }), opacidade: (efeito.opacidade_realce ?? 0.75) * efeito.opacidade, modo: efeito.modo_realce ?? "tela" });
+        continue;
+      }
+      let tinta: Parameters<typeof camadaDoEfeito>[1];
+      if (efeito.tipo === "tracado" || efeito.tipo === "sobreposicao_degrade" || efeito.tipo === "sobreposicao_padrao") {
+        tinta = { pixels: pixelsDaTinta(efeito.tinta ?? { tipo: "cor", cor: efeito.cor ?? "#000000" }, w, h, efeito.alinhar === false ? { x0: 0, y0: 0, x1: w, y1: h } : retangulo, escala, giro) };
+      } else {
+        const tabela = (efeito.tipo === "brilho_externo" || efeito.tipo === "brilho_interno") && efeito.tinta ? tabelaDaTinta(efeito.tinta) : null;
+        tinta = tabela && campo.t ? { tabela, t: campo.t } : { cor: efeito.cor ?? "#000000" };
+      }
+      feitas.push({ tipo: efeito.tipo, dados: camadaDoEfeito(campo.cobertura, tinta), opacidade: efeito.opacidade, modo });
+    }
+    // A ordem dos editores de imagem: por baixo, a sombra e o brilho de fora; por cima, das sobreposições ao chanfro.
+    // Dois do mesmo tipo: o primeiro da lista fica por cima
+    const ordem: TipoDoEfeito[] = ["sombra", "brilho_externo", "sobreposicao_padrao", "sobreposicao_degrade", "sobreposicao_cor", "cetim", "brilho_interno", "sombra_interna", "tracado", "chanfro"];
+    const ordenadas = feitas.map((feita, i) => ({ feita, i })).sort((a, b) => ordem.indexOf(a.feita.tipo) - ordem.indexOf(b.feita.tipo) || (a.feita.tipo === "chanfro" ? a.i - b.i : b.i - a.i)).map(({ feita }) => feita);
+    return {
+      abaixo: ordenadas.filter((feita) => feita.tipo === "sombra" || feita.tipo === "brilho_externo"),
+      acima: ordenadas.filter((feita) => feita.tipo !== "sombra" && feita.tipo !== "brilho_externo"),
+    };
   }
 
   destruir() {

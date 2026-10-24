@@ -150,7 +150,9 @@ import {
   mudarTextoRico,
   textoEmForma,
   mudarTextosRicos,
+  definirEstiloDeCamada,
 } from "./imagem.ts";
+import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -258,6 +260,7 @@ export type Comando =
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
   | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null; id?: string } }
+  | { comando: "imagem.estiloDeCamada"; parametros: { clipeIds: string[]; estilo: EstiloDeCamada | null; luz?: LuzGlobal } }
   | { comando: "imagem.textosRicos"; parametros: { mudancas: { clipeId: string; texto: TextoRico }[]; nome: "substituir" | "atualizar" } }
   | { comando: "imagem.textoEmForma"; parametros: { clipeId: string; vetor: CamadaVetorial; centro: { x: number; y: number } } }
   | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico; deslocamento?: { x: number; y: number } } }
@@ -397,6 +400,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.textoRico": "mudar o texto",
   "imagem.textoEmForma": "converter o texto em forma",
   "imagem.textosRicos": "mudar os textos",
+  "imagem.estiloDeCamada": "mudar o estilo de camada",
   "imagem.adicionarPrancheta": "pôr a prancheta",
   "imagem.prancheta": "mudar a prancheta",
   "imagem.pranchetaDoGrupo": "prancheta a partir do grupo",
@@ -684,6 +688,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima, parametros.id);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.estiloDeCamada":
+      return { projeto: definirEstiloDeCamada(projeto, parametros.clipeIds, parametros.estilo, parametros.luz) };
     case "imagem.textosRicos":
       return { projeto: mudarTextosRicos(projeto, parametros.mudancas) };
     case "imagem.textoEmForma": {

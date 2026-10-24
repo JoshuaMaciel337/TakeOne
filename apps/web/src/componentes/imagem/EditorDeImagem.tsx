@@ -30,7 +30,6 @@ import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/
 import { type CaixaDoCorte, camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { acharClipe, type Canal, type Clipe, type Faixa, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
-import { CONTORNO_PADRAO, SOMBRA_PADRAO } from "@/lib/projeto/silhueta";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 import { useMidias } from "@/lib/useMidias";
@@ -109,6 +108,8 @@ import { LOREM_IPSUM, ocorrencias, type OpcoesDaBusca, substituirTodas } from "@
 import { estiloNoIndice, nomeDoTexto, substituir } from "@/lib/texto/modelo";
 import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
 import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
+import { JanelaEstiloDeCamada } from "./JanelaEstiloDeCamada";
+import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
 import { novoId } from "@/componentes/editor/contexto";
@@ -434,6 +435,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo> }>({ estilo: {}, paragrafo: {} });
   const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
   const [localizandoTexto, setLocalizandoTexto] = useState(false);
+  // Camada › Estilo de camada: a camada e o efeito em que a janela abriu
+  const [estiloAberto, setEstiloAberto] = useState<{ clipeId: string; foco: TipoDoEfeito | "mesclagem" } | null>(null);
   // Texto › Deformar texto: a deformação de antes (para o Cancelar) enquanto a janela está aberta
   const [deformando, setDeformando] = useState<{ clipeId: string; antes: Deformacao | null } | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
@@ -2319,6 +2322,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (mudancas.length) executar({ comando: "imagem.textosRicos", parametros: { nome: "atualizar", mudancas } });
     mostrarAviso(mudancas.length ? `${mudancas.length} ${mudancas.length === 1 ? "camada de texto atualizada" : "camadas de texto atualizadas"}.` : "As camadas de texto já estão atualizadas.");
   };
+  /** Abre a janela Estilo de camada da camada escolhida (as pastas e as camadas de ajuste não têm). */
+  const abrirEstiloDeCamada = (foco: TipoDoEfeito | "mesclagem") => {
+    const clipe = escolhidoNaTela?.clipe;
+    if (!clipe || clipe.pasta || clipe.ajuste) {
+      mostrarAviso("Escolha uma camada (pastas e camadas de ajuste não têm estilo).");
+      return;
+    }
+    setEstiloAberto({ clipeId: clipe.id, foco });
+  };
+  const preverEstilo = useCallback((estilo: EstiloDeCamada, luz: LuzGlobal) => {
+    setProvisorio((atual) => {
+      const clipeId = estiloAberto?.clipeId;
+      return clipeId ? { comando: "imagem.estiloDeCamada", parametros: { clipeIds: [clipeId], estilo, luz } } : atual;
+    });
+  }, [estiloAberto?.clipeId]);
   /** Abre o Deformar texto no texto em edição ou no escolhido. */
   const abrirDeformar = () => {
     const texto = edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico;
@@ -3747,12 +3765,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     alinhar: (como) => projeto && posicoes(alinhar(projeto, selecaoValida, caixasRef.current, como)),
     distribuir: (como) => projeto && posicoes(distribuir(projeto, selecaoValida, caixasRef.current, como)),
     camadaVizinha,
-    estilo: (qual) => {
-      if (!camadaEscolhida) return;
-      const clipe = camadaEscolhida.clipe;
-      const parametros = qual === "contorno" ? { clipeIds: [clipe.id], contorno: clipe.contorno ?? CONTORNO_PADRAO } : { clipeIds: [clipe.id], sombra: clipe.sombra ?? SOMBRA_PADRAO };
-      if (executar({ comando: "clipe.silhueta", parametros })) abrirAba("basico");
-    },
+    estilo: (foco) => abrirEstiloDeCamada(foco),
     mascara: () => {
       if (camadaEscolhida && executar({ comando: "clipe.mascara", parametros: { clipeIds: [camadaEscolhida.clipe.id], mascara: camadaEscolhida.clipe.mascara ?? MASCARA_PADRAO } })) abrirAba("basico");
     },
@@ -4182,7 +4195,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoAbrirEstilo={abrirEstiloDeCamada} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
             setMascaraVetorialEmFoco(clipeId);
             if (clipeId) {
               setMascaraEmFoco(null);
@@ -4793,6 +4806,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascara={pinturas.fonteDaMascara}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {estiloAberto && projeto ? (
+        <JanelaEstiloDeCamada
+          inicial={acharClipe(projeto, estiloAberto.clipeId)?.clipe.estilo_camada ?? null}
+          luz={projeto.luz_global ?? LUZ_GLOBAL_PADRAO}
+          foco={estiloAberto.foco}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          degradesDoEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+          aoPrever={preverEstilo}
+          aoConfirmar={(estilo, luz) => {
+            setProvisorio(null);
+            executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [estiloAberto.clipeId], estilo, luz } });
+            setEstiloAberto(null);
+          }}
+          aoCancelar={() => {
+            setProvisorio(null);
+            setEstiloAberto(null);
+          }}
         />
       ) : null}
       {deformando ? (

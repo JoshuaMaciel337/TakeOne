@@ -1,6 +1,7 @@
 // O projeto de edição, no mesmo formato que a API salva (core/modelos/projeto.py).
 // Tempos em ticks (lib/tempo.ts). As faixas vão de cima para baixo, como aparecem na linha do tempo.
 import type { Contorno, Sombra } from "./silhueta.ts";
+import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -291,6 +292,8 @@ export type Clipe = {
   mascara_vetorial?: MascaraVetorial | null;
   /** Só no projeto de imagem: a camada vetorial (forma viva ou caminho, lib/vetor/modelo.ts), sem mídia nem texto. */
   vetor?: CamadaVetorial | null;
+  /** Só no projeto de imagem: o estilo de camada (lib/imagem/estiloDeCamada.ts), no lugar do contorno e da sombra. */
+  estilo_camada?: EstiloDeCamada | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */
@@ -427,6 +430,8 @@ export type Projeto = {
   canais?: Canal[];
   /** Os caminhos do painel Caminhos (lib/vetor/caminhos.ts), em pixels do documento. */
   caminhos?: CaminhoDoDocumento[];
+  /** Só no projeto de imagem: a luz global que os efeitos com "usar a luz global" seguem. */
+  luz_global?: LuzGlobal | null;
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;
