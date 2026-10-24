@@ -49,7 +49,7 @@ import { PreviaDaImagem, proximoZoom } from "./PreviaDaImagem";
 import { PropriedadesDoDocumento } from "./PropriedadesDoDocumento";
 import { PropriedadesDaMascara } from "./PropriedadesDaMascara";
 import { useObjeto } from "./useObjeto";
-import { alvoDaMascara, alvoDosPixels, usePinturas } from "./usePinturas";
+import { alvoDaMascara, alvoDaMascaraDosFiltros, alvoDosPixels, usePinturas } from "./usePinturas";
 import type { AlvoDaPintura } from "./PinturaNaPrevia";
 import { type FerramentaDePintura, type OpcoesDoPincel, PINCEL_PADRAO, type SecaoDoPincel, type Simetria } from "@/lib/pintura/traco";
 import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./PaineisDoPincel";
@@ -112,6 +112,9 @@ import { PainelEstilosDeCamada } from "./PainelEstilosDeCamada";
 import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
 import { JanelaCamadaDePreenchimento, preenchimentoNovo } from "./JanelaCamadaDePreenchimento";
 import { PropriedadesDoAjuste } from "./ajustes/PropriedadesDoAjuste";
+import { JanelaDoFiltroInteligente, JanelaMesclagemDoFiltro } from "./filtros/JanelasDoFiltro";
+import { FILTRO_POR_ID, type Valores, valoresDoFiltro } from "@/lib/imagem/filtros/catalogo";
+import { aplicarFiltro as aplicarFiltroNaImagem, type FiltrosInteligentes } from "@/lib/imagem/filtros/pilha";
 import { JanelaDeAjusteNosPixels, type OperacaoDosPixels } from "./ajustes/JanelaDeAjusteNosPixels";
 import {
   CORRESPONDER_PADRAO,
@@ -132,7 +135,7 @@ import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
 import { PainelHistograma } from "./ajustes/PainelHistograma";
-import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
+import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, corEmRgb, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
@@ -665,7 +668,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const guardada = imagemLida.current;
     if (guardada && guardada.projeto === atual && guardada.chave === chave) return guardada.imagem;
     const desenhar = so ? projetoSoCom(atual, [so], { neutras: new Set([so]), semEstilo: true, semMascara: true }) : atual;
-    const imagem = exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }).then(imagemDoBlob);
+    const imagem = exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }).then(imagemDoBlob);
     imagemLida.current = { chave, projeto: atual, imagem };
     imagem.catch(() => {
       if (imagemLida.current?.imagem === imagem) imagemLida.current = null;
@@ -827,7 +830,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const atual = projetoRef.current;
     if (!atual) return;
     const faixa = selecionado?.faixa ?? null;
-    const ler = (projetoParaLer: Projeto) => exportarImagem(projetoParaLer, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }).then(imagemDoBlob);
+    const ler = (projetoParaLer: Projeto) => exportarImagem(projetoParaLer, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }).then(imagemDoBlob);
     const daCamada = faixa ? ler(projetoSoCom(atual, [faixa.id], { neutras: new Set([faixa.id]), semEstilo: true, semMascara: true })) : imagemParaSelecao(true);
     const resto = faixa ? ler({ ...atual, faixas: atual.faixas.map((item) => (item.id === faixa.id ? { ...item, oculta: true } : item)) }) : Promise.resolve(null);
     Promise.all([daCamada, resto])
@@ -1633,7 +1636,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           // As camadas com máscara continuam inteiras (a máscara acompanha a caixa delas)
           if (!clipe.pixels || !clipe.midia_id || clipe.mascara_pixels) continue;
           const sozinha = projetoSoCom(depois, [faixa.id], { neutras: new Set([faixa.id]), semEstilo: true });
-          const blob = await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+          const blob = await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
           const midia = await criarCamadaDePixels(documento.largura, documento.altura, nomeDaFaixa(faixa));
           setCriadas((atuais) => new Map([...atuais, [midia.id, midia]]));
           pixels.push({ id: clipe.id, midiaId: midia.id, versao: await enviarVersao(midia.id, blob) });
@@ -1679,7 +1682,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           continue;
         }
         const { desenhar, ...dados } = plano;
-        const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+        const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
         const tela = document.createElement("canvas");
         tela.width = documento.largura;
         tela.height = documento.altura;
@@ -1740,7 +1743,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     try {
       await pinturas.esperar();
       const documento = tamanhoDaImagem(atual);
-      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
       const canvas = document.createElement("canvas");
       canvas.width = documento.largura;
       canvas.height = documento.altura;
@@ -1773,7 +1776,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         continue;
       }
       const { desenhar, ...dados } = plano;
-      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
       const canvas = document.createElement("canvas");
       canvas.width = documento.largura;
       canvas.height = documento.altura;
@@ -1879,7 +1882,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     try {
       await pinturas.esperar();
       const documento = tamanhoDaImagem(atual);
-      const bitmap = await createImageBitmap(await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const bitmap = await createImageBitmap(await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
       const canvas = document.createElement("canvas");
       canvas.width = documento.largura;
       canvas.height = documento.altura;
@@ -1906,7 +1909,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } else {
       const documento = tamanhoDaImagem(atual);
       const sozinha = projetoSoCom(atual, [id], { neutras: new Set([id]), semEstilo: true });
-      const bitmap = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const bitmap = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
       canvas = document.createElement("canvas");
       canvas.width = documento.largura;
       canvas.height = documento.altura;
@@ -1981,7 +1984,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const preencherOVazio = async (depois: Projeto) => {
     const documento = tamanhoDaImagem(depois);
     const comTransparencia = { ...depois, fundo: { ...depois.fundo, transparente: true } };
-    const bitmap = await createImageBitmap(await exportarImagem(comTransparencia, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+    const bitmap = await createImageBitmap(await exportarImagem(comTransparencia, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
     const canvas = document.createElement("canvas");
     canvas.width = documento.largura;
     canvas.height = documento.altura;
@@ -2124,7 +2127,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (!atual) return null;
     const documento = tamanhoDaImagem(atual);
     const desenhar = faixaId ? projetoSoCom(atual, [faixaId], { neutras: new Set([faixaId]), semEstilo: true, semMascara: true }) : atual;
-    const blob = await exportarImagem(desenhar, midias, { formato: "png", escala: Math.min(1, 512 / Math.max(documento.largura, documento.altura)), fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+    const blob = await exportarImagem(desenhar, midias, { formato: "png", escala: Math.min(1, 512 / Math.max(documento.largura, documento.altura)), fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -2144,6 +2147,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       aplicarAjusteNosPixels(dados, compilarAjuste(ajuste, daPesquisa), sessao.cobertura);
       return dados;
     }
+    if (operacao.tipo === "filtro") return filtrarPixelsRetos(sessao.original, sessao.largura, sessao.altura, operacao.filtro, operacao.opcoes, sessao.cobertura);
     if (operacao.tipo === "sombrasRealces") sombrasRealces(dados, sessao.largura, sessao.altura, operacao.opcoes);
     else if (operacao.tipo === "hdr") tonalizacaoHdr(dados, sessao.largura, sessao.altura, operacao.opcoes);
     else if (operacao.tipo === "substituir") substituirCor(dados, operacao.opcoes);
@@ -2233,6 +2237,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   const confirmarNosPixels = () => {
     if (!nosPixels) return;
+    if (nosPixels.operacao.tipo === "filtro") setUltimoFiltro({ tipo: nosPixels.operacao.filtro, opcoes: nosPixels.operacao.opcoes });
     const dados = pixelsDaOperacao(nosPixels);
     nosPixels.canvas.getContext("2d", { willReadFrequently: true })!.putImageData(new ImageData(new Uint8ClampedArray(dados), nosPixels.largura, nosPixels.altura), 0, 0);
     pinturas.soltar(nosPixels.chave);
@@ -2274,6 +2279,137 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else aplicarAjusteNosPixels(dados, compilarAjuste({ tipo: "niveis", canais: niveisAutomaticos(histogramas(dados), qual) }));
       misturarComCobertura(antes, dados, cobertura);
     });
+  };
+  // ——— Filtros (menu Filtro): nos pixels da camada de pixels, ou na pilha de filtros inteligentes das outras ———
+  const [ultimoFiltro, setUltimoFiltro] = useState<{ tipo: string; opcoes: Valores } | null>(null);
+  /** A janela de um filtro inteligente: o novo (que entra no topo da pilha) ou um que já está nela. */
+  const [filtroAberto, setFiltroAberto] = useState<{ clipeId: string; filtroId: string; tipo: string; antes: FiltrosInteligentes | null; inicial: Valores; novo: boolean } | null>(null);
+  const [mesclagemDoFiltro, setMesclagemDoFiltro] = useState<{ clipeId: string; filtroId: string; antes: FiltrosInteligentes } | null>(null);
+  const [mascaraDosFiltrosEmFoco, setMascaraDosFiltrosEmFoco] = useState<string | null>(null);
+  /** A pilha com o filtro da janela nas opções da vez. */
+  const pilhaComFiltro = useCallback(
+    (valores: Valores): FiltrosInteligentes | null => {
+      if (!filtroAberto) return null;
+      const base = filtroAberto.antes ?? { filtros: [] };
+      const filtros = filtroAberto.novo
+        ? [...base.filtros, { id: filtroAberto.filtroId, tipo: filtroAberto.tipo, opcoes: valores, ligado: true, modo: "normal" as const, opacidade: 1 }]
+        : base.filtros.map((filtro) => (filtro.id === filtroAberto.filtroId ? { ...filtro, opcoes: valores } : filtro));
+      return { ...base, filtros };
+    },
+    [filtroAberto],
+  );
+  const preverFiltro = useCallback(
+    (valores: Valores | null) => {
+      if (!filtroAberto) return;
+      setProvisorio({ comando: "imagem.filtros", parametros: { clipeId: filtroAberto.clipeId, filtros: valores ? pilhaComFiltro(valores) : filtroAberto.antes } });
+    },
+    [filtroAberto, pilhaComFiltro],
+  );
+  /** O filtro em pixels pré-multiplicados (como o compositor) sobre a camada de pixels em cor reta, com a seleção. */
+  const filtrarPixelsRetos = (original: Uint8ClampedArray, largura: number, altura: number, tipo: string, opcoes: Valores, cobertura: Uint8ClampedArray | Uint8Array | null): Uint8ClampedArray => {
+    const documento = tamanhoDaImagem(projetoRef.current ?? projeto!);
+    const pre = new Uint8ClampedArray(original.length);
+    for (let i = 0; i < pre.length; i += 4) {
+      const a = original[i + 3];
+      for (let k = 0; k < 3; k++) pre[i + k] = Math.round((original[i + k] * a) / 255);
+      pre[i + 3] = a;
+    }
+    const saida = aplicarFiltroNaImagem({ largura, altura, dados: pre }, tipo, opcoes, {
+      escala: largura / documento.largura,
+      primeiroPlano: corEmRgb(cores.primeiroPlano),
+      fundo: corEmRgb(cores.fundo),
+      origem: { x: 0, y: 0 },
+      documento,
+    }).dados;
+    const dados = new Uint8ClampedArray(original.length);
+    for (let p = 0, i = 0; i < dados.length; p++, i += 4) {
+      const a = saida[i + 3];
+      // A seleção mistura os quatro canais (um filtro pode mexer no alfa, como o Cor para alfa)
+      const peso = cobertura ? cobertura[p] / 255 : 1;
+      const reto = [0, 1, 2].map((k) => (a ? Math.round((saida[i + k] * 255) / a) : original[i + k]));
+      for (let k = 0; k < 3; k++) dados[i + k] = Math.round(original[i + k] + (reto[k] - original[i + k]) * peso);
+      dados[i + 3] = Math.round(original[i + 3] + (a - original[i + 3]) * peso);
+    }
+    return dados;
+  };
+  /**
+   * O filtro do menu: na camada de pixels (sem filtros inteligentes), grava nos pixels (com a janela, se ele tem
+   * opções); nas outras, entra na pilha de filtros inteligentes (a primeira vez, ela nasce).
+   */
+  const aplicarFiltroDoMenu = (tipo: string, opcoes?: Valores, semJanela = false) => {
+    const definicao = FILTRO_POR_ID.get(tipo);
+    const atual = projetoRef.current;
+    if (!definicao || !atual) return;
+    if (!selecionado) return mostrarAviso("Escolha uma camada.");
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado) return;
+    if (achado.clipe.ajuste || achado.clipe.pasta) return mostrarAviso("Os filtros valem para camadas com conteúdo, não para ajustes nem grupos.");
+    const valores = valoresDoFiltro(definicao, opcoes ?? {});
+    const direto = definicao.semJanela || semJanela;
+    if (achado.clipe.pixels && !achado.clipe.filtros_inteligentes) {
+      if (!direto) return void abrirNosPixels({ tipo: "filtro", filtro: tipo, opcoes: valores });
+      setUltimoFiltro({ tipo, opcoes: valores });
+      void editarPixels((dados, cobertura, camada) => {
+        dados.set(filtrarPixelsRetos(dados, camada.largura, camada.altura, tipo, valores, cobertura));
+      });
+      return;
+    }
+    const pilha = achado.clipe.filtros_inteligentes ?? { filtros: [] };
+    const filtroId = Math.random().toString(36).slice(2, 10);
+    if (direto) {
+      const novo = { id: filtroId, tipo, opcoes: valores, ligado: true, modo: "normal" as const, opacidade: 1 };
+      if (executar({ comando: "imagem.filtros", parametros: { clipeId: achado.clipe.id, filtros: { ...pilha, filtros: [...pilha.filtros, novo] } } })) setUltimoFiltro({ tipo, opcoes: valores });
+      return;
+    }
+    setFiltroAberto({ clipeId: achado.clipe.id, filtroId, tipo, antes: achado.clipe.filtros_inteligentes ?? null, inicial: valores, novo: true });
+  };
+  /** O clique duplo num filtro da pilha: a janela dele, com as opções que ele tem. */
+  const editarFiltroInteligente = (clipeId: string, filtroId: string) => {
+    const pilha = projetoRef.current ? acharClipe(projetoRef.current, clipeId)?.clipe.filtros_inteligentes : null;
+    const filtro = pilha?.filtros.find((item) => item.id === filtroId);
+    if (!pilha || !filtro) return;
+    if (!FILTRO_POR_ID.get(filtro.tipo)?.opcoes.length) return mostrarAviso("Este filtro não tem opções.");
+    setFiltroAberto({ clipeId, filtroId, tipo: filtro.tipo, antes: pilha, inicial: filtro.opcoes, novo: false });
+  };
+  /** A máscara dos filtros: a primeira vez, uma branca (ou a seleção); depois, o clique põe ela em foco para o pincel. */
+  const mascaraDosFiltros = async (clipeId: string) => {
+    const atual = projetoRef.current;
+    const achado = atual ? acharClipe(atual, clipeId) : null;
+    if (!achado?.clipe.filtros_inteligentes || gerandoPixels) return;
+    if (achado.clipe.filtros_inteligentes.mascara) {
+      setMascaraDosFiltrosEmFoco((foco) => (foco === clipeId ? null : clipeId));
+      setMascaraEmFoco(null);
+      return;
+    }
+    const medida = caixasRef.current.get(clipeId);
+    if (!medida?.bruta || !medida.quadro) return mostrarAviso("A camada ainda não apareceu na prévia. Tente de novo.");
+    const matriz = matrizDaCaixa(medida.bruta, medida.quadro);
+    setGerandoPixels(true);
+    try {
+      const selecao = selecaoNoDocumento;
+      const gerar = selecao
+        ? pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, selecao, false))
+        : pngDoDocumento((ctx2d, largura, altura) => {
+            ctx2d.fillStyle = "#ffffff";
+            ctx2d.fillRect(0, 0, largura, altura);
+          });
+      const { midia, versao } = await subirMascara(gerar);
+      if (executar({ comando: "imagem.mascaraDosFiltros", parametros: { clipeId, mudanca: { midia_id: midia.id, versao, ligada: true, vinculada: true, densidade: 1, difusao: 0, matriz } } })) {
+        setMascaraDosFiltrosEmFoco(clipeId);
+        setMascaraEmFoco(null);
+      }
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar a máscara dos filtros.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Filtro › Converter para filtros inteligentes: a camada de pixels passa a receber os filtros na pilha. */
+  const converterParaFiltrosInteligentes = () => {
+    const clipe = selecionado?.clipe;
+    if (!clipe || clipe.ajuste || clipe.pasta) return mostrarAviso("Escolha uma camada com conteúdo.");
+    if (clipe.filtros_inteligentes) return mostrarAviso("A camada já recebe filtros inteligentes.");
+    if (executar({ comando: "imagem.filtros", parametros: { clipeId: clipe.id, filtros: { filtros: [] } } })) mostrarAviso("Os filtros desta camada agora entram como filtros inteligentes.");
   };
   // ——— A ferramenta Texto (texto desenhado no navegador) ———
   const textoEscolhido = !edicaoDeTexto && selecionado?.clipe.texto_rico ? selecionado.clipe : null;
@@ -3013,7 +3149,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const acima = new Set(ordem.slice(0, Math.max(0, indice)).map((faixa) => faixa.id));
       projetoDaAmostra = { ...atual, faixas: atual.faixas.map((faixa) => (acima.has(faixa.id) ? { ...faixa, oculta: true } : faixa)) };
     }
-    const imagem = await createImageBitmap(await exportarImagem(projetoDaAmostra, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+    const imagem = await createImageBitmap(await exportarImagem(projetoDaAmostra, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
     ctx2d.drawImage(imagem, 0, 0, documento.largura, documento.altura);
     imagem.close();
     return canvas;
@@ -3256,6 +3392,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         return null;
       }
     }
+    // A máscara dos filtros inteligentes em foco: o pincel pinta nela, como na máscara da camada
+    if (selecionado && mascaraDosFiltrosEmFoco === selecionado.clipe.id && selecionado.clipe.filtros_inteligentes?.mascara) {
+      const achado = acharClipe(atual, selecionado.clipe.id);
+      const mascara = achado?.clipe.filtros_inteligentes?.mascara;
+      const alvo = achado ? alvoDaMascaraDosFiltros(achado.clipe) : null;
+      if (!achado || !mascara || !alvo) return null;
+      if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) {
+        mostrarAviso("A camada está travada. Destrave para pintar a máscara dos filtros.");
+        return null;
+      }
+      try {
+        const pintura = await pinturas.preparar(alvo, tamanhoDaImagem(atual));
+        return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: true, mascara };
+      } catch {
+        mostrarAviso("Não foi possível abrir a máscara dos filtros para pintar. Tente de novo.");
+        return null;
+      }
+    }
     // A máscara em foco (Ctrl+\ ou o clique na miniatura dela): o pincel pinta a máscara em tons de cinza
     if (selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels) {
       const achado = acharClipe(atual, selecionado.clipe.id);
@@ -3390,7 +3544,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     setGerandoPixels(true);
     try {
       await pinturas.esperar();
-      const blob = typeof plano === "function" ? await plano() : await exportarImagem(plano.desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+      const blob = typeof plano === "function" ? await plano() : await exportarImagem(plano.desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
       const { largura, altura } = tamanhoDaImagem(projetoRef.current ?? projeto);
       const midia = await criarCamadaDePixels(largura, altura, dados.nome);
       setCriadas((atual) => new Map([...atual, [midia.id, midia]]));
@@ -3438,7 +3592,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     try {
       await pinturas.esperar();
       const desenhar = projetoSoCom(atual, [achado.faixa.id], { neutras: new Set([achado.faixa.id]), semEstilo: true });
-      const blob = await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+      const blob = await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
       const bitmap = await createImageBitmap(blob);
       const tela = document.createElement("canvas");
       tela.width = documento.largura;
@@ -4037,6 +4191,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       void abrirNosPixels({ tipo: "substituir", opcoes: SUBSTITUIR_PADRAO });
     },
     automatico: (jeito) => void ajusteInstantaneo(jeito),
+    filtroDoCatalogo: (tipo) => aplicarFiltroDoMenu(tipo),
+    ultimoFiltro: { nome: ultimoFiltro ? (FILTRO_POR_ID.get(ultimoFiltro.tipo)?.nome ?? null) : null, aplicar: () => ultimoFiltro && aplicarFiltroDoMenu(ultimoFiltro.tipo, ultimoFiltro.opcoes, true) },
+    converterParaFiltrosInteligentes,
     preenchimento: {
       escolhido: Boolean(escolhidoNaTela?.clipe.camada_de_preenchimento),
       nova: novoPreenchimento,
@@ -4572,7 +4729,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoCriarPreenchimento={novoPreenchimento} aoEditarPreenchimento={(clipeId) => editarPreenchimento(clipeId)} aoAbrirPropriedades={() => abrirAba("basico")} aoAbrirEstilo={abrirEstiloDeCamada} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoCriarPreenchimento={novoPreenchimento} aoEditarPreenchimento={(clipeId) => editarPreenchimento(clipeId)} aoFiltros={{
+            mascaraEmFoco: mascaraDosFiltrosEmFoco,
+            editar: editarFiltroInteligente,
+            mesclagem: (clipeId, filtroId) => {
+              const pilha = projetoRef.current ? acharClipe(projetoRef.current, clipeId)?.clipe.filtros_inteligentes : null;
+              if (pilha) setMesclagemDoFiltro({ clipeId, filtroId, antes: pilha });
+            },
+            mascara: (clipeId) => void mascaraDosFiltros(clipeId),
+          }} aoAbrirPropriedades={() => abrirAba("basico")} aoAbrirEstilo={abrirEstiloDeCamada} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
             setMascaraVetorialEmFoco(clipeId);
             if (clipeId) {
               setMascaraEmFoco(null);
@@ -5003,6 +5168,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             }
             fonteDosPixels={pinturas.fonte}
             fonteDaMascara={pinturas.fonteDaMascara}
+            fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
             mascaraAVista={mascaraAVista}
             veu={
               motorDasManchas
@@ -5256,6 +5422,54 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoVisualizar={(visualizar) => setNosPixels((atual) => (atual ? { ...atual, visualizar } : atual))}
           aoConfirmar={confirmarNosPixels}
           aoCancelar={cancelarNosPixels}
+        />
+      ) : null}
+      {filtroAberto ? (
+        <JanelaDoFiltroInteligente
+          key={`${filtroAberto.clipeId}:${filtroAberto.filtroId}`}
+          tipo={filtroAberto.tipo}
+          inicial={filtroAberto.inicial}
+          aoPrever={preverFiltro}
+          aoConfirmar={(valores) => {
+            const filtros = pilhaComFiltro(valores);
+            setProvisorio(null);
+            setFiltroAberto(null);
+            if (executar({ comando: "imagem.filtros", parametros: { clipeId: filtroAberto.clipeId, filtros } })) setUltimoFiltro({ tipo: filtroAberto.tipo, opcoes: valores });
+          }}
+          aoCancelar={() => {
+            setProvisorio(null);
+            setFiltroAberto(null);
+          }}
+        />
+      ) : null}
+      {mesclagemDoFiltro ? (
+        <JanelaMesclagemDoFiltro
+          nome={(() => {
+            const filtro = mesclagemDoFiltro.antes.filtros.find((item) => item.id === mesclagemDoFiltro.filtroId);
+            return (filtro && FILTRO_POR_ID.get(filtro.tipo)?.nome) ?? "filtro";
+          })()}
+          inicial={(() => {
+            const filtro = mesclagemDoFiltro.antes.filtros.find((item) => item.id === mesclagemDoFiltro.filtroId);
+            return { modo: filtro?.modo ?? "normal", opacidade: filtro?.opacidade ?? 1 };
+          })()}
+          aoPrever={(m) =>
+            setProvisorio({
+              comando: "imagem.filtros",
+              parametros: { clipeId: mesclagemDoFiltro.clipeId, filtros: { ...mesclagemDoFiltro.antes, filtros: mesclagemDoFiltro.antes.filtros.map((item) => (item.id === mesclagemDoFiltro.filtroId ? { ...item, ...m } : item)) } },
+            })
+          }
+          aoConfirmar={(m) => {
+            setProvisorio(null);
+            executar({
+              comando: "imagem.filtros",
+              parametros: { clipeId: mesclagemDoFiltro.clipeId, filtros: { ...mesclagemDoFiltro.antes, filtros: mesclagemDoFiltro.antes.filtros.map((item) => (item.id === mesclagemDoFiltro.filtroId ? { ...item, ...m } : item)) } },
+            });
+            setMesclagemDoFiltro(null);
+          }}
+          aoCancelar={() => {
+            setProvisorio(null);
+            setMesclagemDoFiltro(null);
+          }}
         />
       ) : null}
       {preenchendo ? (

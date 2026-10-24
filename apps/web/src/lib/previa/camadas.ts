@@ -28,6 +28,7 @@ import { efeitosLigados, LUZ_GLOBAL_PADRAO, type LuzGlobal } from "@/lib/imagem/
 import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { type AjusteDaImagem, compilarAjuste, lutDaFuncao, type TabelaDoAjuste } from "@/lib/imagem/ajustes";
+import { filtrosQueValem } from "@/lib/imagem/filtros/pilha";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
@@ -41,7 +42,12 @@ import { type Camada, FUNDO } from "./compositor";
 import type { ImagemDeTexto } from "./imagensDeTexto";
 
 /** O que a camada do compositor precisa do documento (editor de imagem): a luz global e o fundo. */
-export const documentoDaCamada = (projeto: Pick<Projeto, "luz_global" | "fundo">) => ({ luz: projeto.luz_global ?? null, fundo: projeto.fundo.transparente ? null : projeto.fundo.cor });
+export const documentoDaCamada = (projeto: Pick<Projeto, "luz_global" | "fundo" | "tamanho">) => ({
+  luz: projeto.luz_global ?? null,
+  fundo: projeto.fundo.transparente ? null : projeto.fundo.cor,
+  // O tamanho do documento: as medidas dos filtros inteligentes são dadas nele
+  tamanho: projeto.tamanho ? { largura: projeto.tamanho.largura, altura: projeto.tamanho.altura } : { largura: 1080, altura: 1080 },
+});
 
 /** Um clipe de mídia que precisa de uma fonte de quadros agora (o atual ou o próximo da faixa). */
 export type ItemDaPrevia = {
@@ -446,7 +452,9 @@ export function camadaDoCompositor(
    */
   mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho; matriz?: [number, number, number, number, number, number]; densidade?: number; difusao?: number } | null,
   /** O documento (editor de imagem): a luz global dos efeitos e o fundo (null: transparente), para o vazamento. */
-  documento?: { luz?: LuzGlobal | null; fundo?: string | null } | null,
+  documento?: { luz?: LuzGlobal | null; fundo?: string | null; tamanho?: { largura: number; altura: number } } | null,
+  /** A máscara dos filtros inteligentes (a imagem dela e o quadro em que a caixa foi medida), como a da camada. */
+  mascaraDosFiltros?: { fonte: TexImageSource; quadro: Tamanho } | null,
 ): Camada {
   const mascara = camada.clipe.mascara_pixels;
   // O estilo de camada do editor de imagem fica no lugar do contorno e da sombra de antes
@@ -506,5 +514,19 @@ export function camadaDoCompositor(
     chroma: camada.clipe.texto ? null : camada.clipe.chroma,
     chaveLuma: camada.clipe.texto ? null : camada.clipe.chave_luma,
     mascaraDoFundo,
+    filtros: filtrosDaCamada(camada, documento?.tamanho, mascaraDosFiltros),
+  };
+}
+
+/** Os filtros inteligentes que valem, com a máscara deles levada à caixa da camada (como a máscara da camada). */
+function filtrosDaCamada(camada: CamadaNaTela, documento: { largura: number; altura: number } | undefined, mascara: { fonte: TexImageSource; quadro: Tamanho } | null | undefined): Camada["filtros"] {
+  const pilha = camada.clipe.filtros_inteligentes;
+  const lista = filtrosQueValem(pilha);
+  if (!lista.length || !documento) return null;
+  const daMascara = pilha?.mascara?.ligada && mascara ? pilha.mascara : null;
+  return {
+    lista,
+    documento,
+    mascara: daMascara && mascara ? { fonte: mascara.fonte, matriz: matrizEmUso(daMascara, camada.caixa, mascara.quadro), densidade: daMascara.densidade, difusao: daMascara.difusao } : null,
   };
 }

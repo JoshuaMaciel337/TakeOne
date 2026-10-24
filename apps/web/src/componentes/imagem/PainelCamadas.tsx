@@ -22,6 +22,7 @@ import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { NOMES_DO_PREENCHIMENTO } from "@/lib/imagem/camadaDePreenchimento";
 import { NOMES_DOS_AJUSTES } from "@/lib/imagem/ajustes";
 import { AmostraDaTinta } from "./OpcoesDaForma";
+import { FiltrosDaCamada } from "./filtros/FiltrosDaCamada";
 
 type Props = {
   projeto: Projeto;
@@ -35,6 +36,8 @@ type Props = {
   /** Uma camada de preenchimento nova (cor sólida, degradê ou padrão), e a janela dela com o clique duplo na miniatura. */
   aoCriarPreenchimento?: (tipo: "cor" | "degrade" | "padrao") => void;
   aoEditarPreenchimento?: (clipeId: string) => void;
+  /** Os filtros inteligentes de cada camada: editar um, as opções de mesclagem dele e a máscara deles. */
+  aoFiltros?: { mascaraEmFoco: string | null; editar: (clipeId: string, filtroId: string) => void; mesclagem: (clipeId: string, filtroId: string) => void; mascara: (clipeId: string) => void };
   /** Um estilo de camada novo: abre o painel Propriedades na parte dele. */
   aoAbrirPropriedades: () => void;
   /** A janela Estilo de camada da escolhida, aberta num efeito (ou nas opções de mesclagem). */
@@ -278,6 +281,7 @@ export function PainelCamadas({
   aoCriarAjuste,
   aoCriarPreenchimento,
   aoEditarPreenchimento,
+  aoFiltros,
   aoAbrirPropriedades,
   aoAbrirEstilo,
   aoNovaCamada,
@@ -567,8 +571,8 @@ export function PainelCamadas({
           const temTrava = faixa.travada || Boolean(faixa.travas);
           const alvoAqui = alvo?.faixaId === faixa.id ? alvo.zona : null;
           return (
+            <Fragment key={faixa.id}>
             <li
-              key={faixa.id}
               draggable={renomeando !== faixa.id}
               onDragStart={(evento) => {
                 setArrastadas(marcada ? ids : [faixa.id]);
@@ -802,6 +806,19 @@ export function PainelCamadas({
                 {temTrava ? <Lock className={`size-3 shrink-0 ${faixa.travada ? "text-texto" : "text-suave/70"}`} aria-label={faixa.travada ? "Bloqueada" : "Com bloqueio parcial"} /> : null}
               </div>
             </li>
+            {clipe.filtros_inteligentes && aoFiltros ? (
+              <FiltrosDaCamada
+                clipeId={clipe.id}
+                pilha={clipe.filtros_inteligentes}
+                nivel={nivel}
+                mascaraEmFoco={aoFiltros.mascaraEmFoco === clipe.id}
+                aoExecutar={aoExecutar}
+                aoEditar={(filtroId) => aoFiltros.editar(clipe.id, filtroId)}
+                aoMesclagem={(filtroId) => aoFiltros.mesclagem(clipe.id, filtroId)}
+                aoMascara={() => aoFiltros.mascara(clipe.id)}
+              />
+            ) : null}
+            </Fragment>
           );
         })}
         {!filtrando && !projeto.fundo.transparente && !todas.some((faixa) => faixa.fundo) ? (

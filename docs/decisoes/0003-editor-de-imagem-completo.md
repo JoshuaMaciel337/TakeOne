@@ -233,18 +233,18 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.11 — Filtros
 
-- [ ] Filtros inteligentes (pilha não destrutiva por camada, com a máscara do filtro, opções de mesclagem de cada um, ligar e desligar, reordenar), Converter para filtros inteligentes, Último filtro (Ctrl+Alt+F), Atenuar
+- [x] Filtros inteligentes (pilha não destrutiva por camada, com a máscara do filtro, opções de mesclagem de cada um, ligar e desligar, reordenar), Converter para filtros inteligentes, Último filtro (Ctrl+Alt+F), Atenuar
 - [ ] Galeria de filtros com os 47 e a pilha de efeitos dela: artísticos (lápis de cor, recorte, pincel seco, filme granulado, afresco, brilho neon, pinceladas, espátula, plástico, bordas posterizadas, pastel, borrão, esponja, base, aquarela), traçados de pincel (bordas acentuadas, traços angulares, hachura, traços escuros, contornos de tinta, salpicos, traços borrifados, sumi-e), distorção (brilho difuso, vidro, ondulação oceânica), esboço (baixo-relevo, giz e carvão, carvão, cromado, conté, caneta gráfica, padrão de meio-tom, papel de carta, fotocópia, gesso, reticulação, carimbo, bordas rasgadas, papel molhado), estilização (bordas brilhantes), textura (craquelado, grão, ladrilhos de mosaico, colcha, vitral, texturizador)
 - [ ] Desfoque: média, desfoque, mais desfoque, caixa, gaussiano, lente (com mapa de profundidade), movimento, radial, forma, inteligente, superfície
 - [ ] Galeria de desfoque: campo, íris, inclinação, caminho, giro, com alfinetes na tela
 - [ ] Distorção: deslocamento (mapa), pinçar, coordenadas polares, ondulação, cisalhamento, esfera, redemoinho, onda, ziguezague
-- [ ] Ruído: adicionar, remover manchas, poeira e riscos, mediana, reduzir ruído
+- [x] Ruído: adicionar, remover manchas, poeira e riscos, mediana, reduzir ruído
 - [ ] Pixelização: meio-tom em cores, cristalizar, facetar, fragmentar, meia-tinta, mosaico, pontilhismo
 - [ ] Renderização: chamas, moldura, árvore, nuvens, nuvens por diferença, fibras, reflexo de lente, efeitos de iluminação (spot, ponto, infinita, canal de textura), reiluminar
-- [ ] Nitidez: tornar nítido, mais nítido, nitidez nas bordas, nitidez inteligente, máscara de nitidez
+- [x] Nitidez: tornar nítido, mais nítido, nitidez nas bordas, nitidez inteligente, máscara de nitidez
 - [ ] Estilização: difusão, entalhe, extrusão, encontrar bordas, pintura a óleo, solarizar, ladrilhos, traçar contorno, vento
 - [ ] Vídeo: desentrelaçar, cores NTSC
-- [ ] Outros: personalizado (matriz), HSB/HSL, alta frequência, máximo, mínimo, deslocamento, cor para alfa
+- [x] Outros: personalizado (matriz), HSB/HSL, alta frequência, máximo, mínimo, deslocamento, cor para alfa
 - [ ] Filtro de revelação (a aba Cor no lugar do filtro de câmera, com as seções que faltam: detalhe, granulação, mistura de cores, gradação de cor, vinheta com prioridade)
 
 ### Onda 13.12 — IA

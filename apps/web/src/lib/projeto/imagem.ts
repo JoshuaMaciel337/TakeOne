@@ -16,6 +16,7 @@ import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
 import { type EstiloDeCamada, estiloFazAlgo, type LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import type { AjusteDaImagem } from "../imagem/ajustes.ts";
+import type { FiltrosInteligentes } from "../imagem/filtros/pilha.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -486,6 +487,30 @@ export function mudarAjusteDaCamada(projeto: Projeto, clipeId: string, ajuste: A
   return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
     if (!clipe.ajuste) throw new ErroEdicao("Essa camada não é de ajuste.");
     return { ...clipe, ajuste_imagem: ajuste };
+  });
+}
+
+/** Põe, troca ou tira (null) a pilha de filtros inteligentes de uma camada. */
+export function definirFiltrosInteligentes(projeto: Projeto, clipeId: string, filtros: FiltrosInteligentes | null): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (filtros && (clipe.ajuste || clipe.pasta)) throw new ErroEdicao("Os filtros inteligentes ficam em camadas com conteúdo, não em ajustes nem em grupos.");
+    if (!filtros) {
+      const sem = { ...clipe };
+      delete sem.filtros_inteligentes;
+      return sem;
+    }
+    return { ...clipe, filtros_inteligentes: filtros };
+  });
+}
+
+/** Muda (ou tira, com null) a máscara dos filtros inteligentes: a versão pintada, ligar, vincular, densidade e difusão. */
+export function mudarMascaraDosFiltros(projeto: Projeto, clipeId: string, mudanca: Partial<MascaraDePixels> | null): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    const pilha = clipe.filtros_inteligentes;
+    if (!pilha) throw new ErroEdicao("A camada não tem filtros inteligentes.");
+    if (mudanca === null) return { ...clipe, filtros_inteligentes: { ...pilha, mascara: null } };
+    if (!pilha.mascara && !mudanca.midia_id) throw new ErroEdicao("Os filtros não têm máscara.");
+    return { ...clipe, filtros_inteligentes: { ...pilha, mascara: { ...(pilha.mascara as MascaraDePixels), ...mudanca } } };
   });
 }
 

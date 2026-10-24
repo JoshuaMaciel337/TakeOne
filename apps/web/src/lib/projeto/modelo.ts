@@ -4,6 +4,7 @@ import type { Contorno, Sombra } from "./silhueta.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import type { AjusteDaImagem } from "../imagem/ajustes.ts";
+import type { FiltrosInteligentes } from "../imagem/filtros/pilha.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -300,6 +301,8 @@ export type Clipe = {
   estilo_camada?: EstiloDeCamada | null;
   /** Só no projeto de imagem: a camada de preenchimento (cor, degradê ou padrão cobrindo o documento), sem mídia. */
   camada_de_preenchimento?: CamadaDePreenchimento | null;
+  /** Só no projeto de imagem: os filtros inteligentes (lib/imagem/filtros/pilha.ts), a pilha não destrutiva da camada. */
+  filtros_inteligentes?: FiltrosInteligentes | null;
   /** Mistura com o que está embaixo; sem ela, normal. */
   mesclagem?: Mesclagem;
   /** Efeito de vídeo (lib/projeto/efeitos.ts); sem ele, a imagem como veio. */

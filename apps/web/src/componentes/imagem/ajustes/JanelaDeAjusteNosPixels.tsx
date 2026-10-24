@@ -13,18 +13,23 @@ import type { Degrade } from "@/lib/pintura/degrade";
 import type { ImagemRgba } from "@/lib/selecao/varinha";
 
 import { PropriedadesDoAjuste } from "./PropriedadesDoAjuste";
+import { FILTRO_POR_ID, type Valores } from "@/lib/imagem/filtros/catalogo";
+import { OpcoesDoFiltro } from "../filtros/OpcoesDoFiltro";
 
 export type OperacaoDosPixels =
   | { tipo: "ajuste"; ajuste: AjusteDaImagem }
   | { tipo: "sombrasRealces"; opcoes: SombrasRealces }
   | { tipo: "hdr"; opcoes: Hdr }
   | { tipo: "corresponder"; opcoes: Corresponder; origem: string }
-  | { tipo: "substituir"; opcoes: Substituir };
+  | { tipo: "substituir"; opcoes: Substituir }
+  | { tipo: "filtro"; filtro: string; opcoes: Valores };
 
 export const NOME_DA_OPERACAO = (operacao: OperacaoDosPixels) =>
   operacao.tipo === "ajuste"
     ? NOMES_DOS_AJUSTES[operacao.ajuste.tipo]
-    : { sombrasRealces: "Sombras/Realces", hdr: "Tonalização HDR", corresponder: "Corresponder cor", substituir: "Substituir cor" }[operacao.tipo];
+    : operacao.tipo === "filtro"
+      ? (FILTRO_POR_ID.get(operacao.filtro)?.nome ?? "Filtro")
+      : { sombrasRealces: "Sombras/Realces", hdr: "Tonalização HDR", corresponder: "Corresponder cor", substituir: "Substituir cor" }[operacao.tipo];
 
 /** Uma janela que flutua ao lado dos painéis, sem escurecer nem bloquear o resto (os conta-gotas clicam na imagem). */
 export function JanelaFlutuante({ titulo, children, aoConfirmar, aoCancelar, rodape }: { titulo: string; children: ReactNode; aoConfirmar: () => void; aoCancelar: () => void; rodape?: ReactNode }) {
@@ -130,6 +135,13 @@ export function JanelaDeAjusteNosPixels({
         semTitulo
       />
     );
+  } else if (operacao.tipo === "filtro") {
+    const definicao = FILTRO_POR_ID.get(operacao.filtro);
+    conteudo = definicao ? (
+      <div className="p-3 text-xs">
+        <OpcoesDoFiltro definicao={definicao} valores={operacao.opcoes} aoPrever={(opcoes) => aoMudar({ ...operacao, opcoes })} aoMudar={(opcoes) => aoMudar({ ...operacao, opcoes })} />
+      </div>
+    ) : null;
   } else if (operacao.tipo === "sombrasRealces") {
     const o = operacao.opcoes;
     const com = (mudanca: Partial<SombrasRealces>) => aoMudar({ ...operacao, opcoes: { ...o, ...mudanca } });

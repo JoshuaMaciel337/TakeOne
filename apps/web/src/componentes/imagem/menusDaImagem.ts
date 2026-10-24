@@ -7,6 +7,7 @@ import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
 import { NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { TipoDoAjuste } from "@/lib/imagem/ajustes";
+import { FILTROS as CATALOGO_DE_FILTROS, GRUPOS_DE_FILTROS } from "@/lib/imagem/filtros/catalogo";
 import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
@@ -174,6 +175,10 @@ export type AcoesDosMenus = {
   ajusteNosPixels: (tipo: TipoDoAjuste) => void;
   classico: (qual: "sombrasRealces" | "hdr" | "dessaturar" | "corresponder" | "substituir" | "equalizar") => void;
   automatico: (jeito: "tom" | "contraste" | "cor") => void;
+  /** Um filtro do catálogo (lib/imagem/filtros), o último de novo (com as mesmas opções) e converter a camada. */
+  filtroDoCatalogo: (tipo: string) => void;
+  ultimoFiltro: { nome: string | null; aplicar: () => void };
+  converterParaFiltrosInteligentes: () => void;
   /** Camada › Nova camada de preenchimento, Opções do conteúdo e Alterar o conteúdo (da escolhida, se for uma). */
   preenchimento: { escolhido: boolean; nova: (tipo: "cor" | "degrade" | "padrao") => void; editar: (tipo?: "cor" | "degrade" | "padrao") => void };
   documento: () => void;
@@ -671,11 +676,22 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Filtro",
       itens: [
-        ...FILTROS.map((grupo): ItemDeMenu => ({
-          nome: grupo.submenu,
+        { nome: a.ultimoFiltro.nome ? `Último filtro: ${a.ultimoFiltro.nome}` : "Último filtro", atalho: "Ctrl+Alt+F", desativado: semCamada || !a.ultimoFiltro.nome, aoEscolher: a.ultimoFiltro.aplicar },
+        "-",
+        { nome: "Converter para filtros inteligentes", desativado: semCamada, aoEscolher: a.converterParaFiltrosInteligentes },
+        "-",
+        ...GRUPOS_DE_FILTROS.filter((grupo) => CATALOGO_DE_FILTROS.some((filtro) => filtro.grupo === grupo.id)).map(
+          (grupo): ItemDeMenu => ({
+            nome: grupo.nome,
+            desativado: semCamada,
+            itens: CATALOGO_DE_FILTROS.filter((filtro) => filtro.grupo === grupo.id).map((filtro) => ({ nome: filtro.semJanela ? filtro.nome : `${filtro.nome}…`, aoEscolher: () => a.filtroDoCatalogo(filtro.id) })),
+          }),
+        ),
+        {
+          nome: "Efeitos do vídeo",
           desativado: semCamada,
-          itens: grupo.itens.map((item) => ({ nome: item.nome, titulo: nomeDoFiltro(item.efeito), aoEscolher: () => a.filtro(item.efeito) })),
-        })),
+          itens: FILTROS.flatMap((grupo) => grupo.itens).map((item) => ({ nome: item.nome, titulo: nomeDoFiltro(item.efeito), aoEscolher: () => a.filtro(item.efeito) })),
+        },
         "-",
         { nome: "Grande-angular adaptável…", atalho: "Ctrl+Alt+Shift+A", desativado: semCamada, aoEscolher: () => a.lente("grandeAngular") },
         { nome: "Correção de lente…", desativado: semCamada, aoEscolher: () => a.lente("lente"), titulo: "Ctrl+Shift+R é do navegador: use o menu" },

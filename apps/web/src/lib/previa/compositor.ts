@@ -7,6 +7,8 @@
 import { COLUNAS_DOS_BLOCOS, FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO, ZOOM_DO_DESFOQUE } from "../projeto/transicao.ts";
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
 import type { TabelaDoAjuste } from "../imagem/ajustes.ts";
+import type { ImagemDoFiltro } from "../imagem/filtros/comum.ts";
+import { aplicarPilha, type FiltroInteligente, margemDaPilha } from "../imagem/filtros/pilha.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
@@ -60,6 +62,11 @@ export type Camada = {
   vinheta?: number;
   /** A tabela de 256 tons de um ajuste do editor de imagem (lib/imagem/ajustes.ts), depois da LUT. */
   tabela?: TabelaDoAjuste | null;
+  /**
+   * Os filtros inteligentes (editor de imagem): os ligados, a máscara deles (a mesma forma da máscara da camada) e o
+   * tamanho do documento, em que as medidas dos filtros são dadas.
+   */
+  filtros?: { lista: FiltroInteligente[]; mascara?: Camada["mascaraDaCamada"]; documento: { largura: number; altura: number } } | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
   /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
@@ -1206,6 +1213,16 @@ export class Compositor {
 
   /** Uma camada, uma pasta ou uma base de recorte (com as presas a ela). */
   private desenharNo(camada: Camada) {
+    if (camada.filtros?.lista.length && camada.fonte !== FUNDO && !camada.pasta) {
+      const filtrada = this.camadaFiltrada(camada, this.proximaFolha++);
+      if (!filtrada) return;
+      try {
+        this.desenharNo(filtrada.camada);
+      } finally {
+        this.gl.deleteTexture(filtrada.textura);
+      }
+      return;
+    }
     if (camada.recortadas?.length) this.desenharComRecorte(camada);
     else if (camada.pasta) this.desenharPasta(camada);
     else if (camada.estiloDeCamada && camada.fonte !== FUNDO) this.desenharComEstilo(camada, this.proximaFolha++);
@@ -1779,6 +1796,129 @@ export class Compositor {
     const internos: TipoDoEfeito[] = ["sobreposicao_padrao", "sobreposicao_degrade", "sobreposicao_cor", "cetim", "brilho_interno", "sombra_interna"];
     for (const efeito of camadas.acima) comoCamada(efeito.dados, efeito.opacidade * (estilo.internosComoGrupo && internos.includes(efeito.tipo) ? estilo.preenchimento : 1), efeito.modo);
     // Opções de mesclagem: o conteúdo com o Mesclar se e os canais passa por cima de novo (no lugar do de antes)
+  }
+
+  /** Os resultados dos filtros guardados: os mesmos pixels com os mesmos filtros e a mesma escala dão o mesmo. */
+  private filtradosGuardados = new Map<string, ImagemDoFiltro>();
+
+  /**
+   * Os filtros inteligentes (lib/imagem/filtros): a camada é desenhada sozinha, já girada, num quadro local do tamanho
+   * do retângulo dela mais a margem dos filtros; os pixels vão para a CPU, passam pela pilha, misturam com os de antes
+   * pela máscara dos filtros e são cortados pela máscara da camada (que vale depois dos filtros, como lá). Devolve a
+   * camada pronta (a textura, a caixa reta) para seguir o caminho de sempre: o estilo de camada fica por cima.
+   */
+  private camadaFiltrada(camada: Camada, indice: number): { camada: Camada; textura: WebGLTexture } | null {
+    const gl = this.gl;
+    const tela = this.destino;
+    const filtros = camada.filtros!;
+    const { caixa } = camada;
+    if (caixa.largura <= 0 || caixa.altura <= 0) return null;
+    const densidade = tela.largura / tela.quadro.largura;
+    // Do documento ao quadro do destino (a prévia com zoom é menor que o documento)
+    const doDocumento = tela.quadro.largura / filtros.documento.largura;
+    const r = (caixa.rotacao * Math.PI) / 180;
+    const c = Math.abs(Math.cos(r));
+    const s = Math.abs(Math.sin(r));
+    const margem = margemDaPilha(filtros.lista) * doDocumento;
+    const quadroLocal = { largura: caixa.largura * c + caixa.altura * s + 2 * margem, altura: caixa.largura * s + caixa.altura * c + 2 * margem };
+    const w = Math.max(1, Math.round(quadroLocal.largura * densidade));
+    const h = Math.max(1, Math.round(quadroLocal.altura * densidade));
+    const local = this.alvo(ALVO_DA_SILHUETA, w, h);
+    const caixaLocal = { ...caixa, cx: quadroLocal.largura / 2, cy: quadroLocal.altura / 2, opacidade: 1 };
+    const lerLocal = (desenho: Camada) => {
+      this.destino = { buffer: local.buffer, largura: w, altura: h, quadro: quadroLocal };
+      this.irAoDestino();
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      this.desenharCamada(desenho, indice);
+      const lidos = new Uint8Array(w * h * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, local.buffer);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, lidos);
+      // O framebuffer vem de baixo para cima; a imagem dos filtros, de cima para baixo
+      const linhas = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < h; y++) linhas.set(lidos.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+      return linhas;
+    };
+    const branco = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx2d = canvas.getContext("2d")!;
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.fillRect(0, 0, 1, 1);
+      return canvas;
+    };
+    const sozinha: Camada = {
+      ...camada,
+      filtros: null,
+      mascaraDaCamada: null,
+      mascaraDeForma: null,
+      estiloDeCamada: undefined,
+      silhueta: undefined,
+      mesclagem: "normal",
+      mesclarSe: null,
+      canais: null,
+      recortada: false,
+      recortadas: undefined,
+      caixa: caixaLocal,
+    };
+    const antes = lerLocal(sozinha);
+    const mascaraDosFiltros = filtros.mascara ? lerLocal({ fonte: branco(), recorte: RECORTE_INTEIRO, caixa: caixaLocal, mascaraDaCamada: filtros.mascara }) : null;
+    const mascaraDaCamada = camada.mascaraDaCamada || camada.mascaraDeForma ? lerLocal({ fonte: branco(), recorte: RECORTE_INTEIRO, caixa: caixaLocal, mascaraDaCamada: camada.mascaraDaCamada, mascaraDeForma: camada.mascaraDeForma }) : null;
+    this.destino = tela;
+    this.irAoDestino();
+    // A origem do quadro local no documento (o ruído e as texturas ficam presos ao documento)
+    const origem = { x: (caixa.cx - quadroLocal.largura / 2) / doDocumento, y: (caixa.cy - quadroLocal.altura / 2) / doDocumento };
+    const contexto = { escala: doDocumento * densidade, primeiroPlano: [0, 0, 0] as [number, number, number], fundo: [1, 1, 1] as [number, number, number], origem, documento: filtros.documento };
+    // Um resumo dos pixels (FNV-1a nas palavras de 4 bytes), dos filtros e do lugar
+    const palavras = new Uint32Array(antes.buffer);
+    let resumo = 0x811c9dc5;
+    for (let i = 0; i < palavras.length; i++) resumo = Math.imul(resumo ^ palavras[i], 0x01000193);
+    const chave = `${w}x${h}:${resumo >>> 0}:${JSON.stringify([filtros.lista, contexto])}`;
+    let filtrada = this.filtradosGuardados.get(chave);
+    if (!filtrada) {
+      filtrada = aplicarPilha({ largura: w, altura: h, dados: antes }, filtros.lista, contexto);
+      if (this.filtradosGuardados.size > 8) this.filtradosGuardados.delete(this.filtradosGuardados.keys().next().value!);
+      this.filtradosGuardados.set(chave, filtrada);
+    }
+    let dados = filtrada.dados;
+    if (mascaraDosFiltros || mascaraDaCamada) {
+      dados = new Uint8ClampedArray(filtrada.dados);
+      for (let p = 0, i = 0; p < w * h; p++, i += 4) {
+        // A máscara dos filtros mistura com o de antes; a da camada corta tudo (as duas lidas no alfa do branco)
+        const m = mascaraDosFiltros ? mascaraDosFiltros[i + 3] / 255 : 1;
+        const k = mascaraDaCamada ? mascaraDaCamada[i + 3] / 255 : 1;
+        for (let j = 0; j < 4; j++) dados[i + j] = Math.round((antes[i + j] + (filtrada.dados[i + j] - antes[i + j]) * m) * k);
+      }
+    }
+    const textura = gl.createTexture()!;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textura);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, dados);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    return {
+      textura,
+      // Só o que é da camada (o estilo, a mesclagem, o recorte); a cor, os efeitos e as máscaras já entraram no desenho
+      camada: {
+        fonte: camada.fonte,
+        estiloDeCamada: camada.estiloDeCamada,
+        silhueta: camada.silhueta,
+        mesclagem: camada.mesclagem,
+        mesclarSe: camada.mesclarSe,
+        canais: camada.canais,
+        apagar: camada.apagar,
+        recortada: camada.recortada,
+        recortadas: camada.recortadas,
+        texturaPronta: { textura, largura: w, altura: h },
+        recorte: RECORTE_INTEIRO,
+        virar: { horizontal: false, vertical: false },
+        caixa: { cx: caixa.cx, cy: caixa.cy, largura: quadroLocal.largura, altura: quadroLocal.altura, rotacao: 0, opacidade: caixa.opacidade },
+      },
+    };
   }
 
   /** As contas dos efeitos guardadas: o mesmo alfa com o mesmo estilo dá as mesmas camadas. */

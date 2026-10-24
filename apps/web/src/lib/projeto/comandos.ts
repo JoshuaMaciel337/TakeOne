@@ -151,6 +151,8 @@ import {
   mudarTextoRico,
   mudarCamadaDePreenchimento,
   mudarAjusteDaCamada,
+  definirFiltrosInteligentes,
+  mudarMascaraDosFiltros,
   textoEmForma,
   mudarTextosRicos,
   definirEstiloDeCamada,
@@ -160,6 +162,7 @@ import {
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
 import type { AjusteDaImagem } from "../imagem/ajustes.ts";
+import type { FiltrosInteligentes } from "../imagem/filtros/pilha.ts";
 import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -194,6 +197,8 @@ export type Comando =
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
   | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null; ajuste?: AjusteDaImagem | null; recortada?: boolean } }
   | { comando: "imagem.ajuste"; parametros: { clipeId: string; ajuste: AjusteDaImagem } }
+  | { comando: "imagem.filtros"; parametros: { clipeId: string; filtros: FiltrosInteligentes | null; nome?: string } }
+  | { comando: "imagem.mascaraDosFiltros"; parametros: { clipeId: string; mudanca: Partial<MascaraDePixels> | null } }
   | { comando: "imagem.adicionarPreenchimento"; parametros: { preenchimento: CamadaDePreenchimento; acima?: string | null } }
   | { comando: "imagem.preenchimento"; parametros: { clipeId: string; preenchimento: CamadaDePreenchimento } }
   | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
@@ -337,6 +342,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.adicionarAjuste": "pôr a camada de ajuste",
   "imagem.adicionarPreenchimento": "pôr a camada de preenchimento",
   "imagem.ajuste": "mudar o ajuste",
+  "imagem.filtros": "mudar os filtros inteligentes",
+  "imagem.mascaraDosFiltros": "mudar a máscara dos filtros",
   "imagem.preenchimento": "mudar o preenchimento",
   "clipe.moverCorte": "mover o corte",
   "linha.dividir": "dividir",
@@ -520,6 +527,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = adicionarCamadaDePreenchimento(projeto, ctx, parametros.preenchimento, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.filtros":
+      return { projeto: definirFiltrosInteligentes(projeto, parametros.clipeId, parametros.filtros) };
+    case "imagem.mascaraDosFiltros":
+      return { projeto: mudarMascaraDosFiltros(projeto, parametros.clipeId, parametros.mudanca) };
     case "imagem.ajuste":
       return { projeto: mudarAjusteDaCamada(projeto, parametros.clipeId, parametros.ajuste) };
     case "imagem.preenchimento":

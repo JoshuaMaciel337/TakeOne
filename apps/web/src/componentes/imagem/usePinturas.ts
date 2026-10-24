@@ -43,6 +43,13 @@ export function alvoDaMascara(clipe: Clipe): AlvoDoMotor | null {
   return { chave: `${clipe.id}#mascara`, midiaId: mascara.midia_id, versao: mascara.versao, aoSubir: (versao) => ({ comando: "mascara.mudar", parametros: { clipeId: clipe.id, mudanca: { versao } } }) };
 }
 
+/** A máscara dos filtros inteligentes, como a máscara da camada (o pincel pinta nela com ela em foco). */
+export function alvoDaMascaraDosFiltros(clipe: Clipe): AlvoDoMotor | null {
+  const mascara = clipe.filtros_inteligentes?.mascara;
+  if (!mascara) return null;
+  return { chave: `${clipe.id}#filtros`, midiaId: mascara.midia_id, versao: mascara.versao, aoSubir: (versao) => ({ comando: "imagem.mascaraDosFiltros", parametros: { clipeId: clipe.id, mudanca: { versao } } }) };
+}
+
 export type Pinturas = ReturnType<typeof usePinturas>;
 
 export function usePinturas({ executar, aoAvisar }: { executar: (comando: Comando) => unknown; aoAvisar: (mensagem: string) => void }) {
@@ -65,6 +72,7 @@ export function usePinturas({ executar, aoAvisar }: { executar: (comando: Comand
   }, []);
   const fonte = useCallback((clipe: Clipe) => fonteDoAlvo(alvoDosPixels(clipe)), [fonteDoAlvo]);
   const fonteDaMascara = useCallback((clipe: Clipe) => fonteDoAlvo(alvoDaMascara(clipe)), [fonteDoAlvo]);
+  const fonteDaMascaraDosFiltros = useCallback((clipe: Clipe) => fonteDoAlvo(alvoDaMascaraDosFiltros(clipe)), [fonteDoAlvo]);
 
   /** O motor do alvo com a versão dele carregada (a de outra versão, depois do desfazer, é carregada de novo). */
   const preparar = useCallback(async (alvo: AlvoDoMotor, tamanho: { largura: number; altura: number }): Promise<Pintura> => {
@@ -120,5 +128,5 @@ export function usePinturas({ executar, aoAvisar }: { executar: (comando: Comand
     }
   }, []);
 
-  return { fonte, fonteDaMascara, fonteDe: fonteDoAlvo, preparar, avisarQuadro, soltar, esperar, quadro, enviando: enviando > 0 };
+  return { fonte, fonteDaMascara, fonteDaMascaraDosFiltros, fonteDe: fonteDoAlvo, preparar, avisarQuadro, soltar, esperar, quadro, enviando: enviando > 0 };
 }
