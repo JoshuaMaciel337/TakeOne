@@ -11,7 +11,7 @@ import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/t
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_RETOQUE, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_RETOQUE, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import type { Interpolacao, NumerosDaTransformacao, Referencia } from "@/lib/transformar/livre";
 import { type EstiloDeDeformacao, ESTILOS_DE_DEFORMACAO, type OpcoesDoEstilo } from "@/lib/transformar/deformar";
@@ -30,7 +30,7 @@ import type { FerramentaObjeto } from "./useObjeto";
 import type { OpcoesDasFormas } from "@/lib/vetor/arrasto";
 
 /** As opções das ferramentas de forma (lib/vetor/arrasto.ts) e a forma da Forma personalizada. */
-export type OpcoesDaForma = OpcoesDasFormas & { personalizada: "seta" | "balao" | "coracao" };
+export type OpcoesDaForma = OpcoesDasFormas & { personalizada: string };
 
 type Props = {
   ferramenta: IdFerramentaDaImagem;
@@ -608,18 +608,6 @@ export function BarraDeOpcoes(props: Props) {
           Preenchimento:
           <span className="size-5 rounded border border-white/40" style={{ background: props.primeiroPlano }} title="A cor de primeiro plano" />
         </span>
-        {ferramenta === "formaPersonalizada" ? (
-          <label className="flex items-center gap-1 text-suave">
-            Forma:
-            <select aria-label="Forma personalizada" className={campo} value={props.forma.personalizada} onChange={(evento) => props.aoMudarForma({ personalizada: evento.currentTarget.value as OpcoesDaForma["personalizada"] })}>
-              {FORMAS_PERSONALIZADAS.map((item) => (
-                <option key={item.tipo} value={item.tipo}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
       </>
     );
   }

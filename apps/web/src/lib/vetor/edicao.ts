@@ -2,7 +2,7 @@
 // um trecho sem mudar a curva (de Casteljau), tirar e converter nós, mover alças (a do outro lado segue alinhada se o
 // nó é liso), a caneta de curvatura (as alças pelos vizinhos), o ajuste de curva da caneta de forma livre (Schneider,
 // "An algorithm for automatically fitting digitized curves", 1990) e o contorno de uma seleção em caminhos.
-import { alcasDoTrecho, pontoNaCubica, trechos } from "./contorno.ts";
+import { alcasDoTrecho, caminhosDaRegiao, pontoNaCubica, regiaoDosCaminhos, trechos } from "./contorno.ts";
 import type { No, Subcaminho } from "./modelo.ts";
 
 type Ponto = { x: number; y: number };
@@ -458,4 +458,57 @@ export function caminhosDaMascara(mascara: { largura: number; altura: number; da
     if (nos.length >= 2) saida.push({ nos, fechado: true, operacao: "somar" });
   }
   return saida;
+}
+
+/**
+ * Um anel de pontos em curvas, guardando os cantos: onde a direção vira mais que `anguloDoCanto` graus o nó é um
+ * canto (as alças dos dois lados independentes) e os trechos entre os cantos são ajustados cada um.
+ */
+export function curvasComCantos(pontos: Ponto[], tolerancia: number, anguloDoCanto = 30): No[] {
+  const d = semRepetidos(pontos);
+  if (d.length > 2 && dist(d[0], d[d.length - 1]) < 0.5) d.pop();
+  const n = d.length;
+  if (n < 3) return d.map(({ x, y }) => ({ x, y }));
+  const limite = Math.cos((anguloDoCanto * Math.PI) / 180);
+  const cantos: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = unitario(menos(d[i], d[(i + n - 1) % n]));
+    const b = unitario(menos(d[(i + 1) % n], d[i]));
+    if (a.x * b.x + a.y * b.y < limite) cantos.push(i);
+  }
+  if (!cantos.length) return ajustarCurvas(d, tolerancia, true);
+  const nos: No[] = [];
+  cantos.forEach((inicio, k) => {
+    const fim = cantos[(k + 1) % cantos.length];
+    const trecho: Ponto[] = [];
+    for (let i = inicio; ; i = (i + 1) % n) {
+      trecho.push(d[i]);
+      if (i === fim && trecho.length > 1) break;
+      if (trecho.length > n + 1) break;
+    }
+    const ajustados = ajustarCurvas(trecho, tolerancia, false);
+    if (!nos.length) nos.push(...ajustados);
+    else {
+      // O primeiro nó do trecho é o último do anterior: só a alça de saída dele vem daqui
+      const ultimo = nos[nos.length - 1];
+      nos[nos.length - 1] = { ...ultimo, ...(ajustados[0].sx !== undefined ? { sx: ajustados[0].sx, sy: ajustados[0].sy } : {}) };
+      nos.push(...ajustados.slice(1));
+    }
+  });
+  // O último nó é o primeiro canto de novo: a alça de entrada dele vai para o primeiro
+  const ultimo = nos.pop()!;
+  if (ultimo.ex !== undefined) nos[0] = { ...nos[0], ex: ultimo.ex, ey: ultimo.ey };
+  return nos;
+}
+
+/**
+ * Mesclar componentes da forma: os caminhos fechados viram a região combinada (as operações aplicadas), contornada
+ * de novo em curvas (com os cantos); os abertos ficam como estão.
+ */
+export function mesclarComponentes(subcaminhos: Subcaminho[], tolerancia = 0.35): Subcaminho[] {
+  const fechados = subcaminhos.filter((sub) => sub.fechado);
+  const abertos = subcaminhos.filter((sub) => !sub.fechado);
+  const regiao = regiaoDosCaminhos(fechados, Math.min(0.1, tolerancia / 4));
+  const novos = caminhosDaRegiao(regiao).map((sub) => ({ ...sub, nos: curvasComCantos(sub.nos, tolerancia) }));
+  return [...novos, ...abertos];
 }

@@ -60,7 +60,6 @@ import {
   MousePointer,
 } from "lucide-react";
 
-import type { TipoDeForma } from "@/lib/elementos";
 import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
 
 
@@ -242,22 +241,6 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
   poligono: "poligono",
   linha: "linha",
 };
-
-/** As ferramentas que desenham uma forma, e a forma do servidor de cada uma. */
-export const FORMA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, TipoDeForma>> = {
-  retangulo: "retangulo",
-  elipse: "elipse",
-  triangulo: "triangulo",
-  poligono: "estrela",
-  linha: "linha",
-};
-
-/** As formas da Forma personalizada. */
-export const FORMAS_PERSONALIZADAS: { tipo: TipoDeForma; nome: string }[] = [
-  { tipo: "seta", nome: "Seta" },
-  { tipo: "balao", nome: "Balão de fala" },
-  { tipo: "coracao", nome: "Coração" },
-];
 
 /** As ferramentas que marcam na foto escolhida (e o jeito de marcar de cada uma). */
 export const MODO_DA_SELECAO: Partial<Record<IdFerramentaDaImagem, "clique" | "pincel">> = {

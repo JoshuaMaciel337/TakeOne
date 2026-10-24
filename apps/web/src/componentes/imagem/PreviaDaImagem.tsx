@@ -26,7 +26,7 @@ import type { ImagemRgba } from "@/lib/selecao/varinha";
 import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
-import { FORMA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { FORMA_VIVA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
@@ -94,7 +94,7 @@ type Props = {
    */
   aoDesenharForma?: (arrasto: ArrastoDaForma, clique: boolean) => void;
   /** As ferramentas de caminho (canetas, pontos e seleções de caminho), com o caminho editado e o que fazer com ele. */
-  caminhos?: { ferramenta: FerramentaDeCaminho; caminhos: Subcaminho[] | null; opcoes: OpcoesDosCaminhos; aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void; aoCriar: (sub: Subcaminho) => void } | null;
+  caminhos?: { ferramenta: FerramentaDeCaminho; caminhos: Subcaminho[] | null; opcoes: OpcoesDosCaminhos; aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void; aoCriar: (sub: Subcaminho) => void; aoEscolherComponentes?: (indices: number[]) => void } | null;
   /** O contorno da forma que está sendo arrastada, em pixels da imagem (sem ele, um retângulo tracejado). */
   caminhoDoArrasto?: (arrasto: ArrastoDaForma) => Subcaminho[] | null;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
@@ -439,7 +439,7 @@ export function PreviaDaImagem({
       else aoClicarTexto?.(ponto.x / escala, ponto.y / escala);
       return;
     }
-    if (FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada") {
+    if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada") {
       evento.currentTarget.setPointerCapture(evento.pointerId);
       setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
@@ -484,7 +484,7 @@ export function PreviaDaImagem({
   }
 
   const ajustada = zoom === null;
-  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? "crosshair" : undefined;
+  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
   const arrastoDoDesenho = desenho ? arrastoNaImagem(desenho) : null;
   const caminhoDoDesenho = arrastoDoDesenho ? (caminhoDoArrasto?.(arrastoDoDesenho) ?? null) : null;
@@ -753,7 +753,7 @@ export function PreviaDaImagem({
               />
             ) : null}
             {caminhos && !maoAtiva && !transformacao && !recorte && tamanho.largura > 1 ? (
-              <CaminhosNaPrevia ferramenta={caminhos.ferramenta} caminhos={caminhos.caminhos} quadro={tamanho} documento={imagem} opcoes={caminhos.opcoes} aoMudar={caminhos.aoMudar} aoCriar={caminhos.aoCriar} />
+              <CaminhosNaPrevia ferramenta={caminhos.ferramenta} caminhos={caminhos.caminhos} quadro={tamanho} documento={imagem} opcoes={caminhos.opcoes} aoMudar={caminhos.aoMudar} aoCriar={caminhos.aoCriar} aoEscolherComponentes={caminhos.aoEscolherComponentes} />
             ) : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}
             {caminhoDoDesenho ? (

@@ -52,6 +52,7 @@ export function CaminhosNaPrevia({
   opcoes,
   aoMudar,
   aoCriar,
+  aoEscolherComponentes,
 }: {
   ferramenta: FerramentaDeCaminho;
   /** O caminho que as ferramentas editam (o da camada de forma escolhida, ou o do painel Caminhos), ou nenhum. */
@@ -63,6 +64,8 @@ export function CaminhosNaPrevia({
   aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void;
   /** Um caminho novo, terminado por uma das canetas. */
   aoCriar: (sub: Subcaminho) => void;
+  /** Os componentes escolhidos pela Seleção de caminho (a barra muda a operação deles). */
+  aoEscolherComponentes?: (indices: number[]) => void;
 }) {
   const escala = quadro.largura / documento.largura;
   const tolerancia = 7 / escala;
@@ -70,6 +73,10 @@ export function CaminhosNaPrevia({
   const [cursor, setCursor] = useState<Ponto | null>(null);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [componentes, setComponentes] = useState<Set<number>>(new Set());
+  const escolherComponentes = (novos: Set<number>) => {
+    setComponentes(novos);
+    aoEscolherComponentes?.([...novos].sort((a, b) => a - b));
+  };
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
   const ultimoClique = useRef(0);
   // O último caminho mostrado enquanto arrasta: é ele que vira o passo do desfazer ao soltar
@@ -228,7 +235,7 @@ export function CaminhosNaPrevia({
       const sub = alvo?.sub ?? trecho?.sub ?? lista.findIndex((item) => dentroDoCaminho(item, p));
       if (sub === undefined || sub < 0) {
         setArrasto({ tipo: "letreiro", inicio: p, fim: p, somar: evento.shiftKey });
-        if (!evento.shiftKey) setComponentes(new Set());
+        if (!evento.shiftKey) escolherComponentes(new Set());
         return;
       }
       let escolha = componentes;
@@ -245,7 +252,7 @@ export function CaminhosNaPrevia({
         subs = subs.map((_, k) => lista.length + k);
         escolha = new Set(subs);
       }
-      setComponentes(escolha);
+      escolherComponentes(escolha);
       setArrasto({ tipo: "componentes", inicio: p, antes, subs, moveu: false });
     }
   }
@@ -340,7 +347,7 @@ export function CaminhosNaPrevia({
       } else {
         const novos = new Set(a.somar ? componentes : []);
         lista.forEach((sub, i) => sub.nos.some(dentro) && novos.add(i));
-        setComponentes(novos);
+        escolherComponentes(novos);
       }
     }
   }
@@ -371,7 +378,7 @@ export function CaminhosNaPrevia({
         tratou = true;
       } else if ((evento.key === "Delete" || evento.key === "Backspace") && ferramenta === "selecaoDeCaminho" && componentes.size) {
         aoMudar(lista.filter((_, i) => !componentes.has(i)), false);
-        setComponentes(new Set());
+        escolherComponentes(new Set());
         tratou = true;
       } else if (evento.key.startsWith("Arrow") && (ferramenta === "selecaoDireta" ? selecionados.size : ferramenta === "selecaoDeCaminho" ? componentes.size : 0)) {
         const passo = evento.shiftKey ? 10 : 1;

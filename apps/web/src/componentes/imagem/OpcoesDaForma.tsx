@@ -7,7 +7,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Degrade, degradeComCores, DEGRADES_PRONTOS, FORMAS_DO_DEGRADE } from "@/lib/pintura/degrade";
 import { type IdDoPadrao, usePadroes } from "@/lib/pintura/padroes";
 import type { OpcoesDasFormas, TipoDaFormaViva } from "@/lib/vetor/arrasto";
-import type { TintaDaForma, TracoDaForma } from "@/lib/vetor/modelo";
+import type { OperacaoDoCaminho, TintaDaForma, TracoDaForma } from "@/lib/vetor/modelo";
 
 import { AmostraDoDegrade } from "./Degrades";
 import { Moldura } from "./JanelasDePixels";
@@ -17,7 +17,7 @@ const SEPARADOR = <span className="mx-1 h-5 w-px shrink-0 bg-borda" aria-hidden 
 const XADREZ = "repeating-conic-gradient(#c8cad0 0% 25%, #ffffff 0% 50%) 50% / 8px 8px";
 
 /** Um balão preso a um botão, em posição fixa (a barra de opções corta o que passa dela), que fecha clicando fora. */
-function Balao({ ancora, aoFechar, children }: { ancora: HTMLElement; aoFechar: () => void; children: ReactNode }) {
+export function Balao({ ancora, aoFechar, children }: { ancora: HTMLElement; aoFechar: () => void; children: ReactNode }) {
   const caixaRef = useRef<HTMLDivElement>(null);
   const [lugar] = useState(() => {
     const r = ancora.getBoundingClientRect();
@@ -283,8 +283,9 @@ export function OpcoesDaFormaNaBarra({
   doEspaco,
   comFormaEscolhida,
   aoMudar,
+  seletor,
 }: {
-  tipo: TipoDaFormaViva;
+  tipo: TipoDaFormaViva | "personalizada";
   opcoes: OpcoesDasFormas;
   primeiroPlano: string;
   fundo: string;
@@ -292,6 +293,8 @@ export function OpcoesDaFormaNaBarra({
   /** Se há uma camada de forma escolhida (as operações que juntam só valem nela). */
   comFormaEscolhida: boolean;
   aoMudar: (mudanca: Partial<OpcoesDasFormas>) => void;
+  /** A Forma personalizada: o seletor da forma, antes das tintas. */
+  seletor?: ReactNode;
 }) {
   const linha = tipo === "linha";
   return (
@@ -307,6 +310,12 @@ export function OpcoesDaFormaNaBarra({
         </select>
       </label>
       {SEPARADOR}
+      {seletor ? (
+        <>
+          {seletor}
+          {SEPARADOR}
+        </>
+      ) : null}
       <TintasDaForma
         preenchimento={opcoes.preenchimento ?? { tipo: "cor", cor: primeiroPlano }}
         traco={linha ? { ...opcoes.traco, largura: opcoes.espessuraDaLinha } : opcoes.traco}
@@ -381,6 +390,7 @@ export function OpcoesDaCanetaNaBarra({
   aoMudarFormas,
   aoCriarSelecao,
   aoCriarForma,
+  componentes,
 }: {
   ferramenta: string;
   caneta: OpcoesDaCaneta;
@@ -395,6 +405,8 @@ export function OpcoesDaCanetaNaBarra({
   aoMudarFormas: (mudanca: Partial<OpcoesDasFormas>) => void;
   aoCriarSelecao: () => void;
   aoCriarForma: () => void;
+  /** A Seleção de caminho: a operação dos componentes escolhidos e o mesclar (todos os componentes). */
+  componentes?: { quantos: number; operacao: OperacaoDoCaminho | null; aoOperacao: (operacao: OperacaoDoCaminho) => void; aoMesclar: (() => void) | null };
 }) {
   const ehCaneta = ferramenta === "caneta" || ferramenta === "canetaLivre" || ferramenta === "canetaDeCurvatura";
   return (
@@ -456,6 +468,24 @@ export function OpcoesDaCanetaNaBarra({
             <input type="checkbox" checked={caneta.autoAdicionar} onChange={(evento) => aoMudarCaneta({ autoAdicionar: evento.currentTarget.checked })} />
             Adicionar e excluir automaticamente
           </label>
+        </>
+      ) : null}
+      {componentes ? (
+        <>
+          {SEPARADOR}
+          <label className="flex items-center gap-1 text-suave">
+            Componentes:
+            <select className={campo} disabled={!componentes.quantos} value={componentes.operacao ?? ""} onChange={(evento) => componentes.aoOperacao(evento.currentTarget.value as OperacaoDoCaminho)} aria-label="Operação dos componentes" title={componentes.quantos ? undefined : "Clique num componente do caminho para escolhê-lo"}>
+              {componentes.operacao === null ? <option value="">{componentes.quantos ? "Várias" : "Nenhum escolhido"}</option> : null}
+              <option value="somar">Combinar formas</option>
+              <option value="subtrair">Subtrair a forma da frente</option>
+              <option value="intersectar">Intersectar as áreas</option>
+              <option value="excluir">Excluir a sobreposição</option>
+            </select>
+          </label>
+          <button type="button" className={`${campo} hover:text-texto disabled:opacity-50`} disabled={!componentes.aoMesclar} onClick={() => componentes.aoMesclar?.()} title="Junta os componentes num contorno só, com as operações aplicadas">
+            Mesclar componentes
+          </button>
         </>
       ) : null}
       {ferramenta === "canetaLivre" ? (

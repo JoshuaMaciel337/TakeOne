@@ -12,12 +12,13 @@ import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { PainelEfeitos } from "@/componentes/editor/PainelEfeitos";
-import { PainelFormas } from "@/componentes/editor/PainelFormas";
 import { type IdAba, PainelPropriedades } from "@/componentes/editor/PainelPropriedades";
 import { MiniaturaDoEstilo } from "@/componentes/editor/PainelTexto";
 import { useProjeto } from "@/componentes/editor/useProjeto";
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { criarForma } from "@/lib/elementos";
+import { caminhosDaFormaPersonalizada, type FormaDoEspaco, PainelFormasPersonalizadas, SeletorDeFormaPersonalizada } from "./FormasPersonalizadas";
+import { caminhosNaCaixa, normalizarParaFormaPersonalizada } from "@/lib/vetor/arrasto";
 import type { EstadoDaArea } from "@/lib/areaDeTrabalho";
 import { enderecoDoProjeto } from "@/lib/hub";
 import { useMarca } from "@/lib/marca";
@@ -37,7 +38,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FORMA_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
@@ -98,9 +99,9 @@ import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
 import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
 import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
-import { caminhosDaMascara } from "@/lib/vetor/edicao";
+import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
-import { camadaDosCaminhos, type Subcaminho, temArea } from "@/lib/vetor/modelo";
+import { camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
 import { caminhosDoVetorNaImagem } from "@/lib/projeto/imagem";
 import { caixaDoClipe } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
@@ -123,6 +124,8 @@ import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEM
 import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
 import { type Malha, malhaDoEstilo, mapaDaMalha, type OpcoesDoEstilo } from "@/lib/transformar/deformar";
+import { homografia } from "@/lib/transformar/malha";
+import { inversaDaHomografia } from "@/lib/transformar/perspectiva";
 import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, reamostrarPeloMapa, type Referencia, retificar, semelhanca } from "@/lib/transformar/livre";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
@@ -219,13 +222,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ferramenta, setFerramenta] = useState<IdFerramentaDaImagem>("mover");
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
   const [cores, setCores] = useState<{ primeiroPlano: string; fundo: string; editando: "primeiroPlano" | "fundo" }>({ primeiroPlano: "#000000", fundo: "#ffffff", editando: "primeiroPlano" });
-  const [forma, setForma] = useState<OpcoesDaForma>({ ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "seta" });
+  const [forma, setForma] = useState<OpcoesDaForma>({ ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "coracao" });
+  // As formas personalizadas do espaço (Editar › Definir forma personalizada) e o nome da que está sendo definida
+  const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
+  const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
+  const [nomeDaForma, setNomeDaForma] = useState(false);
   // O clique sem arrastar de uma ferramenta de forma: a janela com as medidas
   const [criandoForma, setCriandoForma] = useState<{ tipo: TipoDaFormaViva; ponto: { x: number; y: number } } | null>(null);
   // O painel Caminhos: o caminho escolhido (a caneta soma nele; null, um caminho de trabalho novo), as opções das canetas
   // e as janelas de traçar, preencher e criar da seleção
   const [caminhoEscolhido, setCaminhoEscolhido] = useState<string | null>(null);
   const [caneta, setCaneta] = useState<OpcoesDaCaneta>(CANETA_PADRAO);
+  // Os componentes escolhidos pela Seleção de caminho (a barra muda a operação deles)
+  const [componentesEscolhidos, setComponentesEscolhidos] = useState<number[]>([]);
   const [janelaDoCaminho, setJanelaDoCaminho] = useState<{ tipo: "tracar" | "preencher"; id: string } | { tipo: "daSelecao" } | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomMedido, setZoomMedido] = useState(1);
@@ -2026,16 +2035,36 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else criarFormaViva(viva, arrasto);
       return;
     }
-    const tipo = ferramenta === "formaPersonalizada" ? forma.personalizada : FORMA_DA_FERRAMENTA[ferramenta];
-    if (!tipo) return;
-    // Um clique sem arrastar desenha uma forma de um quarto do lado menor da imagem, no ponto
+    if (ferramenta !== "formaPersonalizada") return;
+    // Um clique sem arrastar: a forma com um quarto do lado menor da imagem, no ponto, na proporção dela
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
-    const caixa: RetanguloDaImagem = clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto;
-    const proporcao = Math.min(20, Math.max(0.05, caixa.largura / Math.max(1, caixa.altura)));
-    const contorno = forma.traco.tinta.tipo === "cor" ? forma.traco.tinta.cor : "#000000";
-    criarForma({ tipo, cor: cores.primeiroPlano, contorno_cor: contorno, contorno: forma.traco.tinta.tipo === "nenhuma" ? 0 : 0.02, proporcao })
-      .then((midia) => esperarMidia(midia, { caixa }))
-      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível desenhar a forma agora."));
+    porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
+  };
+  /** A forma personalizada escolhida na caixa (com as tintas e a operação da barra). */
+  const porFormaPersonalizada = (id: string, caixa: RetanguloDaImagem, proporcional: boolean) => {
+    const escolhida = caminhosDaFormaPersonalizada(id, formasDoEspaco);
+    if (!escolhida) return void mostrarAviso("Essa forma não existe mais. Escolha outra no painel Formas.");
+    const caminhos = caminhosNaCaixa(escolhida.caminhos, caixa, proporcional);
+    if (forma.operacao !== "nova" && selecionado?.clipe.vetor) {
+      executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos, operacao: forma.operacao } });
+      return;
+    }
+    const preenchimento = forma.preenchimento ?? { tipo: "cor" as const, cor: cores.primeiroPlano };
+    const { vetor, centro } = camadaDosCaminhos(caminhos, preenchimento, forma.traco.tinta.tipo === "nenhuma" ? null : forma.traco);
+    const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(escolhida.nome)).length ?? 0) + 1;
+    executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `${escolhida.nome} ${numero}`.slice(0, 60), acima: escolhidas[0]?.id ?? null } });
+  };
+  /** Editar › Definir forma personalizada: os caminhos da forma (ou do caminho) escolhida viram uma forma do espaço. */
+  const definirFormaPersonalizada = (nome: string) => {
+    const caminhos = caminhosEditaveis?.filter((sub) => sub.nos.length >= 2) ?? [];
+    if (!caminhos.length) return void mostrarAviso("Escolha uma camada de forma ou um caminho.");
+    criarRecurso({ tipo: "forma", nome, dados: { subcaminhos: normalizarParaFormaPersonalizada(caminhos) } })
+      .then((recurso) => {
+        recursosDasFormas.recarregar();
+        setForma((atual) => ({ ...atual, personalizada: `espaco:${recurso.id}` }));
+        mostrarAviso(`A forma "${nome}" está no painel Formas e na ferramenta Forma personalizada.`);
+      })
+      .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível guardar a forma."));
   };
   const aplicarFiltro = (efeito: TipoEfeito) => {
     if (!selecionado) return;
@@ -2679,6 +2708,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       });
       return;
     }
+    // A forma continua vetorial: os pontos (e as alças) vão pela mesma conta da imagem, da caixa dela ao lugar novo
+    if (achado.clipe.vetor && !camada.copia && !camada.selecao) {
+      const paraUv = inversaDaHomografia(t.inicial);
+      const destino = t.estado.malha ? mapaDaMalha(t.estado.malha) : homografia(t.estado.quad);
+      const caminhos = transformarCaminhos(caminhosDoVetorNaImagem(achado.clipe, documento), (p) => {
+        const uv = paraUv(p);
+        return destino(uv.x, uv.y);
+      });
+      executar({ comando: "imagem.caminhosDoVetor", parametros: { clipeId: camada.clipeId, caminhos } });
+      return;
+    }
     if (typeof camada.plano === "string") return mostrarAviso(camada.plano);
     const canvas = document.createElement("canvas");
     canvas.width = documento.largura;
@@ -3020,6 +3060,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     temCanais: canais.length > 0,
     definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
     definirPadrao: () => setNomeDoPadrao(true),
+    definirFormaPersonalizada: () => setNomeDaForma(true),
     transformarSelecao,
     transformarCamada: transformarCamadaPeloMenu,
     tamanhoDaImagem: () => setJanelaDoDocumento("imagem"),
@@ -3172,7 +3213,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3286,9 +3327,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     formas: {
       nome: PAINEIS_DA_IMAGEM.formas,
       conteudo: (
-        <div className="p-3">
-          <PainelFormas aoPedir={(midia) => esperarMidia(midia)} aoAvisar={mostrarAviso} />
-        </div>
+        <PainelFormasPersonalizadas
+          escolhida={forma.personalizada}
+          doEspaco={formasDoEspaco}
+          aoEscolher={(personalizada) => {
+            setForma((atual) => ({ ...atual, personalizada }));
+            escolherFerramenta("formaPersonalizada");
+          }}
+          aoPor={(id) => {
+            // No meio da imagem, com um terço do lado menor
+            const { largura, altura } = tamanho;
+            const lado = Math.min(largura, altura) / 3;
+            porFormaPersonalizada(id, { x: (largura - lado) / 2, y: (altura - lado) / 2, largura: lado, altura: lado }, true);
+          }}
+          aoExcluir={(id) => void excluirRecurso(id).then(recursosDasFormas.recarregar)}
+        />
       ),
     },
     propriedades: {
@@ -3680,10 +3733,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               aoMudarFormas={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
               aoCriarSelecao={() => caminhoComoSelecao(caminhoDaVez?.subcaminhos ?? null)}
               aoCriarForma={() => caminhoDaVez && formaDosCaminhos(caminhoDaVez.subcaminhos)}
+              componentes={
+                ferramenta === "selecaoDeCaminho"
+                  ? (() => {
+                      const lista = caminhosEditaveis ?? [];
+                      const escolhidos = componentesEscolhidos.filter((i) => i < lista.length);
+                      const operacoes = new Set(escolhidos.map((i) => lista[i].operacao));
+                      return {
+                        quantos: escolhidos.length,
+                        operacao: operacoes.size === 1 ? [...operacoes][0] : null,
+                        aoOperacao: (operacao: OperacaoDoCaminho) => mudarCaminhos(lista.map((sub, i) => (escolhidos.includes(i) ? { ...sub, operacao } : sub)), false),
+                        aoMesclar: lista.filter((sub) => sub.fechado).length > 1 ? () => mudarCaminhos(mesclarComponentes(lista), false) : null,
+                      };
+                    })()
+                  : undefined
+              }
             />
-          ) : FORMA_VIVA_DA_FERRAMENTA[ferramenta] ? (
+          ) : FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? (
             <OpcoesDaFormaNaBarra
-              tipo={FORMA_VIVA_DA_FERRAMENTA[ferramenta]!}
+              tipo={FORMA_VIVA_DA_FERRAMENTA[ferramenta] ?? "personalizada"}
+              seletor={ferramenta === "formaPersonalizada" ? <SeletorDeFormaPersonalizada escolhida={forma.personalizada} doEspaco={formasDoEspaco} aoEscolher={(personalizada) => setForma((atual) => ({ ...atual, personalizada }))} /> : undefined}
               opcoes={forma}
               primeiroPlano={cores.primeiroPlano}
               fundo={cores.fundo}
@@ -3960,12 +4029,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     opcoes: caneta,
                     aoMudar: mudarCaminhos,
                     aoCriar: criarCaminho,
+                    aoEscolherComponentes: setComponentesEscolhidos,
                   }
                 : null
             }
             caminhoDoArrasto={(arrasto) => {
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
-              return viva ? formaDoArrasto(viva, arrasto).naImagem : null;
+              if (viva) return formaDoArrasto(viva, arrasto).naImagem;
+              const personalizada = ferramenta === "formaPersonalizada" ? caminhosDaFormaPersonalizada(forma.personalizada, formasDoEspaco) : null;
+              return personalizada ? caminhosNaCaixa(personalizada.caminhos, arrasto, Boolean(arrasto.proporcional)) : null;
             }}
             aoPegarCor={(cor, paraOFundo) => setCores((atual) => ({ ...atual, [paraOFundo ? "fundo" : "primeiroPlano"]: cor }))}
           />
@@ -4252,6 +4324,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(graus) => {
             setJanelaDoDocumento(null);
             if (graus) executar({ comando: "imagem.girar", parametros: { giro: { graus }, tamanhos: tamanhosDasMidias() } });
+          }}
+        />
+      ) : null}
+      {nomeDaForma ? (
+        <JanelaDeNome
+          titulo="Nome da forma"
+          rotulo="Nome"
+          inicial={`Forma ${formasDoEspaco.length + 1}`}
+          aoFechar={() => setNomeDaForma(false)}
+          aoConfirmar={(nome) => {
+            setNomeDaForma(false);
+            definirFormaPersonalizada(nome);
           }}
         />
       ) : null}

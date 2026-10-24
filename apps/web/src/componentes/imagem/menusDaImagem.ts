@@ -93,6 +93,8 @@ export type AcoesDosMenus = {
   /** O caminho escolhido no painel Caminhos (ou o da forma escolhida) tem área: vira seleção (Ctrl+Enter). */
   temCaminho: boolean;
   caminhoComoSelecao: () => void;
+  /** Editar › Definir forma personalizada (os caminhos da forma escolhida, ou do caminho escolhido). */
+  definirFormaPersonalizada: () => void;
   caminhoDaSelecao: () => void;
   podeSelecionarNovamente: boolean;
   bordasVisiveis: boolean;
@@ -310,6 +312,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         },
         { nome: "Definir predefinição de pincel…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.definirPincel },
         { nome: "Definir padrão…", aoEscolher: a.definirPadrao },
+        { nome: "Definir forma personalizada…", desativado: !a.temCaminho, aoEscolher: a.definirFormaPersonalizada, titulo: "Escolha uma camada de forma ou um caminho" },
         "-",
         { nome: "Atalhos do teclado…", aoEscolher: a.atalhos },
       ],

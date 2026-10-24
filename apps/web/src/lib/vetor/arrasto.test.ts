@@ -5,7 +5,7 @@ import { executarComando } from "../projeto/comandos.ts";
 import type { Contexto } from "../projeto/edicao.ts";
 import { caixaDoClipe } from "../projeto/geometria.ts";
 import type { Clipe, Projeto } from "../projeto/modelo.ts";
-import { arrastoDaForma, camadaDoArrasto, OPCOES_DAS_FORMAS_PADRAO } from "./arrasto.ts";
+import { arrastoDaForma, camadaDoArrasto, caminhosNaCaixa, normalizarParaFormaPersonalizada, OPCOES_DAS_FORMAS_PADRAO } from "./arrasto.ts";
 import { refazerForma, TRACO_PADRAO } from "./modelo.ts";
 
 const ctx: Contexto = { novoId: (() => {
@@ -40,7 +40,7 @@ function cantoNaImagem(clipe: Clipe) {
 }
 
 test("o arrasto com Shift fica quadrado (e a linha em 45°), com Alt sai do meio", () => {
-  assert.deepEqual(arrastoDaForma({ x: 10, y: 10 }, { x: 50, y: 30 }), { x: 10, y: 10, largura: 40, altura: 20, de: { x: 10, y: 10 }, ate: { x: 50, y: 30 } });
+  assert.deepEqual(arrastoDaForma({ x: 10, y: 10 }, { x: 50, y: 30 }), { x: 10, y: 10, largura: 40, altura: 20, de: { x: 10, y: 10 }, ate: { x: 50, y: 30 }, proporcional: false });
   const quadrado = arrastoDaForma({ x: 10, y: 10 }, { x: 50, y: 30 }, { proporcional: true });
   assert.equal(quadrado.largura, 40);
   assert.equal(quadrado.altura, 40);
@@ -86,4 +86,14 @@ test("juntar uma forma à camada guarda as duas no lugar e a forma deixa de ser 
   const x = caixa.cx + ux * Math.cos(r) - uy * Math.sin(r);
   const y = caixa.cy + ux * Math.sin(r) + uy * Math.cos(r);
   assert.ok(Math.abs(x - 50) < 1e-6 && Math.abs(y - 300) < 1e-6, `${x}, ${y}`);
+});
+
+test("a forma personalizada estica até a caixa (ou cabe nela, no meio, com a proporção) e é guardada em 100 × 100", () => {
+  const caminhos = [{ nos: [{ x: 10, y: 10 }, { x: 30, y: 10 }, { x: 30, y: 20 }], fechado: true, operacao: "somar" as const }];
+  const esticado = caminhosNaCaixa(caminhos, { x: 0, y: 0, largura: 100, altura: 100 }, false);
+  assert.deepEqual(esticado[0].nos.map((no) => [no.x, no.y]), [[0, 0], [100, 0], [100, 100]]);
+  const proporcional = caminhosNaCaixa(caminhos, { x: 0, y: 0, largura: 100, altura: 100 }, true);
+  assert.deepEqual(proporcional[0].nos.map((no) => [no.x, no.y]), [[0, 25], [100, 25], [100, 75]]);
+  const guardado = normalizarParaFormaPersonalizada(caminhos);
+  assert.deepEqual(guardado[0].nos.map((no) => [no.x, no.y]), [[0, 0], [100, 0], [100, 50]]);
 });

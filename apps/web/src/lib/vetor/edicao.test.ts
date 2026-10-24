@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { achatar, areaDoPoligono, pontoNaCubica } from "./contorno.ts";
-import { acharPonto, acharTrecho, ajustarCurvas, caminhoDeCurvatura, caminhosDaMascara, contornosDaMascara, converterNo, dividirTrecho, excluirNo, moverAlca, noLiso } from "./edicao.ts";
+import { acharPonto, acharTrecho, ajustarCurvas, caminhoDeCurvatura, caminhosDaMascara, contornosDaMascara, converterNo, dividirTrecho, excluirNo, mesclarComponentes, moverAlca, noLiso } from "./edicao.ts";
 import { subcaminhosDaForma, type Subcaminho } from "./modelo.ts";
 
 const perto = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
@@ -93,4 +93,21 @@ test("o anel ajustado tem ao menos quatro nós e fica perto da elipse", () => {
   const achatado = achatar({ nos, fechado: true, operacao: "somar" }, 0.05);
   const erro = Math.max(...achatado.map((p) => Math.abs(Math.hypot((p.x - 300) / 100, (p.y - 200) / 110) - 1) * 100));
   assert.ok(erro < 2.5, `${erro.toFixed(2)} px fora da elipse`);
+});
+
+test("mesclar componentes: a união de um quadrado com um círculo guarda os cantos do quadrado e a área", () => {
+  const quadrado: Subcaminho = { nos: [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 60 }, { x: 0, y: 60 }], fechado: true, operacao: "somar" };
+  const circulo = subcaminhosDaForma({ tipo: "elipse", largura: 60, altura: 60 }).map((sub) => ({ ...sub, nos: sub.nos.map((no) => ({ x: no.x + 30, y: no.y + 30, ex: no.ex! + 30, ey: no.ey! + 30, sx: no.sx! + 30, sy: no.sy! + 30 })) }));
+  const furo: Subcaminho = { nos: [{ x: 10, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 20 }, { x: 10, y: 20 }], fechado: true, operacao: "subtrair" };
+  const mesclado = mesclarComponentes([quadrado, ...circulo, furo]);
+  assert.equal(mesclado.length, 2, "o contorno de fora e o furo");
+  assert.ok(mesclado.every((sub) => sub.operacao === "somar"));
+  // Área: 3600 + 3/4 do círculo (π 30²) − 100
+  const esperado = 3600 + 0.75 * Math.PI * 900 - 100;
+  const area = mesclado.reduce((soma, sub) => soma + areaDoPoligono(achatar(sub, 0.05)), 0);
+  assert.ok(Math.abs(Math.abs(area) - esperado) / esperado < 0.01, `${area} contra ${esperado}`);
+  // O canto de cima à esquerda continua um canto (sem alças)
+  const canto = mesclado[0].nos.find((no) => Math.hypot(no.x, no.y) < 0.5);
+  assert.ok(canto, "o canto (0, 0) ficou");
+  assert.ok(mesclado[0].nos.length < 20, `${mesclado[0].nos.length} nós`);
 });
