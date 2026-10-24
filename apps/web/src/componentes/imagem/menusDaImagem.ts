@@ -165,6 +165,11 @@ export type AcoesDosMenus = {
   /** Arquivo › Colocar incorporado: uma imagem do computador como camada. */
   colocarIncorporado: () => void;
   exportar: () => void;
+  /** Arquivo › Exportar: Salvar para web, Exportação rápida (no formato das preferências) e as preferências. */
+  salvarParaWeb: () => void;
+  exportacaoRapida: () => void;
+  nomeDaExportacaoRapida: string;
+  preferenciasDeExportacao: () => void;
   /** As pranchetas: Camada › Novo › Prancheta (nova, a partir do grupo escolhido ou das camadas escolhidas) e a exportação. */
   temPranchetas: boolean;
   grupoEscolhido: boolean;
@@ -333,7 +338,11 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         {
           nome: "Exportar",
           itens: [
+            { nome: `Exportação rápida como ${a.nomeDaExportacaoRapida}`, atalho: "Ctrl+Alt+Shift+'", aoEscolher: a.exportacaoRapida },
             { nome: "Exportar como…", atalho: "Ctrl+Alt+Shift+W", aoEscolher: a.exportar },
+            { nome: "Salvar para web…", atalho: "Ctrl+Alt+Shift+S", aoEscolher: a.salvarParaWeb, titulo: "GIF, PNG-8, JPG e WebP com a original e a otimizada lado a lado" },
+            { nome: "Preferências de exportação…", aoEscolher: a.preferenciasDeExportacao },
+            "-",
             { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas },
             { nome: "PSD com as camadas", aoEscolher: a.exportarPsd, titulo: "As camadas, as pastas, as máscaras, os modos e os ajustes, para abrir em outro editor" },
           ],

@@ -261,7 +261,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Abrir uma imagem do computador como documento (PNG, JPG, WebP, GIF, BMP, TIFF, SVG, HEIC pelo servidor), Abrir recentes
 - [x] Abrir e salvar PSD com as camadas (grupos, máscaras, mesclagens, textos e ajustes quando der). Os textos vão e voltam como pixels (com o nome da camada): o texto do arquivo depende das fontes de quem o fez
 - [x] Colocar incorporado (do computador ou da biblioteca)
-- [ ] Exportar como (PNG, JPG com qualidade, WebP com e sem perda, GIF, TIFF, AVIF, BMP, ICO, PDF), Exportação rápida, Salvar para web (GIF e PNG-8 com paleta), Preferências de exportação
+- [x] Exportar como (PNG, JPG com qualidade, WebP com e sem perda, GIF, TIFF, AVIF, BMP, ICO, PDF), Exportação rápida, Salvar para web (GIF e PNG-8 com paleta), Preferências de exportação
 - [ ] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem
 - [ ] Duplicar documento; Informações do arquivo; Imprimir
 - [ ] Modo: Escala de cinza, Bitmap (limiar, pontilhado, meio-tom), Duotone, Cores indexadas (paletas, pontilhado, tabela de cores); CMYK e Lab na prova e na exportação; 16 e 32 bits desligados com o motivo

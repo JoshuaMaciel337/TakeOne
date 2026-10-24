@@ -44,7 +44,8 @@ import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
 import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
-import { JanelaExportarImagem } from "./JanelaExportarImagem";
+import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
+import { baixarBlob, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO } from "@/lib/exportacao/exportarComo";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
 import { PainelFotoIA } from "./PainelFotoIA";
@@ -67,6 +68,7 @@ import { JanelaGaleriaDeFiltros } from "./filtros/JanelaGaleriaDeFiltros";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { documentoDaImagem, enviarEEsperar, type ImagemRecente, imagensRecentes } from "@/lib/abrirImagem";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
+import { formatarBytes } from "@/lib/formatar";
 import { abrirPsd, ACEITAR_PSD, avisosGuardados, ehPsd, guardarAvisos, salvarPsd } from "@/lib/psd/arquivo";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, ceuPelaProfundidade, imagemMenor } from "@/lib/selecao/cores";
@@ -467,7 +469,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const pinceisDoEspaco = usePinceisDoEspaco();
   const [ocupadoComPinceis, setOcupadoComPinceis] = useState<string | null>(null);
   const [selecao, definirSelecao] = useState<string[]>([]);
-  const [exportando, setExportando] = useState(false);
+  const [exportando, setExportando] = useState<false | "exportar" | "web">(false);
+  const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
@@ -735,6 +738,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  /** Arquivo › Exportar › Exportação rápida: o formato das preferências, no tamanho do documento, direto para o download. */
+  const exportacaoRapida = async () => {
+    if (!projeto) return;
+    const { formato, qualidade } = lerPreferencias();
+    try {
+      mostrarAviso(`Exportando em ${formatoDe(formato).nome}…`);
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const blob = await gerarArquivo(atual, midias, { ...OPCOES_PADRAO_DE_EXPORTACAO, formato, qualidade }, { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      baixarBlob(blob, nomeDoArquivo(edicao.nome, formato));
+      mostrarAviso(`Imagem baixada (${formatarBytes(blob.size)}).`);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível exportar.");
+    }
+  };
   /** Arquivo › Exportar › PSD: as camadas, as pastas, as máscaras, os ajustes e os efeitos com par. */
   const exportarPsd = async () => {
     if (!projeto) return;
@@ -4581,7 +4599,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     recentes,
     abrirRecente: (id: string) => router.push(`/app/imagem/${id}`),
     colocarIncorporado: () => escolherArquivo("camada"),
-    exportar: () => setExportando(true),
+    exportar: () => setExportando("exportar"),
+    salvarParaWeb: () => setExportando("web"),
+    exportacaoRapida: () => void exportacaoRapida(),
+    nomeDaExportacaoRapida: formatoDe(lerPreferencias().formato).nome,
+    preferenciasDeExportacao: () => setPreferenciasDeExportacao(true),
     temPranchetas: Boolean(projeto?.faixas.some((faixa) => faixa.clipes[0]?.prancheta)),
     grupoEscolhido: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0]?.pasta) && !escolhidas[0].clipes[0]?.prancheta,
     prancheta: (como) => novaPrancheta(como),
@@ -5340,7 +5362,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ))}
         </select>
         <BotaoTema />
-        <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando(true)} title="Exportar como PNG, JPG ou WebP (Ctrl+Alt+Shift+W)">
+        <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando("exportar")} title="Exportar como PNG, JPG, WebP, GIF, AVIF, TIFF, PDF… (Ctrl+Alt+Shift+W)">
           <Download className="size-3.5" aria-hidden />
           <span className="hidden sm:inline">Exportar</span>
         </button>
@@ -6004,13 +6026,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           projeto={projeto}
           nome={edicao.nome}
           midias={midias}
+          modo={exportando}
           aoFechar={() => setExportando(false)}
           aoAvisar={mostrarAviso}
           aoPrepararPintura={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
           fonteDosPixels={pinturas.fonte}
           fonteDaMascara={pinturas.fonteDaMascara}
+          fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
         />
       ) : null}
+      {preferenciasDeExportacao ? <JanelaPreferenciasDeExportacao aoFechar={() => setPreferenciasDeExportacao(false)} aoAvisar={mostrarAviso} /> : null}
       {atalhos ? <JanelaDeAtalhos acoes={acoes} aoFechar={() => setAtalhos(false)} /> : null}
       {janelaDaSelecao?.tipo === "cores" ? (
         <JanelaIntervaloDeCores
