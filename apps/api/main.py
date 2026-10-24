@@ -18,6 +18,7 @@ from api.rotas import (
     auth,
     celular,
     chaves,
+    conversoes,
     direcoes,
     elementos,
     eventos,
@@ -160,3 +161,4 @@ app.include_router(pinceis.router)
 app.include_router(recursos.router)
 app.include_router(fontes.router)
 app.include_router(chaves.router)
+app.include_router(conversoes.router)
