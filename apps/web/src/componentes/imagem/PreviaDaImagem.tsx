@@ -123,6 +123,9 @@ type Props = {
     estado: EstadoDaTransformacao;
     modo: ModoDaTransformacao;
     origem: { imagem: CanvasImageSource; largura: number; altura: number } | null;
+    /** O ponto de referência (pixels do documento) e a camada inteira (sem a transparência da seleção). */
+    referencia?: { x: number; y: number } | null;
+    opaco?: boolean;
     aoMudar: (estado: EstadoDaTransformacao) => void;
     aoConfirmar: () => void;
   } | null;
@@ -671,6 +674,8 @@ export function PreviaDaImagem({
                 quadro={tamanho}
                 documento={imagem}
                 origem={transformacao.origem}
+                referencia={transformacao.referencia}
+                opaco={transformacao.opaco}
                 aoMudar={transformacao.aoMudar}
                 aoConfirmar={transformacao.aoConfirmar}
               />

@@ -218,3 +218,17 @@ test("a imagem vai até 100 camadas, mais que as 30 faixas do vídeo, e recusa a
   assert.throws(() => executarComando(projeto, { comando: "imagem.adicionarTexto", parametros: { texto: TEXTO_PADRAO } }, ctx), /100 camadas/);
   assert.throws(() => executarComando(projeto, { comando: "imagem.duplicar", parametros: { faixaId: camadasDaImagem(projeto)[0].faixa.id } }, ctx), /100 camadas/);
 });
+
+test("transformar a camada: posição, escala, giro e virar num passo só; a posição travada recusa", () => {
+  const ctx = contexto();
+  const r = executarComando(vazio(), { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx);
+  const clipeId = r.selecao![0];
+  const projeto = executarComando(r.projeto, { comando: "imagem.transformarCamada", parametros: { clipeId, transformacao: { x: 0.1, escala: 2, rotacao: 270 }, virar: { horizontal: true, vertical: false } } }, ctx).projeto;
+  const clipe = camadasDaImagem(projeto)[0].clipe;
+  assert.equal(clipe.transformacao.x, 0.1);
+  assert.equal(clipe.transformacao.escala, 2);
+  assert.equal(clipe.transformacao.rotacao, -90);
+  assert.deepEqual(clipe.virar, { horizontal: true, vertical: false });
+  const travado = { ...projeto, faixas: projeto.faixas.map((faixa) => (faixa.clipes[0]?.id === clipeId ? { ...faixa, travas: { posicao: true } } : faixa)) };
+  assert.throws(() => executarComando(travado, { comando: "imagem.transformarCamada", parametros: { clipeId, transformacao: { x: 0 } } }, ctx), /travada/);
+});

@@ -13,10 +13,13 @@ import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
 import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_RETOQUE, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
+import type { Interpolacao, NumerosDaTransformacao, Referencia } from "@/lib/transformar/livre";
 import type { ModoDaTransformacao } from "./TransformacaoNaPrevia";
 
 const MODOS_DA_TRANSFORMACAO: { id: ModoDaTransformacao; nome: string }[] = [
   { id: "livre", nome: "Livre" },
+  { id: "escala", nome: "Escala" },
+  { id: "girar", nome: "Girar" },
   { id: "inclinar", nome: "Inclinar" },
   { id: "distorcer", nome: "Distorcer" },
   { id: "perspectiva", nome: "Perspectiva" },
@@ -74,7 +77,19 @@ type Props = {
   /** As opções que o editor monta (Degradê, Balde de tinta, Borracha mágica): ficam no lugar das daqui. */
   opcoesProprias?: React.ReactNode;
   /** A transformação livre em andamento: os modos, confirmar (Enter) e cancelar (Esc). */
-  transformacao?: { modo: ModoDaTransformacao; aoModo: (modo: ModoDaTransformacao) => void; aoConfirmar: () => void; aoCancelar: () => void } | null;
+  transformacao?: {
+    modo: ModoDaTransformacao;
+    aoModo: (modo: ModoDaTransformacao) => void;
+    aoConfirmar: () => void;
+    aoCancelar: () => void;
+    /** Os números (null quando o quadrilátero não é um paralelogramo: distorcido, em perspectiva ou deformado). */
+    numeros?: NumerosDaTransformacao | null;
+    aoNumeros?: (numeros: NumerosDaTransformacao) => void;
+    referencia?: Referencia;
+    aoReferencia?: (referencia: Referencia) => void;
+    interpolacao?: Interpolacao;
+    aoInterpolacao?: (interpolacao: Interpolacao) => void;
+  } | null;
   /** A seleção de objeto: o localizador (o realce com o ponteiro parado) ligado ou não. */
   localizador?: boolean;
   aoMudarLocalizador?: (ligado: boolean) => void;
@@ -135,7 +150,52 @@ export function BarraDeOpcoes(props: Props) {
             </button>
           ))}
         </span>
-        <span className="text-suave">Arraste as alças; fora dos cantos gira (Shift de 15°); Ctrl num canto distorce.</span>
+        {t.referencia && t.aoReferencia ? (
+          <>
+            {SEPARADOR}
+            <span className="grid grid-cols-3 gap-px" role="group" aria-label="Ponto de referência" title="Ponto de referência: o giro e os números partem dele">
+              {[0, 0.5, 1].flatMap((v) =>
+                [0, 0.5, 1].map((u) => (
+                  <button
+                    key={`${u}-${v}`}
+                    type="button"
+                    className={`size-2 rounded-[1px] border border-suave ${t.referencia!.u === u && t.referencia!.v === v ? "bg-texto" : "bg-transparent hover:bg-painel-3"}`}
+                    aria-label={`Referência ${v === 0 ? "em cima" : v === 1 ? "embaixo" : "no meio"} ${u === 0 ? "à esquerda" : u === 1 ? "à direita" : "no centro"}`}
+                    aria-pressed={t.referencia!.u === u && t.referencia!.v === v}
+                    onClick={() => t.aoReferencia!({ u, v })}
+                  />
+                )),
+              )}
+            </span>
+          </>
+        ) : null}
+        {t.aoNumeros ? (
+          t.numeros ? (
+            <>
+              <Numero rotulo="X" valor={Math.round(t.numeros.x * 10) / 10} minimo={-100000} maximo={100000} sufixo="px" largura="w-14" aoMudar={(x) => t.aoNumeros!({ ...t.numeros!, x })} />
+              <Numero rotulo="Y" valor={Math.round(t.numeros.y * 10) / 10} minimo={-100000} maximo={100000} sufixo="px" largura="w-14" aoMudar={(y) => t.aoNumeros!({ ...t.numeros!, y })} />
+              <Numero rotulo="L" valor={Math.round(t.numeros.largura * 10) / 10} minimo={-10000} maximo={10000} sufixo="%" aoMudar={(largura) => t.aoNumeros!({ ...t.numeros!, largura })} />
+              <Numero rotulo="A" valor={Math.round(t.numeros.altura * 10) / 10} minimo={-10000} maximo={10000} sufixo="%" aoMudar={(altura) => t.aoNumeros!({ ...t.numeros!, altura })} />
+              <Numero rotulo="Giro" valor={Math.round(t.numeros.giro * 10) / 10} minimo={-360} maximo={360} sufixo="°" aoMudar={(giro) => t.aoNumeros!({ ...t.numeros!, giro })} />
+              <Numero rotulo="Incl. H" valor={Math.round(t.numeros.inclinacaoH * 10) / 10} minimo={-89} maximo={89} sufixo="°" aoMudar={(inclinacaoH) => t.aoNumeros!({ ...t.numeros!, inclinacaoH })} />
+              <Numero rotulo="Incl. V" valor={Math.round(t.numeros.inclinacaoV * 10) / 10} minimo={-89} maximo={89} sufixo="°" aoMudar={(inclinacaoV) => t.aoNumeros!({ ...t.numeros!, inclinacaoV })} />
+            </>
+          ) : (
+            <span className="text-suave">Distorcida: os números voltam numa caixa sem distorção.</span>
+          )
+        ) : (
+          <span className="text-suave">Arraste as alças; fora dos cantos gira (Shift de 15°); Ctrl num canto distorce.</span>
+        )}
+        {t.interpolacao && t.aoInterpolacao ? (
+          <label className="flex items-center gap-1 text-suave">
+            Interpolação:
+            <select className={campo} value={t.interpolacao} onChange={(evento) => t.aoInterpolacao!(evento.currentTarget.value as Interpolacao)} aria-label="Interpolação">
+              <option value="bicubica">Bicúbica</option>
+              <option value="bilinear">Bilinear</option>
+              <option value="vizinho">Vizinho mais próximo</option>
+            </select>
+          </label>
+        ) : null}
         {SEPARADOR}
         <button type="button" className="botao-icone size-6" title="Cancelar (Esc)" aria-label="Cancelar a transformação" onClick={t.aoCancelar}>
           <X className="size-4" aria-hidden />

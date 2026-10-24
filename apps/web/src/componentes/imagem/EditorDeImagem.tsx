@@ -94,7 +94,8 @@ import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
-import { desenharNaMalha } from "@/lib/transformar/malha";
+import { bezier, desenharNaMalha, type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
+import { afimEntre, doReferencial, type Interpolacao, noReferencial, type NumerosDaTransformacao, numerosDoQuad, quadDosNumeros, reamostrar, type Referencia, semelhanca } from "@/lib/transformar/livre";
 import { type CorDoCanal, PainelCanais } from "./PainelCanais";
 import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
@@ -306,14 +307,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ultimoTracado, setUltimoTracado] = useState<Tracado>({ largura: 4, cor: "#000000", onde: "centro", modo: "normal", opacidade: 1, preservar: false });
   // Selecionar e mascarar: a camada sozinha (ou a imagem), o resto das camadas e o clipe da camada
   const [refinando, setRefinando] = useState<{ imagem: ImagemRgba; fundo: ImagemRgba | null; clipeId: string | null; faixaId: string | null } | null>(null);
-  // Selecionar › Transformar seleção: a caixa (em pixels do documento), o modo, o pedaço da seleção em resolução cheia
-  // (a fonte) e a cópia pequena dele para a prévia
-  const [transformando, setTransformando] = useState<{
-    estado: EstadoDaTransformacao;
-    modo: ModoDaTransformacao;
-    fonte: HTMLCanvasElement;
-    previa: { imagem: HTMLCanvasElement; largura: number; altura: number };
-  } | null>(null);
+  // A transformação livre (da seleção, ou de uma camada): a caixa (em pixels do documento) do começo e a de agora, o
+  // modo, o pedaço em resolução cheia (a fonte) e a cópia pequena dele para a prévia, a referência, os números digitados
+  // (null: tirados da caixa) e a interpolação; numa camada, o que é preciso para gravar o resultado
+  const [transformando, setTransformando] = useState<Transformando | null>(null);
+  // A última transformação de camada, no referencial da caixa dela (Editar › Transformar › Transformar novamente)
+  const ultimaTransformacao = useRef<{ cantos: PontoDaMalha[]; malha: PontoDaMalha[] | null; interpolacao: Interpolacao } | null>(null);
   const [pedidoAsCamadas, setPedidoAsCamadas] = useState<{ tipo: "procurar" | "isolar"; vez: number; faixaIds: string[] } | null>(null);
   // As seções travadas no painel Configurações do pincel ficam ao escolher outra predefinição
   const [secoesTravadas, setSecoesTravadas] = useState<ReadonlySet<SecaoDoPincel>>(new Set());
@@ -355,14 +354,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   });
   /** Desfazer e refazer esperam a pintura que ainda está subindo: o traço vira um passo antes. */
   const depoisDaPintura = (acao: () => void) => (pinturas.enviando ? void pinturas.esperar().then(acao) : acao());
+  const faixaTransformada = transformando?.camada && !transformando.camada.copia ? transformando.camada.faixaId : null;
   const projetoNaTela = useMemo(() => {
-    if (!projeto || !provisorio) return projeto;
-    try {
-      return executarComando(projeto, provisorio, ctx).projeto;
-    } catch {
-      return projeto;
+    let base = projeto;
+    if (base && provisorio) {
+      try {
+        base = executarComando(base, provisorio, ctx).projeto;
+      } catch {
+        // fica o de antes
+      }
     }
-  }, [projeto, provisorio, ctx]);
+    // A camada que está sendo transformada sai da prévia: ela aparece pela caixa da transformação
+    if (base && faixaTransformada) base = { ...base, faixas: base.faixas.map((faixa) => (faixa.id === faixaTransformada ? { ...faixa, oculta: true } : faixa)) };
+    return base;
+  }, [projeto, provisorio, ctx, faixaTransformada]);
   const preverDoPainel = (comando: Comando | null) => {
     if (comando !== null || !provisorio) {
       setProvisorio(comando);
@@ -1161,11 +1166,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     pequena.height = Math.max(1, Math.round(altura * fator));
     pequena.getContext("2d")!.drawImage(fonte, 0, 0, pequena.width, pequena.height);
     const quad: EstadoDaTransformacao["quad"] = [{ x: caixa.x0, y: caixa.y0 }, { x: caixa.x1, y: caixa.y0 }, { x: caixa.x1, y: caixa.y1 }, { x: caixa.x0, y: caixa.y1 }];
-    setTransformando({ estado: { quad, malha: null }, modo: "livre", fonte, previa: { imagem: pequena, largura: pequena.width, altura: pequena.height } });
+    setTransformando({ estado: { quad, malha: null }, inicial: quad, modo: "livre", fonte, previa: { imagem: pequena, largura: pequena.width, altura: pequena.height }, referencia: { u: 0.5, v: 0.5 }, numeros: null, interpolacao: "bicubica" });
   };
   /** Enter: a seleção desenhada pelo mapa da transformação, na resolução cheia. */
   const confirmarTransformacao = () => {
     if (!transformando || !projeto) return;
+    if (transformando.camada) return void confirmarTransformacaoDaCamada(transformando);
     const { largura, altura } = tamanhoDaImagem(projeto);
     const canvas = document.createElement("canvas");
     canvas.width = largura;
@@ -1953,6 +1959,213 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const inteira = { cx: medida.quadro.largura / 2, cy: medida.quadro.altura / 2, largura: medida.quadro.largura, altura: medida.quadro.altura, rotacao: 0, opacidade: 1 };
     return matrizParaOutraCaixa(mascara, medida.bruta, inteira, medida.quadro);
   };
+  /**
+   * Começa a transformação livre da camada escolhida. A camada é desenhada sozinha (como no rasterizar, sem o estilo):
+   * a caixa é a dela (girada com ela) ou, nas de pixels, o retângulo do que não é transparente; com uma seleção numa
+   * camada de pixels, só o que está selecionado vai, e o resto fica. `imediata` leva a caixa do começo à final e
+   * confirma na hora (girar e virar pelo menu, Transformar novamente).
+   */
+  const comecarTransformacaoDaCamada = async (opcoes: { copia?: boolean; modo?: ModoDaTransformacao; imediata?: (inicial: Quadrilatero) => { quad: Quadrilatero; malha: PontoDaMalha[] | null } }) => {
+    const atual = projetoRef.current;
+    if (!atual || !selecionado || transformando || gerandoPixels) return;
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado || achado.clipe.pasta || achado.clipe.ajuste) return mostrarAviso("Escolha uma camada com conteúdo para transformar.");
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.posicao) return mostrarAviso("A posição desta camada está travada.");
+    let plano: Omit<PlanoDosPixels, "desenhar"> | string;
+    try {
+      const { desenhar: _desenhar, ...dados } = planoDosPixels(atual, "transformar", [achado.faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
+      void _desenhar;
+      plano = dados;
+    } catch (e) {
+      plano = e instanceof Error ? e.message : "Não foi possível transformar a camada.";
+    }
+    const documento = tamanhoDaImagem(atual);
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const desenhar = projetoSoCom(atual, [achado.faixa.id], { neutras: new Set([achado.faixa.id]), semEstilo: true });
+      const blob = await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara });
+      const bitmap = await createImageBitmap(blob);
+      const tela = document.createElement("canvas");
+      tela.width = documento.largura;
+      tela.height = documento.altura;
+      const ctxTela = tela.getContext("2d", { willReadFrequently: true })!;
+      ctxTela.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+      bitmap.close();
+      // Com uma seleção numa camada de pixels: o pedaço selecionado vai, o resto fica
+      const selecao = achado.clipe.pixels && selecaoNoDocumento && temAlgo(selecaoNoDocumento) ? selecaoNoDocumento : null;
+      let resto: HTMLCanvasElement | null = null;
+      if (selecao) {
+        const pixels = ctxTela.getImageData(0, 0, documento.largura, documento.altura);
+        const sobra = new ImageData(new Uint8ClampedArray(pixels.data), documento.largura, documento.altura);
+        for (let i = 0; i < selecao.dados.length; i++) {
+          pixels.data[i * 4 + 3] = Math.round((pixels.data[i * 4 + 3] * selecao.dados[i]) / 255);
+          sobra.data[i * 4 + 3] = Math.round((sobra.data[i * 4 + 3] * (255 - selecao.dados[i])) / 255);
+        }
+        ctxTela.putImageData(pixels, 0, 0);
+        resto = document.createElement("canvas");
+        resto.width = documento.largura;
+        resto.height = documento.altura;
+        resto.getContext("2d")!.putImageData(sobra, 0, 0);
+      }
+      // A caixa do começo
+      let inicial: Quadrilatero | null = null;
+      const medida = caixasRef.current.get(achado.clipe.id);
+      if (!achado.clipe.pixels && medida?.bruta && medida.quadro) {
+        const k = documento.largura / medida.quadro.largura;
+        inicial = quadDoRetangulo(medida.bruta.cx * k, medida.bruta.cy * k, medida.bruta.largura * k, medida.bruta.altura * k, medida.bruta.rotacao);
+      } else {
+        const caixa = caixaParaAparar(ctxTela.getImageData(0, 0, documento.largura, documento.altura).data, documento.largura, documento.altura, "transparencia");
+        if (caixa)
+          inicial = [
+            { x: caixa.x0, y: caixa.y0 },
+            { x: caixa.x1, y: caixa.y0 },
+            { x: caixa.x1, y: caixa.y1 },
+            { x: caixa.x0, y: caixa.y1 },
+          ];
+      }
+      if (!inicial) return mostrarAviso(selecao ? "A seleção não pega nada desta camada." : "A camada está vazia.");
+      // A fonte: o conteúdo no referencial da caixa, na resolução do documento
+      const u = { x: inicial[1].x - inicial[0].x, y: inicial[1].y - inicial[0].y };
+      const v = { x: inicial[3].x - inicial[0].x, y: inicial[3].y - inicial[0].y };
+      const largura = Math.max(1, Math.round(Math.hypot(u.x, u.y)));
+      const altura = Math.max(1, Math.round(Math.hypot(v.x, v.y)));
+      const fonte = document.createElement("canvas");
+      fonte.width = largura;
+      fonte.height = altura;
+      const ctxFonte = fonte.getContext("2d")!;
+      // Do documento para a caixa: a inversa de (a, b) → q0 + a·U/largura + b·V/altura
+      const m00 = u.x / largura;
+      const m10 = u.y / largura;
+      const m01 = v.x / altura;
+      const m11 = v.y / altura;
+      const det = m00 * m11 - m01 * m10 || 1e-12;
+      const i00 = m11 / det;
+      const i01 = -m01 / det;
+      const i10 = -m10 / det;
+      const i11 = m00 / det;
+      ctxFonte.imageSmoothingQuality = "high";
+      ctxFonte.setTransform(i00, i10, i01, i11, -(i00 * inicial[0].x + i01 * inicial[0].y), -(i10 * inicial[0].x + i11 * inicial[0].y));
+      ctxFonte.drawImage(tela, 0, 0);
+      // A seleção no mesmo referencial (ela anda junto com o pedaço)
+      let fonteDaSelecao: HTMLCanvasElement | null = null;
+      if (selecao) {
+        fonteDaSelecao = document.createElement("canvas");
+        fonteDaSelecao.width = largura;
+        fonteDaSelecao.height = altura;
+        const ctxSelecao = fonteDaSelecao.getContext("2d")!;
+        ctxSelecao.setTransform(i00, i10, i01, i11, -(i00 * inicial[0].x + i01 * inicial[0].y), -(i10 * inicial[0].x + i11 * inicial[0].y));
+        ctxSelecao.drawImage(selecaoParaCanvas(selecao), 0, 0);
+      }
+      const fator = Math.min(1, 800 / Math.max(largura, altura));
+      const pequena = document.createElement("canvas");
+      pequena.width = Math.max(1, Math.round(largura * fator));
+      pequena.height = Math.max(1, Math.round(altura * fator));
+      pequena.getContext("2d")!.drawImage(fonte, 0, 0, pequena.width, pequena.height);
+      const novo: Transformando = {
+        estado: { quad: inicial, malha: null },
+        inicial,
+        modo: opcoes.modo ?? "livre",
+        fonte,
+        previa: { imagem: pequena, largura: pequena.width, altura: pequena.height },
+        referencia: { u: 0.5, v: 0.5 },
+        numeros: null,
+        interpolacao: "bicubica",
+        camada: { faixaId: achado.faixa.id, clipeId: achado.clipe.id, copia: Boolean(opcoes.copia), plano, resto, selecao, fonteDaSelecao },
+      };
+      if (opcoes.imediata) {
+        const final = opcoes.imediata(inicial);
+        await confirmarTransformacaoDaCamada({ ...novo, estado: { quad: final.quad, malha: final.malha }, interpolacao: ultimaTransformacao.current?.interpolacao ?? "bicubica" }, true);
+      } else setTransformando(novo);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível transformar a camada.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /**
+   * Confirma a transformação da camada. Mover, girar, escalar por igual e virar ficam na posição da camada (ela continua
+   * editável, sem perder nitidez); o resto (e a cópia, e o pedaço de uma seleção) vai para os pixels, reamostrado na
+   * interpolação escolhida, e a camada vira de pixels.
+   */
+  const confirmarTransformacaoDaCamada = async (t: Transformando, jaComGerando = false) => {
+    const camada = t.camada;
+    const atual = projetoRef.current;
+    setTransformando(null);
+    if (!camada || !atual) return;
+    const achado = acharClipe(atual, camada.clipeId);
+    if (!achado) return;
+    ultimaTransformacao.current = { cantos: noReferencial(t.inicial, t.estado.quad), malha: t.estado.malha ? noReferencial(t.inicial, t.estado.malha) : null, interpolacao: t.interpolacao };
+    const documento = tamanhoDaImagem(atual);
+    const parecida = !t.estado.malha && !camada.copia && !camada.selecao ? semelhanca(t.inicial, t.estado.quad) : null;
+    if (parecida) {
+      const tr = achado.clipe.transformacao;
+      const centro = afimEntre(t.inicial, t.estado.quad)({ x: (tr.x + 0.5) * documento.largura, y: (tr.y + 0.5) * documento.altura });
+      const virar = achado.clipe.virar ?? { horizontal: false, vertical: false };
+      executar({
+        comando: "imagem.transformarCamada",
+        parametros: {
+          clipeId: camada.clipeId,
+          transformacao: { x: centro.x / documento.largura - 0.5, y: centro.y / documento.altura - 0.5, escala: tr.escala * parecida.escala, rotacao: parecida.espelhado ? parecida.giro - tr.rotacao : tr.rotacao + parecida.giro },
+          ...(parecida.espelhado ? { virar: { ...virar, horizontal: !virar.horizontal } } : {}),
+        },
+      });
+      return;
+    }
+    if (typeof camada.plano === "string") return mostrarAviso(camada.plano);
+    const canvas = document.createElement("canvas");
+    canvas.width = documento.largura;
+    canvas.height = documento.altura;
+    const ctx2d = canvas.getContext("2d")!;
+    if (camada.resto) ctx2d.drawImage(camada.resto, 0, 0);
+    const pedaco = document.createElement("canvas");
+    pedaco.width = documento.largura;
+    pedaco.height = documento.altura;
+    const ctxPedaco = pedaco.getContext("2d", { willReadFrequently: true })!;
+    if (t.estado.malha) {
+      ctxPedaco.imageSmoothingEnabled = t.interpolacao !== "vizinho";
+      ctxPedaco.imageSmoothingQuality = t.interpolacao === "bicubica" ? "high" : "low";
+      desenharNaMalha(ctxPedaco, t.fonte, t.fonte.width, t.fonte.height, bezier(t.estado.malha), 64);
+    } else {
+      const origem = t.fonte.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, t.fonte.width, t.fonte.height);
+      ctxPedaco.putImageData(new ImageData(reamostrar({ dados: origem.data, largura: origem.width, altura: origem.height }, t.estado.quad, documento, t.interpolacao), documento.largura, documento.altura), 0, 0);
+    }
+    ctx2d.drawImage(pedaco, 0, 0);
+    // A seleção anda junto com o pedaço
+    if (camada.fonteDaSelecao) {
+      const mascara = document.createElement("canvas");
+      mascara.width = documento.largura;
+      mascara.height = documento.altura;
+      desenharNaMalha(mascara.getContext("2d")!, camada.fonteDaSelecao, camada.fonteDaSelecao.width, camada.fonteDaSelecao.height, mapaDoEstado(t.estado), 48);
+      const nova = selecaoDoCanvas(mascara, "alfa");
+      setSelecaoDoDocumento(temAlgo(nova) ? nova : null);
+    }
+    const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+    if (jaComGerando) setGerandoPixels(false);
+    await gerarPixels(async () => blob, camada.copia ? { ...camada.plano, remover: [], nome: `${camada.plano.nome} cópia` } : camada.plano);
+  };
+  /** O menu Editar: a transformação livre, a de uma cópia, o submenu Transformar. */
+  const transformarCamadaPeloMenu = (como: Parameters<AcoesDosMenus["transformarCamada"]>[0]) => {
+    const girarEm = (graus: number) => (q: Quadrilatero) => {
+      const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+      const cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+      const r = (graus * Math.PI) / 180;
+      return { quad: q.map((p) => ({ x: cx + (p.x - cx) * Math.cos(r) - (p.y - cy) * Math.sin(r), y: cy + (p.x - cx) * Math.sin(r) + (p.y - cy) * Math.cos(r) })) as Quadrilatero, malha: null };
+    };
+    if (como === "livre") return void comecarTransformacaoDaCamada({});
+    if (como === "copia") return void comecarTransformacaoDaCamada({ copia: true });
+    if (como === "girar180") return void comecarTransformacaoDaCamada({ imediata: girarEm(180) });
+    if (como === "girar90") return void comecarTransformacaoDaCamada({ imediata: girarEm(90) });
+    if (como === "girarMenos90") return void comecarTransformacaoDaCamada({ imediata: girarEm(-90) });
+    if (como === "virarH") return void comecarTransformacaoDaCamada({ imediata: (q) => ({ quad: [q[1], q[0], q[3], q[2]], malha: null }) });
+    if (como === "virarV") return void comecarTransformacaoDaCamada({ imediata: (q) => ({ quad: [q[3], q[2], q[1], q[0]], malha: null }) });
+    if (como === "novamente") {
+      const ultima = ultimaTransformacao.current;
+      if (!ultima) return;
+      return void comecarTransformacaoDaCamada({ imediata: (q) => ({ quad: doReferencial(q, ultima.cantos) as Quadrilatero, malha: ultima.malha ? doReferencial(q, ultima.malha) : null }) });
+    }
+    void comecarTransformacaoDaCamada({ modo: como });
+  };
   /** Rasterizar, mesclar, achatar ou carimbar as escolhidas (cada rasterizar é uma camada por vez). */
   const mesclarEmPixels = async (tipo: TipoDaMesclagem) => {
     if (!projeto || gerandoPixels) return;
@@ -2170,6 +2383,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     definirPincel: () => selecaoNoDocumento && setNomeDoPincel(true),
     definirPadrao: () => setNomeDoPadrao(true),
     transformarSelecao,
+    transformarCamada: transformarCamadaPeloMenu,
+    temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
       area.abrir("camadas");
@@ -2785,6 +3000,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 aoModo: (modo) => setTransformando((atual) => (atual ? { ...atual, modo } : atual)),
                 aoConfirmar: confirmarTransformacao,
                 aoCancelar: () => setTransformando(null),
+                numeros: transformando.estado.malha ? null : (transformando.numeros ?? numerosDoQuad(transformando.inicial, transformando.estado.quad, transformando.referencia)),
+                aoNumeros: (numeros) => setTransformando((atual) => (atual ? { ...atual, numeros, estado: { quad: quadDosNumeros(atual.inicial, numeros, atual.referencia), malha: null } } : atual)),
+                referencia: transformando.referencia,
+                aoReferencia: (referencia) => setTransformando((atual) => (atual ? { ...atual, referencia, numeros: null } : atual)),
+                interpolacao: transformando.camada ? transformando.interpolacao : undefined,
+                aoInterpolacao: (interpolacao) => setTransformando((atual) => (atual ? { ...atual, interpolacao } : atual)),
               }
             : null
         }
@@ -2914,7 +3135,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     estado: transformando.estado,
                     modo: transformando.modo,
                     origem: transformando.previa,
-                    aoMudar: (estado) => setTransformando((atual) => (atual ? { ...atual, estado } : atual)),
+                    referencia: mapaDoEstado(transformando.estado)(transformando.referencia.u, transformando.referencia.v),
+                    opaco: Boolean(transformando.camada),
+                    aoMudar: (estado) => setTransformando((atual) => (atual ? { ...atual, estado, numeros: null } : atual)),
                     aoConfirmar: confirmarTransformacao,
                   }
                 : null
@@ -3305,3 +3528,27 @@ function JanelaDeAtalhos({ acoes, aoFechar }: { acoes: AcoesDosMenus; aoFechar: 
     </div>
   );
 }
+
+/** A transformação livre em andamento (a da seleção ou a de uma camada). */
+type Transformando = {
+  estado: EstadoDaTransformacao;
+  /** A caixa do começo: os números e o Transformar novamente são em relação a ela. */
+  inicial: Quadrilatero;
+  modo: ModoDaTransformacao;
+  fonte: HTMLCanvasElement;
+  previa: { imagem: HTMLCanvasElement; largura: number; altura: number };
+  referencia: Referencia;
+  numeros: NumerosDaTransformacao | null;
+  interpolacao: Interpolacao;
+  camada?: {
+    faixaId: string;
+    clipeId: string;
+    copia: boolean;
+    /** O plano da camada nova de pixels, ou por que ela não pode ir para os pixels (a máscara de camada). */
+    plano: Omit<PlanoDosPixels, "desenhar"> | string;
+    /** Com uma seleção numa camada de pixels: o que fica no lugar, e a seleção. */
+    resto: HTMLCanvasElement | null;
+    selecao: Selecao | null;
+    fonteDaSelecao: HTMLCanvasElement | null;
+  };
+};

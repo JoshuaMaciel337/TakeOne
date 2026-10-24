@@ -105,6 +105,9 @@ export type AcoesDosMenus = {
   selecionarEMascarar: () => void;
   /** Selecionar › Transformar seleção. */
   transformarSelecao: () => void;
+  /** Editar › Transformação livre, a de uma cópia e o submenu Transformar (na camada escolhida). */
+  transformarCamada: (como: "livre" | "copia" | "novamente" | "escala" | "girar" | "inclinar" | "distorcer" | "perspectiva" | "deformar" | "girar180" | "girar90" | "girarMenos90" | "virarH" | "virarV") => void;
+  temUltimaTransformacao: boolean;
   /** Editar › Definir predefinição de pincel (a seleção vira a ponta). */
   definirPincel: () => void;
   /** Editar › Definir padrão (a seleção retangular, ou a imagem inteira, vira um padrão do espaço). */
@@ -252,7 +255,29 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Com o fundo, preservando a transparência", atalho: "Shift+Ctrl+Backspace", aoEscolher: () => a.preencherRapido("fundo", true) },
           ],
         },
-        { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.ferramenta("mover") },
+        { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.transformarCamada("livre"), titulo: "Ctrl+T é do navegador: use o menu" },
+        { nome: "Transformação livre de uma cópia", atalho: "Ctrl+Alt+T", desativado: semCamada, aoEscolher: () => a.transformarCamada("copia") },
+        {
+          nome: "Transformar",
+          desativado: semCamada,
+          itens: [
+            { nome: "Transformar novamente", desativado: !a.temUltimaTransformacao, aoEscolher: () => a.transformarCamada("novamente") },
+            "-",
+            { nome: "Escala", aoEscolher: () => a.transformarCamada("escala") },
+            { nome: "Girar", aoEscolher: () => a.transformarCamada("girar") },
+            { nome: "Inclinar", aoEscolher: () => a.transformarCamada("inclinar") },
+            { nome: "Distorcer", aoEscolher: () => a.transformarCamada("distorcer") },
+            { nome: "Perspectiva", aoEscolher: () => a.transformarCamada("perspectiva") },
+            { nome: "Deformar", aoEscolher: () => a.transformarCamada("deformar") },
+            "-",
+            { nome: "Girar 180°", aoEscolher: () => a.transformarCamada("girar180") },
+            { nome: "Girar 90° no sentido horário", aoEscolher: () => a.transformarCamada("girar90") },
+            { nome: "Girar 90° no sentido anti-horário", aoEscolher: () => a.transformarCamada("girarMenos90") },
+            "-",
+            { nome: "Virar horizontalmente", aoEscolher: () => a.transformarCamada("virarH") },
+            { nome: "Virar verticalmente", aoEscolher: () => a.transformarCamada("virarV") },
+          ],
+        },
         { nome: "Definir predefinição de pincel…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.definirPincel },
         { nome: "Definir padrão…", aoEscolher: a.definirPadrao },
         "-",

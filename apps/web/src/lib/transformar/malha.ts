@@ -15,6 +15,15 @@ export type Mapa = (u: number, v: number) => Ponto;
  * (0,1) → q3. Num paralelogramo vira uma afim.
  */
 export function homografia(q: Quadrilatero): Mapa {
+  const [a, b, c, d, e, f, g, h] = coeficientesDaHomografia(q);
+  return (u, v) => {
+    const w = g * u + h * v + 1;
+    return { x: (a * u + b * v + c) / w, y: (d * u + e * v + f) / w };
+  };
+}
+
+/** Os oito coeficientes da homografia: x = (a·u + b·v + c) / (g·u + h·v + 1), y = (d·u + e·v + f) / (g·u + h·v + 1). */
+export function coeficientesDaHomografia(q: Quadrilatero): [number, number, number, number, number, number, number, number] {
   const [p0, p1, p2, p3] = q;
   const sx = p0.x - p1.x + p2.x - p3.x;
   const sy = p0.y - p1.y + p2.y - p3.y;
@@ -43,10 +52,7 @@ export function homografia(q: Quadrilatero): Mapa {
     e = p3.y - p0.y + h * p3.y;
     f = p0.y;
   }
-  return (u, v) => {
-    const w = g * u + h * v + 1;
-    return { x: (a * u + b * v + c) / w, y: (d * u + e * v + f) / w };
-  };
+  return [a, b, c, d, e, f, g, h];
 }
 
 const bernstein = (t: number): [number, number, number, number] => {

@@ -10,6 +10,7 @@ export type TipoDaMesclagem =
   | "aplicarMascara"
   | "rasterizar"
   | "rasterizarEstilo"
+  | "transformar"
   | "baixo"
   | "selecionadas"
   | "visiveis"
@@ -162,6 +163,19 @@ export function planoDosPixels(
         nome: nomeDe(primeira),
         manter,
       };
+    }
+    case "transformar": {
+      // A transformação que não cabe na posição (esticar, inclinar, distorcer, perspectiva, deformar) ou a cópia
+      // transformada: a camada desenhada sozinha, sem o estilo, que continua editável na camada nova
+      if (escolhidas.length !== 1) throw new ErroEdicao("Escolha uma camada para transformar.");
+      const clipe = primeira.clipes[0];
+      if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Grupos e camadas de ajuste não se transformam assim.");
+      if (clipe.mascara_pixels) throw new ErroEdicao("Aplique ou exclua a máscara da camada antes de distorcer.");
+      const manter = propriedadesDe(primeira, true);
+      const fator = alturaDaCaixa(primeira) ?? 1;
+      if (manter.contorno) manter.contorno = { ...manter.contorno, largura: manter.contorno.largura * fator };
+      if (manter.sombra) manter.sombra = { ...manter.sombra, distancia: manter.sombra.distancia * fator, desfoque: manter.sombra.desfoque * fator };
+      return { desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: true }), remover: [primeira.id], lugar: primeira.id, nome: nomeDe(primeira), manter };
     }
     case "baixo":
     case "carimbarBaixo": {

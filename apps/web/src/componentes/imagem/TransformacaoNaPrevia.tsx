@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Tamanho } from "@/lib/projeto/geometria";
 import { bezier, desenharNaMalha, homografia, type MalhaDeDeformacao, malhaDoQuadrilatero, type Ponto, type Quadrilatero } from "@/lib/transformar/malha";
 
-export type ModoDaTransformacao = "livre" | "inclinar" | "distorcer" | "perspectiva" | "deformar";
+export type ModoDaTransformacao = "livre" | "escala" | "girar" | "inclinar" | "distorcer" | "perspectiva" | "deformar";
 export type EstadoDaTransformacao = { quad: Quadrilatero; malha: MalhaDeDeformacao | null };
 
 /** O mapa do estado: a malha, quando deformada, senão a homografia dos cantos. */
@@ -69,6 +69,8 @@ export function TransformacaoNaPrevia({
   quadro,
   documento,
   origem,
+  referencia = null,
+  opaco = false,
   aoMudar,
   aoConfirmar,
 }: {
@@ -78,6 +80,10 @@ export function TransformacaoNaPrevia({
   documento: Tamanho;
   /** O conteúdo que vai junto (a seleção em branco, a camada), já pequeno para a tela. */
   origem: { imagem: CanvasImageSource; largura: number; altura: number } | null;
+  /** O ponto de referência (pixels do documento): o giro é em volta dele. */
+  referencia?: Ponto | null;
+  /** A camada aparece inteira (a seleção, meio transparente). */
+  opaco?: boolean;
   aoMudar: (estado: EstadoDaTransformacao) => void;
   aoConfirmar: () => void;
 }) {
@@ -113,7 +119,8 @@ export function TransformacaoNaPrevia({
       if (i >= 0) return { tipo: "malha", i };
     }
     const canto = estado.quad.findIndex(perto);
-    if (canto >= 0) return { tipo: "canto", i: canto };
+    // No modo Girar, as alças giram
+    if (canto >= 0) return modo === "girar" ? { tipo: "girar" } : { tipo: "canto", i: canto };
     if (modo !== "deformar") {
       const lado = [0, 1, 2, 3].findIndex((i) => perto(meio(estado.quad[i], estado.quad[(i + 1) % 4])));
       if (lado >= 0) return { tipo: "lado", i: lado };
@@ -125,6 +132,7 @@ export function TransformacaoNaPrevia({
       const b = estado.quad[j];
       if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) dentro = !dentro;
     }
+    if (modo === "girar") return dentro ? { tipo: "mover" } : { tipo: "girar" };
     return dentro ? { tipo: "mover" } : modo === "livre" ? { tipo: "girar" } : { tipo: "mover" };
   };
 
@@ -137,7 +145,7 @@ export function TransformacaoNaPrevia({
     }
     evento.currentTarget.setPointerCapture(evento.pointerId);
     const p = paraDocumento(evento, evento.currentTarget);
-    const centro = centroDe(estado.quad);
+    const centro = referencia ?? centroDe(estado.quad);
     arrasto.current = { alca: alcaEm(p), inicio: p, estado, anguloInicial: Math.atan2(p.y - centro.y, p.x - centro.x) };
   }
 
@@ -169,7 +177,7 @@ export function TransformacaoNaPrevia({
       return;
     }
     if (a.alca.tipo === "girar") {
-      const centro = centroDe(q);
+      const centro = referencia ?? centroDe(q);
       let angulo = Math.atan2(p.y - centro.y, p.x - centro.x) - a.anguloInicial;
       if (evento.shiftKey) angulo = Math.round(angulo / (Math.PI / 12)) * (Math.PI / 12);
       novo(q.map((ponto) => girar(ponto, centro, angulo)) as Quadrilatero, a.estado.malha?.map((ponto) => girar(ponto, centro, angulo)) ?? null);
@@ -228,7 +236,7 @@ export function TransformacaoNaPrevia({
   const pontosSvg = (lista: Ponto[]) => lista.map((p) => `${p.x},${p.y}`).join(" ");
   return (
     <div className="absolute inset-0 z-30 touch-none" style={{ cursor }} onPointerDown={aoApertar} onPointerMove={aoMover} onPointerUp={aoSoltar} aria-label="Transformação">
-      <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 size-full opacity-40" aria-hidden />
+      <canvas ref={canvasRef} className={`pointer-events-none absolute inset-0 size-full ${opaco ? "" : "opacity-40"}`} aria-hidden />
       <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
         <polygon points={pontosSvg(borda)} fill="none" stroke="#000" strokeWidth={2} strokeOpacity={0.5} />
         <polygon points={pontosSvg(borda)} fill="none" stroke="#fff" strokeWidth={1} />
@@ -238,6 +246,13 @@ export function TransformacaoNaPrevia({
         {alcas.map((p, i) => (
           <rect key={i} x={p.x - 3.5} y={p.y - 3.5} width={7} height={7} fill="#fff" stroke="#000" strokeWidth={1} />
         ))}
+        {referencia ? (
+          <g transform={`translate(${naTela(referencia).x} ${naTela(referencia).y})`}>
+            <circle r={5} fill="none" stroke="#000" strokeWidth={2} strokeOpacity={0.5} />
+            <circle r={5} fill="none" stroke="#fff" strokeWidth={1} />
+            <path d="M -8 0 H 8 M 0 -8 V 8" stroke="#fff" strokeWidth={1} />
+          </g>
+        ) : null}
       </svg>
     </div>
   );

@@ -7,7 +7,7 @@ import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
-import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada } from "./modelo.ts";
+import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
@@ -599,6 +599,30 @@ export type RetanguloDaImagem = { x: number; y: number; largura: number; altura:
  * em pixels (só o que fica fora some). A escala de uma mídia é relativa a caber no quadro e a de um texto, ao lado
  * menor dele, então as duas são refeitas para o quadro novo; os tamanhos das mídias vêm de quem chama.
  */
+/**
+ * A transformação livre que cabe na posição da camada (mover, girar, escalar por igual e virar), num passo só: a
+ * camada continua editável. O giro fica entre -180 e 180.
+ */
+export function transformarCamada(projeto: Projeto, clipeId: string, transformacao: Partial<Transformacao>, virar?: Virar): Projeto {
+  let achou = false;
+  const faixas = projeto.faixas.map((faixa) => {
+    if (!faixa.clipes.some((clipe) => clipe.id === clipeId)) return faixa;
+    achou = true;
+    if (faixa.travada || faixa.travas?.posicao) throw new ErroEdicao("A posição desta camada está travada.");
+    return {
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => {
+        if (clipe.id !== clipeId) return clipe;
+        const nova = { ...clipe.transformacao, ...transformacao };
+        nova.rotacao = ((((nova.rotacao + 180) % 360) + 360) % 360) - 180;
+        return { ...clipe, transformacao: nova, ...(virar ? { virar } : {}) };
+      }),
+    };
+  });
+  if (!achou) throw new ErroEdicao("A camada não existe mais.");
+  return { ...projeto, faixas };
+}
+
 export function recortarImagem(projeto: Projeto, retangulo: RetanguloDaImagem, tamanhos: Record<string, Tamanho>): Projeto {
   const antes = tamanhoDaImagem(projeto);
   const depois = { largura: Math.round(retangulo.largura), altura: Math.round(retangulo.altura) };

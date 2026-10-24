@@ -126,6 +126,7 @@ import {
   mudarFundoDaImagem,
   mudarTamanhoDaImagem,
   recortarImagem,
+  transformarCamada,
   type RetanguloDaImagem,
   type TamanhoDaImagem,
   trocarImagemDaCamada,
@@ -226,6 +227,7 @@ export type Comando =
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
+  | { comando: "imagem.transformarCamada"; parametros: { clipeId: string; transformacao: Partial<Transformacao>; virar?: Virar } }
   | { comando: "imagem.camadaComOutraMidia"; parametros: { faixaId: string; midiaId: string } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
@@ -341,6 +343,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.fundo": "mudar o fundo",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
+  "imagem.transformarCamada": "transformar a camada",
   "imagem.camadaComOutraMidia": "pôr o objeto recortado",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
@@ -598,6 +601,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     }
     case "imagem.recortar":
       return { projeto: recortarImagem(projeto, parametros.retangulo, parametros.tamanhos) };
+    case "imagem.transformarCamada":
+      return { projeto: transformarCamada(projeto, parametros.clipeId, parametros.transformacao, parametros.virar) };
     case "imagem.aplicarModelo":
       return { projeto: aplicarModeloDeImagem(projeto, ctx, parametros), selecao: [] };
     case "imagem.trocarImagem":
