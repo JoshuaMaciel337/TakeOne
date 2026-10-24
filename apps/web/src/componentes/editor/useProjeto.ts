@@ -139,11 +139,17 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
     }
   }, [estado, pendente, projetoId]);
 
+  // O salvamento que está esperando o tempo: ao sair do editor (outro documento, o hub), ele vai na hora
+  const salvarAoSair = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!estado || !pendente || situacao === "salvando" || situacao === "conflito" || situacao === "erro") return;
+    if (!estado || !pendente || situacao === "salvando" || situacao === "conflito" || situacao === "erro") {
+      salvarAoSair.current = null;
+      return;
+    }
     const { historico, nome, versao } = estado;
     const projeto = historico.presente;
-    const temporizador = setTimeout(() => {
+    const salvar = () => {
+      salvarAoSair.current = null;
       setSituacao("salvando");
       chamarApi<Projeto>(`/projetos/${projetoId}`, {
         metodo: "PUT",
@@ -182,9 +188,12 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
             setSituacao("sem-conexao");
           }
         });
-    }, situacao === "sem-conexao" ? ESPERA_NOVA_TENTATIVA_MS : ESPERA_SALVAR_MS);
+    };
+    salvarAoSair.current = salvar;
+    const temporizador = setTimeout(salvar, situacao === "sem-conexao" ? ESPERA_NOVA_TENTATIVA_MS : ESPERA_SALVAR_MS);
     return () => clearTimeout(temporizador);
   }, [estado, pendente, situacao, projetoId, mostrarAviso]);
+  useEffect(() => () => salvarAoSair.current?.(), []);
 
   // Salvo e sem nada pendente: o rascunho não serve mais
   useEffect(() => {
