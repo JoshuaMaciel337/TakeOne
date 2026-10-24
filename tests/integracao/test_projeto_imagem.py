@@ -51,6 +51,18 @@ def test_criar_salvar_e_abrir_um_projeto_de_imagem(cliente, db_limpo):
     assert cliente.get(f"/api/projetos/{projeto['id']}/intercambio.xml").status_code == 422
 
 
+def test_resolucao_da_imagem(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    assert "resolucao" not in projeto["tamanho"]
+    salvo = salvar(cliente, projeto, projeto["faixas"], tamanho={"largura": 1600, "altura": 1200, "resolucao": 300})
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["tamanho"] == {"largura": 1600, "altura": 1200, "resolucao": 300}
+    zero = {"largura": 1600, "altura": 1200, "resolucao": 0}
+    assert salvar(cliente, aberto, aberto["faixas"], tamanho=zero).status_code == 422
+
+
 def test_tamanho_fora_dos_limites_e_o_video_continua_igual(cliente):
     cadastrar(cliente)
     assert cliente.post("/api/projetos", json={"tamanho": {"largura": 9000, "altura": 100}}).status_code == 422

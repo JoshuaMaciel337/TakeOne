@@ -4,7 +4,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_serializer, model_validator
 
 from core.modelos.animacao_html import DURACAO_MAXIMA as DURACAO_MAXIMA_ANIMACAO
 from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
@@ -176,6 +176,15 @@ class TamanhoEntrada(BaseModel):
     """O tamanho do projeto de imagem, em pixels (os limites são os de core/modelos/projeto.py)."""
     largura: int = Field(ge=16, le=8192)
     altura: int = Field(ge=16, le=8192)
+    # A resolução em pixels por polegada (Imagem › Tamanho da imagem): vai no PNG e no JPG exportados
+    resolucao: int | None = Field(default=None, ge=1, le=10000)
+
+    @model_serializer(mode="wrap")
+    def sem_resolucao_vazia(self, serializar):
+        dados = serializar(self)
+        if dados.get("resolucao") is None:
+            dados.pop("resolucao", None)
+        return dados
 
     @model_validator(mode="after")
     def area_que_cabe(self):
