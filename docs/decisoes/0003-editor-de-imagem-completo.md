@@ -293,7 +293,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Linha do tempo de quadros (animação), com exportar GIF e vídeo e abrir no editor de vídeo
 - [x] Fatia e Seleção de fatia (fatias a partir das guias, exportação por fatia)
 - [x] Painel Teclas modificadoras (Shift, Ctrl e Alt presos, para a tela de toque)
-- [ ] Temas da interface (cinza médio e cinza claro, além do escuro e do claro de hoje)
+- [x] Temas da interface (cinza médio e cinza claro, além do escuro e do claro de hoje)
 
 ### Onda 13.16 — Ferramentas vetoriais da suíte
 

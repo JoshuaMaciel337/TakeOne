@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Cores do TakeOne, do kit da marca (docs/marca/guia.md). O tema escuro é o padrão; o claro vale
-   com data-tema="claro" no <html>, que o script do layout põe antes da pintura (lib/tema.ts). */
+/* Cores do TakeOne, do kit da marca (docs/marca/guia.md). O tema escuro é o padrão; o claro e os dois cinzas
+   (o médio e o claro, como os dos editores de imagem) valem com data-tema no <html>, que o script do layout põe
+   antes da pintura (lib/tema.ts). */
 :root {
   --to-fundo: #08090b;
   --to-painel: #111319;
@@ -21,6 +22,37 @@
   --to-codigo: #4aa3ff;
   --to-gradiente: linear-gradient(120deg, var(--to-destaque) 0%, var(--to-destaque-2) 100%);
   color-scheme: dark;
+}
+
+/* O cinza médio: os painéis em cinza, o texto claro */
+:root[data-tema="cinza"] {
+  --to-fundo: #2e2f33;
+  --to-painel: #3b3c41;
+  --to-painel-2: #45464c;
+  --to-painel-3: #4f5057;
+  --to-borda: #56575e;
+  --to-borda-forte: #686a72;
+  --to-texto: #f3f4f7;
+  --to-suave: #cfd1d6;
+  --to-apagado: #a7aab2;
+}
+
+/* O cinza claro: os painéis em cinza claro, o texto escuro */
+:root[data-tema="cinza-claro"] {
+  --to-fundo: #a9abb0;
+  --to-painel: #c6c8cc;
+  --to-painel-2: #bcbec3;
+  --to-painel-3: #b1b3b9;
+  --to-borda: #9c9fa6;
+  --to-borda-forte: #888b93;
+  --to-texto: #121419;
+  --to-suave: #33373f;
+  --to-apagado: #4d525c;
+  color-scheme: light;
+  --to-sucesso: #0b7f5d;
+  --to-aviso: #8f5306;
+  --to-erro: #b70e33;
+  --to-codigo: #0d4f94;
 }
 
 :root[data-tema="claro"] {

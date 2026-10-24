@@ -9,7 +9,7 @@ import { useState } from "react";
 
 import { MAXIMO_DE_ESTADOS } from "@/lib/imagem/opcoesDoHistorico";
 import { CORES_DO_XADREZ, ESTILOS_DA_LINHA, fundoDoXadrez, type PreferenciasDaVista, TAMANHOS_DO_XADREZ, UNIDADES_DA_REGUA, type UnidadeDaRegua, VISTA_PADRAO } from "@/lib/imagem/vista";
-import { type Tema, temaAtual, trocarTema } from "@/lib/tema";
+import { type Tema, TEMAS, temaAtual, trocarTema } from "@/lib/tema";
 
 const CAMPO = "rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-xs text-texto";
 type Secao = "geral" | "interface" | "ferramentas" | "unidades" | "guias" | "transparencia" | "desempenho";
@@ -80,8 +80,11 @@ export function JanelaPreferencias({ vista: inicial, estadosDoHistorico, aoFecha
                 <label className="flex items-center gap-2">
                   Tema da interface:
                   <select aria-label="Tema da interface" className={CAMPO} value={tema} onChange={(e) => setTema(e.currentTarget.value as Tema)}>
-                    <option value="escuro">Escuro</option>
-                    <option value="claro">Claro</option>
+                    {TEMAS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nome}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button type="button" className="botao-secundario px-2 py-1 text-xs" onClick={() => setV({ ...VISTA_PADRAO, unidade: v.unidade, reguas: v.reguas })}>

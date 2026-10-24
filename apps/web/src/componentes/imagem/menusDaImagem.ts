@@ -194,6 +194,8 @@ export type AcoesDosMenus = {
   fecharTodos: () => void;
   /** Editar › Atalhos de teclado e menus e Barra de ferramentas: a janela da personalização, na aba pedida. */
   personalizar: (aba: "atalhos" | "menus" | "ferramentas") => void;
+  /** Exibir › Interface mais escura e mais clara (os quatro temas, em ordem). */
+  clarearInterface: (passo: -1 | 1) => void;
   /** Editar › Preferências (Ctrl+K). */
   preferencias: () => void;
   /** Editar › Pesquisar (Ctrl+F): a caixa que procura nos comandos e nas ferramentas. */
@@ -956,6 +958,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           ],
         },
         { nome: "Mostrar ou ocultar os painéis", atalho: "Tab", aoEscolher: () => a.ocultarPaineis("todos") },
+        { nome: "Interface mais escura", atalho: "Shift+F1", aoEscolher: () => a.clarearInterface(-1) },
+        { nome: "Interface mais clara", atalho: "Shift+F2", aoEscolher: () => a.clarearInterface(1) },
         { nome: "Mostrar ou ocultar os painéis encaixados", atalho: "Shift+Tab", aoEscolher: () => a.ocultarPaineis("encaixados"), titulo: "Só os painéis da direita; a caixa de ferramentas e a barra de opções ficam" },
         "-",
         { nome: "Extras", atalho: "Ctrl+H", marcado: a.vista.extras, aoEscolher: () => a.mudarVista({ extras: !a.vista.extras }), titulo: "Mostra ou esconde de uma vez as guias, a grade, as bordas e as formigas da seleção" },

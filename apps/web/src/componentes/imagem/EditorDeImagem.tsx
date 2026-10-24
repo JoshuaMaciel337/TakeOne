@@ -131,6 +131,7 @@ import { PainelTeclasModificadoras, useTeclasPresas } from "./TeclasPresas";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
 import { type AbaDaPersonalizacao, JanelaPersonalizar } from "./JanelaPersonalizar";
 import { JanelaPreferencias } from "./JanelaPreferencias";
+import { TEMAS, temaAtual, trocarTema } from "@/lib/tema";
 import { carregarPersonalizacao, guardarPersonalizacao, type Personalizacao, personalizarMenus, teclaDaFerramenta } from "@/lib/imagem/personalizacao";
 import { achatarMenus } from "@/lib/pesquisa";
 import { PredefinicoesDeFerramenta } from "./PredefinicoesDeFerramenta";
@@ -5044,6 +5045,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     pesquisar: () => setPesquisando(true),
     personalizar: setPersonalizando,
     preferencias: () => setPreferindo(true),
+    clarearInterface: (passo) => {
+      const indice = TEMAS.findIndex((item) => item.id === temaAtual());
+      const proximo = TEMAS[Math.min(TEMAS.length - 1, Math.max(0, indice + passo))];
+      trocarTema(proximo.id);
+      mostrarAviso(`Tema: ${proximo.nome.toLowerCase()}.`);
+    },
     compsEmArquivos: () => setCompsEmArquivos(true),
     fatiasEmArquivos: () => setFatiasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
