@@ -381,3 +381,20 @@ def test_variacoes_do_preenchimento_generativo(cliente, db_limpo):
     video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
     principal = {**video["faixas"][0], "clipes": [{**clipe(escolhida, 0, 5, id_="v"), "geracao": geracao}]}
     assert salvar(cliente, video, [principal]).status_code == 422
+
+
+def test_informacoes_do_arquivo(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 640, "altura": 480}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    informacoes = {"titulo": "Cartaz", "autor": "Equipe", "descricao": "Para a vitrine.",
+                   "palavras_chave": [" verão ", "promoção", "verão", ""], "direitos": "© 2026 Equipe",
+                   "situacao_direitos": "protegido", "url": "https://exemplo.com.br"}
+    salvo = salvar(cliente, projeto, [vazia], informacoes=informacoes)
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["informacoes"] == {**informacoes, "palavras_chave": ["verão", "promoção"]}
+    # Longo demais não passa; no vídeo, fica de fora
+    assert salvar(cliente, aberto, [vazia], informacoes={"titulo": "x" * 201}).status_code == 422
+    video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    assert salvar(cliente, video, video["faixas"], informacoes=informacoes).json()["informacoes"] is None

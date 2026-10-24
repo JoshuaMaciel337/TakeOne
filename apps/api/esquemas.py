@@ -1322,6 +1322,23 @@ class CamadaDePreenchimentoEntrada(BaseModel):
         return self
 
 
+class InformacoesDoArquivoEntrada(BaseModel):
+    """Arquivo › Informações do arquivo (editor de imagem): o que vai nos metadados dos arquivos exportados."""
+    titulo: str = Field(default="", max_length=200)
+    autor: str = Field(default="", max_length=200)
+    descricao: str = Field(default="", max_length=2000)
+    palavras_chave: list[str] = Field(default=[], max_length=50)
+    direitos: str = Field(default="", max_length=500)
+    situacao_direitos: Literal["desconhecido", "protegido", "dominio_publico"] = "desconhecido"
+    url: str = Field(default="", max_length=500)
+
+    @field_validator("palavras_chave")
+    @classmethod
+    def limpar_palavras(cls, valor: list[str]) -> list[str]:
+        palavras = [p.strip()[:60] for p in valor if p.strip()]
+        return list(dict.fromkeys(palavras))
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1792,6 +1809,7 @@ class ProjetoSalvarEntrada(BaseModel):
     canais: list[CanalEntrada] = Field(default=[], max_length=50)
     caminhos: list[CaminhoDoDocumento] = Field(default=[], max_length=100)
     luz_global: LuzGlobalEntrada | None = None
+    informacoes: InformacoesDoArquivoEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1828,6 +1846,7 @@ class ProjetoSaida(BaseModel):
     canais: list[CanalEntrada] = []
     caminhos: list[CaminhoDoDocumento] = []
     luz_global: LuzGlobalEntrada | None = None
+    informacoes: InformacoesDoArquivoEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
