@@ -1061,6 +1061,204 @@ class EstiloDeCamadaEntrada(SoOQueVeio):
     mesclar_se: MesclarSeEntrada | None = None
 
 
+class NiveisDoCanalEntrada(BaseModel):
+    preto: float = Field(default=0, ge=0, le=253)
+    branco: float = Field(default=255, ge=2, le=255)
+    gama: float = Field(default=1, ge=0.1, le=9.99)
+    saida_preto: float = Field(default=0, ge=0, le=255)
+    saida_branco: float = Field(default=255, ge=0, le=255)
+
+    @model_validator(mode="after")
+    def _ordem(self):
+        if self.branco <= self.preto:
+            raise ValueError("Nos níveis, o branco de entrada fica acima do preto.")
+        return self
+
+
+class CurvaDoAjusteEntrada(BaseModel):
+    pontos: list[tuple[float, float]] = Field(min_length=2, max_length=16)
+    lapis: list[float] | None = Field(default=None, min_length=256, max_length=256)
+
+    @model_validator(mode="after")
+    def _pontos(self):
+        fora = any(not (0 <= x <= 1 and 0 <= y <= 1) for x, y in self.pontos)
+        if fora or (self.lapis and any(not 0 <= v <= 1 for v in self.lapis)):
+            raise ValueError("Os pontos da curva vão de 0 a 1.")
+        if any(b[0] <= a[0] for a, b in zip(self.pontos, self.pontos[1:], strict=False)):
+            raise ValueError("Os pontos da curva vão da esquerda para a direita.")
+        return self
+
+
+class TomHslEntrada(BaseModel):
+    matiz: float = Field(default=0, ge=-360, le=360)
+    saturacao: float = Field(default=0, ge=-100, le=100)
+    luminosidade: float = Field(default=0, ge=-100, le=100)
+
+
+class FaixaDoMatizEntrada(TomHslEntrada):
+    limites: tuple[float, float, float, float]
+
+    @model_validator(mode="after")
+    def _limites(self):
+        if any(not 0 <= v <= 360 for v in self.limites):
+            raise ValueError("Os limites de uma faixa de cor vão de 0 a 360 graus.")
+        return self
+
+
+class TonsDoEquilibrioEntrada(BaseModel):
+    ciano_vermelho: float = Field(default=0, ge=-100, le=100)
+    magenta_verde: float = Field(default=0, ge=-100, le=100)
+    amarelo_azul: float = Field(default=0, ge=-100, le=100)
+
+
+class LinhaDoMixerEntrada(BaseModel):
+    r: float = Field(default=0, ge=-200, le=200)
+    g: float = Field(default=0, ge=-200, le=200)
+    b: float = Field(default=0, ge=-200, le=200)
+    constante: float = Field(default=0, ge=-200, le=200)
+
+
+class TintasEntrada(BaseModel):
+    ciano: float = Field(default=0, ge=-100, le=100)
+    magenta: float = Field(default=0, ge=-100, le=100)
+    amarelo: float = Field(default=0, ge=-100, le=100)
+    preto: float = Field(default=0, ge=-100, le=100)
+
+
+class PesosDoPretoBrancoEntrada(BaseModel):
+    vermelhos: float = Field(default=40, ge=-200, le=300)
+    amarelos: float = Field(default=60, ge=-200, le=300)
+    verdes: float = Field(default=40, ge=-200, le=300)
+    cianos: float = Field(default=60, ge=-200, le=300)
+    azuis: float = Field(default=20, ge=-200, le=300)
+    magentas: float = Field(default=80, ge=-200, le=300)
+
+
+class ParadaDoMapaEntrada(BaseModel):
+    posicao: float = Field(ge=0, le=1)
+    cor: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+
+
+_CanalDoAjuste = Literal["rgb", "r", "g", "b"]
+_FaixaDoMatiz = Literal["vermelhos", "amarelos", "verdes", "cianos", "azuis", "magentas"]
+_CorDaSeletiva = Literal["vermelhos", "amarelos", "verdes", "cianos", "azuis", "magentas", "brancos", "neutros",
+                         "pretos"]
+
+
+class _BrilhoContraste(BaseModel):
+    tipo: Literal["brilho_contraste"]
+    brilho: float = Field(default=0, ge=-150, le=150)
+    contraste: float = Field(default=0, ge=-50, le=100)
+    antigo: bool = False
+
+
+class _Niveis(BaseModel):
+    tipo: Literal["niveis"]
+    canais: dict[_CanalDoAjuste, NiveisDoCanalEntrada] = Field(default_factory=dict)
+
+
+class _Curvas(BaseModel):
+    tipo: Literal["curvas"]
+    canais: dict[_CanalDoAjuste, CurvaDoAjusteEntrada] = Field(default_factory=dict)
+
+
+class _Exposicao(BaseModel):
+    tipo: Literal["exposicao"]
+    exposicao: float = Field(default=0, ge=-20, le=20)
+    deslocamento: float = Field(default=0, ge=-0.5, le=0.5)
+    gama: float = Field(default=1, ge=0.01, le=9.99)
+
+
+class _Vibracao(BaseModel):
+    tipo: Literal["vibracao"]
+    vibracao: float = Field(default=0, ge=-100, le=100)
+    saturacao: float = Field(default=0, ge=-100, le=100)
+
+
+class _MatizSaturacao(BaseModel):
+    tipo: Literal["matiz_saturacao"]
+    mestre: TomHslEntrada = Field(default_factory=TomHslEntrada)
+    faixas: dict[_FaixaDoMatiz, FaixaDoMatizEntrada] = Field(default_factory=dict)
+    colorir: bool = False
+    cor_colorir: TomHslEntrada = Field(default_factory=TomHslEntrada)
+
+
+class _Equilibrio(BaseModel):
+    tipo: Literal["equilibrio"]
+    sombras: TonsDoEquilibrioEntrada = Field(default_factory=TonsDoEquilibrioEntrada)
+    meios: TonsDoEquilibrioEntrada = Field(default_factory=TonsDoEquilibrioEntrada)
+    realces: TonsDoEquilibrioEntrada = Field(default_factory=TonsDoEquilibrioEntrada)
+    preservar: bool = True
+
+
+class _PretoBranco(BaseModel):
+    tipo: Literal["preto_branco"]
+    pesos: PesosDoPretoBrancoEntrada = Field(default_factory=PesosDoPretoBrancoEntrada)
+    tonalizar: bool = False
+    matiz: float = Field(default=42, ge=0, le=360)
+    saturacao: float = Field(default=20, ge=0, le=100)
+
+
+class _FiltroDeFotos(BaseModel):
+    tipo: Literal["filtro_de_fotos"]
+    cor: str = Field(default="#ec8a00", pattern=r"^#[0-9a-fA-F]{6}$")
+    densidade: float = Field(default=25, ge=0, le=100)
+    preservar: bool = True
+
+
+class _Mixer(BaseModel):
+    tipo: Literal["mixer"]
+    monocromatico: bool = False
+    vermelho: LinhaDoMixerEntrada = Field(default_factory=lambda: LinhaDoMixerEntrada(r=100))
+    verde: LinhaDoMixerEntrada = Field(default_factory=lambda: LinhaDoMixerEntrada(g=100))
+    azul: LinhaDoMixerEntrada = Field(default_factory=lambda: LinhaDoMixerEntrada(b=100))
+    cinza: LinhaDoMixerEntrada = Field(default_factory=lambda: LinhaDoMixerEntrada(r=40, g=40, b=20))
+
+
+class LutDoAjusteEntrada(BaseModel):
+    id: str = Field(min_length=1, max_length=40)
+    intensidade: float = Field(default=1, ge=0, le=1)
+
+
+class _Pesquisa(BaseModel):
+    tipo: Literal["pesquisa"]
+    lut: LutDoAjusteEntrada | None = None
+
+
+class _Inverter(BaseModel):
+    tipo: Literal["inverter"]
+
+
+class _Posterizar(BaseModel):
+    tipo: Literal["posterizar"]
+    niveis: int = Field(default=4, ge=2, le=255)
+
+
+class _Limiar(BaseModel):
+    tipo: Literal["limiar"]
+    nivel: int = Field(default=128, ge=1, le=255)
+
+
+class _MapaDeDegrade(BaseModel):
+    tipo: Literal["mapa_degrade"]
+    cores: list[ParadaDoMapaEntrada] = Field(min_length=1, max_length=32)
+    inverter: bool = False
+
+
+class _CorSeletiva(BaseModel):
+    tipo: Literal["cor_seletiva"]
+    absoluto: bool = False
+    cores: dict[_CorDaSeletiva, TintasEntrada] = Field(default_factory=dict)
+
+
+# Os ajustes da camada de ajuste do editor de imagem (lib/imagem/ajustes.ts); os limites são os dos painéis de lá
+AjusteDaImagemEntrada = Annotated[
+    _BrilhoContraste | _Niveis | _Curvas | _Exposicao | _Vibracao | _MatizSaturacao | _Equilibrio | _PretoBranco
+    | _FiltroDeFotos | _Mixer | _Pesquisa | _Inverter | _Posterizar | _Limiar | _MapaDeDegrade | _CorSeletiva,
+    Field(discriminator="tipo"),
+]
+
+
 class PontoNoDocumentoEntrada(BaseModel):
     """Um ponto em frações do documento (pode sair dele: a alça do degradê arrastada para fora)."""
     x: float = Field(ge=-10, le=10)
@@ -1211,6 +1409,8 @@ class ClipeEntrada(BaseModel):
     mascara: MascaraEntrada | None = None
     # Camada de ajuste: sem mídia nem texto, muda a cor de tudo o que está embaixo
     ajuste: bool = False
+    # Só no projeto de imagem: o ajuste da camada de ajuste (níveis, curvas, matiz/saturação...), no lugar da cor
+    ajuste_imagem: AjusteDaImagemEntrada | None = None
     # Só no projeto de imagem: o estilo de camada (sombra, brilhos, chanfro, cetim, sobreposições, traçado)
     estilo_camada: EstiloDeCamadaEntrada | None = None
     # Só no projeto de imagem: a camada de preenchimento (cor sólida, degradê ou padrão, cobrindo o documento)

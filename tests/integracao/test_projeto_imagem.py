@@ -296,3 +296,41 @@ def test_camada_de_preenchimento(cliente):
     # Com foto não vale; a tinta "nenhuma" também não
     com_foto = camada("video", {**camada_, "camada_de_preenchimento": {"tinta": {"tipo": "nenhuma"}}})
     assert salvar(cliente, aberto, [com_foto, faixas[1]]).status_code == 422
+
+
+def test_ajustes_da_camada_de_ajuste(cliente):
+    from tests.integracao.test_luts import cube_que_inverte, importar
+
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    lut = importar(cliente, cube_que_inverte()).json()
+
+    def ajuste(id_, ajuste_imagem, **extra):
+        return camada("video", {**clipe(None, 0, 5, id_=id_), "midia_id": None, "ajuste": True,
+                                "ajuste_imagem": ajuste_imagem, **extra})
+
+    niveis = {"tipo": "niveis", "canais": {"rgb": {"preto": 20, "branco": 230, "gama": 1.2}}}
+    curvas = {"tipo": "curvas", "canais": {"r": {"pontos": [[0, 0], [0.5, 0.6], [1, 1]]}}}
+    mapa = {"tipo": "mapa_degrade", "cores": [{"posicao": 0, "cor": "#200040"}, {"posicao": 1, "cor": "#ffd080"}]}
+    pesquisa = {"tipo": "pesquisa", "lut": {"id": lut["id"], "intensidade": 0.5}}
+    principal = {**projeto["faixas"][0], "clipes": []}
+    faixas = [ajuste("a1", niveis), ajuste("a2", curvas), ajuste("a3", mapa), ajuste("a4", pesquisa), principal]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    lidos = [f["clipes"][0]["ajuste_imagem"] for f in aberto["faixas"][:4]]
+    assert lidos[0]["canais"]["rgb"]["gama"] == 1.2 and lidos[0]["canais"]["rgb"]["saida_branco"] == 255
+    assert lidos[2]["inverter"] is False and lidos[3]["lut"]["intensidade"] == 0.5
+    # A LUT usada pela Pesquisa de cores não sai
+    assert cliente.delete(f"/api/luts/{lut['id']}").status_code == 409
+    # Sem ser camada de ajuste, com o branco abaixo do preto, com a curva fora de ordem ou de um tipo que não existe
+    sem_ajuste = camada("video", {**clipe(None, 0, 5, id_="x"), "midia_id": None, "ajuste_imagem": niveis})
+    invertidos = ajuste("x", {"tipo": "niveis", "canais": {"g": {"preto": 200, "branco": 100}}})
+    fora_de_ordem = ajuste("x", {"tipo": "curvas", "canais": {"rgb": {"pontos": [[0.5, 0.5], [0.2, 0.2]]}}})
+    desconhecido = ajuste("x", {"tipo": "solarizar"})
+    for errado in (sem_ajuste, invertidos, fora_de_ordem, desconhecido):
+        assert salvar(cliente, aberto, [errado, principal]).status_code == 422
+    # No vídeo não vale
+    video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    resposta = salvar(cliente, video, [ajuste("v", niveis), {**video["faixas"][0], "clipes": []}])
+    assert resposta.status_code == 422

@@ -89,8 +89,11 @@ async def dados_da_lut(lut_id: str, usuario=Depends(usuario_atual), db=Depends(o
 @router.delete("/{lut_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def excluir_lut(lut_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     lut = await buscar_lut(db, lut_id, usuario)
+    # Na cor de um clipe ou na Pesquisa de cores de uma camada de ajuste do editor de imagem
     usado = await db.projetos.find_one({"organizacao_id": usuario["organizacao_id"],
-                                        "faixas.clipes.cor.lut.id": str(lut["_id"])}, {"nome": 1})
+                                        "$or": [{"faixas.clipes.cor.lut.id": str(lut["_id"])},
+                                                {"faixas.clipes.ajuste_imagem.lut.id": str(lut["_id"])}]},
+                                       {"nome": 1})
     if usado:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             f'O projeto "{usado["nome"]}" usa esta LUT. Tire a LUT dos clipes antes de excluir.')
