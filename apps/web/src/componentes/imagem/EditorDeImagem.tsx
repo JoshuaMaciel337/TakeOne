@@ -67,6 +67,8 @@ import { juntarTraco } from "@/lib/pintura/mesclar";
 import { type Degrade, pixelsDoDegrade, tabelaDoDegrade } from "@/lib/pintura/degrade";
 import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
 import { JanelaEditorDeDegrade, PainelDegrades } from "./Degrades";
+import { MANCHAS_PADRAO, type OpcoesDasManchas, OpcoesDaCorrecaoNaBarra, OpcoesDasManchasNaBarra, OpcoesDoMoverSensivelNaBarra } from "./OpcoesDaRecuperacao";
+import { colarSemEmenda, corrigirTom, preencherBuraco } from "@/lib/pintura/recuperar";
 import { CARIMBO_PADRAO, type FonteDeClonagem, type OpcoesDoCarimbo, OpcoesDoCarimboNaBarra, PainelFonteDeClonagem } from "./FonteDeClonagem";
 import { BALDE_PADRAO, BORRACHA_MAGICA_PADRAO, DEGRADE_PADRAO, OpcoesDaBorrachaMagicaNaBarra, OpcoesDoBaldeNaBarra, OpcoesDoDegradeNaBarra } from "./OpcoesDosPontos";
 import type { ModoDaPintura } from "@/lib/pintura/traco";
@@ -187,7 +189,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     historicoArtistico: { ...PINCEL_PADRAO, tamanho: 6, dureza: 0.6, fluxo: 0.85 },
     carimbo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
     carimboDePadrao: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+    recuperacao: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5 },
+    recuperacaoParaManchas: { ...PINCEL_PADRAO, tamanho: 20, dureza: 0.5 },
   });
+  // O pincel de manchas, a Correção e o Mover sensível ao conteúdo: as opções, o que o traço de manchas precisa para
+  // refazer a área quando solta, e o motor provisório das manchas numa foto (a IA refaz)
+  const [opcoesDasManchas, setOpcoesDasManchas] = useState<OpcoesDasManchas>(MANCHAS_PADRAO);
+  const [modoDaCorrecao, setModoDaCorrecao] = useState<"origem" | "destino">("origem");
+  const [modoDoMoverSensivel, setModoDoMoverSensivel] = useState<"mover" | "estender">("mover");
+  // O traço dos pincéis de recuperação, refeito ao soltar (com `fonte`, o de recuperação: a fonte colada sem emenda)
+  const manchas = useRef<{ chave: string; pintura: Pintura; antes: ImageData; amostra: ImageData; vazia: boolean; fonte?: ImageData } | null>(null);
+  const [motorDasManchas, setMotorDasManchas] = useState<{ pintura: Pintura; clipeId: string } | null>(null);
+  const [quadroDasManchas, setQuadroDasManchas] = useState(0);
   // O carimbo: as cinco fontes de clonagem (o ponto do Alt + clique e o deslocamento), a da vez e as opções
   const [fontesDeClonagem, setFontesDeClonagem] = useState<(FonteDeClonagem | null)[]>([null, null, null, null, null]);
   const [fonteAtiva, setFonteAtiva] = useState(0);
@@ -231,7 +244,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDePixels, setJanelaDePixels] = useState<"preencher" | "tracado" | "aparar" | "atenuar" | null>(null);
   // Mover os pixels selecionados (a seleção flutuante): o motor da camada, o que fica (com o buraco ou não), o pedaço
   // levado, a conta do deslocamento do documento para a camada e o arrasto ainda abrindo
-  const flutuante = useRef<{ chave: string; pintura: Pintura; base: ImageData; peca: HTMLCanvasElement; inversa: Afim; selecao: Selecao } | null>(null);
+  const flutuante = useRef<{ chave: string; pintura: Pintura; original: Uint8ClampedArray; base: ImageData; peca: HTMLCanvasElement; inversa: Afim; selecao: Selecao; cobertura: Uint8ClampedArray } | null>(null);
   const flutuanteAbrindo = useRef<Promise<void> | null>(null);
   // O Balde de tinta, a Borracha mágica e o Degradê: as opções da barra, os degradês do espaço e o editor aberto
   const [opcoesDoBalde, setOpcoesDoBalde] = useState(BALDE_PADRAO);
@@ -405,14 +418,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * A seleção do documento levada à foto escolhida, como o pincel da ferramenta Objeto: um PNG opaco, branco no que
    * entra, no tamanho da foto (até 2048 no lado maior). Null sem seleção ou sem a camada na prévia.
    */
-  const selecaoNaFoto = (): string | null => {
-    if (!selecaoNoDocumento || !selecionado || !foto?.video || !projeto) return null;
+  const selecaoNaFoto = (selecaoDada: Selecao | null = selecaoNoDocumento): string | null => {
+    if (!selecaoDada || !selecionado || !foto?.video || !projeto) return null;
     const medida = caixasRef.current.get(selecionado.clipe.id);
     if (!medida?.bruta || !medida.quadro) return null;
     const fator = Math.min(1, 2048 / Math.max(foto.video.largura, foto.video.altura));
     const naFoto = { largura: Math.max(1, Math.round(foto.video.largura * fator)), altura: Math.max(1, Math.round(foto.video.altura * fator)) };
     const matriz = matrizDaMidiaNoDocumento(medida.bruta, selecionado.clipe.recorte, selecionado.clipe.virar, naFoto, medida.quadro, tamanhoDaImagem(projeto));
-    const branca = selecaoNaMidia(selecaoNoDocumento, matriz, naFoto);
+    const branca = selecaoNaMidia(selecaoDada, matriz, naFoto);
     const canvas = document.createElement("canvas");
     canvas.width = naFoto.largura;
     canvas.height = naFoto.altura;
@@ -678,6 +691,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       const pintura = await pinturas.preparar(alvo, tamanho);
       const ctx2d = pintura.camada.getContext("2d", { willReadFrequently: true })!;
       const tudo = ctx2d.getImageData(0, 0, tamanho.largura, tamanho.altura);
+      const original = Uint8ClampedArray.from(tudo.data);
       const cobertura = coberturaNaCamada(achado.clipe, tamanho, selecao, documento);
       const peca = document.createElement("canvas");
       peca.width = tamanho.largura;
@@ -693,15 +707,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       pctx.putImageData(pedaco, 0, 0);
       const m = matrizDaCamada(achado.clipe, tamanho, documento);
       const det = m[0] * m[3] - m[1] * m[2] || 1;
-      flutuante.current = { chave: alvo.chave, pintura, base: tudo, peca, inversa: [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, 0, 0], selecao };
+      flutuante.current = { chave: alvo.chave, pintura, original, base: tudo, peca, inversa: [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, 0, 0], selecao, cobertura };
     })().catch((e: unknown) => {
       flutuante.current = null;
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível mover os pixels.");
     });
   };
   /** O pedaço no deslocamento (pixels do documento), sobre o que ficou. */
-  const desenharFlutuante = (dx: number, dy: number) => {
-    const f = flutuante.current;
+  const desenharFlutuante = (dx: number, dy: number, f = flutuante.current) => {
     if (!f) return;
     const ctx2d = f.pintura.camada.getContext("2d")!;
     ctx2d.putImageData(f.base, 0, 0);
@@ -709,12 +722,33 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     pinturas.avisarQuadro();
   };
   /** Solta: a camada sobe como versão nova e a seleção anda junto. */
-  const soltarFlutuante = (dx: number, dy: number) => {
+  const soltarFlutuante = (dx: number, dy: number, sensivel: "" | "mover" | "estender" = "") => {
     void flutuanteAbrindo.current?.then(() => {
       const f = flutuante.current;
       flutuante.current = null;
       if (!f) return;
-      desenharFlutuante(dx, dy);
+      // Mover sensível ao conteúdo: o lugar de onde o pedaço saiu é refeito pelo que está em volta
+      const largura = f.pintura.largura;
+      const altura = f.pintura.altura;
+      if (sensivel === "mover" && (dx || dy)) {
+        preencherBuraco(f.base.data, largura, altura, Uint8Array.from(f.cobertura, (v) => (v > 32 ? 1 : 0)), { jeito: "remendo", alcance: 4.5 });
+        for (let i = 0; i < f.cobertura.length; i++) if (f.cobertura[i] > 32) f.base.data[i * 4 + 3] = 255;
+      }
+      // A conta da soltura usa o pedaço daqui (o ref já foi limpo para o próximo arrasto)
+      desenharFlutuante(dx, dy, f);
+      // No sensível ao conteúdo, o pedaço emenda com a luz e a cor do lugar novo
+      if (sensivel && (dx || dy)) {
+        const ox = Math.round(f.inversa[0] * dx + f.inversa[2] * dy);
+        const oy = Math.round(f.inversa[1] * dx + f.inversa[3] * dy);
+        const regiao = new Uint8Array(largura * altura);
+        for (let y = Math.max(0, oy); y < Math.min(altura, altura + oy); y++) {
+          for (let x = Math.max(0, ox); x < Math.min(largura, largura + ox); x++) regiao[y * largura + x] = f.cobertura[(y - oy) * largura + x - ox];
+        }
+        const ctx2d = f.pintura.camada.getContext("2d", { willReadFrequently: true })!;
+        const colado = colarSemEmenda(f.base.data, f.original, largura, altura, regiao, { dx: -ox, dy: -oy });
+        ctx2d.putImageData(new ImageData(colado, largura, altura), 0, 0);
+        pinturas.avisarQuadro();
+      }
       if (!dx && !dy) return void pinturas.soltar(f.chave);
       pinturas.soltar(f.chave);
       const andada = vazia(f.selecao.largura, f.selecao.altura);
@@ -1395,7 +1429,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     return canvas;
   };
   /** A imagem de onde o carimbo copia, no documento: a camada (pelo motor dela), a camada e as de baixo, ou todas. */
-  const imagemDaAmostra = async (clipe: Clipe, pintura: Pintura, tamanho: { largura: number; altura: number }): Promise<HTMLCanvasElement> => {
+  const imagemDaAmostra = async (clipe: Clipe, pintura: Pintura, tamanho: { largura: number; altura: number }, forcada?: "atual" | "atualEAbaixo" | "todas"): Promise<HTMLCanvasElement> => {
     const atual = projetoRef.current!;
     const documento = tamanhoDaImagem(atual);
     const canvas = document.createElement("canvas");
@@ -1403,7 +1437,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     canvas.height = documento.altura;
     const ctx2d = canvas.getContext("2d")!;
     // Numa camada de pixels ainda vazia (a que nasce ao carimbar sobre uma foto), a camada atual não tem o que copiar
-    const amostra = opcoesDoCarimbo.amostra === "atual" && clipe.pixels?.versao === 0 ? "atualEAbaixo" : opcoesDoCarimbo.amostra;
+    const pedida = forcada ?? opcoesDoCarimbo.amostra;
+    const amostra = pedida === "atual" && clipe.pixels?.versao === 0 ? "atualEAbaixo" : pedida;
     if (amostra === "atual") {
       ctx2d.setTransform(...matrizDaCamada(clipe, tamanho, documento));
       ctx2d.drawImage(pintura.camada, 0, 0);
@@ -1496,9 +1531,131 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       vivo.atual = false;
     };
   }, [chaveDaSobreposicao]);
+  /** Um canvas do documento levado à camada (do tamanho dela), pela matriz inversa da caixa. */
+  const documentoNaCamada = (doc: CanvasImageSource, clipe: Clipe, tamanho: { largura: number; altura: number }) => {
+    const saida = document.createElement("canvas");
+    saida.width = tamanho.largura;
+    saida.height = tamanho.altura;
+    const ctx2d = saida.getContext("2d", { willReadFrequently: true })!;
+    ctx2d.setTransform(...inverter(matrizDaCamada(clipe, tamanho, tamanhoDaImagem(projetoRef.current!))));
+    ctx2d.drawImage(doc, 0, 0);
+    return saida;
+  };
+  const pixelsDe = (canvas: HTMLCanvasElement) => canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height);
+  /**
+   * Um pincel de recuperação soltou: a área do traço é refeita (o de manchas, pelo que está em volta na amostra; o de
+   * recuperação, com a fonte colada sem emenda, agora que se sabe onde o traço acabou) e entra na camada.
+   */
+  const refazerManchas = () => {
+    const m = manchas.current;
+    manchas.current = null;
+    if (!m) return;
+    const mascara = m.pintura.mascaraDoUltimoTraco();
+    const ctx2d = m.pintura.camada.getContext("2d", { willReadFrequently: true })!;
+    if (!mascara) {
+      ctx2d.putImageData(m.antes, 0, 0);
+      pinturas.avisarQuadro();
+      return;
+    }
+    const largura = m.pintura.largura;
+    const altura = m.pintura.altura;
+    let refeita = Uint8ClampedArray.from(m.amostra.data);
+    // Por proximidade, o lugar parecido mais perto; sensível ao conteúdo, mais longe; criar textura, a membrana com o grão
+    const jeito = opcoesDasManchas.tipo === "textura" ? "textura" : "remendo";
+    if (m.fonte) refeita = colarSemEmenda(m.amostra.data, m.fonte.data, largura, altura, Uint8Array.from(mascara, (v) => (v > 8 ? 255 : 0)));
+    else preencherBuraco(refeita, largura, altura, Uint8Array.from(mascara, (v) => (v > 8 ? 1 : 0)), { jeito, alcance: opcoesDasManchas.tipo === "sensivel" ? 6 : 2 });
+    const saida = Uint8ClampedArray.from(m.antes.data);
+    // Onde o traço passou, a área refeita entra na força do traço (o resto da camada fica como estava)
+    for (let i = 0; i < mascara.length; i++) {
+      const a = mascara[i] / 255;
+      if (!a) continue;
+      const aa = saida[i * 4 + 3] / 255;
+      const ar = refeita[i * 4 + 3] / 255;
+      const alfa = aa * (1 - a) + ar * a;
+      for (let c = 0; c < 3; c++) saida[i * 4 + c] = alfa > 0 ? Math.round((saida[i * 4 + c] * aa * (1 - a) + refeita[i * 4 + c] * ar * a) / alfa) : 0;
+      saida[i * 4 + 3] = Math.round(alfa * 255);
+    }
+    ctx2d.putImageData(new ImageData(saida, largura, altura), 0, 0);
+    pinturas.soltar(m.chave);
+    pinturas.avisarQuadro();
+  };
+  /** O pincel de manchas numa foto, sensível ao conteúdo: o traço vira a seleção que a IA refaz (a foto é trocada). */
+  const refazerManchasComIa = () => {
+    const motor = motorDasManchas;
+    setMotorDasManchas(null);
+    const mascara = motor?.pintura.mascaraDoUltimoTraco();
+    if (!motor || !mascara || !projeto) return;
+    const documento = tamanhoDaImagem(projeto);
+    const selecao: Selecao = { largura: documento.largura, altura: documento.altura, dados: Uint8Array.from(mascara, (v) => (v > 8 ? 255 : 0)) };
+    const pincel = selecaoNaFoto(selecao);
+    if (!pincel) return mostrarAviso("A foto ainda não apareceu na prévia. Tente de novo.");
+    setPedindo(true);
+    objeto
+      .pedir("apagar", pincel)
+      .then((midia) => {
+        if (!midia) return;
+        esperarMidia(midia, { trocar: [motor.clipeId] });
+        mostrarAviso("Refazendo a mancha: a foto troca quando ficar pronta.");
+      })
+      .finally(() => setPedindo(false));
+  };
+  /** A Correção: a área da seleção (de origem) ou a do destino é refeita com a textura da outra, no tom do lugar. */
+  const aplicarCorrecao = async (dx: number, dy: number) => {
+    const selecao = selecaoNoDocumento;
+    if (!selecao || (!dx && !dy) || !projeto) return;
+    try {
+      const imagem = await imagemParaSelecao(!selecionado?.clipe.pixels);
+      const { largura, altura } = imagem;
+      // A fonte deslocada: na de origem, cada ponto da seleção pega o ponto para onde ela foi arrastada; na de
+      // destino, cada ponto do destino pega o da seleção
+      const sinal = modoDaCorrecao === "origem" ? 1 : -1;
+      const fonte = new Uint8ClampedArray(imagem.dados.length);
+      for (let y = 0; y < altura; y++) {
+        const ys = Math.min(altura - 1, Math.max(0, y + sinal * dy));
+        for (let x = 0; x < largura; x++) {
+          const xs = Math.min(largura - 1, Math.max(0, x + sinal * dx));
+          const i = (y * largura + x) * 4;
+          const j = (ys * largura + xs) * 4;
+          for (let c = 0; c < 4; c++) fonte[i + c] = imagem.dados[j + c];
+        }
+      }
+      // A região refeita: a seleção, ou ela levada ao destino
+      let regiao = selecao;
+      if (modoDaCorrecao === "destino") {
+        regiao = vazia(largura, altura);
+        for (let y = 0; y < altura; y++) {
+          const ys = y - dy;
+          if (ys < 0 || ys >= altura) continue;
+          for (let x = 0; x < largura; x++) {
+            const xs = x - dx;
+            if (xs >= 0 && xs < largura) regiao.dados[y * largura + x] = selecao.dados[ys * largura + xs];
+          }
+        }
+      }
+      const corrigida = colarSemEmenda(imagem.dados as Uint8ClampedArray, fonte, largura, altura, regiao.dados);
+      const doc = document.createElement("canvas");
+      doc.width = largura;
+      doc.height = altura;
+      doc.getContext("2d")!.putImageData(new ImageData(corrigida, largura, altura), 0, 0);
+      await editarPixels(
+        (dados, cobertura, camada) => preencherPixels(dados, camada.largura, cobertura, pixelsDe(documentoNaCamada(doc, camada.clipe, camada)).data, { modo: "normal", opacidade: 1, preservar: false }),
+        { criar: true, selecao: regiao },
+      );
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível corrigir.");
+    }
+  };
   const alvoDaPintura = async (inicio: { x: number; y: number }): Promise<Omit<AlvoDaPintura, "caixa"> | null> => {
     const atual = projetoRef.current;
     if (!atual) return null;
+    // O pincel de manchas numa foto, sensível ao conteúdo: o traço vai num motor do documento só para virar a
+    // seleção que a IA refaz (a foto é trocada, sem camada nova)
+    if (ferramenta === "recuperacaoParaManchas" && opcoesDasManchas.tipo === "sensivel" && selecionado && !selecionado.clipe.pixels && foto) {
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const pintura = new Pintura(largura, altura);
+      setMotorDasManchas({ pintura, clipeId: selecionado.clipe.id });
+      return { clipeId: "#manchas", chave: "#manchas", pintura, mascara: { vinculada: false, matriz: IDENTIDADE }, recorte: { x: 0, y: 0, largura: 1, altura: 1 }, virar: null, travarTransparencia: false };
+    }
     // Na máscara rápida, todo pincel pinta a seleção (do tamanho do documento, parada no lugar)
     if (mascaraRapida) {
       return { clipeId: CHAVE_DA_MASCARA_RAPIDA, chave: CHAVE_DA_MASCARA_RAPIDA, pintura: mascaraRapida, mascara: { vinculada: false, matriz: IDENTIDADE }, recorte: { x: 0, y: 0, largura: 1, altura: 1 }, virar: null, travarTransparencia: true };
@@ -1580,6 +1737,35 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         const fonte = await fonteDoCarimbo(inicio, achado.clipe, pintura, tamanhoDaCamada);
         if (!fonte) return null;
         fonteDaTinta = fonte;
+      }
+      // O pincel de recuperação: a textura copiada da fonte, com a luz e a cor de onde pinta
+      if (ferramenta === "recuperacao") {
+        const fonte = await fonteDoCarimbo(inicio, achado.clipe, pintura, tamanhoDaCamada);
+        if (!fonte) return null;
+        const destino = achado.clipe.pixels.versao === 0 ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, "atualEAbaixo"), achado.clipe, tamanhoDaCamada) : pintura.camada;
+        const corrigida = corrigirTom(pixelsDe(destino).data, pixelsDe(fonte).data, tamanhoDaCamada.largura, tamanhoDaCamada.altura, Math.max(2, pinceis.recuperacao.tamanho / 2));
+        const canvas = document.createElement("canvas");
+        canvas.width = tamanhoDaCamada.largura;
+        canvas.height = tamanhoDaCamada.altura;
+        canvas.getContext("2d")!.putImageData(new ImageData(corrigida, canvas.width, canvas.height), 0, 0);
+        // Enquanto pinta, o tom pelo desfoque da diferença; ao soltar, a fonte colada sem emenda na área do traço
+        manchas.current = { chave: alvo.chave, pintura, antes: pixelsDe(pintura.camada), amostra: pixelsDe(destino), vazia: achado.clipe.pixels.versao === 0, fonte: pixelsDe(fonte) };
+        fonteDaTinta = canvas;
+      }
+      // O pincel de manchas: o traço aparece escurecido; ao soltar, a área é refeita pelo que está em volta
+      if (ferramenta === "recuperacaoParaManchas") {
+        const vazia = achado.clipe.pixels.versao === 0;
+        const amostra = vazia || opcoesDasManchas.todasAsCamadas ? documentoNaCamada(await imagemDaAmostra(achado.clipe, pintura, tamanhoDaCamada, vazia ? "atualEAbaixo" : "todas"), achado.clipe, tamanhoDaCamada) : pintura.camada;
+        const escura = document.createElement("canvas");
+        escura.width = tamanhoDaCamada.largura;
+        escura.height = tamanhoDaCamada.altura;
+        const ectx = escura.getContext("2d")!;
+        ectx.drawImage(amostra, 0, 0);
+        ectx.fillStyle = "rgba(0,0,0,0.45)";
+        ectx.globalCompositeOperation = "source-atop";
+        ectx.fillRect(0, 0, escura.width, escura.height);
+        manchas.current = { chave: alvo.chave, pintura, antes: pixelsDe(pintura.camada), amostra: pixelsDe(amostra), vazia };
+        fonteDaTinta = escura;
       }
       return { clipeId: achado.clipe.id, chave: alvo.chave, pintura, recorte: achado.clipe.recorte, virar: achado.clipe.virar, travarTransparencia: Boolean(achado.faixa.travas?.transparencia), fonteDaTinta };
     } catch {
@@ -2384,8 +2570,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         simetria={simetria}
         aoMudarSimetria={setSimetria}
         extraDoPincel={
-          ferramenta === "carimbo" || ferramenta === "carimboDePadrao" ? (
+          ferramenta === "carimbo" || ferramenta === "carimboDePadrao" || ferramenta === "recuperacao" ? (
             <OpcoesDoCarimboNaBarra padrao={ferramenta === "carimboDePadrao"} opcoes={opcoesDoCarimbo} aoMudar={(mudanca) => setOpcoesDoCarimbo((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "recuperacaoParaManchas" ? (
+            <OpcoesDasManchasNaBarra opcoes={opcoesDasManchas} aoMudar={(mudanca) => setOpcoesDasManchas((atual) => ({ ...atual, ...mudanca }))} />
           ) : undefined
         }
         opcoesProprias={
@@ -2393,6 +2581,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             <OpcoesDoBaldeNaBarra opcoes={opcoesDoBalde} aoMudar={(mudanca) => setOpcoesDoBalde((atual) => ({ ...atual, ...mudanca }))} />
           ) : ferramenta === "borrachaMagica" ? (
             <OpcoesDaBorrachaMagicaNaBarra opcoes={opcoesDaBorrachaMagica} aoMudar={(mudanca) => setOpcoesDaBorrachaMagica((atual) => ({ ...atual, ...mudanca }))} />
+          ) : ferramenta === "correcao" ? (
+            <OpcoesDaCorrecaoNaBarra modo={modoDaCorrecao} aoMudar={setModoDaCorrecao} />
+          ) : ferramenta === "moverSensivel" ? (
+            <OpcoesDoMoverSensivelNaBarra modo={modoDoMoverSensivel} aoMudar={setModoDoMoverSensivel} />
           ) : ferramenta === "degrade" ? (
             <OpcoesDoDegradeNaBarra
               opcoes={opcoesDoDegrade}
@@ -2476,14 +2668,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     cores,
                     aoPedirAlvo: alvoDaPintura,
                     aoAltClique:
-                      ferramenta === "carimbo"
+                      ferramenta === "carimbo" || ferramenta === "recuperacao"
                         ? (ponto) => {
                             setFontesDeClonagem((atual) => atual.map((item, i) => (i === fonteAtiva ? { ponto, deslocamento: null } : item)));
                             setSobreposicaoDaFonte(null);
                           }
                         : undefined,
-                    aoQuadro: mascaraRapida ? () => setQuadroDaRapida((atual) => atual + 1) : pinturas.avisarQuadro,
-                    aoSoltar: (clipeId) => (clipeId === CHAVE_DA_MASCARA_RAPIDA ? setQuadroDaRapida((atual) => atual + 1) : pinturas.soltar(clipeId)),
+                    aoQuadro: mascaraRapida ? () => setQuadroDaRapida((atual) => atual + 1) : motorDasManchas ? () => setQuadroDasManchas((atual) => atual + 1) : pinturas.avisarQuadro,
+                    aoSoltar: (clipeId) => {
+                      if (clipeId === CHAVE_DA_MASCARA_RAPIDA) setQuadroDaRapida((atual) => atual + 1);
+                      else if (clipeId === "#manchas") refazerManchasComIa();
+                      else if (manchas.current?.chave === clipeId) refazerManchas();
+                      else pinturas.soltar(clipeId);
+                    },
                     aoAjustar: mudarPincel,
                     simetria,
                     // Na máscara, a tinta é cinza: a luz das cores (o branco mostra, o preto esconde)
@@ -2495,7 +2692,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             fonteDaMascara={pinturas.fonteDaMascara}
             mascaraAVista={mascaraAVista}
             veu={
-              mascaraRapida
+              motorDasManchas
+                ? { fonte: motorDasManchas.pintura.fonte, quadro: quadroDasManchas, cinza: true }
+                : mascaraRapida
                 ? { fonte: mascaraRapida.fonte, quadro: quadroDaRapida, cinza: false }
                 : canalDaVez
                   ? (() => {
@@ -2507,7 +2706,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             }
             corAVista={canalDaVez ? null : corAVista}
             sobreposicao={chaveDaSobreposicao && sobreposicaoDaFonte ? { imagem: sobreposicaoDaFonte, opacidade: opcoesDoCarimbo.opacidadeDaSobreposicao } : null}
-            pontoDaFonte={ferramenta === "carimbo" ? (fonteDaVez?.ponto ?? null) : null}
+            pontoDaFonte={ferramenta === "carimbo" || ferramenta === "recuperacao" ? (fonteDaVez?.ponto ?? null) : null}
             ponto={
               FERRAMENTAS_DE_PONTO.has(ferramenta)
                 ? ferramenta === "degrade"
@@ -2516,14 +2715,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 : null
             }
             moverPixels={
-              ferramenta === "mover" && selecaoNoDocumento && selecionado?.clipe.pixels && limites(selecaoNoDocumento)
+              (ferramenta === "mover" || ferramenta === "moverSensivel") && selecaoNoDocumento && selecionado?.clipe.pixels && limites(selecaoNoDocumento)
                 ? {
                     caixa: limites(selecaoNoDocumento)!,
-                    aoComecar: comecarAMoverPixels,
+                    aoComecar: (duplicar) => comecarAMoverPixels(duplicar || (ferramenta === "moverSensivel" && modoDoMoverSensivel === "estender")),
                     aoMover: (dx, dy) => void flutuanteAbrindo.current?.then(() => desenharFlutuante(dx, dy)),
-                    aoSoltar: soltarFlutuante,
+                    aoSoltar: (dx, dy) => soltarFlutuante(dx, dy, ferramenta === "moverSensivel" ? modoDoMoverSensivel : ""),
                   }
-                : null
+                : ferramenta === "correcao" && selecaoNoDocumento && limites(selecaoNoDocumento)
+                  ? { caixa: limites(selecaoNoDocumento)!, aoComecar: () => undefined, aoMover: () => undefined, aoSoltar: (dx, dy) => void aplicarCorrecao(dx, dy) }
+                  : null
             }
             transformacao={
               transformando

@@ -11,7 +11,7 @@ import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/t
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
 
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FORMAS_PERSONALIZADAS, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import type { OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import type { ModoDaTransformacao } from "./TransformacaoNaPrevia";
 
@@ -381,7 +381,7 @@ export function BarraDeOpcoes(props: Props) {
     ) : (
       <span className="text-suave">Clique na imagem para escrever; o texto sai na cor de primeiro plano. Clique num texto para mudar a fonte, o tamanho e a cor.</span>
     );
-  } else if ((ferramenta === "pincel" || ferramenta === "lapis" || ferramenta === "borracha" || ferramenta === "historico" || ferramenta === "historicoArtistico" || ferramenta === "carimbo" || ferramenta === "carimboDePadrao") && props.pincel && props.aoMudarPincel) {
+  } else if (FERRAMENTAS_DE_PINTURA.has(ferramenta) && props.pincel && props.aoMudarPincel) {
     const pincel = props.pincel;
     const mudar = props.aoMudarPincel;
     const porcento = (valor: number) => Math.round(valor * 100);

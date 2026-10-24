@@ -189,6 +189,8 @@ export class Pintura {
   /** O que o traço já tocou (para gravar na camada ao soltar) e o que mudou desde a última tela. */
   private area: Retangulo | null = null;
   private sujo: Retangulo | null = null;
+  /** O alfa do último traço (o quanto cada pixel foi pintado), para quem refaz a área depois (o pincel de manchas). */
+  private ultimoTraco: { area: Retangulo; alfa: Uint8ClampedArray } | null = null;
 
   constructor(largura: number, altura: number) {
     this.largura = largura;
@@ -484,8 +486,22 @@ export class Pintura {
     const y1 = Math.min(this.altura, area.y1);
     if (x1 <= x0 || y1 <= y0) return null;
     this.ctxCamada.putImageData(this.ctxTela.getImageData(x0, y0, x1 - x0, y1 - y0), x0, y0);
+    const traco = this.ctxTraco.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+    const alfa = new Uint8ClampedArray((x1 - x0) * (y1 - y0));
+    for (let i = 0; i < alfa.length; i++) alfa[i] = traco[i * 4 + 3];
+    this.ultimoTraco = { area: { x0, y0, x1, y1 }, alfa };
     this.ctxTraco.clearRect(x0, y0, x1 - x0, y1 - y0);
     return { x0, y0, x1, y1 };
+  }
+
+  /** O alfa do último traço no tamanho da camada (0 fora dele), ou null. */
+  mascaraDoUltimoTraco(): Uint8ClampedArray | null {
+    const ultimo = this.ultimoTraco;
+    if (!ultimo) return null;
+    const mascara = new Uint8ClampedArray(this.largura * this.altura);
+    const largura = ultimo.area.x1 - ultimo.area.x0;
+    for (let y = ultimo.area.y0; y < ultimo.area.y1; y++) mascara.set(ultimo.alfa.subarray((y - ultimo.area.y0) * largura, (y - ultimo.area.y0 + 1) * largura), y * this.largura + ultimo.area.x0);
+    return mascara;
   }
 
   /** O PNG da camada (para subir como versão nova). */

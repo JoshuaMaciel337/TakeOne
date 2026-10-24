@@ -2,6 +2,10 @@
 // posição da caixa de ferramentas é um grupo: o botão mostra a última usada do grupo e o botão direito abre as outras.
 import {
   Bandage,
+  Combine,
+  HeartPulse,
+  Move3d,
+  Sparkle,
   Blend,
   Brush,
   Circle,
@@ -54,6 +58,10 @@ export type IdFerramentaDaImagem =
   | "corte"
   | "contaGotas"
   | "remover"
+  | "recuperacaoParaManchas"
+  | "recuperacao"
+  | "correcao"
+  | "moverSensivel"
   | "pincel"
   | "lapis"
   | "borracha"
@@ -106,7 +114,13 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   ],
   [F("corte", "Ferramenta Corte", "C", Crop, "Arraste o retângulo e os cantos; Enter recorta, Esc cancela.")],
   [F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo.")],
-  [F("remover", "Ferramenta Remover", "J", Bandage, "Pinte por cima do que quer tirar da foto; a IA refaz o que estava atrás.")],
+  [
+    F("recuperacaoParaManchas", "Ferramenta Pincel de recuperação para manchas", "J", Sparkle, "Pinte por cima da mancha: ela é refeita com o que está em volta."),
+    F("recuperacao", "Ferramenta Pincel de recuperação", "J", HeartPulse, "Alt + clique marca de onde copiar; pinte para copiar a textura de lá com a luz e a cor daqui."),
+    F("correcao", "Ferramenta Correção", "J", Combine, "Com uma seleção, arraste-a até a área boa: a selecionada é refeita com a textura de lá."),
+    F("moverSensivel", "Ferramenta Mover sensível ao conteúdo", "J", Move3d, "Com uma seleção numa camada de pixels, arraste: o pedaço vai e o buraco é preenchido."),
+    F("remover", "Ferramenta Remover", "J", Bandage, "Pinte por cima do que quer tirar da foto; a IA refaz o que estava atrás."),
+  ],
   [
     F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
     F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
@@ -175,7 +189,7 @@ export const FERRAMENTAS_DA_SELECAO: ReadonlySet<IdFerramentaDaImagem> = new Set
 export const FERRAMENTAS_DE_PONTO: ReadonlySet<IdFerramentaDaImagem> = new Set(["degrade", "balde", "borrachaMagica"]);
 
 /** As ferramentas que pintam numa camada de pixels (lib/pintura). */
-export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao"]);
+export const FERRAMENTAS_DE_PINTURA: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao", "recuperacao", "recuperacaoParaManchas"]);
 
 /** O grupo de uma ferramenta (as do mesmo grupo dividem a tecla; Shift + tecla passa à seguinte). */
 export function grupoDa(id: IdFerramentaDaImagem): FerramentaDaImagem[] {

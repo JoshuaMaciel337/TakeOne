@@ -148,9 +148,9 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 - [x] Carimbo (S) e Carimbo de padrão, com alinhado e amostra (camada atual, atual e abaixo, todas)
 - [x] Painel Fonte de clonagem (fontes, sobreposição, deslocamento, escala e giro)
-- [ ] Pincel de recuperação (com a correspondência de tom) e Pincel de recuperação para manchas (sensível ao conteúdo, criar textura, correspondência por proximidade)
-- [ ] Correção (normal, de origem ou de destino; sensível ao conteúdo, com estrutura e cor)
-- [ ] Mover sensível ao conteúdo (mover e estender)
+- [x] Pincel de recuperação (com a correspondência de tom) e Pincel de recuperação para manchas (sensível ao conteúdo, criar textura, correspondência por proximidade)
+- [x] Correção (de origem ou de destino, colada sem emenda; o preenchimento por IA fica com o Remover)
+- [x] Mover sensível ao conteúdo (mover e estender)
 - [ ] Remover (J) com "criar camada nova" e traços que cercam um objeto
 - [ ] Pincel misturador (úmido, carregar, misturar, fluxo; limpar e carregar depois de cada traço)
 - [ ] Substituição de cor (matiz, saturação, cor, luminosidade; amostragem; limites; tolerância)
