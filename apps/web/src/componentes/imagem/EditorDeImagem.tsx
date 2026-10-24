@@ -194,6 +194,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [zoom, setZoom] = useState<number | null>(null);
   const [zoomMedido, setZoomMedido] = useState(1);
   const [removerAoSoltar, setRemoverAoSoltar] = useState(true);
+  const [removerCercando, setRemoverCercando] = useState(true);
+  const [removerNaCamadaNova, setRemoverNaCamadaNova] = useState(false);
   const [localizador, setLocalizador] = useState(true);
   const [pedindo, setPedindo] = useState(false);
   const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
@@ -1430,9 +1432,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const midia = await objeto.pedir(acao, selecaoNaFoto());
     setPedindo(false);
     if (!midia) return;
-    esperarMidia(midia, acao === "apagar" ? { trocar: [selecionado.clipe.id] } : { camadaDe: selecionado.faixa.id });
+    // Com "Numa camada nova" (o Remover), a foto refeita entra por cima, no mesmo lugar, e a original fica
+    const naCamadaNova = acao === "recortar" || (ferramenta === "remover" && removerNaCamadaNova);
+    esperarMidia(midia, naCamadaNova ? { camadaDe: selecionado.faixa.id } : { trocar: [selecionado.clipe.id] });
     objeto.limpar();
-    mostrarAviso(acao === "apagar" ? "Removendo: a foto troca quando ficar pronta." : "Recortando: o objeto entra numa camada nova quando ficar pronto.");
+    mostrarAviso(acao === "recortar" ? "Recortando: o objeto entra numa camada nova quando ficar pronto." : naCamadaNova ? "Removendo: o resultado entra numa camada nova quando ficar pronto." : "Removendo: a foto troca quando ficar pronta.");
   }
   // O "Remover após cada traço" roda depois que o traço entra no estado do pincel
   const usarSelecaoRef = useRef(usarSelecao);
@@ -2711,6 +2715,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         pedindo={pedindo}
         removerAoSoltar={removerAoSoltar}
         aoMudarRemoverAoSoltar={setRemoverAoSoltar}
+        removerCercando={removerCercando}
+        aoMudarRemoverCercando={setRemoverCercando}
+        removerNaCamadaNova={removerNaCamadaNova}
+        aoMudarRemoverNaCamadaNova={setRemoverNaCamadaNova}
         localizador={localizador}
         aoMudarLocalizador={setLocalizador}
         corte={recorte ? { proporcao: recorte.proporcao, largura: recorte.retangulo.largura, altura: recorte.retangulo.altura } : null}
@@ -2928,6 +2936,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             recorte={recorte ? { ...recorte, aoMudar: (retangulo) => setRecorte({ ...recorte, retangulo }) } : null}
             objeto={MODO_DA_SELECAO[ferramenta] && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto, localizador } : null}
             aoTerminarTraco={ferramenta === "remover" && removerAoSoltar ? () => window.setTimeout(() => void usarSelecaoRef.current("apagar"), 0) : undefined}
+            preencherCercado={ferramenta === "remover" && removerCercando}
             aoClicarTexto={(x, y) => porTexto(undefined, { x: x / tamanho.largura - 0.5, y: y / tamanho.altura - 0.5 })}
             aoDesenharForma={desenharForma}
             aoPegarCor={(cor, paraOFundo) => setCores((atual) => ({ ...atual, [paraOFundo ? "fundo" : "primeiroPlano"]: cor }))}

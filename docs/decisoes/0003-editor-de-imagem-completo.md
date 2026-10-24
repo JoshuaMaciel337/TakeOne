@@ -151,7 +151,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Pincel de recuperação (com a correspondência de tom) e Pincel de recuperação para manchas (sensível ao conteúdo, criar textura, correspondência por proximidade)
 - [x] Correção (de origem ou de destino, colada sem emenda; o preenchimento por IA fica com o Remover)
 - [x] Mover sensível ao conteúdo (mover e estender)
-- [ ] Remover (J) com "criar camada nova" e traços que cercam um objeto
+- [x] Remover (J) com "criar camada nova" e traços que cercam um objeto
 - [x] Pincel misturador (úmido, carregar, misturar, fluxo; limpar e carregar depois de cada traço)
 - [x] Substituição de cor (matiz, saturação, cor, luminosidade; amostragem; limites; tolerância)
 - [x] Desfoque, Nitidez e Borrar com pincel (força, proteger detalhes, pintura com o dedo)
@@ -160,7 +160,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Borracha mágica
 - [x] Balde de tinta (primeiro plano ou padrão, tolerância, contígua, todas as camadas)
 - [x] Degradê (G) clássico (pinta pixels): linear, radial, ângulo, refletido, losango; inverter, pontilhar
-- [ ] Degradê ao vivo (camada de preenchimento com alças na tela)
+- [x] Degradê ao vivo: vai com as camadas de preenchimento, na 13.9 (o degradê é uma delas)
 - [x] Editor de degradês (paradas de cor e de opacidade, ponto médio, ruído) e painel Degradês com predefinições
 - [x] Painel Padrões com predefinições, Definir padrão, importar .pat
 
@@ -221,7 +221,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [ ] Vários efeitos do mesmo tipo; contornos personalizados
 - [ ] Luz global; Copiar, Colar e Limpar estilo; Ocultar todos os efeitos; Dimensionar efeitos; Criar camadas a partir dos efeitos
 - [ ] Painel Estilos com predefinições
-- [ ] Camadas de preenchimento: cor sólida, degradê (com as opções do degradê) e padrão
+- [ ] Camadas de preenchimento: cor sólida, degradê (com as opções do degradê e as alças na tela: o degradê ao vivo da 13.5) e padrão
 
 ### Onda 13.10 — Ajustes
 

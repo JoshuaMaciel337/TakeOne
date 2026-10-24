@@ -72,6 +72,8 @@ type Props = {
   /** As ferramentas de seleção: os cliques e os traços vão para a foto escolhida, no lugar das alças. */
   objeto?: { clipeId: string; ferramenta: FerramentaObjeto; localizador?: boolean } | null;
   aoTerminarTraco?: () => void;
+  /** O Remover enche o que o traço cerca. */
+  preencherCercado?: boolean;
   /** Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels). */
   aoClicarTexto?: (x: number, y: number) => void;
   /** Ferramentas de forma: o retângulo arrastado, em pixels da imagem. */
@@ -190,6 +192,7 @@ export function PreviaDaImagem({
   recorte = null,
   objeto = null,
   aoTerminarTraco,
+  preencherCercado,
   aoClicarTexto,
   aoDesenharForma,
   aoPegarCor,
@@ -521,7 +524,7 @@ export function PreviaDaImagem({
             ) : null}
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia retangulo={recorte.retangulo} imagem={imagem} escala={tamanho.largura / imagem.largura} proporcao={recorte.proporcao} aoMudar={recorte.aoMudar} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
-              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} />
+              <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} preencherCercado={preencherCercado} />
             ) : null}
             {selecionada && !recorte && !objeto && mostrarAlcas ? (
               <ManipuladorNaPrevia

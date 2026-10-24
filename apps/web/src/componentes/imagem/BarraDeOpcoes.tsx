@@ -48,6 +48,11 @@ type Props = {
   pedindo: boolean;
   removerAoSoltar: boolean;
   aoMudarRemoverAoSoltar: (valor: boolean) => void;
+  /** O Remover: encher o que o traço cerca e pôr o resultado numa camada nova (a foto fica como está). */
+  removerCercando: boolean;
+  aoMudarRemoverCercando: (valor: boolean) => void;
+  removerNaCamadaNova: boolean;
+  aoMudarRemoverNaCamadaNova: (valor: boolean) => void;
   corte: { proporcao: number | null; largura: number; altura: number } | null;
   aoMudarProporcao: (valor: number | null) => void;
   aoConfirmarCorte: () => void;
@@ -271,6 +276,14 @@ export function BarraDeOpcoes(props: Props) {
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked={props.removerAoSoltar} onChange={(evento) => props.aoMudarRemoverAoSoltar(evento.currentTarget.checked)} />
               Remover após cada traço
+            </label>
+            <label className="flex items-center gap-1.5" title="Desenhe uma volta em torno do objeto: o miolo entra junto">
+              <input type="checkbox" checked={props.removerCercando} onChange={(evento) => props.aoMudarRemoverCercando(evento.currentTarget.checked)} />
+              Encher o que o traço cerca
+            </label>
+            <label className="flex items-center gap-1.5" title="A foto fica como está e o resultado entra numa camada por cima">
+              <input type="checkbox" checked={props.removerNaCamadaNova} onChange={(evento) => props.aoMudarRemoverNaCamadaNova(evento.currentTarget.checked)} />
+              Numa camada nova
             </label>
           </>
         ) : (

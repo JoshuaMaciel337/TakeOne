@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { cercaUmObjeto } from "@/lib/pintura/cercado";
 import type { Caixa } from "@/lib/projeto/geometria";
 import type { Recorte, Virar } from "@/lib/projeto/modelo";
 
@@ -16,6 +17,8 @@ type Props = {
   aoTerminarTraco?: () => void;
   /** O localizador de objetos (o realce em azul com o ponteiro parado). */
   localizador?: boolean;
+  /** O Remover: o traço que fecha uma volta enche o que cerca. */
+  preencherCercado?: boolean;
 };
 
 type Ponto = { x: number; y: number };
@@ -49,8 +52,10 @@ const ESPERA_DO_LOCALIZADOR = 450;
  * giro do CSS). Na seleção de objeto, arrastar desenha um retângulo em volta do objeto e, com o ponteiro parado, o
  * localizador mostra em azul o objeto que um clique pegaria. Os letreiros e os laços desenham a seleção do documento.
  */
-export function ObjetoNaPrevia({ caixa, recorte, virar, objeto, aoTerminarTraco, localizador = true }: Props) {
+export function ObjetoNaPrevia({ caixa, recorte, virar, objeto, aoTerminarTraco, localizador = true, preencherCercado = false }: Props) {
   const desenhando = useRef<Ponto | null>(null);
+  // Os pontos do traço da vez (o Remover enche o que ele cerca)
+  const caminho = useRef<Ponto[]>([]);
   // O arrasto do retângulo (frações da camada) e o relógio do localizador
   const [arrasto, setArrasto] = useState<{ inicio: Ponto; fim: Ponto } | null>(null);
   const relogio = useRef<number | null>(null);
@@ -84,6 +89,21 @@ export function ObjetoNaPrevia({ caixa, recorte, virar, objeto, aoTerminarTraco,
     ctx.lineTo(x, y);
     ctx.stroke();
     desenhando.current = { x, y };
+    caminho.current.push({ x, y });
+  }
+
+  /** O traço fechou uma volta: o miolo entra no pincel. */
+  function encherSeCercou() {
+    const ctx = pincelRef.current?.getContext("2d");
+    const pontos = caminho.current;
+    caminho.current = [];
+    if (!ctx || !preencherCercado || !cercaUmObjeto(pontos, objeto.tamanhoDoPincel * Math.min(largura, altura))) return;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    pontos.forEach((ponto, i) => (i ? ctx.lineTo(ponto.x, ponto.y) : ctx.moveTo(ponto.x, ponto.y)));
+    ctx.closePath();
+    ctx.fill();
   }
 
   return (
@@ -104,6 +124,7 @@ export function ObjetoNaPrevia({ caixa, recorte, virar, objeto, aoTerminarTraco,
           return;
         }
         desenhando.current = null;
+        caminho.current = [];
         tracar(offsetX, offsetY);
         objeto.marcarPincel();
       }}
@@ -128,6 +149,7 @@ export function ObjetoNaPrevia({ caixa, recorte, virar, objeto, aoTerminarTraco,
       onPointerUp={(evento) => {
         if (modo === "pincel" && desenhando.current) {
           desenhando.current = null;
+          encherSeCercou();
           aoTerminarTraco?.();
         }
         if (modo !== "clique" || !arrasto) return;
