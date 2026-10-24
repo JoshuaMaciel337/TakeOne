@@ -442,3 +442,15 @@ def test_variaveis_e_conjuntos(cliente):
     assert salvar(cliente, atual, [vazia], variaveis=longo).status_code == 422
     # Sem variáveis, não guarda nada
     assert salvar(cliente, atual, [vazia], variaveis={"variaveis": [], "conjuntos": []}).json()["variaveis"] is None
+
+
+def test_guias_do_documento(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    salvo = salvar(cliente, projeto, [vazia], guias={"verticais": [160, -20.5], "horizontais": [0]})
+    assert salvo.status_code == 200, salvo.text
+    assert salvo.json()["guias"] == {"verticais": [160, -20.5], "horizontais": [0]}
+    atual = salvo.json()
+    assert salvar(cliente, atual, [vazia], guias={"verticais": [1e7]}).status_code == 422
+    assert salvar(cliente, atual, [vazia], guias={"verticais": [], "horizontais": []}).json()["guias"] is None

@@ -1417,6 +1417,19 @@ class VariaveisEntrada(BaseModel):
         return self
 
 
+class GuiasEntrada(BaseModel):
+    """As guias do editor de imagem, em pixels do documento (podem ficar fora dele, na mesa)."""
+    verticais: list[float] = Field(default=[], max_length=400)
+    horizontais: list[float] = Field(default=[], max_length=400)
+
+    @field_validator("verticais", "horizontais")
+    @classmethod
+    def no_alcance(cls, valor: list[float]) -> list[float]:
+        if any(not -100_000 <= v <= 100_000 for v in valor):
+            raise ValueError("A guia fica longe demais do documento.")
+        return valor
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1890,6 +1903,7 @@ class ProjetoSalvarEntrada(BaseModel):
     informacoes: InformacoesDoArquivoEntrada | None = None
     modo: ModoDeCorEntrada | None = None
     variaveis: VariaveisEntrada | None = None
+    guias: GuiasEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1929,6 +1943,7 @@ class ProjetoSaida(BaseModel):
     informacoes: InformacoesDoArquivoEntrada | None = None
     modo: ModoDeCorEntrada | None = None
     variaveis: VariaveisEntrada | None = None
+    guias: GuiasEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"

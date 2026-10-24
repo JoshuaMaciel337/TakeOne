@@ -165,6 +165,8 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     tamanho = (dados.tamanho.model_dump() if dados.tamanho else atual.get("tamanho")) if imagem else None
     # O RGB é o modo de sempre: não precisa ser guardado
     modo = dados.modo.model_dump(exclude_none=True) if imagem and dados.modo and dados.modo.tipo != "rgb" else None
+    com_guias = imagem and dados.guias and (dados.guias.verticais or dados.guias.horizontais)
+    guias = dados.guias.model_dump() if com_guias else None
     campos = {
         "nome": dados.nome,
         # Na imagem, a proporção acompanha o tamanho
@@ -179,6 +181,7 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "informacoes": dados.informacoes.model_dump() if imagem and dados.informacoes else None,
         "modo": modo,
         "variaveis": dados.variaveis.model_dump() if imagem and dados.variaveis and dados.variaveis.variaveis else None,
+        "guias": guias,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
         "capa_midia_id": capa_do_projeto(faixas, "imagem" if imagem else "video"),
