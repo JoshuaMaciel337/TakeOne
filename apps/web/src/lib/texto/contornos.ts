@@ -6,11 +6,9 @@
 import { caminhosDoSvg } from "../vetor/svg.ts";
 import type { No, Subcaminho } from "../vetor/modelo.ts";
 import { deforma, type Deformacao, deformarCaminhos, deformarPonto, limitesDosPoligonos, type Retangulo } from "./deformar.ts";
-import { type Disposicao, disporTexto, type Fontes } from "./layout.ts";
+import { type Disposicao, disporTexto, type Fontes, matrizDoGlifo } from "./layout.ts";
 import type { TextoRico } from "./modelo.ts";
 import { funcaoDoCaminho, glifoNoCaminho } from "./caminho.ts";
-
-const INCLINACAO = Math.tan((12 * Math.PI) / 180);
 
 /** Os contornos de uma letra (ou de um risco), com a cor e o negrito falso dela. */
 export type GrupoDeContornos = { cor: string; negrito: boolean; em: number; caminhos: Subcaminho[]; centro?: number };
@@ -47,12 +45,9 @@ export function contornosDaDisposicao(disposicao: Disposicao): GrupoDeContornos[
   const grupos: GrupoDeContornos[] = [];
   for (const g of disposicao.glifos) {
     if (g.glifo.caixa.x1 <= g.glifo.caixa.x0) continue;
-    // A conta do desenho: a escala (com o y da fonte para cima), a inclinação do itálico falso e o lugar
-    const f = (x: number, y: number) => {
-      const sx = x * g.escalaX;
-      const sy = -y * g.escalaY;
-      return { x: g.x + sx - (g.italico ? INCLINACAO * sy : 0), y: g.y + sy };
-    };
+    // A conta do desenho: a escala (com o y da fonte para cima), a inclinação do itálico falso, o giro e o lugar
+    const m = matrizDoGlifo(g);
+    const f = (x: number, y: number) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f });
     const contornos = caminhosDoSvg(g.glifo.caminho())
       .filter((sub) => sub.nos.length > 1)
       .map((sub) => ({ ...sub, fechado: true, nos: sub.nos.map((no) => levar(no, f)) }))

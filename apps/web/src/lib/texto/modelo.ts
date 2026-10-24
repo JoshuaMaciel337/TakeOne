@@ -32,6 +32,9 @@ export type EstiloDoCaractere = {
   escalaV: number;
   /** O deslocamento da linha de base, em pixels (positivo sobe). */
   linhaDeBase: number;
+  /** Toque no texto: o giro da letra em volta do meio dela, em graus (horário), e o deslocamento para o lado, em pixels, sem empurrar as seguintes. */
+  giro?: number;
+  deslocamento?: number;
   negritoFalso: boolean;
   italicoFalso: boolean;
   caixa: CaixaDasLetras;
@@ -194,7 +197,10 @@ export function substituir(texto: TextoRico, de: number, ate: number, inserido: 
   const lista = letras(texto);
   const a = Math.max(0, Math.min(de, ate, lista.length));
   const b = Math.max(a, Math.min(Math.max(de, ate), lista.length));
-  const herdado = estilo ?? estiloNoIndice(texto, a === 0 && b > 0 ? 1 : a);
+  // O giro e o deslocamento do toque no texto são da letra tocada: o que se digita depois dela não herda
+  const { giro: _giro, deslocamento: _deslocamento, ...herdavel } = estiloNoIndice(texto, a === 0 && b > 0 ? 1 : a);
+  void [_giro, _deslocamento];
+  const herdado = estilo ?? herdavel;
   // O parágrafo que a quebra nova fecha guarda o estilo do parágrafo em que ela entrou
   const ultimoParagrafo = texto.paragrafos[texto.paragrafos.length - 1];
   const paragrafoAqui = paragrafoDoIndice(texto, a);

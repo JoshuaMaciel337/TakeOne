@@ -6743,6 +6743,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            toqueNoTexto={{
+              aoMudar: (clipeId, texto, final) => {
+                const comando: Comando = { comando: "imagem.textoRico", parametros: { clipeId, texto } };
+                if (!final) return setProvisorio(comando);
+                setProvisorio(null);
+                executar(comando);
+              },
+              aoAviso: mostrarAviso,
+            }}
             aoVarinhaVetorial={(clipeId, modo) => {
               const achadas = clipeId ? camadasParecidas(projeto, clipeId, opcoesDaVarinhaVetorial) : [];
               setSelecao(modo === "somar" ? [...new Set([...selecaoValida, ...achadas])] : modo === "subtrair" ? selecaoValida.filter((id) => !achadas.includes(id)) : achadas);

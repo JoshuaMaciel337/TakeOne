@@ -53,3 +53,9 @@ test("localizar e substituir: maiúsculas, acentos, palavra inteira e o estilo d
   assert.equal(texto.paragrafos.map((p) => p.trechos.map((t) => t.texto).join("")).join("|"), "um cão|um cão");
   assert.equal(texto.paragrafos[0].trechos[1].estilo.cor, "#ff0000");
 });
+
+test("o que se digita depois de uma letra tocada não herda o giro nem o deslocamento", () => {
+  const tocado = aplicarEstilo(textoNovo("ab"), 1, 2, { giro: 30, deslocamento: 4, linhaDeBase: 5 });
+  const digitado = substituir(tocado, 2, 2, "c");
+  assert.deepEqual(digitado.paragrafos[0].trechos.map((t) => [t.texto, t.estilo]), [["a", {}], ["b", { giro: 30, deslocamento: 4, linhaDeBase: 5 }], ["c", { linhaDeBase: 5 }]]);
+});

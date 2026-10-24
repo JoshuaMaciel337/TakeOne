@@ -45,6 +45,7 @@ import {
   Type,
   AArrowDown,
   SquareDashedText,
+  CaseSensitive,
   TypeOutline,
   Wand,
   WandSparkles,
@@ -133,6 +134,7 @@ export type IdFerramentaDaImagem =
   | "textoVertical"
   | "mascaraDeTexto"
   | "mascaraDeTextoVertical"
+  | "toqueNoTexto"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -252,6 +254,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("textoVertical", "Ferramenta Texto vertical", "T", AArrowDown, "Clique para escrever em coluna, de cima para baixo, ou arraste uma caixa."),
     F("mascaraDeTexto", "Ferramenta Máscara de texto horizontal", "T", SquareDashedText, "Escreva e o texto vira uma seleção no formato das letras (Ctrl+Enter termina)."),
     F("mascaraDeTextoVertical", "Ferramenta Máscara de texto vertical", "T", TypeOutline, "Escreva em coluna e o texto vira uma seleção no formato das letras."),
+    F("toqueNoTexto", "Ferramenta Toque no texto", "T", CaseSensitive, "Clique numa letra de um texto e arraste para movê-la; os cantos mudam o tamanho e a alça de cima gira (Shift de 15°). O texto continua editável."),
   ],
   [
     F("selecaoDeCaminho", "Ferramenta Seleção de caminho", "A", MousePointer2, "Clique num componente do caminho para escolhê-lo e arraste para mover; Shift soma, Alt arrastando duplica, Delete apaga."),

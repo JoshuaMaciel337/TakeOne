@@ -43,7 +43,7 @@ export function textoMedido(texto: TextoRico): TextoRico {
 }
 
 /** A conta da tela: do ponto do texto (coordenadas da disposição) ao pixel da prévia, e de volta. */
-function contasDaCaixa(texto: TextoRico, caixa: Caixa, virar?: Virar | null) {
+export function contasDaCaixa(texto: TextoRico, caixa: Caixa, virar?: Virar | null) {
   const sx = caixa.largura / texto.caixa.largura;
   const sy = caixa.altura / texto.caixa.altura;
   const r = (caixa.rotacao * Math.PI) / 180;

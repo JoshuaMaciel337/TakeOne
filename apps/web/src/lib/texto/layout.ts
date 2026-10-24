@@ -49,7 +49,48 @@ export type GlifoPosto = {
   italico: boolean;
   /** O primeiro caractere do texto que o glifo cobre. */
   indice: number;
+  /** O giro do toque no texto, em radianos (horário), em volta do meio da caixa do glifo. */
+  giro: number;
 };
+
+const INCLINACAO_DO_ITALICO = Math.tan((12 * Math.PI) / 180);
+
+/**
+ * A matriz do glifo: de um ponto da fonte (unidades, y para cima) ao ponto da disposição, com a escala, a inclinação
+ * do itálico falso e o giro do toque no texto. É a conta do desenho (setTransform), dos contornos e da medida.
+ */
+export function matrizDoGlifo(g: GlifoPosto): { a: number; b: number; c: number; d: number; e: number; f: number } {
+  const k = g.italico ? INCLINACAO_DO_ITALICO * g.escalaY : 0;
+  if (!g.giro) return { a: g.escalaX, b: 0, c: k, d: -g.escalaY, e: g.x, f: g.y };
+  const cos = Math.cos(g.giro);
+  const sen = Math.sin(g.giro);
+  const caixa = g.glifo.caixa;
+  const cx = ((caixa.x0 + caixa.x1) / 2) * g.escalaX;
+  const cy = (-(caixa.y0 + caixa.y1) / 2) * g.escalaY;
+  return {
+    a: cos * g.escalaX,
+    b: sen * g.escalaX,
+    c: cos * k + sen * g.escalaY,
+    d: sen * k - cos * g.escalaY,
+    e: g.x + cx - (cos * cx - sen * cy),
+    f: g.y + cy - (sen * cx + cos * cy),
+  };
+}
+
+/** Os quatro cantos da caixa do glifo na disposição (com o giro e o itálico). */
+export function cantosDoGlifo(g: GlifoPosto, folga = 0): { x: number; y: number }[] {
+  const m = matrizDoGlifo(g);
+  const c = g.glifo.caixa;
+  // A folga é em pixels: nas unidades da fonte, dividida pela escala
+  const fx = folga / Math.max(1e-9, g.escalaX);
+  const fy = folga / Math.max(1e-9, g.escalaY);
+  return [
+    [c.x0 - fx, c.y1 + fy],
+    [c.x1 + fx, c.y1 + fy],
+    [c.x1 + fx, c.y0 - fy],
+    [c.x0 - fx, c.y0 - fy],
+  ].map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
+}
 export type Risco = { x0: number; x1: number; y: number; espessura: number; cor: string };
 export type LinhaPosta = { inicio: number; fim: number; baseX: number; baseY: number; ascendente: number; descendente: number; largura: number };
 
@@ -350,7 +391,19 @@ export function disporTexto(texto: TextoRico, fontes: Fontes): Disposicao {
       for (const atomo of grupo) {
         const x = vertical ? posicaoDaLinha - (atomo.glifo.avanco * atomo.escalaX) / 2 : avancado;
         const y = vertical ? avancado + ascendente * 0.85 : posicaoDaLinha;
-        glifos.push({ fonte: atomo.fonte, glifo: atomo.glifo, x: x + atomo.glifo.dx * atomo.escalaX, y: y - atomo.subida - atomo.glifo.dy * atomo.escalaY, escalaX: atomo.escalaX, escalaY: atomo.escalaY, cor: atomo.estilo.cor, negrito: atomo.estilo.negritoFalso, italico: atomo.estilo.italicoFalso, indice: atomo.indice });
+        glifos.push({
+          fonte: atomo.fonte,
+          glifo: atomo.glifo,
+          x: x + atomo.glifo.dx * atomo.escalaX + (atomo.estilo.deslocamento ?? 0),
+          y: y - atomo.subida - atomo.glifo.dy * atomo.escalaY,
+          escalaX: atomo.escalaX,
+          escalaY: atomo.escalaY,
+          cor: atomo.estilo.cor,
+          negrito: atomo.estilo.negritoFalso,
+          italico: atomo.estilo.italicoFalso,
+          indice: atomo.indice,
+          giro: ((atomo.estilo.giro ?? 0) * Math.PI) / 180,
+        });
         // O cursor de cada caractere do glifo (a ligadura reparte o avanço); o hífen da hifenização não tem
         const passos = atomo.hifen ? 0 : atomo.glifo.letras;
         const passo = (medida(atomo) + (atomo.espaco ? extra : 0)) / Math.max(1, passos);
@@ -392,6 +445,12 @@ export function disporTexto(texto: TextoRico, fontes: Fontes): Disposicao {
     if (c.x1 <= c.x0 && c.y1 <= c.y0) continue;
     // A inclinação do itálico falso e o negrito falso alargam a tinta
     const folga = g.negrito ? g.escalaX * g.fonte.unidades * 0.02 : 0;
+    if (g.giro) {
+      // A letra girada: os cantos da caixa dela
+      const cantos = cantosDoGlifo(g, folga);
+      somar(Math.min(...cantos.map((p) => p.x)), Math.min(...cantos.map((p) => p.y)), Math.max(...cantos.map((p) => p.x)), Math.max(...cantos.map((p) => p.y)));
+      continue;
+    }
     const inclinacao = g.italico ? Math.tan((12 * Math.PI) / 180) * c.y1 * g.escalaY : 0;
     somar(g.x + c.x0 * g.escalaX - folga, g.y - c.y1 * g.escalaY - folga, g.x + c.x1 * g.escalaX + folga + Math.max(0, inclinacao), g.y - c.y0 * g.escalaY + folga);
   }

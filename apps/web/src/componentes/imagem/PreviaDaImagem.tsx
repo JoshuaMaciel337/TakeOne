@@ -34,6 +34,7 @@ import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
 import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
+import { ToqueNoTextoNaPrevia } from "./ToqueNoTextoNaPrevia";
 import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
 import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -100,6 +101,8 @@ type Props = {
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
   /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
   aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
+  /** A ferramenta Toque no texto: a letra mudada (final ao soltar) e o aviso. */
+  toqueNoTexto?: Pick<React.ComponentProps<typeof ToqueNoTextoNaPrevia>, "aoMudar" | "aoAviso"> | null;
   /** As fatias (ferramentas Fatia e Seleção de fatia, C). */
   fatias?: Omit<React.ComponentProps<typeof FatiasNaPrevia>, "escala" | "documento"> | null;
   /** A Contagem e as notas (ferramentas Contagem e Nota, I). */
@@ -326,6 +329,7 @@ export function PreviaDaImagem({
   notas = null,
   fatias = null,
   aoVarinhaVetorial,
+  toqueNoTexto,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -1078,6 +1082,17 @@ export function PreviaDaImagem({
               <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
                 <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
               </svg>
+            ) : null}
+            {toqueNoTexto && ferramenta === "toqueNoTexto" && tamanho.largura > 1 ? (
+              <ToqueNoTextoNaPrevia
+                textos={[...camadas]
+                  .reverse()
+                  .filter((camada) => camada.clipe.texto_rico && !camada.faixa.oculta && camada.caixa.opacidade > 0)
+                  .map((camada) => ({ clipeId: camada.clipe.id, texto: camada.clipe.texto_rico!, caixa: camada.caixa, virar: camada.clipe.virar }))}
+                aoMudar={toqueNoTexto.aoMudar}
+                aoAviso={toqueNoTexto.aoAviso}
+                aoSelecionarCamada={(clipeId) => aoSelecionar([clipeId])}
+              />
             ) : null}
             {edicaoDeTexto && tamanho.largura > 1
               ? (() => {

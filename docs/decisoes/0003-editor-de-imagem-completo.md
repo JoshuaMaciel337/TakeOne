@@ -298,7 +298,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.16 — Ferramentas vetoriais da suíte
 
 - [x] Seleção de grupo, Laço vetorial e Varinha mágica vetorial
-- [ ] Toque no texto
+- [x] Toque no texto
 - [ ] Segmento de linha, Arco, Espiral, Grade retangular, Grade polar
 - [ ] Retângulo arredondado, Estrela, Reflexo (brilho)
 - [ ] Pincel de traço, Pincel de bolha, Lápis vetorial, Suavizar, Borracha de caminho, Unir, Modelador

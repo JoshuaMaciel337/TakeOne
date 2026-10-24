@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { disporTexto, type FonteCarregada, pontosDeHifen } from "./layout.ts";
+import { cantosDoGlifo, disporTexto, type FonteCarregada, matrizDoGlifo, pontosDeHifen } from "./layout.ts";
 import { aplicarEstilo, textoNovo } from "./modelo.ts";
 import { medirTexto } from "./medida.ts";
 
@@ -126,4 +126,23 @@ test("texto dentro de uma forma: cada linha quebra no trecho de dentro do triân
     const [x0, x1] = intervalosNaAltura(triangulo, linha.baseY)[0] ?? [0, 0];
     assert.ok(linha.baseX >= x0 - 1e-6 && linha.baseX + linha.largura <= x1 + 1e-6, `linha em ${linha.baseY}: ${linha.baseX}..${linha.baseX + linha.largura} fora de ${x0}..${x1}`);
   }
+});
+
+test("toque no texto: a letra gira em volta do meio dela e anda para o lado sem empurrar as seguintes", () => {
+  const texto = aplicarEstilo(textoNovo("ab", { tamanho: 10 }), 0, 1, { giro: 90, deslocamento: 3 });
+  const d = disporTexto(texto, fontes);
+  // O "a" anda 3 px; o "b" fica onde estava
+  assert.deepEqual(d.glifos.map((g) => g.x), [3, 5]);
+  // A caixa do "a" (0,5 a 4,5 por 0 a 7, com o meio em 5,5 por -3,5) girada 90° em volta do meio
+  const cantos = cantosDoGlifo(d.glifos[0]).map((p) => [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100]);
+  assert.deepEqual(cantos, [[9, -5.5], [9, -1.5], [2, -1.5], [2, -5.5]]);
+  // O meio não sai do lugar
+  const m = matrizDoGlifo(d.glifos[0]);
+  const meio = { x: m.a * 250 + m.c * 350 + m.e, y: m.b * 250 + m.d * 350 + m.f };
+  assert.ok(Math.abs(meio.x - 5.5) < 1e-9 && Math.abs(meio.y + 3.5) < 1e-9);
+  // A medida acompanha a letra girada
+  assert.deepEqual(d.limites, { x0: 2, y0: -7, x1: 9.5, y1: 0 });
+  // Sem giro, a matriz é a de sempre
+  const reta = matrizDoGlifo(disporTexto(textoNovo("a", { tamanho: 10 }), fontes).glifos[0]);
+  assert.deepEqual(reta, { a: 0.01, b: 0, c: 0, d: -0.01, e: 0, f: 0 });
 });

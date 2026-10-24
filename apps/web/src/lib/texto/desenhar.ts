@@ -3,13 +3,12 @@
 // O desenho do texto do editor de imagem (ADR 0003, onda 13.8): os contornos dos glifos (os do fontkit, como Path2D) na
 // caixa do texto, no tamanho em que ela aparece (nítido em qualquer zoom), com o itálico e o negrito falsos e os
 // sublinhados e tachados. No de parágrafo, o que passa da caixa não aparece.
-import { type Disposicao, disporTexto } from "./layout";
+import { type Disposicao, disporTexto, matrizDoGlifo } from "./layout";
 import type { Suavizacao, TextoRico } from "./modelo";
 import { fonteDoEstilo } from "./fontes";
 import { gruposDeformados } from "./contornos";
 
 const CAMINHOS = new Map<string, Path2D>();
-const INCLINACAO = Math.tan((12 * Math.PI) / 180);
 
 function caminhoDo(chave: string, svg: () => string): Path2D {
   let caminho = CAMINHOS.get(chave);
@@ -28,10 +27,9 @@ export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Di
     if (g.glifo.caixa.x1 <= g.glifo.caixa.x0) continue;
     const caminho = caminhoDo(`${g.fonte.chave}#${g.glifo.id}`, g.glifo.caminho);
     ctx.save();
-    ctx.setTransform(escala, 0, 0, escala, (g.x + origem.x) * escala, (g.y + origem.y) * escala);
-    // O itálico falso inclina (o alto vai para a direita); os glifos têm o y para cima
-    if (g.italico) ctx.transform(1, 0, -INCLINACAO, 1, 0, 0);
-    ctx.scale(g.escalaX, -g.escalaY);
+    // A escala (os glifos têm o y para cima), o itálico falso (o alto vai para a direita) e o giro do toque no texto
+    const m = matrizDoGlifo(g);
+    ctx.setTransform(m.a * escala, m.b * escala, m.c * escala, m.d * escala, (m.e + origem.x) * escala, (m.f + origem.y) * escala);
     ctx.fillStyle = g.cor;
     ctx.fill(caminho);
     if (g.negrito || suavizacao === "forte") {
