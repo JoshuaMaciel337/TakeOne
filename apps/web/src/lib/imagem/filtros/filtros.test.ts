@@ -179,3 +179,35 @@ test("galeria de desfoque: o giro não mexe fora da elipse, e o caminho borra s�
   assert.ok(pixel(caminho, 19, 15)[3] > 0);
   assert.equal(pixel(caminho, 15, 18)[3], 0);
 });
+
+test("galeria de filtros: os 47 efeitos rodam com os padrões e a pilha vai e volta pelo texto", async () => {
+  const { EFEITOS_DA_GALERIA, aplicarGaleriaDeFiltros, pilhaDoTexto, textoDaPilha, valoresDoEfeito } = await import("./galeriaDeFiltros/index.ts");
+  assert.equal(EFEITOS_DA_GALERIA.length, 47);
+  assert.equal(new Set(EFEITOS_DA_GALERIA.map((e) => e.id)).size, 47);
+  const base = imagem(24, 18, [120, 90, 60, 255], [[5, 5, [250, 250, 250, 255]], [12, 9, [10, 10, 10, 255]]]);
+  for (const efeito of EFEITOS_DA_GALERIA) {
+    const saida = efeito.aplicar(base, valoresDoEfeito(efeito), ctx);
+    assert.equal(saida.dados.length, base.dados.length, efeito.id);
+    assert.ok(saida.dados.every((v) => Number.isFinite(v)), efeito.id);
+  }
+  const pilha: import("./galeriaDeFiltros/index.ts").CamadaDeEfeito[] = [
+    { efeito: "pastel", opcoes: { comprimento: 10, detalhe: 3, textura: "tijolo", escala: 120, relevo: 15, luz: "cima" }, ligado: true },
+    { efeito: "brilho_neon", opcoes: { tamanho: -6, brilho: 20, cor: "#ff00aa" }, ligado: false },
+    { efeito: "vidro", opcoes: { distorcao: 4, suavidade: 2, textura: "lentes", escala: 80, inverter: true }, ligado: true },
+  ];
+  assert.deepEqual(pilhaDoTexto(textoDaPilha(pilha)), pilha);
+  // A camada desligada não muda nada
+  const so = aplicarGaleriaDeFiltros(base, [pilha[1]], ctx);
+  assert.deepEqual([...so.dados], [...base.dados]);
+});
+
+test("galeria de filtros: os esboços pintam só com a cor da frente e a do fundo", async () => {
+  const { EFEITO_DA_GALERIA, valoresDoEfeito } = await import("./galeriaDeFiltros/index.ts");
+  const frente: [number, number, number] = [1, 0, 0];
+  const fundo: [number, number, number] = [0, 0, 1];
+  const base = imagem(16, 16, [128, 128, 128, 255], [[3, 3, [255, 255, 255, 255]], [10, 10, [0, 0, 0, 255]]]);
+  const efeito = EFEITO_DA_GALERIA.get("carimbo")!;
+  const saida = efeito.aplicar(base, valoresDoEfeito(efeito), { ...ctx, primeiroPlano: frente, fundo });
+  // Entre o vermelho e o azul: o verde fica em zero
+  for (let i = 0; i < saida.dados.length; i += 4) assert.equal(saida.dados[i + 1], 0);
+});

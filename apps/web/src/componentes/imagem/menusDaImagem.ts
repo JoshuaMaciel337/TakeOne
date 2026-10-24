@@ -180,6 +180,8 @@ export type AcoesDosMenus = {
   filtroDoCatalogo: (tipo: string) => void;
   /** A galeria de desfoque, aberta numa ferramenta (campo, íris, inclinação, caminho ou giro). */
   galeriaDeDesfoque: (ferramenta: FerramentaDaGaleria) => void;
+  /** Filtro › Galeria de filtros: os 47 efeitos numa pilha própria. */
+  galeriaDeFiltros: () => void;
   ultimoFiltro: { nome: string | null; aplicar: () => void };
   converterParaFiltrosInteligentes: () => void;
   /** Camada › Nova camada de preenchimento, Opções do conteúdo e Alterar o conteúdo (da escolhida, se for uma). */
@@ -703,7 +705,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Correção de lente…", desativado: semCamada, aoEscolher: () => a.lente("lente"), titulo: "Ctrl+Shift+R é do navegador: use o menu" },
         { nome: "Dissolver…", atalho: "Ctrl+Shift+X", desativado: semCamada, aoEscolher: a.dissolver },
         { nome: "Ponto de fuga…", atalho: "Ctrl+Alt+V", aoEscolher: a.pontoDeFuga },
-        { nome: "Galeria de filtros…", aoEscolher: () => a.painel("filtros") },
+        { nome: "Galeria de filtros…", desativado: semCamada, aoEscolher: a.galeriaDeFiltros },
       ],
     },
     {

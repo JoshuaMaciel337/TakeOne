@@ -59,6 +59,7 @@ import { exportarImagem } from "@/lib/exportacao/imagem";
 import { planoDosPixels, type PlanoDosPixels, planosDosEfeitos, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { FERRAMENTAS_DA_GALERIA, type FerramentaDaGaleria, type Galeria, galeriaDasOpcoes, pinoNovo, textoDosPinos } from "@/lib/imagem/filtros/galeria";
 import { type Escolhido } from "./filtros/Galeria";
+import { JanelaGaleriaDeFiltros } from "./filtros/JanelaGaleriaDeFiltros";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
@@ -2143,12 +2144,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   const [estatisticasDaOrigem, setEstatisticasDaOrigem] = useState<{ origem: string; estatisticas: Estatisticas | null } | null>(null);
   /** A camada sozinha (ou o documento, com `null`) desenhada pequena: o histograma e a cor de origem. */
-  const imagemPequena = async (faixaId: string | null): Promise<ImagemRgba | null> => {
-    const atual = projetoRef.current;
+  const imagemPequena = async (faixaId: string | null, lado = 512, base?: Projeto): Promise<ImagemRgba | null> => {
+    const atual = base ?? projetoRef.current;
     if (!atual) return null;
     const documento = tamanhoDaImagem(atual);
     const desenhar = faixaId ? projetoSoCom(atual, [faixaId], { neutras: new Set([faixaId]), semEstilo: true, semMascara: true }) : atual;
-    const blob = await exportarImagem(desenhar, midias, { formato: "png", escala: Math.min(1, 512 / Math.max(documento.largura, documento.altura)), fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+    const blob = await exportarImagem(desenhar, midias, { formato: "png", escala: Math.min(1, lado / Math.max(documento.largura, documento.altura)), fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -2451,12 +2452,65 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     escolhido: escolhidoDaGaleria,
     aoEscolher: escolherNaGaleria,
   };
+  // Filtro › Galeria de filtros: a janela com a camada pequena, na pilha da camada (ou a que está sendo editada)
+  const [galeriaDeFiltros, setGaleriaDeFiltros] = useState<{
+    clipeId: string;
+    filtroId: string | null;
+    imagem: ImagemRgba;
+    documento: { largura: number; altura: number };
+    inicial: string;
+    cores: { frente: string; fundo: string };
+  } | null>(null);
+  const abrirGaleriaDeFiltros = async (editar?: { clipeId: string; filtroId: string }) => {
+    const atual = projetoRef.current;
+    const clipeId = editar?.clipeId ?? selecionado?.clipe.id;
+    if (!atual || !clipeId) return mostrarAviso("Escolha uma camada.");
+    const achado = acharClipe(atual, clipeId);
+    if (!achado) return;
+    if (achado.clipe.ajuste || achado.clipe.pasta) return mostrarAviso("Os filtros valem para camadas com conteúdo, não para ajustes nem grupos.");
+    const pilha = achado.clipe.filtros_inteligentes;
+    const indice = editar && pilha ? pilha.filtros.findIndex((filtro) => filtro.id === editar.filtroId) : -1;
+    const filtro = indice >= 0 ? pilha!.filtros[indice] : undefined;
+    // A camada como chega à galeria: com os filtros de baixo dela (os de cima ainda não valem)
+    const base: Projeto =
+      pilha && indice >= 0
+        ? { ...atual, faixas: atual.faixas.map((faixa) => (faixa.id === achado.faixa.id ? { ...faixa, clipes: faixa.clipes.map((clipe) => (clipe.id === clipeId ? { ...clipe, filtros_inteligentes: { ...pilha, filtros: pilha.filtros.slice(0, indice) } } : clipe)) } : faixa)) }
+        : atual;
+    try {
+      await pinturas.esperar();
+      const imagem = await imagemPequena(achado.faixa.id, 900, base);
+      if (!imagem) return;
+      setGaleriaDeFiltros({
+        clipeId,
+        filtroId: filtro?.id ?? null,
+        imagem,
+        documento: tamanhoDaImagem(atual),
+        inicial: filtro ? String(filtro.opcoes.pilha ?? "") : "",
+        cores: filtro ? { frente: String(filtro.opcoes.cor_frente ?? "#000000"), fundo: String(filtro.opcoes.cor_fundo ?? "#ffffff") } : { frente: cores.primeiroPlano, fundo: cores.fundo },
+      });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir a galeria.");
+    }
+  };
+  const fecharGaleriaDeFiltros = useCallback(() => setGaleriaDeFiltros(null), []);
+  const confirmarGaleriaDeFiltros = (texto: string) => {
+    const galeria = galeriaDeFiltros;
+    setGaleriaDeFiltros(null);
+    if (!galeria) return;
+    const opcoes = { pilha: texto, cor_frente: galeria.cores.frente, cor_fundo: galeria.cores.fundo };
+    if (!galeria.filtroId) return aplicarFiltroDoMenu("galeria_filtros", opcoes, true);
+    const pilha = projetoRef.current ? acharClipe(projetoRef.current, galeria.clipeId)?.clipe.filtros_inteligentes : null;
+    if (!pilha) return;
+    const filtros = pilha.filtros.map((filtro) => (filtro.id === galeria.filtroId ? { ...filtro, opcoes } : filtro));
+    if (executar({ comando: "imagem.filtros", parametros: { clipeId: galeria.clipeId, filtros: { ...pilha, filtros } } })) setUltimoFiltro({ tipo: "galeria_filtros", opcoes });
+  };
   /** O clique duplo num filtro da pilha: a janela dele, com as opções que ele tem. */
   const editarFiltroInteligente = (clipeId: string, filtroId: string) => {
     const pilha = projetoRef.current ? acharClipe(projetoRef.current, clipeId)?.clipe.filtros_inteligentes : null;
     const filtro = pilha?.filtros.find((item) => item.id === filtroId);
     if (!pilha || !filtro) return;
     if (!FILTRO_POR_ID.get(filtro.tipo)?.opcoes.length) return mostrarAviso("Este filtro não tem opções.");
+    if (filtro.tipo === "galeria_filtros") return void abrirGaleriaDeFiltros({ clipeId, filtroId });
     if (filtro.tipo === "galeria") {
       const galeria = galeriaDasOpcoes(filtro.opcoes);
       setFerramentaDaGaleria(FERRAMENTAS_DA_GALERIA.find((f) => (galeria[f] as unknown[]).length) ?? "campo");
@@ -4287,6 +4341,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     automatico: (jeito) => void ajusteInstantaneo(jeito),
     filtroDoCatalogo: (tipo) => aplicarFiltroDoMenu(tipo),
     galeriaDeDesfoque: abrirGaleria,
+    galeriaDeFiltros: () => void abrirGaleriaDeFiltros(),
     ultimoFiltro: { nome: ultimoFiltro ? (FILTRO_POR_ID.get(ultimoFiltro.tipo)?.nome ?? null) : null, aplicar: () => ultimoFiltro && aplicarFiltroDoMenu(ultimoFiltro.tipo, ultimoFiltro.opcoes, true) },
     converterParaFiltrosInteligentes,
     preenchimento: {
@@ -5520,6 +5575,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoCancelar={cancelarNosPixels}
           canais={projeto.canais ?? []}
           galeria={propsDaGaleria}
+        />
+      ) : null}
+      {galeriaDeFiltros ? (
+        <JanelaGaleriaDeFiltros
+          imagem={galeriaDeFiltros.imagem}
+          documento={galeriaDeFiltros.documento}
+          primeiroPlano={corEmRgb(galeriaDeFiltros.cores.frente)}
+          fundo={corEmRgb(galeriaDeFiltros.cores.fundo)}
+          inicial={galeriaDeFiltros.inicial}
+          aoConfirmar={confirmarGaleriaDeFiltros}
+          aoCancelar={fecharGaleriaDeFiltros}
         />
       ) : null}
       {filtroAberto ? (

@@ -6,6 +6,7 @@ import type { ContextoDoFiltro, ImagemDoFiltro } from "./comum.ts";
 import { hexParaRgb } from "./comum.ts";
 import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radial } from "./desfoque.ts";
 import { galeriaDasOpcoes, galeriaDeDesfoque, margemDaGaleria } from "./galeria.ts";
+import { aplicarGaleriaDeFiltros, margemDaGaleriaDeFiltros, pilhaDoTexto } from "./galeriaDeFiltros/index.ts";
 import { desfoqueDeLente } from "./lente.ts";
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
 import { coresNtsc, desentrelacar, difusao, encontrarBordas, entalhe, extrusao, ladrilhos, pinturaAOleo, solarizar, tracarContorno, vento } from "./estilizacao.ts";
@@ -41,7 +42,7 @@ export type Opcao =
   /** Um texto que a janela genérica não mostra (os alfinetes da galeria de desfoque, que têm a janela deles). */
   | { id: string; nome: string; tipo: "texto"; padrao: string };
 
-export type GrupoDoFiltro = "desfoque" | "galeria" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
+export type GrupoDoFiltro = "desfoque" | "galeria" | "galeria_filtros" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
 export const GRUPOS_DE_FILTROS: { id: GrupoDoFiltro; nome: string }[] = [
   { id: "desfoque", nome: "Desfoque" },
   { id: "galeria", nome: "Galeria de desfoque" },
@@ -63,7 +64,7 @@ export type DefinicaoDoFiltro = {
   /** Sem opções: aplica direto, sem janela (como o Desfoque e o Tornar nítido de lá). */
   semJanela?: boolean;
   /** A janela própria (a galeria de desfoque, com os alfinetes na prévia) no lugar da genérica. */
-  janela?: "galeria";
+  janela?: "galeria" | "galeriaDeFiltros";
   margem?: (v: Valores) => number;
   aplicar: (imagem: ImagemDoFiltro, v: Valores, ctx: ContextoDoFiltro) => ImagemDoFiltro;
 };
@@ -192,6 +193,17 @@ export const FILTROS: DefinicaoDoFiltro[] = [
         { luz: n(v, "luz"), cor: n(v, "cor"), faixaDe: n(v, "faixa_de"), faixaAte: n(v, "faixa_ate"), ruido: n(v, "ruido"), distribuicao: s(v, "distribuicao"), monocromatico: Boolean(v.monocromatico) },
         ctx,
       ),
+  },
+  // ——— Galeria de filtros (fora dos submenus: Filtro › Galeria de filtros…) ———
+  {
+    id: "galeria_filtros",
+    nome: "Galeria de filtros",
+    grupo: "galeria_filtros",
+    janela: "galeriaDeFiltros",
+    // As cores da paleta de quando foi aplicado (os esboços pintam com elas), como lá
+    opcoes: [{ id: "pilha", nome: "Efeitos", tipo: "texto", padrao: "" }, { id: "cor_frente", nome: "Cor da frente", tipo: "cor", padrao: "#000000" }, { id: "cor_fundo", nome: "Cor do fundo", tipo: "cor", padrao: "#ffffff" }],
+    margem: (v) => margemDaGaleriaDeFiltros(pilhaDoTexto(s(v, "pilha"))),
+    aplicar: (imagem, v, ctx) => aplicarGaleriaDeFiltros(imagem, pilhaDoTexto(s(v, "pilha")), { ...ctx, primeiroPlano: hexParaRgb(s(v, "cor_frente")), fundo: hexParaRgb(s(v, "cor_fundo")) }),
   },
   // ——— Distorção ———
   {
