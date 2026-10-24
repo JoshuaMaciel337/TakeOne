@@ -56,7 +56,7 @@ function Moldura({ titulo, aoFechar, aoConfirmar, children }: { titulo: string; 
 }
 
 /** O modo e a opacidade da mistura, como no pincel. */
-function ModoEOpacidade({ modo, opacidade, preservar, aoMudar }: { modo: ModoDaPintura; opacidade: number; preservar: boolean; aoMudar: (mudanca: { modo?: ModoDaPintura; opacidade?: number; preservar?: boolean }) => void }) {
+function ModoEOpacidade({ modo, opacidade, preservar, aoMudar, semPreservar = false }: { modo: ModoDaPintura; opacidade: number; preservar: boolean; aoMudar: (mudanca: { modo?: ModoDaPintura; opacidade?: number; preservar?: boolean }) => void; semPreservar?: boolean }) {
   return (
     <fieldset className="flex flex-col gap-2 border-t border-borda pt-2">
       <legend className="sr-only">Mistura</legend>
@@ -80,10 +80,12 @@ function ModoEOpacidade({ modo, opacidade, preservar, aoMudar }: { modo: ModoDaP
         <input type="range" min={1} max={100} value={Math.round(opacidade * 100)} onChange={(evento) => aoMudar({ opacidade: Number(evento.currentTarget.value) / 100 })} className="flex-1" aria-label="Opacidade" />
         <span className="w-9 text-right tabular-nums">{Math.round(opacidade * 100)}%</span>
       </label>
-      <label className="flex items-center gap-1.5">
-        <input type="checkbox" checked={preservar} onChange={(evento) => aoMudar({ preservar: evento.currentTarget.checked })} />
-        Preservar transparência
-      </label>
+      {semPreservar ? null : (
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={preservar} onChange={(evento) => aoMudar({ preservar: evento.currentTarget.checked })} />
+          Preservar transparência
+        </label>
+      )}
     </fieldset>
   );
 }
@@ -165,6 +167,20 @@ export function JanelaTracado({ inicial, aoFechar, aoConfirmar }: { inicial: Tra
         ))}
       </fieldset>
       <ModoEOpacidade modo={t.modo} opacidade={t.opacidade} preservar={t.preservar} aoMudar={mudar} />
+    </Moldura>
+  );
+}
+
+/** Editar › Atenuar (Ctrl+Shift+F): quanto do último passo fica (a opacidade) e o modo da mistura com o de antes. */
+export function JanelaAtenuar({ nome, aoFechar, aoConfirmar }: { nome: string; aoFechar: () => void; aoConfirmar: (opacidade: number, modo: ModoDaPintura) => void }) {
+  const [opacidade, setOpacidade] = useState(1);
+  const [modo, setModo] = useState<ModoDaPintura>("normal");
+  return (
+    <Moldura titulo={`Atenuar: ${nome}`} aoFechar={aoFechar} aoConfirmar={() => aoConfirmar(opacidade, modo)}>
+      <ModoEOpacidade modo={modo} opacidade={opacidade} preservar={false} aoMudar={(mudanca) => {
+        if (mudanca.modo) setModo(mudanca.modo);
+        if (mudanca.opacidade !== undefined) setOpacidade(mudanca.opacidade);
+      }} semPreservar />
     </Moldura>
   );
 }

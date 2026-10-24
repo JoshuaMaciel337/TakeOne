@@ -62,7 +62,9 @@ import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
 import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
-import { JanelaAparar, JanelaPreencher, JanelaTracado, type Preenchimento, type Tracado } from "./JanelasDePixels";
+import { JanelaAparar, JanelaAtenuar, JanelaPreencher, JanelaTracado, type Preenchimento, type Tracado } from "./JanelasDePixels";
+import { juntarTraco } from "@/lib/pintura/mesclar";
+import type { ModoDaPintura } from "@/lib/pintura/traco";
 import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCor } from "@/lib/pintura/operacoes";
 import { ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
@@ -74,7 +76,7 @@ import type { AlvoDoMotor } from "./usePinturas";
 import { Pintura } from "@/lib/pintura/motor";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { type Afim, compor, IDENTIDADE, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
-import { borda, cheia, combinar, limites, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
+import { borda, cheia, combinar, limites, vazia, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
 import { imagemDoBlob, imagemNoDocumento, selecaoDoCanvas, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
 import { aumentar, type ImagemRgba, varinha } from "@/lib/selecao/varinha";
@@ -214,7 +216,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // Editar › Definir predefinição de pincel (pede o nome) e os pedidos ao painel Camadas (encontrar e isolar)
   const [nomeDoPincel, setNomeDoPincel] = useState(false);
   // As janelas de Preencher, Traçado e Aparar (lembram as últimas escolhas, como lá)
-  const [janelaDePixels, setJanelaDePixels] = useState<"preencher" | "tracado" | "aparar" | null>(null);
+  const [janelaDePixels, setJanelaDePixels] = useState<"preencher" | "tracado" | "aparar" | "atenuar" | null>(null);
+  // Mover os pixels selecionados (a seleção flutuante): o motor da camada, o que fica (com o buraco ou não), o pedaço
+  // levado, a conta do deslocamento do documento para a camada e o arrasto ainda abrindo
+  const flutuante = useRef<{ chave: string; pintura: Pintura; base: ImageData; peca: HTMLCanvasElement; inversa: Afim; selecao: Selecao } | null>(null);
+  const flutuanteAbrindo = useRef<Promise<void> | null>(null);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
   // do sistema (para reconhecer a própria cópia ao colar e colar no mesmo lugar)
@@ -626,6 +632,110 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Os pixels da camada de pixels escolhida (sem uma, com `criar`, uma nova acima) passam pela função, com a cobertura
    * da seleção levada à camada (sem seleção, a camada inteira); o resultado sobe como versão nova, um passo do desfazer.
    */
+  /** A matriz do pixel da camada para o do documento (a camada nova, ainda não medida, cobre o quadro). */
+  const matrizDaCamada = (clipe: Clipe, tamanho: { largura: number; altura: number }, documento: { largura: number; altura: number }) => {
+    const medida = caixasRef.current.get(clipe.id);
+    const caixa = medida?.bruta ?? { cx: documento.largura / 2, cy: documento.altura / 2, largura: documento.largura, altura: documento.altura, rotacao: 0 };
+    return matrizDaMidiaNoDocumento(caixa, clipe.recorte, clipe.virar, tamanho, medida?.quadro ?? documento, documento);
+  };
+  /** A cobertura da seleção (0 a 255) em cada pixel da camada. */
+  const coberturaNaCamada = (clipe: Clipe, tamanho: { largura: number; altura: number }, selecao: Selecao, documento: { largura: number; altura: number }) => {
+    const naCamada = selecaoNaMidia(selecao, matrizDaCamada(clipe, tamanho, documento), tamanho).getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, tamanho.largura, tamanho.altura).data;
+    const cobertura = new Uint8ClampedArray(tamanho.largura * tamanho.altura);
+    for (let i = 0; i < cobertura.length; i++) cobertura[i] = naCamada[i * 4 + 3];
+    return cobertura;
+  };
+  /** A ferramenta Mover pega os pixels selecionados da camada de pixels (com Alt, uma cópia) para arrastar. */
+  const comecarAMoverPixels = (duplicar: boolean) => {
+    const atual = projetoRef.current;
+    const achado = selecionado?.clipe.pixels && atual ? acharClipe(atual, selecionado.clipe.id) : null;
+    const selecao = selecaoNoDocumento;
+    if (!atual || !achado?.clipe.midia_id || !selecao) return;
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels || achado.faixa.travas?.posicao) return mostrarAviso("Esta camada está travada.");
+    const alvo = alvoDosPixels(achado.clipe)!;
+    const documento = tamanhoDaImagem(atual);
+    const tamanho = midias.get(achado.clipe.midia_id)?.camada_pixels ?? documento;
+    flutuanteAbrindo.current = (async () => {
+      await pinturas.esperar();
+      const pintura = await pinturas.preparar(alvo, tamanho);
+      const ctx2d = pintura.camada.getContext("2d", { willReadFrequently: true })!;
+      const tudo = ctx2d.getImageData(0, 0, tamanho.largura, tamanho.altura);
+      const cobertura = coberturaNaCamada(achado.clipe, tamanho, selecao, documento);
+      const peca = document.createElement("canvas");
+      peca.width = tamanho.largura;
+      peca.height = tamanho.altura;
+      const pctx = peca.getContext("2d")!;
+      const pedaco = pctx.createImageData(tamanho.largura, tamanho.altura);
+      pedaco.data.set(tudo.data);
+      for (let i = 0; i < cobertura.length; i++) {
+        pedaco.data[i * 4 + 3] = Math.round((tudo.data[i * 4 + 3] * cobertura[i]) / 255);
+        // Sem Alt, o que é levado sai do lugar
+        if (!duplicar) tudo.data[i * 4 + 3] = Math.round((tudo.data[i * 4 + 3] * (255 - cobertura[i])) / 255);
+      }
+      pctx.putImageData(pedaco, 0, 0);
+      const m = matrizDaCamada(achado.clipe, tamanho, documento);
+      const det = m[0] * m[3] - m[1] * m[2] || 1;
+      flutuante.current = { chave: alvo.chave, pintura, base: tudo, peca, inversa: [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, 0, 0], selecao };
+    })().catch((e: unknown) => {
+      flutuante.current = null;
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível mover os pixels.");
+    });
+  };
+  /** O pedaço no deslocamento (pixels do documento), sobre o que ficou. */
+  const desenharFlutuante = (dx: number, dy: number) => {
+    const f = flutuante.current;
+    if (!f) return;
+    const ctx2d = f.pintura.camada.getContext("2d")!;
+    ctx2d.putImageData(f.base, 0, 0);
+    ctx2d.drawImage(f.peca, f.inversa[0] * dx + f.inversa[2] * dy, f.inversa[1] * dx + f.inversa[3] * dy);
+    pinturas.avisarQuadro();
+  };
+  /** Solta: a camada sobe como versão nova e a seleção anda junto. */
+  const soltarFlutuante = (dx: number, dy: number) => {
+    void flutuanteAbrindo.current?.then(() => {
+      const f = flutuante.current;
+      flutuante.current = null;
+      if (!f) return;
+      desenharFlutuante(dx, dy);
+      if (!dx && !dy) return void pinturas.soltar(f.chave);
+      pinturas.soltar(f.chave);
+      const andada = vazia(f.selecao.largura, f.selecao.altura);
+      for (let y = 0; y < andada.altura; y++) {
+        const ys = y - dy;
+        if (ys < 0 || ys >= andada.altura) continue;
+        for (let x = 0; x < andada.largura; x++) {
+          const xs = x - dx;
+          if (xs >= 0 && xs < andada.largura) andada.dados[y * andada.largura + x] = f.selecao.dados[ys * andada.largura + xs];
+        }
+      }
+      setSelecaoDoDocumento(temAlgo(andada) ? andada : null);
+    });
+  };
+  /** Editar › Atenuar: o último passo de pixels misturado com o estado de antes dele, na opacidade e no modo. */
+  const atenuar = async (opacidade: number, modo: ModoDaPintura) => {
+    const agora = projetoRef.current;
+    const antes = edicao.projetoDoPasso(edicao.passos.feitos.length - 1);
+    if (!agora || !antes) return;
+    // A camada de pixels cuja versão o último passo mudou
+    const mudada = agora.faixas.flatMap((faixa) => faixa.clipes).find((clipe) => clipe.pixels && acharClipe(antes, clipe.id)?.clipe.pixels?.versao !== clipe.pixels.versao);
+    if (!mudada?.midia_id) return mostrarAviso("Atenuar vale para a última pintura, preenchimento ou mudança de pixels numa camada.");
+    const versaoAntes = acharClipe(antes, mudada.id)?.clipe.pixels?.versao ?? 0;
+    const midiaId = mudada.midia_id;
+    await editarPixelsDoClipe(mudada.id, async (dados, _cobertura, camada) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = camada.largura;
+      canvas.height = camada.altura;
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      if (versaoAntes > 0) ctx2d.drawImage(await carregarBitmap(arquivoDaMidia(midiaId, arquivoDaVersao(versaoAntes))), 0, 0, camada.largura, camada.altura);
+      const anterior = ctx2d.getImageData(0, 0, camada.largura, camada.altura).data;
+      const depois = Uint8ClampedArray.from(dados);
+      if (modo === "normal") {
+        // O meio do caminho entre os dois estados (a transparência também), na opacidade
+        const forca = new Uint8ClampedArray(dados.length).fill(255);
+        juntarTraco(anterior, forca, dados, { substituirPor: depois, modo: "normal", opacidade, travarTransparencia: false, apagar: false, largura: camada.largura, x0: 0, y0: 0 });
+      } else juntarTraco(anterior, depois, dados, { modo, opacidade, travarTransparencia: false, apagar: false, largura: camada.largura, x0: 0, y0: 0 });
+    }, null);
+  };
   type EdicaoDePixels = (dados: Uint8ClampedArray, cobertura: Uint8ClampedArray | null, camada: { largura: number; altura: number; clipe: Clipe; faixa: Faixa }) => void | Promise<void>;
   const editarPixels = (editar: EdicaoDePixels, opcoes: { criar?: boolean; selecao?: Selecao | null } = {}) =>
     editarPixelsDoClipe(selecionado?.clipe.pixels ? selecionado.clipe.id : null, editar, opcoes.selecao === undefined ? selecaoNoDocumento : opcoes.selecao, opcoes.criar);
@@ -656,13 +766,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       let cobertura: Uint8ClampedArray | null = null;
       if (selecao) {
         // A camada nova ainda não foi medida pela prévia: ela cobre o quadro, e o quadro é o documento
-        const medida = caixasRef.current.get(achado.clipe.id);
-        const caixa = medida?.bruta ?? { cx: documento.largura / 2, cy: documento.altura / 2, largura: documento.largura, altura: documento.altura, rotacao: 0 };
-        const quadro = medida?.quadro ?? documento;
-        const matriz = matrizDaMidiaNoDocumento(caixa, achado.clipe.recorte, achado.clipe.virar, tamanho, quadro, documento);
-        const naCamada = selecaoNaMidia(selecao, matriz, tamanho).getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, tamanho.largura, tamanho.altura).data;
-        cobertura = new Uint8ClampedArray(tamanho.largura * tamanho.altura);
-        for (let i = 0; i < cobertura.length; i++) cobertura[i] = naCamada[i * 4 + 3];
+        cobertura = coberturaNaCamada(achado.clipe, tamanho, selecao, documento);
       }
       await editar(dados.data, cobertura, { ...tamanho, clipe: achado.clipe, faixa: achado.faixa });
       ctx2d.putImageData(dados, 0, 0);
@@ -1657,6 +1761,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     colar: (como) => void colar(como),
     novoDaAreaDeTransferencia: () => void novoDaAreaDeTransferencia(),
     camadaVia: (recortar) => void camadaVia(recortar),
+    atenuar: () => setJanelaDePixels("atenuar"),
     preencherRapido: (com, preservar) => preencher({ ...ultimoPreenchimento, conteudo: com, modo: "normal", opacidade: 1, preservar }),
     limpar,
     tracado: () => selecaoNoDocumento && setJanelaDePixels("tracado"),
@@ -2156,6 +2261,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   : null
             }
             corAVista={canalDaVez ? null : corAVista}
+            moverPixels={
+              ferramenta === "mover" && selecaoNoDocumento && selecionado?.clipe.pixels && limites(selecaoNoDocumento)
+                ? {
+                    caixa: limites(selecaoNoDocumento)!,
+                    aoComecar: comecarAMoverPixels,
+                    aoMover: (dx, dy) => void flutuanteAbrindo.current?.then(() => desenharFlutuante(dx, dy)),
+                    aoSoltar: soltarFlutuante,
+                  }
+                : null
+            }
             transformacao={
               transformando
                 ? {
@@ -2275,6 +2390,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             setJanelaDePixels(null);
             setUltimoTracado(t);
             tracar(t);
+          }}
+        />
+      ) : null}
+      {janelaDePixels === "atenuar" ? (
+        <JanelaAtenuar
+          nome={edicao.nomeDesfazer ?? ""}
+          aoFechar={() => setJanelaDePixels(null)}
+          aoConfirmar={(opacidade, modo) => {
+            setJanelaDePixels(null);
+            void atenuar(opacidade, modo);
           }}
         />
       ) : null}

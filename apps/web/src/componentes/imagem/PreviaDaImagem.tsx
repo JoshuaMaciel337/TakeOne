@@ -103,6 +103,11 @@ type Props = {
   veu?: { fonte: CanvasImageSource; quadro: number; cinza: boolean } | null;
   /** Só um canal de cor, em cinza (painel Canais). */
   corAVista?: CorDoCanal | null;
+  /**
+   * A ferramenta Mover com uma seleção numa camada de pixels: arrastar dentro da caixa da seleção leva os pixels
+   * selecionados (Alt leva uma cópia). Os deslocamentos vão em pixels do documento, desde o começo do arrasto.
+   */
+  moverPixels?: { caixa: { x0: number; y0: number; x1: number; y1: number }; aoComecar: (duplicar: boolean) => void; aoMover: (dx: number, dy: number) => void; aoSoltar: (dx: number, dy: number) => void } | null;
   /** A transformação livre em andamento (a da seleção): a caixa com as alças, por cima de tudo. */
   transformacao?: {
     estado: EstadoDaTransformacao;
@@ -175,7 +180,9 @@ export function PreviaDaImagem({
   veu = null,
   corAVista = null,
   transformacao = null,
+  moverPixels = null,
 }: Props) {
+  const arrastandoPixels = useRef<{ x: number; y: number } | null>(null);
   const imagem = tamanhoDaImagem(projeto);
   const { areaRef, area } = useArea();
   const ajuste = area.largura > 0 ? Math.min((area.largura - MESA * 2) / imagem.largura, (area.altura - MESA * 2) / imagem.altura) : 0;
@@ -569,6 +576,51 @@ export function PreviaDaImagem({
               />
             ) : null}
             {veu && tamanho.largura > 1 ? <VeuDaMascaraRapida fonte={veu.fonte} tamanho={tamanho} quadro={veu.quadro} cinza={veu.cinza} /> : null}
+            {moverPixels && !transformacao && !maoAtiva && tamanho.largura > 1 ? (
+              <div
+                className="absolute z-20 cursor-move touch-none"
+                style={{
+                  left: (moverPixels.caixa.x0 * tamanho.largura) / imagem.largura,
+                  top: (moverPixels.caixa.y0 * tamanho.altura) / imagem.altura,
+                  width: ((moverPixels.caixa.x1 - moverPixels.caixa.x0) * tamanho.largura) / imagem.largura,
+                  height: ((moverPixels.caixa.y1 - moverPixels.caixa.y0) * tamanho.altura) / imagem.altura,
+                }}
+                aria-label="Mover a seleção"
+                onPointerDown={(evento) => {
+                  if (evento.button !== 0) return;
+                  evento.stopPropagation();
+                  evento.currentTarget.setPointerCapture(evento.pointerId);
+                  arrastandoPixels.current = { x: evento.clientX, y: evento.clientY };
+                  moverPixels.aoComecar(evento.altKey);
+                }}
+                onPointerMove={(evento) => {
+                  const inicio = arrastandoPixels.current;
+                  if (!inicio) return;
+                  const escalaDaTela = imagem.largura / tamanho.largura;
+                  let dx = (evento.clientX - inicio.x) * escalaDaTela;
+                  let dy = (evento.clientY - inicio.y) * escalaDaTela;
+                  // Shift prende a um eixo
+                  if (evento.shiftKey) {
+                    if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+                    else dx = 0;
+                  }
+                  moverPixels.aoMover(Math.round(dx), Math.round(dy));
+                }}
+                onPointerUp={(evento) => {
+                  const inicio = arrastandoPixels.current;
+                  arrastandoPixels.current = null;
+                  if (!inicio) return;
+                  const escalaDaTela = imagem.largura / tamanho.largura;
+                  let dx = (evento.clientX - inicio.x) * escalaDaTela;
+                  let dy = (evento.clientY - inicio.y) * escalaDaTela;
+                  if (evento.shiftKey) {
+                    if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+                    else dx = 0;
+                  }
+                  moverPixels.aoSoltar(Math.round(dx), Math.round(dy));
+                }}
+              />
+            ) : null}
             {transformacao && tamanho.largura > 1 ? (
               <TransformacaoNaPrevia
                 estado={transformacao.estado}

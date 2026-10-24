@@ -141,8 +141,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Traçado (largura, cor, dentro, centro, fora, modo, opacidade)
 - [x] Camada via cópia (Ctrl+J) e via recorte (Ctrl+Shift+J) com os pixels da seleção
 - [x] Imagem › Cortar (pela seleção) e Aparar (pela transparência ou pela cor dos cantos)
-- [ ] Atenuar (Ctrl+Shift+F) o último filtro ou a última pintura
-- [ ] A ferramenta Mover leva o que está selecionado (seleção flutuante); Alt + arrastar duplica
+- [x] Atenuar (Ctrl+Shift+F) a última pintura (ou o último passo que mudou os pixels de uma camada)
+- [x] A ferramenta Mover leva o que está selecionado (seleção flutuante); Alt + arrastar duplica
 
 ### Onda 13.5 — Retoque e pintura avançada
 

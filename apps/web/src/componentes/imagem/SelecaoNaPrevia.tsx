@@ -369,8 +369,13 @@ export function SelecaoNaPrevia({
         if (arrasto.modo === "nova") aoSelecionar(null);
         return;
       }
-      const forma = ferramenta === "letreiroEliptico" ? elipse : retangulo;
-      aplicar(forma(documento.largura, documento.altura, r, opcoes.suavizar), arrasto.modo);
+      if (ferramenta === "letreiroEliptico") aplicar(elipse(documento.largura, documento.altura, r, opcoes.suavizar), arrasto.modo);
+      else {
+        // O letreiro retangular fica na grade dos pixels, sem borda suave, como lá (mover o que ele pegou não deixa rastro)
+        const x0 = Math.round(r.x);
+        const y0 = Math.round(r.y);
+        aplicar(retangulo(documento.largura, documento.altura, { x: x0, y: y0, largura: Math.round(r.x + r.largura) - x0, altura: Math.round(r.y + r.altura) - y0 }, false), arrasto.modo);
+      }
       return;
     }
     if (laco && ferramenta === "laco") {

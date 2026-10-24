@@ -178,6 +178,8 @@ export type AcoesDosMenus = {
   novoDaAreaDeTransferencia: () => void;
   /** Camada › Novo › Camada via cópia (Ctrl+J; sem seleção, duplica) e via recorte (Ctrl+Shift+J). */
   camadaVia: (recortar: boolean) => void;
+  /** Editar › Atenuar (Ctrl+Shift+F) o último passo de pixels. */
+  atenuar: () => void;
   /** Editar › Limpar (Delete com seleção) e Traçado. */
   limpar: () => void;
   tracado: () => void;
@@ -230,6 +232,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Colar fora", desativado: !a.temSelecaoDoDocumento, aoEscolher: () => a.colar("fora") },
           ],
         },
+        "-",
+        { nome: a.podeDesfazer ? `Atenuar ${a.podeDesfazer}…` : "Atenuar…", atalho: "Ctrl+Shift+F", desativado: !a.podeDesfazer, aoEscolher: a.atenuar },
         "-",
         { nome: "Preencher…", atalho: "Shift+F5", aoEscolher: a.preencher },
         { nome: "Traçado…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.tracado },
