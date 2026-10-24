@@ -211,3 +211,19 @@ test("galeria de filtros: os esboços pintam só com a cor da frente e a do fund
   // Entre o vermelho e o azul: o verde fica em zero
   for (let i = 0; i < saida.dados.length; i += 4) assert.equal(saida.dados[i + 1], 0);
 });
+
+test("filtro de revelação: neutro não muda nada; exposição, gradação e vinheta fazem o que dizem", () => {
+  const base = imagem(21, 21, [100, 100, 100, 255], [[2, 2, [20, 20, 20, 255]]]);
+  assert.deepEqual([...aplicarFiltro(base, "revelacao", {}, ctx).dados], [...base.dados]);
+  assert.ok(pixel(aplicarFiltro(base, "revelacao", { exposicao: 1 }, ctx), 10, 10)[0] > 130);
+  // A gradação das sombras em vermelho (matiz 0) puxa o escuro para o vermelho
+  const sombra = pixel(aplicarFiltro(base, "revelacao", { grad_sombras_matiz: 0, grad_sombras_saturacao: 100 }, ctx), 2, 2);
+  assert.ok(sombra[0] > sombra[2] + 10, `sombra ${sombra}`);
+  // A vinheta escurece o canto e deixa o meio
+  const vinheta = aplicarFiltro(base, "revelacao", { vinheta: -100, vinheta_estilo: "pintura" }, ctx);
+  assert.ok(pixel(vinheta, 0, 20)[0] < 40);
+  assert.deepEqual(pixel(vinheta, 10, 10), [100, 100, 100, 255]);
+  // Tudo ligado roda sem erro e no mesmo tamanho
+  const tudo = aplicarFiltro(base, "revelacao", { textura: 50, claridade: 50, nitidez: 80, mascaramento: 30, ruido_luminancia: 50, ruido_cor: 50, grao: 50, vermelho_saturacao: 40, curva_sombras: 30, vinheta: 40, vinheta_estilo: "cor" }, ctx);
+  assert.equal(tudo.dados.length, base.dados.length);
+});

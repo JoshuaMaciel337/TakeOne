@@ -245,7 +245,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Estilização: difusão, entalhe, extrusão, encontrar bordas, pintura a óleo, solarizar, ladrilhos, traçar contorno, vento
 - [x] Vídeo: desentrelaçar, cores NTSC
 - [x] Outros: personalizado (matriz), HSB/HSL, alta frequência, máximo, mínimo, deslocamento, cor para alfa
-- [ ] Filtro de revelação (a aba Cor no lugar do filtro de câmera, com as seções que faltam: detalhe, granulação, mistura de cores, gradação de cor, vinheta com prioridade)
+- [x] Filtro de revelação (a aba Cor no lugar do filtro de câmera, com as seções que faltam: detalhe, granulação, mistura de cores, gradação de cor, vinheta com prioridade)
 
 ### Onda 13.12 — IA
 

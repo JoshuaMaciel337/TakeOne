@@ -142,7 +142,7 @@ export function JanelaGaleriaDeFiltros({
     return () => window.removeEventListener("keydown", tecla, true);
   }, [aoCancelar]);
 
-  const definicao = efeito ? ({ ...efeito, grupo: "galeria_filtros" } as unknown as DefinicaoDoFiltro) : null;
+  const definicao = efeito ? ({ ...efeito, grupo: "especial" } as unknown as DefinicaoDoFiltro) : null;
   return (
     <div className="fixed inset-0 z-50 flex bg-fundo text-xs" role="dialog" aria-modal aria-label="Galeria de filtros">
       <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#1b1d22] p-4">

@@ -8,6 +8,7 @@ import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radia
 import { galeriaDasOpcoes, galeriaDeDesfoque, margemDaGaleria } from "./galeria.ts";
 import { aplicarGaleriaDeFiltros, margemDaGaleriaDeFiltros, pilhaDoTexto } from "./galeriaDeFiltros/index.ts";
 import { desfoqueDeLente } from "./lente.ts";
+import { OPCOES_DA_REVELACAO, revelar, SECOES_DA_REVELACAO } from "./revelacao.ts";
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
 import { coresNtsc, desentrelacar, difusao, encontrarBordas, entalhe, extrusao, ladrilhos, pinturaAOleo, solarizar, tracarContorno, vento } from "./estilizacao.ts";
 import { cristalizar, fragmentar, kuwahara, meiaTinta, meioTomEmCores, mosaico, pontilhismo } from "./pixelizacao.ts";
@@ -42,7 +43,7 @@ export type Opcao =
   /** Um texto que a janela genérica não mostra (os alfinetes da galeria de desfoque, que têm a janela deles). */
   | { id: string; nome: string; tipo: "texto"; padrao: string };
 
-export type GrupoDoFiltro = "desfoque" | "galeria" | "galeria_filtros" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
+export type GrupoDoFiltro = "desfoque" | "galeria" | "especial" | "distorcao" | "ruido" | "pixelizacao" | "renderizacao" | "nitidez" | "estilizacao" | "video" | "outros";
 export const GRUPOS_DE_FILTROS: { id: GrupoDoFiltro; nome: string }[] = [
   { id: "desfoque", nome: "Desfoque" },
   { id: "galeria", nome: "Galeria de desfoque" },
@@ -65,6 +66,8 @@ export type DefinicaoDoFiltro = {
   semJanela?: boolean;
   /** A janela própria (a galeria de desfoque, com os alfinetes na prévia) no lugar da genérica. */
   janela?: "galeria" | "galeriaDeFiltros";
+  /** As opções em seções (a janela genérica mostra cada uma abrindo e fechando), pelos ids. */
+  secoes?: { nome: string; opcoes: string[] }[];
   margem?: (v: Valores) => number;
   aplicar: (imagem: ImagemDoFiltro, v: Valores, ctx: ContextoDoFiltro) => ImagemDoFiltro;
 };
@@ -194,11 +197,21 @@ export const FILTROS: DefinicaoDoFiltro[] = [
         ctx,
       ),
   },
+  // ——— Filtro de revelação (fora dos submenus: Filtro › Filtro de revelação…) ———
+  {
+    id: "revelacao",
+    nome: "Filtro de revelação",
+    grupo: "especial",
+    opcoes: OPCOES_DA_REVELACAO,
+    secoes: SECOES_DA_REVELACAO.map((secao) => ({ nome: secao.nome, opcoes: secao.opcoes.map((opcao) => opcao.id) })),
+    margem: () => 0,
+    aplicar: (imagem, v, ctx) => revelar(imagem, v, ctx),
+  },
   // ——— Galeria de filtros (fora dos submenus: Filtro › Galeria de filtros…) ———
   {
     id: "galeria_filtros",
     nome: "Galeria de filtros",
-    grupo: "galeria_filtros",
+    grupo: "especial",
     janela: "galeriaDeFiltros",
     // As cores da paleta de quando foi aplicado (os esboços pintam com elas), como lá
     opcoes: [{ id: "pilha", nome: "Efeitos", tipo: "texto", padrao: "" }, { id: "cor_frente", nome: "Cor da frente", tipo: "cor", padrao: "#000000" }, { id: "cor_fundo", nome: "Cor do fundo", tipo: "cor", padrao: "#ffffff" }],

@@ -706,6 +706,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Dissolver…", atalho: "Ctrl+Shift+X", desativado: semCamada, aoEscolher: a.dissolver },
         { nome: "Ponto de fuga…", atalho: "Ctrl+Alt+V", aoEscolher: a.pontoDeFuga },
         { nome: "Galeria de filtros…", desativado: semCamada, aoEscolher: a.galeriaDeFiltros },
+        { nome: "Filtro de revelação…", desativado: semCamada, aoEscolher: () => a.filtroDoCatalogo("revelacao"), titulo: "Ctrl+Shift+A é do navegador: use o menu" },
       ],
     },
     {
