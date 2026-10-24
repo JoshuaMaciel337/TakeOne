@@ -159,10 +159,12 @@ import {
   tonalizacaoHdr,
 } from "@/lib/imagem/ajustesNosPixels";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
+import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
 import { PainelHistograma } from "./ajustes/PainelHistograma";
 import { PainelInformacoes, PainelNavegador } from "./PaineisDaVista";
+import { JanelaEscalaDeMedida, JanelaMarcadorDeEscala, OpcoesDaContagemNaBarra, OpcoesDaNotaNaBarra, type OpcoesDoMarcador, PainelNotas, PainelRegistro } from "./PaineisDaMedicao";
 import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, corEmRgb, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
@@ -177,7 +179,7 @@ import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
 import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
-import { camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
+import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
 import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
@@ -498,6 +500,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // O Amostrador de cor (os pontos, em pixels do documento, só da sessão) e o lado da amostra do conta-gotas
   const [amostradores, setAmostradores] = useState<{ x: number; y: number }[]>([]);
   const [ladoDaAmostra, setLadoDaAmostra] = useState(1);
+  // A medição: a nota aberta, o autor e a cor das notas novas, o Registro de medições (só da sessão) e as janelas
+  const [notaEscolhida, setNotaEscolhida] = useState<string | null>(null);
+  const [autorDasNotas, setAutorDasNotas] = useState("");
+  const [corDasNotas, setCorDasNotas] = useState("#ffd60a");
+  const [medicoes, setMedicoes] = useState<Medicao[]>([]);
+  const medicoesFeitas = useRef(0);
+  const [janelaDaMedicao, setJanelaDaMedicao] = useState<"escala" | "marcador" | null>(null);
   // Exibir › Modo de tela (F) e os painéis escondidos pelo Tab (todos) ou pelo Shift+Tab (só os da direita)
   const [modoDeTela, setModoDeTela] = useState<ModoDeTela>("padrao");
   const [paineisOcultos, setPaineisOcultos] = useState<"nenhum" | "todos" | "encaixados">("nenhum");
@@ -4908,6 +4917,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     girarVista: (giro) => setGiroDaVista((atual) => ({ ...atual, ...giro })),
     modoDeTela,
     mudarModoDeTela,
+    temEscalaDeMedida: Boolean(projeto?.escala_de_medida),
+    escalaDeMedidaPadrao: () => executar({ comando: "imagem.escalaDeMedida", parametros: { escala: null } }),
+    janelaDaMedicao: setJanelaDaMedicao,
+    registrarMedicoes: () => registrarMedicoes(),
     ocultarPaineis: (quais) => setPaineisOcultos((atual) => (atual === "nenhum" ? quais : "nenhum")),
     janelaDaVista: (janela) => setJanelaDaVista(janela),
     temGuias: Boolean(projeto?.guias),
@@ -5118,7 +5131,65 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  // ——— A medição (Imagem › Análise): as notas, o Registro de medições e o marcador de escala ———
+  const mudarNotas = (notas: Nota[], escolhida?: string) => {
+    executar({ comando: "imagem.notas", parametros: { notas } });
+    if (escolhida !== undefined) setNotaEscolhida(escolhida);
+    else if (!notas.some((nota) => nota.id === notaEscolhida)) setNotaEscolhida(null);
+    if (escolhida && !area.aberto("notas")) area.abrir("notas");
+  };
+  /** Da Régua (com ela escolhida e uma medida), da Contagem (com ela escolhida) ou da seleção, como lá. */
+  const registrarMedicoes = () => {
+    if (!projeto) return;
+    const base = { id: novoId(), rotulo: `Medição ${medicoesFeitas.current + 1}`, data: new Date().toLocaleString("pt-BR"), documento: edicao.nome, escala: projeto.escala_de_medida };
+    const registrar = (medicao: Medicao) => {
+      medicoesFeitas.current++;
+      setMedicoes((atual) => [...atual, medicao]);
+      if (!area.aberto("registro")) area.abrir("registro");
+    };
+    if (ferramenta === "regua" && medida) return registrar(medicaoDaRegua(base, medida.de, medida.ate));
+    if (ferramenta === "contagem") return registrar(medicaoDaContagem(base, projeto.contagem));
+    const selecao = selecaoNoDocumento;
+    if (selecao) {
+      imagemParaSelecao(true)
+        .then((imagem) => {
+          const medidas = medirSelecao(selecao, imagem);
+          if (medidas) registrar(medicaoDaSelecao(base, medidas));
+        })
+        .catch(() => mostrarAviso("Não foi possível ler a imagem para medir."));
+      return;
+    }
+    if (medida) return registrar(medicaoDaRegua(base, medida.de, medida.ate));
+    if (totalDaContagem(projeto.contagem)) return registrar(medicaoDaContagem(base, projeto.contagem));
+    mostrarAviso("Faça uma seleção, uma medida com a Régua ou uma contagem para registrar.");
+  };
+  /** Imagem › Análise › Inserir marcador de escala: a barra no comprimento pedido e o número, no canto de baixo. */
+  const inserirMarcadorDeEscala = async (opcoes: OpcoesDoMarcador) => {
+    if (!projeto) return;
+    const documento = tamanhoDaImagem(projeto);
+    const escala = projeto.escala_de_medida ?? ESCALA_PADRAO;
+    const comprimento = (opcoes.comprimento * escala.pixels) / escala.comprimento;
+    if (comprimento < 2 || comprimento > documento.largura * 4) return mostrarAviso("A barra ficaria pequena ou grande demais para a imagem: mude o comprimento.");
+    const lado = Math.min(documento.largura, documento.altura);
+    const margem = Math.round(lado * 0.04);
+    const altura = Math.max(2, Math.round(lado * 0.008));
+    const cor = opcoes.cor === "preto" ? "#000000" : "#ffffff";
+    const embaixo = opcoes.mostrarTexto && opcoes.textoEmBaixo;
+    const topoDaBarra = documento.altura - margem - altura - (embaixo ? Math.round(opcoes.fonte * 1.3) : 0);
+    const barra = camadaDaForma({ tipo: "retangulo", largura: comprimento, altura, raios: [0, 0, 0, 0] }, { tipo: "cor", cor }, null);
+    const centro = { x: margem + barra.caixa.largura / 2, y: topoDaBarra + barra.caixa.altura / 2 };
+    let texto: TextoRico | null = null;
+    if (opcoes.mostrarTexto) {
+      const numero = (Math.round(opcoes.comprimento * 1000) / 1000).toLocaleString("pt-BR");
+      const novo = textoNovo(`${numero} ${escala.unidade}`, { tamanho: opcoes.fonte, cor });
+      await esperarFontes([novo]);
+      texto = textoMedido(novo);
+    }
+    // O ponto do texto é o começo da linha de base
+    const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
+    executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
+  };
+  const janelaAberta = exportando || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5313,6 +5384,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           className="h-full"
         />
         ),
+    },
+    notas: {
+      nome: PAINEIS_DA_IMAGEM.notas,
+      conteudo: <PainelNotas notas={projeto.notas ?? []} escolhida={notaEscolhida} aoEscolher={setNotaEscolhida} aoMudar={mudarNotas} />,
+    },
+    registro: {
+      nome: PAINEIS_DA_IMAGEM.registro,
+      conteudo: <PainelRegistro medicoes={medicoes} aoRegistrar={registrarMedicoes} aoExcluir={(ids) => setMedicoes((atual) => atual.filter((m) => !ids.includes(m.id)))} />,
     },
     informacoes: {
       nome: PAINEIS_DA_IMAGEM.informacoes,
@@ -5852,6 +5931,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "contagem" ? (
+            <OpcoesDaContagemNaBarra
+              contagem={projeto.contagem ?? null}
+              aoMudar={(contagem, nome) => executar({ comando: "imagem.contagem", parametros: { contagem, nome } })}
+              aoNovoGrupo={() => {
+                try {
+                  executar({ comando: "imagem.contagem", parametros: { contagem: novoGrupo(projeto.contagem, novoId()), nome: "novo grupo de contagem" } });
+                } catch (e) {
+                  mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o grupo.");
+                }
+              }}
+              aoTirarGrupo={(id) => projeto.contagem && executar({ comando: "imagem.contagem", parametros: { contagem: tirarGrupo(projeto.contagem, id), nome: "excluir o grupo de contagem" } })}
+            />
+          ) : ferramenta === "nota" ? (
+            <OpcoesDaNotaNaBarra autor={autorDasNotas} cor={corDasNotas} total={projeto.notas?.length ?? 0} aoMudarAutor={setAutorDasNotas} aoMudarCor={setCorDasNotas} aoLimpar={() => mudarNotas([])} />
           ) : ferramenta === "regua" ? (
             <OpcoesDaReguaNaBarra
               medida={medida}
@@ -6112,6 +6206,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            contagem={{
+              contagem: projeto.contagem ?? null,
+              ativo: ferramenta === "contagem",
+              aoMudar: (contagem, nome) => executar({ comando: "imagem.contagem", parametros: { contagem, nome } }),
+              aoErro: mostrarAviso,
+              novoId,
+            }}
+            notas={{
+              notas: projeto.notas ?? [],
+              ativo: ferramenta === "nota",
+              escolhida: notaEscolhida,
+              autor: autorDasNotas,
+              cor: corDasNotas,
+              aoEscolher: (id) => {
+                setNotaEscolhida(id);
+                if (id && !area.aberto("notas")) area.abrir("notas");
+              },
+              aoMudar: mudarNotas,
+              novoId,
+            }}
             amostradores={{
               pontos: amostradores,
               ativo: ferramenta === "amostradorDeCor",
@@ -6206,6 +6320,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         </div>
       </div>
 
+      {janelaDaMedicao === "escala" ? (
+        <JanelaEscalaDeMedida
+          escala={projeto.escala_de_medida}
+          comprimentoDaRegua={medida ? Math.hypot(medida.ate.x - medida.de.x, medida.ate.y - medida.de.y) : null}
+          aoFechar={() => setJanelaDaMedicao(null)}
+          aoConfirmar={(escala) => {
+            setJanelaDaMedicao(null);
+            executar({ comando: "imagem.escalaDeMedida", parametros: { escala } });
+          }}
+        />
+      ) : null}
+      {janelaDaMedicao === "marcador" ? (
+        <JanelaMarcadorDeEscala
+          escala={projeto.escala_de_medida}
+          aoFechar={() => setJanelaDaMedicao(null)}
+          aoConfirmar={(opcoes) => {
+            setJanelaDaMedicao(null);
+            void inserirMarcadorDeEscala(opcoes);
+          }}
+        />
+      ) : null}
       {filtroNeural ? <JanelaFiltroNeural tipo={filtroNeural} aoConfirmar={(corpo) => void pedirFiltroNeural(filtroNeural, corpo)} aoCancelar={() => setFiltroNeural(null)} /> : null}
       {substituindoCeu ? (
         <JanelaSubstituirCeu base={substituindoCeu.base} mascara={substituindoCeu.mascara} escala={substituindoCeu.escala} imagens={imagensProntas} aoConfirmar={(opcoes) => void confirmarSubstituicaoDoCeu(opcoes)} aoCancelar={() => setSubstituindoCeu(null)} />

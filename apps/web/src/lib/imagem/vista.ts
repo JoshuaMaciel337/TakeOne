@@ -184,6 +184,9 @@ export type PreferenciasDaVista = {
   guiasInteligentes: boolean;
   bordasDaCamada: boolean;
   malhaDePixels: boolean;
+  /** Exibir › Mostrar › Notas e Contagem. */
+  notas: boolean;
+  contagem: boolean;
   encaixar: boolean;
   encaixarEm: EncaixarEm;
 };
@@ -200,6 +203,8 @@ export const VISTA_PADRAO: PreferenciasDaVista = {
   guiasInteligentes: true,
   bordasDaCamada: false,
   malhaDePixels: true,
+  notas: true,
+  contagem: true,
   encaixar: true,
   encaixarEm: ENCAIXAR_EM_TUDO,
 };

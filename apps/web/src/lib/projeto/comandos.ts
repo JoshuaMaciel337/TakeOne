@@ -10,6 +10,7 @@ import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
 import type { ModoDeCor } from "../imagem/modos.ts";
 import type { VariaveisDoDocumento } from "./variaveis.ts";
 import type { Guias } from "./geometria.ts";
+import type { Contagem, EscalaDeMedida, Nota } from "../imagem/medicao.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -275,6 +276,10 @@ export type Comando =
   | { comando: "imagem.modo"; parametros: { modo: ModoDeCor } }
   | { comando: "imagem.variaveis"; parametros: { variaveis: VariaveisDoDocumento } }
   | { comando: "imagem.guias"; parametros: { guias: Guias } }
+  | { comando: "imagem.contagem"; parametros: { contagem: Contagem | null; nome?: string } }
+  | { comando: "imagem.notas"; parametros: { notas: Nota[] } }
+  | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
@@ -425,6 +430,10 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.modo": "mudar o modo de cor",
   "imagem.variaveis": "mudar as variáveis",
   "imagem.guias": "mudar as guias",
+  "imagem.contagem": "mudar a contagem",
+  "imagem.notas": "mudar as notas",
+  "imagem.escalaDeMedida": "definir a escala de medida",
+  "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
@@ -494,6 +503,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
+/** A faixa de um clipe (o marcador de escala junta as camadas que acabou de criar). */
+const faixaDoClipeNoProjeto = (projeto: Projeto, clipeId: string | undefined) => (clipeId ? projeto.faixas.find((faixa) => faixa.clipes.some((clipe) => clipe.id === clipeId))?.id : undefined);
+
 export function executarComando(projeto: Projeto, comando: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
   if (projeto.tipo === "imagem" && (comando.comando === "clipe.transformar" || comando.comando === "imagem.posicoes")) {
     const ids = comando.comando === "clipe.transformar" ? comando.parametros.clipeIds : comando.parametros.mudancas.map((mudanca) => mudanca.clipeId);
@@ -805,6 +817,27 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mudarFundoDaImagem(projeto, parametros) };
     case "imagem.informacoes":
       return { projeto: { ...projeto, informacoes: parametros.informacoes } };
+    case "imagem.contagem":
+      return { projeto: { ...projeto, contagem: parametros.contagem?.grupos.length ? parametros.contagem : null } };
+    case "imagem.notas":
+      return { projeto: { ...projeto, notas: parametros.notas } };
+    case "imagem.escalaDeMedida":
+      return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.marcadorDeEscala": {
+      // A barra e o número numa pasta "Marcador de escala de medida", num passo só
+      const barra = executarComando(projeto, { comando: "imagem.adicionarVetor", parametros: { vetor: parametros.barra, centro: parametros.centro, nome: "Barra de escala", acima: parametros.acima } }, ctx);
+      const faixas = [faixaDoClipeNoProjeto(barra.projeto, barra.selecao?.[0])];
+      let atual = barra.projeto;
+      if (parametros.texto) {
+        const id = ctx.novoId();
+        atual = executarComando(atual, { comando: "imagem.adicionarTextoRico", parametros: { texto: parametros.texto, ponto: parametros.ponto, nome: "Texto da escala", acima: faixas[0], id } }, ctx).projeto;
+        faixas.push(faixaDoClipeNoProjeto(atual, id));
+      }
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas.filter((f): f is string => Boolean(f)) } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: "Marcador de escala de medida" } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
     case "imagem.guias":
       return { projeto: { ...projeto, guias: parametros.guias.verticais.length || parametros.guias.horizontais.length ? parametros.guias : null } };
     case "imagem.variaveis":

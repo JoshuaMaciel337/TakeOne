@@ -28,6 +28,8 @@ export const PAINEIS_DA_IMAGEM = {
   glifos: "Glifos",
   histograma: "Histograma",
   informacoes: "Informações",
+  notas: "Notas",
+  registro: "Registro de medições",
   navegador: "Navegador",
   paragrafo: "Parágrafo",
   degrades: "Degradês",
@@ -177,6 +179,11 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Imagem › Análise: a escala de medida, o registro e o marcador de escala. */
+  temEscalaDeMedida: boolean;
+  escalaDeMedidaPadrao: () => void;
+  janelaDaMedicao: (janela: "escala" | "marcador") => void;
+  registrarMedicoes: () => void;
   /** Exibir › Modo de tela (F) e os painéis escondidos (Tab: todos; Shift+Tab: só os encaixados, que alternam). */
   modoDeTela: ModoDeTela;
   mudarModoDeTela: (modo: ModoDeTela) => void;
@@ -579,6 +586,25 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Aparar…", aoEscolher: a.aparar },
         { nome: "Revelar tudo", aoEscolher: a.revelarTudo },
         "-",
+        {
+          nome: "Análise",
+          itens: [
+            {
+              nome: "Definir escala de medida",
+              itens: [
+                { nome: "Padrão", marcado: !a.temEscalaDeMedida, aoEscolher: a.escalaDeMedidaPadrao, titulo: "1 pixel = 1 pixel" },
+                { nome: "Personalizar…", marcado: a.temEscalaDeMedida, aoEscolher: () => a.janelaDaMedicao("escala") },
+              ],
+            },
+            { nome: "Registrar medições", aoEscolher: a.registrarMedicoes, titulo: "Da seleção, da medida da Régua (com ela escolhida) ou da Contagem (com ela escolhida)" },
+            "-",
+            { nome: "Ferramenta Régua", aoEscolher: () => a.ferramenta("regua") },
+            { nome: "Ferramenta Contagem", aoEscolher: () => a.ferramenta("contagem") },
+            "-",
+            { nome: "Inserir marcador de escala…", aoEscolher: () => a.janelaDaMedicao("marcador") },
+          ],
+        },
+        "-",
         { nome: "Ampliar ou expandir com IA…", desativado: !a.temFoto, aoEscolher: () => a.painel("fotoIA") },
       ],
     },
@@ -907,6 +933,8 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Guias", atalho: "Ctrl+;", marcado: a.vista.guias, aoEscolher: () => a.mudarVista({ guias: !a.vista.guias }) },
             { nome: "Grade", atalho: "Ctrl+'", marcado: a.vista.grade, aoEscolher: () => a.mudarVista({ grade: !a.vista.grade }) },
             { nome: "Guias inteligentes", marcado: a.vista.guiasInteligentes, aoEscolher: () => a.mudarVista({ guiasInteligentes: !a.vista.guiasInteligentes }) },
+            { nome: "Notas", marcado: a.vista.notas, aoEscolher: () => a.mudarVista({ notas: !a.vista.notas }) },
+            { nome: "Contagem", marcado: a.vista.contagem, aoEscolher: () => a.mudarVista({ contagem: !a.vista.contagem }) },
             { nome: "Malha de pixels", marcado: a.vista.malhaDePixels, aoEscolher: () => a.mudarVista({ malhaDePixels: !a.vista.malhaDePixels }), titulo: "Um quadriculado em cada pixel, com o zoom a partir de 800%" },
             "-",
             { nome: "Configurar a grade…", aoEscolher: () => a.janelaDaVista("grade") },

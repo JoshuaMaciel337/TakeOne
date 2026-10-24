@@ -278,7 +278,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Girar a vista (R) e espelhar a vista; 200% e tamanho de impressão; Ajustar a camada à tela
 - [x] Modos de tela (F); Tab esconde os painéis (Shift+Tab só os encaixados)
 - [x] Navegador; Informações (a cor sob o ponteiro, X e Y, o tamanho da seleção) com o Amostrador de cor (I)
-- [ ] Contagem (I), Nota (I), escala de medida e Registro de medições
+- [x] Contagem (I), Nota (I), escala de medida e Registro de medições
 - [ ] Vários documentos abertos em abas, com Ctrl+Tab
 
 ### Onda 13.15 — Organização e fluxo

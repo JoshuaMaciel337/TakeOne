@@ -50,6 +50,8 @@ import {
   WandSparkles,
   ZoomIn,
   Crosshair,
+  Hash,
+  StickyNote,
   RotateCw,
   CircleDashed,
   Spline,
@@ -101,6 +103,8 @@ export type IdFerramentaDaImagem =
   | "corte"
   | "contaGotas"
   | "amostradorDeCor"
+  | "contagem"
+  | "nota"
   | "remover"
   | "recuperacaoParaManchas"
   | "recuperacao"
@@ -178,6 +182,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [F("quadro", "Ferramenta Quadro", "K", Frame, "Arraste para desenhar um quadro (retangular ou elíptico) e ponha uma foto nele: com o quadro escolhido, clique numa foto da biblioteca.")],
   [
     F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo."),
+    F("contagem", "Ferramenta Contagem", "I", Hash, "Clique para contar (os pontos ganham números, por grupo); arraste um ponto para mover e Alt + clique para tirar."),
+    F("nota", "Ferramenta Nota", "I", StickyNote, "Clique para pôr uma nota na imagem; o painel Notas mostra o texto dela."),
     F("amostradorDeCor", "Ferramenta Amostrador de cor", "I", Crosshair, "Clique para pôr um ponto (até 10) cuja cor o painel Informações mostra; arraste para mover e Alt + clique para tirar."),
     F("regua", "Ferramenta Régua", "I", Ruler, "Arraste para medir a distância e o ângulo; Endireitar camada deixa a linha medida reta."),
   ],
