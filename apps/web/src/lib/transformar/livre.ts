@@ -137,7 +137,7 @@ export function doReferencial(quad: Quadrilatero, pontos: Ponto[]): Ponto[] {
   return pontos.map((p) => emUV(quad, p.x, p.y));
 }
 
-type Imagem = { dados: Uint8ClampedArray; largura: number; altura: number };
+type Imagem = { dados: ArrayLike<number>; largura: number; altura: number };
 
 /** O peso de Keys (a = −0,5), o bicúbico de sempre. */
 function keys(t: number): number {
@@ -152,7 +152,7 @@ function keys(t: number): number {
  * cor dos transparentes não vaza), e escreve no pixel `k` da saída. Fora da origem não escreve; a borda fica suave pela
  * própria interpolação.
  */
-function leitor(origem: Imagem, interpolacao: Interpolacao) {
+export function leitor(origem: Imagem, interpolacao: Interpolacao) {
   const { dados, largura: lo, altura: ao } = origem;
   const pre = new Float32Array(4);
   const ler = (sx: number, sy: number, peso: number) => {

@@ -179,7 +179,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Rotação da imagem (180, 90, arbitrária, virar a tela)
 - [x] Revelar tudo
 - [x] Régua (I) com "Endireitar camada"
-- [ ] Dissolver (Ctrl+Shift+X): empurrar, reconstruir, suavizar, girar, contrair, inflar, deslocar, congelar e descongelar máscara
+- [x] Dissolver (Ctrl+Shift+X): empurrar, reconstruir, suavizar, girar, contrair, inflar, deslocar, congelar e descongelar máscara
 - [ ] Ponto de fuga (planos e colar em perspectiva)
 - [ ] Grande-angular adaptável e Correção de lente
 - [ ] Alinhar camadas automaticamente e Mesclar camadas automaticamente (panorama e empilhamento de foco)

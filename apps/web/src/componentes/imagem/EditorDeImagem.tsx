@@ -98,6 +98,7 @@ import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } fr
 import { preencherBuracos } from "@/lib/pintura/recuperar";
 import { JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
 import { redimensionar } from "@/lib/transformar/reamostragem";
+import { JanelaDissolver } from "./JanelaDissolver";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
@@ -308,6 +309,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [nomeDoPadrao, setNomeDoPadrao] = useState(false);
   // Imagem › Tamanho da imagem, Tamanho da tela e Rotação da imagem › Arbitrária
   const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
+  // Filtro › Dissolver: a camada desenhada sozinha e o plano da camada de pixels que vem dela
+  const [dissolvendo, setDissolvendo] = useState<{ imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
   const [importandoPadroes, setImportandoPadroes] = useState(false);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
@@ -1533,6 +1536,39 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       setGerandoPixels(false);
     }
   };
+  /** Filtro › Dissolver: a camada escolhida, desenhada sozinha (como no rasterizar), vai para a área de trabalho. */
+  const abrirDissolver = async () => {
+    const atual = projetoRef.current;
+    if (!atual || !selecionado || gerandoPixels) return;
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado || achado.clipe.pasta || achado.clipe.ajuste) return mostrarAviso("Escolha uma camada com conteúdo para dissolver.");
+    if (camadaTravada(atual, achado.faixa) || achado.faixa.travas?.pixels) return mostrarAviso("A camada está travada.");
+    let plano: PlanoDosPixels;
+    try {
+      plano = planoDosPixels(atual, achado.clipe.mascara_pixels ? "aplicarMascara" : "transformar", [achado.faixa.id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
+    } catch (e) {
+      return mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o Dissolver.");
+    }
+    const { desenhar, ...dados } = plano;
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const documento = tamanhoDaImagem(atual);
+      const bitmap = await createImageBitmap(await exportarImagem(desenhar, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const canvas = document.createElement("canvas");
+      canvas.width = documento.largura;
+      canvas.height = documento.altura;
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx2d.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+      bitmap.close();
+      const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura);
+      setDissolvendo({ imagem: { dados: pixels.data, largura: pixels.width, altura: pixels.height }, dados });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o Dissolver.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
   /** Sensível ao conteúdo: o que ficou sem nenhuma camada (as cunhas do giro, o que passou da imagem) é refeito. */
   const preencherOVazio = async (depois: Projeto) => {
     const documento = tamanhoDaImagem(depois);
@@ -2606,6 +2642,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     tamanhoDaTela: () => setJanelaDoDocumento("tela"),
     girarImagem: (giro) => (giro === "arbitraria" ? setJanelaDoDocumento("giro") : executar({ comando: "imagem.girar", parametros: { giro, tamanhos: tamanhosDasMidias() } })),
     revelarTudo,
+    dissolver: () => void abrirDissolver(),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2741,7 +2778,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3592,6 +3629,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           temCamada={Boolean(refinando.clipeId)}
           aoFechar={() => setRefinando(null)}
           aoConfirmar={(resultado) => void saidaDoRefinamento(resultado)}
+        />
+      ) : null}
+      {dissolvendo ? (
+        <JanelaDissolver
+          imagem={dissolvendo.imagem}
+          aoFechar={() => setDissolvendo(null)}
+          aoConfirmar={(pixels) => {
+            const { dados, imagem } = dissolvendo;
+            setDissolvendo(null);
+            const canvas = document.createElement("canvas");
+            canvas.width = imagem.largura;
+            canvas.height = imagem.altura;
+            canvas.getContext("2d")!.putImageData(new ImageData(pixels, imagem.largura, imagem.altura), 0, 0);
+            canvas.toBlob((blob) => blob && void gerarPixels(async () => blob, dados), "image/png");
+          }}
         />
       ) : null}
       {janelaDoDocumento === "imagem" && projeto ? (

@@ -105,6 +105,8 @@ export type AcoesDosMenus = {
   selecionarEMascarar: () => void;
   /** Selecionar › Transformar seleção. */
   transformarSelecao: () => void;
+  /** Filtro › Dissolver (na camada escolhida). */
+  dissolver: () => void;
   /** Imagem › Tamanho da imagem, Tamanho da tela, Rotação da imagem e Revelar tudo. */
   tamanhoDaImagem: () => void;
   tamanhoDaTela: () => void;
@@ -480,6 +482,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: grupo.itens.map((item) => ({ nome: item.nome, titulo: nomeDoFiltro(item.efeito), aoEscolher: () => a.filtro(item.efeito) })),
         })),
         "-",
+        { nome: "Dissolver…", atalho: "Ctrl+Shift+X", desativado: semCamada, aoEscolher: a.dissolver },
         { nome: "Galeria de filtros…", aoEscolher: () => a.painel("filtros") },
       ],
     },
