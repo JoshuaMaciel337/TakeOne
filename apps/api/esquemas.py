@@ -947,6 +947,28 @@ class PontoEntrada(BaseModel):
     y: float = Field(ge=-LIMITE_DO_VETOR, le=LIMITE_DO_VETOR)
 
 
+class DeformacaoDoTextoEntrada(BaseModel):
+    """Texto › Deformar texto (apps/web/src/lib/texto/deformar.ts): estilo, curvatura e distorções (-100 a 100)."""
+    estilo: Literal["arco", "arcoInferior", "arcoSuperior", "arcada", "saliencia", "conchaInferior", "conchaSuperior",
+                    "bandeira", "onda", "peixe", "elevar", "olhoDePeixe", "inflar", "espremer", "torcao"]
+    vertical: bool = False
+    curvatura: float = Field(ge=-100, le=100)
+    distorcaoH: float = Field(default=0, ge=-100, le=100)  # noqa: N815
+    distorcaoV: float = Field(default=0, ge=-100, le=100)  # noqa: N815
+
+
+class CaminhoDoTextoEntrada(BaseModel):
+    """
+    O texto num caminho (as letras seguem a linha) ou dentro de uma forma (as linhas quebram dentro dela), nas unidades
+    do texto (apps/web/src/lib/texto/caminho.ts).
+    """
+    tipo: Literal["linha", "area"]
+    nos: list[NoDoCaminho] = Field(min_length=2, max_length=5000)
+    fechado: bool = False
+    inicio: float = Field(default=0, ge=0, le=1)
+    inverter: bool = False
+
+
 class TextoRicoEntrada(BaseModel):
     """O texto do editor de imagem, desenhado no navegador (apps/web/src/lib/texto/modelo.ts)."""
     paragrafos: list[ParagrafoRicoEntrada] = Field(min_length=1, max_length=2000)
@@ -956,9 +978,22 @@ class TextoRicoEntrada(BaseModel):
     orientacao: Literal["horizontal", "vertical"] = "horizontal"
     caixa: TamanhoDoVetor
     origem: PontoEntrada
+    deformar: DeformacaoDoTextoEntrada | None = None
+    caminho: CaminhoDoTextoEntrada | None = None
+
+    @model_serializer(mode="wrap")
+    def _sem_os_vazios(self, serializar):
+        # Sem deformação e sem caminho, os campos nem aparecem (o texto guardado fica como o editor manda)
+        dados = serializar(self)
+        for chave in ("deformar", "caminho"):
+            if dados.get(chave) is None:
+                dados.pop(chave, None)
+        return dados
 
     @model_validator(mode="after")
     def _completo(self):
+        if self.caminho and self.caminho.tipo == "area" and not self.caminho.fechado:
+            raise ValueError("O texto dentro de uma forma precisa de um caminho fechado.")
         if not {"familia", "tamanho", "cor"} <= self.estilo.model_fields_set:
             raise ValueError("O estilo do texto precisa da fonte, do tamanho e da cor.")
         if sum(len(trecho.texto) for paragrafo in self.paragrafos for trecho in paragrafo.trechos) > 50_000:

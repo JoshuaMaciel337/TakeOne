@@ -128,6 +128,22 @@ def test_texto_rico(cliente):
     sem_fonte_camada = camada("video", {**camada_, "texto_rico": sem_fonte})
     assert salvar(cliente, aberto, [sem_fonte_camada, faixas[1]]).status_code == 422
     assert salvar(cliente, aberto, [camada("texto", camada_), faixas[1]]).status_code == 422
+    # Deformado e num caminho: os campos voltam como foram
+    caminho = {"tipo": "linha", "nos": [{"x": 0, "y": 0}, {"x": 100, "y": 0, "ex": 50, "ey": -40}], "fechado": False,
+               "inicio": 0.1, "inverter": False}
+    deformado = {**texto, "deformar": {"estilo": "arco", "vertical": False, "curvatura": 50, "distorcaoH": 0,
+                                        "distorcaoV": -10}, "caminho": caminho}
+    salvo = salvar(cliente, aberto, [camada("video", {**camada_, "texto_rico": deformado}), faixas[1]])
+    assert salvo.status_code == 200, salvo.text
+    guardado = cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["texto_rico"]
+    assert guardado["deformar"]["curvatura"] == 50 and guardado["caminho"]["nos"][1]["ex"] == 50
+    # Dentro de uma forma, o caminho tem de ser fechado; curvatura fora de -100 a 100 não vale
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    area_aberta = {**texto, "caminho": {**caminho, "tipo": "area"}}
+    com_area = camada("video", {**camada_, "texto_rico": area_aberta})
+    assert salvar(cliente, aberto, [com_area, faixas[1]]).status_code == 422
+    exagero = {**texto, "deformar": {"estilo": "onda", "curvatura": 150}}
+    assert salvar(cliente, aberto, [camada("video", {**camada_, "texto_rico": exagero}), faixas[1]]).status_code == 422
 
 
 def test_pranchetas(cliente, db_limpo):
