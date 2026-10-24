@@ -12,7 +12,7 @@ from worker.tarefas.esconder_rostos import marcar_com_erro as marcar_rostos_com_
 from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabilizacao_com_erro
 from worker.tarefas.fala import executar_fala
 from worker.tarefas.fluido import executar_fluido, marcar_fluido_com_erro
-from worker.tarefas.foto_ia import executar_ampliar, executar_expandir, executar_foto_3d
+from worker.tarefas.foto_ia import executar_ampliar, executar_expandir, executar_foto_3d, executar_profundidade
 from worker.tarefas.geracao_video import (
     executar_geracao_imagem,
     executar_geracao_video,
@@ -71,6 +71,7 @@ REGISTRO = {
     "ampliar": Tarefa(executar_ampliar, ao_falhar=marcar_geracao_com_erro),
     "expandir": Tarefa(executar_expandir, ao_falhar=marcar_geracao_com_erro),
     "foto_3d": Tarefa(executar_foto_3d, ao_falhar=marcar_geracao_com_erro),
+    "profundidade": Tarefa(executar_profundidade),
     "direcao": Tarefa(executar_direcao),
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),

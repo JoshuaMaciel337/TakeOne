@@ -75,3 +75,28 @@ def test_pedidos_que_nao_servem(cliente, db_limpo):
     grande_id = str(enviar_imagem(db_limpo, organizacao, "Grande.png", _grande))
     assert cliente.post(f"/api/midias/{grande_id}/ampliar", json={"fator": 2}).status_code == 409
     assert "dobro" in cliente.post(f"/api/midias/{grande_id}/expandir", json={"proporcao": "9:16"}).json()["detail"]
+
+
+def test_profundidade_da_foto_e_guardada_uma_vez(cliente, db_limpo):
+    import numpy as np
+
+    from core.modelos.midia import chave_arquivo
+    from core.utils import storage
+
+    cadastrar(cliente)
+    foto_id = str(enviar_imagem(db_limpo, organizacao_de(cliente), "Foto.jpg", _foto))
+    resposta = cliente.post(f"/api/midias/{foto_id}/profundidade")
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["arquivo"] == "profundidade.png" and resposta.json()["job_id"]
+    # Pedir de novo enquanto mede devolve o mesmo job
+    assert cliente.post(f"/api/midias/{foto_id}/profundidade").json()["job_id"] == resposta.json()["job_id"]
+    _processar(db_limpo, "profundidade")
+    assert cliente.post(f"/api/midias/{foto_id}/profundidade").json()["job_id"] is None
+    servida = cliente.get(f"/api/midias/{foto_id}/arquivos/profundidade.png")
+    assert servida.status_code == 200
+    from bson import ObjectId
+
+    caminho = storage.caminho_local(chave_arquivo(organizacao_de(cliente), ObjectId(foto_id), "profundidade.png"))
+    cinza = np.asarray(Image.open(caminho))
+    # No modo simulado, o chão perto (claro, embaixo) e o céu longe (escuro, em cima)
+    assert cinza.ndim == 2 and cinza[0].mean() < 20 and cinza[-1].mean() > 235

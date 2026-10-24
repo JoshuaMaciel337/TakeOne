@@ -48,6 +48,7 @@ TAREFAS = {
     "ampliar": RECURSO_CPU,
     "expandir": RECURSO_CPU,
     "foto_3d": RECURSO_CPU,
+    "profundidade": RECURSO_CPU,
 }
 
 

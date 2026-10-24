@@ -43,6 +43,10 @@ ARQUIVO_PROXY_IMAGEM = "proxy.webp"
 ARQUIVO_MASCARA_IMAGEM = "mascara.png"
 # A de resolução cheia também: o editor de imagem exporta no navegador, no tamanho de verdade
 ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROXY_IMAGEM, ARQUIVO_IMAGEM, ARQUIVO_MASCARA_IMAGEM}
+# A profundidade de uma foto (Depth Anything, tarefa "profundidade"): cinza, 255 perto e 0 longe, no tamanho da
+# cópia leve; o céu, o desfoque de profundidade e a substituição do céu do editor de imagem leem
+ARQUIVO_PROFUNDIDADE = "profundidade.png"
+ARQUIVOS_PUBLICOS = ARQUIVOS_PUBLICOS | {ARQUIVO_PROFUNDIDADE}
 # A entrada do preenchimento generativo (o recorte com a área a preencher transparente); não é servida
 ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO = "entrada_preenchimento.png"
 # O vídeo ao contrário (tarefa "inversao"): o de resolução cheia é do render; a cópia leve, com o som, da prévia

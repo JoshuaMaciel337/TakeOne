@@ -15,7 +15,7 @@ from PIL import Image
 
 from core.config import FFMPEG, MODELO_AMPLIAR, MODELO_APAGAR, MODELO_PROFUNDIDADE, MODO_IA
 from core.modelos.job import ErroDefinitivo, montar_job
-from core.modelos.midia import ARQUIVO_IMAGEM, PRIORIDADE_INGESTAO, chave_arquivo, pasta_da_midia
+from core.modelos.midia import ARQUIVO_IMAGEM, ARQUIVO_PROFUNDIDADE, PRIORIDADE_INGESTAO, chave_arquivo, pasta_da_midia
 from core.utils import storage
 from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709
 from core.utils.foto_ia import FPS_3D, ampliar, conferir_expansao, expandir, preparar_3d, profundidade, quadro_3d
@@ -157,3 +157,31 @@ def executar_foto_3d(db, job: dict, reportar: Callable[[int, str], None]) -> dic
     _entregar(db, job, midia, original, f"Foto em 3D ({entrada['movimento']}, {total} quadros)")
     reportar(100, "Pronto")
     return {"midia_id": str(midia["_id"]), "quadros": total, "largura": largura, "altura": altura}
+
+
+# A profundidade guardada tem o lado maior da cópia leve das fotos
+LADO_DA_PROFUNDIDADE_GUARDADA = 1920
+
+
+def executar_profundidade(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
+    """A profundidade da foto (Depth Anything V2 Small), guardada em cinza (255 perto, 0 longe) para o editor de
+    imagem: o céu, o desfoque de profundidade e a substituição do céu."""
+    midia = db.midias.find_one({"_id": ObjectId(job["entrada"]["midia_id"])})
+    if midia is None:
+        raise ErroDefinitivo("A foto foi excluída antes de a profundidade ser medida.")
+    foto = _foto(midia)
+    reportar(10, "Medindo a profundidade")
+    disparidade = profundidade(foto, _sessao_de(MODELO_PROFUNDIDADE))
+    imagem = Image.fromarray((disparidade * 255 + 0.5).astype("uint8"), "L")
+    fator = min(1.0, LADO_DA_PROFUNDIDADE_GUARDADA / max(imagem.size))
+    if fator < 1:
+        imagem = imagem.resize((max(1, round(imagem.width * fator)), max(1, round(imagem.height * fator))),
+                               Image.Resampling.BILINEAR)
+    destino = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_PROFUNDIDADE))
+    parcial = destino.with_name("profundidade.parcial.png")
+    imagem.save(parcial, optimize=True)
+    parcial.replace(destino)
+    db.midias.update_one({"_id": midia["_id"]},
+                         {"$addToSet": {"arquivos": ARQUIVO_PROFUNDIDADE}, "$set": {"atualizado_em": agora()}})
+    reportar(100, "Profundidade pronta")
+    return {"midia_id": str(midia["_id"]), "arquivo": ARQUIVO_PROFUNDIDADE}

@@ -17,8 +17,9 @@ from starlette.concurrency import run_in_threadpool
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import MidiaSaida, ObjetoEntrada, SelecaoEntrada, SelecaoSaida
 from api.rotas.midias import buscar_midia, para_saida
-from core.modelos.job import montar_job
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import (
+    ARQUIVO_PROFUNDIDADE,
     PRIORIDADE_INGESTAO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
@@ -67,6 +68,23 @@ async def selecionar(midia_id: str, dados: SelecaoEntrada, usuario=Depends(usuar
                      prioridade=PRIORIDADE_INGESTAO + 1, criado_por=usuario["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     return SelecaoSaida(arquivo=arquivo, job_id=str(job_id))
+
+
+@router.post("/{midia_id}/profundidade", response_model=SelecaoSaida)
+async def medir_profundidade(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A profundidade da foto (Depth Anything, no worker de CPU), uma vez por foto: o céu, o desfoque de
+    profundidade e a substituição do céu do editor de imagem leem o profundidade.png."""
+    midia = await _foto_pronta(db, midia_id, usuario)
+    if ARQUIVO_PROFUNDIDADE in midia.get("arquivos", []):
+        return SelecaoSaida(arquivo=ARQUIVO_PROFUNDIDADE, job_id=None)
+    pendente = await db.jobs.find_one({"tipo": "profundidade", "entrada.midia_id": str(midia["_id"]),
+                                       "status": {"$in": [STATUS_PENDENTE, STATUS_EXECUTANDO]}})
+    if pendente:
+        return SelecaoSaida(arquivo=ARQUIVO_PROFUNDIDADE, job_id=str(pendente["_id"]))
+    job = montar_job("profundidade", usuario["organizacao_id"], {"midia_id": str(midia["_id"])},
+                     prioridade=PRIORIDADE_INGESTAO + 1, criado_por=usuario["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    return SelecaoSaida(arquivo=ARQUIVO_PROFUNDIDADE, job_id=str(job_id))
 
 
 def _ler_pincel(texto: str) -> Image.Image:
