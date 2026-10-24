@@ -92,6 +92,8 @@ import { caixaParaAparar, faixaDoTracado, limparPixels, preencherPixels, rgbDaCo
 import { definirPadroesDoEspaco, esperarLadrilho, type IdDoPadrao, ladrilhar, ladrilhoDoPadrao } from "@/lib/pintura/padroes";
 import { lerPat } from "@/lib/pintura/pat";
 import { PainelPadroes } from "./Padroes";
+import { JanelaTamanhoDaImagem, JanelaTamanhoDaTela, type NovaTela, type NovoTamanho } from "./JanelasDoDocumento";
+import { redimensionar } from "@/lib/transformar/reamostragem";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
 import { type DivisaoDaMalha, type EstadoDaTransformacao, mapaDoEstado, type ModoDaTransformacao } from "./TransformacaoNaPrevia";
 import { type Ponto as PontoDaMalha, type Quadrilatero, quadDoRetangulo } from "@/lib/transformar/malha";
@@ -300,6 +302,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const padroesDoEspaco = useRecursos("padrao");
   useEffect(() => definirPadroesDoEspaco(padroesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome }))), [padroesDoEspaco.recursos]);
   const [nomeDoPadrao, setNomeDoPadrao] = useState(false);
+  // Imagem › Tamanho da imagem, Tamanho da tela e Rotação da imagem › Arbitrária
+  const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
   const [importandoPadroes, setImportandoPadroes] = useState(false);
   const [ultimoPreenchimento, setUltimoPreenchimento] = useState<Preenchimento>({ conteudo: "primeiroPlano", cor: "#ff0000", padrao: "xadrez", modo: "normal", opacidade: 1, preservar: false });
   // A área de transferência das camadas: os pixels copiados, onde estavam no documento e o tamanho do PNG que foi para a
@@ -2159,6 +2163,85 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     void comecarTransformacaoDaCamada({ modo: como });
   };
+  /**
+   * Imagem › Tamanho da imagem: com a reamostragem, cada camada de pixels e cada canal vão para o tamanho novo pelo
+   * método escolhido (mídias novas, que sobem antes) e o quadro muda num passo só; sem ela, só a resolução muda.
+   */
+  const aplicarTamanhoDaImagem = async (novo: NovoTamanho) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const antes = tamanhoDaImagem(atual);
+    const mudou = novo.largura !== antes.largura || novo.altura !== antes.altura;
+    const pixels: { id: string; midiaId: string; versao: number }[] = [];
+    const canais: { id: string; midiaId: string; versao: number }[] = [];
+    setGerandoPixels(true);
+    try {
+      if (mudou && novo.reamostrar) {
+        await pinturas.esperar();
+        const reamostrarAlvo = async (alvo: AlvoDoMotor, tamanho: { largura: number; altura: number }, nome: string) => {
+          const pintura = await pinturas.preparar(alvo, tamanho);
+          const dados = pintura.camada.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, tamanho.largura, tamanho.altura).data;
+          const largura = Math.max(1, Math.round((tamanho.largura * novo.largura) / antes.largura));
+          const altura = Math.max(1, Math.round((tamanho.altura * novo.altura) / antes.altura));
+          const canvas = document.createElement("canvas");
+          canvas.width = largura;
+          canvas.height = altura;
+          canvas.getContext("2d")!.putImageData(new ImageData(redimensionar({ dados, largura: tamanho.largura, altura: tamanho.altura }, largura, altura, novo.metodo), largura, altura), 0, 0);
+          const blob = await new Promise<Blob>((pronto, falhou) => canvas.toBlob((b) => (b ? pronto(b) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+          const midia = await criarCamadaDePixels(largura, altura, nome);
+          setCriadas((atuais) => new Map([...atuais, [midia.id, midia]]));
+          return { midiaId: midia.id, versao: await enviarVersao(midia.id, blob) };
+        };
+        for (const { clipe, faixa } of camadasDaImagem(atual)) {
+          if (!clipe.pixels || !clipe.midia_id) continue;
+          const alvo = alvoDosPixels(clipe);
+          if (!alvo) continue;
+          const tamanho = midias.get(clipe.midia_id)?.camada_pixels ?? antes;
+          pixels.push({ id: clipe.id, ...(await reamostrarAlvo(alvo, tamanho, nomeDaFaixa(faixa))) });
+        }
+        for (const canal of atual.canais ?? []) canais.push({ id: canal.id, ...(await reamostrarAlvo(alvoDoCanal(canal), antes, canal.nome)) });
+        void biblioteca.recarregar();
+      }
+      executar({ comando: "imagem.tamanhoComPixels", parametros: { tamanho: { largura: novo.largura, altura: novo.altura, resolucao: novo.resolucao }, pixels, canais } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível mudar o tamanho da imagem.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** Imagem › Tamanho da tela: o retângulo novo pela âncora, as camadas no mesmo lugar em pixels. */
+  const aplicarTamanhoDaTela = (nova: NovaTela) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const antes = tamanhoDaImagem(atual);
+    const retangulo = { x: (antes.largura - nova.largura) * nova.ancora.u, y: (antes.altura - nova.altura) * nova.ancora.v, largura: nova.largura, altura: nova.altura };
+    executar({ comando: "imagem.tamanhoDaTela", parametros: { retangulo, tamanhos: tamanhosDasMidias(), fundo: nova.extensao } });
+  };
+  /** Imagem › Revelar tudo: a tela cresce até caber o que está fora dela (pelas caixas que a prévia mede). */
+  const revelarTudo = () => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const antes = tamanhoDaImagem(atual);
+    let x0 = 0;
+    let y0 = 0;
+    let x1 = antes.largura;
+    let y1 = antes.altura;
+    for (const { clipe } of camadasDaImagem(atual)) {
+      if (clipe.ajuste || clipe.pasta) continue;
+      const medida = caixasRef.current.get(clipe.id);
+      if (!medida?.bruta || !medida.quadro) continue;
+      const k = antes.largura / medida.quadro.largura;
+      // A caixa medida na tela tem um resto de conta: um centésimo de pixel não aumenta a tela
+      for (const canto of quadDoRetangulo(medida.bruta.cx * k, medida.bruta.cy * k, medida.bruta.largura * k, medida.bruta.altura * k, medida.bruta.rotacao)) {
+        x0 = Math.min(x0, Math.floor(canto.x + 0.01));
+        y0 = Math.min(y0, Math.floor(canto.y + 0.01));
+        x1 = Math.max(x1, Math.ceil(canto.x - 0.01));
+        y1 = Math.max(y1, Math.ceil(canto.y - 0.01));
+      }
+    }
+    if (x0 === 0 && y0 === 0 && x1 === antes.largura && y1 === antes.altura) return mostrarAviso("Não há nada fora da tela.");
+    executar({ comando: "imagem.tamanhoDaTela", parametros: { retangulo: { x: x0, y: y0, largura: x1 - x0, altura: y1 - y0 }, tamanhos: tamanhosDasMidias(), fundo: null } });
+  };
   /** Rasterizar, mesclar, achatar ou carimbar as escolhidas (cada rasterizar é uma camada por vez). */
   const mesclarEmPixels = async (tipo: TipoDaMesclagem) => {
     if (!projeto || gerandoPixels) return;
@@ -2377,6 +2460,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     definirPadrao: () => setNomeDoPadrao(true),
     transformarSelecao,
     transformarCamada: transformarCamadaPeloMenu,
+    tamanhoDaImagem: () => setJanelaDoDocumento("imagem"),
+    tamanhoDaTela: () => setJanelaDoDocumento("tela"),
+    girarImagem: (giro) => (giro === "arbitraria" ? setJanelaDoDocumento("giro") : executar({ comando: "imagem.girar", parametros: { giro, tamanhos: tamanhosDasMidias() } })),
+    revelarTudo,
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2512,7 +2599,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3296,6 +3383,42 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           temCamada={Boolean(refinando.clipeId)}
           aoFechar={() => setRefinando(null)}
           aoConfirmar={(resultado) => void saidaDoRefinamento(resultado)}
+        />
+      ) : null}
+      {janelaDoDocumento === "imagem" && projeto ? (
+        <JanelaTamanhoDaImagem
+          antes={{ ...tamanhoDaImagem(projeto), resolucao: projeto.tamanho?.resolucao ?? 72 }}
+          aoFechar={() => setJanelaDoDocumento(null)}
+          aoConfirmar={(novo) => {
+            setJanelaDoDocumento(null);
+            void aplicarTamanhoDaImagem(novo);
+          }}
+        />
+      ) : null}
+      {janelaDoDocumento === "tela" && projeto ? (
+        <JanelaTamanhoDaTela
+          antes={{ ...tamanhoDaImagem(projeto), resolucao: projeto.tamanho?.resolucao ?? 72 }}
+          primeiroPlano={cores.primeiroPlano}
+          fundo={cores.fundo}
+          aoFechar={() => setJanelaDoDocumento(null)}
+          aoConfirmar={(nova) => {
+            setJanelaDoDocumento(null);
+            aplicarTamanhoDaTela(nova);
+          }}
+        />
+      ) : null}
+      {janelaDoDocumento === "giro" ? (
+        <JanelaDeNumero
+          titulo="Girar a imagem"
+          rotulo="Ângulo (° no sentido horário; negativo, no anti-horário)"
+          padrao={0}
+          minimo={-359.99}
+          maximo={359.99}
+          aoFechar={() => setJanelaDoDocumento(null)}
+          aoConfirmar={(graus) => {
+            setJanelaDoDocumento(null);
+            if (graus) executar({ comando: "imagem.girar", parametros: { giro: { graus }, tamanhos: tamanhosDasMidias() } });
+          }}
         />
       ) : null}
       {nomeDoPadrao ? (

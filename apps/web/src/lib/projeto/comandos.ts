@@ -127,6 +127,11 @@ import {
   mudarTamanhoDaImagem,
   recortarImagem,
   transformarCamada,
+  tamanhoComPixels,
+  tamanhoDaTela,
+  girarImagem,
+  type GiroDaImagem,
+  type TrocaDePixels,
   type RetanguloDaImagem,
   type TamanhoDaImagem,
   trocarImagemDaCamada,
@@ -228,6 +233,9 @@ export type Comando =
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.transformarCamada"; parametros: { clipeId: string; transformacao: Partial<Transformacao>; virar?: Virar } }
+  | { comando: "imagem.tamanhoComPixels"; parametros: { tamanho: TamanhoDaImagem; pixels: TrocaDePixels[]; canais: TrocaDePixels[] } }
+  | { comando: "imagem.tamanhoDaTela"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho>; fundo: { cor: string; transparente: boolean } | null } }
+  | { comando: "imagem.girar"; parametros: { giro: GiroDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.camadaComOutraMidia"; parametros: { faixaId: string; midiaId: string } }
   | { comando: "clipe.efeito"; parametros: { clipeIds: string[]; efeito: Efeito | null } }
   | { comando: "clipe.chroma"; parametros: { clipeIds: string[]; chroma: Chroma | null } }
@@ -344,6 +352,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
   "imagem.transformarCamada": "transformar a camada",
+  "imagem.tamanhoComPixels": "mudar o tamanho da imagem",
+  "imagem.tamanhoDaTela": "mudar o tamanho da tela",
+  "imagem.girar": "girar a imagem",
   "imagem.camadaComOutraMidia": "pôr o objeto recortado",
   "clipe.efeito": "mudar o efeito",
   "clipe.chroma": "mudar a tela verde",
@@ -603,6 +614,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: recortarImagem(projeto, parametros.retangulo, parametros.tamanhos) };
     case "imagem.transformarCamada":
       return { projeto: transformarCamada(projeto, parametros.clipeId, parametros.transformacao, parametros.virar) };
+    case "imagem.tamanhoComPixels":
+      return { projeto: tamanhoComPixels(projeto, parametros.tamanho, parametros.pixels, parametros.canais) };
+    case "imagem.tamanhoDaTela":
+      return { projeto: tamanhoDaTela(projeto, parametros.retangulo, parametros.tamanhos, parametros.fundo) };
+    case "imagem.girar":
+      return { projeto: girarImagem(projeto, parametros.giro, parametros.tamanhos) };
     case "imagem.aplicarModelo":
       return { projeto: aplicarModeloDeImagem(projeto, ctx, parametros), selecao: [] };
     case "imagem.trocarImagem":

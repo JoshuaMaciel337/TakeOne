@@ -232,3 +232,47 @@ test("transformar a camada: posição, escala, giro e virar num passo só; a pos
   const travado = { ...projeto, faixas: projeto.faixas.map((faixa) => (faixa.clipes[0]?.id === clipeId ? { ...faixa, travas: { posicao: true } } : faixa)) };
   assert.throws(() => executarComando(travado, { comando: "imagem.transformarCamada", parametros: { clipeId, transformacao: { x: 0 } } }, ctx), /travada/);
 });
+
+test("girar a imagem 90°: o quadro troca de lado, as camadas giram em volta do meio e ficam do mesmo tamanho em pixels", () => {
+  const ctx = contexto();
+  let projeto: Projeto = { ...vazio(), tamanho: { largura: 1200, altura: 800, resolucao: 300 } };
+  const r = executarComando(projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx);
+  const clipeId = r.selecao![0];
+  projeto = executarComando(r.projeto, { comando: "imagem.transformarCamada", parametros: { clipeId, transformacao: { x: 0.25, y: 0, escala: 0.5, rotacao: 10 } } }, ctx).projeto;
+  const tamanhos = { foto: { largura: 600, altura: 400 } };
+  const caixaAntes = caixaDoClipe(camadasDaImagem(projeto)[0].clipe.transformacao, camadasDaImagem(projeto)[0].clipe.recorte, tamanhos.foto, projeto.tamanho!);
+  const girado = executarComando(projeto, { comando: "imagem.girar", parametros: { giro: "90", tamanhos } }, ctx).projeto;
+  assert.deepEqual(girado.tamanho, { largura: 800, altura: 1200, resolucao: 300 });
+  const clipe = camadasDaImagem(girado)[0].clipe;
+  const caixa = caixaDoClipe(clipe.transformacao, clipe.recorte, tamanhos.foto, girado.tamanho!);
+  // O centro estava 300 px à direita do meio: agora está 300 px abaixo
+  assert.ok(Math.abs(caixa.cx - 400) < 1e-6 && Math.abs(caixa.cy - 900) < 1e-6, `${caixa.cx} ${caixa.cy}`);
+  assert.ok(Math.abs(caixa.largura - caixaAntes.largura) < 1e-6);
+  assert.equal(clipe.transformacao.rotacao, 100);
+  // Virar a tela na horizontal: o lado troca e o giro inverte
+  const virado = executarComando(projeto, { comando: "imagem.girar", parametros: { giro: "virarH", tamanhos } }, ctx).projeto;
+  const v = camadasDaImagem(virado)[0].clipe;
+  assert.equal(v.transformacao.x, -0.25);
+  assert.equal(v.transformacao.rotacao, -10);
+  assert.deepEqual(v.virar, { horizontal: true, vertical: false });
+  // Um ângulo qualquer: o quadro cresce até caber
+  const torto = executarComando(projeto, { comando: "imagem.girar", parametros: { giro: { graus: 30 }, tamanhos } }, ctx).projeto;
+  assert.deepEqual(torto.tamanho, { largura: Math.round(1200 * Math.cos(Math.PI / 6) + 800 * 0.5), altura: Math.round(1200 * 0.5 + 800 * Math.cos(Math.PI / 6)), resolucao: 300 });
+});
+
+test("tamanho da tela com âncora e cor; tamanho da imagem troca as camadas de pixels", () => {
+  const ctx = contexto();
+  const projeto = { ...vazio(), tamanho: { largura: 1000, altura: 1000 } };
+  const tela = executarComando(projeto, { comando: "imagem.tamanhoDaTela", parametros: { retangulo: { x: -200, y: 0, largura: 1200, altura: 1000 }, tamanhos: {}, fundo: { cor: "#000000", transparente: false } } }, ctx).projeto;
+  assert.deepEqual(tela.tamanho, { largura: 1200, altura: 1000 });
+  assert.equal(tela.fundo.cor, "#000000");
+  const comPixels = {
+    ...projeto,
+    faixas: [{ id: "f", tipo: "video" as const, oculta: false, muda: false, travada: false, clipes: [{ ...camadasDaImagem(executarComando(projeto, { comando: "imagem.adicionarMidia", parametros: { midiaId: "foto" } }, ctx).projeto)[0].clipe, id: "px", pixels: { versao: 1 } }] }, ...projeto.faixas],
+    canais: [{ id: "c1", nome: "Alfa 1", midia_id: "canal", versao: 1 }],
+  };
+  const novo = executarComando(comPixels, { comando: "imagem.tamanhoComPixels", parametros: { tamanho: { largura: 500, altura: 500, resolucao: 150 }, pixels: [{ id: "px", midiaId: "nova", versao: 1 }], canais: [{ id: "c1", midiaId: "canal2", versao: 1 }] } }, ctx).projeto;
+  assert.deepEqual(novo.tamanho, { largura: 500, altura: 500, resolucao: 150 });
+  assert.equal(camadasDaImagem(novo)[0].clipe.midia_id, "nova");
+  assert.equal(novo.canais![0].midia_id, "canal2");
+});

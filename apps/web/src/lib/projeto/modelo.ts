@@ -399,7 +399,8 @@ export type Projeto = {
   /** "imagem" no editor de imagem (lib/projeto/imagem.ts); sem ele, vídeo. */
   tipo?: "video" | "imagem";
   /** O tamanho em pixels do projeto de imagem. */
-  tamanho?: { largura: number; altura: number } | null;
+  /** Só na imagem: o tamanho em pixels e a resolução (pixels por polegada), que vai no PNG e no JPG exportados. */
+  tamanho?: { largura: number; altura: number; resolucao?: number } | null;
   versao: number;
   duracao: Tick;
   /** Marcadores na régua (tecla M); viram capítulos na janela Exportar. */

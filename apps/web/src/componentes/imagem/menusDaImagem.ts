@@ -105,6 +105,11 @@ export type AcoesDosMenus = {
   selecionarEMascarar: () => void;
   /** Selecionar › Transformar seleção. */
   transformarSelecao: () => void;
+  /** Imagem › Tamanho da imagem, Tamanho da tela, Rotação da imagem e Revelar tudo. */
+  tamanhoDaImagem: () => void;
+  tamanhoDaTela: () => void;
+  girarImagem: (giro: "180" | "90" | "-90" | "virarH" | "virarV" | "arbitraria") => void;
+  revelarTudo: () => void;
   /** Editar › Transformação livre, a de uma cópia e o submenu Transformar (na camada escolhida). */
   transformarCamada: (como: "livre" | "copia" | "novamente" | "escala" | "girar" | "inclinar" | "distorcer" | "perspectiva" | "deformar" | "girar180" | "girar90" | "girarMenos90" | "virarH" | "virarV") => void;
   temUltimaTransformacao: boolean;
@@ -289,10 +294,23 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
       itens: [
         { nome: "Ajustes", itens: AJUSTES.map((ajuste) => ({ nome: `${ajuste.nome}…`, atalho: ajuste.atalho, aoEscolher: () => a.ajuste(ajuste) })) },
         "-",
-        { nome: "Tamanho da imagem…", atalho: "Ctrl+Alt+I", aoEscolher: a.documento },
-        { nome: "Tamanho da tela…", atalho: "Ctrl+Alt+C", aoEscolher: a.documento },
+        { nome: "Tamanho da imagem…", atalho: "Ctrl+Alt+I", aoEscolher: a.tamanhoDaImagem },
+        { nome: "Tamanho da tela…", atalho: "Ctrl+Alt+C", aoEscolher: a.tamanhoDaTela },
+        {
+          nome: "Rotação da imagem",
+          itens: [
+            { nome: "180°", aoEscolher: () => a.girarImagem("180") },
+            { nome: "90° no sentido horário", aoEscolher: () => a.girarImagem("90") },
+            { nome: "90° no sentido anti-horário", aoEscolher: () => a.girarImagem("-90") },
+            { nome: "Arbitrária…", aoEscolher: () => a.girarImagem("arbitraria") },
+            "-",
+            { nome: "Virar a tela na horizontal", aoEscolher: () => a.girarImagem("virarH") },
+            { nome: "Virar a tela na vertical", aoEscolher: () => a.girarImagem("virarV") },
+          ],
+        },
         { nome: "Cortar", aoEscolher: a.cortar },
         { nome: "Aparar…", aoEscolher: a.aparar },
+        { nome: "Revelar tudo", aoEscolher: a.revelarTudo },
         "-",
         { nome: "Ampliar ou expandir com IA…", desativado: !a.temFoto, aoEscolher: () => a.painel("fotoIA") },
       ],

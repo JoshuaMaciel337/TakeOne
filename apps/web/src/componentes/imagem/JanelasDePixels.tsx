@@ -14,7 +14,7 @@ export type Tracado = { largura: number; cor: string; onde: "dentro" | "centro" 
 
 const campo = "rounded border border-borda bg-painel-2 px-1.5 py-0.5";
 
-function Moldura({ titulo, aoFechar, aoConfirmar, children }: { titulo: string; aoFechar: () => void; aoConfirmar: () => void; children: React.ReactNode }) {
+export function Moldura({ titulo, aoFechar, aoConfirmar, children }: { titulo: string; aoFechar: () => void; aoConfirmar: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
       if (evento.key === "Escape") aoFechar();

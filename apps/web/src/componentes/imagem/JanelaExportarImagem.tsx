@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { exportarImagem, FORMATOS_DA_IMAGEM, type FormatoDaImagem } from "@/lib/exportacao/imagem";
+import { comResolucao } from "@/lib/exportacao/resolucao";
 import { useEnvios } from "@/lib/envios";
 import { formatarBytes } from "@/lib/formatar";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
@@ -59,13 +60,16 @@ export function JanelaExportarImagem({ projeto, nome, midias, aoFechar, aoAvisar
     setErro("");
     try {
       const atual = aoPrepararPintura ? await aoPrepararPintura() : projeto;
-      const blob = await exportarImagem(atual, midias, {
+      let blob = await exportarImagem(atual, midias, {
         formato,
         qualidade,
         escala,
         fonteDosPixels,
         fonteDaMascara,
       });
+      // A resolução da imagem vai no arquivo (no tamanho escolhido, a medida em centímetros fica a mesma)
+      const resolucao = atual.tamanho?.resolucao;
+      if (resolucao && (formato === "png" || formato === "jpeg")) blob = new Blob([comResolucao(new Uint8Array(await blob.arrayBuffer()), formato, resolucao * escala) as Uint8Array<ArrayBuffer>], { type: blob.type });
       const arquivo = nomeDoArquivo(nome, formato);
       if (destino === "baixar") {
         const url = URL.createObjectURL(blob);

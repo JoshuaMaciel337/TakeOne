@@ -18,7 +18,7 @@ export const DURACAO_DA_CAMADA = segundosParaTicks(5);
 /** A escala com que entra uma imagem com transparência (logo, forma). */
 export const ESCALA_DO_RECORTADO = 0.5;
 
-export type TamanhoDaImagem = { largura: number; altura: number };
+export type TamanhoDaImagem = { largura: number; altura: number; resolucao?: number };
 
 /** Os mesmos limites de core/modelos/projeto.py. */
 export const LADO_MINIMO = 16;
@@ -653,15 +653,104 @@ export function recortarImagem(projeto: Projeto, retangulo: RetanguloDaImagem, t
     });
     return { ...faixa, clipes };
   });
-  return { ...projeto, tamanho: depois, faixas };
+  const resolucao = projeto.tamanho?.resolucao;
+  return { ...projeto, tamanho: { ...depois, ...(resolucao ? { resolucao } : {}) }, faixas };
 }
 
-/** Muda o tamanho do quadro. As camadas ficam no mesmo lugar em frações (o meio continua no meio). */
+/** Muda o tamanho do quadro. As camadas ficam no mesmo lugar em frações (o meio continua no meio); a resolução fica. */
 export function mudarTamanhoDaImagem(projeto: Projeto, tamanho: TamanhoDaImagem): Projeto {
   const problema = problemaNoTamanho(tamanho);
   if (problema) throw new ErroEdicao(problema);
+  const resolucao = tamanho.resolucao ?? projeto.tamanho?.resolucao;
   return {
     ...projeto,
-    tamanho: { largura: tamanho.largura, altura: tamanho.altura },
+    tamanho: { largura: tamanho.largura, altura: tamanho.altura, ...(resolucao ? { resolucao } : {}) },
   };
+}
+
+/** Uma camada de pixels (ou um canal) que passou para outra mídia, já no tamanho novo. */
+export type TrocaDePixels = { id: string; midiaId: string; versao: number };
+
+/**
+ * Imagem › Tamanho da imagem: o quadro no tamanho novo, com a resolução, e as camadas de pixels e os canais trocados
+ * pelas versões reamostradas (o editor reamostra e sobe antes), num passo só.
+ */
+export function tamanhoComPixels(projeto: Projeto, tamanho: TamanhoDaImagem, pixels: TrocaDePixels[], canais: TrocaDePixels[]): Projeto {
+  const base = mudarTamanhoDaImagem(projeto, tamanho);
+  const porClipe = new Map(pixels.map((troca) => [troca.id, troca]));
+  const porCanal = new Map(canais.map((troca) => [troca.id, troca]));
+  return {
+    ...base,
+    faixas: base.faixas.map((faixa) => ({
+      ...faixa,
+      clipes: faixa.clipes.map((clipe) => {
+        const troca = porClipe.get(clipe.id);
+        return troca && clipe.pixels ? { ...clipe, midia_id: troca.midiaId, pixels: { ...clipe.pixels, versao: troca.versao } } : clipe;
+      }),
+    })),
+    ...(base.canais ? { canais: base.canais.map((canal) => (porCanal.has(canal.id) ? { ...canal, midia_id: porCanal.get(canal.id)!.midiaId, versao: porCanal.get(canal.id)!.versao } : canal)) } : {}),
+  };
+}
+
+/** Imagem › Tamanho da tela: o retângulo novo (em pixels do quadro de agora) e, se pedida, a cor do que aumentou. */
+export function tamanhoDaTela(projeto: Projeto, retangulo: RetanguloDaImagem, tamanhos: Record<string, Tamanho>, fundo: { cor: string; transparente: boolean } | null): Projeto {
+  const recortado = recortarImagem(projeto, retangulo, tamanhos);
+  return fundo ? { ...recortado, fundo: { ...recortado.fundo, cor: fundo.cor, transparente: fundo.transparente } } : recortado;
+}
+
+export type GiroDaImagem = "180" | "90" | "-90" | "virarH" | "virarV" | { graus: number };
+
+/**
+ * Imagem › Rotação da imagem: a imagem inteira gira (180°, 90° para um lado ou para o outro, ou um ângulo qualquer, com
+ * o quadro crescendo até caber) ou vira; cada camada gira junto, em volta do meio, e continua editável.
+ */
+export function girarImagem(projeto: Projeto, giro: GiroDaImagem, tamanhos: Record<string, Tamanho>): Projeto {
+  const antes = tamanhoDaImagem(projeto);
+  const graus = typeof giro === "object" ? giro.graus : giro === "180" ? 180 : giro === "90" ? 90 : giro === "-90" ? -90 : 0;
+  const r = (graus * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(r)) < 1e-12 ? 0 : Math.cos(r);
+  const sen = Math.abs(Math.sin(r)) < 1e-12 ? 0 : Math.sin(r);
+  const depois =
+    typeof giro === "string" && (giro === "virarH" || giro === "virarV")
+      ? { largura: antes.largura, altura: antes.altura }
+      : { largura: Math.round(Math.abs(antes.largura * cos) + Math.abs(antes.altura * sen)), altura: Math.round(Math.abs(antes.largura * sen) + Math.abs(antes.altura * cos)) };
+  const problema = problemaNoTamanho(depois);
+  if (problema) throw new ErroEdicao(problema);
+  const ladoAntes = Math.min(antes.largura, antes.altura);
+  const ladoDepois = Math.min(depois.largura, depois.altura);
+  const faixas = projeto.faixas.map((faixa) => {
+    if (faixa.tipo === "principal") return faixa;
+    const clipes = faixa.clipes.map((clipe) => {
+      if (clipe.ajuste) return clipe;
+      const t = clipe.transformacao;
+      // O centro da camada a partir do meio do quadro, em pixels
+      const dx = t.x * antes.largura;
+      const dy = t.y * antes.altura;
+      let nx = dx * cos - dy * sen;
+      let ny = dx * sen + dy * cos;
+      let rotacao = t.rotacao + graus;
+      let virar = clipe.virar;
+      if (giro === "virarH" || giro === "virarV") {
+        nx = giro === "virarH" ? -dx : dx;
+        ny = giro === "virarV" ? -dy : dy;
+        rotacao = -t.rotacao;
+        const atual = clipe.virar ?? { horizontal: false, vertical: false };
+        virar = giro === "virarH" ? { ...atual, horizontal: !atual.horizontal } : { ...atual, vertical: !atual.vertical };
+      }
+      // A escala é relativa ao quadro: refeita para o tamanho em pixels continuar o mesmo
+      let escala = t.escala;
+      if (clipe.texto) escala = (t.escala * ladoAntes) / ladoDepois;
+      else if (clipe.midia_id && tamanhos[clipe.midia_id]) {
+        const midia = tamanhos[clipe.midia_id];
+        const largura = midia.largura * clipe.recorte.largura;
+        const altura = midia.altura * clipe.recorte.altura;
+        escala = (t.escala * Math.min(antes.largura / largura, antes.altura / altura)) / Math.min(depois.largura / largura, depois.altura / altura);
+      }
+      rotacao = ((((rotacao + 180) % 360) + 360) % 360) - 180;
+      return { ...clipe, transformacao: { ...t, x: nx / depois.largura, y: ny / depois.altura, escala, rotacao }, ...(virar ? { virar } : {}) };
+    });
+    return { ...faixa, clipes };
+  });
+  const resolucao = projeto.tamanho?.resolucao;
+  return { ...projeto, tamanho: { ...depois, ...(resolucao ? { resolucao } : {}) }, faixas };
 }
