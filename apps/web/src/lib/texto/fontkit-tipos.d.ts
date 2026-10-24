@@ -37,7 +37,7 @@ declare module "fontkit" {
     variationAxes: Record<string, { name: string; min: number; default: number; max: number }>;
     "OS/2"?: { yStrikeoutPosition: number; yStrikeoutSize: number };
     familyName: string;
-    layout(texto: string, recursos?: string[] | Record<string, boolean>): Corrida;
+    layout(texto: string | Glifo[], recursos?: string[] | Record<string, boolean>): Corrida;
     getVariation(eixos: Record<string, number>): Fonte;
     glyphForCodePoint(codigo: number): Glifo;
   }

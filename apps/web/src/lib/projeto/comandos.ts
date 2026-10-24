@@ -255,7 +255,7 @@ export type Comando =
   | { comando: "imagem.caminhosDoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[] } }
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
-  | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null } }
+  | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null; id?: string } }
   | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico } }
   | { comando: "imagem.adicionarPrancheta"; parametros: { retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.prancheta"; parametros: { clipeId: string; mudanca: Partial<Prancheta>; tamanhos: Record<string, Tamanho> } }
@@ -675,7 +675,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     case "imagem.mascaraVetorial":
       return { projeto: definirMascaraVetorial(projeto, parametros.clipeId, parametros.mascara) };
     case "imagem.adicionarTextoRico": {
-      const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima);
+      const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima, parametros.id);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.textoRico":

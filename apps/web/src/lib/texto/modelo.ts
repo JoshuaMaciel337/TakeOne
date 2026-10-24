@@ -216,6 +216,35 @@ export function aplicarEstilo(texto: TextoRico, de: number, ate: number, mudanca
   return deLetras(texto, novas, { paragrafo: ultimo.estilo, estilo: fim });
 }
 
+/** Uma mudança de estilo no texto inteiro: entra no estilo de base e sai dos trechos. */
+export function estiloEmTudo(texto: TextoRico, mudanca: Partial<EstiloDoCaractere>): TextoRico {
+  const chaves = Object.keys(mudanca) as (keyof EstiloDoCaractere)[];
+  const tirar = (estilo: Partial<EstiloDoCaractere>) => {
+    const saida = { ...estilo };
+    for (const chave of chaves) delete saida[chave];
+    return saida;
+  };
+  return {
+    ...texto,
+    estilo: { ...texto.estilo, ...mudanca },
+    paragrafos: texto.paragrafos.map((paragrafo) => ({ ...paragrafo, trechos: juntar(paragrafo.trechos.map((trecho) => ({ ...trecho, estilo: tirar(trecho.estilo) }))) })),
+  };
+}
+
+/** Uma mudança de parágrafo no texto inteiro. */
+export function paragrafoEmTudo(texto: TextoRico, mudanca: Partial<EstiloDoParagrafo>): TextoRico {
+  const chaves = Object.keys(mudanca) as (keyof EstiloDoParagrafo)[];
+  return {
+    ...texto,
+    paragrafo: { ...texto.paragrafo, ...mudanca },
+    paragrafos: texto.paragrafos.map((paragrafo) => {
+      const estilo = { ...paragrafo.estilo };
+      for (const chave of chaves) delete estilo[chave];
+      return { ...paragrafo, estilo };
+    }),
+  };
+}
+
 /** O parágrafo em que fica o índice. */
 export function paragrafoDoIndice(texto: TextoRico, indice: number): number {
   let inicio = 0;

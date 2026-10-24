@@ -8,7 +8,8 @@ import { create, type Fonte as FonteDoFontkit } from "fontkit";
 import { useEffect, useState } from "react";
 
 import { chamarApi } from "../api";
-import type { FonteCarregada, GlifoFormatado } from "./layout";
+import { adaptarFonte } from "./fontkit";
+import type { FonteCarregada } from "./layout";
 import type { EstiloDoCaractere, TextoRico } from "./modelo";
 import { estiloDe } from "./modelo";
 
@@ -105,38 +106,6 @@ export function arquivoDoEstilo(estilo: EstiloDoCaractere, familias: FamiliaDoCa
 
 const instancias = new Map<string, FonteCarregada>();
 
-function adaptar(fonte: FonteDoFontkit, chave: string): FonteCarregada {
-  const recursos = new Set(fonte.availableFeatures ?? []);
-  const os2 = fonte["OS/2"];
-  return {
-    chave,
-    unidades: fonte.unitsPerEm,
-    ascendente: fonte.ascent,
-    descendente: fonte.descent,
-    sublinhado: { posicao: fonte.underlinePosition || -fonte.unitsPerEm * 0.1, espessura: fonte.underlineThickness || fonte.unitsPerEm * 0.05 },
-    tachado: { posicao: os2?.yStrikeoutPosition || fonte.unitsPerEm * 0.28, espessura: os2?.yStrikeoutSize || fonte.unitsPerEm * 0.05 },
-    temRecurso: (tag) => recursos.has(tag),
-    formatar(texto, pedidos) {
-      const corrida = fonte.layout(texto, pedidos);
-      return corrida.glyphs.map((glifo, i): GlifoFormatado => {
-        const posicao = corrida.positions[i];
-        const b = glifo.bbox;
-        const comTinta = Number.isFinite(b.minX) && Number.isFinite(b.maxX) && b.maxX > b.minX;
-        return {
-          id: glifo.id,
-          avanco: posicao.xAdvance,
-          dx: posicao.xOffset,
-          dy: posicao.yOffset,
-          // Unidades de UTF-16 (o índice do texto): fora do plano básico, um caractere são duas
-          letras: glifo.codePoints.reduce((soma, cp) => soma + (cp > 0xffff ? 2 : 1), 0),
-          caminho: () => glifo.path.toSVG(),
-          caixa: comTinta ? { x0: b.minX, y0: b.minY, x1: b.maxX, y1: b.maxY } : { x0: 0, y0: 0, x1: 0, y1: 0 },
-        };
-      });
-    },
-  };
-}
-
 /** A fonte de um estilo, se já carregou; senão pede e devolve null (a versão muda quando chegar). */
 export function fonteDoEstilo(estilo: EstiloDoCaractere): FonteCarregada | null {
   if (!catalogo) {
@@ -153,7 +122,7 @@ export function fonteDoEstilo(estilo: EstiloDoCaractere): FonteCarregada | null 
     void lerArquivo(escolha.arquivo);
     return null;
   }
-  const instancia = adaptar(Object.keys(escolha.eixos).length ? fonte.getVariation(escolha.eixos) : fonte, chave);
+  const instancia = adaptarFonte(Object.keys(escolha.eixos).length ? fonte.getVariation(escolha.eixos) : fonte, chave);
   instancias.set(chave, instancia);
   return instancia;
 }

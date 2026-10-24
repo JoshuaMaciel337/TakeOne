@@ -221,12 +221,12 @@ export function mudarVetor(projeto: Projeto, clipeId: string, vetor: CamadaVetor
  * Um texto novo (já medido: a caixa e a origem) com a origem em `ponto` (pixels da imagem; no de parágrafo, o canto da
  * caixa), uma unidade = um pixel, acima da camada escolhida.
  */
-export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: TextoRico, ponto: { x: number; y: number }, nome: string, acima?: string | null): { projeto: Projeto; clipeId: string } {
+export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: TextoRico, ponto: { x: number; y: number }, nome: string, acima?: string | null, id?: string): { projeto: Projeto; clipeId: string } {
   const quadro = tamanhoDaImagem(projeto);
   const centro = { x: ponto.x - texto.origem.x + texto.caixa.largura / 2, y: ponto.y - texto.origem.y + texto.caixa.altura / 2 };
   const escala = 1 / pixelsPorUnidade(texto.caixa, 1, quadro);
   const transformacao = { ...TRANSFORMACAO_PADRAO, x: (centro.x - quadro.largura / 2) / quadro.largura, y: (centro.y - quadro.altura / 2) / quadro.altura, escala };
-  const clipe = clipeDaCamada(ctx.novoId(), { texto_rico: texto, transformacao });
+  const clipe = clipeDaCamada(id ?? ctx.novoId(), { texto_rico: texto, transformacao });
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
 }
 

@@ -24,6 +24,7 @@ import { caminhosDaMascaraNoDocumento, caminhosNoEspacoDaMascara } from "@/lib/v
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
+import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
 import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { CaminhosNaPrevia, type FerramentaDeCaminho, type OpcoesDosCaminhos } from "./CaminhosNaPrevia";
@@ -93,8 +94,15 @@ type Props = {
   aoTerminarTraco?: () => void;
   /** O Remover enche o que o traço cerca. */
   preencherCercado?: boolean;
-  /** Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels). */
-  aoClicarTexto?: (x: number, y: number) => void;
+  /**
+   * Ferramenta Texto: o clique fora de um texto, no ponto da imagem (em pixels), ou o arrasto de uma caixa de parágrafo
+   * (o canto de cima e o tamanho).
+   */
+  aoClicarTexto?: (x: number, y: number, caixa?: { largura: number; altura: number }) => void;
+  /** Ferramenta Texto: o clique num texto do navegador abre a edição, com o cursor no caractere do clique. */
+  aoEditarTexto?: (clipeId: string, indice: number) => void;
+  /** O texto em edição (a caixa vem da camada na prévia). */
+  edicaoDeTexto?: (Omit<React.ComponentProps<typeof EdicaoDeTextoNaPrevia>, "texto" | "caixa" | "virar"> & { clipeId: string }) | null;
   /**
    * Ferramentas de forma: o arrasto (com Shift prendendo a proporção e Alt saindo do meio), em pixels da imagem;
    * `clique` quando a pessoa só clicou (sem arrastar), no ponto.
@@ -241,6 +249,8 @@ export function PreviaDaImagem({
   aoTerminarTraco,
   preencherCercado,
   aoClicarTexto,
+  aoEditarTexto,
+  edicaoDeTexto,
   aoDesenharForma,
   caminhos = null,
   pranchetas = null,
@@ -469,9 +479,19 @@ export function PreviaDaImagem({
       return;
     }
     if (ferramenta === "texto") {
+      const rico = camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto_rico));
+      if (rico?.clipe.texto_rico) {
+        aoEditarTexto?.(rico.clipe.id, indiceNaTela(rico.clipe.texto_rico, rico.caixa, rico.clipe.virar, ponto));
+        return;
+      }
       const texto = camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto));
-      if (texto) aoSelecionar([texto.clipe.id]);
-      else aoClicarTexto?.(ponto.x / escala, ponto.y / escala);
+      if (texto) {
+        aoSelecionar([texto.clipe.id]);
+        return;
+      }
+      // O clique faz um texto de ponto; o arrasto, uma caixa de parágrafo
+      evento.currentTarget.setPointerCapture(evento.pointerId);
+      setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
     }
     if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro") {
@@ -508,6 +528,15 @@ export function PreviaDaImagem({
     setArrastandoMao(false);
     if (!desenho) return;
     setDesenho(null);
+    if (ferramenta === "texto") {
+      const x0 = Math.min(desenho.inicio.x, desenho.fim.x) / escala;
+      const y0 = Math.min(desenho.inicio.y, desenho.fim.y) / escala;
+      const largura = Math.abs(desenho.fim.x - desenho.inicio.x) / escala;
+      const altura = Math.abs(desenho.fim.y - desenho.inicio.y) / escala;
+      if (Math.hypot(desenho.fim.x - desenho.inicio.x, desenho.fim.y - desenho.inicio.y) < 6) aoClicarTexto?.(desenho.inicio.x / escala, desenho.inicio.y / escala);
+      else aoClicarTexto?.(x0, y0, { largura: Math.max(8, largura), altura: Math.max(8, altura) });
+      return;
+    }
     const arrasto = arrastoNaImagem(desenho);
     // Um clique sem arrastar: quem desenha pergunta as medidas, com o ponto
     const clique = Math.hypot(desenho.fim.x - desenho.inicio.x, desenho.fim.y - desenho.inicio.y) < 4;
@@ -662,7 +691,15 @@ export function PreviaDaImagem({
                 }}
               />
             ) : null}
-            {selecionada && !mostrarAlcas && !objeto && !recorte ? (
+            {edicaoDeTexto && tamanho.largura > 1
+              ? (() => {
+                  const editada = camadas.find((camada) => camada.clipe.id === edicaoDeTexto.clipeId);
+                  if (!editada?.clipe.texto_rico) return null;
+                  const { clipeId, ...resto } = edicaoDeTexto;
+                  return <EdicaoDeTextoNaPrevia key={clipeId} texto={editada.clipe.texto_rico} caixa={editada.caixa} virar={editada.clipe.virar} {...resto} />;
+                })()
+              : null}
+            {selecionada && !mostrarAlcas && !objeto && !recorte && selecionada.clipe.id !== edicaoDeTexto?.clipeId ? (
               // Nas outras ferramentas, a camada escolhida só ganha o contorno
               <div
                 className="pointer-events-none absolute border border-destaque/80"

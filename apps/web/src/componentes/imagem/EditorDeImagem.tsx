@@ -99,6 +99,11 @@ import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
+import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
+import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
+import { esperarFontes, useVersaoDasFontes } from "@/lib/texto/fontes";
+import { type Alinhamento as AlinhamentoDoTexto, aplicarEstilo, aplicarParagrafo, type EstiloDoCaractere, estiloComum, estiloEmTudo, estiloDoParagrafo, paragrafoDoIndice, paragrafoEmTudo, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
+import { novoId } from "@/componentes/editor/contexto";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
 import { type AcaoDaMascaraVetorial, PropriedadesDaMascaraVetorial } from "./PropriedadesDaMascaraVetorial";
 import { inverterMascaraVetorial, novaMascaraVetorial, vincularMascaraVetorial, caminhosDaMascaraNoDocumento } from "@/lib/vetor/mascaraVetorial";
@@ -213,6 +218,31 @@ function porcentagem(zoom: number): string {
  * painéis encaixados à direita, nos lugares e com os nomes dos editores de imagem profissionais. O projeto, o
  * desfazer e o salvamento são os do editor de vídeo; as camadas são faixas com um clipe só.
  */
+type EdicaoDeTexto = {
+  clipeId: string;
+  /** Um texto novo: onde ele começa (pixels da imagem) e acima de que camada entra. */
+  novo: { ponto: { x: number; y: number }; acima: string | null } | null;
+  texto: TextoRico;
+  /** O texto como estava (cancelar e "nada mudou"). */
+  original: TextoRico | null;
+  selecao: SelecaoDoTexto;
+  /** O estilo mudado sem seleção, para o que for digitado. */
+  estiloPendente: Partial<EstiloDoCaractere> | null;
+};
+
+/** O nome da camada de texto: o começo do texto, como nos editores de imagem. */
+const nomeDoTexto = (texto: TextoRico) => textoCorrido(texto).replace(/\s+/g, " ").trim().slice(0, 40) || "Texto";
+
+/** O comando que põe o texto em edição no projeto (com a fonte sob o mouse no seletor, na seleção ou no texto todo). */
+function comandoDaEdicao(edicao: EdicaoDeTexto, previa: Partial<EstiloDoCaractere> | null): Comando {
+  let texto = edicao.texto;
+  // Sem seleção, a fonte escolhida vale só para o que for digitado: a prévia também não muda o texto
+  if (previa && edicao.selecao.de !== edicao.selecao.ate) texto = textoMedido(aplicarEstilo(texto, edicao.selecao.de, edicao.selecao.ate, previa));
+  return edicao.novo
+    ? { comando: "imagem.adicionarTextoRico", parametros: { texto, ponto: edicao.novo.ponto, nome: nomeDoTexto(texto), acima: edicao.novo.acima, id: edicao.clipeId } }
+    : { comando: "imagem.textoRico", parametros: { clipeId: edicao.clipeId, texto } };
+}
+
 export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string; modeloInicial?: string }) {
   const router = useRouter();
   const marca = useMarca();
@@ -389,6 +419,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [exportando, setExportando] = useState(false);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
+  // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
+  const [edicaoDeTexto, setEdicaoDeTexto] = useState<EdicaoDeTexto | null>(null);
+  // As opções da ferramenta Texto para o próximo texto, e a fonte sob o mouse no seletor (a prévia mostra nela)
+  const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; alinhamento: AlinhamentoDoTexto; orientacao: TextoRico["orientacao"] }>({ estilo: {}, alinhamento: "esquerda", orientacao: "horizontal" });
+  const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
+  const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
   const pendentes = useRef(new Map<string, Pendente>());
   // O modelo escolhido espera as formas dele aparecerem na biblioteca, como as formas avulsas
@@ -438,10 +474,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         // fica o de antes
       }
     }
+    // O texto em edição (ou o escolhido, com a fonte sob o mouse no seletor) aparece como está
+    const textoNaTela = edicaoDeTexto ? comandoDaEdicao(edicaoDeTexto, fonteEmPrevia ? { familia: fonteEmPrevia } : null) : null;
+    if (base && textoNaTela) {
+      try {
+        base = executarComando(base, textoNaTela, ctx).projeto;
+      } catch {
+        // fica o de antes
+      }
+    }
     // A camada que está sendo transformada sai da prévia: ela aparece pela caixa da transformação
     if (base && faixaTransformada) base = { ...base, faixas: base.faixas.map((faixa) => (faixa.id === faixaTransformada ? { ...faixa, oculta: true } : faixa)) };
     return base;
-  }, [projeto, provisorio, ctx, faixaTransformada]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a versão das fontes refaz a medida do texto em edição
+  }, [projeto, provisorio, ctx, faixaTransformada, edicaoDeTexto, fonteEmPrevia, versaoDasFontes]);
   const preverDoPainel = (comando: Comando | null) => {
     if (comando !== null || !provisorio) {
       setProvisorio(comando);
@@ -1934,6 +1980,95 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (id && ajuste.cor) executar({ comando: "clipe.cor", parametros: { clipeIds: [id], cor: ajuste.cor } });
     if (resultado) abrirAba("cor");
   };
+  // ——— A ferramenta Texto (texto desenhado no navegador) ———
+  const textoEscolhido = !edicaoDeTexto && selecionado?.clipe.texto_rico ? selecionado.clipe : null;
+  /** Começa um texto novo no ponto (de ponto) ou na caixa arrastada (de parágrafo), com as opções da barra. */
+  const comecarTexto = (x: number, y: number, caixa?: { largura: number; altura: number }) => {
+    terminarTexto();
+    if (!projeto) return;
+    const documento = tamanhoDaImagem(projeto);
+    const estilo = { tamanho: Math.max(12, Math.round(Math.min(documento.largura, documento.altura) / 18)), ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
+    const base = textoNovo("", estilo, caixa ? "paragrafo" : "ponto");
+    const texto = textoMedido({ ...base, orientacao: opcoesDoTexto.orientacao, paragrafo: { ...base.paragrafo, alinhamento: opcoesDoTexto.alinhamento }, caixa: caixa ?? base.caixa });
+    setSelecao([]);
+    setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x, y }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
+  };
+  /** Abre a edição de um texto que já existe, com o cursor no caractere do clique. */
+  const editarTexto = (clipeId: string, indice: number) => {
+    const clipe = projeto ? acharClipe(projeto, clipeId)?.clipe : null;
+    if (!clipe?.texto_rico || clipeId === edicaoDeTexto?.clipeId) return;
+    terminarTexto();
+    setSelecao([clipeId]);
+    setEdicaoDeTexto({ clipeId, novo: null, texto: clipe.texto_rico, original: clipe.texto_rico, selecao: { de: indice, ate: indice }, estiloPendente: null });
+  };
+  /** Termina a edição: o texto vira um passo do histórico (o vazio não entra; o que ficou vazio sai). */
+  const terminarTexto = (cancelar = false) => {
+    const atual = edicaoDeTexto;
+    if (!atual) return;
+    setEdicaoDeTexto(null);
+    setFonteEmPrevia(null);
+    if (cancelar) return;
+    const vazio = !textoCorrido(atual.texto).trim();
+    if (vazio) {
+      if (!atual.novo) {
+        const faixa = projeto ? acharClipe(projeto, atual.clipeId)?.faixa : null;
+        if (faixa) executar({ comando: "imagem.apagar", parametros: { faixaId: faixa.id } });
+      }
+      return;
+    }
+    if (!atual.novo && JSON.stringify(atual.texto) === JSON.stringify(atual.original)) return;
+    // As fontes chegam antes da medida final (o texto não fica com a caixa de uma fonte que faltava)
+    void esperarFontes([atual.texto]).then(() => {
+      executar(comandoDaEdicao({ ...atual, texto: textoMedido(atual.texto) }, null));
+      setSelecao([atual.clipeId]);
+    });
+  };
+  /** Uma mudança de estilo da barra ou dos painéis: na seleção do texto em edição, no texto escolhido inteiro ou no próximo. */
+  const mudarEstiloDoTexto = (mudanca: Partial<EstiloDoCaractere>) => {
+    if (edicaoDeTexto) {
+      const { de, ate } = edicaoDeTexto.selecao;
+      if (de === ate) setEdicaoDeTexto({ ...edicaoDeTexto, estiloPendente: { ...edicaoDeTexto.estiloPendente, ...mudanca } });
+      else setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(aplicarEstilo(edicaoDeTexto.texto, de, ate, mudanca)) });
+      return;
+    }
+    if (textoEscolhido?.texto_rico) {
+      const novo = estiloEmTudo(textoEscolhido.texto_rico, mudanca);
+      const clipeId = textoEscolhido.id;
+      void esperarFontes([novo]).then(() => executar({ comando: "imagem.textoRico", parametros: { clipeId, texto: textoMedido(novo) } }));
+      return;
+    }
+    setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, ...mudanca } }));
+  };
+  const mudarParagrafoDoTexto = (mudanca: { alinhamento: AlinhamentoDoTexto }) => {
+    if (edicaoDeTexto) {
+      setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(aplicarParagrafo(edicaoDeTexto.texto, edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate, mudanca)) });
+      return;
+    }
+    if (textoEscolhido?.texto_rico) {
+      executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido(paragrafoEmTudo(textoEscolhido.texto_rico, mudanca)) } });
+      return;
+    }
+    setOpcoesDoTexto((atual) => ({ ...atual, ...mudanca }));
+  };
+  const mudarOrientacaoDoTexto = (orientacao: TextoRico["orientacao"]) => {
+    if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, orientacao }) });
+    else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido({ ...textoEscolhido.texto_rico, orientacao }) } });
+    else setOpcoesDoTexto((atual) => ({ ...atual, orientacao }));
+  };
+  // O que a barra mostra: o estilo comum da seleção do texto em edição, o do texto escolhido ou as opções do próximo
+  const estiloNaBarra: Partial<EstiloDoCaractere> = edicaoDeTexto
+    ? { ...estiloComum(edicaoDeTexto.texto, edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate), ...edicaoDeTexto.estiloPendente }
+    : textoEscolhido?.texto_rico
+      ? estiloComum(textoEscolhido.texto_rico, 0, textoCorrido(textoEscolhido.texto_rico).length)
+      : { familia: "inter", peso: 400, italico: false, tamanho: tamanhoDoDocumento ? Math.max(12, Math.round(Math.min(tamanhoDoDocumento.largura, tamanhoDoDocumento.altura) / 18)) : 48, ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
+  const textoDaBarra = edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico ?? null;
+  const alinhamentoNaBarra = textoDaBarra ? estiloDoParagrafo(textoDaBarra, textoDaBarra.paragrafos[paragrafoDoIndice(textoDaBarra, edicaoDeTexto?.selecao.ate ?? 0)]).alinhamento : opcoesDoTexto.alinhamento;
+  // Trocar de ferramenta termina a edição
+  useEffect(() => {
+    if (ferramenta !== "texto" && edicaoDeTexto) terminarTexto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só a troca de ferramenta
+  }, [ferramenta]);
+
   const porTexto = (texto?: Texto, onde?: { x: number; y: number }) => {
     const base = texto ?? { ...TEXTO_PADRAO, cor: cores.primeiroPlano };
     const resultado = executar({ comando: "imagem.adicionarTexto", parametros: { texto: base, transformacao: onde } });
@@ -3863,7 +3998,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "prancheta" ? (
+          ferramenta === "texto" && !selecionado?.clipe.texto ? (
+            <OpcoesDoTextoNaBarra
+              estilo={estiloNaBarra}
+              alinhamento={alinhamentoNaBarra}
+              orientacao={textoDaBarra?.orientacao ?? opcoesDoTexto.orientacao}
+              aoEstilo={mudarEstiloDoTexto}
+              aoPreverFonte={setFonteEmPrevia}
+              aoAlinhamento={(alinhamento) => mudarParagrafoDoTexto({ alinhamento })}
+              aoOrientacao={mudarOrientacaoDoTexto}
+              edicao={edicaoDeTexto ? { aoConfirmar: () => terminarTexto(), aoCancelar: () => terminarTexto(true) } : null}
+            />
+          ) : ferramenta === "prancheta" ? (
             <OpcoesDaPranchetaNaBarra
               prancheta={escolhidoNaTela?.clipe.prancheta ?? null}
               tamanho={tamanhoDaPrancheta}
@@ -4188,7 +4334,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             objeto={MODO_DA_SELECAO[ferramenta] && objeto.foto && selecionado ? { clipeId: selecionado.clipe.id, ferramenta: objeto, localizador } : null}
             aoTerminarTraco={ferramenta === "remover" && removerAoSoltar ? () => window.setTimeout(() => void usarSelecaoRef.current("apagar"), 0) : undefined}
             preencherCercado={ferramenta === "remover" && removerCercando}
-            aoClicarTexto={(x, y) => porTexto(undefined, { x: x / tamanho.largura - 0.5, y: y / tamanho.altura - 0.5 })}
+            aoClicarTexto={comecarTexto}
+            aoEditarTexto={editarTexto}
+            edicaoDeTexto={
+              edicaoDeTexto
+                ? {
+                    clipeId: edicaoDeTexto.clipeId,
+                    selecao: edicaoDeTexto.selecao,
+                    estiloPendente: edicaoDeTexto.estiloPendente,
+                    aoSelecionar: (selecao) => setEdicaoDeTexto((atual) => (atual ? { ...atual, selecao, estiloPendente: selecao.de === atual.selecao.de && selecao.ate === atual.selecao.ate ? atual.estiloPendente : null } : atual)),
+                    aoMudar: (texto) => setEdicaoDeTexto((atual) => (atual ? { ...atual, texto } : atual)),
+                    aoTerminar: () => terminarTexto(),
+                  }
+                : null
+            }
             aoDesenharForma={desenharForma}
             caminhos={
               ferramentaDeCaminho

@@ -199,14 +199,14 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 ### Onda 13.8 — Texto
 
-- [ ] Texto desenhado no navegador, com edição direta na tela (clique, arrastar para caixa; 2, 3, 4 e 5 cliques escolhem palavra, linha, parágrafo e tudo)
+- [x] Texto desenhado no navegador, com edição direta na tela (clique, arrastar para caixa; 2, 3, 4 e 5 cliques escolhem palavra, linha, parágrafo e tudo)
 - [ ] Texto de ponto e de parágrafo (caixa com quebra automática), um convertido no outro
 - [ ] Texto vertical e as máscaras de texto horizontal e vertical
 - [ ] Biblioteca grande de fontes livres, com prévia ao passar o mouse, estilos (pesos e itálicos) e envio de fontes do espaço
 - [ ] Painel Caractere: fonte, estilo, tamanho, entrelinha, kerning (métrica, óptico, manual), tracking, escala vertical e horizontal, deslocamento da linha de base, cor, negrito e itálico falsos, todas maiúsculas, versalete, sobrescrito, subscrito, sublinhado, tachado, OpenType (ligaduras, alternativos, frações, ordinais), eixos de fonte variável, antisserrilhamento
 - [ ] Painel Parágrafo: alinhar à esquerda, ao centro e à direita, justificar (última à esquerda, ao centro, à direita, tudo), recuos (início, fim, primeira linha), espaço antes e depois, hifenização
 - [ ] Estilos de caractere e de parágrafo; painel Glifos
-- [ ] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
+- [x] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
 - [ ] Texto em caminho (e dentro de uma forma)
 - [ ] Deformar texto: arco, arco inferior, arco superior, arco, saliência, concha inferior e superior, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torção
 - [ ] Converter em forma, Criar caminho de trabalho, Rasterizar
