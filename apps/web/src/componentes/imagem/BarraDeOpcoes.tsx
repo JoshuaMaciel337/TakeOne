@@ -7,6 +7,7 @@ import { ESTILOS_ARTISTICOS, LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesD
 import type { Comando } from "@/lib/projeto/comandos";
 import { MESCLAGENS_DA_IMAGEM } from "@/lib/projeto/modelo";
 import type { Clipe } from "@/lib/projeto/modelo";
+import { TAMANHOS_DA_AMOSTRA } from "@/lib/imagem/informacoes";
 import { type Alinhamento, FONTES_TEXTO, type FonteTexto } from "@/lib/projeto/texto";
 import type { ModoDaSelecao } from "@/lib/selecao/mascara";
 import { AMOSTRAS, type TamanhoDaAmostra } from "@/lib/selecao/varinha";
@@ -52,6 +53,8 @@ type Props = {
   aoMudarForma: (mudanca: Partial<OpcoesDaForma>) => void;
   primeiroPlano: string;
   aoZoom: (zoom: number | null) => void;
+  /** Conta-gotas e Amostrador de cor: o lado da amostra (a média) e os amostradores. */
+  amostra?: { lado: number; aoMudar: (lado: number) => void; amostradores: number; aoLimpar: () => void };
   /** Girar vista: o ângulo e o espelho da vista (só da tela). */
   giroDaVista?: { angulo: number; espelhada: boolean };
   aoGirarVista?: (giro: Partial<{ angulo: number; espelhada: boolean }>) => void;
@@ -420,8 +423,28 @@ export function BarraDeOpcoes(props: Props) {
         {!clipe ? <span className="text-suave">Clique numa foto para começar.</span> : null}
       </>
     );
-  } else if (ferramenta === "contaGotas") {
-    opcoes = <span className="text-suave">Tamanho da amostra: ponto · Amostra: todas as camadas · Alt + clique pega a cor de fundo</span>;
+  } else if (ferramenta === "contaGotas" || ferramenta === "amostradorDeCor") {
+    const amostra = props.amostra;
+    opcoes = (
+      <>
+        <label className="flex items-center gap-1">
+          Tamanho da amostra:
+          <select aria-label="Tamanho da amostra" className={campo} value={amostra?.lado ?? 1} onChange={(evento) => amostra?.aoMudar(Number(evento.currentTarget.value))}>
+            {TAMANHOS_DA_AMOSTRA.map((item) => (
+              <option key={item.lado} value={item.lado}>
+                {item.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        {ferramenta === "amostradorDeCor" ? (
+          <button type="button" className="botao-secundario px-2 py-0.5 text-xs" disabled={!amostra?.amostradores} onClick={amostra?.aoLimpar}>
+            Limpar tudo
+          </button>
+        ) : null}
+        <span className="text-suave">{ferramenta === "contaGotas" ? "Amostra: todas as camadas · Alt + clique pega a cor de fundo" : dados.dica}</span>
+      </>
+    );
   } else if (ferramenta === "texto") {
     const texto = clipe?.texto;
     const mudar = (mudanca: Record<string, unknown>) => clipe && aoExecutar({ comando: "texto.mudar", parametros: { clipeIds: [clipe.id], texto: mudanca } });

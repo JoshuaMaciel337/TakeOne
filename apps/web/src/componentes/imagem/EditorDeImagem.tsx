@@ -162,6 +162,7 @@ import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
 import { PainelHistograma } from "./ajustes/PainelHistograma";
+import { PainelInformacoes, PainelNavegador } from "./PaineisDaVista";
 import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, corEmRgb, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
@@ -231,7 +232,7 @@ const AREAS: Record<string, EstadoDaArea> = {
   },
   fotografia: {
     direita: [
-      { id: "g-histograma", abas: ["histograma"], ativa: "histograma", altura: 230 },
+      { id: "g-histograma", abas: ["navegador", "histograma", "informacoes"], ativa: "navegador", altura: 260 },
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "filtros"], ativa: "propriedades", altura: 360 },
       { id: "g-biblioteca", abas: ["biblioteca", "fotoIA"], ativa: "biblioteca", altura: 220 },
       { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico"], ativa: "camadas" },
@@ -494,6 +495,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [vista, setVista] = useState<PreferenciasDaVista>(lerVista);
   // A vista girada (R) e o pedido de enquadrar uma camada: só da tela
   const [giroDaVista, setGiroDaVista] = useState({ angulo: 0, espelhada: false });
+  // O Amostrador de cor (os pontos, em pixels do documento, só da sessão) e o lado da amostra do conta-gotas
+  const [amostradores, setAmostradores] = useState<{ x: number; y: number }[]>([]);
+  const [ladoDaAmostra, setLadoDaAmostra] = useState(1);
   // Exibir › Modo de tela (F) e os painéis escondidos pelo Tab (todos) ou pelo Shift+Tab (só os da direita)
   const [modoDeTela, setModoDeTela] = useState<ModoDeTela>("padrao");
   const [paineisOcultos, setPaineisOcultos] = useState<"nenhum" | "todos" | "encaixados">("nenhum");
@@ -996,6 +1000,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const tamanhoDoDocumento = projeto ? tamanhoDaImagem(projeto) : null;
   const selecaoNoDocumento =
     selecaoDoDocumento && tamanhoDoDocumento && selecaoDoDocumento.largura === tamanhoDoDocumento.largura && selecaoDoDocumento.altura === tamanhoDoDocumento.altura ? selecaoDoDocumento : null;
+  // A largura e a altura da seleção, para o painel Informações (a conta passa pela máscara inteira: só com ele aberto)
+  const informacoesVisiveis = area.aberto("informacoes");
+  const limitesDaSelecao = useMemo(() => (selecaoNoDocumento && informacoesVisiveis ? limites(selecaoNoDocumento) : null), [selecaoNoDocumento, informacoesVisiveis]);
   const temSelecao = Boolean(objeto.selecao) || objeto.temPincel || Boolean(selecaoNoDocumento && foto);
   /** A seleção do documento muda; a que é desmarcada fica para o Selecionar novamente. */
   const selecionarNoDocumento = (nova: Selecao | null) => {
@@ -2600,6 +2607,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [origemDoHistograma, setOrigemDoHistograma] = useState<"imagem" | "camada">("imagem");
   const camadaDoHistograma = origemDoHistograma === "camada" ? (selecionado?.faixa.id ?? null) : null;
   const imagemDoHistograma = useImagemAbaixo(projeto, midias, camadaDoHistograma, area.aberto("histograma"), Boolean(camadaDoHistograma));
+  // O Navegador: a imagem inteira, pequena
+  const miniaturaDoNavegador = useImagemAbaixo(projeto, midias, null, area.aberto("navegador"));
+  // O painel Informações lê a imagem inteira em resolução cheia (a mesma da varinha), lida de novo quando o projeto muda
+  const [imagemDasInformacoes, setImagemDasInformacoes] = useState<ImagemRgba | null>(null);
+  const informacoesAbertas = area.aberto("informacoes");
+  const lerImagemDasInformacoes = useEffectEvent(() => imagemParaSelecao(true));
+  useEffect(() => {
+    if (!informacoesAbertas || !projeto) return;
+    let cancelado = false;
+    const espera = window.setTimeout(() => {
+      lerImagemDasInformacoes()
+        .then((lida) => {
+          if (!cancelado) setImagemDasInformacoes(lida);
+        })
+        .catch(() => undefined);
+    }, 400);
+    return () => {
+      cancelado = true;
+      window.clearTimeout(espera);
+    };
+  }, [informacoesAbertas, projeto]);
   const ajusteEscolhido = selecionado?.clipe.ajuste_imagem ? selecionado : null;
   const imagemAbaixo = useImagemAbaixo(projeto, midias, ajusteEscolhido?.faixa.id ?? null, Boolean(ajusteEscolhido));
   // O pedido vale só para o ajuste que pediu: trocar de camada desiste dele
@@ -5286,6 +5314,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
         ),
     },
+    informacoes: {
+      nome: PAINEIS_DA_IMAGEM.informacoes,
+      conteudo: (
+        <PainelInformacoes
+          imagem={imagemDasInformacoes}
+          modo={projeto.modo}
+          amostra={ladoDaAmostra}
+          unidade={vista.unidade}
+          ppi={projeto.tamanho?.resolucao ?? 72}
+          documento={tamanho}
+          selecao={limitesDaSelecao}
+          amostradores={amostradores}
+          aoLimparAmostradores={() => setAmostradores([])}
+          aoTirarAmostrador={(indice) => setAmostradores((atual) => atual.filter((_, i) => i !== indice))}
+          dica={dadosDa(ferramenta).dica}
+        />
+      ),
+    },
+    navegador: {
+      nome: PAINEIS_DA_IMAGEM.navegador,
+      conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
+    },
     histograma: {
       nome: PAINEIS_DA_IMAGEM.histograma,
       conteudo: <PainelHistograma imagem={imagemDoHistograma} selecao={selecaoNoDocumento} origem={origemDoHistograma} temCamada={Boolean(selecionado)} aoMudarOrigem={setOrigemDoHistograma} />,
@@ -5675,6 +5725,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
       <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
       <BarraDeOpcoes
+        amostra={{ lado: ladoDaAmostra, aoMudar: setLadoDaAmostra, amostradores: amostradores.length, aoLimpar: () => setAmostradores([]) }}
         giroDaVista={giroDaVista}
         aoGirarVista={(giro) => setGiroDaVista((atual) => ({ ...atual, ...giro }))}
         ferramenta={ferramenta}
@@ -6060,6 +6111,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMudarZoom={setZoom}
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
+            tamanhoDaAmostra={ladoDaAmostra}
+            amostradores={{
+              pontos: amostradores,
+              ativo: ferramenta === "amostradorDeCor",
+              aoMudar: (pontos) => {
+                if (pontos.length > amostradores.length && !area.aberto("informacoes")) area.abrir("informacoes");
+                setAmostradores(pontos);
+              },
+              aoCheio: () => mostrarAviso("São no máximo 10 amostradores: tire um com Alt + clique."),
+            }}
             galeria={galeriaNaTela ? { ...galeriaNaTela, ferramenta: ferramentaDaGaleria, escolhido: escolhidoDaGaleria, aoEscolher: escolherNaGaleria } : null}
             cortePerspectiva={
               ferramenta === "corteDePerspectiva"

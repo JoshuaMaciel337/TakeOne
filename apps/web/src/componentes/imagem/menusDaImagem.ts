@@ -27,6 +27,8 @@ export const PAINEIS_DA_IMAGEM = {
   caractere: "Caractere",
   glifos: "Glifos",
   histograma: "Histograma",
+  informacoes: "Informações",
+  navegador: "Navegador",
   paragrafo: "Parágrafo",
   degrades: "Degradês",
   fonteDeClonagem: "Fonte de clonagem",
@@ -958,7 +960,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         },
         "-",
         ...(Object.entries(PAINEIS_DA_IMAGEM) as [IdPainelDaImagem, string][]).map(
-          (([id, nome]): ItemDeMenu => ({ nome, marcado: a.painelAberto(id), atalho: id === "configuracoesDoPincel" ? "F5" : undefined, aoEscolher: () => a.alternarPainel(id) })),
+          (([id, nome]): ItemDeMenu => ({ nome, marcado: a.painelAberto(id), atalho: id === "configuracoesDoPincel" ? "F5" : id === "informacoes" ? "F8" : undefined, aoEscolher: () => a.alternarPainel(id) })),
         ),
       ],
     },

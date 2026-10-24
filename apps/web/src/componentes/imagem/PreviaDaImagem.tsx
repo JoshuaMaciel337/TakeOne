@@ -51,7 +51,9 @@ import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
 import { CortePerspectivaNaPrevia } from "./CortePerspectivaNaPrevia";
 import { GaleriaNaPrevia } from "./filtros/Galeria";
+import { AmostradoresNaPrevia } from "./AmostradoresNaPrevia";
 import { ReguaNaPrevia } from "./ReguaNaPrevia";
+import { mudarVistaAoVivo, registrarRolagem } from "./vistaAoVivo";
 import { type FerramentaDeSelecao, FormigasDaSelecao, type OpcoesDaSelecao, SelecaoNaPrevia } from "./SelecaoNaPrevia";
 import { VeuDaMascaraRapida } from "./MascaraRapida";
 import { PontoNaPrevia } from "./PontoNaPrevia";
@@ -93,6 +95,10 @@ type Props = {
   /** Pixels de tela por pixel da imagem; null ajusta a imagem à área. */
   zoom: number | null;
   aoMudarZoom: (zoom: number | null) => void;
+  /** O Amostrador de cor (I): os pontos (pixels do documento) e se a ferramenta está ativa. */
+  amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
+  /** O lado do quadrado que o conta-gotas lê (a média), em pixels do documento. */
+  tamanhoDaAmostra?: number;
   /** Modo de tela cheia: a mesa em volta da imagem fica preta. */
   telaCheia?: boolean;
   /** Girar vista (R) e Exibir › Espelhar a vista: só a tela gira; a imagem não muda. */
@@ -307,6 +313,8 @@ export function PreviaDaImagem({
   mascaraAVista = null,
   giroDaVista = { angulo: 0, espelhada: false },
   telaCheia = false,
+  amostradores = null,
+  tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
   vista = VISTA_PADRAO,
@@ -543,6 +551,42 @@ export function PreviaDaImagem({
     }
   });
 
+  // O retângulo do documento que aparece na área (o Navegador desenha ele): os cantos da área levados à imagem, que
+  // pode estar girada, e a caixa em volta deles
+  function medirVisivel() {
+    const area = areaRef.current;
+    const alvo = imagemRef.current;
+    if (!area || !alvo) return;
+    const r = area.getBoundingClientRect();
+    const cantos = [
+      [r.left, r.top],
+      [r.right, r.top],
+      [r.left, r.bottom],
+      [r.right, r.bottom],
+    ].map(([clientX, clientY]) => pontoNoElemento({ clientX, clientY }, alvo));
+    const xs = cantos.map((p) => p.x / escala);
+    const ys = cantos.map((p) => p.y / escala);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    mudarVistaAoVivo({ visivel: { x: Math.round(x), y: Math.round(y), largura: Math.round(Math.max(...xs) - x), altura: Math.round(Math.max(...ys) - y) } });
+  }
+  useLayoutEffect(medirVisivel);
+  // O Navegador põe um ponto do documento no meio da área: o deslocamento dele até o meio da imagem, girado como a
+  // vista, a partir do meio da área de rolagem (a imagem fica no meio dela)
+  useEffect(() => {
+    registrarRolagem((x, y) => {
+      const area = areaRef.current;
+      if (!area) return;
+      let vx = (x - imagem.largura / 2) * escala;
+      const vy = (y - imagem.altura / 2) * escala;
+      if (giroDaVista.espelhada) vx = -vx;
+      const t = (giroDaVista.angulo * Math.PI) / 180;
+      area.scrollLeft = area.scrollWidth / 2 + vx * Math.cos(t) - vy * Math.sin(t) - area.clientWidth / 2;
+      area.scrollTop = area.scrollHeight / 2 + vx * Math.sin(t) + vy * Math.cos(t) - area.clientHeight / 2;
+    });
+    return () => registrarRolagem(null);
+  });
+
   // Exibir › Ajustar a camada à tela: o zoom em que o retângulo cabe na área, com o meio dele no meio dela
   const ultimoEnquadrar = useRef(0);
   useLayoutEffect(() => {
@@ -577,17 +621,34 @@ export function PreviaDaImagem({
   function pegarCor(ponto: { x: number; y: number }, paraOFundo: boolean) {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // O quadrado da amostra em pixels do documento, levado ao canvas (a média de tudo o que cai nele)
+    const raio = Math.floor(tamanhoDaAmostra / 2);
+    const px = escala * densidade;
+    const x0 = Math.max(0, Math.floor((Math.floor(ponto.x / escala) - raio) * px));
+    const y0 = Math.max(0, Math.floor((Math.floor(ponto.y / escala) - raio) * px));
+    const ladoNoCanvas = Math.max(1, Math.round((2 * raio + 1) * px));
+    const w = Math.min(ladoNoCanvas, Math.max(1, canvas.width - x0));
+    const h = Math.min(ladoNoCanvas, Math.max(1, canvas.height - y0));
     const leitor = document.createElement("canvas");
-    leitor.width = 1;
-    leitor.height = 1;
-    const ctx = leitor.getContext("2d");
+    leitor.width = w;
+    leitor.height = h;
+    const ctx = leitor.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
     ctx.fillStyle = projeto.fundo.transparente ? "#ffffff" : projeto.fundo.cor;
-    ctx.fillRect(0, 0, 1, 1);
+    ctx.fillRect(0, 0, w, h);
     // Num modo de cor, a cor é a da imagem como aparece (no modo)
-    ctx.drawImage(modoAtivo && modoCanvasRef.current ? modoCanvasRef.current : canvas, Math.floor(ponto.x * densidade), Math.floor(ponto.y * densidade), 1, 1, 0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    aoPegarCor?.(hex(r, g, b), paraOFundo);
+    ctx.drawImage(modoAtivo && modoCanvasRef.current ? modoCanvasRef.current : canvas, x0, y0, w, h, 0, 0, w, h);
+    const dados = ctx.getImageData(0, 0, w, h).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let i = 0; i < dados.length; i += 4) {
+      r += dados[i];
+      g += dados[i + 1];
+      b += dados[i + 2];
+    }
+    const n = dados.length / 4;
+    aoPegarCor?.(hex(Math.round(r / n), Math.round(g / n), Math.round(b / n)), paraOFundo);
   }
 
   function aoApertar(evento: React.PointerEvent<HTMLDivElement>) {
@@ -804,6 +865,11 @@ export function PreviaDaImagem({
           girandoVista.current = { base: giroDaVista.angulo, inicio: Math.atan2(evento.clientY - cy, evento.clientX - cx), cx, cy };
         }}
         onPointerMoveCapture={(evento) => {
+          // O ponto do ponteiro no documento, para o painel Informações
+          if (imagemRef.current) {
+            const p = pontoNoElemento(evento, imagemRef.current);
+            mudarVistaAoVivo({ ponteiro: { x: p.x / escala, y: p.y / escala } });
+          }
           const giro = girandoVista.current;
           if (!giro || !aoGirarVista) return;
           const agora = Math.atan2(evento.clientY - giro.cy, evento.clientX - giro.cx);
@@ -814,6 +880,8 @@ export function PreviaDaImagem({
         onPointerUp={() => {
           girandoVista.current = null;
         }}
+        onPointerLeave={() => mudarVistaAoVivo({ ponteiro: null })}
+        onScroll={medirVisivel}
         onWheel={(evento) => {
           if (!evento.ctrlKey && !evento.altKey) return;
           evento.preventDefault();
@@ -889,6 +957,9 @@ export function PreviaDaImagem({
             {recorte && tamanho.largura > 1 ? <RecorteNaPrevia {...recorte} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {cortePerspectiva && tamanho.largura > 1 ? <CortePerspectivaNaPrevia {...cortePerspectiva} imagem={imagem} escala={tamanho.largura / imagem.largura} /> : null}
             {regua && tamanho.largura > 1 ? <ReguaNaPrevia {...regua} escala={tamanho.largura / imagem.largura} /> : null}
+            {amostradores && (amostradores.ativo || (amostradores.pontos.length && vista.extras)) && tamanho.largura > 1 ? (
+              <AmostradoresNaPrevia {...amostradores} escala={tamanho.largura / imagem.largura} />
+            ) : null}
             {galeria && tamanho.largura > 1 ? <GaleriaNaPrevia {...galeria} escala={tamanho.largura / imagem.largura} documento={imagem} /> : null}
             {objeto && !maoAtiva && selecionada?.clipe.id === objeto.clipeId ? (
               <ObjetoNaPrevia caixa={selecionada.caixa} recorte={selecionada.clipe.recorte} virar={selecionada.clipe.virar} objeto={objeto.ferramenta} aoTerminarTraco={aoTerminarTraco} localizador={objeto.localizador} preencherCercado={preencherCercado} />
