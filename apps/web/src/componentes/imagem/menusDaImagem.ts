@@ -105,8 +105,9 @@ export type AcoesDosMenus = {
   selecionarEMascarar: () => void;
   /** Selecionar › Transformar seleção. */
   transformarSelecao: () => void;
-  /** Filtro › Dissolver (na camada escolhida). */
+  /** Filtro › Dissolver e Editar › Distorção de marionete (na camada escolhida). */
   dissolver: () => void;
+  marionete: () => void;
   /** Imagem › Tamanho da imagem, Tamanho da tela, Rotação da imagem e Revelar tudo. */
   tamanhoDaImagem: () => void;
   tamanhoDaTela: () => void;
@@ -264,6 +265,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         },
         { nome: "Transformação livre", desativado: semCamada, aoEscolher: () => a.transformarCamada("livre"), titulo: "Ctrl+T é do navegador: use o menu" },
         { nome: "Transformação livre de uma cópia", atalho: "Ctrl+Alt+T", desativado: semCamada, aoEscolher: () => a.transformarCamada("copia") },
+        { nome: "Distorção de marionete", desativado: semCamada, aoEscolher: a.marionete },
         {
           nome: "Transformar",
           desativado: semCamada,

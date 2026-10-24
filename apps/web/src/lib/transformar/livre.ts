@@ -233,7 +233,7 @@ const areaAssinada = (p: Ponto, q: Ponto, r: Ponto) => (q.x - p.x) * (r.y - p.y)
  * ponto (u, v) dele (as coordenadas baricêntricas). Sem emendas: o pixel é escrito, não misturado, e o da beira entre
  * dois triângulos fica num deles.
  */
-export function reamostrarPeloMapa(origem: Imagem, mapa: (u: number, v: number) => Ponto, destino: { largura: number; altura: number }, interpolacao: Interpolacao, divisoes = 48): Uint8ClampedArray<ArrayBuffer> {
+export function reamostrarPeloMapa(origem: Imagem, mapa: (u: number, v: number) => Ponto, destino: { largura: number; altura: number }, interpolacao: Interpolacao, divisoes = 48, deTrasParaFrente = false): Uint8ClampedArray<ArrayBuffer> {
   const saida = new Uint8ClampedArray(destino.largura * destino.altura * 4);
   const n = divisoes;
   const pontos: Ponto[] = [];
@@ -262,11 +262,13 @@ export function reamostrarPeloMapa(origem: Imagem, mapa: (u: number, v: number) 
       }
     }
   };
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      triangulo(i, j, i + 1, j, i + 1, j + 1);
-      triangulo(i, j, i + 1, j + 1, i, j + 1);
-    }
+  // Onde a malha dobra sobre si, o último triângulo desenhado fica por cima (a profundidade da marionete inverte)
+  for (let k = 0; k < n * n; k++) {
+    const indice = deTrasParaFrente ? n * n - 1 - k : k;
+    const i = indice % n;
+    const j = Math.floor(indice / n);
+    triangulo(i, j, i + 1, j, i + 1, j + 1);
+    triangulo(i, j, i + 1, j + 1, i, j + 1);
   }
   return saida;
 }

@@ -169,7 +169,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Transformação livre (Ctrl+T) com X, Y, L, A, giro, inclinação, ponto de referência e interpolação (pelo menu: o Ctrl+T é do navegador)
 - [x] Transformar › Escala, Girar, Inclinar, Distorcer, Perspectiva, Deformar (malha, estilos prontos, dividir em cruz, na vertical e na horizontal), Transformar novamente (Ctrl+Shift+T), girar 180 e 90, virar
 - [x] Transformação livre de uma cópia (Ctrl+Alt+T)
-- [ ] Distorção de marionete (malha, alfinetes, rígido, normal, distorcer, densidade, expansão, profundidade)
+- [x] Distorção de marionete (malha, alfinetes, rígido, normal, distorcer, densidade, expansão, profundidade)
 - [ ] Deformação de perspectiva (planos, endireitar, nivelar)
 - [ ] Escala sensível ao conteúdo (Ctrl+Alt+Shift+C)
 - [x] Corte (C) completo: predefinições de proporção e de tamanho com resolução, endireitar, sobreposições (terços, grade, diagonal, triângulo, proporção áurea, espiral áurea), mostrar a área cortada, escudo, apagar os pixels cortados, preencher sensível ao conteúdo, girar arrastando fora
