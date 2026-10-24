@@ -16,12 +16,27 @@ export async function codificarTiff(
   rgba: Uint8ClampedArray | Uint8Array,
   largura: number,
   altura: number,
-  { compressao = "deflate", ppi = 72, etiquetas = [] }: { compressao?: CompressaoDoTiff; ppi?: number | null; etiquetas?: { tag: number; tipo: 1 | 2; bytes: Uint8Array }[] } = {},
+  {
+    compressao = "deflate",
+    ppi = 72,
+    etiquetas = [],
+    espaco,
+  }: {
+    compressao?: CompressaoDoTiff;
+    ppi?: number | null;
+    etiquetas?: { tag: number; tipo: 1 | 2; bytes: Uint8Array }[];
+    /** A imagem em CMYK (4 amostras por pixel) ou Lab (3, a e b com sinal), já separada, no lugar do RGBA. */
+    espaco?: { tipo: "cmyk" | "lab"; amostras: Uint8Array };
+  } = {},
 ): Promise<Uint8Array> {
-  const alfa = temTransparencia(rgba);
-  const canais = alfa ? 4 : 3;
-  const cru = new Uint8Array(largura * altura * canais);
-  for (let p = 0, o = 0; p < largura * altura; p++) for (let c = 0; c < canais; c++) cru[o++] = rgba[p * 4 + c];
+  const alfa = !espaco && temTransparencia(rgba);
+  const canais = espaco ? (espaco.tipo === "cmyk" ? 4 : 3) : alfa ? 4 : 3;
+  let cru: Uint8Array;
+  if (espaco) cru = espaco.amostras;
+  else {
+    cru = new Uint8Array(largura * altura * canais);
+    for (let p = 0, o = 0; p < largura * altura; p++) for (let c = 0; c < canais; c++) cru[o++] = rgba[p * 4 + c];
+  }
   let dados: Uint8Array = cru;
   if (compressao === "deflate") {
     const previsto = new Uint8Array(cru.length);
@@ -40,7 +55,8 @@ export async function codificarTiff(
     { tag: 257, tipo: 4, valores: [altura] },
     { tag: 258, tipo: 3, valores: new Array(canais).fill(8) },
     { tag: 259, tipo: 3, valores: [compressao === "deflate" ? 8 : 1] },
-    { tag: 262, tipo: 3, valores: [2] },
+    // A interpretação: RGB (2), separado em tintas (5, CMYK) ou CIELab (8)
+    { tag: 262, tipo: 3, valores: [espaco?.tipo === "cmyk" ? 5 : espaco?.tipo === "lab" ? 8 : 2] },
     { tag: 273, tipo: 4, valores: [8] },
     { tag: 277, tipo: 3, valores: [canais] },
     { tag: 278, tipo: 4, valores: [altura] },
@@ -51,6 +67,7 @@ export async function codificarTiff(
     { tag: 296, tipo: 3, valores: [2] },
     ...(compressao === "deflate" ? [{ tag: 317, tipo: 3 as const, valores: [2] }] : []),
     ...(alfa ? [{ tag: 338, tipo: 3 as const, valores: [2] }] : []),
+    ...(espaco?.tipo === "cmyk" ? [{ tag: 332, tipo: 3 as const, valores: [1] }] : []),
     ...etiquetas,
   ];
   // O diretório vai em ordem crescente das etiquetas

@@ -158,18 +158,27 @@ function sorteio(x: number, y: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** A imagem RGBA em cores indexadas. */
-export function indexar(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number, opcoes: OpcoesDaPaleta): ImagemIndexada {
-  const total = largura * altura;
+type Preparada = { opacos: Uint8Array; cor: Float32Array; temTransparente: boolean };
+
+/** A cor de cada pixel sobre o fosco (o que é meio transparente) e quem é opaco. */
+function preparar(rgba: Uint8ClampedArray | Uint8Array, total: number, transparencia: boolean, fosco: Rgb): Preparada {
   const opacos = new Uint8Array(total);
   const cor = new Float32Array(total * 3);
   for (let p = 0; p < total; p++) {
     const a = rgba[p * 4 + 3];
-    opacos[p] = !opcoes.transparencia || a >= 128 ? 1 : 0;
+    opacos[p] = !transparencia || a >= 128 ? 1 : 0;
     // O que é meio transparente vai sobre o fosco
     const t = a / 255;
-    for (let e = 0; e < 3; e++) cor[p * 3 + e] = rgba[p * 4 + e] * t + opcoes.fosco[e] * (1 - t);
+    for (let e = 0; e < 3; e++) cor[p * 3 + e] = rgba[p * 4 + e] * t + fosco[e] * (1 - t);
   }
+  return { opacos, cor, temTransparente: transparencia && opacos.some((v) => !v) };
+}
+
+/** A imagem RGBA em cores indexadas, com a paleta calculada para ela. */
+export function indexar(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number, opcoes: OpcoesDaPaleta): ImagemIndexada {
+  const total = largura * altura;
+  const preparada = preparar(rgba, total, opcoes.transparencia, opcoes.fosco);
+  const { opacos, cor, temTransparente } = preparada;
   const plano = new Uint8ClampedArray(total * 4);
   for (let p = 0; p < total; p++) {
     plano[p * 4] = cor[p * 3];
@@ -177,13 +186,27 @@ export function indexar(rgba: Uint8ClampedArray | Uint8Array, largura: number, a
     plano[p * 4 + 2] = cor[p * 3 + 2];
     plano[p * 4 + 3] = 255;
   }
-  const temTransparente = opcoes.transparencia && opacos.some((v) => !v);
   const maximo = Math.max(2, Math.min(256, Math.round(opcoes.cores))) - (temTransparente ? 1 : 0);
   let paleta: Rgb[];
   if (opcoes.paleta === "web") paleta = paletaDaWeb().slice(0, Math.max(maximo, 2));
   else if (opcoes.paleta === "cinza") paleta = paletaCinza(maximo);
   else if (opcoes.paleta === "preto_branco") paleta = [[0, 0, 0], [255, 255, 255]];
   else paleta = paletaAdaptavel(plano, opacos, maximo, opcoes.paleta === "perceptual");
+  return mapear(preparada, largura, altura, paleta, opcoes);
+}
+
+/**
+ * A imagem numa paleta que já existe (a tabela de cores do modo Cores indexadas), com o pontilhado e a transparência
+ * das opções. A paleta tem no máximo 255 cores quando há transparência (o índice dela vem depois).
+ */
+export function mapearNaPaleta(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number, paleta: Rgb[], opcoes: Pick<OpcoesDaPaleta, "pontilhado" | "quantidade" | "transparencia" | "fosco">): ImagemIndexada {
+  const lista = paleta.length ? paleta.slice(0, 256) : ([[0, 0, 0]] as Rgb[]);
+  const preparada = preparar(rgba, largura * altura, opcoes.transparencia, opcoes.fosco);
+  return mapear(preparada, largura, altura, preparada.temTransparente ? lista.slice(0, 255) : lista, opcoes);
+}
+
+function mapear({ opacos, cor, temTransparente }: Preparada, largura: number, altura: number, paleta: Rgb[], opcoes: Pick<OpcoesDaPaleta, "pontilhado" | "quantidade" | "fosco">): ImagemIndexada {
+  const total = largura * altura;
   const perto = buscador(paleta);
   const indices = new Uint8Array(total);
   const transparente = temTransparente ? paleta.length : null;

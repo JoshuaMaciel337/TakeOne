@@ -18,6 +18,7 @@ import { indexar, type OpcoesDaPaleta, OPCOES_PADRAO_DA_PALETA } from "./formato
 import { type CompressaoDoTiff, codificarTiff } from "./formatos/tiff";
 import { exportarImagem } from "./imagem";
 import { comInformacoes, etiquetasDoTiff, type InformacoesDoArquivo, temInformacoes } from "./metadados";
+import { amostrasDoEspaco, aplicarModo, type ModoDeCor } from "../imagem/modos";
 import { comResolucao } from "./resolucao";
 
 export type FormatoDeExportacao = "png" | "png8" | "jpeg" | "webp" | "webp_sem_perda" | "gif" | "avif" | "tiff" | "bmp" | "ico" | "pdf";
@@ -52,6 +53,8 @@ export type OpcoesDeExportacao = {
   pdf: "jpeg" | "sem_perda";
   /** As informações do arquivo que vão nos metadados (null: sem elas). */
   informacoes: InformacoesDoArquivo | null;
+  /** O modo de cor do documento (Imagem › Modo): o passo final dos pixels, e o CMYK e o Lab no TIFF e no PDF. */
+  modo?: ModoDeCor | null;
 };
 
 export const OPCOES_PADRAO_DE_EXPORTACAO: OpcoesDeExportacao = {
@@ -139,9 +142,36 @@ async function icone(origem: HTMLCanvasElement, lados: number[]): Promise<Uint8A
   return codificarIco(imagens);
 }
 
-/** O PDF de uma imagem: a cor em JPEG (sem o alfa, para a borda não escurecer) ou sem perda, e o alfa à parte. */
-export async function paginaDoPdf(canvas: HTMLCanvasElement, dados: Uint8ClampedArray, ppi: number, modo: "jpeg" | "sem_perda", qualidade: number) {
+/** A cópia do canvas com o modo de cor aplicado (o próprio canvas, sem modo ou no RGB e no Lab, que não mudam a tela). */
+export function canvasNoModo(canvas: HTMLCanvasElement, modo: ModoDeCor | null | undefined, ppi: number): HTMLCanvasElement {
+  if (!modo || modo.tipo === "rgb" || modo.tipo === "lab") return canvas;
+  const copia = document.createElement("canvas");
+  copia.width = canvas.width;
+  copia.height = canvas.height;
+  const contexto = copia.getContext("2d", { willReadFrequently: true })!;
+  contexto.drawImage(canvas, 0, 0);
+  const pixels = contexto.getImageData(0, 0, copia.width, copia.height);
+  aplicarModo(pixels.data, copia.width, copia.height, modo, ppi);
+  contexto.putImageData(pixels, 0, 0);
+  return copia;
+}
+
+/**
+ * O PDF de uma imagem: a cor em JPEG (sem o alfa, para a borda não escurecer) ou sem perda, e o alfa à parte. Em CMYK
+ * e Lab, as amostras vão sem perda e sem o alfa (sobre o papel).
+ */
+export async function paginaDoPdf(canvas: HTMLCanvasElement, dados: Uint8ClampedArray, ppi: number, modo: "jpeg" | "sem_perda", qualidade: number, espaco: "cmyk" | "lab" | null = null, modoDeCor?: ModoDeCor | null) {
   const { width: largura, height: altura } = canvas;
+  if (espaco) {
+    const amostras = amostrasDoEspaco(dados, largura * altura, espaco, modoDeCor ?? undefined);
+    // No PDF, o a e o b vão com 128 somado (o Decode leva de volta)
+    if (espaco === "lab")
+      for (let i = 0; i < amostras.length; i += 3) {
+        amostras[i + 1] ^= 0x80;
+        amostras[i + 2] ^= 0x80;
+      }
+    return { largura, altura, ppi, imagem: { tipo: "flate" as const, bytes: await zlib(amostras) }, alfa: null, espaco };
+  }
   const alfa = temTransparencia(dados);
   let imagem: { tipo: "jpeg"; bytes: Uint8Array } | { tipo: "flate"; bytes: Uint8Array };
   if (modo === "jpeg") {
@@ -178,7 +208,7 @@ export async function gerarArquivo(projeto: Projeto, midias: ReadonlyMap<string,
   const ppi = (projeto.tamanho?.resolucao ?? 72) * escala;
   const comPpi = projeto.tamanho?.resolucao ? ppi : null;
   const { canvas } = await pixelsDoBlob(await exportarImagem(projeto, midias, { formato: "png", escala, ...fontes }));
-  return codificarCanvas(canvas, opcoes, ppi, comPpi);
+  return codificarCanvas(canvas, { ...opcoes, modo: projeto.modo ?? null }, ppi, comPpi);
 }
 
 /** A resolução e as informações do arquivo nos bytes do PNG, do JPG e do WebP. */
@@ -196,11 +226,14 @@ async function comOQueFalta(blob: Blob, formato: "png" | "jpeg" | "webp", opcoes
  * tem onde; `comPpi`, a mesma só quando o documento tem uma (o PNG e o JPG sem ela ficam sem o bloco). As informações
  * do arquivo (quando as opções trazem) vão no PNG, no PNG-8, no JPG, no WebP, no TIFF e no PDF.
  */
-export async function codificarCanvas(canvas: HTMLCanvasElement, opcoes: OpcoesDeExportacao, ppi = 72, comPpi: number | null = null): Promise<Blob> {
-  const { formato, qualidade } = opcoes;
-  const { width: largura, height: altura } = canvas;
+export async function codificarCanvas(original: HTMLCanvasElement, opcoes: OpcoesDeExportacao, ppi = 72, comPpi: number | null = null): Promise<Blob> {
+  const { formato, qualidade, modo } = opcoes;
+  const { width: largura, height: altura } = original;
   const tamanho = { largura, altura };
   const info = temInformacoes(opcoes.informacoes) ? opcoes.informacoes : null;
+  // O TIFF e o PDF guardam o CMYK e o Lab de verdade; os outros formatos levam a imagem já no modo (a prova, no CMYK)
+  const espaco = (formato === "tiff" || formato === "pdf") && (modo?.tipo === "cmyk" || modo?.tipo === "lab") ? modo.tipo : null;
+  const canvas = espaco ? original : canvasNoModo(original, modo, ppi);
   if (formato === "png" || formato === "webp" || formato === "webp_sem_perda" || formato === "avif") {
     const blob = await blobDoCanvas(canvas, formato === "png" || formato === "avif" ? "image/png" : "image/webp", formato === "webp_sem_perda" ? 1 : qualidade);
     if (formato === "avif") return avifPelaApi(blob, qualidade);
@@ -224,13 +257,16 @@ export async function codificarCanvas(canvas: HTMLCanvasElement, opcoes: OpcoesD
     case "gif":
       return blobDeBytes(codificarGif(indexar(dados, largura, altura, opcoes.paleta)), "image/gif");
     case "tiff":
-      return blobDeBytes(await codificarTiff(dados, largura, altura, { compressao: opcoes.tiff, ppi, etiquetas: info ? etiquetasDoTiff(info) : [] }), "image/tiff");
+      return blobDeBytes(
+        await codificarTiff(dados, largura, altura, { compressao: opcoes.tiff, ppi, etiquetas: info ? etiquetasDoTiff(info) : [], ...(espaco ? { espaco: { tipo: espaco, amostras: amostrasDoEspaco(dados, largura * altura, espaco, modo ?? undefined) } } : {}) }),
+        "image/tiff",
+      );
     case "bmp":
       return blobDeBytes(codificarBmp(dados, largura, altura, ppi), "image/bmp");
     case "ico":
       return blobDeBytes(await icone(canvas, opcoes.icone), "image/x-icon");
     case "pdf":
-      return blobDeBytes(codificarPdf([await paginaDoPdf(canvas, dados, ppi, opcoes.pdf, qualidade)], infoDoPdf(info)), "application/pdf");
+      return blobDeBytes(codificarPdf([await paginaDoPdf(canvas, dados, ppi, opcoes.pdf, qualidade, espaco, modo)], infoDoPdf(info)), "application/pdf");
   }
 }
 

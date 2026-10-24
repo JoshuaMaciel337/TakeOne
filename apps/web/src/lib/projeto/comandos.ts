@@ -7,6 +7,7 @@
 import type { Contorno, Sombra } from "./silhueta.ts";
 import type { Tick } from "../tempo.ts";
 import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
+import type { ModoDeCor } from "../imagem/modos.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -269,6 +270,7 @@ export type Comando =
   | { comando: "imagem.trocarImagem"; parametros: { clipeId: string; midiaId: string; tamanhoAtual: Tamanho; tamanhoNovo: Tamanho } }
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.informacoes"; parametros: { informacoes: InformacoesDoArquivo } }
+  | { comando: "imagem.modo"; parametros: { modo: ModoDeCor } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.transformarCamada"; parametros: { clipeId: string; transformacao: Partial<Transformacao>; virar?: Virar } }
@@ -415,6 +417,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.trocarImagem": "trocar a imagem",
   "imagem.fundo": "mudar o fundo",
   "imagem.informacoes": "mudar as informações do arquivo",
+  "imagem.modo": "mudar o modo de cor",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
   "imagem.transformarCamada": "transformar a camada",
@@ -794,6 +797,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mudarFundoDaImagem(projeto, parametros) };
     case "imagem.informacoes":
       return { projeto: { ...projeto, informacoes: parametros.informacoes } };
+    case "imagem.modo":
+      return { projeto: { ...projeto, modo: parametros.modo.tipo === "rgb" ? null : parametros.modo } };
     case "imagem.tamanho":
       return { projeto: mudarTamanhoDaImagem(projeto, parametros) };
     case "clipe.preencher":

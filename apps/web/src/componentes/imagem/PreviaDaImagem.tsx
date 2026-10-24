@@ -20,6 +20,7 @@ import { canaisDaPilha, filtrosQueValem, usaProfundidade } from "@/lib/imagem/fi
 import { CHAVE_DA_PROFUNDIDADE } from "@/lib/previa/camadas";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
+import { aplicarModo } from "@/lib/imagem/modos";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { textoNoTamanho } from "@/lib/texto/desenhar";
 import { useVersaoDasFontes } from "@/lib/texto/fontes";
@@ -301,6 +302,9 @@ export function PreviaDaImagem({
   const escala = Math.max(0.01, zoom ?? ajuste);
   const tamanho: Tamanho = { largura: Math.max(1, Math.round(imagem.largura * escala)), altura: Math.max(1, Math.round(imagem.altura * escala)) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A camada do modo de cor: fora do RGB (e do Lab, que não muda a tela), a prévia mostra a imagem no modo
+  const modoCanvasRef = useRef<HTMLCanvasElement>(null);
+  const modoAtivo = Boolean(projeto.modo && projeto.modo.tipo !== "rgb" && projeto.modo.tipo !== "lab" && !mascaraAVista);
   const compositor = useRef<Compositor | null>(null);
   const [guias, setGuias] = useState<Guias | null>(null);
   const [semWebgl, setSemWebgl] = useState(false);
@@ -481,6 +485,20 @@ export function PreviaDaImagem({
     if (caixasRef) caixasRef.current = new Map(camadas.map((camada) => [camada.clipe.id, { ...caixaNoQuadro(camada.caixa, tamanho), bruta: camada.caixa, quadro: tamanho }]));
     const resolucao = { largura: Math.round(tamanho.largura * densidade), altura: Math.round(tamanho.altura * densidade) };
     atual.desenhar(camadasEmArvore(projeto, porFaixa, tamanho), projeto.fundo.transparente ? null : projeto.fundo.cor, tamanho, resolucao);
+    // O modo de cor (Imagem › Modo): a mesma conta da exportação, sobre o que o compositor acabou de desenhar (o canvas
+    // do WebGL ainda tem o desenho nesta tarefa), numa camada 2D por cima
+    const sobre = modoCanvasRef.current;
+    const origem = canvasRef.current;
+    if (modoAtivo && sobre && origem) {
+      sobre.width = origem.width;
+      sobre.height = origem.height;
+      const contexto = sobre.getContext("2d", { willReadFrequently: true })!;
+      contexto.clearRect(0, 0, sobre.width, sobre.height);
+      contexto.drawImage(origem, 0, 0);
+      const pixels = contexto.getImageData(0, 0, sobre.width, sobre.height);
+      aplicarModo(pixels.data, sobre.width, sobre.height, projeto.modo, ((projeto.tamanho?.resolucao ?? 72) * sobre.width) / tamanhoDaImagem(projeto).largura);
+      contexto.putImageData(pixels, 0, 0);
+    }
   });
 
   // Depois de um zoom pelo clique, o ponto clicado volta para baixo do mouse
@@ -513,7 +531,8 @@ export function PreviaDaImagem({
     if (!ctx) return;
     ctx.fillStyle = projeto.fundo.transparente ? "#ffffff" : projeto.fundo.cor;
     ctx.fillRect(0, 0, 1, 1);
-    ctx.drawImage(canvas, Math.floor(ponto.x * densidade), Math.floor(ponto.y * densidade), 1, 1, 0, 0, 1, 1);
+    // Num modo de cor, a cor é a da imagem como aparece (no modo)
+    ctx.drawImage(modoAtivo && modoCanvasRef.current ? modoCanvasRef.current : canvas, Math.floor(ponto.x * densidade), Math.floor(ponto.y * densidade), 1, 1, 0, 0, 1, 1);
     const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
     aoPegarCor?.(hex(r, g, b), paraOFundo);
   }
@@ -675,7 +694,8 @@ export function PreviaDaImagem({
             onPointerMove={aoMover}
             onPointerUp={aoSoltar}
           >
-            <canvas ref={canvasRef} className="absolute inset-0 size-full" style={corAVista ? { filter: `url(#to-canal-${corAVista})` } : undefined} />
+            <canvas ref={canvasRef} className="absolute inset-0 size-full" style={{ ...(corAVista ? { filter: `url(#to-canal-${corAVista})` } : {}), ...(modoAtivo ? { visibility: "hidden" } : {}) }} />
+            <canvas ref={modoCanvasRef} className="pointer-events-none absolute inset-0 size-full" hidden={!modoAtivo} aria-hidden data-modo-de-cor />
             {corAVista ? (
               <svg width="0" height="0" className="absolute" aria-hidden>
                 {/* Um canal de cor nos três, para a imagem aparecer em cinza por ele */}

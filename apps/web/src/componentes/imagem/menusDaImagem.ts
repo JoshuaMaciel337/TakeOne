@@ -164,6 +164,10 @@ export type AcoesDosMenus = {
   abrirRecente: (id: string) => void;
   /** Arquivo › Colocar incorporado: uma imagem do computador como camada. */
   colocarIncorporado: () => void;
+  /** Imagem › Modo: o modo de cor do documento e a tabela de cores (nas cores indexadas). */
+  modoAtual: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab";
+  modoDeCor: (tipo: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab") => void;
+  tabelaDeCores: () => void;
   /** Arquivo › Informações do arquivo, Arquivo › Imprimir e Imagem › Duplicar. */
   informacoesDoArquivo: () => void;
   imprimir: () => void;
@@ -439,6 +443,25 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Imagem",
       itens: [
+        {
+          nome: "Modo",
+          itens: [
+            { nome: "Bitmap…", marcado: a.modoAtual === "bitmap", aoEscolher: () => a.modoDeCor("bitmap") },
+            { nome: "Escala de cinza", marcado: a.modoAtual === "cinza", aoEscolher: () => a.modoDeCor("cinza") },
+            { nome: "Duotone…", marcado: a.modoAtual === "duotone", aoEscolher: () => a.modoDeCor("duotone") },
+            { nome: "Cores indexadas…", marcado: a.modoAtual === "indexadas", aoEscolher: () => a.modoDeCor("indexadas") },
+            { nome: "Cor RGB", marcado: a.modoAtual === "rgb", aoEscolher: () => a.modoDeCor("rgb") },
+            { nome: "Cor CMYK…", marcado: a.modoAtual === "cmyk", aoEscolher: () => a.modoDeCor("cmyk"), titulo: "A prova da impressão na tela; o TIFF e o PDF saem em CMYK" },
+            { nome: "Cor Lab", marcado: a.modoAtual === "lab", aoEscolher: () => a.modoDeCor("lab"), titulo: "A tela não muda; o TIFF e o PDF saem em L*a*b*" },
+            "-",
+            { nome: "8 bits/canal", marcado: true, aoEscolher: () => undefined },
+            { nome: "16 bits/canal", desativado: true, aoEscolher: () => undefined, titulo: "O TakeOne desenha e guarda as camadas em 8 bits por canal (o que o navegador desenha e grava)." },
+            { nome: "32 bits/canal", desativado: true, aoEscolher: () => undefined, titulo: "O TakeOne desenha e guarda as camadas em 8 bits por canal (o que o navegador desenha e grava)." },
+            "-",
+            { nome: "Tabela de cores…", desativado: a.modoAtual !== "indexadas", aoEscolher: a.tabelaDeCores },
+          ],
+        },
+        "-",
         {
           nome: "Ajustes",
           itens: [

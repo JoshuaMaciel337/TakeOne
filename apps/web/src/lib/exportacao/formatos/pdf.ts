@@ -12,6 +12,15 @@ export type PaginaDoPdf = {
   imagem: { tipo: "jpeg"; bytes: Uint8Array } | { tipo: "flate"; bytes: Uint8Array };
   /** O alfa em cinza de 8 bits, já no zlib (sem ele, a imagem é opaca). */
   alfa?: Uint8Array | null;
+  /** As amostras da imagem: RGB (o padrão), CMYK (4 por pixel) ou Lab (L de 0 a 255 e a, b com 128 somado). */
+  espaco?: "rgb" | "cmyk" | "lab";
+};
+
+const ESPACOS = {
+  rgb: "/ColorSpace /DeviceRGB",
+  cmyk: "/ColorSpace /DeviceCMYK",
+  // O branco D65, como a conversão; o Decode leva os bytes a L de 0 a 100 e a, b de -128 a 127
+  lab: "/ColorSpace [/Lab << /WhitePoint [0.9505 1 1.089] /Range [-128 127 -128 127] >>] /Decode [0 100 -128 127 -128 127]",
 };
 
 /** O texto em UTF-16 com a marca de ordem, em hexadecimal: vale para qualquer acento. */
@@ -59,7 +68,7 @@ export function codificarPdf(paginas: PaginaDoPdf[], info: InfoDoPdf = {}): Uint
     definir(nConteudo, [`<< /Length ${desenho.length} >>\nstream\n`, desenho, "\nendstream"]);
     const filtro = pagina.imagem.tipo === "jpeg" ? "/DCTDecode" : "/FlateDecode";
     definir(nImagem, [
-      `<< /Type /XObject /Subtype /Image /Width ${pagina.largura} /Height ${pagina.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ${filtro}${nAlfa ? ` /SMask ${nAlfa} 0 R` : ""} /Length ${pagina.imagem.bytes.length} >>\nstream\n`,
+      `<< /Type /XObject /Subtype /Image /Width ${pagina.largura} /Height ${pagina.altura} ${ESPACOS[pagina.espaco ?? "rgb"]} /BitsPerComponent 8 /Filter ${filtro}${nAlfa ? ` /SMask ${nAlfa} 0 R` : ""} /Length ${pagina.imagem.bytes.length} >>\nstream\n`,
       pagina.imagem.bytes,
       "\nendstream",
     ]);

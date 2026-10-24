@@ -46,8 +46,11 @@ import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } fro
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
+import { JanelaBitmap, JanelaCmyk, JanelaCoresIndexadas, JanelaDuotone, JanelaTabelaDeCores } from "./JanelasDoModo";
+import { SIGLAS_DOS_MODOS } from "@/lib/imagem/modos";
+import { indexar, type PaletaDaExportacao, type Pontilhado } from "@/lib/exportacao/formatos/quantizar";
 import { imprimirImagem, type OpcoesDaImpressao } from "@/lib/exportacao/imprimir";
-import { baixarBlob, caixaDoConteudo as caixaDoDesenho, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
+import { baixarBlob, caixaDoConteudo as caixaDoDesenho, codificarCanvas, formatoDe, gerarArquivo, lerPreferencias, nomeDoArquivo, OPCOES_PADRAO_DE_EXPORTACAO, pixelsDoBlob } from "@/lib/exportacao/exportarComo";
 import { type AcoesDosMenus, AREAS_DA_IMAGEM, type IdPainelDaImagem, menusDaImagem, PAINEIS_DA_IMAGEM } from "./menusDaImagem";
 import { nomeDaCamada, PainelCamadas } from "./PainelCamadas";
 import { PainelFotoIA } from "./PainelFotoIA";
@@ -476,6 +479,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
   const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
   const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
+  const [janelaDoModo, setJanelaDoModo] = useState<"bitmap" | "duotone" | "indexadas" | "tabela" | "cmyk" | null>(null);
   const [atalhos, setAtalhos] = useState(false);
   const [provisorio, setProvisorio] = useState<Comando | null>(null);
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
@@ -743,6 +747,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  /** Imagem › Modo › Cores indexadas: a paleta sai da imagem como ela está agora (no RGB, numa cópia de até 1024 px). */
+  const converterEmIndexadas = async (opcoes: { paleta: PaletaDaExportacao; cores: number; pontilhado: Pontilhado; quantidade: number; transparencia: boolean }) => {
+    setJanelaDoModo(null);
+    if (!projeto) return;
+    try {
+      await pinturas.esperar();
+      const atual = projetoRef.current ?? projeto;
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const escala = Math.min(1, 1024 / Math.max(largura, altura));
+      const { canvas } = await pixelsDoBlob(await exportarImagem(atual, midias, { formato: "png", escala, fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
+      const dados = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height).data;
+      const indexada = indexar(dados, canvas.width, canvas.height, { ...opcoes, fosco: [255, 255, 255] });
+      const paleta = indexada.transparente === null ? indexada.paleta : indexada.paleta.slice(0, indexada.transparente);
+      executar({ comando: "imagem.modo", parametros: { modo: { tipo: "indexadas", paleta, pontilhado: opcoes.pontilhado, quantidade: opcoes.quantidade, transparencia: opcoes.transparencia } } });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível converter em cores indexadas.");
+    }
+  };
   /** Imagem › Duplicar: um documento novo com uma cópia deste (as camadas de pixels continuam nas mesmas mídias). */
   const duplicarDocumento = async (nome: string, mescladas: boolean) => {
     setJanelaDoArquivo(null);
@@ -791,7 +813,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       await pinturas.esperar();
       const atual = projetoRef.current ?? projeto;
       const { largura, altura } = tamanhoDaImagem(atual);
-      const png = await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      const exportada = await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros });
+      // No modo de cor do documento (a prova, no CMYK)
+      const png = atual.modo ? await codificarCanvas((await pixelsDoBlob(exportada)).canvas, { ...OPCOES_PADRAO_DE_EXPORTACAO, modo: atual.modo }, atual.tamanho?.resolucao ?? 72) : exportada;
       await imprimirImagem(png, edicao.nome, opcoes, largura, altura, atual.tamanho?.resolucao ?? 72);
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível imprimir.");
@@ -4692,6 +4716,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    modoAtual: projeto?.modo?.tipo ?? "rgb",
+    modoDeCor: (tipo) => {
+      if (tipo === "rgb" || tipo === "cinza" || tipo === "lab") executar({ comando: "imagem.modo", parametros: { modo: { tipo } } });
+      else setJanelaDoModo(tipo);
+    },
+    tabelaDeCores: () => setJanelaDoModo("tabela"),
     imprimir: () => setJanelaDoArquivo("imprimir"),
     duplicarDocumento: () => setJanelaDoArquivo("duplicar"),
     gerarAtivos: () => void gerarAtivosDaImagem(),
@@ -4872,7 +4902,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5702,7 +5732,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 className="min-w-0 bg-transparent font-medium outline-none focus:bg-painel-2"
               />
               <span className="shrink-0 truncate text-suave">
-                @ {porcentagem(zoomNaTela)} ({escolhidoNaTela ? nomeDaCamada(escolhidoNaTela.clipe, midias, escolhidoNaTela.faixa) : escolhidas.length > 1 ? `${escolhidas.length} camadas` : "Fundo"}, RGB/8)
+                @ {porcentagem(zoomNaTela)} ({escolhidoNaTela ? nomeDaCamada(escolhidoNaTela.clipe, midias, escolhidoNaTela.faixa) : escolhidas.length > 1 ? `${escolhidas.length} camadas` : "Fundo"}, {SIGLAS_DOS_MODOS[projeto?.modo?.tipo ?? "rgb"]}/8)
               </span>
             </div>
           </div>
@@ -6147,6 +6177,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(informacoes) => {
             setJanelaDoArquivo(null);
             executar({ comando: "imagem.informacoes", parametros: { informacoes } });
+          }}
+        />
+      ) : null}
+      {janelaDoModo === "bitmap" && projeto ? (
+        <JanelaBitmap inicial={projeto.modo} ppi={projeto.tamanho?.resolucao ?? 72} aoFechar={() => setJanelaDoModo(null)} aoConfirmar={(modo) => (setJanelaDoModo(null), executar({ comando: "imagem.modo", parametros: { modo } }))} />
+      ) : null}
+      {janelaDoModo === "duotone" && projeto ? (
+        <JanelaDuotone inicial={projeto.modo} aoFechar={() => setJanelaDoModo(null)} aoConfirmar={(modo) => (setJanelaDoModo(null), executar({ comando: "imagem.modo", parametros: { modo } }))} />
+      ) : null}
+      {janelaDoModo === "cmyk" && projeto ? (
+        <JanelaCmyk inicial={projeto.modo} aoFechar={() => setJanelaDoModo(null)} aoConfirmar={(modo) => (setJanelaDoModo(null), executar({ comando: "imagem.modo", parametros: { modo } }))} />
+      ) : null}
+      {janelaDoModo === "indexadas" && projeto ? <JanelaCoresIndexadas inicial={projeto.modo} aoFechar={() => setJanelaDoModo(null)} aoConfirmar={(opcoes) => void converterEmIndexadas(opcoes)} /> : null}
+      {janelaDoModo === "tabela" && projeto?.modo?.tipo === "indexadas" ? (
+        <JanelaTabelaDeCores
+          modo={projeto.modo}
+          aoFechar={() => setJanelaDoModo(null)}
+          aoConfirmar={(paleta) => {
+            setJanelaDoModo(null);
+            if (projeto.modo?.tipo === "indexadas") executar({ comando: "imagem.modo", parametros: { modo: { ...projeto.modo, paleta } } });
           }}
         />
       ) : null}

@@ -19,6 +19,7 @@ import type { Clipe, Faixa, Projeto } from "@/lib/projeto/modelo";
 import { projetoSoCom } from "@/lib/projeto/rasterizar";
 import { arquivoDaVersao, criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { temInformacoes, xmpDasInformacoes } from "@/lib/exportacao/metadados";
+import { canvasNoModo } from "@/lib/exportacao/exportarComo";
 import type { Midia } from "@/lib/tipos";
 
 import {
@@ -344,7 +345,8 @@ export async function salvarPsd(projeto: Projeto, midias: ReadonlyMap<string, Mi
   if (ajustesFora) avisos.push(ajustesFora === 1 ? "Um ajuste sem par no arquivo ficou de fora." : `${ajustesFora} ajustes sem par no arquivo ficaram de fora.`);
 
   aoProgresso("Salvando a imagem inteira…");
-  const inteira = await canvasDoBlob(await exportarImagem(projeto, midias, { formato: "png", ...fontes }));
+  // A imagem inteira no modo de cor do documento (as camadas ficam em RGB)
+  const inteira = canvasNoModo(await canvasDoBlob(await exportarImagem(projeto, midias, { formato: "png", ...fontes })), projeto.modo, projeto.tamanho?.resolucao ?? 72);
   const resolucao = projeto.tamanho?.resolucao;
   const psd: Psd = {
     width: largura,

@@ -159,6 +159,7 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
           caminhos: projeto.caminhos ?? [],
           luz_global: projeto.luz_global ?? undefined,
           informacoes: projeto.informacoes ?? undefined,
+          modo: projeto.modo ?? undefined,
           tamanho: projeto.tamanho ?? undefined,
         },
       })
