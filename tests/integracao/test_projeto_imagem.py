@@ -398,3 +398,24 @@ def test_informacoes_do_arquivo(cliente):
     assert salvar(cliente, aberto, [vazia], informacoes={"titulo": "x" * 201}).status_code == 422
     video = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
     assert salvar(cliente, video, video["faixas"], informacoes=informacoes).json()["informacoes"] is None
+
+
+def test_modo_de_cor(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 320, "altura": 240}}).json()
+    vazia = {**projeto["faixas"][0], "clipes": []}
+    duotone = {"tipo": "duotone", "tintas": [{"nome": "Preto", "cor": "#000000", "curva": [0, 25, 50, 75, 100]},
+                                             {"nome": "Marrom", "cor": "#a0703c", "curva": [0, 35, 60, 80, 90]}]}
+    salvo = salvar(cliente, projeto, [vazia], modo=duotone)
+    assert salvo.status_code == 200, salvo.text
+    assert salvo.json()["modo"]["tintas"][1]["cor"] == "#a0703c"
+    indexadas = {"tipo": "indexadas", "paleta": [[0, 0, 0], [255, 255, 255]], "pontilhado": "difusao",
+                 "quantidade": 1, "transparencia": False}
+    aberto = salvar(cliente, salvo.json(), [vazia], modo=indexadas).json()
+    assert aberto["modo"]["paleta"] == [[0, 0, 0], [255, 255, 255]]
+    # O RGB não é guardado; campos que faltam, cores fora de 0 a 255 e tinta demais não passam
+    assert salvar(cliente, aberto, [vazia], modo={"tipo": "rgb"}).json()["modo"] is None
+    atual = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert salvar(cliente, atual, [vazia], modo={"tipo": "bitmap", "metodo": "limiar"}).status_code == 422
+    assert salvar(cliente, atual, [vazia], modo={**indexadas, "paleta": [[0, 0, 300]]}).status_code == 422
+    assert salvar(cliente, atual, [vazia], modo={**duotone, "tintas": duotone["tintas"] * 3}).status_code == 422

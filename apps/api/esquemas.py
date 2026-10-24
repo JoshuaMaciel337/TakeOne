@@ -1339,6 +1339,53 @@ class InformacoesDoArquivoEntrada(BaseModel):
         return list(dict.fromkeys(palavras))
 
 
+class TintaDoDuotoneEntrada(BaseModel):
+    nome: str = Field(default="", max_length=40)
+    cor: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+    # A tinta (0 a 100) em 0, 25, 50, 75 e 100% do cinza
+    curva: list[float] = Field(min_length=5, max_length=5)
+
+    @field_validator("curva")
+    @classmethod
+    def curva_em_porcentagem(cls, valor: list[float]) -> list[float]:
+        if any(not 0 <= v <= 100 for v in valor):
+            raise ValueError("A curva da tinta vai de 0 a 100.")
+        return valor
+
+
+class ModoDeCorEntrada(BaseModel):
+    """Imagem › Modo (editor de imagem): o passo final da prévia e da exportação. Cada tipo usa só os campos dele."""
+    tipo: Literal["rgb", "cinza", "bitmap", "duotone", "indexadas", "cmyk", "lab"]
+    metodo: Literal["limiar", "padrao", "difusao", "meio_tom"] | None = None
+    limiar: int | None = Field(default=None, ge=0, le=255)
+    frequencia: float | None = Field(default=None, ge=1, le=600)
+    angulo: float | None = Field(default=None, ge=-360, le=360)
+    forma: Literal["redondo", "elipse", "linha", "quadrado", "losango", "cruz"] | None = None
+    tintas: list[TintaDoDuotoneEntrada] | None = Field(default=None, min_length=1, max_length=4)
+    paleta: list[list[int]] | None = Field(default=None, min_length=1, max_length=256)
+    pontilhado: Literal["nenhum", "difusao", "padrao", "ruido"] | None = None
+    quantidade: float | None = Field(default=None, ge=0, le=1)
+    transparencia: bool | None = None
+    preto: Literal["nenhuma", "leve", "media", "pesada", "maxima"] | None = None
+    limite: float | None = Field(default=None, ge=100, le=400)
+
+    @field_validator("paleta")
+    @classmethod
+    def cores_da_paleta(cls, valor):
+        if valor is not None and any(len(cor) != 3 or any(not 0 <= v <= 255 for v in cor) for cor in valor):
+            raise ValueError("Cada cor da paleta tem vermelho, verde e azul de 0 a 255.")
+        return valor
+
+    @model_validator(mode="after")
+    def campos_do_tipo(self):
+        exigidos = {"bitmap": ("metodo", "limiar", "frequencia", "angulo", "forma"), "duotone": ("tintas",),
+                    "indexadas": ("paleta", "pontilhado", "quantidade", "transparencia"), "cmyk": ("preto", "limite")}
+        faltam = [campo for campo in exigidos.get(self.tipo, ()) if getattr(self, campo) is None]
+        if faltam:
+            raise ValueError(f"O modo {self.tipo} precisa de: {', '.join(faltam)}.")
+        return self
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1810,6 +1857,7 @@ class ProjetoSalvarEntrada(BaseModel):
     caminhos: list[CaminhoDoDocumento] = Field(default=[], max_length=100)
     luz_global: LuzGlobalEntrada | None = None
     informacoes: InformacoesDoArquivoEntrada | None = None
+    modo: ModoDeCorEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1847,6 +1895,7 @@ class ProjetoSaida(BaseModel):
     caminhos: list[CaminhoDoDocumento] = []
     luz_global: LuzGlobalEntrada | None = None
     informacoes: InformacoesDoArquivoEntrada | None = None
+    modo: ModoDeCorEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
