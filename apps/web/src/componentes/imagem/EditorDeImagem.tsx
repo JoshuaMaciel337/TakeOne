@@ -4503,6 +4503,65 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [faixa.clipes[0].id], estilo: null } });
   };
   /** Rasterizar › Todas as camadas: cada camada que não é de pixels (nem grupo nem ajuste), uma por vez. */
+  /** Arquivo › Scripts › Achatar todos os efeitos de camada e Achatar todas as máscaras: o plano de uma camada, em todas. */
+  const achatarEmTodas = async (tipo: "rasterizarEstilo" | "aplicarMascara") => {
+    if (!projeto) return;
+    const precisa = (faixa: Faixa) => {
+      const clipe = faixa.clipes[0];
+      if (!clipe || clipe.pasta || clipe.ajuste || faixa.travada) return false;
+      return tipo === "rasterizarEstilo" ? Boolean(clipe.contorno || clipe.sombra || clipe.estilo_camada?.efeitos.length) : Boolean(clipe.mascara_pixels || clipe.mascara_vetorial);
+    };
+    const alvos = faixasEmOrdem(projeto).filter(precisa).map((faixa) => faixa.id);
+    if (!alvos.length) return mostrarAviso(tipo === "rasterizarEstilo" ? "Nenhuma camada tem efeitos." : "Nenhuma camada tem máscara.");
+    let feitas = 0;
+    for (const id of alvos) {
+      const atual = projetoRef.current ?? projeto;
+      if (!atual.faixas.some((item) => item.id === id)) continue;
+      try {
+        const { desenhar, ...dados } = planoDosPixels(atual, tipo, [id], nomeDaFaixa, alturaDaCaixa, matrizNoQuadro);
+        await gerarPixels({ desenhar, ...dados }, dados);
+        feitas++;
+      } catch {
+        // A camada que não dá (travada no meio do caminho) fica como está
+      }
+    }
+    mostrarAviso(`${feitas} ${feitas === 1 ? "camada achatada" : "camadas achatadas"}.`);
+  };
+  /**
+   * Arquivo › Scripts › Excluir todas as camadas vazias: as de pixels sem nada pintado, os textos sem texto e os
+   * grupos que ficam sem nada (como o script dos editores; o fundo e os ajustes ficam).
+   */
+  const excluirCamadasVazias = async () => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    await pinturas.esperar();
+    const vazias = new Set<string>();
+    for (const { faixa, clipe } of camadasDaImagem(atual)) {
+      if (clipe.pasta || clipe.ajuste || clipe.camada_de_preenchimento || faixa.fundo || faixa.travada) continue;
+      if (clipe.texto_rico && !textoCorrido(clipe.texto_rico).trim()) vazias.add(faixa.id);
+      if (!clipe.pixels || !clipe.midia_id) continue;
+      if (clipe.pixels.versao === 0) {
+        vazias.add(faixa.id);
+        continue;
+      }
+      const fonte = pinturas.fonte(clipe) ?? (await carregarBitmap(arquivoDaMidia(clipe.midia_id, arquivoDaVersao(clipe.pixels.versao))));
+      const canvas = document.createElement("canvas");
+      canvas.width = fonte.width;
+      canvas.height = fonte.height;
+      const contexto = canvas.getContext("2d", { willReadFrequently: true })!;
+      contexto.drawImage(fonte, 0, 0);
+      const dados = contexto.getImageData(0, 0, canvas.width, canvas.height).data;
+      let algo = false;
+      for (let i = 3; i < dados.length && !algo; i += 4) if (dados[i]) algo = true;
+      if (!algo) vazias.add(faixa.id);
+    }
+    // Os grupos com só grupos e camadas vazias dentro
+    for (const faixa of atual.faixas)
+      if (faixa.clipes[0]?.pasta && comDescendentes(atual, faixa.id).every((item) => item.id === faixa.id || item.clipes[0]?.pasta || vazias.has(item.id))) vazias.add(faixa.id);
+    if (!vazias.size) return mostrarAviso("Nenhuma camada vazia.");
+    const camadas = [...vazias].filter((id) => !atual.faixas.find((faixa) => faixa.id === id)?.clipes[0]?.pasta).length;
+    if (executar({ comando: "imagem.apagarVarias", parametros: { faixaIds: [...vazias] } })) mostrarAviso(`${camadas} ${camadas === 1 ? "camada vazia excluída" : "camadas vazias excluídas"}${vazias.size > camadas ? `, com ${vazias.size - camadas} ${vazias.size - camadas === 1 ? "grupo" : "grupos"}` : ""}.`);
+  };
   const rasterizarTodas = async () => {
     if (!projeto) return;
     for (const faixa of faixasEmOrdem(projeto).filter((item) => !item.clipes[0].pixels && !item.clipes[0].pasta && !item.clipes[0].ajuste && !item.travada)) {
@@ -4749,6 +4808,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     automatizar: (tipo) => setAutomatizando(tipo),
     cortarEEndireitar: () => void cortarEEndireitarFotos(),
     ajustarImagem: () => setAjustandoImagem(true),
+    script: (qual) => void (qual === "vazias" ? excluirCamadasVazias() : achatarEmTodas(qual === "efeitos" ? "rasterizarEstilo" : "aplicarMascara")),
     prova,
     mudarProva: (mudanca) => setProva((atual) => ({ ...atual, ...mudanca })),
     alertaDeGama,

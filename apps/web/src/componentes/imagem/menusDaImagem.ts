@@ -178,6 +178,7 @@ export type AcoesDosMenus = {
   automatizar: (tipo: "lote" | "processador" | "pilha" | "fotomesclagem" | "hdr" | "folha") => void;
   cortarEEndireitar: () => void;
   ajustarImagem: () => void;
+  script: (qual: "vazias" | "efeitos" | "mascaras") => void;
   /** Arquivo › Informações do arquivo, Arquivo › Imprimir e Imagem › Duplicar. */
   informacoesDoArquivo: () => void;
   imprimir: () => void;
@@ -378,6 +379,10 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           itens: [
             { nome: "Processador de imagens…", aoEscolher: () => a.automatizar("processador") },
             { nome: "Carregar arquivos em pilha…", aoEscolher: () => a.automatizar("pilha") },
+            "-",
+            { nome: "Excluir todas as camadas vazias", aoEscolher: () => a.script("vazias"), titulo: "As camadas de pixels sem nada, os textos vazios e os grupos que ficam sem nada" },
+            { nome: "Achatar todos os efeitos de camada", aoEscolher: () => a.script("efeitos"), titulo: "O estilo de cada camada vai para os pixels dela" },
+            { nome: "Achatar todas as máscaras", aoEscolher: () => a.script("mascaras"), titulo: "As máscaras de pixels e vetoriais de cada camada vão para os pixels dela" },
           ],
         },
         {

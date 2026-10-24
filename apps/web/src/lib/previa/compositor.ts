@@ -860,6 +860,11 @@ export class Compositor {
   };
   /** O nível de pasta (ou de recorte) que está sendo desenhado: cada um tem o framebuffer dele. */
   private nivel = 0;
+  /**
+   * O canvas guarda a transparência (o editor de imagem): o multiplicar, a tela e o somar também leem o fundo, porque
+   * as funções de mistura do WebGL não sabem do alfa dele (sobre o transparente, a camada em multiplicar sumia).
+   */
+  private readonly comAlfa: boolean;
   /** O número da camada folha da vez (as texturas e as LUTs ficam guardadas por ele, de um quadro para o outro). */
   private proximaFolha = 0;
 
@@ -869,6 +874,7 @@ export class Compositor {
     if (!gl) throw new Error("Este navegador não tem WebGL2, que a prévia usa para desenhar o vídeo.");
     this.canvas = canvas;
     this.gl = gl;
+    this.comAlfa = comAlfa;
     // Para desenhar em ponto flutuante (o desfoque do contorno); sem a extensão, fica em 8 bits
     this.comFlutuante = Boolean(gl.getExtension("EXT_color_buffer_float"));
     this.recursos = this.criarRecursos();
@@ -1569,7 +1575,8 @@ export class Compositor {
     const recortada = Boolean(camada.recortada);
     // As opções de mesclagem precisam do fundo (o caminho que lê a cópia do destino)
     const canais = camada.canais && !camada.canais.every(Boolean) ? camada.canais : null;
-    const opcoes = Boolean(camada.mesclarSe || canais);
+    // Com a transparência, os modos rápidos também leem o fundo (a fórmula do W3C, com o alfa dele)
+    const opcoes = Boolean(camada.mesclarSe || canais) || (this.comAlfa && codigo > 0 && codigo < MESCLAGEM_COM_O_FUNDO);
     gl.uniform1i(uniformes.mesclagem, codigo);
     gl.uniform1i(uniformes.recortada, recortada ? 1 : 0);
     gl.uniform1i(uniformes.comFundo, opcoes ? 1 : 0);

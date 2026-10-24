@@ -185,8 +185,8 @@ export function planoDosPixels(
   if (escolhidas.some((faixa) => faixa.travada) && tipo !== "carimbarVisiveis") throw new ErroEdicao("Uma das camadas está travada.");
   switch (tipo) {
     case "aplicarMascara": {
-      if (escolhidas.length !== 1 || !primeira.clipes[0].mascara_pixels) throw new ErroEdicao("Escolha uma camada com máscara para aplicar.");
-      // A máscara vai para os pixels; a opacidade, a mesclagem e o estilo continuam na camada
+      if (escolhidas.length !== 1 || (!primeira.clipes[0].mascara_pixels && !primeira.clipes[0].mascara_vetorial)) throw new ErroEdicao("Escolha uma camada com máscara para aplicar.");
+      // As máscaras (a de pixels e a vetorial) vão para os pixels; a opacidade, a mesclagem e o estilo continuam na camada
       return {
         desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: true }),
         remover: [primeira.id],

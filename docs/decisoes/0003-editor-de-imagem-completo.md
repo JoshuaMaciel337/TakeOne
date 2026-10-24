@@ -267,7 +267,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Modo: Escala de cinza, Bitmap (limiar, pontilhado, meio-tom), Duotone, Cores indexadas (paletas, pontilhado, tabela de cores); CMYK e Lab na prova e na exportação; 16 e 32 bits desligados com o motivo. O CMYK é uma aproximação sem perfil ICC (não há perfil de gráfica com licença livre para redistribuir)
 - [x] Prova de cores e alerta de gama; simulação de daltonismo
 - [x] Automatizar: Lote, Processador de imagens, Folha de contato, Ajustar imagem, Cortar e endireitar fotos, Fotomesclagem, Mesclar para HDR, Carregar arquivos em pilha (com os modos de pilha). O Lote aplica os passos (tons e cores automáticos, as camadas de ajuste e o modo do documento); rodar uma ação gravada entra quando as ações chegarem (13.15)
-- [ ] Scripts úteis: excluir camadas vazias, achatar todos os efeitos, achatar todas as máscaras
+- [x] Scripts úteis: excluir camadas vazias, achatar todos os efeitos, achatar todas as máscaras
 - [ ] Variáveis e conjuntos de dados
 
 ### Onda 13.14 — Visualização e medição
