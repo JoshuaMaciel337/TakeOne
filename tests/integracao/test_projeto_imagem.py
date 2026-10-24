@@ -99,6 +99,29 @@ def test_camada_vetorial(cliente):
     assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
 
 
+def test_caminhos_do_documento(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    assert projeto["caminhos"] == []
+    sub = {"nos": [{"x": 10, "y": 10, "sx": 30, "sy": 0}, {"x": 90, "y": 40, "ex": 70, "ey": 50}], "fechado": False,
+           "operacao": "somar"}
+    caminhos = [{"id": "trab", "nome": "Caminho de trabalho", "subcaminhos": [sub], "trabalho": True, "recorte": False},
+                {"id": "c1", "nome": "  Contorno  ", "subcaminhos": [], "trabalho": False, "recorte": True}]
+    salvo = salvar(cliente, projeto, projeto["faixas"], caminhos=caminhos)
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["caminhos"][0]["subcaminhos"] == [sub]
+    assert aberto["caminhos"][1]["nome"] == "Contorno"
+    # Dois de trabalho, ou o mesmo id, não valem
+    dois = [{**caminhos[0]}, {**caminhos[1], "trabalho": True, "recorte": False}]
+    assert salvar(cliente, aberto, aberto["faixas"], caminhos=dois).status_code == 422
+    repetido = [caminhos[0], {**caminhos[1], "id": "trab"}]
+    assert salvar(cliente, aberto, aberto["faixas"], caminhos=repetido).status_code == 422
+    # No vídeo, os caminhos são ignorados
+    video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
+    assert salvar(cliente, video, video["faixas"], caminhos=caminhos).json()["caminhos"] == []
+
+
 def test_tamanho_fora_dos_limites_e_o_video_continua_igual(cliente):
     cadastrar(cliente)
     assert cliente.post("/api/projetos", json={"tamanho": {"largura": 9000, "altura": 100}}).status_code == 422

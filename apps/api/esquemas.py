@@ -844,6 +844,21 @@ class VetorEntrada(BaseModel):
         return self
 
 
+class CaminhoDoDocumento(BaseModel):
+    """Um caminho do painel Caminhos do editor de imagem, em pixels do documento (lib/vetor/caminhos.ts)."""
+    id: str = Field(min_length=1, max_length=40)
+    nome: str = Field(min_length=1, max_length=60)
+    subcaminhos: list[SubcaminhoEntrada] = Field(max_length=1000)
+    # O caminho de trabalho (o que a caneta faz sem um caminho escolhido) e o caminho de recorte
+    trabalho: bool = False
+    recorte: bool = False
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -1194,6 +1209,7 @@ class ProjetoSalvarEntrada(BaseModel):
     # Só no projeto de imagem (no de vídeo é ignorado)
     tamanho: TamanhoEntrada | None = None
     canais: list[CanalEntrada] = Field(default=[], max_length=50)
+    caminhos: list[CaminhoDoDocumento] = Field(default=[], max_length=100)
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -1228,6 +1244,7 @@ class ProjetoSaida(BaseModel):
     faixas: list[FaixaEntrada]
     marcadores: list[MarcadorEntrada] = []
     canais: list[CanalEntrada] = []
+    caminhos: list[CaminhoDoDocumento] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"

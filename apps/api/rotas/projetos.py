@@ -27,6 +27,7 @@ from core.modelos.projeto import (
     duracao_do_projeto,
     midias_usadas,
     montar_projeto,
+    problema_nos_caminhos,
     proporcao_mais_perto,
 )
 from core.utils.mongo import agora
@@ -114,6 +115,10 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         problema = "Dois canais têm o mesmo id."
     if not problema and any(not midias.get(c["midia_id"], {}).get("camada_pixels") for c in canais):
         problema = "O canal precisa ser uma camada de pixels deste espaço."
+    # Os caminhos do painel Caminhos também só existem na imagem
+    caminhos = [c.model_dump() for c in dados.caminhos] if imagem else []
+    if not problema:
+        problema = problema_nos_caminhos(caminhos)
     if problema:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problema)
 
@@ -127,6 +132,7 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
         "faixas": faixas,
         "marcadores": sorted((m.model_dump() for m in dados.marcadores), key=lambda m: m["t"]),
         "canais": canais,
+        "caminhos": caminhos,
         "duracao": duracao_do_projeto(faixas),
         "midias_usadas": usadas,
         "capa_midia_id": capa_do_projeto(faixas, "imagem" if imagem else "video"),

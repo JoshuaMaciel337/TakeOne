@@ -148,6 +148,22 @@ MESCLAGENS_SO_DA_IMAGEM = {
 PROFUNDIDADE_DAS_PASTAS = 10
 
 
+PONTOS_DOS_CAMINHOS = 100_000
+
+
+def problema_nos_caminhos(caminhos: list[dict]) -> str | None:
+    """Os caminhos do painel Caminhos: ids sem repetir, um caminho de trabalho e um de recorte no máximo."""
+    if len({c["id"] for c in caminhos}) != len(caminhos):
+        return "Dois caminhos têm o mesmo id."
+    if sum(1 for c in caminhos if c.get("trabalho")) > 1:
+        return "Só um caminho pode ser o caminho de trabalho."
+    if sum(1 for c in caminhos if c.get("recorte")) > 1:
+        return "Só um caminho pode ser o caminho de recorte."
+    if sum(len(s["nos"]) for c in caminhos for s in c["subcaminhos"]) > PONTOS_DOS_CAMINHOS:
+        return "Os caminhos podem ter no máximo 100 mil pontos."
+    return None
+
+
 def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
     """As regras da árvore de camadas (as mesmas de lib/projeto/arvore.ts, problemaNaArvore)."""
     por_id = {f["id"]: f for f in faixas}
