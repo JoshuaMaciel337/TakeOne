@@ -1,21 +1,47 @@
-// Os tipos de ajuste do painel Ajustes e do botão de ajuste do painel Camadas, na ordem dos editores de imagem
-// profissionais. Todos criam a mesma camada de ajuste (a cor dela vale para o que está embaixo); o tipo só dá os
-// valores de partida e a parte do painel Propriedades que abre.
-import { Aperture, Blend, Contrast, Droplet, Gauge, Grid3x3, type LucideIcon, PenTool, Sparkles, Sun, Thermometer } from "lucide-react";
+// Os tipos de ajuste do painel Ajustes, do menu e do botão de ajuste do painel Camadas, na ordem dos editores de
+// imagem profissionais (lib/imagem/ajustes.ts faz a conta de cada um). Criar põe uma camada de ajuste acima da
+// escolhida, com os valores de partida, e abre o painel Propriedades dela.
+import {
+  Aperture,
+  Blend,
+  Contrast,
+  Droplet,
+  Gauge,
+  Grid3x3,
+  type LucideIcon,
+  Layers2,
+  Palette,
+  PenTool,
+  Rainbow,
+  ScanLine,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  SunMoon,
+  Thermometer,
+} from "lucide-react";
 
-import type { Cor } from "@/lib/projeto/cor";
+import { NOMES_DOS_AJUSTES, type TipoDoAjuste } from "@/lib/imagem/ajustes";
 
-export type Ajuste = { id: string; nome: string; icone: LucideIcon; atalho?: string; cor?: Partial<Cor> };
+export type Ajuste = { id: TipoDoAjuste; nome: string; icone: LucideIcon; atalho?: string };
+
+const ajuste = (id: TipoDoAjuste, icone: LucideIcon, atalho?: string): Ajuste => ({ id, nome: NOMES_DOS_AJUSTES[id], icone, atalho });
 
 export const AJUSTES: Ajuste[] = [
-  { id: "brilho", nome: "Brilho/Contraste", icone: Sun },
-  { id: "niveis", nome: "Níveis", icone: Gauge, atalho: "Ctrl+L" },
-  { id: "curvas", nome: "Curvas", icone: PenTool, atalho: "Ctrl+M" },
-  { id: "exposicao", nome: "Exposição", icone: Aperture },
-  { id: "vibracao", nome: "Vibração", icone: Sparkles },
-  { id: "matiz", nome: "Matiz/Saturação", icone: Droplet, atalho: "Ctrl+U" },
-  { id: "equilibrio", nome: "Equilíbrio de cores", icone: Blend, atalho: "Ctrl+B" },
-  { id: "pretoBranco", nome: "Preto e branco", icone: Contrast, atalho: "Ctrl+Alt+Shift+B", cor: { saturacao: -1 } },
-  { id: "filtroDeFoto", nome: "Filtro de fotos", icone: Thermometer, cor: { temperatura: 0.25 } },
-  { id: "lut", nome: "Pesquisa de cores", icone: Grid3x3 },
+  ajuste("brilho_contraste", Sun),
+  ajuste("niveis", Gauge, "Ctrl+L"),
+  ajuste("curvas", PenTool, "Ctrl+M"),
+  ajuste("exposicao", Aperture),
+  ajuste("vibracao", Sparkles),
+  ajuste("matiz_saturacao", Droplet, "Ctrl+U"),
+  ajuste("equilibrio", Blend, "Ctrl+B"),
+  ajuste("preto_branco", Contrast, "Ctrl+Alt+Shift+B"),
+  ajuste("filtro_de_fotos", Thermometer),
+  ajuste("mixer", SlidersHorizontal),
+  ajuste("pesquisa", Grid3x3),
+  ajuste("inverter", SunMoon, "Ctrl+I"),
+  ajuste("posterizar", Layers2),
+  ajuste("limiar", ScanLine),
+  ajuste("mapa_degrade", Rainbow),
+  ajuste("cor_seletiva", Palette),
 ];

@@ -15,6 +15,8 @@ import { MODELOS_DE_IMAGEM, type ModeloDeImagem } from "@/lib/projeto/modelosDeI
 import type { Midia } from "@/lib/tipos";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
+import { type AjusteDaImagem, NOMES_DOS_AJUSTES, type TipoDoAjuste } from "@/lib/imagem/ajustes";
+import { PREDEFINICOES } from "@/lib/imagem/predefinicoesDosAjustes";
 
 /** As amostras de sempre: tons de cinza e as cores básicas, depois das cores da marca. */
 const AMOSTRAS_PADRAO = [
@@ -96,8 +98,8 @@ export function PainelAmostras({ aoEscolher }: { aoEscolher: (cor: string, paraO
   );
 }
 
-/** Ajustes: um botão por tipo; cada um põe uma camada de ajuste por cima. */
-export function PainelAjustes({ aoCriar }: { aoCriar: (ajuste: Ajuste) => void }) {
+/** Ajustes: um botão por tipo e as predefinições; cada um põe uma camada de ajuste acima da escolhida. */
+export function PainelAjustes({ aoCriar, aoCriarPronto }: { aoCriar: (ajuste: Ajuste) => void; aoCriarPronto: (ajuste: AjusteDaImagem) => void }) {
   return (
     <div className="flex flex-col gap-2 p-3 text-xs">
       <h3 className="text-[11px] text-suave">Adicionar um ajuste</h3>
@@ -119,6 +121,21 @@ export function PainelAjustes({ aoCriar }: { aoCriar: (ajuste: Ajuste) => void }
         })}
       </div>
       <p className="text-[11px] text-suave">O ajuste vale para todas as camadas embaixo dele; mude a ordem no painel Camadas.</p>
+      <h3 className="mt-1 text-[11px] text-suave">Predefinições</h3>
+      <div className="flex flex-col gap-1.5">
+        {Object.entries(PREDEFINICOES).map(([tipo, lista]) => (
+          <details key={tipo} className="rounded border border-borda">
+            <summary className="cursor-pointer px-2 py-1 text-texto">{NOMES_DOS_AJUSTES[tipo as TipoDoAjuste]}</summary>
+            <div className="flex flex-col py-0.5">
+              {lista!.map((item) => (
+                <button key={item.nome} type="button" className="px-3 py-1 text-left text-suave hover:bg-painel-3 hover:text-texto" onClick={() => aoCriarPronto(item.ajuste)}>
+                  {item.nome}
+                </button>
+              ))}
+            </div>
+          </details>
+        ))}
+      </div>
     </div>
   );
 }

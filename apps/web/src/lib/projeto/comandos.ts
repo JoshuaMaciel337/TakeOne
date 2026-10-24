@@ -150,6 +150,7 @@ import {
   adicionarTextoRico,
   mudarTextoRico,
   mudarCamadaDePreenchimento,
+  mudarAjusteDaCamada,
   textoEmForma,
   mudarTextosRicos,
   definirEstiloDeCamada,
@@ -158,6 +159,7 @@ import {
 } from "./imagem.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
+import type { AjusteDaImagem } from "../imagem/ajustes.ts";
 import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -190,7 +192,8 @@ export type Comando =
   | { comando: "clipe.esticar"; parametros: { clipeId: string; borda: "inicio" | "fim"; tempo: Tick } }
   | { comando: "clipe.deslizar"; parametros: { clipeId: string; deslocamento: Tick } }
   | { comando: "clipe.adicionarAjuste"; parametros: { inicio: Tick } }
-  | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null } }
+  | { comando: "imagem.adicionarAjuste"; parametros: { acima?: string | null; ajuste?: AjusteDaImagem | null } }
+  | { comando: "imagem.ajuste"; parametros: { clipeId: string; ajuste: AjusteDaImagem } }
   | { comando: "imagem.adicionarPreenchimento"; parametros: { preenchimento: CamadaDePreenchimento; acima?: string | null } }
   | { comando: "imagem.preenchimento"; parametros: { clipeId: string; preenchimento: CamadaDePreenchimento } }
   | { comando: "clipe.moverCorte"; parametros: { clipeId: string; tempo: Tick } }
@@ -333,6 +336,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionarAjuste": "pôr a camada de ajuste",
   "imagem.adicionarAjuste": "pôr a camada de ajuste",
   "imagem.adicionarPreenchimento": "pôr a camada de preenchimento",
+  "imagem.ajuste": "mudar o ajuste",
   "imagem.preenchimento": "mudar o preenchimento",
   "clipe.moverCorte": "mover o corte",
   "linha.dividir": "dividir",
@@ -509,13 +513,15 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarAjuste": {
-      const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima);
+      const resultado = adicionarCamadaDeAjuste(projeto, ctx, parametros.acima, parametros.ajuste);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.adicionarPreenchimento": {
       const resultado = adicionarCamadaDePreenchimento(projeto, ctx, parametros.preenchimento, parametros.acima);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.ajuste":
+      return { projeto: mudarAjusteDaCamada(projeto, parametros.clipeId, parametros.ajuste) };
     case "imagem.preenchimento":
       return { projeto: mudarCamadaDePreenchimento(projeto, parametros.clipeId, parametros.preenchimento) };
     case "clipe.deslizar":

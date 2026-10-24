@@ -2,6 +2,7 @@
 
 import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, LayoutTemplate, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, SquarePlus, Trash2, Type } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { arquivoDaMidia } from "@/lib/api";
 import { arquivoDaVersao } from "@/lib/pixels";
@@ -19,6 +20,7 @@ import type { CamadaVetorial, TintaDaForma } from "@/lib/vetor/modelo";
 import type { MascaraVetorial } from "@/lib/vetor/mascaraVetorial";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import { NOMES_DO_PREENCHIMENTO } from "@/lib/imagem/camadaDePreenchimento";
+import { NOMES_DOS_AJUSTES } from "@/lib/imagem/ajustes";
 import { AmostraDaTinta } from "./OpcoesDaForma";
 
 type Props = {
@@ -68,7 +70,7 @@ export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, f
   if (faixa?.nome) return faixa.nome;
   if (clipe.pasta) return "Grupo";
   if (clipe.texto) return clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto";
-  if (clipe.ajuste) return "Camada de ajuste";
+  if (clipe.ajuste) return clipe.ajuste_imagem ? NOMES_DOS_AJUSTES[clipe.ajuste_imagem.tipo] : "Camada de ajuste";
   if (clipe.camada_de_preenchimento) return NOMES_DO_PREENCHIMENTO[clipe.camada_de_preenchimento.tinta.tipo];
   if (clipe.vetor) return "Forma";
   if (clipe.texto_rico) return clipe.texto_rico.paragrafos.map((paragrafo) => paragrafo.trechos.map((trecho) => trecho.texto).join("")).join(" ").replace(/\s+/g, " ").trim() || "Texto";
@@ -180,11 +182,12 @@ function ListaDeItens({ itens, aoFechar }: { itens: Item[]; aoFechar: () => void
 }
 
 /** Fecha ao clicar fora ou com Esc. */
-function useFecharFora(aberto: boolean, aoFechar: () => void) {
+function useFecharFora(aberto: boolean, aoFechar: () => void, listaRef?: React.RefObject<HTMLDivElement | null>) {
   const caixaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!aberto) return;
-    const fora = (evento: PointerEvent) => !caixaRef.current?.contains(evento.target as Node) && aoFechar();
+    // A lista pode estar fora da caixa (num portal): clicar nela não conta como fora
+    const fora = (evento: PointerEvent) => !caixaRef.current?.contains(evento.target as Node) && !listaRef?.current?.contains(evento.target as Node) && aoFechar();
     const tecla = (evento: KeyboardEvent) => evento.key === "Escape" && aoFechar();
     window.addEventListener("pointerdown", fora);
     window.addEventListener("keydown", tecla);
@@ -192,25 +195,44 @@ function useFecharFora(aberto: boolean, aoFechar: () => void) {
       window.removeEventListener("pointerdown", fora);
       window.removeEventListener("keydown", tecla);
     };
-  }, [aberto, aoFechar]);
+  }, [aberto, aoFechar, listaRef]);
   return caixaRef;
 }
 
-/** Um botão de rodapé que abre uma lista para cima. */
+/**
+ * Um botão de rodapé que abre uma lista para cima. A lista vai num portal, em posição fixa: dentro do painel ela era
+ * cortada (com as camadas de preenchimento e os dezesseis ajustes, os primeiros itens sumiam acima dele).
+ */
 function BotaoComLista({ titulo, rotulo, itens, desativado }: { titulo: string; rotulo: React.ReactNode; itens: Item[]; desativado?: boolean }) {
-  const [aberto, setAberto] = useState(false);
-  const caixaRef = useFecharFora(aberto, () => setAberto(false));
+  const [lugar, setLugar] = useState<{ left: number; bottom: number; maxHeight: number } | null>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  const caixaRef = useFecharFora(Boolean(lugar), () => setLugar(null), listaRef);
   return (
     <div ref={caixaRef} className="relative">
-      <button type="button" className="botao-icone h-6 w-auto gap-0.5 px-1" title={titulo} aria-label={titulo} aria-expanded={aberto} disabled={desativado} onClick={() => setAberto((valor) => !valor)}>
+      <button
+        type="button"
+        className="botao-icone h-6 w-auto gap-0.5 px-1"
+        title={titulo}
+        aria-label={titulo}
+        aria-expanded={Boolean(lugar)}
+        disabled={desativado}
+        onClick={(evento) => {
+          if (lugar) return setLugar(null);
+          const r = evento.currentTarget.getBoundingClientRect();
+          setLugar({ left: Math.max(8, Math.min(r.left, window.innerWidth - 216)), bottom: window.innerHeight - r.top + 4, maxHeight: Math.max(120, r.top - 12) });
+        }}
+      >
         {rotulo}
         <ChevronDown className="size-2.5" aria-hidden />
       </button>
-      {aberto ? (
-        <div role="menu" className="absolute bottom-full left-0 z-50 mb-1 min-w-48 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50">
-          <ListaDeItens itens={itens} aoFechar={() => setAberto(false)} />
-        </div>
-      ) : null}
+      {lugar
+        ? createPortal(
+            <div ref={listaRef} role="menu" className="fixed z-50 min-w-48 overflow-y-auto rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={lugar}>
+              <ListaDeItens itens={itens} aoFechar={() => setLugar(null)} />
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -846,7 +868,7 @@ export function PainelCamadas({
           className="botao-icone size-6"
           title="Adicionar uma máscara de camada (Alt: ocultar tudo)"
           aria-label="Adicionar uma máscara de camada"
-          disabled={escolhidas.length !== 1 || algumaTravada || Boolean(primeira?.clipes[0].mascara_pixels) || Boolean(primeira?.clipes[0].pasta) || Boolean(primeira?.clipes[0].ajuste)}
+          disabled={escolhidas.length !== 1 || algumaTravada || Boolean(primeira?.clipes[0].mascara_pixels) || Boolean(primeira?.clipes[0].pasta)}
           onClick={(evento) => aoCriarMascara(evento.altKey ? "ocultar" : "revelar")}
         >
           <SquareDashed className="size-3.5" aria-hidden />

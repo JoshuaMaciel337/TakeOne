@@ -3,6 +3,7 @@
 import type { Contorno, Sombra } from "./silhueta.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
+import type { AjusteDaImagem } from "../imagem/ajustes.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -268,6 +269,8 @@ export type Clipe = {
    * tudo o que está embaixo dela, durante o clipe.
    */
   ajuste?: boolean;
+  /** Só no projeto de imagem: o ajuste da camada de ajuste (lib/imagem/ajustes.ts), no lugar da cor. */
+  ajuste_imagem?: AjusteDaImagem | null;
   /**
    * Só no projeto de imagem: o clipe de uma pasta (grupo de camadas). Ele não tem mídia nem texto; a opacidade, a
    * mesclagem e a máscara dele valem para tudo o que está dentro (as faixas com `pai` apontando para a faixa dele).

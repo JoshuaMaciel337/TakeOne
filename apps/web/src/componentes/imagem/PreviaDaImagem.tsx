@@ -21,6 +21,8 @@ import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { textoNoTamanho } from "@/lib/texto/desenhar";
 import { useVersaoDasFontes } from "@/lib/texto/fontes";
+import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
+import { useTabelasDasLuts } from "@/lib/useLuts";
 import { caminhosDaMascaraNoDocumento, caminhosNoEspacoDaMascara } from "@/lib/vetor/mascaraVetorial";
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
@@ -323,6 +325,8 @@ export function PreviaDaImagem({
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
   // Os textos desenhados no navegador redesenham quando uma fonte chega
   const versaoDasFontes = useVersaoDasFontes();
+  // As tabelas das LUTs (a Pesquisa de cores e a LUT da aba Cor): a prévia redesenha quando chegam
+  useTabelasDasLuts(lutsDoProjeto(projeto));
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
   const fonteDa = (midiaId: string) => arquivoDaMidia(midiaId, "proxy.webp");
   // A camada de pixels lê a versão do clipe (a 0 é vazia), ou o canvas enquanto é pintada
@@ -400,7 +404,8 @@ export function PreviaDaImagem({
     const porFaixa = new Map(
       camadas.flatMap((camada) => {
         if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada), documentoDaCamada(projeto))] as const];
-        if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        // A camada de ajuste lê o que já foi desenhado; a máscara dela escolhe onde o ajuste vale
+        if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null, mascaraDe(camada))] as const];
         if (camada.clipe.camada_de_preenchimento) {
           // A cor, o degradê ou o padrão no tamanho da tela
           const fonte = preenchimentoNoTamanho(camada.clipe.id, camada.clipe.camada_de_preenchimento, tamanho.largura * densidade, tamanho.altura * densidade, (tamanho.largura * densidade) / tamanhoDaImagem(projeto).largura);

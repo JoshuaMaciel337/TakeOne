@@ -15,6 +15,7 @@ import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
 import { type EstiloDeCamada, estiloFazAlgo, type LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { CamadaDePreenchimento } from "../imagem/camadaDePreenchimento.ts";
+import type { AjusteDaImagem } from "../imagem/ajustes.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -406,7 +407,7 @@ export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subca
 /** Põe, troca ou tira (null) a máscara vetorial. */
 export function definirMascaraVetorial(projeto: Projeto, clipeId: string, mascara: MascaraVetorial | null): Projeto {
   return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
-    if ((clipe.pasta || clipe.ajuste) && mascara) throw new ErroEdicao("A máscara vetorial vale para camadas com imagem, texto ou forma.");
+    if (clipe.pasta && mascara) throw new ErroEdicao("A máscara vetorial vale para camadas, não para grupos.");
     if (!mascara) {
       const sem = { ...clipe };
       delete sem.mascara_vetorial;
@@ -419,9 +420,8 @@ export function definirMascaraVetorial(projeto: Projeto, clipeId: string, mascar
 /** Põe, troca ou tira (null) a máscara de camada pintável. */
 export function definirMascaraDePixels(projeto: Projeto, clipeId: string, mascara: MascaraDePixels | null): Projeto {
   return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
-    if (clipe.pasta || clipe.ajuste) {
-      if (mascara) throw new ErroEdicao("A máscara de pixels vale para camadas com imagem.");
-    }
+    // A camada de ajuste também tem máscara: ela escolhe onde o ajuste vale
+    if (clipe.pasta && mascara) throw new ErroEdicao("A máscara de pixels vale para camadas, não para grupos.");
     if (!mascara) {
       const sem = { ...clipe };
       delete sem.mascara_pixels;
@@ -468,8 +468,8 @@ export function trocarVersaoDosPixels(projeto: Projeto, clipeId: string, versao:
 }
 
 /** Uma camada de ajuste acima da escolhida (ou de todas): muda a cor do que está embaixo dela. */
-export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null): { projeto: Projeto; clipeId: string } {
-  const clipe = clipeDaCamada(ctx.novoId(), { ajuste: true });
+export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?: string | null, ajuste?: AjusteDaImagem | null): { projeto: Projeto; clipeId: string } {
+  const clipe = clipeDaCamada(ctx.novoId(), ajuste ? { ajuste: true, ajuste_imagem: ajuste } : { ajuste: true });
   return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
 }
 
@@ -477,6 +477,14 @@ export function adicionarCamadaDeAjuste(projeto: Projeto, ctx: Contexto, acima?:
 export function adicionarCamadaDePreenchimento(projeto: Projeto, ctx: Contexto, preenchimento: CamadaDePreenchimento, acima?: string | null): { projeto: Projeto; clipeId: string } {
   const clipe = clipeDaCamada(ctx.novoId(), { camada_de_preenchimento: preenchimento });
   return { projeto: porNoTopo(projeto, faixaNova(ctx, "video", clipe), acima), clipeId: clipe.id };
+}
+
+/** Muda o ajuste (níveis, curvas...) de uma camada de ajuste. */
+export function mudarAjusteDaCamada(projeto: Projeto, clipeId: string, ajuste: AjusteDaImagem): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if (!clipe.ajuste) throw new ErroEdicao("Essa camada não é de ajuste.");
+    return { ...clipe, ajuste_imagem: ajuste };
+  });
 }
 
 /** Muda a tinta (ou as alças do degradê) de uma camada de preenchimento. */

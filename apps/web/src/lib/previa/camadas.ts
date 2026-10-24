@@ -27,6 +27,7 @@ import { efeitosLigados, LUZ_GLOBAL_PADRAO, type LuzGlobal } from "@/lib/imagem/
 
 import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
+import { type AjusteDaImagem, compilarAjuste, lutDaFuncao, type TabelaDoAjuste } from "@/lib/imagem/ajustes";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
@@ -66,6 +67,8 @@ export type CamadaNaTela = {
   segundos: number;
   /** A LUT 3D dos ajustes e das curvas (a mesma do render); null quando a cor é a original. */
   lut: LutDaCor | null;
+  /** A tabela de 256 tons de um ajuste do editor de imagem (níveis, curvas, limiar...), depois da LUT. */
+  tabela?: TabelaDoAjuste | null;
   /** A vinheta, que fica fora da LUT (depende do lugar no clipe). */
   vinheta: number;
   /** A parte do clipe que aparece numa cortina; sem ela, o clipe inteiro. */
@@ -195,10 +198,33 @@ function luzEGrao(clipe: Clipe, caixa: Caixa, tempo: Tick, taxa: Taxa): Pick<Cam
  * A camada de ajuste: cobre o quadro inteiro, sem mídia, com a opacidade do instante (fades e keyframes como os
  * outros clipes). O compositor desenha nela o que já está embaixo, com a cor dela.
  */
+/**
+ * O ajuste do editor de imagem pronto para o compositor: a tabela de 256 tons ou a LUT 3D da função, guardadas pela
+ * chave (a mesma camada redesenha sem refazer a conta). A Pesquisa de cores espera a tabela do .cube chegar.
+ */
+const ajustesProntos = new Map<string, Pick<CamadaNaTela, "lut" | "tabela" | "vinheta">>();
+function corDoAjuste(ajuste: AjusteDaImagem): Pick<CamadaNaTela, "lut" | "tabela" | "vinheta"> {
+  const daPesquisa = ajuste.tipo === "pesquisa" && ajuste.lut ? lutGuardada(ajuste.lut.id) : null;
+  const chave = JSON.stringify([ajuste, Boolean(daPesquisa)]);
+  const guardado = ajustesProntos.get(chave);
+  if (guardado) return guardado;
+  const compilado = compilarAjuste(ajuste, daPesquisa);
+  const pronto =
+    compilado.tipo === "tabela"
+      ? { lut: null, tabela: compilado.tabela, vinheta: 0 }
+      : compilado.tipo === "funcao"
+        ? { lut: { chave, dados: lutDaFuncao(compilado.funcao) }, tabela: null, vinheta: 0 }
+        : { lut: null, tabela: null, vinheta: 0 };
+  if (ajustesProntos.size > 40) ajustesProntos.clear();
+  ajustesProntos.set(chave, pronto);
+  return pronto;
+}
+
 function camadaDeAjuste(clipe: Clipe, faixa: Faixa, tempo: Tick, quadro: Tamanho): CamadaNaTela {
   const opacidade = transformacaoAnimada(clipe, tempo).opacidade;
   const caixa = { cx: quadro.largura / 2, cy: quadro.altura / 2, largura: quadro.largura, altura: quadro.altura, rotacao: 0, opacidade };
-  return { chave: `ajuste:${clipe.id}`, clipe, faixa, recorte: RECORTE_INTEIRO, caixa, caixaBase: caixa, ...corDoClipe(clipe), segundos: 0 };
+  const cor = clipe.ajuste_imagem ? corDoAjuste(clipe.ajuste_imagem) : corDoClipe(clipe);
+  return { chave: `ajuste:${clipe.id}`, clipe, faixa, recorte: RECORTE_INTEIRO, caixa, caixaBase: caixa, ...cor, segundos: 0 };
 }
 
 const RECORTE_INTEIRO: Recorte = { x: 0, y: 0, largura: 1, altura: 1 };
@@ -460,6 +486,7 @@ export function camadaDoCompositor(
     canais: opcoes?.canais ? [opcoes.canais.vermelho, opcoes.canais.verde, opcoes.canais.azul] : null,
     caixa: comEstilos || efeitos.length || vazamento || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
     lut: camada.lut,
+    tabela: camada.tabela,
     vinheta: camada.vinheta,
     revelado: camada.revelado,
     mascaraDaTransicao: camada.mascaraDaTransicao,

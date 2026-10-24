@@ -68,8 +68,14 @@ export function aoGuardarLut(ouvinte: () => void): () => void {
 }
 
 /** As LUTs que os clipes do projeto usam. */
-export function lutsDoProjeto(projeto: { faixas: { clipes: { cor?: { lut?: LutDoClipe | null } | null }[] }[] }): string[] {
+export function lutsDoProjeto(projeto: { faixas: { clipes: { cor?: { lut?: LutDoClipe | null } | null; ajuste_imagem?: { tipo: string; lut?: LutDoClipe | null } | null }[] }[] }): string[] {
   const ids = new Set<string>();
-  for (const faixa of projeto.faixas) for (const clipe of faixa.clipes) if (clipe.cor?.lut?.id) ids.add(clipe.cor.lut.id);
+  for (const faixa of projeto.faixas) {
+    for (const clipe of faixa.clipes) {
+      if (clipe.cor?.lut?.id) ids.add(clipe.cor.lut.id);
+      // A Pesquisa de cores da camada de ajuste do editor de imagem
+      if (clipe.ajuste_imagem?.lut?.id) ids.add(clipe.ajuste_imagem.lut.id);
+    }
+  }
   return [...ids];
 }

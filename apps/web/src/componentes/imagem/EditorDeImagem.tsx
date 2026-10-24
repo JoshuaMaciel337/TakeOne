@@ -111,6 +111,9 @@ import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
 import { PainelEstilosDeCamada } from "./PainelEstilosDeCamada";
 import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
 import { JanelaCamadaDePreenchimento, preenchimentoNovo } from "./JanelaCamadaDePreenchimento";
+import { PropriedadesDoAjuste } from "./ajustes/PropriedadesDoAjuste";
+import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
+import { type AjusteDaImagem, ajustePadrao, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
@@ -2039,11 +2042,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     [preenchendo],
   );
   const preverPreenchimento = useCallback((preenchimento: CamadaDePreenchimento) => setProvisorio(comandoDoPreenchimento(preenchimento)), [comandoDoPreenchimento]);
-  const criarAjuste = (ajuste: Ajuste) => {
-    const resultado = executar({ comando: "imagem.adicionarAjuste", parametros: {} });
-    const id = resultado?.selecao?.[0];
-    if (id && ajuste.cor) executar({ comando: "clipe.cor", parametros: { clipeIds: [id], cor: ajuste.cor } });
-    if (resultado) abrirAba("cor");
+  /** Uma camada de ajuste (do tipo, ou já numa predefinição), acima da escolhida, com o painel Propriedades dela aberto. */
+  const criarAjustePronto = (ajuste: AjusteDaImagem) => {
+    const resultado = executar({ comando: "imagem.adicionarAjuste", parametros: { acima: selecionado?.faixa.id ?? null, ajuste } });
+    if (resultado) area.abrir("propriedades");
+  };
+  const criarAjuste = (ajuste: Ajuste) => criarAjustePronto(ajustePadrao(ajuste.id, cores.primeiroPlano, cores.fundo));
+  // ——— A camada de ajuste escolhida: o que está embaixo dela (histograma, conta-gotas) e o conta-gotas ———
+  const ajusteEscolhido = selecionado?.clipe.ajuste_imagem ? selecionado : null;
+  const imagemAbaixo = useImagemAbaixo(projeto, midias, ajusteEscolhido?.faixa.id ?? null, Boolean(ajusteEscolhido));
+  // O pedido vale só para o ajuste que pediu: trocar de camada desiste dele
+  const [pedidoDeAmostra, setPedidoDeAmostra] = useState<{ clipeId: string; receber: (cor: Rgb) => void } | null>(null);
+  const amostraDoAjuste = pedidoDeAmostra && pedidoDeAmostra.clipeId === ajusteEscolhido?.clipe.id ? pedidoDeAmostra.receber : null;
+  /** A cor da imagem embaixo do ajuste no ponto clicado (pixels do documento). */
+  const amostrarAbaixo = (ponto: { x: number; y: number }) => {
+    const receber = amostraDoAjuste;
+    setPedidoDeAmostra(null);
+    if (!receber || !imagemAbaixo || !projeto) return;
+    const documento = tamanhoDaImagem(projeto);
+    const x = Math.min(imagemAbaixo.largura - 1, Math.max(0, Math.floor((ponto.x / documento.largura) * imagemAbaixo.largura)));
+    const y = Math.min(imagemAbaixo.altura - 1, Math.max(0, Math.floor((ponto.y / documento.altura) * imagemAbaixo.altura)));
+    const i = (y * imagemAbaixo.largura + x) * 4;
+    receber([imagemAbaixo.dados[i] / 255, imagemAbaixo.dados[i + 1] / 255, imagemAbaixo.dados[i + 2] / 255]);
   };
   // ——— A ferramenta Texto (texto desenhado no navegador) ———
   const textoEscolhido = !edicaoDeTexto && selecionado?.clipe.texto_rico ? selecionado.clipe : null;
@@ -3566,7 +3586,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if ((como === "revelarSelecao" || como === "ocultarSelecao") && !daSelecao) return mostrarAviso("Não há seleção.");
     const alvo = selecionado;
     if (!alvo || !projeto || gerandoPixels) return;
-    if (alvo.clipe.pasta || alvo.clipe.ajuste) return mostrarAviso("A máscara de pixels vale para camadas com imagem.");
+    if (alvo.clipe.pasta) return mostrarAviso("A máscara de pixels vale para camadas, não para grupos.");
     if (alvo.faixa.travada) return mostrarAviso("A camada está travada.");
     const medida = caixasRef.current.get(alvo.clipe.id);
     if (!medida?.bruta || !medida.quadro) return mostrarAviso("A camada ainda não apareceu na prévia. Tente de novo.");
@@ -4053,6 +4073,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoExecutar={executar}
             aoAcao={(acao) => acoes.mascaraDePixels(acao)}
           />
+        ) : selecionado && escolhidoNaTela?.clipe.ajuste_imagem ? (
+          <PropriedadesDoAjuste
+            key={selecionado.clipe.id}
+            clipeId={selecionado.clipe.id}
+            faixa={escolhidoNaTela.faixa}
+            ajuste={escolhidoNaTela.clipe.ajuste_imagem}
+            imagem={imagemAbaixo}
+            primeiroPlano={cores.primeiroPlano}
+            fundo={cores.fundo}
+            degradesDoEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
+            aoPedirAmostra={(receber) => setPedidoDeAmostra(receber ? { clipeId: selecionado.clipe.id, receber } : null)}
+            amostrando={Boolean(amostraDoAjuste)}
+            aoPrever={preverDoPainel}
+            aoExecutar={executar}
+            aoVerSem={(ver) => setProvisorio(ver ? { comando: "imagem.camada", parametros: { faixaIds: [selecionado.faixa.id], mudanca: { oculta: true } } } : null)}
+            aoExcluir={acoes.excluir}
+          />
         ) : (
         <PainelPropriedades
           modo="imagem"
@@ -4077,7 +4114,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
         ),
     },
-    ajustes: { nome: PAINEIS_DA_IMAGEM.ajustes, conteudo: <PainelAjustes aoCriar={criarAjuste} /> },
+    ajustes: { nome: PAINEIS_DA_IMAGEM.ajustes, conteudo: <PainelAjustes aoCriar={criarAjuste} aoCriarPronto={criarAjustePronto} /> },
     biblioteca: {
       nome: PAINEIS_DA_IMAGEM.biblioteca,
       conteudo: (
@@ -4761,7 +4798,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             sobreposicao={chaveDaSobreposicao && sobreposicaoDaFonte ? { imagem: sobreposicaoDaFonte, opacidade: opcoesDoCarimbo.opacidadeDaSobreposicao } : null}
             pontoDaFonte={ferramenta === "carimbo" || ferramenta === "recuperacao" ? (fonteDaVez?.ponto ?? null) : null}
             ponto={
-              FERRAMENTAS_DE_PONTO.has(ferramenta)
+              amostraDoAjuste
+                ? { modo: "clique", aoClicar: amostrarAbaixo }
+                : FERRAMENTAS_DE_PONTO.has(ferramenta)
                 ? ferramenta === "degrade"
                   ? degradeDoPreenchimento
                     ? {

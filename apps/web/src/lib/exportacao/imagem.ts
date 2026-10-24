@@ -85,7 +85,7 @@ export async function exportarImagem(
   const prontas = await Promise.all(
     camadas.map(async (camada) => {
       if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe), documentoDaCamada(projeto))] as const;
-      if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
+      if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null, await mascaraDe(camada.clipe))] as const;
       if (camada.clipe.camada_de_preenchimento) {
         const fonte = preenchimentoNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.camada_de_preenchimento, tamanho.largura, tamanho.altura, escala);
         return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe), documentoDaCamada(projeto))] as const;

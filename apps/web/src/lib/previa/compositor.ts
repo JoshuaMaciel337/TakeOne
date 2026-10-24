@@ -6,6 +6,7 @@
 // com os modos de mesclagem, nos dois lados ao mesmo tempo.
 import { COLUNAS_DOS_BLOCOS, FAIXAS_DAS_PERSIANAS, type MascaraDeTransicao, MASCARAS_DE_TRANSICAO, SUAVIDADE_DA_TRANSICAO, ZOOM_DO_DESFOQUE } from "../projeto/transicao.ts";
 import { type LutDaCor, PONTOS_DA_LUT } from "../projeto/cor.ts";
+import type { TabelaDoAjuste } from "../imagem/ajustes.ts";
 import { type Caixa, recorteNaFonte, type Tamanho } from "../projeto/geometria.ts";
 import { AMOSTRAS_DO_BORRAO, BRILHO_SIGMA, GRAO_LINHAS, GRAO_TEXTURA, LINHAS_POR_ALTURA, LUZ_COR, LUZ_LARGURA, valoresDoGrao } from "../projeto/efeitos.ts";
 import type { Cortes } from "../projeto/letras.ts";
@@ -57,6 +58,8 @@ export type Camada = {
   lut?: LutDaCor | null;
   /** A vinheta (0 a 1), que fica fora da LUT. */
   vinheta?: number;
+  /** A tabela de 256 tons de um ajuste do editor de imagem (lib/imagem/ajustes.ts), depois da LUT. */
+  tabela?: TabelaDoAjuste | null;
   /** Em pixels do quadro passado para `desenhar`. */
   caixa: Caixa;
   /** A parte do clipe que aparece (cortinas); sem ela, o clipe inteiro. */
@@ -299,6 +302,9 @@ uniform float u_opacidade;
 // A LUT 3D dos ajustes e das curvas (unidade 1), em RGBA de ponto flutuante; a vinheta fica fora
 uniform bool u_comLut;
 uniform sampler3D u_lut;
+// A tabela de 256 tons dos ajustes do editor de imagem (unidade 7): 1 lê cada canal na sua coluna, 2 a cor pela luminância
+uniform int u_modoTabela;
+uniform sampler2D u_tabela;
 uniform float u_vinheta;
 // x0, y0, x1, y1 da parte que aparece, em frações do clipe (as cortinas)
 uniform vec4 u_revelado;
@@ -638,12 +644,20 @@ void main() {
     texel = texel + luz - texel * luz;
   }
   bool comCantos = u_cantos.x > 0.0 || u_cantos.y > 0.0 || u_mascaraForma > 0;
-  if ((u_comLut || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos || u_comMascaraCamada) && (texel.a > 0.0 || comCantos)) {
+  if ((u_comLut || u_modoTabela > 0 || u_vinheta > 0.0 || u_linhas > 0.0 || u_luz > 0.0 || u_grao > 0.0 || comCantos || u_comMascaraCamada) && (texel.a > 0.0 || comCantos)) {
     // A textura vem com o alfa pré-multiplicado: a cor é ajustada sem ele e multiplicada de volta.
     // A ordem é a do render: a LUT (ajustes e curvas), os cantos e depois a vinheta
     vec3 c = texel.a > 0.0 ? texel.rgb / texel.a : vec3(0.0);
     float alfa = texel.a;
     if (u_comLut) c = lerLut(c);
+    // O tom de 8 bits mais perto, o mesmo índice de aplicarAjusteNosPixels
+    if (u_modoTabela == 1) {
+      ivec3 i = ivec3(clamp(c, 0.0, 1.0) * 255.0 + 0.5);
+      c = vec3(texelFetch(u_tabela, ivec2(i.r, 0), 0).r, texelFetch(u_tabela, ivec2(i.g, 0), 0).g, texelFetch(u_tabela, ivec2(i.b, 0), 0).b);
+    } else if (u_modoTabela == 2) {
+      int i = int(clamp(dot(c, vec3(0.299, 0.587, 0.114)), 0.0, 1.0) * 255.0 + 0.5);
+      c = texelFetch(u_tabela, ivec2(i, 0), 0).rgb;
+    }
     if (comCantos) {
       // O clipe fica com a parte de dentro e a borda (o anel) vai por cima, como o alphamerge e o overlay do render
       vec2 meia = u_tamanho * u_pixelsPorUnidade / 2.0;
@@ -799,6 +813,8 @@ type Recursos = {
   alvos: Alvo[];
   /** A LUT 3D de cada camada, na unidade de textura 1, com a chave da que está nela (para não subir de novo). */
   luts: ({ textura: WebGLTexture; chave: string } | undefined)[];
+  /** A tabela de 256 tons de cada camada, na unidade 7, também com a chave. */
+  tabelas: ({ textura: WebGLTexture; chave: string } | undefined)[];
   /** A imagem fixa do grão, feita na primeira vez que um clipe usa granulação. */
   grao: WebGLTexture | null;
   /** O quadro da máscara do fundo de cada camada, na unidade 4. */
@@ -806,7 +822,7 @@ type Recursos = {
   /** As máscaras de camada pintáveis, uma por camada (unidade 5). */
   mascarasDaCamada: WebGLTexture[];
   uniformes: Record<
-    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono" | "comMascaraCamada" | "mascaraCamada" | "mascaraCamadaMatriz" | "mascaraCamadaDensidade" | "comFundo" | "mesclarSe" | "mesclarSeCanal" | "mesclarSeEsta" | "mesclarSeAbaixo" | "canais",
+    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "modoTabela" | "tabela" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono" | "comMascaraCamada" | "mascaraCamada" | "mascaraCamadaMatriz" | "mascaraCamadaDensidade" | "comFundo" | "mesclarSe" | "mesclarSeCanal" | "mesclarSeEsta" | "mesclarSeAbaixo" | "canais",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -953,6 +969,8 @@ export class Compositor {
         opacidade: local("u_opacidade"),
         comLut: local("u_comLut"),
         lut: local("u_lut"),
+        modoTabela: local("u_modoTabela"),
+        tabela: local("u_tabela"),
         vinheta: local("u_vinheta"),
         revelado: local("u_revelado"),
         corteDe: local("u_corteDe"),
@@ -1003,6 +1021,7 @@ export class Compositor {
       },
       texturas: [],
       luts: [],
+      tabelas: [],
       grao: null,
       mascaras: [],
       mascarasDaCamada: [],
@@ -1488,6 +1507,27 @@ export class Compositor {
       }
       gl.activeTexture(gl.TEXTURE0);
     }
+    gl.uniform1i(uniformes.tabela, 7);
+    gl.uniform1i(uniformes.modoTabela, camada.tabela ? (camada.tabela.modo === "canais" ? 1 : 2) : 0);
+    if (camada.tabela) {
+      let tabela = recursos.tabelas[indice];
+      if (!tabela) {
+        tabela = { textura: gl.createTexture()!, chave: "" };
+        recursos.tabelas[indice] = tabela;
+      }
+      gl.activeTexture(gl.TEXTURE7);
+      gl.bindTexture(gl.TEXTURE_2D, tabela.textura);
+      if (tabela.chave !== camada.tabela.chave) {
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 256, 1, 0, gl.RGBA, gl.FLOAT, camada.tabela.dados);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        // Lida só com texelFetch, como a LUT 3D
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        tabela.chave = camada.tabela.chave;
+      }
+      gl.activeTexture(gl.TEXTURE0);
+    }
     gl.uniform1f(uniformes.vinheta, camada.vinheta ?? 0);
     gl.uniform1i(uniformes.comMascaraCamada, texturaDaMascara ? 1 : 0);
     if (texturaDaMascara && camada.mascaraDaCamada) {
@@ -1824,7 +1864,7 @@ export class Compositor {
     const recursos = this.recursos;
     if (recursos && !this.gl.isContextLost()) {
       // As listas podem ter buracos (o brilho cria os framebuffers 2 e 3 sem o 0 e o 1)
-      for (const textura of [...recursos.texturas, ...recursos.luts.map((lut) => lut?.textura), ...recursos.mascaras, ...recursos.mascarasDaCamada, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
+      for (const textura of [...recursos.texturas, ...recursos.luts.map((lut) => lut?.textura), ...recursos.tabelas.map((tabela) => tabela?.textura), ...recursos.mascaras, ...recursos.mascarasDaCamada, recursos.grao]) if (textura) this.gl.deleteTexture(textura);
       for (const alvo of recursos.alvos) {
         if (!alvo) continue;
         this.gl.deleteTexture(alvo.textura);
