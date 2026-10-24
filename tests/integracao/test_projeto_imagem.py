@@ -100,6 +100,36 @@ def test_camada_vetorial(cliente):
     assert salvar(cliente, video, [camada("video", forma), *video["faixas"]]).status_code == 422
 
 
+def test_texto_rico(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    estilo = {"familia": "inter", "peso": 400, "italico": False, "tamanho": 48, "cor": "#000000", "entrelinha": None,
+              "tracking": 0, "kerning": "metrica", "kern": 0, "escalaH": 1, "escalaV": 1, "linhaDeBase": 0,
+              "negritoFalso": False, "italicoFalso": False, "caixa": "normal", "posicao": "normal", "sublinhado": False,
+              "tachado": False, "ligaduras": True, "alternativos": False, "fracoes": False, "ordinais": False,
+              "eixos": {}, "suavizacao": "nitida"}
+    texto = {"paragrafos": [{"trechos": [{"texto": "Olá ", "estilo": {}},
+                                         {"texto": "mundo", "estilo": {"cor": "#ff0000", "entrelinha": None}}],
+                             "estilo": {"alinhamento": "centro"}}],
+             "estilo": estilo, "paragrafo": {"alinhamento": "esquerda", "recuoInicio": 0, "recuoFim": 0,
+                                             "recuoPrimeira": 0, "espacoAntes": 0, "espacoDepois": 0,
+                                             "hifenizar": False},
+             "modo": "ponto", "orientacao": "horizontal", "caixa": {"largura": 230, "altura": 70},
+             "origem": {"x": 6, "y": 52}}
+    camada_ = {**clipe(None, 0, 5, id_="t1"), "midia_id": None, "texto_rico": texto}
+    faixas = [camada("video", camada_), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    guardado = cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["texto_rico"]
+    assert guardado == texto, "o estilo do trecho guarda só o que veio (com o null que veio)"
+    # Sem a fonte no estilo de base, ou numa faixa de texto, não vale
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    sem_fonte = {**texto, "estilo": {k: v for k, v in estilo.items() if k != "familia"}}
+    sem_fonte_camada = camada("video", {**camada_, "texto_rico": sem_fonte})
+    assert salvar(cliente, aberto, [sem_fonte_camada, faixas[1]]).status_code == 422
+    assert salvar(cliente, aberto, [camada("texto", camada_), faixas[1]]).status_code == 422
+
+
 def test_pranchetas(cliente, db_limpo):
     cadastrar(cliente)
     projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()

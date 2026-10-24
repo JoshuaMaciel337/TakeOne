@@ -885,6 +885,87 @@ class PranchetaEntrada(BaseModel):
     fundo: FundoDaPrancheta = Field(default_factory=FundoDaPrancheta)
 
 
+class SoOQueVeio(BaseModel):
+    """Guarda só os campos que vieram (um null que veio fica): o estilo de um trecho é só o que muda do de base."""
+
+    @model_serializer(mode="wrap")
+    def _so_o_que_veio(self, serializar):
+        return {chave: valor for chave, valor in serializar(self).items() if chave in self.model_fields_set}
+
+
+class EstiloDoCaractereEntrada(SoOQueVeio):
+    """O estilo de um trecho do texto do editor de imagem (apps/web/src/lib/texto/modelo.ts), com os nomes de lá."""
+    familia: str | None = Field(default=None, min_length=1, max_length=60)
+    peso: int | None = Field(default=None, ge=1, le=1000)
+    italico: bool | None = None
+    tamanho: float | None = Field(default=None, gt=0, le=5000)
+    cor: str | None = Field(default=None, pattern=COR)
+    entrelinha: float | None = Field(default=None, ge=0, le=20000)
+    tracking: float | None = Field(default=None, ge=-1000, le=10000)
+    kerning: Literal["metrica", "optico", "nenhum"] | None = None
+    kern: float | None = Field(default=None, ge=-1000, le=1000)
+    escalaH: float | None = Field(default=None, ge=0.01, le=10)  # noqa: N815
+    escalaV: float | None = Field(default=None, ge=0.01, le=10)  # noqa: N815
+    linhaDeBase: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    negritoFalso: bool | None = None  # noqa: N815
+    italicoFalso: bool | None = None  # noqa: N815
+    caixa: Literal["normal", "maiusculas", "versalete"] | None = None
+    posicao: Literal["normal", "sobrescrito", "subscrito"] | None = None
+    sublinhado: bool | None = None
+    tachado: bool | None = None
+    ligaduras: bool | None = None
+    alternativos: bool | None = None
+    fracoes: bool | None = None
+    ordinais: bool | None = None
+    eixos: dict[Annotated[str, Field(min_length=4, max_length=4)], float] | None = Field(default=None, max_length=16)
+    suavizacao: Literal["nenhuma", "nitida", "forte", "suave"] | None = None
+
+
+class EstiloDoParagrafoEntrada(SoOQueVeio):
+    alinhamento: Literal["esquerda", "centro", "direita", "justificado-esquerda", "justificado-centro",
+                         "justificado-direita", "justificado"] | None = None
+    recuoInicio: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    recuoFim: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    recuoPrimeira: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    espacoAntes: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    espacoDepois: float | None = Field(default=None, ge=-10000, le=10000)  # noqa: N815
+    hifenizar: bool | None = None
+
+
+class TrechoEntrada(BaseModel):
+    texto: str = Field(max_length=20000)
+    estilo: EstiloDoCaractereEntrada = Field(default_factory=EstiloDoCaractereEntrada)
+
+
+class ParagrafoRicoEntrada(BaseModel):
+    trechos: list[TrechoEntrada] = Field(min_length=1, max_length=2000)
+    estilo: EstiloDoParagrafoEntrada = Field(default_factory=EstiloDoParagrafoEntrada)
+
+
+class PontoEntrada(BaseModel):
+    x: float = Field(ge=-LIMITE_DO_VETOR, le=LIMITE_DO_VETOR)
+    y: float = Field(ge=-LIMITE_DO_VETOR, le=LIMITE_DO_VETOR)
+
+
+class TextoRicoEntrada(BaseModel):
+    """O texto do editor de imagem, desenhado no navegador (apps/web/src/lib/texto/modelo.ts)."""
+    paragrafos: list[ParagrafoRicoEntrada] = Field(min_length=1, max_length=2000)
+    estilo: EstiloDoCaractereEntrada
+    paragrafo: EstiloDoParagrafoEntrada
+    modo: Literal["ponto", "paragrafo"] = "ponto"
+    orientacao: Literal["horizontal", "vertical"] = "horizontal"
+    caixa: TamanhoDoVetor
+    origem: PontoEntrada
+
+    @model_validator(mode="after")
+    def _completo(self):
+        if not {"familia", "tamanho", "cor"} <= self.estilo.model_fields_set:
+            raise ValueError("O estilo do texto precisa da fonte, do tamanho e da cor.")
+        if sum(len(trecho.texto) for paragrafo in self.paragrafos for trecho in paragrafo.trechos) > 50_000:
+            raise ValueError("O texto pode ter no máximo 50 mil caracteres.")
+        return self
+
+
 class CaminhoDoDocumento(BaseModel):
     """Um caminho do painel Caminhos do editor de imagem, em pixels do documento (lib/vetor/caminhos.ts)."""
     id: str = Field(min_length=1, max_length=40)
@@ -962,6 +1043,8 @@ class ClipeEntrada(BaseModel):
     # Camada vetorial (forma ou caminho): sem mídia nem texto, desenhada pelo editor
     vetor: VetorEntrada | None = None
     mascara_vetorial: MascaraVetorialEntrada | None = None
+    # O texto do editor de imagem (desenhado no navegador); o `texto` é o do vídeo (desenhado no servidor)
+    texto_rico: TextoRicoEntrada | None = None
     prancheta: PranchetaEntrada | None = None
     efeito: EfeitoEntrada | None = None
     chroma: ChromaEntrada | None = None

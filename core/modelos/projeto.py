@@ -182,7 +182,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
         if not imagem:
             if da_imagem or any(c.get("pasta") or c.get("preenchimento") is not None or c.get("pixels")
                                 or c.get("mascara_pixels") or c.get("vetor") or c.get("mascara_vetorial")
-                                or c.get("prancheta")
+                                or c.get("prancheta") or c.get("texto_rico")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels, formas vetoriais e os modos de mesclagem"
                         " novos só existem no editor de imagem.")
@@ -247,12 +247,14 @@ def conferir_linha_do_tempo(faixas: list[dict], midias: dict[str, dict], imagem:
             mascara = clipe.get("mascara_pixels")
             if mascara and not (midias.get(mascara["midia_id"]) or {}).get("camada_pixels"):
                 return "A máscara de uma camada não existe mais."
-            if clipe.get("ajuste") or clipe.get("pasta") or clipe.get("vetor"):
+            if clipe.get("ajuste") or clipe.get("pasta") or clipe.get("vetor") or clipe.get("texto_rico"):
                 # A camada de ajuste, a pasta e a forma vetorial não têm mídia nem texto: só nas sobreposições
                 if faixa["tipo"] != FAIXA_VIDEO or clipe.get("texto") or clipe.get("midia_id"):
                     return "A camada de ajuste e a forma ficam só numa faixa de sobreposição, sem mídia nem texto."
                 if clipe.get("vetor") and (clipe.get("ajuste") or clipe.get("pasta")):
                     return "Uma forma não é camada de ajuste nem pasta."
+                if clipe.get("texto_rico") and (clipe.get("ajuste") or clipe.get("pasta") or clipe.get("vetor")):
+                    return "Um texto não é camada de ajuste, pasta nem forma."
                 foto = foto_do_quadro(clipe)
                 if foto and not (midias.get(foto) or {}).get("imagem"):
                     return "A foto de um quadro precisa ser uma imagem pronta deste espaço."
