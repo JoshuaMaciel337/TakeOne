@@ -77,3 +77,18 @@ def test_estilos_de_texto(cliente):
                                                "dados": {"estilo": {}}}).status_code == 422
     assert cliente.post("/api/recursos", json={"tipo": "estilo_paragrafo", "nome": "E",
                                                "dados": {"estilo": {"alinhamento": "torto"}}}).status_code == 422
+
+
+def test_estilos_de_camada(cliente):
+    cadastrar(cliente)
+    estilo = {"efeitos": [{"tipo": "sombra", "id": "s1", "modo": "multiplicar", "opacidade": 0.5, "distancia": 4,
+                           "tamanho": 6}]}
+    criado = cliente.post("/api/recursos", json={"tipo": "estilo_camada", "nome": "Sombra leve",
+                                                 "dados": {"estilo": estilo, "preenchimento": 0.4}})
+    assert criado.status_code == 201, criado.text
+    assert criado.json()["dados"]["preenchimento"] == 0.4
+    assert criado.json()["dados"]["estilo"]["efeitos"][0]["distancia"] == 4
+    assert [r["nome"] for r in cliente.get("/api/recursos?tipo=estilo_camada").json()] == ["Sombra leve"]
+    sem_efeito = {"estilo": {"efeitos": []}}
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_camada", "nome": "V",
+                                               "dados": sem_efeito}).status_code == 422

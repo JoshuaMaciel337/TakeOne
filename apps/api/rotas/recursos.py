@@ -25,6 +25,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
+    EstiloDeCamadaEntrada,
     EstiloDoCaractereEntrada,
     EstiloDoParagrafoEntrada,
     RecursoEntrada,
@@ -95,7 +96,16 @@ def _conferir_forma(dados: dict) -> list[dict]:
 
 
 def _conferir_estilo(tipo: str, dados: dict) -> dict:
-    """O estilo de caractere ou de parágrafo, conferido como o de um trecho ou de um parágrafo do texto."""
+    """O estilo de caractere ou de parágrafo (como o de um trecho ou de um parágrafo) ou o de camada."""
+    if tipo == "estilo_camada":
+        try:
+            estilo = EstiloDeCamadaEntrada.model_validate(dados.get("estilo") or {})
+            preenchimento = float(dados.get("preenchimento", 1))
+        except (ValidationError, TypeError, AttributeError, ValueError) as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O estilo veio estragado.") from erro
+        if not estilo.efeitos:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O estilo não tem efeitos.")
+        return {"estilo": estilo.model_dump(), "preenchimento": min(1.0, max(0.0, preenchimento))}
     esquema = EstiloDoCaractereEntrada if tipo == "estilo_caractere" else EstiloDoParagrafoEntrada
     try:
         estilo = esquema.model_validate(dados.get("estilo") or {})
@@ -113,7 +123,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Os dados passam de {limite // 1024} KB.")
     if dados.tipo == "forma":
         dados.dados = {"subcaminhos": _conferir_forma(dados.dados)}
-    if dados.tipo in ("estilo_caractere", "estilo_paragrafo"):
+    if dados.tipo in ("estilo_caractere", "estilo_paragrafo", "estilo_camada"):
         dados.dados = _conferir_estilo(dados.tipo, dados.dados)
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
@@ -141,8 +151,11 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
     return para_saida(doc)
 
 
+TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada)$"
+
+
 @router.get("", response_model=list[RecursoSaida])
-async def listar_recursos(tipo: str = Query(pattern="^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo)$"),
+async def listar_recursos(tipo: str = Query(pattern=TIPOS_DE_RECURSO),
                           usuario=Depends(usuario_atual),
                           db=Depends(obter_db)):
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": tipo}
