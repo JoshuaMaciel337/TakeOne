@@ -25,6 +25,8 @@ import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
 import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
+import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
+import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
 import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { CaminhosNaPrevia, type FerramentaDeCaminho, type OpcoesDosCaminhos } from "./CaminhosNaPrevia";
@@ -99,6 +101,14 @@ type Props = {
    * (o canto de cima e o tamanho).
    */
   aoClicarTexto?: (x: number, y: number, caixa?: { largura: number; altura: number }) => void;
+  /**
+   * Ferramenta Texto: os caminhos (em pixels da imagem) em que um clique começa um texto no caminho; o clique perto de
+   * um deles chama `aoClicarNoCaminho` com o caminho e a fração do comprimento.
+   */
+  caminhosDoTexto?: Subcaminho[] | null;
+  aoClicarNoCaminho?: (caminho: Subcaminho, fracao: number) => void;
+  /** Ferramenta Texto: o clique dentro de um desses caminhos (fechado) começa um texto que quebra dentro dele. */
+  aoClicarNaArea?: (caminho: Subcaminho) => void;
   /** Ferramenta Texto: o clique num texto do navegador abre a edição, com o cursor no caractere do clique. */
   aoEditarTexto?: (clipeId: string, indice: number) => void;
   /** O texto em edição (a caixa vem da camada na prévia). */
@@ -251,6 +261,9 @@ export function PreviaDaImagem({
   aoClicarTexto,
   aoEditarTexto,
   edicaoDeTexto,
+  caminhosDoTexto,
+  aoClicarNoCaminho,
+  aoClicarNaArea,
   aoDesenharForma,
   caminhos = null,
   pranchetas = null,
@@ -491,6 +504,23 @@ export function PreviaDaImagem({
         aoSelecionar([texto.clipe.id]);
         return;
       }
+      // Perto de um caminho (6 pixels da tela), o texto segue ele
+      if (!mascara && caminhosDoTexto?.length && aoClicarNoCaminho) {
+        const naImagem = { x: ponto.x / escala, y: ponto.y / escala };
+        const perto = caminhosDoTexto
+          .map((sub) => ({ sub, ...pontoMaisPerto({ tipo: "linha", nos: sub.nos, fechado: sub.fechado, inicio: 0, inverter: false }, naImagem) }))
+          .sort((a, b) => a.distancia - b.distancia)[0];
+        if (perto && perto.distancia * escala <= 6) {
+          aoClicarNoCaminho(perto.sub, perto.fracao);
+          return;
+        }
+        // Dentro de um caminho fechado, o texto quebra dentro dele
+        const dentro = caminhosDoTexto.find((sub) => sub.fechado && intervalosNaAltura(achatar(sub, 0.5), naImagem.y).some(([x0, x1]) => naImagem.x >= x0 && naImagem.x <= x1));
+        if (dentro && aoClicarNaArea) {
+          aoClicarNaArea(dentro);
+          return;
+        }
+      }
       // O clique faz um texto de ponto; o arrasto, uma caixa de parágrafo
       evento.currentTarget.setPointerCapture(evento.pointerId);
       setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
@@ -692,6 +722,12 @@ export function PreviaDaImagem({
                   }
                 }}
               />
+            ) : null}
+            {caminhosDoTexto?.length && FERRAMENTAS_DE_TEXTO.has(ferramenta) && tamanho.largura > 1 ? (
+              // Os caminhos em que o clique da ferramenta Texto começa um texto no caminho
+              <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>
+                <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              </svg>
             ) : null}
             {edicaoDeTexto && tamanho.largura > 1
               ? (() => {

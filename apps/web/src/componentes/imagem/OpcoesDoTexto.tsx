@@ -217,9 +217,11 @@ type Props = {
   aoPaineis?: () => void;
   /** Texto › Deformar texto (só com um texto escolhido ou em edição). */
   aoDeformar?: (() => void) | null;
+  /** O texto num caminho: onde ele começa (fração do comprimento) e o lado. */
+  caminho?: { inicio: number; aoInicio: (inicio: number) => void; aoInverter: () => void } | null;
 };
 
-export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo, aoPreverFonte, aoAlinhamento, aoOrientacao, edicao, aoPaineis, aoDeformar }: Props) {
+export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo, aoPreverFonte, aoAlinhamento, aoOrientacao, edicao, aoPaineis, aoDeformar, caminho }: Props) {
   const catalogo = useCatalogoDeFontes();
   const familia = catalogo.find((item) => item.id === estilo.familia);
   const estilos = estilosDaFamilia(familia);
@@ -278,6 +280,18 @@ export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo
         Cor:
         <input type="color" aria-label="Cor do texto" value={estilo.cor ?? "#000000"} onChange={(evento) => aoEstilo({ cor: evento.currentTarget.value })} className="h-6 w-8 cursor-pointer rounded border border-borda bg-fundo p-0" />
       </label>
+      {caminho ? (
+        <>
+          <label className="flex items-center gap-1 text-suave" title="Onde o texto começa no caminho">
+            Início:
+            <CampoNumerico rotulo="Início do texto no caminho, em % do comprimento" valor={caminho.inicio * 100} unidade="%" min={0} max={100} aoMudar={(valor) => caminho.aoInicio(valor / 100)} />
+          </label>
+          <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" title="Passar o texto para o outro lado do caminho" onClick={caminho.aoInverter}>
+            Inverter
+          </button>
+          {SEPARADOR}
+        </>
+      ) : null}
       {aoDeformar ? (
         <button type="button" className="botao-icone h-6 w-auto px-1.5" title="Deformar texto" aria-label="Deformar texto" onClick={aoDeformar}>
           <Spline className="size-4" aria-hidden />

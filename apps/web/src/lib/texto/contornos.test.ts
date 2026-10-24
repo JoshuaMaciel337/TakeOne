@@ -44,3 +44,20 @@ test("o sublinhado vira um retângulo", () => {
   assert.equal(caminhos.length, 3);
   assert.equal(caminhos[2].nos.length, 4);
 });
+
+test("texto num caminho: cada letra vai para o ponto do caminho, girada pela tangente; o que passa do fim some", async () => {
+  const { gruposDeformados } = await import("./contornos.ts");
+  const { disporTexto } = await import("./layout.ts");
+  // Um caminho que desce (de 0,0 a 0,100): as letras ficam de lado, com a base à esquerda
+  const caminho = { tipo: "linha" as const, nos: [{ x: 0, y: 0 }, { x: 0, y: 100 }], fechado: false, inicio: 0, inverter: false };
+  const texto = { ...textoNovo("o o o o o o o o o o o o o o o o o o", { tamanho: 10 }), caminho };
+  const grupos = gruposDeformados(texto, disporTexto(texto, () => fonte), 0.1)!;
+  const primeiro = grupos[0].poligonos[0];
+  const xs = primeiro.map((p) => p.x);
+  const ys = primeiro.map((p) => p.y);
+  // A letra (5 × 5) a partir do começo do caminho, para a direita da tela fica o "alto" da letra virado para x positivo
+  assert.ok(Math.abs(Math.min(...ys) - 0) < 1e-6 && Math.abs(Math.max(...ys) - 5) < 1e-6, `y ${Math.min(...ys)}..${Math.max(...ys)}`);
+  assert.ok(Math.abs(Math.min(...xs) - 0) < 1e-6 && Math.abs(Math.max(...xs) - 5) < 1e-6, `x ${Math.min(...xs)}..${Math.max(...xs)}`);
+  // 18 letras de 12 de passo não cabem em 100: as do fim não aparecem
+  assert.ok(grupos.some((g) => g.poligonos.length === 0));
+});

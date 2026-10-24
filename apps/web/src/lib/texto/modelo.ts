@@ -5,6 +5,7 @@
 // quebra ("\n") entre os parágrafos, como num campo de texto.
 
 import type { Deformacao } from "./deformar.ts";
+import type { CaminhoDoTexto } from "./caminho.ts";
 
 export type CaixaDasLetras = "normal" | "maiusculas" | "versalete";
 export type PosicaoDasLetras = "normal" | "sobrescrito" | "subscrito";
@@ -78,6 +79,8 @@ export type TextoRico = {
   origem: { x: number; y: number };
   /** Texto › Deformar texto (deformar.ts). */
   deformar?: Deformacao | null;
+  /** O caminho que o texto segue (linha) ou a forma em que as linhas quebram (área), nas unidades do texto (caminho.ts). */
+  caminho?: CaminhoDoTexto | null;
 };
 
 export const ESTILO_PADRAO: EstiloDoCaractere = {

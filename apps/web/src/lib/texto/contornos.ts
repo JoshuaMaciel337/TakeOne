@@ -8,11 +8,12 @@ import type { No, Subcaminho } from "../vetor/modelo.ts";
 import { deforma, type Deformacao, deformarCaminhos, deformarPonto, limitesDosPoligonos, type Retangulo } from "./deformar.ts";
 import { type Disposicao, disporTexto, type Fontes } from "./layout.ts";
 import type { TextoRico } from "./modelo.ts";
+import { funcaoDoCaminho, glifoNoCaminho } from "./caminho.ts";
 
 const INCLINACAO = Math.tan((12 * Math.PI) / 180);
 
 /** Os contornos de uma letra (ou de um risco), com a cor e o negrito falso dela. */
-export type GrupoDeContornos = { cor: string; negrito: boolean; em: number; caminhos: Subcaminho[] };
+export type GrupoDeContornos = { cor: string; negrito: boolean; em: number; caminhos: Subcaminho[]; centro?: number };
 
 /** A área com sinal do contorno (pelos nós, sem as alças: basta para o sentido e para a ordem). */
 function areaComSinal(nos: { x: number; y: number }[]): number {
@@ -62,6 +63,8 @@ export function contornosDaDisposicao(disposicao: Disposicao): GrupoDeContornos[
       cor: g.cor,
       negrito: g.negrito,
       em: g.fonte.unidades * g.escalaX,
+      // O meio da letra na linha (o texto num caminho gira cada letra em volta dele)
+      centro: g.x + (g.glifo.avanco * g.escalaX) / 2,
       caminhos: contornos.map(({ sub, area }, i) => ({ ...sub, operacao: i === 0 || Math.sign(area) === sentido ? "somar" : "subtrair" })),
     });
   }
@@ -87,6 +90,8 @@ function referencia(texto: TextoRico, disposicao: Disposicao): Retangulo | null 
  * é reduzido (em volta do meio da caixa) até caber nela, porque o que passa da caixa não aparece.
  */
 export function funcaoDaDeformacao(texto: TextoRico, disposicao: Disposicao): ((p: { x: number; y: number }) => { x: number; y: number }) | null {
+  // No caminho, a curva dele (a deformação não vale junto)
+  if (texto.caminho?.tipo === "linha") return funcaoDoCaminho(texto.caminho);
   const d: Deformacao | null | undefined = texto.deformar;
   if (!deforma(d)) return null;
   const r = referencia(texto, disposicao);
@@ -111,13 +116,19 @@ export function gruposDeformados(texto: TextoRico, disposicao: Disposicao, toler
   if (!f) return null;
   // A deformação só precisa de um retângulo: a função já traz a referência (e o encaixe do parágrafo)
   const identidade = { x0: 0, y0: 0, x1: 1, y1: 1 };
-  return contornosDaDisposicao(disposicao).map((grupo) => ({
-    cor: grupo.cor,
-    negrito: grupo.negrito,
-    em: grupo.em,
-    operacoes: grupo.caminhos.map((sub) => sub.operacao),
-    poligonos: deformarCaminhos(grupo.caminhos, identidade, null, tolerancia, f),
-  }));
+  const caminho = texto.caminho?.tipo === "linha" ? texto.caminho : null;
+  return contornosDaDisposicao(disposicao).map((grupo) => {
+    // No caminho, cada letra vai rígida (girada pela tangente no meio dela); a que cai fora do caminho não aparece
+    const rigida = caminho && grupo.centro !== undefined ? glifoNoCaminho(caminho, grupo.centro) : null;
+    const fora = caminho && grupo.centro !== undefined && !rigida;
+    return {
+      cor: grupo.cor,
+      negrito: grupo.negrito,
+      em: grupo.em,
+      operacoes: grupo.caminhos.map((sub) => sub.operacao),
+      poligonos: fora ? [] : deformarCaminhos(grupo.caminhos, identidade, null, tolerancia, rigida ?? f),
+    };
+  });
 }
 
 /** Os contornos do texto, nas unidades da caixa (a origem do texto já somada; deformados quando o texto deforma). */

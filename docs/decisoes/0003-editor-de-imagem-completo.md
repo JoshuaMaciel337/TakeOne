@@ -207,7 +207,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Painel Parágrafo: alinhar à esquerda, ao centro e à direita, justificar (última à esquerda, ao centro, à direita, tudo), recuos (início, fim, primeira linha), espaço antes e depois, hifenização
 - [ ] Estilos de caractere e de parágrafo; painel Glifos
 - [x] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
-- [ ] Texto em caminho (e dentro de uma forma)
+- [x] Texto em caminho (e dentro de uma forma)
 - [x] Deformar texto: arco, arco inferior, arco superior, arco, saliência, concha inferior e superior, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torção
 - [x] Converter em forma, Criar caminho de trabalho, Rasterizar
 - [x] Localizar e substituir texto; Colar Lorem Ipsum; Atualizar todas as camadas de texto

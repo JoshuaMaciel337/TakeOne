@@ -109,3 +109,21 @@ test("texto vertical: as colunas da direita para a esquerda e a caixa do tamanho
   assert.ok(caixa.altura < 3 * 12 + 2 * 3, `altura ${caixa.altura}`);
   assert.ok(caixa.largura < 2 * 12 + 10 + 2 * 3, `largura ${caixa.largura}`);
 });
+
+test("texto dentro de uma forma: cada linha quebra no trecho de dentro do triângulo", async () => {
+  const { intervalosNaAltura } = await import("./caminho.ts");
+  const triangulo = [{ x: 50, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+  const texto = {
+    ...textoNovo("aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv", { tamanho: 10 }, "paragrafo"),
+    caixa: { largura: 100, altura: 100 },
+    caminho: { tipo: "area" as const, nos: triangulo, fechado: true, inicio: 0, inverter: false },
+  };
+  const d = disporTexto(texto, fontes);
+  assert.ok(d.linhas.length >= 4);
+  // As linhas de baixo são mais largas, e toda letra fica dentro do triângulo na altura da linha
+  assert.ok(d.linhas[d.linhas.length - 2].largura > d.linhas[0].largura);
+  for (const linha of d.linhas) {
+    const [x0, x1] = intervalosNaAltura(triangulo, linha.baseY)[0] ?? [0, 0];
+    assert.ok(linha.baseX >= x0 - 1e-6 && linha.baseX + linha.largura <= x1 + 1e-6, `linha em ${linha.baseY}: ${linha.baseX}..${linha.baseX + linha.largura} fora de ${x0}..${x1}`);
+  }
+});

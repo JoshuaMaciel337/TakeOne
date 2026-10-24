@@ -4,13 +4,16 @@ import type { Disposicao } from "./layout.ts";
 import type { TextoRico } from "./modelo.ts";
 import { gruposDeformados } from "./contornos.ts";
 import { limitesDosPoligonos } from "./deformar.ts";
+import { percurso } from "./caminho.ts";
 
 export function medirTexto(texto: TextoRico, disposicao: Disposicao): Pick<TextoRico, "caixa" | "origem"> {
   if (texto.modo === "paragrafo") return { caixa: texto.caixa, origem: { x: 0, y: 0 } };
   const folga = Math.max(2, Math.round(texto.estilo.tamanho * 0.12));
   // Deformado, a caixa é o que as letras deformadas ocupam (o cursor anda junto com elas)
   const deformados = gruposDeformados(texto, disposicao, Math.max(0.05, texto.estilo.tamanho / 400));
-  const limites = deformados ? limitesDosPoligonos(deformados.flatMap((grupo) => grupo.poligonos)) : null;
+  // O caminho do texto também entra (para ele continuar à vista e editável dentro da caixa)
+  const doCaminho = texto.caminho ? [percurso(texto.caminho).pontos] : [];
+  const limites = deformados ? limitesDosPoligonos([...deformados.flatMap((grupo) => grupo.poligonos), ...doCaminho]) : null;
   if (limites) {
     const negrito = Math.max(0, ...deformados!.map((grupo) => (grupo.negrito ? grupo.em * 0.035 : 0))) / 2;
     const x0 = limites.x0 - negrito;

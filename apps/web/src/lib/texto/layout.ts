@@ -4,6 +4,7 @@
 // cada caractere (o cursor) e o retângulo do que aparece. A fonte entra por uma interface, para os testes usarem uma de
 // mentira; lib/texto/fontes.ts liga ela ao fontkit.
 import { type EstiloDoCaractere, type EstiloDoParagrafo, estiloDe, estiloDoParagrafo, type TextoRico } from "./modelo.ts";
+import { faixaNaArea, poligonoDaArea } from "./caminho.ts";
 
 export type GlifoFormatado = {
   id: number;
@@ -259,7 +260,30 @@ export function disporTexto(texto: TextoRico, fontes: Fontes): Disposicao {
     if (!primeiraLinha) posicaoDaLinha += estiloP.espacoAntes;
     // As linhas do parágrafo (no de parágrafo, quebradas na caixa)
     const medida = (atomo: Atomo) => (vertical ? atomo.alto : atomo.avanco);
-    const disponivel = (primeira: boolean) => (vertical ? texto.caixa.altura : texto.caixa.largura) - estiloP.recuoInicio - estiloP.recuoFim - (primeira ? estiloP.recuoPrimeira : 0);
+    // Dentro de uma forma, cada linha tem o trecho de dentro dela na altura em que cai (pela entrelinha do começo do
+    // parágrafo; a altura sem trecho é pulada); fora dela, a caixa inteira
+    const area = paragrafo && !vertical && texto.caminho?.tipo === "area" ? poligonoDaArea(texto.caminho) : null;
+    const estiloDoComeco = estiloDe(texto, p.trechos[0] ?? { texto: "", estilo: {} });
+    const passo = entrelinhaDe(estiloDoComeco);
+    const subida = estiloDoComeco.tamanho * 0.8;
+    const descida = estiloDoComeco.tamanho * 0.25;
+    const inicioDasLinhas = primeiraLinha ? subida : posicaoDaLinha + estiloP.espacoAntes + passo;
+    const faixas: { x0: number; largura: number; base: number }[] = [];
+    const faixa = (linha: number) => {
+      if (!area) return { x0: 0, largura: vertical ? texto.caixa.altura : texto.caixa.largura, base: NaN };
+      for (let k = faixas.length; k <= linha; k++) {
+        let base = k === 0 ? inicioDasLinhas : faixas[k - 1].base + passo;
+        let achada = faixaNaArea(area, base - subida, base + descida);
+        while (!achada && base < texto.caixa.altura) {
+          base += passo / 4;
+          achada = faixaNaArea(area, base - subida, base + descida);
+        }
+        // O que não cabe mais na forma fica abaixo da caixa (não aparece, como o resto do parágrafo que passa dela)
+        faixas.push(achada ? { x0: achada.x0, largura: achada.x1 - achada.x0, base } : { x0: 0, largura: texto.caixa.largura, base: Math.max(base, texto.caixa.altura + subida + descida) });
+      }
+      return faixas[linha];
+    };
+    const disponivel = (linha: number) => faixa(linha).largura - estiloP.recuoInicio - estiloP.recuoFim - (linha === 0 ? estiloP.recuoPrimeira : 0);
     const grupos: Atomo[][] = [];
     if (!paragrafo) grupos.push(atomos);
     else {
@@ -271,7 +295,7 @@ export function disporTexto(texto: TextoRico, fontes: Fontes): Disposicao {
         atual.push(atomo);
         largura += medida(atomo);
         if (atomo.quebraDepois) ultimaQuebra = atual.length - 1;
-        const limite = disponivel(grupos.length === 0);
+        const limite = disponivel(grupos.length);
         // Os espaços no fim não contam: a palavra que passou é hifenizada (se pedido) ou vai inteira para a linha de
         // baixo; sem onde quebrar, ela é cortada
         if (largura > limite && atual.length > 1 && !atomo.espaco) {
@@ -299,13 +323,15 @@ export function disporTexto(texto: TextoRico, fontes: Fontes): Disposicao {
       if (primeiraLinha) posicaoDaLinha = paragrafo ? (vertical ? texto.caixa.largura - entrelinha / 2 : ascendente) : 0;
       else posicaoDaLinha += vertical ? -entrelinha : entrelinha;
       if (vertical && primeiraLinha && !paragrafo) posicaoDaLinha = 0;
+      // Dentro de uma forma, a linha fica na altura em que o trecho dela foi achado
+      if (area) posicaoDaLinha = faixa(numeroDaLinha).base;
       primeiraLinha = false;
       // Os espaços do fim da linha não contam para o alinhamento
       let ocupados = grupo.length;
       while (ocupados > 0 && grupo[ocupados - 1].espaco) ocupados--;
       const comprimento = grupo.slice(0, ocupados).reduce((soma, atomo) => soma + medida(atomo), 0);
-      const recuo = estiloP.recuoInicio + (primeiraDoParagrafo ? estiloP.recuoPrimeira : 0);
-      const espacoTotal = paragrafo ? disponivel(primeiraDoParagrafo) : 0;
+      const recuo = (area ? faixa(numeroDaLinha).x0 : 0) + estiloP.recuoInicio + (primeiraDoParagrafo ? estiloP.recuoPrimeira : 0);
+      const espacoTotal = paragrafo ? disponivel(numeroDaLinha) : 0;
       const sobra = Math.max(0, espacoTotal - comprimento);
       const al = estiloP.alinhamento;
       const justificar = paragrafo && al.startsWith("justificado") && (!ultimaDoParagrafo || al === "justificado");

@@ -124,7 +124,7 @@ import { camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } f
 import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
-import { deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
+import { caixaDosCaminhos, deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
 import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
 import { preencherBuracos } from "@/lib/pintura/recuperar";
@@ -2004,6 +2004,43 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     setSelecao([]);
     setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x, y }, acima: escolhidas[0]?.id ?? null, mascara }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
   };
+  /** Um texto novo no caminho (pixels da imagem: as unidades do texto novo são os pixels, a origem no canto da imagem). */
+  const comecarTextoNoCaminho = (caminho: Subcaminho, fracao: number) => {
+    terminarTexto();
+    if (!projeto) return;
+    const documento = tamanhoDaImagem(projeto);
+    const estilo = { tamanho: Math.max(12, Math.round(Math.min(documento.largura, documento.altura) / 18)), ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
+    const base = textoNovo("", estilo, "ponto");
+    const texto = textoMedido({ ...base, paragrafo: { ...base.paragrafo, ...opcoesDoTexto.paragrafo }, caminho: { tipo: "linha", nos: caminho.nos, fechado: caminho.fechado, inicio: fracao, inverter: false } });
+    setSelecao([]);
+    setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x: 0, y: 0 }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
+  };
+  /** Um texto novo dentro de um caminho fechado: a caixa é o retângulo dele, e as linhas quebram dentro do contorno. */
+  const comecarTextoNaArea = (caminho: Subcaminho) => {
+    terminarTexto();
+    const retangulo = caixaDosCaminhos([caminho]);
+    if (!projeto || !retangulo) return;
+    const documento = tamanhoDaImagem(projeto);
+    const estilo = { tamanho: Math.max(12, Math.round(Math.min(documento.largura, documento.altura) / 18)), ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
+    const base = textoNovo("", estilo, "paragrafo");
+    const nos = deslocarCaminhos([caminho], -retangulo.x0, -retangulo.y0)[0].nos;
+    const texto = textoMedido({
+      ...base,
+      paragrafo: { ...base.paragrafo, ...opcoesDoTexto.paragrafo },
+      caixa: { largura: Math.max(8, retangulo.x1 - retangulo.x0), altura: Math.max(8, retangulo.y1 - retangulo.y0) },
+      caminho: { tipo: "area", nos, fechado: true, inicio: 0, inverter: false },
+    });
+    setSelecao([]);
+    setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x: retangulo.x0, y: retangulo.y0 }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
+  };
+  /** O texto no caminho: onde ele começa (fração) e de que lado fica. */
+  const mudarCaminhoDoTexto = (mudanca: { inicio?: number; inverter?: boolean }) => {
+    const alvo = edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico;
+    if (!alvo?.caminho) return;
+    const novo = textoMedido({ ...alvo, caminho: { ...alvo.caminho, ...mudanca } });
+    if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: novo });
+    else if (textoEscolhido) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: novo } });
+  };
   /** Abre a edição de um texto que já existe, com o cursor no caractere do clique. */
   const editarTexto = (clipeId: string, indice: number) => {
     const clipe = projeto ? acharClipe(projeto, clipeId)?.clipe : null;
@@ -2074,7 +2111,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       void esperarFontes([novo]).then(() => executar({ comando: "imagem.textoRico", parametros: { clipeId, texto: textoMedido(novo) } }));
       return;
     }
-    setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, ...mudanca } }));
+    // A cor do próximo texto é a de primeiro plano (como nos editores de imagem)
+    const { cor, ...resto } = mudanca;
+    if (cor) setCores((atual) => ({ ...atual, primeiroPlano: cor }));
+    setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, ...resto } }));
   };
   const mudarParagrafoDoTexto = (mudanca: Partial<EstiloDoParagrafo>) => {
     if (edicaoDeTexto) {
@@ -4282,7 +4322,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               aoOrientacao={mudarOrientacaoDoTexto}
               edicao={edicaoDeTexto ? { aoConfirmar: () => terminarTexto(), aoCancelar: () => terminarTexto(true) } : null}
               aoPaineis={() => area.abrir("caractere")}
-              aoDeformar={edicaoDeTexto || textoEscolhido ? abrirDeformar : null}
+              aoDeformar={(edicaoDeTexto || textoEscolhido) && !textoDaBarra?.caminho ? abrirDeformar : null}
+              caminho={textoDaBarra?.caminho?.tipo === "linha" ? { inicio: textoDaBarra.caminho.inicio, aoInicio: (inicio) => mudarCaminhoDoTexto({ inicio }), aoInverter: () => mudarCaminhoDoTexto({ inverter: !textoDaBarra.caminho!.inverter }) } : null}
             />
           ) : ferramenta === "prancheta" ? (
             <OpcoesDaPranchetaNaBarra
@@ -4610,6 +4651,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoTerminarTraco={ferramenta === "remover" && removerAoSoltar ? () => window.setTimeout(() => void usarSelecaoRef.current("apagar"), 0) : undefined}
             preencherCercado={ferramenta === "remover" && removerCercando}
             aoClicarTexto={comecarTexto}
+            caminhosDoTexto={FERRAMENTAS_DE_TEXTO.has(ferramenta) ? caminhosEditaveis : null}
+            aoClicarNoCaminho={comecarTextoNoCaminho}
+            aoClicarNaArea={comecarTextoNaArea}
             aoEditarTexto={editarTexto}
             edicaoDeTexto={
               edicaoDeTexto
