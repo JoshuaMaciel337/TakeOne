@@ -82,3 +82,30 @@ test("a mesclagem do filtro: opacidade 0 devolve o que chegou; normal a 50% fica
   assert.deepEqual(pixel(pilha, 0, 0), [0, 0, 0, 255]);
   assert.equal(margemDaPilha([{ id: "a", tipo: "gaussiano", opcoes: { raio: 4 }, ligado: true, modo: "normal", opacidade: 1 }]), 12);
 });
+
+test("mosaico: cada quadrado do documento com a média dele", () => {
+  const img = imagem(4, 2, [0, 0, 0, 255], [[1, 0, [200, 0, 0, 255]]]);
+  const saida = aplicarFiltro(img, "mosaico", { tamanho: 2 }, ctx);
+  assert.deepEqual(pixel(saida, 0, 1), [50, 0, 0, 255]);
+  assert.deepEqual(pixel(saida, 3, 1), [0, 0, 0, 255]);
+});
+
+test("solarizar inverte só o que passa do meio", () => {
+  const img = imagem(2, 1, [60, 60, 60, 255], [[1, 0, [200, 200, 200, 255]]]);
+  const saida = aplicarFiltro(img, "solarizar", {}, ctx);
+  assert.deepEqual(pixel(saida, 0, 0), [60, 60, 60, 255]);
+  assert.deepEqual(pixel(saida, 1, 0), [55, 55, 55, 255]);
+});
+
+test("o redemoinho e a esfera não mexem fora da elipse, e o desentrelaçar copia a linha vizinha", () => {
+  const img = imagem(9, 9, [10, 20, 30, 255], [[0, 0, [250, 0, 0, 255]]]);
+  assert.deepEqual(pixel(aplicarFiltro(img, "redemoinho", { angulo: 300 }, ctx), 0, 0), [250, 0, 0, 255]);
+  assert.deepEqual(pixel(aplicarFiltro(img, "esfera", { quantidade: 100 }, ctx), 0, 0), [250, 0, 0, 255]);
+  const linhas = imagem(1, 3, [0, 0, 0, 255], [[0, 0, [90, 90, 90, 255]], [0, 2, [30, 30, 30, 255]]]);
+  assert.deepEqual(pixel(aplicarFiltro(linhas, "desentrelacar", { eliminar: "impares", criar: "interpolacao" }, ctx), 0, 1), [60, 60, 60, 255]);
+});
+
+test("encontrar bordas deixa o liso branco", () => {
+  const img = imagem(5, 5, [80, 120, 40, 255]);
+  assert.deepEqual(pixel(aplicarFiltro(img, "encontrar_bordas", {}, ctx), 2, 2), [255, 255, 255, 255]);
+});
