@@ -125,6 +125,7 @@ import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
 import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
 import { PainelComps } from "./PainelComps";
+import { PredefinicoesDeFerramenta } from "./PredefinicoesDeFerramenta";
 import { gerarAtivos } from "@/lib/exportacao/varios";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
@@ -164,6 +165,7 @@ import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServi
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { type CamadasEscolhidas, mesmaTecla, teclaDoEventoDaAcao } from "@/lib/imagem/acoes";
 import { atualizarComp, camadasQueSumiram, type CompDeCamada, novaComp } from "@/lib/imagem/comps";
+import { opcoesParaGuardar, type ParteDasOpcoes, partesDaFerramenta, type PredefinicaoDeFerramenta } from "@/lib/imagem/predefinicoesDeFerramenta";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
@@ -317,6 +319,38 @@ function comandoDaEdicao(edicao: EdicaoDeTexto, previa: Partial<EstiloDoCaracter
     : { comando: "imagem.textoRico", parametros: { clipeId: edicao.clipeId, texto } };
 }
 
+/** As opções de cada ferramenta de pintura ao abrir (o pincel e a borracha guardam tamanhos diferentes, como lá). */
+const PINCEIS_PADRAO: Record<FerramentaDePintura, OpcoesDoPincel> = {
+  pincel: PINCEL_PADRAO,
+  lapis: { ...PINCEL_PADRAO, tamanho: 4, dureza: 1, espacamento: 0.1, suavizacao: 0 },
+  borracha: { ...PINCEL_PADRAO, tamanho: 40 },
+  historico: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+  historicoArtistico: { ...PINCEL_PADRAO, tamanho: 6, dureza: 0.6, fluxo: 0.85 },
+  carimbo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+  carimboDePadrao: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
+  recuperacao: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5 },
+  recuperacaoParaManchas: { ...PINCEL_PADRAO, tamanho: 20, dureza: 0.5 },
+  desfoque: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
+  nitidez: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
+  borrar: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5, espacamento: 0.1 },
+  subexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+  superexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+  esponja: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
+  misturador: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.7, espacamento: 0.1 },
+  substituicaoDeCor: { ...PINCEL_PADRAO, tamanho: 30, dureza: 1 },
+  borrachaDeFundo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 1 },
+};
+const RETOQUES_PADRAO: Record<FerramentaDoRetoque, OpcoesDoRetoque> = {
+  desfoque: RETOQUE_PADRAO,
+  nitidez: RETOQUE_PADRAO,
+  borrar: RETOQUE_PADRAO,
+  subexposicao: RETOQUE_PADRAO,
+  superexposicao: RETOQUE_PADRAO,
+  esponja: RETOQUE_PADRAO,
+};
+const FORMA_PADRAO: OpcoesDaForma = { ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "coracao" };
+const PERSPECTIVA_PADRAO = { largura: 0, altura: 0, resolucao: 0, grade: true };
+
 export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string; modeloInicial?: string }) {
   const router = useRouter();
   const marca = useMarca();
@@ -332,7 +366,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ferramenta, setFerramenta] = useState<IdFerramentaDaImagem>("mover");
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
   const [cores, setCores] = useState<{ primeiroPlano: string; fundo: string; editando: "primeiroPlano" | "fundo" }>({ primeiroPlano: "#000000", fundo: "#ffffff", editando: "primeiroPlano" });
-  const [forma, setForma] = useState<OpcoesDaForma>({ ...OPCOES_DAS_FORMAS_PADRAO, personalizada: "coracao" });
+  const [forma, setForma] = useState<OpcoesDaForma>(FORMA_PADRAO);
   // As formas personalizadas do espaço (Editar › Definir forma personalizada) e o nome da que está sendo definida
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
@@ -363,35 +397,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
 
   // As opções de cada ferramenta de pintura (o pincel e a borracha guardam tamanhos diferentes, como lá)
-  const [pinceis, setPinceis] = useState<Record<FerramentaDePintura, OpcoesDoPincel>>({
-    pincel: PINCEL_PADRAO,
-    lapis: { ...PINCEL_PADRAO, tamanho: 4, dureza: 1, espacamento: 0.1, suavizacao: 0 },
-    borracha: { ...PINCEL_PADRAO, tamanho: 40 },
-    historico: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
-    historicoArtistico: { ...PINCEL_PADRAO, tamanho: 6, dureza: 0.6, fluxo: 0.85 },
-    carimbo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
-    carimboDePadrao: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0.5 },
-    recuperacao: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5 },
-    recuperacaoParaManchas: { ...PINCEL_PADRAO, tamanho: 20, dureza: 0.5 },
-    desfoque: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
-    nitidez: { ...PINCEL_PADRAO, tamanho: 40, dureza: 0 },
-    borrar: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.5, espacamento: 0.1 },
-    subexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
-    superexposicao: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
-    esponja: { ...PINCEL_PADRAO, tamanho: 60, dureza: 0 },
-    misturador: { ...PINCEL_PADRAO, tamanho: 30, dureza: 0.7, espacamento: 0.1 },
-    substituicaoDeCor: { ...PINCEL_PADRAO, tamanho: 30, dureza: 1 },
-    borrachaDeFundo: { ...PINCEL_PADRAO, tamanho: 40, dureza: 1 },
-  });
+  const [pinceis, setPinceis] = useState<Record<FerramentaDePintura, OpcoesDoPincel>>(PINCEIS_PADRAO);
   // O retoque com pincel: as opções de cada ferramenta e o pincel do misturador (a tinta suja passa de um traço ao outro)
-  const [opcoesDoRetoque, setOpcoesDoRetoque] = useState<Record<FerramentaDoRetoque, OpcoesDoRetoque>>({
-    desfoque: RETOQUE_PADRAO,
-    nitidez: RETOQUE_PADRAO,
-    borrar: RETOQUE_PADRAO,
-    subexposicao: RETOQUE_PADRAO,
-    superexposicao: RETOQUE_PADRAO,
-    esponja: RETOQUE_PADRAO,
-  });
+  const [opcoesDoRetoque, setOpcoesDoRetoque] = useState<Record<FerramentaDoRetoque, OpcoesDoRetoque>>(RETOQUES_PADRAO);
   const [opcoesDoMisturador, setOpcoesDoMisturador] = useState(MISTURADOR_PADRAO);
   const [opcoesDaSubstituicao, setOpcoesDaSubstituicao] = useState(SUBSTITUICAO_PADRAO);
   const [opcoesDaBorrachaDeFundo, setOpcoesDaBorrachaDeFundo] = useState<OpcoesDaSubstituicao>({ ...SUBSTITUICAO_PADRAO, tolerancia: 128 });
@@ -604,7 +612,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoCorte, setOpcoesDoCorte] = useState<OpcoesDoCorte>(CORTE_PADRAO);
   // O Corte de perspectiva: o quadrilátero e o tamanho do resultado (0 é pelos lados do quadrilátero)
   const [cortePerspectiva, setCortePerspectiva] = useState<Quadrilatero | null>(null);
-  const [opcoesDaPerspectiva, setOpcoesDaPerspectiva] = useState({ largura: 0, altura: 0, resolucao: 0, grade: true });
+  const [opcoesDaPerspectiva, setOpcoesDaPerspectiva] = useState(PERSPECTIVA_PADRAO);
   // A Régua: a última medida (fica ao trocar de ferramenta, como lá)
   const [medida, setMedida] = useState<Medida | null>(null);
   const modeloDoEndereco = useRef(false);
@@ -5264,6 +5272,81 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível criar o instantâneo.");
     }
   };
+  // ——— As predefinições de ferramenta: as opções de cada ferramenta (as partes dela), aplicar e redefinir ———
+  const predefinicoesDoEspaco = useRecursos<PredefinicaoDeFerramenta>("ferramenta");
+  const opcoesDasPartes = (id: string): Partial<Record<ParteDasOpcoes, unknown>> => ({
+    pincel: (pinceis as Record<string, OpcoesDoPincel>)[id],
+    retoque: (opcoesDoRetoque as Record<string, OpcoesDoRetoque>)[id],
+    misturador: opcoesDoMisturador,
+    substituicao: opcoesDaSubstituicao,
+    borrachaDeFundo: opcoesDaBorrachaDeFundo,
+    carimbo: opcoesDoCarimbo,
+    manchas: opcoesDasManchas,
+    selecao: opcoesDaSelecao,
+    forma,
+    caneta,
+    balde: opcoesDoBalde,
+    borrachaMagica: opcoesDaBorrachaMagica,
+    degrade: opcoesDoDegrade,
+    texto: opcoesDoTexto,
+    corte: opcoesDoCorte,
+    perspectiva: opcoesDaPerspectiva,
+  });
+  /** Põe as partes nas opções da ferramenta; o que falta (uma predefinição de antes de uma opção nova) fica no padrão. */
+  const aplicarPartes = (id: string, partes: Partial<Record<ParteDasOpcoes, unknown>>) => {
+    const com = <T,>(padrao: T, valor: unknown): T => (valor && typeof valor === "object" ? ({ ...padrao, ...(valor as object) } as T) : padrao);
+    for (const parte of partesDaFerramenta(id)) {
+      if (!(parte in partes)) continue;
+      const valor = partes[parte];
+      if (parte === "pincel") setPinceis((atual) => ({ ...atual, [id]: com((PINCEIS_PADRAO as Record<string, OpcoesDoPincel>)[id], valor) }));
+      else if (parte === "retoque") setOpcoesDoRetoque((atual) => ({ ...atual, [id]: com(RETOQUE_PADRAO, valor) }));
+      else if (parte === "misturador") setOpcoesDoMisturador(com(MISTURADOR_PADRAO, valor));
+      else if (parte === "substituicao") setOpcoesDaSubstituicao(com(SUBSTITUICAO_PADRAO, valor));
+      else if (parte === "borrachaDeFundo") setOpcoesDaBorrachaDeFundo(com({ ...SUBSTITUICAO_PADRAO, tolerancia: 128 }, valor));
+      else if (parte === "carimbo") setOpcoesDoCarimbo(com(CARIMBO_PADRAO, valor));
+      else if (parte === "manchas") setOpcoesDasManchas(com(MANCHAS_PADRAO, valor));
+      else if (parte === "selecao") setOpcoesDaSelecao(com(OPCOES_DA_SELECAO, valor));
+      else if (parte === "forma") setForma(com(FORMA_PADRAO, valor));
+      else if (parte === "caneta") setCaneta(com(CANETA_PADRAO, valor));
+      else if (parte === "balde") setOpcoesDoBalde(com(BALDE_PADRAO, valor));
+      else if (parte === "borrachaMagica") setOpcoesDaBorrachaMagica(com(BORRACHA_MAGICA_PADRAO, valor));
+      else if (parte === "degrade") setOpcoesDoDegrade(com(DEGRADE_PADRAO, valor));
+      else if (parte === "texto") setOpcoesDoTexto(com({ estilo: {}, paragrafo: {} }, valor));
+      else if (parte === "corte") setOpcoesDoCorte(com(CORTE_PADRAO, valor));
+      else if (parte === "perspectiva") setOpcoesDaPerspectiva(com(PERSPECTIVA_PADRAO, valor));
+    }
+  };
+  /** Redefinir: as partes da ferramenta voltam ao padrão (um objeto vazio em cada uma). */
+  const redefinirFerramenta = (id: string) => aplicarPartes(id, Object.fromEntries(partesDaFerramenta(id).map((parte) => [parte, {}])));
+  const conteudoDasPredefinicoes = (
+    <PredefinicoesDeFerramenta
+      ferramenta={ferramenta}
+      itens={predefinicoesDoEspaco.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, ferramenta: recurso.dados.ferramenta }))}
+      nomeDaFerramenta={(id) => (TODAS_AS_FERRAMENTAS.find((item) => item.id === id)?.nome ?? id).replace(/^Ferramenta /, "")}
+      podeGuardar={partesDaFerramenta(ferramenta).length > 0}
+      aoEscolher={(item) => {
+        const recurso = predefinicoesDoEspaco.recursos.find((r) => r.id === item.id);
+        if (!recurso) return;
+        if (recurso.dados.ferramenta !== ferramenta && TODAS_AS_FERRAMENTAS.some((f) => f.id === recurso.dados.ferramenta)) escolherFerramenta(recurso.dados.ferramenta as IdFerramentaDaImagem);
+        aplicarPartes(recurso.dados.ferramenta, recurso.dados.opcoes);
+      }}
+      aoCriar={(nome) =>
+        void criarRecurso({ tipo: "ferramenta", nome, dados: { ferramenta, opcoes: opcoesParaGuardar(ferramenta, opcoesDasPartes(ferramenta)) } })
+          .then(() => predefinicoesDoEspaco.recarregar())
+          .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível guardar a predefinição."))
+      }
+      aoExcluir={(id) =>
+        void excluirRecurso(id)
+          .then(() => predefinicoesDoEspaco.recarregar())
+          .catch((e: unknown) => mostrarAviso(e instanceof Error ? e.message : "Não foi possível excluir."))
+      }
+      aoRedefinir={() => redefinirFerramenta(ferramenta)}
+      aoRedefinirTodas={() => {
+        for (const item of TODAS_AS_FERRAMENTAS) redefinirFerramenta(item.id);
+        mostrarAviso("Todas as ferramentas voltaram às opções de fábrica.");
+      }}
+    />
+  );
   // ——— A medição (Imagem › Análise): as notas, o Registro de medições e o marcador de escala ———
   const mudarNotas = (notas: Nota[], escolhida?: string) => {
     executar({ comando: "imagem.notas", parametros: { notas } });
@@ -5548,6 +5631,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       nome: PAINEIS_DA_IMAGEM.navegador,
       conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
     },
+    predefinicoes: { nome: PAINEIS_DA_IMAGEM.predefinicoes, conteudo: conteudoDasPredefinicoes },
     comps: {
       nome: PAINEIS_DA_IMAGEM.comps,
       conteudo: (
@@ -5985,6 +6069,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
       <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
       <BarraDeOpcoes
+        predefinicoes={conteudoDasPredefinicoes}
         amostra={{ lado: ladoDaAmostra, aoMudar: setLadoDaAmostra, amostradores: amostradores.length, aoLimpar: () => setAmostradores([]) }}
         giroDaVista={giroDaVista}
         aoGirarVista={(giro) => setGiroDaVista((atual) => ({ ...atual, ...giro }))}

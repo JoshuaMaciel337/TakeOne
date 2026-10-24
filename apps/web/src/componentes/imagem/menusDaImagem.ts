@@ -30,6 +30,7 @@ export const PAINEIS_DA_IMAGEM = {
   histograma: "Histograma",
   acoes: "Ações",
   comps: "Comps de camada",
+  predefinicoes: "Predefinições de ferramenta",
   informacoes: "Informações",
   notas: "Notas",
   registro: "Registro de medições",

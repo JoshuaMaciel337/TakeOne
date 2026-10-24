@@ -1,7 +1,8 @@
 "use client";
 
 import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, Check, LoaderCircle, PenTool, SprayCan, Square, SquaresIntersect, SquaresSubtract, SquaresUnite, X } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ESTILOS_ARTISTICOS, LIMITES_DO_PINCEL, type ModoDaPintura, type OpcoesDoPincel, type Simetria, TIPOS_DE_SIMETRIA } from "@/lib/pintura/traco";
 import type { Comando } from "@/lib/projeto/comandos";
@@ -35,6 +36,8 @@ export type OpcoesDaForma = OpcoesDasFormas & { personalizada: string };
 
 type Props = {
   ferramenta: IdFerramentaDaImagem;
+  /** As predefinições de ferramenta, que abrem no ícone da ferramenta (o conteúdo do menu). */
+  predefinicoes?: React.ReactNode;
   /** A camada escolhida (um texto muda pelas opções da ferramenta Texto). */
   clipe: Clipe | null;
   aoExecutar: (comando: Comando) => void;
@@ -667,11 +670,58 @@ export function BarraDeOpcoes(props: Props) {
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-2 overflow-x-auto border-b border-borda bg-painel px-2 text-xs max-md:hidden">
-      <span className="flex items-center gap-1 pr-1" title={dados.nome}>
+      <BotaoDasPredefinicoes nome={dados.nome} conteudo={props.predefinicoes}>
         <Icone className="size-4" aria-hidden />
-      </span>
+      </BotaoDasPredefinicoes>
       {SEPARADOR}
       {opcoes}
     </div>
+  );
+}
+
+/** O ícone da ferramenta: abre as predefinições num menu por cima de tudo (a barra corta o que passa dela). */
+function BotaoDasPredefinicoes({ nome, conteudo, children }: { nome: string; conteudo?: React.ReactNode; children: React.ReactNode }) {
+  const [aberto, setAberto] = useState<{ x: number; y: number } | null>(null);
+  const caixaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const fechar = (evento: PointerEvent | KeyboardEvent) => {
+      if (evento instanceof KeyboardEvent ? evento.key === "Escape" : !caixaRef.current?.contains(evento.target as Node)) setAberto(null);
+    };
+    window.addEventListener("pointerdown", fechar);
+    window.addEventListener("keydown", fechar);
+    return () => {
+      window.removeEventListener("pointerdown", fechar);
+      window.removeEventListener("keydown", fechar);
+    };
+  }, [aberto]);
+  if (!conteudo) return <span className="flex items-center gap-1 pr-1" title={nome}>{children}</span>;
+  return (
+    <>
+      <button
+        type="button"
+        className="botao-icone h-7 w-auto gap-0.5 px-1"
+        title={`${nome}: predefinições de ferramenta`}
+        aria-label="Predefinições de ferramenta"
+        aria-expanded={Boolean(aberto)}
+        onClick={(evento) => {
+          const r = evento.currentTarget.getBoundingClientRect();
+          setAberto((atual) => (atual ? null : { x: r.left, y: r.bottom + 4 }));
+        }}
+      >
+        {children}
+        <span className="text-[9px] text-suave" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {aberto
+        ? createPortal(
+            <div ref={caixaRef} className="fixed z-50 flex h-80 w-72 flex-col rounded-md border border-borda bg-painel shadow-xl shadow-black/50" style={{ left: aberto.x, top: aberto.y }}>
+              {conteudo}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
