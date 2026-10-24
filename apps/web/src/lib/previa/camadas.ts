@@ -330,6 +330,21 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
   return camadas;
 }
 
+const CORES_SOLIDAS = new Map<string, HTMLCanvasElement>();
+/** Um quadradinho de uma cor só (o fundo de uma prancheta), guardado por cor. */
+function corSolida(cor: string): HTMLCanvasElement {
+  let canvas = CORES_SOLIDAS.get(cor);
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 4;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = cor;
+    ctx.fillRect(0, 0, 4, 4);
+    CORES_SOLIDAS.set(cor, canvas);
+  }
+  return canvas;
+}
+
 /**
  * As camadas prontas para o compositor (por faixa) na ordem da árvore do projeto de imagem, de baixo para cima: as
  * pastas viram camadas com as de dentro (`pasta`) e as recortadas ficam presas à base delas (`recortadas`). As que
@@ -341,7 +356,24 @@ export function camadasEmArvore(projeto: Projeto, prontas: ReadonlyMap<string, C
     [...nos].reverse().flatMap((no): Camada[] => {
       if (no.faixa.oculta) return [];
       let camada: Camada | undefined;
-      if (no.clipe.pasta) {
+      if (no.clipe.pasta && no.clipe.prancheta) {
+        // A prancheta: o fundo dela embaixo das de dentro, e tudo recortado no retângulo dela
+        const prancheta = no.clipe.prancheta;
+        const documento = projeto.tamanho ?? quadro;
+        const largura = (prancheta.largura / documento.largura) * quadro.largura;
+        const altura = (prancheta.altura / documento.altura) * quadro.altura;
+        const cx = (0.5 + no.clipe.transformacao.x) * quadro.largura;
+        const cy = (0.5 + no.clipe.transformacao.y) * quadro.altura;
+        const fundo: Camada[] = prancheta.fundo.transparente ? [] : [{ fonte: corSolida(prancheta.fundo.cor), recorte: { x: 0, y: 0, largura: 1, altura: 1 }, caixa: { cx, cy, largura, altura, rotacao: 0, opacidade: 1 } }];
+        camada = {
+          fonte: FUNDO,
+          recorte: { x: 0, y: 0, largura: 1, altura: 1 },
+          caixa: caixaDoQuadro(no.clipe.transformacao.opacidade),
+          mesclagem: no.clipe.mesclagem ?? "normal",
+          mascaraDeForma: { forma: "retangulo", x: cx / quadro.largura, y: cy / quadro.altura, largura: largura / quadro.largura, altura: altura / quadro.altura, suavidade: 0, inverter: false },
+          pasta: { filhos: [...fundo, ...montar(no.filhos)], passagem: false },
+        };
+      } else if (no.clipe.pasta) {
         const mesclagem = mesclagemDaPasta(no.clipe);
         camada = {
           fonte: FUNDO,

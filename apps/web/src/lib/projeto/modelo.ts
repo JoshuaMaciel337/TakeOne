@@ -76,6 +76,9 @@ export type MascaraDeForma = {
   pontos?: [number, number][] | null;
 };
 export const PONTOS_MAXIMOS_DO_DESENHO = 32;
+
+/** Uma prancheta do editor de imagem: o tamanho (pixels do documento) e o fundo. */
+export type Prancheta = { largura: number; altura: number; fundo: { cor: string; transparente: boolean } };
 export const MASCARA_PADRAO: MascaraDeForma = { forma: "elipse", x: 0.5, y: 0.5, largura: 0.7, altura: 0.7, suavidade: 0.08, inverter: false };
 export const LIMITES_DA_MASCARA = { centro: { minimo: -0.5, maximo: 1.5 }, tamanho: { minimo: 0.02, maximo: 2 }, suavidade: { minimo: 0, maximo: 0.5 } } as const;
 
@@ -276,6 +279,11 @@ export type Clipe = {
   pixels?: { versao: number };
   /** Só no projeto de imagem: a máscara de camada pintável (lib/projeto/mascaraDePixels.ts). */
   mascara_pixels?: MascaraDePixels | null;
+  /**
+   * Só no projeto de imagem, numa pasta: a prancheta (o tamanho em pixels do documento e o fundo dela). O meio é o da
+   * transformação do clipe, então mover a prancheta é mover a pasta; o que está dentro aparece só no retângulo dela.
+   */
+  prancheta?: Prancheta | null;
   /** Só no projeto de imagem: a máscara vetorial (lib/vetor/mascaraVetorial.ts), ao lado da de pixels. */
   mascara_vetorial?: MascaraVetorial | null;
   /** Só no projeto de imagem: a camada vetorial (forma viva ou caminho, lib/vetor/modelo.ts), sem mídia nem texto. */

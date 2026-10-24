@@ -30,7 +30,8 @@ export type Unidade = { faixaId: string; clipeIds: string[] };
 
 /** Os clipes que desenham algo (sem a pasta) da faixa e das de dentro dela. */
 function clipesQueAndam(projeto: Projeto, faixaId: string): string[] {
-  return comDescendentes(projeto, faixaId).flatMap((faixa) => (faixa.clipes[0] && !faixa.clipes[0].pasta ? [faixa.clipes[0].id] : []));
+  // A prancheta anda junto: o meio dela é a transformação da pasta
+  return comDescendentes(projeto, faixaId).flatMap((faixa) => (faixa.clipes[0] && (!faixa.clipes[0].pasta || faixa.clipes[0].prancheta) ? [faixa.clipes[0].id] : []));
 }
 
 /** As unidades da seleção (clipes das camadas): uma camada dentro de uma pasta também escolhida anda com a pasta. */

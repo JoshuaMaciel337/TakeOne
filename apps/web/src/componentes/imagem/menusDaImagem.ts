@@ -150,6 +150,11 @@ export type AcoesDosMenus = {
   novo: () => void;
   abrir: () => void;
   exportar: () => void;
+  /** As pranchetas: Camada › Novo › Prancheta (nova, a partir do grupo escolhido ou das camadas escolhidas) e a exportação. */
+  temPranchetas: boolean;
+  grupoEscolhido: boolean;
+  prancheta: (como: "nova" | "grupo" | "camadas") => void;
+  exportarPranchetas: () => void;
   salvar: () => void;
   desfazer: () => void;
   refazer: () => void;
@@ -251,7 +256,13 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Salvar", atalho: "Ctrl+S", aoEscolher: a.salvar, titulo: "O TakeOne salva sozinho a cada mudança" },
         "-",
-        { nome: "Exportar", itens: [{ nome: "Exportar como…", atalho: "Ctrl+Alt+Shift+W", aoEscolher: a.exportar }] },
+        {
+          nome: "Exportar",
+          itens: [
+            { nome: "Exportar como…", atalho: "Ctrl+Alt+Shift+W", aoEscolher: a.exportar },
+            { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas },
+          ],
+        },
       ],
     },
     {
@@ -362,6 +373,10 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             "-",
             { nome: "Grupo", aoEscolher: a.grupo },
             { nome: "Grupo a partir das camadas…", desativado: semCamada, aoEscolher: a.agrupar },
+            "-",
+            { nome: "Prancheta", aoEscolher: () => a.prancheta("nova") },
+            { nome: "Prancheta a partir de grupo", desativado: !a.grupoEscolhido, aoEscolher: () => a.prancheta("grupo") },
+            { nome: "Prancheta a partir de camadas", desativado: semCamada, aoEscolher: () => a.prancheta("camadas") },
             "-",
             { nome: "Camada via cópia", atalho: "Ctrl+J", desativado: semCamada, aoEscolher: () => a.camadaVia(false) },
             { nome: "Camada via recorte", atalho: "Ctrl+Shift+J", desativado: semCamada || !a.temSelecaoDoDocumento, aoEscolher: () => a.camadaVia(true) },

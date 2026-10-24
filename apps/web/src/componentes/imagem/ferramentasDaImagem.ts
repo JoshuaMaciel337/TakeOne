@@ -59,6 +59,7 @@ import {
   MousePointer2,
   MousePointer,
   Frame,
+  LayoutTemplate,
 } from "lucide-react";
 
 import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
@@ -78,6 +79,7 @@ export type IdFerramentaDaImagem =
   | "superexposicao"
   | "esponja"
   | "mover"
+  | "prancheta"
   | "letreiro"
   | "letreiroEliptico"
   | "linhaUnica"
@@ -136,7 +138,10 @@ const F = (id: IdFerramentaDaImagem, nome: string, tecla: string, icone: LucideI
 
 /** Os grupos da caixa de ferramentas, de cima para baixo. */
 export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
-  [F("mover", "Ferramenta Mover", "V", Move, "Clique para escolher a camada; arraste para mover, as alças mudam o tamanho e o giro.")],
+  [
+    F("mover", "Ferramenta Mover", "V", Move, "Clique para escolher a camada; arraste para mover, as alças mudam o tamanho e o giro."),
+    F("prancheta", "Ferramenta Prancheta", "V", LayoutTemplate, "Arraste no vazio para pôr uma prancheta; clique numa para escolher e arraste para movê-la com o que está nela."),
+  ],
   [
     F("letreiro", "Ferramenta Letreiro retangular", "M", SquareDashed, "Arraste para selecionar um retângulo. Shift soma, Alt subtrai; no arrasto, Shift faz um quadrado e Alt parte do centro."),
     F("letreiroEliptico", "Ferramenta Letreiro elíptico", "M", CircleDashed, "Arraste para selecionar uma elipse. Shift soma, Alt subtrai; no arrasto, Shift faz um círculo e Alt parte do centro."),

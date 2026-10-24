@@ -499,6 +499,77 @@ export function OpcoesDaCanetaNaBarra({
   );
 }
 
+/** Os tamanhos prontos das pranchetas (os do editor de imagem e telas comuns). */
+export const TAMANHOS_DE_PRANCHETA: { nome: string; largura: number; altura: number }[] = [
+  { nome: "Post quadrado", largura: 1080, altura: 1080 },
+  { nome: "Post retrato", largura: 1080, altura: 1350 },
+  { nome: "Story e status", largura: 1080, altura: 1920 },
+  { nome: "Capa de vídeo", largura: 1280, altura: 720 },
+  { nome: "Banner largo", largura: 1500, altura: 500 },
+  { nome: "Slide", largura: 1920, altura: 1080 },
+  { nome: "Celular", largura: 1170, altura: 2532 },
+  { nome: "Tablet", largura: 1640, altura: 2360 },
+  { nome: "Computador", largura: 1440, altura: 1024 },
+  { nome: "Ícone", largura: 1024, altura: 1024 },
+  { nome: "Folha A4", largura: 2480, altura: 3508 },
+  { nome: "Cartão de visita", largura: 1050, altura: 600 },
+];
+
+/** A barra da ferramenta Prancheta: o tamanho pronto, a largura e a altura, retrato ou paisagem e o fundo. */
+export function OpcoesDaPranchetaNaBarra({
+  prancheta,
+  tamanho,
+  aoMudarTamanho,
+  aoMudarPrancheta,
+  aoNova,
+}: {
+  /** A prancheta escolhida (a barra muda ela); sem ela, o tamanho da próxima. */
+  prancheta: { largura: number; altura: number; fundo: { cor: string; transparente: boolean } } | null;
+  tamanho: { largura: number; altura: number };
+  aoMudarTamanho: (tamanho: { largura: number; altura: number }) => void;
+  aoMudarPrancheta: (mudanca: Partial<{ largura: number; altura: number; fundo: { cor: string; transparente: boolean } }>) => void;
+  aoNova: () => void;
+}) {
+  const atual = prancheta ?? tamanho;
+  const mudar = (novo: { largura: number; altura: number }) => (prancheta ? aoMudarPrancheta(novo) : aoMudarTamanho(novo));
+  const pronto = TAMANHOS_DE_PRANCHETA.findIndex((item) => item.largura === Math.round(atual.largura) && item.altura === Math.round(atual.altura));
+  return (
+    <>
+      <span className="text-suave">{prancheta ? "Prancheta escolhida:" : "Próxima prancheta:"}</span>
+      <select className={campo} value={pronto} onChange={(evento) => Number(evento.currentTarget.value) >= 0 && mudar(TAMANHOS_DE_PRANCHETA[Number(evento.currentTarget.value)])} aria-label="Tamanho pronto da prancheta">
+        <option value={-1}>Tamanho próprio</option>
+        {TAMANHOS_DE_PRANCHETA.map((item, i) => (
+          <option key={item.nome} value={i}>
+            {item.nome} ({item.largura} × {item.altura})
+          </option>
+        ))}
+      </select>
+      <NumeroDaForma rotulo="L" valor={Math.round(atual.largura)} minimo={1} maximo={8192} sufixo="px" aoMudar={(largura) => mudar({ largura: Math.round(largura), altura: atual.altura })} largura="w-14" />
+      <NumeroDaForma rotulo="A" valor={Math.round(atual.altura)} minimo={1} maximo={8192} sufixo="px" aoMudar={(altura) => mudar({ largura: atual.largura, altura: Math.round(altura) })} largura="w-14" />
+      <button type="button" className={`${campo} hover:text-texto`} title={atual.largura >= atual.altura ? "Virar para retrato" : "Virar para paisagem"} onClick={() => mudar({ largura: atual.altura, altura: atual.largura })}>
+        {atual.largura >= atual.altura ? "Paisagem" : "Retrato"}
+      </button>
+      {prancheta ? (
+        <>
+          {SEPARADOR}
+          <label className="flex items-center gap-1 text-suave">
+            Fundo:
+            <input type="color" value={prancheta.fundo.cor} disabled={prancheta.fundo.transparente} onChange={(evento) => aoMudarPrancheta({ fundo: { ...prancheta.fundo, cor: evento.currentTarget.value } })} className="h-5 w-8 cursor-pointer rounded border border-borda" aria-label="Cor do fundo da prancheta" />
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={prancheta.fundo.transparente} onChange={(evento) => aoMudarPrancheta({ fundo: { ...prancheta.fundo, transparente: evento.currentTarget.checked } })} />
+            Transparente
+          </label>
+        </>
+      ) : null}
+      {SEPARADOR}
+      <button type="button" className={`${campo} hover:text-texto`} onClick={aoNova} title="Uma prancheta nova à direita das outras">
+        + Prancheta
+      </button>
+    </>
+  );
+}
+
 /** O "Traçar caminho": a ferramenta de pintura (com as opções dela) e a pressão simulada. */
 export function JanelaTracarCaminho({ aoFechar, aoConfirmar }: { aoFechar: () => void; aoConfirmar: (ferramenta: FerramentaDoTracado, simular: boolean) => void }) {
   const [ferramenta, setFerramenta] = useState<FerramentaDoTracado>("pincel");

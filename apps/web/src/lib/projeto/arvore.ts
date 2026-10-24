@@ -122,6 +122,8 @@ export function problemaNaArvore(projeto: Projeto): string | null {
     }
     if (clipe?.pasta && (faixa.tipo !== "video" || clipe.midia_id || clipe.texto || clipe.ajuste)) return "A pasta fica numa faixa de sobreposição, sem mídia nem texto.";
     if (clipe?.mesclagem === "passagem" && !clipe.pasta) return "Só uma pasta usa a mesclagem Passagem.";
+    // A prancheta é uma pasta da raiz (não fica dentro de outra pasta nem de outra prancheta)
+    if (clipe?.prancheta && (!clipe.pasta || faixa.pai)) return "A prancheta é um grupo da raiz, fora das outras pastas.";
     if (faixa.fundo) {
       // O fundo é de pixels, fica na raiz e embaixo de todas as camadas
       const daRaiz = projeto.faixas.filter((item) => item.tipo !== "principal" && item.clipes.length && !item.pai);

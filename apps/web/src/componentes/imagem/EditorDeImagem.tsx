@@ -97,6 +97,9 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
 import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
+import { JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
+import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
 import { type AcaoDaMascaraVetorial, PropriedadesDaMascaraVetorial } from "./PropriedadesDaMascaraVetorial";
 import { inverterMascaraVetorial, novaMascaraVetorial, vincularMascaraVetorial, caminhosDaMascaraNoDocumento } from "@/lib/vetor/mascaraVetorial";
 import { canvasDaMascaraVetorial } from "@/lib/previa/mascaraCombinada";
@@ -106,7 +109,7 @@ import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/li
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
 import { camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
 import { caminhosDoVetorNaImagem } from "@/lib/projeto/imagem";
-import { caixaDoClipe } from "@/lib/projeto/geometria";
+import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
@@ -230,6 +233,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
   const [nomeDaForma, setNomeDaForma] = useState(false);
+  // As pranchetas: o tamanho da próxima (a barra da ferramenta Prancheta) e a janela de exportar
+  const [tamanhoDaPrancheta, setTamanhoDaPrancheta] = useState({ largura: 1080, altura: 1080 });
+  const [exportandoPranchetas, setExportandoPranchetas] = useState(false);
   // A ferramenta Quadro: retangular ou elíptico
   const [formaDoQuadro, setFormaDoQuadro] = useState<"retangulo" | "elipse">("retangulo");
   // O clique sem arrastar de uma ferramenta de forma: a janela com as medidas
@@ -2003,6 +2009,48 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const { caminhos, id } = porNoCaminho(atual.caminhos ?? [], caminhoEscolhido, sub, () => crypto.randomUUID().slice(0, 12));
     if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) setCaminhoEscolhido(id);
   };
+  /** O retângulo (pixels do documento) do que as camadas ocupam, pelas caixas medidas na prévia. */
+  const retanguloDasCamadas = (clipeIds: string[]): RetanguloDaImagem | null => {
+    const atual = projetoRef.current;
+    if (!atual) return null;
+    const documento = tamanhoDaImagem(atual);
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const id of clipeIds) {
+      const medida = caixasRef.current.get(id);
+      if (!medida?.bruta || !medida.quadro) continue;
+      const fator = documento.largura / medida.quadro.largura;
+      for (const canto of cantosDaCaixa(medida.bruta)) {
+        x0 = Math.min(x0, canto.x * fator);
+        y0 = Math.min(y0, canto.y * fator);
+        x1 = Math.max(x1, canto.x * fator);
+        y1 = Math.max(y1, canto.y * fator);
+      }
+    }
+    return x1 > x0 ? { x: Math.floor(x0), y: Math.floor(y0), largura: Math.ceil(x1 - x0), altura: Math.ceil(y1 - y0) } : null;
+  };
+  /** Camada › Novo › Prancheta: uma nova (à direita das que já existem), a partir do grupo ou das camadas escolhidas. */
+  const novaPrancheta = (como: "nova" | "grupo" | "camadas", retangulo?: RetanguloDaImagem) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const existentes = pranchetasDoProjeto(atual);
+    const nome = `Prancheta ${existentes.length + 1}`;
+    const fundo = { cor: "#ffffff", transparente: false };
+    if (como === "nova") {
+      // À direita da última prancheta (ou da tela, se ainda não há nenhuma), 100 px depois
+      const direita = existentes.length ? Math.max(...existentes.map((item) => item.retangulo.x + item.retangulo.largura)) + 100 : 0;
+      const lugar = retangulo ?? { x: direita, y: existentes.length ? Math.min(...existentes.map((item) => item.retangulo.y)) : 0, ...tamanhoDaPrancheta };
+      executar({ comando: "imagem.adicionarPrancheta", parametros: { retangulo: lugar, nome, fundo, tamanhos: tamanhosDasMidias() } });
+      return;
+    }
+    const faixas = como === "grupo" ? escolhidas.slice(0, 1) : escolhidas;
+    const ids = faixas.flatMap((faixa) => comDescendentes(atual, faixa.id).flatMap((item) => (item.clipes[0] ? [item.clipes[0].id] : [])));
+    const lugar = retanguloDasCamadas(ids) ?? { x: 0, y: 0, ...tamanhoDaImagem(atual) };
+    if (como === "grupo") executar({ comando: "imagem.pranchetaDoGrupo", parametros: { faixaId: faixas[0].id, retangulo: lugar, fundo, tamanhos: tamanhosDasMidias() } });
+    else executar({ comando: "imagem.pranchetaDeCamadas", parametros: { faixaIds: faixas.map((faixa) => faixa.id), retangulo: lugar, nome, fundo, tamanhos: tamanhosDasMidias() } });
+  };
   /** A foto no quadro: cobrindo, sem zoom, no meio (as propriedades mudam depois). */
   const porFotoNoQuadro = (clipeId: string, midiaId: string) => {
     const clipe = projetoRef.current ? acharClipe(projetoRef.current, clipeId)?.clipe : null;
@@ -3163,6 +3211,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     novo: () => router.push("/app/ferramentas/editor-de-imagem"),
     abrir: () => router.push("/app/ferramentas/editor-de-imagem"),
     exportar: () => setExportando(true),
+    temPranchetas: Boolean(projeto?.faixas.some((faixa) => faixa.clipes[0]?.prancheta)),
+    grupoEscolhido: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0]?.pasta) && !escolhidas[0].clipes[0]?.prancheta,
+    prancheta: (como) => novaPrancheta(como),
+    exportarPranchetas: () => setExportandoPranchetas(true),
     salvar: () => mostrarAviso(edicao.salvamento === "salvo" ? "Tudo salvo: o TakeOne salva a cada mudança." : "Salvando: o TakeOne salva a cada mudança."),
     desfazer: () =>
       depoisDaPintura(() => {
@@ -3811,7 +3863,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "quadro" ? (
+          ferramenta === "prancheta" ? (
+            <OpcoesDaPranchetaNaBarra
+              prancheta={escolhidoNaTela?.clipe.prancheta ?? null}
+              tamanho={tamanhoDaPrancheta}
+              aoMudarTamanho={setTamanhoDaPrancheta}
+              aoMudarPrancheta={(mudanca) => escolhidoNaTela?.clipe.prancheta && executar({ comando: "imagem.prancheta", parametros: { clipeId: escolhidoNaTela.clipe.id, mudanca, tamanhos: tamanhosDasMidias() } })}
+              aoNova={() => novaPrancheta("nova")}
+            />
+          ) : ferramenta === "quadro" ? (
             <>
               <span className="text-suave">Quadro:</span>
               <span className="flex items-center gap-0.5" role="group" aria-label="Forma do quadro">
@@ -4143,6 +4203,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                   }
                 : null
             }
+            pranchetas={{ ativa: ferramenta === "prancheta", aoCriar: (retangulo) => novaPrancheta("nova", retangulo) }}
             caminhoDoArrasto={(arrasto) => {
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
               if (viva) return formaDoArrasto(viva, arrasto).naImagem;
@@ -4184,6 +4245,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               },
             });
           }}
+        />
+      ) : null}
+      {exportandoPranchetas && projeto ? (
+        <JanelaExportarPranchetas
+          quantas={pranchetasDoProjeto(projeto).length}
+          midias={midias}
+          aoPreparar={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
+          fonteDosPixels={pinturas.fonte}
+          fonteDaMascara={pinturas.fonteDaMascara}
+          aoFechar={() => setExportandoPranchetas(false)}
+          aoAvisar={mostrarAviso}
         />
       ) : null}
       {exportando ? (

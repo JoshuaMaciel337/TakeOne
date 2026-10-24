@@ -195,7 +195,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Máscara vetorial (revelar tudo, ocultar tudo, caminho atual, ativar, vincular, excluir)
 - [x] Converter a seleção em forma (o texto em forma e em caminho de trabalho vai com o texto desenhado no navegador, na 13.8)
 - [x] Quadro (K): lugar retangular ou elíptico que recorta a foto posta dentro
-- [ ] Prancheta (V): várias pranchetas num documento, tamanhos prontos, retrato e paisagem, prancheta a partir de grupo e de camadas, exportar cada uma
+- [x] Prancheta (V): várias pranchetas num documento, tamanhos prontos, retrato e paisagem, prancheta a partir de grupo e de camadas, exportar cada uma
 
 ### Onda 13.8 — Texto
 

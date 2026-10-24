@@ -21,6 +21,9 @@ import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { caminhosDaMascaraNoDocumento, caminhosNoEspacoDaMascara } from "@/lib/vetor/mascaraVetorial";
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
+import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
+import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
+import type { RetanguloDaImagem } from "@/lib/projeto/imagem";
 import { CaminhosNaPrevia, type FerramentaDeCaminho, type OpcoesDosCaminhos } from "./CaminhosNaPrevia";
 import type { Subcaminho } from "@/lib/vetor/modelo";
 import type { MapaDeBordas } from "@/lib/selecao/magnetico";
@@ -109,6 +112,8 @@ type Props = {
      */
     mascaraDe?: string | null;
   } | null;
+  /** As pranchetas: o nome em cima de cada uma e, com a ferramenta Prancheta, criar, escolher e mover. */
+  pranchetas?: { ativa: boolean; aoCriar: (retangulo: RetanguloDaImagem) => void } | null;
   /** O contorno da forma que está sendo arrastada, em pixels da imagem (sem ele, um retângulo tracejado). */
   caminhoDoArrasto?: (arrasto: ArrastoDaForma) => Subcaminho[] | null;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
@@ -236,6 +241,7 @@ export function PreviaDaImagem({
   aoClicarTexto,
   aoDesenharForma,
   caminhos = null,
+  pranchetas = null,
   caminhoDoArrasto,
   aoPegarCor,
   pintura = null,
@@ -769,6 +775,18 @@ export function PreviaDaImagem({
                 simetria={pintura.simetria}
                 emCinza={pintura.emCinza}
                 selecao={veu ? null : selecaoDoDocumento?.selecao}
+              />
+            ) : null}
+            {pranchetas && !transformacao && !recorte && tamanho.largura > 1 ? (
+              <PranchetasNaPrevia
+                pranchetas={pranchetasDoProjeto(projeto).map((item) => ({ ...item, escolhida: selecao.includes(item.clipeId) }))}
+                escala={escala}
+                ativa={pranchetas.ativa && !maoAtiva}
+                quadro={tamanho}
+                aoEscolher={(clipeId) => aoSelecionar([clipeId])}
+                aoCriar={pranchetas.aoCriar}
+                aoPreverDeslocamento={aoPreverDeslocamento}
+                aoDeslocar={aoDeslocar}
               />
             ) : null}
             {caminhos && !maoAtiva && !transformacao && !recorte && tamanho.largura > 1

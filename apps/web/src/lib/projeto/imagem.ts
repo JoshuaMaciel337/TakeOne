@@ -7,7 +7,7 @@ import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
-import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
+import { type Clipe, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
@@ -844,6 +844,75 @@ export function tamanhoComPixels(projeto: Projeto, tamanho: TamanhoDaImagem, pix
 export function tamanhoDaTela(projeto: Projeto, retangulo: RetanguloDaImagem, tamanhos: Record<string, Tamanho>, fundo: { cor: string; transparente: boolean } | null): Projeto {
   const recortado = recortarImagem(projeto, retangulo, tamanhos);
   return fundo ? { ...recortado, fundo: { ...recortado.fundo, cor: fundo.cor, transparente: fundo.transparente } } : recortado;
+}
+
+/** O retângulo da prancheta (pixels do documento). */
+export function retanguloDaPrancheta(clipe: Clipe, quadro: Tamanho): RetanguloDaImagem | null {
+  if (!clipe.prancheta) return null;
+  const cx = (0.5 + clipe.transformacao.x) * quadro.largura;
+  const cy = (0.5 + clipe.transformacao.y) * quadro.altura;
+  return { x: cx - clipe.prancheta.largura / 2, y: cy - clipe.prancheta.altura / 2, largura: clipe.prancheta.largura, altura: clipe.prancheta.altura };
+}
+
+/** A tela cresce até caber o retângulo (pixels do documento de agora), sem mexer em nada; devolve o deslocamento. */
+function comTelaQueCabe(projeto: Projeto, retangulo: RetanguloDaImagem, tamanhos: Record<string, Tamanho>): { projeto: Projeto; dx: number; dy: number } {
+  const q = tamanhoDaImagem(projeto);
+  const x0 = Math.min(0, Math.floor(retangulo.x));
+  const y0 = Math.min(0, Math.floor(retangulo.y));
+  const x1 = Math.max(q.largura, Math.ceil(retangulo.x + retangulo.largura));
+  const y1 = Math.max(q.altura, Math.ceil(retangulo.y + retangulo.altura));
+  if (x0 === 0 && y0 === 0 && x1 === q.largura && y1 === q.altura) return { projeto, dx: 0, dy: 0 };
+  const problema = problemaNoTamanho({ largura: x1 - x0, altura: y1 - y0 });
+  if (problema) throw new ErroEdicao(`A tela precisaria crescer para caber a prancheta. ${problema}`);
+  return { projeto: recortarImagem(projeto, { x: x0, y: y0, largura: x1 - x0, altura: y1 - y0 }, tamanhos), dx: -x0, dy: -y0 };
+}
+
+/** A transformação que põe o meio da prancheta no meio do retângulo. */
+const meioDoRetangulo = (retangulo: RetanguloDaImagem, quadro: Tamanho) => ({ x: (retangulo.x + retangulo.largura / 2) / quadro.largura - 0.5, y: (retangulo.y + retangulo.altura / 2) / quadro.altura - 0.5 });
+
+/**
+ * Uma prancheta nova no retângulo (pixels do documento de agora), por cima de tudo, na raiz: a tela cresce até caber, e
+ * a primeira prancheta deixa o fundo do documento transparente (o que fica fora das pranchetas é a mesa).
+ */
+export function adicionarPrancheta(projeto: Projeto, ctx: Contexto, retangulo: RetanguloDaImagem, nome: string, fundo: Prancheta["fundo"], tamanhos: Record<string, Tamanho>): { projeto: Projeto; clipeId: string } {
+  if (retangulo.largura < 1 || retangulo.altura < 1) throw new ErroEdicao("A prancheta precisa ter tamanho.");
+  const { projeto: maior, dx, dy } = comTelaQueCabe(projeto, retangulo, tamanhos);
+  const quadro = tamanhoDaImagem(maior);
+  const lugar = { ...retangulo, x: retangulo.x + dx, y: retangulo.y + dy };
+  // A prancheta isola o que está dentro (recorta no retângulo): a mesclagem é a normal, nunca a passagem
+  const clipe = clipeDaCamada(ctx.novoId(), { pasta: true, mesclagem: "normal", prancheta: { largura: Math.round(retangulo.largura), altura: Math.round(retangulo.altura), fundo }, transformacao: { ...TRANSFORMACAO_PADRAO, ...meioDoRetangulo(lugar, quadro) } });
+  const faixa: Faixa = { ...faixaNova(ctx, "video", clipe), nome, aberta: true };
+  const primeira = !projeto.faixas.some((item) => item.clipes[0]?.prancheta);
+  return { projeto: { ...maior, faixas: [faixa, ...maior.faixas], ...(primeira ? { fundo: { ...maior.fundo, transparente: true } } : {}) }, clipeId: clipe.id };
+}
+
+/** Muda o tamanho ou o fundo da prancheta: o canto de cima à esquerda fica, e a tela cresce se precisar. */
+export function mudarPrancheta(projeto: Projeto, clipeId: string, mudanca: Partial<Prancheta>, tamanhos: Record<string, Tamanho>): Projeto {
+  const clipe = projeto.faixas.flatMap((faixa) => faixa.clipes).find((item) => item.id === clipeId);
+  if (!clipe?.prancheta) throw new ErroEdicao("Esta camada não é uma prancheta.");
+  const antes = retanguloDaPrancheta(clipe, tamanhoDaImagem(projeto))!;
+  const prancheta = { ...clipe.prancheta, ...mudanca };
+  const novo = { x: antes.x, y: antes.y, largura: Math.max(1, Math.round(prancheta.largura)), altura: Math.max(1, Math.round(prancheta.altura)) };
+  const { projeto: maior, dx, dy } = comTelaQueCabe(projeto, novo, tamanhos);
+  const quadro = tamanhoDaImagem(maior);
+  return mudarClipeDaCamada(maior, clipeId, (atual) => ({ ...atual, prancheta: { ...prancheta, largura: novo.largura, altura: novo.altura }, transformacao: { ...atual.transformacao, ...meioDoRetangulo({ ...novo, x: novo.x + dx, y: novo.y + dy }, quadro) } }));
+}
+
+/** Prancheta a partir de grupo: a pasta vira prancheta no retângulo (o que está dentro dela, medido na prévia). */
+export function pranchetaDoGrupo(projeto: Projeto, faixaId: string, retangulo: RetanguloDaImagem, fundo: Prancheta["fundo"], tamanhos: Record<string, Tamanho>): Projeto {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  const pasta = faixa?.clipes[0];
+  if (!pasta?.pasta) throw new ErroEdicao("Escolha um grupo para virar prancheta.");
+  if (pasta.prancheta) throw new ErroEdicao("O grupo já é uma prancheta.");
+  const { projeto: maior, dx, dy } = comTelaQueCabe(projeto, retangulo, tamanhos);
+  const quadro = tamanhoDaImagem(maior);
+  const lugar = { ...retangulo, x: retangulo.x + dx, y: retangulo.y + dy };
+  const primeira = !projeto.faixas.some((item) => item.clipes[0]?.prancheta);
+  const comPrancheta = mudarClipeDaCamada(maior, pasta.id, (atual) => {
+    // A prancheta recorta o que está dentro: a passagem (que não isola a pasta) não serve
+    return { ...atual, mesclagem: atual.mesclagem && atual.mesclagem !== "passagem" ? atual.mesclagem : "normal", prancheta: { largura: Math.round(retangulo.largura), altura: Math.round(retangulo.altura), fundo }, transformacao: { ...atual.transformacao, ...meioDoRetangulo(lugar, quadro) } };
+  });
+  return primeira ? { ...comPrancheta, fundo: { ...comPrancheta.fundo, transparente: true } } : comPrancheta;
 }
 
 export type GiroDaImagem = "180" | "90" | "-90" | "virarH" | "virarV" | { graus: number };

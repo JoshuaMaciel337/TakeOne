@@ -1,6 +1,6 @@
 "use client";
 
-import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, SquarePlus, Trash2, Type } from "lucide-react";
+import { Brush, ChevronDown, ChevronRight, Copy, CornerLeftDown, Eye, Folder, FolderOpen, FolderPlus, Grid2x2, LayoutTemplate, Link2, Lock, Move, Search, Shapes, SlidersHorizontal, SquareDashed, SquarePlus, Trash2, Type } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 import { arquivoDaMidia } from "@/lib/api";
@@ -624,7 +624,9 @@ export function PainelCamadas({
                       aoSelecionarDaCamada(clipe.id, modoDoCtrl(evento), "camada");
                     }}
                   >
-                    {clipe.pasta ? (
+                    {clipe.prancheta ? (
+                      <LayoutTemplate className="size-3.5 text-suave" aria-label="Prancheta" />
+                    ) : clipe.pasta ? (
                       aberta(faixa) ? (
                         <FolderOpen className="size-3.5 text-suave" aria-hidden />
                       ) : (

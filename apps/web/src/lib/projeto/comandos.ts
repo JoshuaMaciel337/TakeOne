@@ -143,6 +143,9 @@ import {
   mudarVetor,
   trocarCaminhosDoVetor,
   definirMascaraVetorial,
+  adicionarPrancheta,
+  mudarPrancheta,
+  pranchetaDoGrupo,
 } from "./imagem.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
@@ -160,7 +163,7 @@ import type { Tamanho } from "./geometria.ts";
 import type { CaminhoDoSeguidor } from "./seguirObjeto.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
-import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem } from "./modelo.ts";
+import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Prancheta } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Canal, Clipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
@@ -249,6 +252,10 @@ export type Comando =
   | { comando: "imagem.caminhosDoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[] } }
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
+  | { comando: "imagem.adicionarPrancheta"; parametros: { retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
+  | { comando: "imagem.prancheta"; parametros: { clipeId: string; mudanca: Partial<Prancheta>; tamanhos: Record<string, Tamanho> } }
+  | { comando: "imagem.pranchetaDoGrupo"; parametros: { faixaId: string; retangulo: RetanguloDaImagem; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
+  | { comando: "imagem.pranchetaDeCamadas"; parametros: { faixaIds: string[]; retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.tamanhoComPixels"; parametros: { tamanho: TamanhoDaImagem; pixels: TrocaDePixels[]; canais: TrocaDePixels[] } }
   | { comando: "imagem.tamanhoDaTela"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho>; fundo: { cor: string; transparente: boolean } | null } }
   | { comando: "imagem.girar"; parametros: { giro: GiroDaImagem; tamanhos: Record<string, Tamanho> } }
@@ -377,6 +384,10 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.caminhosDoVetor": "editar o caminho da forma",
   "imagem.caminhos": "mudar os caminhos",
   "imagem.mascaraVetorial": "mudar a máscara vetorial",
+  "imagem.adicionarPrancheta": "pôr a prancheta",
+  "imagem.prancheta": "mudar a prancheta",
+  "imagem.pranchetaDoGrupo": "prancheta a partir do grupo",
+  "imagem.pranchetaDeCamadas": "prancheta a partir das camadas",
   "imagem.tamanhoComPixels": "mudar o tamanho da imagem",
   "imagem.tamanhoDaTela": "mudar o tamanho da tela",
   "imagem.girar": "girar a imagem",
@@ -656,6 +667,20 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, caminhos: parametros.caminhos } };
     case "imagem.mascaraVetorial":
       return { projeto: definirMascaraVetorial(projeto, parametros.clipeId, parametros.mascara) };
+    case "imagem.adicionarPrancheta": {
+      const resultado = adicionarPrancheta(projeto, ctx, parametros.retangulo, parametros.nome, parametros.fundo, parametros.tamanhos);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.prancheta":
+      return { projeto: mudarPrancheta(projeto, parametros.clipeId, parametros.mudanca, parametros.tamanhos) };
+    case "imagem.pranchetaDoGrupo":
+      return { projeto: pranchetaDoGrupo(projeto, parametros.faixaId, parametros.retangulo, parametros.fundo, parametros.tamanhos) };
+    case "imagem.pranchetaDeCamadas": {
+      const agrupado = agruparCamadas(projeto, ctx, parametros.faixaIds);
+      const faixa = agrupado.projeto.faixas.find((item) => item.clipes[0]?.id === agrupado.clipeId)!;
+      const comNome = { ...agrupado.projeto, faixas: agrupado.projeto.faixas.map((item) => (item.id === faixa.id ? { ...item, nome: parametros.nome } : item)) };
+      return { projeto: pranchetaDoGrupo(comNome, faixa.id, parametros.retangulo, parametros.fundo, parametros.tamanhos), selecao: [agrupado.clipeId] };
+    }
     case "imagem.tamanhoComPixels":
       return { projeto: tamanhoComPixels(projeto, parametros.tamanho, parametros.pixels, parametros.canais) };
     case "imagem.tamanhoDaTela":
