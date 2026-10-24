@@ -170,6 +170,10 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Imagem › Variáveis e Aplicar conjunto de dados (os nomes dos conjuntos). */
+  variaveis: (janela: "definir" | "conjuntos") => void;
+  conjuntos: string[];
+  aplicarConjunto: (indice: number) => void;
   /** Imagem › Modo: o modo de cor do documento e a tabela de cores (nas cores indexadas). */
   modoAtual: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab";
   modoDeCor: (tipo: "rgb" | "cinza" | "bitmap" | "duotone" | "indexadas" | "cmyk" | "lab") => void;
@@ -480,6 +484,19 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
     {
       nome: "Imagem",
       itens: [
+        {
+          nome: "Variáveis",
+          itens: [
+            { nome: "Definir…", aoEscolher: () => a.variaveis("definir") },
+            { nome: "Conjuntos de dados…", aoEscolher: () => a.variaveis("conjuntos") },
+          ],
+        },
+        {
+          nome: "Aplicar conjunto de dados",
+          desativado: !a.conjuntos.length,
+          itens: a.conjuntos.map((nome, indice) => ({ nome, aoEscolher: () => a.aplicarConjunto(indice) })),
+        },
+        "-",
         {
           nome: "Modo",
           itens: [

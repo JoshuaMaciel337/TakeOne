@@ -268,7 +268,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Prova de cores e alerta de gama; simulação de daltonismo
 - [x] Automatizar: Lote, Processador de imagens, Folha de contato, Ajustar imagem, Cortar e endireitar fotos, Fotomesclagem, Mesclar para HDR, Carregar arquivos em pilha (com os modos de pilha). O Lote aplica os passos (tons e cores automáticos, as camadas de ajuste e o modo do documento); rodar uma ação gravada entra quando as ações chegarem (13.15)
 - [x] Scripts úteis: excluir camadas vazias, achatar todos os efeitos, achatar todas as máscaras
-- [ ] Variáveis e conjuntos de dados
+- [x] Variáveis e conjuntos de dados
 
 ### Onda 13.14 — Visualização e medição
 

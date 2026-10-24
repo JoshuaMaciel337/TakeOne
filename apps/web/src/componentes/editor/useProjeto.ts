@@ -160,6 +160,7 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
           luz_global: projeto.luz_global ?? undefined,
           informacoes: projeto.informacoes ?? undefined,
           modo: projeto.modo ?? undefined,
+          variaveis: projeto.variaveis ?? undefined,
           tamanho: projeto.tamanho ?? undefined,
         },
       })

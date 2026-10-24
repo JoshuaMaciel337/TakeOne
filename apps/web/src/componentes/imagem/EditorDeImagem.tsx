@@ -47,6 +47,9 @@ import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
 import { JanelaAjustarImagem, JanelaAutomatizar, type TipoDaAutomacao } from "./JanelaAutomatizar";
+import { JanelaConjuntos, JanelaDefinirVariaveis } from "./JanelasDasVariaveis";
+import { aplicarConjunto, type ConjuntoDeDados, conjuntoDoDocumento, type ParaAplicar, type TipoDaVariavel, type VariaveisDoDocumento } from "@/lib/projeto/variaveis";
+import { exportarConjuntos } from "@/lib/exportacao/varios";
 import { cortarEEndireitar } from "@/lib/automatizar/executar";
 import { JanelaBitmap, JanelaCmyk, JanelaCoresIndexadas, JanelaDuotone, JanelaTabelaDeCores } from "./JanelasDoModo";
 import { SIGLAS_DOS_MODOS } from "@/lib/imagem/modos";
@@ -485,6 +488,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A prova de cores e o alerta de gama são da tela (como o zoom): não entram no projeto
   const [prova, setProva] = useState<{ tipo: TipoDaProva; ligada: boolean }>({ tipo: "cmyk", ligada: false });
   const [alertaDeGama, setAlertaDeGama] = useState(false);
+  const [janelaDasVariaveis, setJanelaDasVariaveis] = useState<"definir" | "conjuntos" | null>(null);
   const [automatizando, setAutomatizando] = useState<TipoDaAutomacao | null>(null);
   const [ajustandoImagem, setAjustandoImagem] = useState(false);
   const [janelaDoModo, setJanelaDoModo] = useState<"bitmap" | "duotone" | "indexadas" | "tabela" | "cmyk" | null>(null);
@@ -755,6 +759,29 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const avisos = avisosGuardados(projetoId);
     if (avisos.length) mostrarAviso(avisos.join(" "));
   }, [projetoId, mostrarAviso]);
+  // Imagem › Variáveis: como achar a foto pelo valor (o nome do arquivo, com ou sem a extensão, ou o id) e medir o texto
+  const definicaoDasVariaveis: VariaveisDoDocumento = projeto?.variaveis ?? { variaveis: [], conjuntos: [] };
+  const paraAplicar = (): ParaAplicar => ({
+    ctx,
+    medir: textoMedido,
+    imagem: (valor) => {
+      const procurado = valor.trim().toLowerCase();
+      const semExtensao = (nome: string) => nome.toLowerCase().replace(/\.[a-z0-9]+$/, "");
+      const midia = imagensProntas.find((item) => item.id === valor.trim() || item.nome.toLowerCase() === procurado || semExtensao(item.nome) === semExtensao(procurado));
+      return midia?.video ? { midiaId: midia.id, tamanho: { largura: midia.video.largura, altura: midia.video.altura } } : null;
+    },
+    tamanhoDaMidia: (midiaId) => {
+      const video = midias.get(midiaId)?.video;
+      return video ? { largura: video.largura, altura: video.altura } : null;
+    },
+  });
+  /** Aplicar um conjunto de dados: o documento com os valores dele, num passo do desfazer. */
+  const aplicarConjuntoDeDados = (conjunto: ConjuntoDeDados) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    const { projeto: aplicado, avisos } = aplicarConjunto(atual, atual.variaveis ?? definicaoDasVariaveis, conjunto, paraAplicar());
+    if (executar({ comando: "imagem.aplicarConjunto", parametros: { faixas: aplicado.faixas } })) mostrarAviso(avisos.length ? avisos.join(" ") : `Conjunto "${conjunto.nome}" aplicado.`);
+  };
   /** O fim do Automatizar: o primeiro documento criado abre (os outros ficam em Abrir recentes). */
   const aoCriarPelaAutomacao = (ids: string[], avisos: string[]) => {
     setAutomatizando(null);
@@ -4805,6 +4832,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    variaveis: (janela) => setJanelaDasVariaveis(janela),
+    conjuntos: (projeto?.variaveis?.conjuntos ?? []).map((conjunto) => conjunto.nome),
+    aplicarConjunto: (indice) => {
+      const conjunto = projeto?.variaveis?.conjuntos[indice];
+      if (conjunto) aplicarConjuntoDeDados(conjunto);
+    },
     automatizar: (tipo) => setAutomatizando(tipo),
     cortarEEndireitar: () => void cortarEEndireitarFotos(),
     ajustarImagem: () => setAjustandoImagem(true),
@@ -4999,7 +5032,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -6276,6 +6309,46 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(informacoes) => {
             setJanelaDoArquivo(null);
             executar({ comando: "imagem.informacoes", parametros: { informacoes } });
+          }}
+        />
+      ) : null}
+      {janelaDasVariaveis === "definir" && projeto ? (
+        <JanelaDefinirVariaveis
+          camadas={camadasDaImagem(projeto).flatMap(({ faixa, clipe }) => {
+            if (clipe.pasta || clipe.ajuste) return [];
+            const ehFoto = Boolean(clipe.midia_id && !clipe.pixels && midias.get(clipe.midia_id)?.imagem);
+            const tipos: TipoDaVariavel[] = clipe.texto_rico ? ["texto", "visibilidade"] : ehFoto ? ["imagem", "visibilidade"] : ["visibilidade"];
+            return [{ faixaId: faixa.id, nome: nomeDaFaixa(faixa), tipos }];
+          })}
+          inicial={definicaoDasVariaveis}
+          aoFechar={() => setJanelaDasVariaveis(null)}
+          aoConfirmar={(variaveis) => {
+            setJanelaDasVariaveis(null);
+            executar({ comando: "imagem.variaveis", parametros: { variaveis: { ...definicaoDasVariaveis, variaveis } } });
+          }}
+        />
+      ) : null}
+      {janelaDasVariaveis === "conjuntos" && projeto ? (
+        <JanelaConjuntos
+          definicao={definicaoDasVariaveis}
+          imagens={imagensProntas}
+          aoFechar={() => setJanelaDasVariaveis(null)}
+          aoSalvar={(conjuntos) => {
+            const atual = projetoRef.current?.variaveis ?? definicaoDasVariaveis;
+            if (JSON.stringify(atual.conjuntos) !== JSON.stringify(conjuntos)) executar({ comando: "imagem.variaveis", parametros: { variaveis: { ...atual, conjuntos } } });
+          }}
+          aoAplicar={aplicarConjuntoDeDados}
+          aoDoDocumento={(nome) => conjuntoDoDocumento(projetoRef.current ?? projeto, definicaoDasVariaveis, nome, (id) => midias.get(id)?.nome ?? id)}
+          aoExportar={async (conjuntos, formato, padrao) => {
+            try {
+              await pinturas.esperar();
+              const atual = projetoRef.current ?? projeto;
+              const { arquivo, avisos } = await exportarConjuntos(atual, midias, atual.variaveis ?? definicaoDasVariaveis, conjuntos, formato, padrao, paraAplicar(), { fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }, mostrarAviso);
+              baixarBlob(arquivo.blob, arquivo.nome);
+              mostrarAviso([`${conjuntos.length} ${conjuntos.length === 1 ? "arquivo exportado" : "arquivos exportados"}.`, ...avisos].join(" "));
+            } catch (e) {
+              mostrarAviso(e instanceof Error ? e.message : "Não foi possível exportar os conjuntos.");
+            }
           }}
         />
       ) : null}

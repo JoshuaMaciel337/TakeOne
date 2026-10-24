@@ -8,6 +8,7 @@ import type { Contorno, Sombra } from "./silhueta.ts";
 import type { Tick } from "../tempo.ts";
 import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
 import type { ModoDeCor } from "../imagem/modos.ts";
+import type { VariaveisDoDocumento } from "./variaveis.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -186,7 +187,7 @@ import type { Efeito } from "./efeitos.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Prancheta } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
 import type { Legenda } from "./legendas.ts";
-import type { Canal, Clipe, GeracaoDoClipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
+import type { Canal, Clipe, Faixa, GeracaoDoClipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
 import type { Transicao } from "./transicao.ts";
 
@@ -271,6 +272,8 @@ export type Comando =
   | { comando: "imagem.fundo"; parametros: { cor?: string; transparente?: boolean } }
   | { comando: "imagem.informacoes"; parametros: { informacoes: InformacoesDoArquivo } }
   | { comando: "imagem.modo"; parametros: { modo: ModoDeCor } }
+  | { comando: "imagem.variaveis"; parametros: { variaveis: VariaveisDoDocumento } }
+  | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.transformarCamada"; parametros: { clipeId: string; transformacao: Partial<Transformacao>; virar?: Virar } }
@@ -418,6 +421,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.fundo": "mudar o fundo",
   "imagem.informacoes": "mudar as informações do arquivo",
   "imagem.modo": "mudar o modo de cor",
+  "imagem.variaveis": "mudar as variáveis",
+  "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
   "imagem.transformarCamada": "transformar a camada",
@@ -797,6 +802,11 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mudarFundoDaImagem(projeto, parametros) };
     case "imagem.informacoes":
       return { projeto: { ...projeto, informacoes: parametros.informacoes } };
+    case "imagem.variaveis":
+      return { projeto: { ...projeto, variaveis: parametros.variaveis.variaveis.length ? parametros.variaveis : null } };
+    case "imagem.aplicarConjunto":
+      // As faixas já com os valores (o texto medido e as fotos trocadas vêm de quem chama)
+      return { projeto: { ...projeto, faixas: parametros.faixas } };
     case "imagem.modo":
       return { projeto: { ...projeto, modo: parametros.modo.tipo === "rgb" ? null : parametros.modo } };
     case "imagem.tamanho":

@@ -10,7 +10,8 @@ import { projetoSoCom } from "../projeto/rasterizar";
 import type { Midia } from "../tipos";
 
 import { pedidosDoNome, tamanhoDoAtivo } from "./ativos";
-import { caixaDoConteudo, canvasNoModo, codificarCanvas, type FontesDaExportacao, formatoDe, infoDoPdf, nomesSemRepetir, OPCOES_PADRAO_DE_EXPORTACAO, type OpcoesDeExportacao, paginaDoPdf, pixelsDoBlob, recortarCanvas } from "./exportarComo";
+import { aplicarConjunto, type ConjuntoDeDados, type ParaAplicar, type VariaveisDoDocumento } from "../projeto/variaveis";
+import { caixaDoConteudo, canvasNoModo, codificarCanvas, type FormatoDeExportacao, gerarArquivo, type FontesDaExportacao, formatoDe, infoDoPdf, nomesSemRepetir, OPCOES_PADRAO_DE_EXPORTACAO, type OpcoesDeExportacao, paginaDoPdf, pixelsDoBlob, recortarCanvas } from "./exportarComo";
 import { temInformacoes } from "./metadados";
 import { codificarPdf } from "./formatos/pdf";
 import { exportarImagem } from "./imagem";
@@ -138,4 +139,38 @@ export async function gerarAtivos(projeto: Projeto, midias: ReadonlyMap<string, 
     }
   }
   return pacote(arquivos, "ativos.zip");
+}
+
+/**
+ * Arquivo › Exportar › Conjuntos de dados como arquivos: o documento com os valores de cada conjunto, num arquivo cada.
+ * O nome vem do padrão: "{conjunto}", "{n}" e o valor de qualquer variável entre chaves.
+ */
+export async function exportarConjuntos(
+  projeto: Projeto,
+  midias: ReadonlyMap<string, Midia>,
+  definicao: VariaveisDoDocumento,
+  conjuntos: ConjuntoDeDados[],
+  formato: FormatoDeExportacao,
+  padrao: string,
+  para: ParaAplicar,
+  fontes: FontesDaExportacao,
+  aoProgresso: (texto: string) => void,
+): Promise<{ arquivo: Arquivo; avisos: string[] }> {
+  if (!conjuntos.length) throw new Error("Não há conjuntos para exportar.");
+  const nome = nomesSemRepetir();
+  const arquivos: Arquivo[] = [];
+  const avisos = new Set<string>();
+  for (const [indice, conjunto] of conjuntos.entries()) {
+    aoProgresso(`Exportando o conjunto ${indice + 1} de ${conjuntos.length}…`);
+    const aplicado = aplicarConjunto(projeto, definicao, conjunto, para);
+    aplicado.avisos.forEach((aviso) => avisos.add(aviso));
+    const blob = await gerarArquivo(aplicado.projeto, midias, { ...OPCOES_PADRAO_DE_EXPORTACAO, formato, informacoes: projeto.informacoes ?? null }, fontes);
+    const base = (padrao || "{conjunto}")
+      .replaceAll("{conjunto}", conjunto.nome)
+      .replaceAll("{n}", String(indice + 1).padStart(String(conjuntos.length).length, "0"))
+      .replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (inteiro, chave: string) => conjunto.valores[chave] ?? inteiro)
+      .slice(0, 120);
+    arquivos.push({ nome: nome(base || conjunto.nome, formatoDe(formato).extensao), blob });
+  }
+  return { arquivo: await pacote(arquivos, "conjuntos.zip"), avisos: [...avisos] };
 }
