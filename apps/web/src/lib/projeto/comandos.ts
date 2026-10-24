@@ -146,7 +146,10 @@ import {
   adicionarPrancheta,
   mudarPrancheta,
   pranchetaDoGrupo,
+  adicionarTextoRico,
+  mudarTextoRico,
 } from "./imagem.ts";
+import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
@@ -252,6 +255,8 @@ export type Comando =
   | { comando: "imagem.caminhosDoVetor"; parametros: { clipeId: string; caminhos: Subcaminho[] } }
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
+  | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null } }
+  | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico } }
   | { comando: "imagem.adicionarPrancheta"; parametros: { retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.prancheta"; parametros: { clipeId: string; mudanca: Partial<Prancheta>; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.pranchetaDoGrupo"; parametros: { faixaId: string; retangulo: RetanguloDaImagem; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
@@ -384,6 +389,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.caminhosDoVetor": "editar o caminho da forma",
   "imagem.caminhos": "mudar os caminhos",
   "imagem.mascaraVetorial": "mudar a máscara vetorial",
+  "imagem.adicionarTextoRico": "pôr o texto",
+  "imagem.textoRico": "mudar o texto",
   "imagem.adicionarPrancheta": "pôr a prancheta",
   "imagem.prancheta": "mudar a prancheta",
   "imagem.pranchetaDoGrupo": "prancheta a partir do grupo",
@@ -667,6 +674,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, caminhos: parametros.caminhos } };
     case "imagem.mascaraVetorial":
       return { projeto: definirMascaraVetorial(projeto, parametros.clipeId, parametros.mascara) };
+    case "imagem.adicionarTextoRico": {
+      const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.textoRico":
+      return { projeto: mudarTextoRico(projeto, parametros.clipeId, parametros.texto) };
     case "imagem.adicionarPrancheta": {
       const resultado = adicionarPrancheta(projeto, ctx, parametros.retangulo, parametros.nome, parametros.fundo, parametros.tamanhos);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };

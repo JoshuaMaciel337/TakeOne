@@ -12,6 +12,7 @@ import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
+import type { TextoRico } from "../texto/modelo.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -43,7 +44,7 @@ export const TAMANHOS_PRONTOS: {
 ];
 
 /** O tamanho da fonte de uma camada: o da mídia (por quem chama) ou a caixa da forma vetorial. */
-const tamanhoDaFonte = (clipe: Clipe, tamanhos: Record<string, Tamanho>): Tamanho | undefined => clipe.vetor?.caixa ?? (clipe.midia_id ? tamanhos[clipe.midia_id] : undefined);
+const tamanhoDaFonte = (clipe: Clipe, tamanhos: Record<string, Tamanho>): Tamanho | undefined => clipe.vetor?.caixa ?? clipe.texto_rico?.caixa ?? (clipe.midia_id ? tamanhos[clipe.midia_id] : undefined);
 
 export function ehImagem(projeto: Pick<Projeto, "tipo">): boolean {
   return projeto.tipo === "imagem";
@@ -182,28 +183,61 @@ export function adicionarCamadaVetorial(projeto: Projeto, ctx: Contexto, vetor: 
  * fica no mesmo pixel da imagem; a escala muda para 1 unidade continuar valendo os mesmos pixels. Sem `d`, o canto de
  * cima à esquerda dos caminhos (sem a margem do traço) fica onde estava.
  */
+/**
+ * A transformação da camada quando a caixa da fonte dela (a forma, o texto) troca de tamanho: o ponto (x, y) da caixa
+ * antiga vira (x + d.x, y + d.y) na nova e fica no mesmo pixel da imagem; a escala muda para 1 unidade continuar
+ * valendo os mesmos pixels.
+ */
+function transformacaoNaCaixaNova(clipe: Clipe, antiga: Tamanho, nova: Tamanho, d: { x: number; y: number }, quadro: Tamanho): Transformacao {
+  const t = clipe.transformacao;
+  const k = pixelsPorUnidade(antiga, t.escala, quadro);
+  // O meio novo: C' = C + R·F·k·(S'/2 − d − S/2), com F a virada (o espelho vem antes do giro)
+  let ux = (nova.largura / 2 - d.x - antiga.largura / 2) * k;
+  let uy = (nova.altura / 2 - d.y - antiga.altura / 2) * k;
+  if (clipe.virar?.horizontal) ux = -ux;
+  if (clipe.virar?.vertical) uy = -uy;
+  const r = (t.rotacao * Math.PI) / 180;
+  const cx = quadro.largura / 2 + t.x * quadro.largura + ux * Math.cos(r) - uy * Math.sin(r);
+  const cy = quadro.altura / 2 + t.y * quadro.altura + ux * Math.sin(r) + uy * Math.cos(r);
+  const escala = k / pixelsPorUnidade(nova, 1, quadro);
+  return { ...t, x: (cx - quadro.largura / 2) / quadro.largura, y: (cy - quadro.altura / 2) / quadro.altura, escala };
+}
+
 export function mudarVetor(projeto: Projeto, clipeId: string, vetor: CamadaVetorial, d?: { x: number; y: number }): Projeto {
   const quadro = tamanhoDaImagem(projeto);
   return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
     const antigo = clipe.vetor;
     if (!antigo) throw new ErroEdicao("Esta camada não é uma forma.");
-    const t = clipe.transformacao;
-    const k = pixelsPorUnidade(antigo.caixa, t.escala, quadro);
     const deslocamento = d ?? (() => {
       const a = caixaDosCaminhos(antigo.subcaminhos);
       const b = caixaDosCaminhos(vetor.subcaminhos);
       return a && b ? { x: b.x0 - a.x0, y: b.y0 - a.y0 } : { x: 0, y: 0 };
     })();
-    // O meio novo: C' = C + R·F·k·(S'/2 − d − S/2), com F a virada (o espelho vem antes do giro)
-    let ux = (vetor.caixa.largura / 2 - deslocamento.x - antigo.caixa.largura / 2) * k;
-    let uy = (vetor.caixa.altura / 2 - deslocamento.y - antigo.caixa.altura / 2) * k;
-    if (clipe.virar?.horizontal) ux = -ux;
-    if (clipe.virar?.vertical) uy = -uy;
-    const r = (t.rotacao * Math.PI) / 180;
-    const cx = quadro.largura / 2 + t.x * quadro.largura + ux * Math.cos(r) - uy * Math.sin(r);
-    const cy = quadro.altura / 2 + t.y * quadro.altura + ux * Math.sin(r) + uy * Math.cos(r);
-    const escala = k / pixelsPorUnidade(vetor.caixa, 1, quadro);
-    return { ...clipe, vetor, recorte: { ...RECORTE_PADRAO }, transformacao: { ...t, x: (cx - quadro.largura / 2) / quadro.largura, y: (cy - quadro.altura / 2) / quadro.altura, escala } };
+    return { ...clipe, vetor, recorte: { ...RECORTE_PADRAO }, transformacao: transformacaoNaCaixaNova(clipe, antigo.caixa, vetor.caixa, deslocamento, quadro) };
+  });
+}
+
+/**
+ * Um texto novo (já medido: a caixa e a origem) com a origem em `ponto` (pixels da imagem; no de parágrafo, o canto da
+ * caixa), uma unidade = um pixel, acima da camada escolhida.
+ */
+export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: TextoRico, ponto: { x: number; y: number }, nome: string, acima?: string | null): { projeto: Projeto; clipeId: string } {
+  const quadro = tamanhoDaImagem(projeto);
+  const centro = { x: ponto.x - texto.origem.x + texto.caixa.largura / 2, y: ponto.y - texto.origem.y + texto.caixa.altura / 2 };
+  const escala = 1 / pixelsPorUnidade(texto.caixa, 1, quadro);
+  const transformacao = { ...TRANSFORMACAO_PADRAO, x: (centro.x - quadro.largura / 2) / quadro.largura, y: (centro.y - quadro.altura / 2) / quadro.altura, escala };
+  const clipe = clipeDaCamada(ctx.novoId(), { texto_rico: texto, transformacao });
+  return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
+}
+
+/** Troca o texto (já medido): a origem dele (o começo da primeira linha de base, ou o canto da caixa) fica no lugar. */
+export function mudarTextoRico(projeto: Projeto, clipeId: string, texto: TextoRico): Projeto {
+  const quadro = tamanhoDaImagem(projeto);
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    const antigo = clipe.texto_rico;
+    if (!antigo) throw new ErroEdicao("Esta camada não é um texto.");
+    const d = { x: texto.origem.x - antigo.origem.x, y: texto.origem.y - antigo.origem.y };
+    return { ...clipe, texto_rico: texto, recorte: { ...RECORTE_PADRAO }, transformacao: transformacaoNaCaixaNova(clipe, antigo.caixa, texto.caixa, d, quadro) };
   });
 }
 

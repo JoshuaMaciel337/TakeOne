@@ -11,6 +11,8 @@ import type { Midia } from "@/lib/tipos";
 
 import { vetorNoTamanho } from "../vetor/desenhar";
 import { mascaraFinal } from "../previa/mascaraCombinada";
+import { textoNoTamanho } from "../texto/desenhar";
+import { esperarFontes } from "../texto/fontes";
 import { carregarBitmap } from "../previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
@@ -69,6 +71,8 @@ export async function exportarImagem(
   const ladoMenor = Math.min(tamanho.largura, tamanho.altura);
   await Promise.all(textosParaImagens(projeto).map(async ({ id, texto }) => imagensDeTexto.set(id, await imagemDeTextoNoLado(texto, ladoMenor))));
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
+  // Os textos desenhados no navegador esperam as fontes deles
+  await esperarFontes(projeto.faixas.flatMap((faixa) => faixa.clipes.flatMap((clipe) => (clipe.texto_rico ? [clipe.texto_rico] : []))));
 
   // A máscara de camada pintável de cada uma: o canvas sendo pintado, ou a versão do servidor
   const mascaraDe = async (clipe: Clipe) => {
@@ -81,6 +85,11 @@ export async function exportarImagem(
     camadas.map(async (camada) => {
       if (camada.imagem) return [camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, await mascaraDe(camada.clipe))] as const;
       if (camada.clipe.ajuste) return [camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const;
+      if (camada.clipe.texto_rico) {
+        const { caixa, recorte } = camada;
+        const fonte = textoNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.texto_rico, caixa.largura / recorte.largura, caixa.altura / recorte.altura);
+        return fonte ? ([camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const) : null;
+      }
       if (camada.clipe.vetor) {
         // A forma desenhada no tamanho em que sai (a caixa já está em pixels do arquivo)
         const { caixa, recorte } = camada;

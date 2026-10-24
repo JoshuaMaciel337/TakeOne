@@ -18,6 +18,8 @@ import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintur
 import { arquivoDaVersao } from "@/lib/pixels";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
+import { textoNoTamanho } from "@/lib/texto/desenhar";
+import { useVersaoDasFontes } from "@/lib/texto/fontes";
 import { caminhosDaMascaraNoDocumento, caminhosNoEspacoDaMascara } from "@/lib/vetor/mascaraVetorial";
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
@@ -295,6 +297,8 @@ export function PreviaDaImagem({
   }, []);
 
   const imagensDeTexto = useImagensDeTexto(textosParaImagens(projeto));
+  // Os textos desenhados no navegador redesenham quando uma fonte chega
+  const versaoDasFontes = useVersaoDasFontes();
   const camadas = camadasDaImagem(projeto, midias, tamanho, imagensDeTexto);
   const fonteDa = (midiaId: string) => arquivoDaMidia(midiaId, "proxy.webp");
   // A camada de pixels lê a versão do clipe (a 0 é vazia), ou o canvas enquanto é pintada
@@ -373,6 +377,12 @@ export function PreviaDaImagem({
       camadas.flatMap((camada) => {
         if (camada.imagem) return [[camada.faixa.id, camadaDoCompositor(camada, camada.imagem, null, mascaraDe(camada))] as const];
         if (camada.clipe.ajuste) return [[camada.faixa.id, camadaDoCompositor(camada, FUNDO, null)] as const];
+        if (camada.clipe.texto_rico) {
+          // O texto desenhado no tamanho da tela (some até as fontes chegarem)
+          const { caixa, recorte } = camada;
+          const fonte = textoNoTamanho(camada.clipe.id, camada.clipe.texto_rico, (caixa.largura * densidade) / recorte.largura, (caixa.altura * densidade) / recorte.altura, versaoDasFontes);
+          return fonte ? [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada))] as const] : [];
+        }
         if (camada.clipe.vetor) {
           // A forma desenhada no tamanho da tela, para ficar nítida em qualquer zoom
           const { caixa, recorte } = camada;

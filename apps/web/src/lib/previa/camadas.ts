@@ -315,6 +315,12 @@ export function camadasDaImagem(projeto: Projeto, midias: ReadonlyMap<string, Mi
       camadas.push({ ...comum, chave: `texto:${clipe.id}`, caixa, caixaBase: caixa, imagem: imagem.bitmap });
       continue;
     }
+    if (clipe.texto_rico) {
+      // O texto desenhado no navegador: como a forma, a caixa dele faz o papel do tamanho da mídia
+      const caixa = caixaDoClipe(clipe.transformacao, clipe.recorte, clipe.texto_rico.caixa, quadro);
+      camadas.push({ ...comum, chave: `textoRico:${clipe.id}`, caixa, caixaBase: caixa });
+      continue;
+    }
     if (clipe.vetor) {
       // A forma: a caixa dela faz o papel do tamanho da mídia, e quem desenha pede o desenho no tamanho da tela
       const caixa = caixaDoClipe(clipe.transformacao, clipe.recorte, clipe.vetor.caixa, quadro);

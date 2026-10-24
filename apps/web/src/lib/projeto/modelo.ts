@@ -5,6 +5,7 @@ import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
+import type { TextoRico } from "../texto/modelo.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -284,6 +285,8 @@ export type Clipe = {
    * transformação do clipe, então mover a prancheta é mover a pasta; o que está dentro aparece só no retângulo dela.
    */
   prancheta?: Prancheta | null;
+  /** Só no projeto de imagem: o texto desenhado no navegador (lib/texto/modelo.ts), sem mídia; o `texto` é o do vídeo. */
+  texto_rico?: TextoRico | null;
   /** Só no projeto de imagem: a máscara vetorial (lib/vetor/mascaraVetorial.ts), ao lado da de pixels. */
   mascara_vetorial?: MascaraVetorial | null;
   /** Só no projeto de imagem: a camada vetorial (forma viva ou caminho, lib/vetor/modelo.ts), sem mídia nem texto. */

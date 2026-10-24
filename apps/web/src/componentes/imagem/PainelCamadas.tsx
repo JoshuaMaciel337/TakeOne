@@ -62,6 +62,7 @@ export function nomeDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>, f
   if (clipe.texto) return clipe.texto.conteudo.replace(/\s+/g, " ").trim() || "Texto";
   if (clipe.ajuste) return "Camada de ajuste";
   if (clipe.vetor) return "Forma";
+  if (clipe.texto_rico) return clipe.texto_rico.paragrafos.map((paragrafo) => paragrafo.trechos.map((trecho) => trecho.texto).join("")).join(" ").replace(/\s+/g, " ").trim() || "Texto";
   return (clipe.midia_id ? midias.get(clipe.midia_id)?.nome : undefined) ?? "Imagem";
 }
 
@@ -125,7 +126,7 @@ const FILTROS: { grupo: string; itens: { id: string; nome: string }[] }[] = [
 ];
 function tipoDaCamada(clipe: Clipe, midias: ReadonlyMap<string, Midia>): TipoDaCamada {
   if (clipe.pasta) return "grupo";
-  if (clipe.texto) return "texto";
+  if (clipe.texto || clipe.texto_rico) return "texto";
   if (clipe.ajuste) return "ajuste";
   return clipe.vetor || (clipe.midia_id && midias.get(clipe.midia_id)?.elemento) ? "forma" : "imagem";
 }
@@ -640,7 +641,7 @@ export function PainelCamadas({
                           <img src={arquivoDaMidia(clipe.midia_id, arquivoDaVersao(clipe.pixels.versao))} alt="" className="size-full object-contain" />
                         ) : null}
                       </span>
-                    ) : clipe.texto ? (
+                    ) : clipe.texto || clipe.texto_rico ? (
                       <Type className="size-3.5 text-suave" aria-hidden />
                     ) : clipe.ajuste ? (
                       <SlidersHorizontal className="size-3.5 text-suave" aria-hidden />
