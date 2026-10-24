@@ -611,9 +611,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * como a imagem aparece, com a área transparente; a primeira variação entra como camada no recorte, e as outras
    * ficam na seção Variações.
    */
-  const pedirPreenchimento = async (descricao: string, variacoes: number) => {
-    const atual = projetoRef.current;
-    const selecao = selecaoNoDocumento;
+  const pedirPreenchimento = async (descricao: string, variacoes: number, dado?: { selecao: Selecao; projeto: Projeto }) => {
+    const atual = dado?.projeto ?? projetoRef.current;
+    const selecao = dado?.selecao ?? selecaoNoDocumento;
     const caixa = selecao ? limites(selecao) : null;
     if (!atual || !selecao || !caixa) return mostrarAviso("Marque a área a preencher com uma ferramenta de seleção.");
     const documento = tamanhoDaImagem(atual);
@@ -1722,7 +1722,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         if (pixels.length) void biblioteca.recarregar();
       }
       executar({ ...comando, parametros: { ...comando.parametros, pixels } } as Comando);
-      if (o.preencher) await preencherOVazio(depois);
+      if (o.preencher && o.preencherCom === "generativo") await expansaoGenerativa(depois, o.textoDoPreenchimento.trim());
+      else if (o.preencher) await preencherOVazio(depois);
       if (o.predefinicao === "tamanho") await aplicarTamanhoDaImagem({ ...o.tamanhoFinal, reamostrar: true, metodo: "automatica" });
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível cortar.");
@@ -2057,6 +2058,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     } finally {
       setGerandoPixels(false);
     }
+  };
+  /** Expansão generativa: o que ficou sem nenhuma camada vira a área do preenchimento generativo (pelo texto). */
+  const expansaoGenerativa = async (depois: Projeto, descricao: string) => {
+    const documento = tamanhoDaImagem(depois);
+    const comTransparencia = { ...depois, fundo: { ...depois.fundo, transparente: true } };
+    const bitmap = await createImageBitmap(await exportarImagem(comTransparencia, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara, fonteDaMascaraDosFiltros: pinturas.fonteDaMascaraDosFiltros }));
+    const canvas = document.createElement("canvas");
+    canvas.width = documento.largura;
+    canvas.height = documento.altura;
+    const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx2d.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura).data;
+    const vazio = new Uint8Array(documento.largura * documento.altura);
+    for (let i = 0; i < vazio.length; i++) if (pixels[i * 4 + 3] < 250) vazio[i] = 255;
+    if (!vazio.some(Boolean)) return;
+    await pedirPreenchimento(descricao, 1, { selecao: { largura: documento.largura, altura: documento.altura, dados: vazio }, projeto: depois });
   };
   /** Sensível ao conteúdo: o que ficou sem nenhuma camada (as cunhas do giro, o que passou da imagem) é refeito. */
   const preencherOVazio = async (depois: Projeto) => {

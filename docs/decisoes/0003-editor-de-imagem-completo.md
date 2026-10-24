@@ -250,7 +250,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 ### Onda 13.12 — IA
 
 - [x] Preenchimento generativo na seleção, com texto e variações
-- [ ] Expansão generativa no Corte, com texto
+- [x] Expansão generativa no Corte, com texto
 - [ ] Remover fundo (ação rápida), Selecionar assunto e Céu pelos modelos que já rodam
 - [ ] Substituir céu
 - [ ] Filtros neurais: transferência de estilo, colorir, remover artefatos de JPEG, desfoque de profundidade, super zoom, restaurar foto (sem os de rosto)

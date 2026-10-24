@@ -17,6 +17,9 @@ export type OpcoesDoCorte = {
   endireitando: boolean;
   apagar: boolean;
   preencher: boolean;
+  /** Como o vazio é preenchido: pelo que está em volta, ou pelo texto no worker de GPU (a expansão generativa). */
+  preencherCom: "sensivel" | "generativo";
+  textoDoPreenchimento: string;
 };
 
 export const CORTE_PADRAO: OpcoesDoCorte = {
@@ -29,6 +32,8 @@ export const CORTE_PADRAO: OpcoesDoCorte = {
   endireitando: false,
   apagar: false,
   preencher: false,
+  preencherCom: "sensivel",
+  textoDoPreenchimento: "",
 };
 
 export const PROPORCOES_DO_CORTE: { nome: string; valor: OpcoesDoCorte["predefinicao"] }[] = [
@@ -166,10 +171,25 @@ export function OpcoesDoCorteNaBarra({
         <input type="checkbox" checked={opcoes.apagar} onChange={(evento) => aoMudar({ apagar: evento.currentTarget.checked })} />
         Apagar os pixels cortados
       </label>
-      <label className="flex items-center gap-1.5" title="O que ficar vazio (girando ou aumentando além da imagem) é refeito pelo que está em volta, numa camada nova">
+      <label className="flex items-center gap-1.5" title="O que ficar vazio (girando ou aumentando além da imagem) é refeito numa camada nova">
         <input type="checkbox" checked={opcoes.preencher} onChange={(evento) => aoMudar({ preencher: evento.currentTarget.checked })} />
-        Sensível ao conteúdo
+        Preencher o vazio:
       </label>
+      <select className="rounded border border-borda bg-painel-2 px-1 py-0.5" value={opcoes.preencherCom} disabled={!opcoes.preencher} aria-label="Como preencher o vazio" onChange={(evento) => aoMudar({ preencherCom: evento.currentTarget.value as OpcoesDoCorte["preencherCom"] })}>
+        <option value="sensivel">Sensível ao conteúdo</option>
+        <option value="generativo">Expansão generativa</option>
+      </select>
+      {opcoes.preencher && opcoes.preencherCom === "generativo" ? (
+        <input
+          className="w-56 rounded border border-borda bg-painel-2 px-1.5 py-0.5"
+          value={opcoes.textoDoPreenchimento}
+          maxLength={800}
+          placeholder="O que pôr no vazio (vazio: a cena continua)"
+          aria-label="O que pôr no vazio"
+          onChange={(evento) => aoMudar({ textoDoPreenchimento: evento.currentTarget.value })}
+          onKeyDown={(evento) => evento.stopPropagation()}
+        />
+      ) : null}
       <span className="tabular-nums text-suave">
         {Math.round(medidas.largura)} × {Math.round(medidas.altura)} px{medidas.angulo ? ` · ${medidas.angulo.toFixed(1).replace(".", ",")}°` : ""}
       </span>
