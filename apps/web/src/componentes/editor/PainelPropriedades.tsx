@@ -158,6 +158,8 @@ type Props = {
   aoTrocarImagem?: (clipeId: string) => void;
   /** No editor de imagem: pede mais variações do preenchimento generativo da camada. */
   aoMaisVariacoes?: (clipeId: string) => void;
+  /** No editor de imagem: a ação rápida Selecionar o assunto (a pessoa da foto vira a seleção). */
+  aoSelecionarAssunto?: () => void;
   /** Abaixo da tela larga o painel é uma folha por cima, com botão de fechar. */
   aoFechar?: () => void;
   /** Abre uma aba de fora (os menus e os painéis do editor de imagem); `vez` muda a cada pedido. */
@@ -174,7 +176,7 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, formas, className = "", style }: Props) {
+export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, aoBuscar, proporcao, faixas, aoAvisar, aoTrocarMidia, aoTrocarPorVideo, seguirObjeto, fundo, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, aoSelecionarAssunto, aoFechar, pedidoDeAba, somenteAbas, tipoDeSom, semSelecao, formas, className = "", style }: Props) {
   // Uma aba guardada para texto e outra para mídia: um texto novo abre direto na aba Texto
   const [abaDaMidia, setAbaDaMidia] = useState<IdAba>("basico");
   const [abaDoTexto, setAbaDoTexto] = useState<IdAba>("texto");
@@ -339,6 +341,7 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
             modo={modo}
             aoTrocarImagem={aoTrocarImagem}
             aoMaisVariacoes={aoMaisVariacoes}
+            aoSelecionarAssunto={aoSelecionarAssunto}
             formas={formas}
           />
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
@@ -442,7 +445,13 @@ function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: K
   );
 }
 
-function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, formas }: PropsBasico & { modo?: "video" | "imagem"; aoTrocarImagem?: (clipeId: string) => void; aoMaisVariacoes?: (clipeId: string) => void; formas?: ContextoDasFormas }) {
+function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAvisar, seguirObjeto, aoTrocarMidia, aoTrocarPorVideo, faixas, midias, aoPrever, aoExecutar, modo = "video", aoTrocarImagem, aoMaisVariacoes, aoSelecionarAssunto, formas }: PropsBasico & {
+  modo?: "video" | "imagem";
+  aoTrocarImagem?: (clipeId: string) => void;
+  aoMaisVariacoes?: (clipeId: string) => void;
+  aoSelecionarAssunto?: () => void;
+  formas?: ContextoDasFormas;
+}) {
   const comTempo = modo === "video";
   if (faixa.tipo === "audio") {
     return <p className="py-8 text-center text-xs text-suave">Clipes de áudio não aparecem na imagem.</p>;
@@ -542,6 +551,30 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           <ImageIcon className="size-3.5" aria-hidden />
           Trocar a imagem
         </button>
+      ) : null}
+      {modo === "imagem" && midia?.imagem && !midia.animacao && !midia.elemento && !clipe.pixels ? (
+        <Secao titulo="Ações rápidas">
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              className="botao-secundario w-full px-3 py-1 text-xs"
+              disabled={travada || Boolean(clipe.remover_fundo)}
+              onClick={() => {
+                aoExecutar({ comando: "clipe.removerFundo", parametros: { clipeIds: [clipe.id], ligar: true } });
+                const estado = midia.recorte_fundo?.status;
+                if (estado !== "pronta" && estado !== "processando") void chamarApi(`/midias/${midia.id}/recorte-fundo`, { metodo: "POST" }).catch(() => undefined);
+              }}
+              title="A pessoa da foto fica, e o resto fica transparente"
+            >
+              {clipe.remover_fundo ? (midia.recorte_fundo?.status === "processando" ? "Removendo o fundo…" : "Fundo removido") : "Remover o fundo"}
+            </button>
+            {aoSelecionarAssunto ? (
+              <button type="button" className="botao-secundario w-full px-3 py-1 text-xs" onClick={aoSelecionarAssunto} title="A pessoa da foto vira a seleção">
+                Selecionar o assunto
+              </button>
+            ) : null}
+          </div>
+        </Secao>
       ) : null}
       {modo === "imagem" && clipe.geracao?.variacoes.length ? (
         <Secao titulo="Variações">

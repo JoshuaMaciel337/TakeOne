@@ -96,3 +96,20 @@ test("o céu desce do alto pelo degradê e para no contorno dos prédios", async
   assert.equal(s.dados[95 * largura + 10], 0);
   assert.equal(s.dados[90 * largura + 150], 0);
 });
+
+test("céu pela profundidade: o longe ligado à borda de cima, e o longe preso embaixo de um prédio não", async () => {
+  const { ceuPelaProfundidade } = await import("./cores.ts");
+  const largura = 20;
+  const altura = 12;
+  const dados = new Uint8Array(largura * altura).fill(200);
+  // O céu: as 4 linhas de cima e um vão entre os prédios até a linha 7, nas colunas 8 a 11
+  for (let y = 0; y < 4; y++) for (let x = 0; x < largura; x++) dados[y * largura + x] = 5;
+  for (let y = 4; y < 8; y++) for (let x = 8; x < 12; x++) dados[y * largura + x] = 8;
+  // Um longe que não toca o céu (uma janela escura num prédio)
+  dados[10 * largura + 2] = 3;
+  const s = ceuPelaProfundidade({ largura, altura, dados });
+  assert.equal(s.dados[0], 255);
+  assert.equal(s.dados[6 * largura + 9], 255);
+  assert.equal(s.dados[6 * largura + 3], 0);
+  assert.equal(s.dados[10 * largura + 2], 0);
+});

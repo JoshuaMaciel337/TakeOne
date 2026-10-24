@@ -251,7 +251,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 - [x] Preenchimento generativo na seleção, com texto e variações
 - [x] Expansão generativa no Corte, com texto
-- [ ] Remover fundo (ação rápida), Selecionar assunto e Céu pelos modelos que já rodam
+- [x] Remover fundo (ação rápida), Selecionar assunto e Céu pelos modelos que já rodam
 - [ ] Substituir céu
 - [ ] Filtros neurais: transferência de estilo, colorir, remover artefatos de JPEG, desfoque de profundidade, super zoom, restaurar foto (sem os de rosto)
 - [x] Painel de variações geradas

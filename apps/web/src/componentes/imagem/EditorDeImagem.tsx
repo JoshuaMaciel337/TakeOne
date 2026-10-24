@@ -63,7 +63,8 @@ import { type Escolhido } from "./filtros/Galeria";
 import { JanelaGaleriaDeFiltros } from "./filtros/JanelaGaleriaDeFiltros";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
-import { ceu, imagemMenor } from "@/lib/selecao/cores";
+import { ceu, ceuPelaProfundidade, imagemMenor } from "@/lib/selecao/cores";
+import { REFINAMENTO_PADRAO, refinarSelecao } from "@/lib/selecao/refinar";
 import { JanelaAreaDeFoco, JanelaDeNome, JanelaIntervaloDeCores } from "./JanelasDaSelecao";
 import { selecaoEmCinza } from "./MascaraRapida";
 import { JanelaAparar, JanelaAtenuar, JanelaPreencher, JanelaTracado, type Preenchimento, type Tracado } from "./JanelasDePixels";
@@ -1550,7 +1551,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (!FERRAMENTAS_DE_PINTURA.has(ferramenta)) escolherFerramenta("pincel");
   };
   /** Uma máscara cinza da foto escolhida (a do objeto, a do assunto) como seleção do documento; null sem a camada na prévia. */
-  const mascaraDaFotoNoDocumento = async (arquivo: string): Promise<Selecao | null> => {
+  const mascaraDaFotoNoDocumento = async (arquivo: string, canal: "cinza" | "alfa" = "cinza"): Promise<Selecao | null> => {
     const medida = selecionado ? caixasRef.current.get(selecionado.clipe.id) : undefined;
     const video = foto?.video;
     if (!selecionado || !foto || !video || !projeto || !medida?.bruta || !medida.quadro) return null;
@@ -1560,7 +1561,43 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const mascara = await carregarBitmap(arquivoDaMidia(foto.id, arquivo));
     // A máscara vem menor que a foto: o pixel dela vai para o da foto e daí ao documento
     const escala: Afim = [video.largura / mascara.width, 0, 0, video.altura / mascara.height, 0, 0];
-    return imagemNoDocumento(mascara, compor(matrizDaMidiaNoDocumento(bruta, clipe.recorte, clipe.virar, video, quadro, documento), escala), documento, "cinza");
+    return imagemNoDocumento(mascara, compor(matrizDaMidiaNoDocumento(bruta, clipe.recorte, clipe.virar, video, quadro, documento), escala), documento, canal);
+  };
+  /** A profundidade da foto (255 perto, 0 longe), medida uma vez pelo worker de CPU: o nome do arquivo dela. */
+  const profundidadeDaFoto = async (fotoId: string): Promise<string> => {
+    const resposta = await chamarApi<{ arquivo: string; job_id: string | null }>(`/midias/${fotoId}/profundidade`, { metodo: "POST" });
+    if (resposta.job_id) {
+      mostrarAviso("Medindo a profundidade da foto…");
+      for (;;) {
+        const job = await chamarApi<{ status: string; erro?: string | null }>(`/jobs/${resposta.job_id}`);
+        if (job.status === "concluido") break;
+        if (job.status === "erro") throw new Error(job.erro ?? "Não foi possível medir a profundidade.");
+        await new Promise((pronto) => setTimeout(pronto, 500));
+      }
+      void biblioteca.recarregar();
+    }
+    return resposta.arquivo;
+  };
+  /** Selecionar › Céu numa foto: o longe que toca a borda de cima (pela profundidade), com a borda acertada pela cor. */
+  const selecionarCeuPelaProfundidade = async () => {
+    if (!foto || achandoAssunto) return;
+    setAchandoAssunto(true);
+    try {
+      const arquivo = await profundidadeDaFoto(foto.id);
+      const [disparidade, cobertura, imagem] = await Promise.all([mascaraDaFotoNoDocumento(arquivo), mascaraDaFotoNoDocumento(arquivo, "alfa"), imagemParaSelecao(true)]);
+      if (!disparidade || !cobertura) return;
+      // Fora da foto não é céu (o cinza ali seria zero, o mais longe)
+      for (let i = 0; i < disparidade.dados.length; i++) if (cobertura.dados[i] < 128) disparidade.dados[i] = 255;
+      const ceuBruto = ceuPelaProfundidade(disparidade);
+      if (!temAlgo(ceuBruto)) return mostrarAviso("Nenhum céu foi achado (o céu precisa tocar a borda de cima).");
+      // A profundidade vem num tamanho pequeno: a borda é refeita pela cor numa faixa em volta
+      const raio = Math.max(3, Math.round(Math.max(imagem.largura, imagem.altura) / 250));
+      selecionarNoDocumento(refinarSelecao(imagem, ampliarSelecao(ceuBruto, { largura: imagem.largura, altura: imagem.altura }), { ...REFINAMENTO_PADRAO, raio, raioInteligente: true }));
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível achar o céu.");
+    } finally {
+      setAchandoAssunto(false);
+    }
   };
   const levarObjeto = useEffectEvent((arquivo: string) => {
     mascaraDaFotoNoDocumento(arquivo)
@@ -1606,6 +1643,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       : imagemNoDocumento(selecaoParaCanvas(selecao), [documento.largura / selecao.largura, 0, 0, documento.altura / selecao.altura, 0, 0], documento, "alfa");
   const selecionarPor = (como: "cores" | "foco" | "assunto" | "ceu") => {
     if (como === "assunto") return void selecionarAssunto();
+    // Numa foto escolhida, o céu vem pela profundidade dela; sem foto, pela cor (coluna a coluna)
+    if (como === "ceu" && foto && selecionado && !selecionado.clipe.pixels) return void selecionarCeuPelaProfundidade();
     imagemParaSelecao(true)
       .then((imagem) => {
         if (como === "ceu") {
@@ -4719,6 +4758,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           seguirObjeto={SEM_SEGUIR}
           aoTrocarImagem={setTrocando}
           aoMaisVariacoes={(clipeId) => void maisVariacoes(clipeId)}
+          aoSelecionarAssunto={() => void selecionarAssunto()}
           fundo={projeto.fundo.cor}
           aoPrever={preverDoPainel}
           aoExecutar={executar}

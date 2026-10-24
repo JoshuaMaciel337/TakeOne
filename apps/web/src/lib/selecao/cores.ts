@@ -267,3 +267,41 @@ export function ceu(imagem: ImagemRgba, { limite = 30, atraso = 2 }: { limite?: 
   for (let y = 0; y < altura; y++) for (let x = 0; x < largura; x++) if (y < linha[x]) selecao.dados[y * largura + x] = 255;
   return difusao(selecao, 0.7);
 }
+
+/**
+ * Céu pela profundidade (a da foto, 255 perto e 0 longe): o que é tão longe quanto a borda de cima e toca nela, por
+ * um enchimento a partir dela (o céu entre os prédios também entra, pela ligação de cima). O limiar sai das linhas de
+ * cima (o percentil 90 delas) com uma folga pequena perto da mediana da foto: a cidade ao longe fica a poucos níveis
+ * do céu (numa foto noturna, o céu em 0, os prédios em 5 a 7 e a água em 9 a 20), e o Otsu separava a pessoa de
+ * tudo o mais.
+ */
+export function ceuPelaProfundidade(disparidade: Selecao): Selecao {
+  const { largura, altura, dados } = disparidade;
+  const percentil = (valores: Uint8Array, p: number) => {
+    const caixas = new Uint32Array(256);
+    for (let i = 0; i < valores.length; i++) caixas[valores[i]]++;
+    let soma = 0;
+    for (let v = 0; v < 256; v++) if ((soma += caixas[v]) >= p * valores.length) return v;
+    return 255;
+  };
+  const deCima = percentil(dados.subarray(0, Math.max(1, Math.round(altura * 0.03)) * largura), 0.9);
+  const limiar = Math.min(80, deCima + Math.max(2, 0.12 * (percentil(dados, 0.5) - deCima)));
+  const selecao = vazia(largura, altura);
+  const pilha: number[] = [];
+  for (let x = 0; x < largura; x++) {
+    if (dados[x] >= limiar) continue;
+    selecao.dados[x] = 255;
+    pilha.push(x);
+  }
+  while (pilha.length) {
+    const p = pilha.pop()!;
+    const x = p % largura;
+    const y = (p - x) / largura;
+    for (const q of [x > 0 ? p - 1 : -1, x < largura - 1 ? p + 1 : -1, y > 0 ? p - largura : -1, y < altura - 1 ? p + largura : -1]) {
+      if (q < 0 || selecao.dados[q] || dados[q] >= limiar) continue;
+      selecao.dados[q] = 255;
+      pilha.push(q);
+    }
+  }
+  return selecao;
+}
