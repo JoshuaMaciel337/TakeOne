@@ -9,6 +9,7 @@ import type { Tick } from "../tempo.ts";
 import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
 import type { ModoDeCor } from "../imagem/modos.ts";
 import type { VariaveisDoDocumento } from "./variaveis.ts";
+import type { Guias } from "./geometria.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -273,6 +274,7 @@ export type Comando =
   | { comando: "imagem.informacoes"; parametros: { informacoes: InformacoesDoArquivo } }
   | { comando: "imagem.modo"; parametros: { modo: ModoDeCor } }
   | { comando: "imagem.variaveis"; parametros: { variaveis: VariaveisDoDocumento } }
+  | { comando: "imagem.guias"; parametros: { guias: Guias } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
   | { comando: "imagem.recortar"; parametros: { retangulo: RetanguloDaImagem; tamanhos: Record<string, Tamanho> } }
@@ -422,6 +424,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.informacoes": "mudar as informações do arquivo",
   "imagem.modo": "mudar o modo de cor",
   "imagem.variaveis": "mudar as variáveis",
+  "imagem.guias": "mudar as guias",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
@@ -802,6 +805,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: mudarFundoDaImagem(projeto, parametros) };
     case "imagem.informacoes":
       return { projeto: { ...projeto, informacoes: parametros.informacoes } };
+    case "imagem.guias":
+      return { projeto: { ...projeto, guias: parametros.guias.verticais.length || parametros.guias.horizontais.length ? parametros.guias : null } };
     case "imagem.variaveis":
       return { projeto: { ...projeto, variaveis: parametros.variaveis.variaveis.length ? parametros.variaveis : null } };
     case "imagem.aplicarConjunto":

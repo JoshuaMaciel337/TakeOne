@@ -48,6 +48,8 @@ import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaEx
 import { JanelaDuplicarDocumento, JanelaImprimir, JanelaInformacoesDoArquivo } from "./JanelasDoArquivo";
 import { JanelaAjustarImagem, JanelaAutomatizar, type TipoDaAutomacao } from "./JanelaAutomatizar";
 import { JanelaConjuntos, JanelaDefinirVariaveis } from "./JanelasDasVariaveis";
+import { JanelaGrade, JanelaLayoutDeGuias, JanelaNovaGuia } from "./JanelasDaVista";
+import { guardarVista, guiasDaForma as guiasDaFormaDaVista, guiasDoLayout, juntarGuias, lerVista, type PreferenciasDaVista } from "@/lib/imagem/vista";
 import { aplicarConjunto, type ConjuntoDeDados, conjuntoDoDocumento, type ParaAplicar, type TipoDaVariavel, type VariaveisDoDocumento } from "@/lib/projeto/variaveis";
 import { exportarConjuntos } from "@/lib/exportacao/varios";
 import { cortarEEndireitar } from "@/lib/automatizar/executar";
@@ -488,6 +490,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // A prova de cores e o alerta de gama são da tela (como o zoom): não entram no projeto
   const [prova, setProva] = useState<{ tipo: TipoDaProva; ligada: boolean }>({ tipo: "cmyk", ligada: false });
   const [alertaDeGama, setAlertaDeGama] = useState(false);
+  // Exibir: as preferências da vista ficam no navegador (são da tela de quem edita); as guias são do documento
+  const [vista, setVista] = useState<PreferenciasDaVista>(lerVista);
+  const mudarVista = (mudanca: Partial<PreferenciasDaVista>) =>
+    setVista((atual) => {
+      const nova = { ...atual, ...mudanca };
+      guardarVista(nova);
+      return nova;
+    });
+  const [janelaDaVista, setJanelaDaVista] = useState<"guia" | "layout" | "grade" | null>(null);
   const [janelaDasVariaveis, setJanelaDasVariaveis] = useState<"definir" | "conjuntos" | null>(null);
   const [automatizando, setAutomatizando] = useState<TipoDaAutomacao | null>(null);
   const [ajustandoImagem, setAjustandoImagem] = useState(false);
@@ -4832,6 +4843,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
+    vista,
+    mudarVista,
+    janelaDaVista: (janela) => setJanelaDaVista(janela),
+    temGuias: Boolean(projeto?.guias),
+    limparGuias: () => executar({ comando: "imagem.guias", parametros: { guias: { verticais: [], horizontais: [] } } }),
+    guiasDaForma: () => {
+      const retangulo = retanguloDasCamadas(escolhidas.flatMap((faixa) => (faixa.clipes[0] ? [faixa.clipes[0].id] : [])));
+      if (!retangulo) return mostrarAviso("Escolha uma camada com conteúdo.");
+      const forma = guiasDaFormaDaVista({ esquerda: retangulo.x, topo: retangulo.y, direita: retangulo.x + retangulo.largura, base: retangulo.y + retangulo.altura });
+      executar({ comando: "imagem.guias", parametros: { guias: juntarGuias(projeto?.guias ?? { verticais: [], horizontais: [] }, forma) } });
+    },
     variaveis: (janela) => setJanelaDasVariaveis(janela),
     conjuntos: (projeto?.variaveis?.conjuntos ?? []).map((conjunto) => conjunto.nome),
     aplicarConjunto: (indice) => {
@@ -5032,7 +5054,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5867,6 +5889,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             </div>
           </div>
           <PreviaDaImagem
+            vista={vista}
+            guiasDoDocumento={projeto.guias ?? null}
+            aoMudarGuias={(guias) => executar({ comando: "imagem.guias", parametros: { guias } })}
+            aoMudarUnidade={(unidade) => mudarVista({ unidade })}
             projeto={projetoNaTela}
             midias={midias}
             selecao={selecaoValida}
@@ -5975,7 +6001,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             }
             selecaoDoDocumento={{
               selecao: selecaoNoDocumento,
-              bordas: bordasDaSelecao,
+              bordas: bordasDaSelecao && vista.extras,
               ferramenta: FERRAMENTAS_DA_SELECAO.has(ferramenta) ? (ferramenta as FerramentaDeSelecao) : null,
               opcoes: opcoesDaSelecao,
               aoSelecionar: selecionarNoDocumento,
@@ -6309,6 +6335,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoConfirmar={(informacoes) => {
             setJanelaDoArquivo(null);
             executar({ comando: "imagem.informacoes", parametros: { informacoes } });
+          }}
+        />
+      ) : null}
+      {janelaDaVista === "guia" && projeto ? (
+        <JanelaNovaGuia
+          unidade={vista.unidade}
+          ppi={projeto.tamanho?.resolucao ?? 72}
+          documento={tamanhoDaImagem(projeto)}
+          aoFechar={() => setJanelaDaVista(null)}
+          aoConfirmar={(tipo, pos) => {
+            setJanelaDaVista(null);
+            const nova = tipo === "v" ? { verticais: [pos], horizontais: [] } : { verticais: [], horizontais: [pos] };
+            executar({ comando: "imagem.guias", parametros: { guias: juntarGuias(projeto.guias ?? { verticais: [], horizontais: [] }, nova) } });
+          }}
+        />
+      ) : null}
+      {janelaDaVista === "layout" && projeto ? (
+        <JanelaLayoutDeGuias
+          aoFechar={() => setJanelaDaVista(null)}
+          aoConfirmar={(layout, limpar) => {
+            setJanelaDaVista(null);
+            const novas = guiasDoLayout(layout, tamanhoDaImagem(projeto));
+            executar({ comando: "imagem.guias", parametros: { guias: limpar ? novas : juntarGuias(projeto.guias ?? { verticais: [], horizontais: [] }, novas) } });
+          }}
+        />
+      ) : null}
+      {janelaDaVista === "grade" ? (
+        <JanelaGrade
+          espaco={vista.espacoDaGrade}
+          subdivisoes={vista.subdivisoes}
+          aoFechar={() => setJanelaDaVista(null)}
+          aoConfirmar={(espacoDaGrade, subdivisoes) => {
+            setJanelaDaVista(null);
+            mudarVista({ espacoDaGrade, subdivisoes, grade: true });
           }}
         />
       ) : null}

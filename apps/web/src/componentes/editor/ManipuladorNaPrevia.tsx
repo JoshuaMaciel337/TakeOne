@@ -28,6 +28,8 @@ type Props = {
   quadro: Tamanho;
   transformacao: Transformacao;
   travado: boolean;
+  /** Onde a caixa encosta ao andar (pixels do quadro); sem eles, as bordas e o meio do quadro. */
+  alvos?: Guias;
   /** Durante o gesto: a mudança e as guias para mostrar. */
   aoMudar: (mudanca: Partial<Transformacao>, guias: Guias) => void;
   /** Ao soltar. `null` quando foi só um clique. */
@@ -40,7 +42,7 @@ function giroComIma(graus: number): number {
 }
 
 /** A caixa do clipe selecionado na prévia, com as alças. */
-export function ManipuladorNaPrevia({ caixa, quadro, transformacao, travado, aoMudar, aoSoltar }: Props) {
+export function ManipuladorNaPrevia({ caixa, quadro, transformacao, travado, alvos, aoMudar, aoSoltar }: Props) {
   const elementoRef = useRef<HTMLDivElement>(null);
   const partida = useRef<Partida | null>(null);
   const ultima = useRef<Partial<Transformacao> | null>(null);
@@ -77,7 +79,7 @@ export function ManipuladorNaPrevia({ caixa, quadro, transformacao, travado, aoM
     if (inicio.modo === "mover") {
       const movida = { ...inicio.caixa, cx: centro.x + ponto.x - inicio.ponteiro.x, cy: centro.y + ponto.y - inicio.ponteiro.y };
       // Alt solto o ímã, como nos editores de imagem
-      const ima = evento.altKey ? { dx: 0, dy: 0, guias } : ajustarAsGuias(movida, quadro, ALCANCE_IMA);
+      const ima = evento.altKey ? { dx: 0, dy: 0, guias } : ajustarAsGuias(movida, quadro, ALCANCE_IMA, alvos);
       guias = ima.guias;
       mudanca = deslocamentoDoCentro({ x: movida.cx + ima.dx, y: movida.cy + ima.dy }, quadro);
     } else if (inicio.modo === "escala") {

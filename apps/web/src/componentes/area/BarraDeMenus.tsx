@@ -26,7 +26,7 @@ function ehSubmenu(item: ItemDeMenu): item is { nome: string; itens: ItemDeMenu[
   return typeof item === "object" && "itens" in item;
 }
 
-const COM_SHIFT: Record<string, string> = { "+": "=", "{": "[", "}": "]", "?": "/", "<": ",", ">": ".", "_": "-", '"': "'" };
+const COM_SHIFT: Record<string, string> = { "+": "=", "{": "[", "}": "]", "?": "/", "<": ",", ">": ".", "_": "-", '"': "'", ":": ";" };
 
 /** A tecla do evento no formato dos atalhos ("Ctrl+Shift+Z"), ou null para teclas que só modificam. */
 export function teclaDoEvento(evento: KeyboardEvent): string | null {

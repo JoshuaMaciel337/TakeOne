@@ -1,5 +1,6 @@
 // Os menus do editor de imagem (ADR 0002), na ordem e com os nomes e os atalhos dos editores de imagem
 // profissionais. Os atalhos que o navegador não deixa a página pegar (Ctrl+N, Ctrl+T, Ctrl+W) ficam de fora.
+import { type PreferenciasDaVista, UNIDADES_DA_REGUA } from "@/lib/imagem/vista";
 import { PROVAS, type TipoDaProva } from "@/lib/imagem/prova";
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
 import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
@@ -170,6 +171,13 @@ export type AcoesDosMenus = {
   mudarProva: (mudanca: Partial<{ tipo: TipoDaProva; ligada: boolean }>) => void;
   alertaDeGama: boolean;
   alternarAlertaDeGama: () => void;
+  /** Exibir: as preferências da vista (réguas, guias, grade, extras, encaixe) e as guias do documento. */
+  vista: PreferenciasDaVista;
+  mudarVista: (mudanca: Partial<PreferenciasDaVista>) => void;
+  janelaDaVista: (janela: "guia" | "layout" | "grade") => void;
+  temGuias: boolean;
+  limparGuias: () => void;
+  guiasDaForma: () => void;
   /** Imagem › Variáveis e Aplicar conjunto de dados (os nomes dos conjuntos). */
   variaveis: (janela: "definir" | "conjuntos") => void;
   conjuntos: string[];
@@ -855,6 +863,46 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Ajustar à tela", atalho: "Ctrl+0", aoEscolher: () => a.zoom("ajustar") },
         { nome: "100%", atalho: "Ctrl+1", aoEscolher: () => a.zoom(1) },
         "-",
+        { nome: "Extras", atalho: "Ctrl+H", marcado: a.vista.extras, aoEscolher: () => a.mudarVista({ extras: !a.vista.extras }), titulo: "Mostra ou esconde de uma vez as guias, a grade, as bordas e as formigas da seleção" },
+        {
+          nome: "Mostrar",
+          itens: [
+            { nome: "Bordas da seleção", marcado: a.bordasVisiveis, aoEscolher: () => a.selecaoDoDocumento("bordas") },
+            { nome: "Bordas da camada", marcado: a.vista.bordasDaCamada, aoEscolher: () => a.mudarVista({ bordasDaCamada: !a.vista.bordasDaCamada }) },
+            { nome: "Guias", atalho: "Ctrl+;", marcado: a.vista.guias, aoEscolher: () => a.mudarVista({ guias: !a.vista.guias }) },
+            { nome: "Grade", atalho: "Ctrl+'", marcado: a.vista.grade, aoEscolher: () => a.mudarVista({ grade: !a.vista.grade }) },
+            { nome: "Guias inteligentes", marcado: a.vista.guiasInteligentes, aoEscolher: () => a.mudarVista({ guiasInteligentes: !a.vista.guiasInteligentes }) },
+            { nome: "Malha de pixels", marcado: a.vista.malhaDePixels, aoEscolher: () => a.mudarVista({ malhaDePixels: !a.vista.malhaDePixels }), titulo: "Um quadriculado em cada pixel, com o zoom a partir de 800%" },
+            "-",
+            { nome: "Configurar a grade…", aoEscolher: () => a.janelaDaVista("grade") },
+          ],
+        },
+        { nome: "Réguas", atalho: "Ctrl+R", marcado: a.vista.reguas, aoEscolher: () => a.mudarVista({ reguas: !a.vista.reguas }) },
+        {
+          nome: "Unidade das réguas",
+          itens: UNIDADES_DA_REGUA.map((u) => ({ nome: u.nome, marcado: a.vista.unidade === u.id, aoEscolher: () => a.mudarVista({ unidade: u.id }) })),
+        },
+        "-",
+        { nome: "Encaixar", atalho: "Ctrl+Shift+;", marcado: a.vista.encaixar, aoEscolher: () => a.mudarVista({ encaixar: !a.vista.encaixar }) },
+        {
+          nome: "Encaixar em",
+          itens: [
+            { nome: "Guias", marcado: a.vista.encaixarEm.guias, aoEscolher: () => a.mudarVista({ encaixarEm: { ...a.vista.encaixarEm, guias: !a.vista.encaixarEm.guias } }) },
+            { nome: "Grade", marcado: a.vista.encaixarEm.grade, aoEscolher: () => a.mudarVista({ encaixarEm: { ...a.vista.encaixarEm, grade: !a.vista.encaixarEm.grade } }) },
+            { nome: "Camadas", marcado: a.vista.encaixarEm.camadas, aoEscolher: () => a.mudarVista({ encaixarEm: { ...a.vista.encaixarEm, camadas: !a.vista.encaixarEm.camadas } }) },
+            { nome: "Limites do documento", marcado: a.vista.encaixarEm.limites, aoEscolher: () => a.mudarVista({ encaixarEm: { ...a.vista.encaixarEm, limites: !a.vista.encaixarEm.limites } }) },
+            "-",
+            { nome: "Tudo", aoEscolher: () => a.mudarVista({ encaixarEm: { guias: true, grade: true, camadas: true, limites: true } }) },
+            { nome: "Nada", aoEscolher: () => a.mudarVista({ encaixarEm: { guias: false, grade: false, camadas: false, limites: false } }) },
+          ],
+        },
+        "-",
+        { nome: "Bloquear guias", atalho: "Ctrl+Alt+;", marcado: a.vista.travarGuias, aoEscolher: () => a.mudarVista({ travarGuias: !a.vista.travarGuias }) },
+        { nome: "Limpar guias", desativado: !a.temGuias, aoEscolher: a.limparGuias },
+        { nome: "Nova guia…", aoEscolher: () => a.janelaDaVista("guia") },
+        { nome: "Novo layout de guias…", aoEscolher: () => a.janelaDaVista("layout") },
+        { nome: "Novas guias a partir da forma", desativado: semCamada, aoEscolher: a.guiasDaForma },
+        "-",
         {
           nome: "Configuração da prova",
           itens: PROVAS.map((prova) => ({ nome: prova.nome, marcado: a.prova.tipo === prova.id, aoEscolher: () => a.mudarProva({ tipo: prova.id, ligada: true }) })),
@@ -862,7 +910,6 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Cores de prova", atalho: "Ctrl+Y", marcado: a.prova.ligada, aoEscolher: () => a.mudarProva({ ligada: !a.prova.ligada }), titulo: "A tela mostra a imagem como na prova escolhida; os arquivos não mudam" },
         { nome: "Alerta de gama", atalho: "Ctrl+Shift+Y", marcado: a.alertaDeGama, aoEscolher: a.alternarAlertaDeGama, titulo: "Pinta de cinza o que a impressão em CMYK não alcança" },
         "-",
-        { nome: "Bordas da seleção", atalho: "Ctrl+H", marcado: a.bordasVisiveis, aoEscolher: () => a.selecaoDoDocumento("bordas") },
       ],
     },
     {

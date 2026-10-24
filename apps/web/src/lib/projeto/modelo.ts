@@ -13,6 +13,7 @@ import type { TextoRico } from "../texto/modelo.ts";
 import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
 import type { ModoDeCor } from "../imagem/modos.ts";
 import type { VariaveisDoDocumento } from "./variaveis.ts";
+import type { Guias } from "./geometria.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -455,6 +456,8 @@ export type Projeto = {
   modo?: ModoDeCor | null;
   /** Só no projeto de imagem: Imagem › Variáveis (as camadas ligadas e os conjuntos de dados). */
   variaveis?: VariaveisDoDocumento | null;
+  /** Só no projeto de imagem: as guias (Exibir), em pixels do documento. */
+  guias?: Guias | null;
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

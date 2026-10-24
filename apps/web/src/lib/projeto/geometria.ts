@@ -115,7 +115,7 @@ export type Guias = { verticais: number[]; horizontais: number[] };
  * Ímã da prévia: se uma borda ou o centro da caixa passa perto das bordas ou do centro do quadro,
  * devolve quanto mover para encostar, e as linhas de guia para desenhar. `tolerancia` em pixels do quadro.
  */
-export function ajustarAsGuias(caixa: Caixa, quadro: Tamanho, tolerancia: number): { dx: number; dy: number; guias: Guias } {
+export function ajustarAsGuias(caixa: Caixa, quadro: Tamanho, tolerancia: number, alvos?: Guias): { dx: number; dy: number; guias: Guias } {
   const limites = limitesDaCaixa(caixa);
   const melhor = (pontos: number[], alvos: number[]) => {
     let escolha: { delta: number; alvo: number } | null = null;
@@ -127,8 +127,8 @@ export function ajustarAsGuias(caixa: Caixa, quadro: Tamanho, tolerancia: number
     }
     return escolha;
   };
-  const vertical = melhor([limites.esquerda, caixa.cx, limites.direita], [0, quadro.largura / 2, quadro.largura]);
-  const horizontal = melhor([limites.topo, caixa.cy, limites.base], [0, quadro.altura / 2, quadro.altura]);
+  const vertical = melhor([limites.esquerda, caixa.cx, limites.direita], alvos?.verticais ?? [0, quadro.largura / 2, quadro.largura]);
+  const horizontal = melhor([limites.topo, caixa.cy, limites.base], alvos?.horizontais ?? [0, quadro.altura / 2, quadro.altura]);
   return {
     dx: vertical?.delta ?? 0,
     dy: horizontal?.delta ?? 0,

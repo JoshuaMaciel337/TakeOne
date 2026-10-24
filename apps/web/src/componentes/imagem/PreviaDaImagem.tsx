@@ -11,7 +11,7 @@ import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
 import { type CaixaNoQuadro, caixaNoQuadro, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { posicaoTravada } from "@/lib/projeto/arvore";
-import { contemPonto, type Guias, type Tamanho } from "@/lib/projeto/geometria";
+import { type Caixa, contemPonto, type Guias, limitesDaCaixa, type Tamanho } from "@/lib/projeto/geometria";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
@@ -21,6 +21,8 @@ import { CHAVE_DA_PROFUNDIDADE } from "@/lib/previa/camadas";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
 import { preenchimentoNoTamanho } from "@/lib/imagem/desenharPreenchimento";
 import { aplicarModo } from "@/lib/imagem/modos";
+import { alvosDoEncaixe, encaixarValor, type PreferenciasDaVista, type UnidadeDaRegua, VISTA_PADRAO } from "@/lib/imagem/vista";
+import { type GuiaArrastada, GuiasEGrade, LADO_DA_REGUA, noDocumento, Reguas } from "./VistaDaImagem";
 import { aplicarProva, type TipoDaProva } from "@/lib/imagem/prova";
 import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
 import { textoNoTamanho } from "@/lib/texto/desenhar";
@@ -170,6 +172,11 @@ type Props = {
   fonteDaMascaraDosFiltros?: (clipe: Clipe) => HTMLCanvasElement | null;
   /** Alt + clique na miniatura da máscara: a prévia mostra só a máscara desta camada (o clipe), em cinza. */
   mascaraAVista?: string | null;
+  /** Exibir: as réguas, as guias, a grade, os extras e o encaixe (as guias são do documento). */
+  vista?: PreferenciasDaVista;
+  guiasDoDocumento?: Guias | null;
+  aoMudarGuias?: (guias: Guias) => void;
+  aoMudarUnidade?: (unidade: UnidadeDaRegua) => void;
   /** Exibir › Cores de prova (a prova ligada) e Alerta de gama: só na tela. */
   prova?: TipoDaProva | null;
   alertaDeGama?: boolean;
@@ -290,6 +297,10 @@ export function PreviaDaImagem({
   fonteDaMascara,
   fonteDaMascaraDosFiltros,
   mascaraAVista = null,
+  vista = VISTA_PADRAO,
+  guiasDoDocumento = null,
+  aoMudarGuias,
+  aoMudarUnidade,
   prova = null,
   alertaDeGama = false,
   selecaoDoDocumento = null,
@@ -308,6 +319,9 @@ export function PreviaDaImagem({
   const escala = Math.max(0.01, zoom ?? ajuste);
   const tamanho: Tamanho = { largura: Math.max(1, Math.round(imagem.largura * escala)), altura: Math.max(1, Math.round(imagem.altura * escala)) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // O documento na tela (as réguas e as guias se medem por ele) e a guia que está sendo arrastada
+  const imagemRef = useRef<HTMLDivElement>(null);
+  const [guiaArrastada, setGuiaArrastada] = useState<GuiaArrastada | null>(null);
   // A camada do modo de cor: fora do RGB (e do Lab, que não muda a tela), a prévia mostra a imagem no modo
   const modoCanvasRef = useRef<HTMLCanvasElement>(null);
   const modoAtivo = Boolean(((projeto.modo && projeto.modo.tipo !== "rgb" && projeto.modo.tipo !== "lab") || prova || alertaDeGama) && !mascaraAVista);
@@ -656,6 +670,65 @@ export function PreviaDaImagem({
     return arrastoDaForma(naImagem(atual.inicio), naImagem(atual.fim), { proporcional: atual.shift, doMeio: atual.alt, linha: ferramenta === "linha" });
   }
 
+  /**
+   * Arrastar uma guia (nova, da régua, ou uma que já existe): ela segue o ponteiro, encosta nos alvos do encaixe e, ao
+   * soltar, fica (dentro da área) ou some (de volta às réguas).
+   */
+  function arrastarGuia(inicial: GuiaArrastada, evento: React.PointerEvent) {
+    const imagem = imagemRef.current;
+    const area = areaRef.current;
+    if (!imagem || !area || !aoMudarGuias) return;
+    evento.preventDefault();
+    const documento = tamanhoDaImagem(projeto);
+    const alvos = vista.encaixar ? alvosDoEncaixe({ ...vista.encaixarEm, guias: false }, { guias: null, espacoDaGrade: vista.grade ? vista.espacoDaGrade : 0, outras: limitesDasOutras(null), documento }) : { verticais: [], horizontais: [] };
+    let atual = inicial;
+    const posicao = (e: PointerEvent | React.PointerEvent) => {
+      const p = noDocumento(e, imagem, escala);
+      const bruto = inicial.tipo === "v" ? p.x : p.y;
+      const encaixe = encaixarValor(bruto, inicial.tipo === "v" ? alvos.verticais : alvos.horizontais, 6 / escala);
+      return encaixe.alvo !== null ? encaixe.valor : Math.round(bruto);
+    };
+    const mover = (e: PointerEvent) => {
+      atual = { ...inicial, pos: posicao(e) };
+      setGuiaArrastada(atual);
+    };
+    const soltar = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      setGuiaArrastada(null);
+      const r = area.getBoundingClientRect();
+      const dentro = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const base = { verticais: [...(guiasDoDocumento?.verticais ?? [])], horizontais: [...(guiasDoDocumento?.horizontais ?? [])] };
+      const lista = inicial.tipo === "v" ? base.verticais : base.horizontais;
+      if (inicial.indice !== null) lista.splice(inicial.indice, 1);
+      if (dentro) lista.push(atual.pos);
+      if (inicial.indice !== null || dentro) aoMudarGuias(base);
+    };
+    setGuiaArrastada({ ...inicial, pos: inicial.indice === null ? posicao(evento) : inicial.pos });
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+  }
+  /** As bordas das outras camadas visíveis, em pixels do documento (o encaixe nas camadas). */
+  function limitesDasOutras(clipeId: string | null) {
+    return camadas
+      .filter((camada) => camada.clipe.id !== clipeId && !camada.faixa.oculta && camada.caixa.opacidade > 0)
+      .map((camada) => {
+        const l = limitesDaCaixa(caixaNoDocumento(camada.caixa));
+        return { esquerda: l.esquerda, topo: l.topo, direita: l.direita, base: l.base };
+      });
+  }
+  /** A caixa da camada (pixels da tela) em pixels do documento. */
+  function caixaNoDocumento(caixa: Caixa): Caixa {
+    return { ...caixa, cx: caixa.cx / escala, cy: caixa.cy / escala, largura: caixa.largura / escala, altura: caixa.altura / escala };
+  }
+  /** Os alvos do encaixe da camada que anda, em pixels da tela. */
+  function alvosNaTela(clipeId: string): Guias {
+    if (!vista.encaixar) return { verticais: [], horizontais: [] };
+    const documento = tamanhoDaImagem(projeto);
+    const alvos = alvosDoEncaixe(vista.encaixarEm, { guias: vista.extras && vista.guias ? guiasDoDocumento : null, espacoDaGrade: vista.extras && vista.grade ? vista.espacoDaGrade : 0, outras: limitesDasOutras(clipeId), documento });
+    return { verticais: alvos.verticais.map((v) => v * escala), horizontais: alvos.horizontais.map((v) => v * escala) };
+  }
+
   const ajustada = zoom === null;
   const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || FERRAMENTAS_DE_TEXTO.has(ferramenta) || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
@@ -672,9 +745,22 @@ export function PreviaDaImagem({
 
   return (
     <section aria-label="Prévia da imagem" className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-fundo">
+      {vista.reguas ? (
+        <Reguas
+          imagemRef={imagemRef}
+          areaRef={areaRef}
+          escala={escala}
+          documento={tamanhoDaImagem(projeto)}
+          ppi={projeto.tamanho?.resolucao ?? 72}
+          unidade={vista.unidade}
+          aoComecar={(tipo, evento) => (vista.travarGuias ? undefined : arrastarGuia({ tipo, pos: 0, indice: null }, evento))}
+          aoMudarUnidade={(unidade) => aoMudarUnidade?.(unidade)}
+        />
+      ) : null}
       <div
         ref={areaRef}
         className={`min-h-0 flex-1 ${ajustada ? "overflow-hidden" : "overflow-auto"}`}
+        style={vista.reguas ? { marginTop: LADO_DA_REGUA, marginLeft: LADO_DA_REGUA } : undefined}
         onWheel={(evento) => {
           if (!evento.ctrlKey && !evento.altKey) return;
           evento.preventDefault();
@@ -691,6 +777,7 @@ export function PreviaDaImagem({
           }}
         >
           <div
+            ref={imagemRef}
             className="relative shrink-0 select-none shadow-lg shadow-black/40"
             style={{
               width: tamanho.largura,
@@ -704,6 +791,17 @@ export function PreviaDaImagem({
           >
             <canvas ref={canvasRef} className="absolute inset-0 size-full" style={{ ...(corAVista ? { filter: `url(#to-canal-${corAVista})` } : {}), ...(modoAtivo ? { visibility: "hidden" } : {}) }} />
             <canvas ref={modoCanvasRef} className="pointer-events-none absolute inset-0 size-full" hidden={!modoAtivo} aria-hidden data-modo-de-cor />
+            <GuiasEGrade
+              guias={guiasDoDocumento}
+              arrastada={guiaArrastada}
+              vista={vista}
+              escala={escala}
+              tamanho={tamanho}
+              mesa={MESA}
+              caixas={camadas.filter((camada) => !camada.faixa.oculta).map((camada) => camada.caixa)}
+              podeArrastar={ferramenta === "mover" && !vista.travarGuias && Boolean(aoMudarGuias)}
+              aoComecar={arrastarGuia}
+            />
             {corAVista ? (
               <svg width="0" height="0" className="absolute" aria-hidden>
                 {/* Um canal de cor nos três, para a imagem aparecer em cinza por ele */}
@@ -747,9 +845,12 @@ export function PreviaDaImagem({
                 quadro={tamanho}
                 transformacao={selecionada.clipe.transformacao}
                 travado={posicaoTravada(projeto, selecionada.faixa)}
+                alvos={alvosNaTela(selecionada.clipe.id)}
                 aoMudar={(mudanca, novasGuias) => {
                   aoPrever(selecionada.clipe.id, mudanca);
-                  setGuias(novasGuias.verticais.length || novasGuias.horizontais.length ? novasGuias : null);
+                  // As guias inteligentes (as linhas onde a camada encostou) só aparecem com elas e os extras ligados
+                  const mostrar = vista.extras && vista.guiasInteligentes;
+                  setGuias(mostrar && (novasGuias.verticais.length || novasGuias.horizontais.length) ? novasGuias : null);
                 }}
                 aoSoltar={(mudanca) => {
                   setGuias(null);
