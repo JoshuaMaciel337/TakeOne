@@ -108,6 +108,8 @@ import { caminhosDoTexto } from "@/lib/texto/contornos";
 import { LOREM_IPSUM, ocorrencias, type OpcoesDaBusca, substituirTodas } from "@/lib/texto/localizar";
 import { estiloNoIndice, nomeDoTexto, substituir } from "@/lib/texto/modelo";
 import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
+import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
+import type { Deformacao } from "@/lib/texto/deformar";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
 import { novoId } from "@/componentes/editor/contexto";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -429,6 +431,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo> }>({ estilo: {}, paragrafo: {} });
   const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
   const [localizandoTexto, setLocalizandoTexto] = useState(false);
+  // Texto › Deformar texto: a deformação de antes (para o Cancelar) enquanto a janela está aberta
+  const [deformando, setDeformando] = useState<{ clipeId: string; antes: Deformacao | null } | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
   const pendentes = useRef(new Map<string, Pendente>());
@@ -2249,6 +2253,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (mudancas.length) executar({ comando: "imagem.textosRicos", parametros: { nome: "atualizar", mudancas } });
     mostrarAviso(mudancas.length ? `${mudancas.length} ${mudancas.length === 1 ? "camada de texto atualizada" : "camadas de texto atualizadas"}.` : "As camadas de texto já estão atualizadas.");
   };
+  /** Abre o Deformar texto no texto em edição ou no escolhido. */
+  const abrirDeformar = () => {
+    const texto = edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico;
+    const clipeId = edicaoDeTexto?.clipeId ?? textoEscolhido?.id;
+    if (texto && clipeId) setDeformando({ clipeId, antes: texto.deformar ?? null });
+  };
+  /** A deformação no texto: na edição, no próprio texto; fora dela, como prévia (provisória) ou de vez. */
+  const deformarTexto = (deformar: Deformacao | null, deVez: boolean) => {
+    if (!deformando) return;
+    if (edicaoDeTexto?.clipeId === deformando.clipeId) {
+      setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, deformar }) });
+      return;
+    }
+    const clipe = projetoRef.current ? acharClipe(projetoRef.current, deformando.clipeId)?.clipe : null;
+    if (!clipe?.texto_rico) return;
+    const comando: Comando = { comando: "imagem.textoRico", parametros: { clipeId: clipe.id, texto: textoMedido({ ...clipe.texto_rico, deformar }) } };
+    if (deVez) {
+      setProvisorio(null);
+      executar(comando);
+    } else setProvisorio(comando);
+  };
   const mudarOrientacaoDoTexto = (orientacao: TextoRico["orientacao"]) => {
     if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, orientacao }) });
     else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido({ ...textoEscolhido.texto_rico, orientacao }) } });
@@ -3698,6 +3723,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       aoLocalizar: () => setLocalizandoTexto(true),
       aoLorem: colarLorem,
       aoAtualizarTodas: () => void atualizarTextos(),
+      aoDeformar: abrirDeformar,
     },
     filtro: aplicarFiltro,
     zoom: mudarZoom,
@@ -4256,6 +4282,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               aoOrientacao={mudarOrientacaoDoTexto}
               edicao={edicaoDeTexto ? { aoConfirmar: () => terminarTexto(), aoCancelar: () => terminarTexto(true) } : null}
               aoPaineis={() => area.abrir("caractere")}
+              aoDeformar={edicaoDeTexto || textoEscolhido ? abrirDeformar : null}
             />
           ) : ferramenta === "prancheta" ? (
             <OpcoesDaPranchetaNaBarra
@@ -4666,6 +4693,21 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascara={pinturas.fonteDaMascara}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {deformando ? (
+        <JanelaDeformarTexto
+          inicial={deformando.antes}
+          aoPrever={(deformar) => deformarTexto(deformar, false)}
+          aoConfirmar={(deformar) => {
+            deformarTexto(deformar, true);
+            setDeformando(null);
+          }}
+          aoCancelar={() => {
+            deformarTexto(deformando.antes, false);
+            setProvisorio(null);
+            setDeformando(null);
+          }}
         />
       ) : null}
       {localizandoTexto ? <JanelaLocalizarTexto aoFechar={() => setLocalizandoTexto(false)} aoLocalizar={localizarTexto} aoSubstituir={substituirTexto} aoSubstituirTudo={substituirTudo} /> : null}

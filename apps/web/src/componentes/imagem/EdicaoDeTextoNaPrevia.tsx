@@ -12,6 +12,7 @@ import type { Virar } from "@/lib/projeto/modelo";
 import { type Disposicao, disporTexto } from "@/lib/texto/layout";
 import { fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { medirTexto } from "@/lib/texto/medida";
+import { funcaoDaDeformacao } from "@/lib/texto/contornos";
 import { type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, substituir, textoCorrido, type TextoRico } from "@/lib/texto/modelo";
 
 export type SelecaoDoTexto = { de: number; ate: number };
@@ -73,7 +74,22 @@ function contasDaCaixa(texto: TextoRico, caixa: Caixa, virar?: Virar | null) {
 /** O caractere mais perto de um ponto da prévia (o clique que abre a edição). */
 export function indiceNaTela(texto: TextoRico, caixa: Caixa, virar: Virar | null | undefined, ponto: { x: number; y: number }): number {
   const contas = contasDaCaixa(texto, caixa, virar);
-  return indiceNoPonto(disporTexto(texto, fonteDoEstilo), contas.doTexto(ponto.x, ponto.y), texto.orientacao === "vertical");
+  return indiceNoTexto(texto, disporTexto(texto, fonteDoEstilo), contas.doTexto(ponto.x, ponto.y));
+}
+
+/** O caractere do ponto (unidades do texto); no texto deformado, o cursor deformado mais perto. */
+export function indiceNoTexto(texto: TextoRico, disposicao: Disposicao, p: { x: number; y: number }): number {
+  const vertical = texto.orientacao === "vertical";
+  const deformacao = funcaoDaDeformacao(texto, disposicao);
+  if (!deformacao) return indiceNoPonto(disposicao, p, vertical);
+  let melhor = 0;
+  let menor = Infinity;
+  disposicao.cursores.forEach((c, i) => {
+    const meio = deformacao(vertical ? { x: c.x, y: c.y } : { x: c.x, y: c.y - (c.ascendente - c.descendente) / 2 });
+    const d = Math.hypot(meio.x - p.x, meio.y - p.y);
+    if (d < menor) [menor, melhor] = [d, i];
+  });
+  return melhor;
 }
 
 /** O caractere mais perto do ponto (coordenadas do texto). */
@@ -148,6 +164,11 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
   useEffect(() => {
     campoRef.current?.focus({ preventScroll: true });
     const intervalo = window.setInterval(() => setPiscar((atual) => !atual), 530);
+    // O foco que caiu no nada (uma janela que fechou, um clique num painel) volta para o texto
+    const vigia = window.setInterval(() => {
+      const ativo = document.activeElement;
+      if (!ativo || ativo === document.body) campoRef.current?.focus({ preventScroll: true });
+    }, 100);
     // Depois de um botão ou da cor da barra, o que se digita volta para o texto (os campos de digitar ficam com o deles)
     const tecla = (evento: KeyboardEvent) => {
       const campo = campoRef.current;
@@ -179,6 +200,7 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
     document.addEventListener("selectionchange", mudou);
     return () => {
       window.clearInterval(intervalo);
+      window.clearInterval(vigia);
       window.removeEventListener("keydown", tecla, true);
       document.removeEventListener("selectionchange", mudou);
     };
@@ -316,6 +338,17 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
     });
   }
   const cursor = disposicao.cursores[selecao.ate];
+  // No texto deformado, a seleção e o cursor são levados pela deformação (os lados divididos, para curvarem)
+  const deformacao = funcaoDaDeformacao(texto, disposicao);
+  const poligono = (x: number, y: number, l: number, a: number) => {
+    const n = deformacao ? 8 : 1;
+    const pontos: { x: number; y: number }[] = [];
+    for (let i = 0; i < n; i++) pontos.push({ x: x + (l * i) / n, y });
+    for (let i = 0; i < n; i++) pontos.push({ x: x + l, y: y + (a * i) / n });
+    for (let i = 0; i < n; i++) pontos.push({ x: x + l - (l * i) / n, y: y + a });
+    for (let i = 0; i < n; i++) pontos.push({ x, y: y + a - (a * i) / n });
+    return (deformacao ? pontos.map(deformacao) : pontos).map((p) => `${p.x},${p.y}`).join(" ");
+  };
   const espessura = 1.5 / Math.max(1e-6, contas.escala);
   return (
     <div
@@ -332,7 +365,7 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
           return;
         }
         evento.currentTarget.setPointerCapture(evento.pointerId);
-        const indice = indiceNoPonto(disposicao, p, vertical);
+        const indice = indiceNoTexto(texto, disposicao, p);
         const anterior = cliques.current;
         const seguido = evento.timeStamp - anterior.tempo < 500 && Math.hypot(evento.clientX - anterior.x, evento.clientY - anterior.y) < 6;
         cliques.current = { tempo: evento.timeStamp, x: evento.clientX, y: evento.clientY, contagem: seguido ? anterior.contagem + 1 : 1 };
@@ -348,7 +381,7 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
       }}
       onPointerMove={(evento) => {
         if (!arrasto.current) return;
-        const indice = indiceNoPonto(disposicao, noTexto(evento, evento.currentTarget), vertical);
+        const indice = indiceNoTexto(texto, disposicao, noTexto(evento, evento.currentTarget));
         aoSelecionar({ de: arrasto.current.ancora, ate: indice });
       }}
       onPointerUp={() => {
@@ -360,13 +393,13 @@ export function EdicaoDeTextoNaPrevia({ texto, caixa, virar, selecao, aoSelecion
           {/* A borda da caixa (no de parágrafo, a da pessoa) */}
           <rect x={-texto.origem.x} y={-texto.origem.y} width={texto.caixa.largura} height={texto.caixa.altura} fill="none" stroke="#2f80ff" strokeDasharray="4 3" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.7} />
           {retangulos.map((r, i) => (
-            <rect key={i} x={r.x} y={r.y} width={r.largura} height={r.altura} fill="#2f80ff" opacity={0.35} />
+            <polygon key={i} points={poligono(r.x, r.y, r.largura, r.altura)} fill="#2f80ff" opacity={0.35} />
           ))}
           {cursor && b === a && piscar ? (
             vertical ? (
-              <rect x={cursor.x - cursor.ascendente} y={cursor.y - espessura / 2} width={cursor.ascendente + cursor.descendente} height={espessura} fill="#000" stroke="#fff" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+              <polygon points={poligono(cursor.x - cursor.ascendente, cursor.y - espessura / 2, cursor.ascendente + cursor.descendente, espessura)} fill="#000" stroke="#fff" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
             ) : (
-              <rect x={cursor.x - espessura / 2} y={cursor.y - cursor.ascendente} width={espessura} height={cursor.ascendente + cursor.descendente} fill="#000" stroke="#fff" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+              <polygon points={poligono(cursor.x - espessura / 2, cursor.y - cursor.ascendente, espessura, cursor.ascendente + cursor.descendente)} fill="#000" stroke="#fff" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
             )
           ) : null}
         </g>

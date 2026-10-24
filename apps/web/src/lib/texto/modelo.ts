@@ -4,6 +4,8 @@
 // quebram nela), na horizontal ou na vertical. As posições são índices de caracteres (UTF-16) do texto inteiro, com uma
 // quebra ("\n") entre os parágrafos, como num campo de texto.
 
+import type { Deformacao } from "./deformar.ts";
+
 export type CaixaDasLetras = "normal" | "maiusculas" | "versalete";
 export type PosicaoDasLetras = "normal" | "sobrescrito" | "subscrito";
 export type Suavizacao = "nenhuma" | "nitida" | "forte" | "suave";
@@ -74,6 +76,8 @@ export type TextoRico = {
   caixa: { largura: number; altura: number };
   /** No ponto, onde fica o começo da primeira linha de base dentro da caixa (o texto cresce a partir dele). */
   origem: { x: number; y: number };
+  /** Texto › Deformar texto (deformar.ts). */
+  deformar?: Deformacao | null;
 };
 
 export const ESTILO_PADRAO: EstiloDoCaractere = {

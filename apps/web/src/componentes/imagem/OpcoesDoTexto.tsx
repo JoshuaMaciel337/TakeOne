@@ -3,7 +3,7 @@
 // A barra da ferramenta Texto do editor de imagem (ADR 0003, onda 13.8): a direção, a fonte (com a amostra de cada uma
 // e a prévia ao passar o mouse), o estilo, o tamanho, o alinhamento e a cor. Vale para o que está selecionado no texto
 // em edição, para o texto escolhido inteiro ou, sem nenhum, para o próximo texto.
-import { AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, Check, ChevronDown, Search, X } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, Check, ChevronDown, Search, Spline, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -215,9 +215,11 @@ type Props = {
   edicao: { aoConfirmar: () => void; aoCancelar: () => void } | null;
   /** Os painéis Caractere e Parágrafo. */
   aoPaineis?: () => void;
+  /** Texto › Deformar texto (só com um texto escolhido ou em edição). */
+  aoDeformar?: (() => void) | null;
 };
 
-export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo, aoPreverFonte, aoAlinhamento, aoOrientacao, edicao, aoPaineis }: Props) {
+export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo, aoPreverFonte, aoAlinhamento, aoOrientacao, edicao, aoPaineis, aoDeformar }: Props) {
   const catalogo = useCatalogoDeFontes();
   const familia = catalogo.find((item) => item.id === estilo.familia);
   const estilos = estilosDaFamilia(familia);
@@ -276,6 +278,11 @@ export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo
         Cor:
         <input type="color" aria-label="Cor do texto" value={estilo.cor ?? "#000000"} onChange={(evento) => aoEstilo({ cor: evento.currentTarget.value })} className="h-6 w-8 cursor-pointer rounded border border-borda bg-fundo p-0" />
       </label>
+      {aoDeformar ? (
+        <button type="button" className="botao-icone h-6 w-auto px-1.5" title="Deformar texto" aria-label="Deformar texto" onClick={aoDeformar}>
+          <Spline className="size-4" aria-hidden />
+        </button>
+      ) : null}
       {aoPaineis ? (
         <button type="button" className="botao-icone h-6 w-auto px-2 text-xs" title="Os painéis Caractere e Parágrafo" onClick={aoPaineis}>
           Caractere e parágrafo

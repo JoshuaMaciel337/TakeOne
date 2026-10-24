@@ -253,6 +253,7 @@ export type AcoesDosMenus = {
     aoLocalizar: () => void;
     aoLorem: () => void;
     aoAtualizarTodas: () => void;
+    aoDeformar: () => void;
   };
   filtro: (efeito: TipoEfeito) => void;
   zoom: (para: "mais" | "menos" | "ajustar" | 1) => void;
@@ -536,6 +537,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           desativado: !a.textoRico.modo,
           aoEscolher: a.textoRico.aoConverter,
         },
+        { nome: "Deformar texto…", desativado: !a.textoRico.modo, aoEscolher: a.textoRico.aoDeformar },
         "-",
         { nome: "Criar caminho de trabalho", desativado: !a.textoRico.modo, aoEscolher: a.textoRico.aoCaminhoDeTrabalho },
         { nome: "Converter em forma", desativado: !a.textoRico.modo, aoEscolher: a.textoRico.aoConverterEmForma },

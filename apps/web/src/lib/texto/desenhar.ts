@@ -6,6 +6,7 @@
 import { type Disposicao, disporTexto } from "./layout";
 import type { Suavizacao, TextoRico } from "./modelo";
 import { fonteDoEstilo } from "./fontes";
+import { gruposDeformados } from "./contornos";
 
 const CAMINHOS = new Map<string, Path2D>();
 const INCLINACAO = Math.tan((12 * Math.PI) / 180);
@@ -48,6 +49,30 @@ export function desenharDisposicao(ctx: CanvasRenderingContext2D, disposicao: Di
   ctx.filter = "none";
 }
 
+/** O texto deformado: os polígonos de cada letra, com o enrolamento não nulo (os furos giram ao contrário). */
+function desenharDeformado(ctx: CanvasRenderingContext2D, grupos: NonNullable<ReturnType<typeof gruposDeformados>>, origem: { x: number; y: number }, escala: number, suavizacao: Suavizacao) {
+  if (suavizacao === "suave") ctx.filter = `blur(${(0.35 * escala).toFixed(3)}px)`;
+  ctx.setTransform(escala, 0, 0, escala, origem.x * escala, origem.y * escala);
+  for (const grupo of grupos) {
+    const caminho = new Path2D();
+    for (const poligono of grupo.poligonos) {
+      poligono.forEach((p, i) => (i ? caminho.lineTo(p.x, p.y) : caminho.moveTo(p.x, p.y)));
+      caminho.closePath();
+    }
+    ctx.fillStyle = grupo.cor;
+    ctx.fill(caminho, "nonzero");
+    const largura = grupo.em * ((grupo.negrito ? 0.035 : 0) + (suavizacao === "forte" ? 0.012 : 0));
+    if (largura > 0) {
+      ctx.strokeStyle = grupo.cor;
+      ctx.lineJoin = "round";
+      ctx.lineWidth = largura;
+      ctx.stroke(caminho);
+    }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = "none";
+}
+
 const DESENHADOS = new Map<string, { chave: string; canvas: HTMLCanvasElement }>();
 const LADO_MAXIMO = 8192;
 
@@ -74,7 +99,10 @@ export function textoNoTamanho(id: string, texto: TextoRico, largura: number, al
     ctx.rect(0, 0, pl, pa);
     ctx.clip();
   }
-  desenharDisposicao(ctx, disposicao, texto.origem, escala, texto.estilo.suavizacao);
+  // Deformado, as letras são polígonos achatados a um terço de pixel da tela
+  const deformados = gruposDeformados(texto, disposicao, 0.3 / Math.max(1e-6, escala));
+  if (deformados) desenharDeformado(ctx, deformados, texto.origem, escala, texto.estilo.suavizacao);
+  else desenharDisposicao(ctx, disposicao, texto.origem, escala, texto.estilo.suavizacao);
   // Sem suavização, cada pixel fica inteiro ou vazio (a cor de quem fica é a das letras)
   if (texto.estilo.suavizacao === "nenhuma") {
     const dados = ctx.getImageData(0, 0, pl, pa);
