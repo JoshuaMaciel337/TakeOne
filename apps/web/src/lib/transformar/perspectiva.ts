@@ -15,7 +15,7 @@ export type DeformacaoDePerspectiva = { origem: Ponto[]; destino: Ponto[]; plano
 const quadDe = (pontos: Ponto[], plano: Plano): Quadrilatero => [pontos[plano[0]], pontos[plano[1]], pontos[plano[2]], pontos[plano[3]]];
 
 /** O contrário da homografia: do ponto do quadrilátero para o (u, v) do quadrado unitário. */
-function inversaDaHomografia(q: Quadrilatero): (p: Ponto) => Ponto {
+export function inversaDaHomografia(q: Quadrilatero): (p: Ponto) => Ponto {
   const [a, b, c, d, e, f, g, h] = coeficientesDaHomografia(q);
   const A = e - f * h;
   const B = c * h - b;

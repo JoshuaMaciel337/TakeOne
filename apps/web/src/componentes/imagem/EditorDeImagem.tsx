@@ -102,6 +102,7 @@ import { JanelaDissolver } from "./JanelaDissolver";
 import { JanelaMarionete } from "./JanelaMarionete";
 import { JanelaLente } from "./JanelaLente";
 import { JanelaPerspectiva } from "./JanelaPerspectiva";
+import { JanelaPontoDeFuga } from "./JanelaPontoDeFuga";
 import { escalaSensivel } from "@/lib/transformar/escalaSensivel";
 import { type CaixaDaMarionete, caixaDoConteudo } from "@/lib/transformar/marionete";
 import { type ResultadoDoRefinamento, SelecionarEMascarar } from "./SelecionarEMascarar";
@@ -316,6 +317,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [janelaDoDocumento, setJanelaDoDocumento] = useState<"imagem" | "tela" | "giro" | null>(null);
   // Filtro › Dissolver: a camada desenhada sozinha e o plano da camada de pixels que vem dela
   const [dissolvendo, setDissolvendo] = useState<{ tipo: "dissolver" | "marionete" | "lente" | "grandeAngular" | "perspectiva"; imagem: ImagemRgba; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
+  // Filtro › Ponto de fuga: a imagem inteira, por baixo dos planos
+  const [pontoDeFuga, setPontoDeFuga] = useState<ImagemRgba | null>(null);
   // Editar › Escala sensível ao conteúdo: a camada sozinha e a caixa do conteúdo dela
   const [escalando, setEscalando] = useState<{ imagem: ImagemRgba; caixa: CaixaDaMarionete; dados: Omit<PlanoDosPixels, "desenhar"> } | null>(null);
   const [importandoPadroes, setImportandoPadroes] = useState(false);
@@ -1595,6 +1598,57 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       setGerandoPixels(false);
     }
   };
+  /** Filtro › Ponto de fuga: a imagem inteira, como se vê, vai para a área de trabalho. */
+  const abrirPontoDeFuga = async () => {
+    const atual = projetoRef.current;
+    if (!atual || gerandoPixels) return;
+    setGerandoPixels(true);
+    try {
+      await pinturas.esperar();
+      const documento = tamanhoDaImagem(atual);
+      const bitmap = await createImageBitmap(await exportarImagem(atual, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      const canvas = document.createElement("canvas");
+      canvas.width = documento.largura;
+      canvas.height = documento.altura;
+      const ctx2d = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx2d.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+      bitmap.close();
+      const pixels = ctx2d.getImageData(0, 0, documento.largura, documento.altura);
+      setPontoDeFuga({ dados: pixels.data, largura: pixels.width, altura: pixels.height });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível abrir o Ponto de fuga.");
+    } finally {
+      setGerandoPixels(false);
+    }
+  };
+  /** O que colar no Ponto de fuga: o que foi copiado, ou uma camada desenhada sozinha, no retângulo do conteúdo dela. */
+  const fonteDoPontoDeFuga = async (id: string): Promise<ImagemRgba | null> => {
+    const atual = projetoRef.current;
+    if (!atual) return null;
+    let canvas: HTMLCanvasElement;
+    if (id === "copia") {
+      const copia = areaDeTransferencia.current;
+      if (!copia) return null;
+      canvas = copia.canvas;
+    } else {
+      const documento = tamanhoDaImagem(atual);
+      const sozinha = projetoSoCom(atual, [id], { neutras: new Set([id]), semEstilo: true });
+      const bitmap = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png", fonteDosPixels: pinturas.fonte, fonteDaMascara: pinturas.fonteDaMascara }));
+      canvas = document.createElement("canvas");
+      canvas.width = documento.largura;
+      canvas.height = documento.altura;
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, documento.largura, documento.altura);
+      bitmap.close();
+    }
+    const dados = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, canvas.width, canvas.height).data;
+    const caixa = caixaDoConteudo(dados, canvas.width, canvas.height, 0);
+    if (!caixa) return null;
+    const largura = caixa.x1 - caixa.x0;
+    const altura = caixa.y1 - caixa.y0;
+    const recorte = new Uint8ClampedArray(largura * altura * 4);
+    for (let y = 0; y < altura; y++) recorte.set(dados.subarray(((y + caixa.y0) * canvas.width + caixa.x0) * 4, ((y + caixa.y0) * canvas.width + caixa.x1) * 4), y * largura * 4);
+    return { dados: recorte, largura, altura };
+  };
   const abrirEscalaSensivel = async () => {
     const sozinha = await camadaSozinhaParaEditar();
     if (!sozinha) return;
@@ -2728,6 +2782,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     lente: (tipo) => void abrirDissolver(tipo),
     perspectiva: () => void abrirDissolver("perspectiva"),
     escalaSensivel: () => void abrirEscalaSensivel(),
+    pontoDeFuga: () => void abrirPontoDeFuga(),
     temUltimaTransformacao: ultimaTransformacao.current !== null,
     selecionarEMascarar: abrirSelecionarEMascarar,
     camadasNoPainel: (como) => {
@@ -2863,7 +2918,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     restaurarArea: area.restaurar,
     atalhos: () => setAtalhos(true),
   };
-  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -3734,6 +3789,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             );
           })()
         : null}
+      {pontoDeFuga && projeto ? (
+        <JanelaPontoDeFuga
+          fundo={pontoDeFuga}
+          fontes={[
+            ...(areaDeTransferencia.current ? [{ id: "copia", nome: "O que foi copiado" }] : []),
+            ...camadasDaImagem(projeto)
+              .filter(({ clipe }) => !clipe.pasta && !clipe.ajuste)
+              .map(({ faixa }) => ({ id: faixa.id, nome: nomeDaFaixa(faixa) })),
+          ]}
+          carregarFonte={fonteDoPontoDeFuga}
+          aoFechar={() => setPontoDeFuga(null)}
+          aoConfirmar={(pixels) => {
+            const { largura, altura } = pontoDeFuga;
+            setPontoDeFuga(null);
+            const canvas = document.createElement("canvas");
+            canvas.width = largura;
+            canvas.height = altura;
+            canvas.getContext("2d")!.putImageData(new ImageData(pixels, largura, altura), 0, 0);
+            canvas.toBlob((blob) => blob && void gerarPixels(async () => blob, { remover: [], lugar: null, nome: "Ponto de fuga", manter: { opacidade: 1, faixa: {} } }), "image/png");
+          }}
+        />
+      ) : null}
       {escalando ? (
         <JanelaEscalaSensivel
           antes={{ largura: escalando.caixa.x1 - escalando.caixa.x0, altura: escalando.caixa.y1 - escalando.caixa.y0 }}
