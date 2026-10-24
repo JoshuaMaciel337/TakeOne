@@ -148,6 +148,8 @@ import {
   pranchetaDoGrupo,
   adicionarTextoRico,
   mudarTextoRico,
+  textoEmForma,
+  mudarTextosRicos,
 } from "./imagem.ts";
 import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
@@ -256,6 +258,8 @@ export type Comando =
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
   | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null; id?: string } }
+  | { comando: "imagem.textosRicos"; parametros: { mudancas: { clipeId: string; texto: TextoRico }[]; nome: "substituir" | "atualizar" } }
+  | { comando: "imagem.textoEmForma"; parametros: { clipeId: string; vetor: CamadaVetorial; centro: { x: number; y: number } } }
   | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico; deslocamento?: { x: number; y: number } } }
   | { comando: "imagem.adicionarPrancheta"; parametros: { retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.prancheta"; parametros: { clipeId: string; mudanca: Partial<Prancheta>; tamanhos: Record<string, Tamanho> } }
@@ -391,6 +395,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.mascaraVetorial": "mudar a máscara vetorial",
   "imagem.adicionarTextoRico": "pôr o texto",
   "imagem.textoRico": "mudar o texto",
+  "imagem.textoEmForma": "converter o texto em forma",
+  "imagem.textosRicos": "mudar os textos",
   "imagem.adicionarPrancheta": "pôr a prancheta",
   "imagem.prancheta": "mudar a prancheta",
   "imagem.pranchetaDoGrupo": "prancheta a partir do grupo",
@@ -676,6 +682,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: definirMascaraVetorial(projeto, parametros.clipeId, parametros.mascara) };
     case "imagem.adicionarTextoRico": {
       const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima, parametros.id);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
+    }
+    case "imagem.textosRicos":
+      return { projeto: mudarTextosRicos(projeto, parametros.mudancas) };
+    case "imagem.textoEmForma": {
+      const resultado = textoEmForma(projeto, ctx, parametros.clipeId, parametros.vetor, parametros.centro);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.textoRico":

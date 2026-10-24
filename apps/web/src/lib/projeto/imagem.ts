@@ -7,12 +7,12 @@ import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
-import { type Clipe, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
+import { acharClipe, type Clipe, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
-import type { TextoRico } from "../texto/modelo.ts";
+import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -230,18 +230,45 @@ export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: Texto
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
 }
 
+/** Vários textos trocados de uma vez (Substituir tudo, Atualizar todas as camadas de texto): um passo só. */
+export function mudarTextosRicos(projeto: Projeto, mudancas: { clipeId: string; texto: TextoRico }[]): Projeto {
+  return mudancas.reduce((atual, { clipeId, texto }) => mudarTextoRico(atual, clipeId, texto), projeto);
+}
+
+/**
+ * Texto › Converter em forma: uma camada de forma com os contornos das letras (já em pixels da imagem, na cor do texto)
+ * entra no lugar do texto, com o nome, a opacidade, o preenchimento e a mesclagem dele.
+ */
+export function textoEmForma(projeto: Projeto, ctx: Contexto, clipeId: string, vetor: CamadaVetorial, centro: { x: number; y: number }): { projeto: Projeto; clipeId: string } {
+  const achado = acharClipe(projeto, clipeId);
+  if (!achado?.clipe.texto_rico) throw new ErroEdicao("Escolha uma camada de texto.");
+  const { faixa, clipe } = achado;
+  const resultado = adicionarCamadaVetorial(projeto, ctx, vetor, centro, faixa.nome ?? "Forma", faixa.id);
+  const comOsAjustes = mudarClipeDaCamada(resultado.projeto, resultado.clipeId, (novo) => ({
+    ...novo,
+    transformacao: { ...novo.transformacao, opacidade: clipe.transformacao.opacidade },
+    ...(clipe.mesclagem ? { mesclagem: clipe.mesclagem } : {}),
+    ...(clipe.preenchimento !== undefined ? { preenchimento: clipe.preenchimento } : {}),
+  }));
+  return { projeto: apagarCamada(comOsAjustes, faixa.id), clipeId: resultado.clipeId };
+}
+
 /**
  * Troca o texto (já medido): a origem dele (o começo da primeira linha de base, ou o canto da caixa) fica no lugar, ou o
  * ponto que `deslocamento` diz (o ponto da caixa antiga vira ele mais o deslocamento na nova: a conversão de modo).
  */
 export function mudarTextoRico(projeto: Projeto, clipeId: string, texto: TextoRico, deslocamento?: { x: number; y: number }): Projeto {
   const quadro = tamanhoDaImagem(projeto);
-  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+  const anterior = acharClipe(projeto, clipeId)?.clipe.texto_rico;
+  const mudado = mudarClipeDaCamada(projeto, clipeId, (clipe) => {
     const antigo = clipe.texto_rico;
     if (!antigo) throw new ErroEdicao("Esta camada não é um texto.");
     const d = deslocamento ?? { x: texto.origem.x - antigo.origem.x, y: texto.origem.y - antigo.origem.y };
     return { ...clipe, texto_rico: texto, recorte: { ...RECORTE_PADRAO }, transformacao: transformacaoNaCaixaNova(clipe, antigo.caixa, texto.caixa, d, quadro) };
   });
+  // O nome que veio do texto acompanha o texto (o que a pessoa deu fica)
+  const nomeAntigo = anterior ? nomeDoTexto(anterior) : null;
+  return { ...mudado, faixas: mudado.faixas.map((faixa) => (faixa.clipes[0]?.id === clipeId && faixa.nome === nomeAntigo ? { ...faixa, nome: nomeDoTexto(texto) } : faixa)) };
 }
 
 /** Um ponto da imagem nas unidades da caixa da forma da camada (a volta do caminho da camada até a imagem). */
@@ -261,11 +288,12 @@ export function pontoNaForma(clipe: Clipe, ponto: { x: number; y: number }, quad
 
 /** Um ponto das unidades da caixa da forma na imagem (o caminho da camada até a imagem). */
 export function pontoDaForma(clipe: Clipe, ponto: { x: number; y: number }, quadro: Tamanho): { x: number; y: number } {
-  const vetor = clipe.vetor!;
+  // A caixa da forma ou a do texto do navegador (as duas valem uma unidade por pixel na escala 1)
+  const caixa = clipe.vetor?.caixa ?? clipe.texto_rico!.caixa;
   const t = clipe.transformacao;
-  const k = pixelsPorUnidade(vetor.caixa, t.escala, quadro);
-  let ux = (ponto.x - vetor.caixa.largura / 2) * k;
-  let uy = (ponto.y - vetor.caixa.altura / 2) * k;
+  const k = pixelsPorUnidade(caixa, t.escala, quadro);
+  let ux = (ponto.x - caixa.largura / 2) * k;
+  let uy = (ponto.y - caixa.altura / 2) * k;
   if (clipe.virar?.horizontal) ux = -ux;
   if (clipe.virar?.vertical) uy = -uy;
   const r = (t.rotacao * Math.PI) / 180;

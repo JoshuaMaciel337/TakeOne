@@ -104,6 +104,10 @@ import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
 import { PainelCaractere, PainelParagrafo } from "./PaineisDoTexto";
 import { esperarFontes, fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
 import { converterModo } from "@/lib/texto/converter";
+import { caminhosDoTexto } from "@/lib/texto/contornos";
+import { LOREM_IPSUM, ocorrencias, type OpcoesDaBusca, substituirTodas } from "@/lib/texto/localizar";
+import { estiloNoIndice, nomeDoTexto, substituir } from "@/lib/texto/modelo";
+import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
 import { novoId } from "@/componentes/editor/contexto";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -115,7 +119,7 @@ import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
 import { camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
-import { caminhosDoVetorNaImagem } from "@/lib/projeto/imagem";
+import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
@@ -232,8 +236,6 @@ type EdicaoDeTexto = {
   estiloPendente: Partial<EstiloDoCaractere> | null;
 };
 
-/** O nome da camada de texto: o começo do texto, como nos editores de imagem. */
-const nomeDoTexto = (texto: TextoRico) => textoCorrido(texto).replace(/\s+/g, " ").trim().slice(0, 40) || "Texto";
 
 /** O comando que põe o texto em edição no projeto (com a fonte sob o mouse no seletor, na seleção ou no texto todo). */
 function comandoDaEdicao(edicao: EdicaoDeTexto, previa: Partial<EstiloDoCaractere> | null): Comando {
@@ -426,6 +428,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // As opções da ferramenta Texto para o próximo texto, e a fonte sob o mouse no seletor (a prévia mostra nela)
   const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo> }>({ estilo: {}, paragrafo: {} });
   const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
+  const [localizandoTexto, setLocalizandoTexto] = useState(false);
   const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
   const pendentes = useRef(new Map<string, Pendente>());
@@ -2118,6 +2121,134 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       setSelecao([clipeId]);
     });
   };
+  /**
+   * Os contornos do texto escolhido em pixels da imagem (a edição em andamento termina antes): para a forma e para o
+   * caminho de trabalho.
+   */
+  const contornosDoTexto = async (): Promise<{ clipeId: string; caminhos: Subcaminho[]; cor: string } | null> => {
+    const clipeId = edicaoDeTexto?.clipeId ?? textoEscolhido?.id;
+    if (edicaoDeTexto) terminarTexto();
+    const atual = projetoRef.current;
+    const clipe = clipeId && atual ? acharClipe(atual, clipeId)?.clipe : null;
+    const texto = edicaoDeTexto?.texto ?? clipe?.texto_rico;
+    if (!clipeId || !clipe || !texto || !atual) return null;
+    await esperarFontes([texto]);
+    const documento = tamanhoDaImagem(atual);
+    const naImagem = { ...clipe, texto_rico: textoMedido(texto) };
+    const caminhos = caminhosDoTexto(naImagem.texto_rico, fonteDoEstilo).map((sub) => ({
+      ...sub,
+      nos: sub.nos.map((no) => {
+        const levar = (x: number, y: number) => pontoDaForma(naImagem, { x, y }, documento);
+        const p = levar(no.x, no.y);
+        const e = no.ex !== undefined && no.ey !== undefined ? levar(no.ex, no.ey) : null;
+        const s = no.sx !== undefined && no.sy !== undefined ? levar(no.sx, no.sy) : null;
+        return { x: p.x, y: p.y, ...(e ? { ex: e.x, ey: e.y } : {}), ...(s ? { sx: s.x, sy: s.y } : {}) };
+      }),
+    }));
+    return { clipeId, caminhos, cor: texto.estilo.cor };
+  };
+  const textoEmFormaVetorial = async () => {
+    const contornos = await contornosDoTexto();
+    if (!contornos?.caminhos.length) return;
+    const { vetor, centro } = camadaDosCaminhos(contornos.caminhos, { tipo: "cor", cor: contornos.cor }, null);
+    executar({ comando: "imagem.textoEmForma", parametros: { clipeId: contornos.clipeId, vetor, centro } });
+  };
+  const caminhoDoTexto = async () => {
+    const contornos = await contornosDoTexto();
+    const atual = projetoRef.current;
+    if (!contornos?.caminhos.length || !atual) return;
+    // Um caminho de trabalho novo, no lugar do que havia (como a caneta sem caminho escolhido)
+    const id = crypto.randomUUID().slice(0, 12);
+    const caminhos = [...(atual.caminhos ?? []).filter((item) => !item.trabalho), { id, nome: NOME_DO_TRABALHO, subcaminhos: contornos.caminhos, trabalho: true }];
+    if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) {
+      setCaminhoEscolhido(id);
+      area.abrir("caminhos");
+    }
+  };
+  // ——— Localizar e substituir, Lorem Ipsum e Atualizar todas ———
+  /** Troca o trecho [de, ate) do texto, com o estilo do primeiro caractere dele. */
+  const substituirNoTrecho = (texto: TextoRico, de: number, ate: number, troca: string) => substituir(texto, de, ate, troca, estiloNoIndice(texto, de + 1));
+  /** As camadas de texto do navegador, de cima para baixo (como no painel), com o texto em edição no lugar do salvo. */
+  const textosDoProjeto = (): { clipeId: string; texto: TextoRico }[] => {
+    const atual = projetoRef.current;
+    if (!atual) return [];
+    return faixasEmOrdem(atual)
+      .map((faixa) => faixa.clipes[0])
+      .filter((clipe) => clipe?.texto_rico)
+      .map((clipe) => ({ clipeId: clipe.id, texto: clipe.id === edicaoDeTexto?.clipeId ? edicaoDeTexto.texto : clipe.texto_rico! }));
+  };
+  /** Abre a edição de um texto com o trecho selecionado (a ferramenta passa a ser a Texto). */
+  const mostrarTrecho = (clipeId: string, texto: TextoRico, de: number, ate: number) => {
+    if (edicaoDeTexto?.clipeId === clipeId) {
+      setEdicaoDeTexto({ ...edicaoDeTexto, selecao: { de, ate } });
+      return;
+    }
+    terminarTexto();
+    if (!FERRAMENTAS_DE_TEXTO.has(ferramenta)) setFerramenta("texto");
+    setSelecao([clipeId]);
+    setEdicaoDeTexto({ clipeId, novo: null, texto, original: texto, selecao: { de, ate }, estiloPendente: null });
+  };
+  /** O próximo trecho achado depois do cursor (ou do começo), dando a volta pelas camadas. */
+  const localizarTexto = (busca: string, opcoes: OpcoesDaBusca): boolean => {
+    const textos = textosDoProjeto();
+    if (!textos.length) return false;
+    const inicio = Math.max(0, textos.findIndex((item) => item.clipeId === edicaoDeTexto?.clipeId));
+    const depois = edicaoDeTexto ? Math.max(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate) : 0;
+    for (let passo = 0; passo <= textos.length; passo++) {
+      const { clipeId, texto } = textos[(inicio + passo) % textos.length];
+      const achados = ocorrencias(textoCorrido(texto), busca, opcoes);
+      const achado = passo === 0 && clipeId === edicaoDeTexto?.clipeId ? achados.find((item) => item.de >= depois) : achados[0];
+      if (achado) {
+        mostrarTrecho(clipeId, texto, achado.de, achado.ate);
+        return true;
+      }
+    }
+    return false;
+  };
+  /** Troca o trecho selecionado (se ele é o que se procura) e vai para o próximo. */
+  const substituirTexto = (busca: string, troca: string, opcoes: OpcoesDaBusca): boolean => {
+    if (edicaoDeTexto) {
+      const de = Math.min(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate);
+      const ate = Math.max(edicaoDeTexto.selecao.de, edicaoDeTexto.selecao.ate);
+      const selecionado = textoCorrido(edicaoDeTexto.texto).slice(de, ate);
+      if (ate > de && ocorrencias(selecionado, busca, opcoes).some((item) => item.de === 0 && item.ate === selecionado.length)) {
+        const novo = substituirNoTrecho(edicaoDeTexto.texto, de, ate, troca);
+        setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(novo), selecao: { de: de + troca.length, ate: de + troca.length } });
+        return true;
+      }
+    }
+    return localizarTexto(busca, opcoes);
+  };
+  /** Troca em todas as camadas de texto, num passo só; devolve quantas trocas. */
+  const substituirTudo = (busca: string, troca: string, opcoes: OpcoesDaBusca): number => {
+    const mudancas = textosDoProjeto()
+      .map(({ clipeId, texto }) => ({ clipeId, ...substituirTodas(texto, busca, troca, opcoes) }))
+      .filter((item) => item.quantas > 0);
+    const quantas = mudancas.reduce((soma, item) => soma + item.quantas, 0);
+    if (!quantas) return 0;
+    setEdicaoDeTexto(null);
+    void esperarFontes(mudancas.map((item) => item.texto)).then(() =>
+      executar({ comando: "imagem.textosRicos", parametros: { nome: "substituir", mudancas: mudancas.map(({ clipeId, texto }) => ({ clipeId, texto: textoMedido(texto) })) } }),
+    );
+    return quantas;
+  };
+  /** Texto › Colar Lorem Ipsum: no cursor do texto em edição (a caixa de parágrafo ganha os três parágrafos). */
+  const colarLorem = () => {
+    if (!edicaoDeTexto) return;
+    const { de, ate } = edicaoDeTexto.selecao;
+    const lorem = edicaoDeTexto.texto.modo === "paragrafo" ? LOREM_IPSUM.join("\n") : LOREM_IPSUM[0];
+    const novo = substituirNoTrecho(edicaoDeTexto.texto, Math.min(de, ate), Math.max(de, ate), lorem);
+    const fim = Math.min(de, ate) + lorem.length;
+    setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido(novo), selecao: { de: fim, ate: fim } });
+  };
+  /** Texto › Atualizar todas as camadas de texto: mede de novo cada texto com as fontes que chegaram. */
+  const atualizarTextos = async () => {
+    const textos = textosDoProjeto().filter((item) => item.clipeId !== edicaoDeTexto?.clipeId);
+    await esperarFontes(textos.map((item) => item.texto));
+    const mudancas = textos.map(({ clipeId, texto }) => ({ clipeId, texto: textoMedido(texto) })).filter((item, i) => JSON.stringify(item.texto) !== JSON.stringify(textos[i].texto));
+    if (mudancas.length) executar({ comando: "imagem.textosRicos", parametros: { nome: "atualizar", mudancas } });
+    mostrarAviso(mudancas.length ? `${mudancas.length} ${mudancas.length === 1 ? "camada de texto atualizada" : "camadas de texto atualizadas"}.` : "As camadas de texto já estão atualizadas.");
+  };
   const mudarOrientacaoDoTexto = (orientacao: TextoRico["orientacao"]) => {
     if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, orientacao }) });
     else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido({ ...textoEscolhido.texto_rico, orientacao }) } });
@@ -3561,6 +3692,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       aoConverter: converterTexto,
       aoOrientacao: mudarOrientacaoDoTexto,
       aoSuavizacao: mudarSuavizacao,
+      aoConverterEmForma: () => void textoEmFormaVetorial(),
+      aoCaminhoDeTrabalho: () => void caminhoDoTexto(),
+      editando: Boolean(edicaoDeTexto),
+      aoLocalizar: () => setLocalizandoTexto(true),
+      aoLorem: colarLorem,
+      aoAtualizarTodas: () => void atualizarTextos(),
     },
     filtro: aplicarFiltro,
     zoom: mudarZoom,
@@ -4531,6 +4668,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoAvisar={mostrarAviso}
         />
       ) : null}
+      {localizandoTexto ? <JanelaLocalizarTexto aoFechar={() => setLocalizandoTexto(false)} aoLocalizar={localizarTexto} aoSubstituir={substituirTexto} aoSubstituirTudo={substituirTudo} /> : null}
       {exportando ? (
         <JanelaExportarImagem
           projeto={projeto}

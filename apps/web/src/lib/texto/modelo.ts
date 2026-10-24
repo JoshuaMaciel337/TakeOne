@@ -118,6 +118,9 @@ export function textoNovo(conteudo: string, estilo: Partial<EstiloDoCaractere> =
   };
 }
 
+/** O nome da camada de texto: o começo do texto, como nos editores de imagem. */
+export const nomeDoTexto = (texto: TextoRico) => textoCorrido(texto).replace(/\s+/g, " ").trim().slice(0, 40) || "Texto";
+
 /** O texto corrido (os parágrafos separados por "\n"). */
 export function textoCorrido(texto: TextoRico): string {
   return texto.paragrafos.map((paragrafo) => paragrafo.trechos.map((trecho) => trecho.texto).join("")).join("\n");

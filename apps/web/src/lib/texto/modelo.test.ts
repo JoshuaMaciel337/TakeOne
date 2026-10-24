@@ -39,3 +39,17 @@ test("o estilo do parágrafo vale nos parágrafos tocados", () => {
   texto = aplicarParagrafo(texto, 4, 9, { alinhamento: "centro" });
   assert.deepEqual(texto.paragrafos.map((p) => p.estilo.alinhamento ?? "esquerda"), ["esquerda", "centro", "centro"]);
 });
+
+test("localizar e substituir: maiúsculas, acentos, palavra inteira e o estilo do achado", async () => {
+  const { ocorrencias, substituirTodas } = await import("./localizar.ts");
+  const livre = { maiusculas: false, palavraInteira: false, acentos: false };
+  assert.deepEqual(ocorrencias("Ação e acao, AÇÃO", "acao", livre), [{ de: 0, ate: 4 }, { de: 7, ate: 11 }, { de: 13, ate: 17 }]);
+  assert.deepEqual(ocorrencias("Ação e acao", "acao", { ...livre, acentos: true }), [{ de: 7, ate: 11 }]);
+  assert.deepEqual(ocorrencias("ab abc ab", "ab", { ...livre, palavraInteira: true }), [{ de: 0, ate: 2 }, { de: 7, ate: 9 }]);
+  // A troca fica com o estilo do primeiro caractere achado
+  const base = aplicarEstilo(textoNovo("um gato\num gato"), 3, 7, { cor: "#ff0000" });
+  const { texto, quantas } = substituirTodas(base, "gato", "cão", livre);
+  assert.equal(quantas, 2);
+  assert.equal(texto.paragrafos.map((p) => p.trechos.map((t) => t.texto).join("")).join("|"), "um cão|um cão");
+  assert.equal(texto.paragrafos[0].trechos[1].estilo.cor, "#ff0000");
+});

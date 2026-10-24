@@ -209,8 +209,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Estilos misturados no mesmo texto (palavras com outra fonte, cor ou tamanho)
 - [ ] Texto em caminho (e dentro de uma forma)
 - [ ] Deformar texto: arco, arco inferior, arco superior, arco, saliência, concha inferior e superior, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torção
-- [ ] Converter em forma, Criar caminho de trabalho, Rasterizar
-- [ ] Localizar e substituir texto; Colar Lorem Ipsum; Atualizar todas as camadas de texto
+- [x] Converter em forma, Criar caminho de trabalho, Rasterizar
+- [x] Localizar e substituir texto; Colar Lorem Ipsum; Atualizar todas as camadas de texto
 - [x] Atalhos de formatação (Ctrl+Shift+K, U, B, I e /; Alt + setas para a entrelinha e o tracking)
 
 ### Onda 13.9 — Estilos de camada e preenchimentos

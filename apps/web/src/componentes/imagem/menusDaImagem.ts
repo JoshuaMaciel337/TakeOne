@@ -247,6 +247,12 @@ export type AcoesDosMenus = {
     aoConverter: () => void;
     aoOrientacao: (orientacao: TextoRico["orientacao"]) => void;
     aoSuavizacao: (suavizacao: Suavizacao) => void;
+    aoConverterEmForma: () => void;
+    aoCaminhoDeTrabalho: () => void;
+    editando: boolean;
+    aoLocalizar: () => void;
+    aoLorem: () => void;
+    aoAtualizarTodas: () => void;
   };
   filtro: (efeito: TipoEfeito) => void;
   zoom: (para: "mais" | "menos" | "ajustar" | 1) => void;
@@ -530,6 +536,14 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           desativado: !a.textoRico.modo,
           aoEscolher: a.textoRico.aoConverter,
         },
+        "-",
+        { nome: "Criar caminho de trabalho", desativado: !a.textoRico.modo, aoEscolher: a.textoRico.aoCaminhoDeTrabalho },
+        { nome: "Converter em forma", desativado: !a.textoRico.modo, aoEscolher: a.textoRico.aoConverterEmForma },
+        { nome: "Rasterizar camada de texto", desativado: !a.textoRico.modo, aoEscolher: () => a.rasterizar("rasterizar") },
+        "-",
+        { nome: "Localizar e substituir texto…", aoEscolher: a.textoRico.aoLocalizar },
+        { nome: "Colar Lorem Ipsum", desativado: !a.textoRico.editando, aoEscolher: a.textoRico.aoLorem },
+        { nome: "Atualizar todas as camadas de texto", aoEscolher: a.textoRico.aoAtualizarTodas },
       ],
     },
     {
