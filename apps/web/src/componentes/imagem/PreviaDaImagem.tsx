@@ -300,6 +300,8 @@ export function PreviaDaImagem({
     return endereco ? [endereco] : [];
   });
   const enderecos = camadas.flatMap((camada) => {
+    const tintaDoQuadro = camada.clipe.vetor?.preenchimento;
+    if (tintaDoQuadro?.tipo === "imagem") return [fonteDa(tintaDoQuadro.midia_id)];
     if (camada.imagem || !camada.clipe.midia_id || camada.clipe.ajuste) return [];
     if (camada.clipe.pixels) {
       const versao = fonteDosPixels?.(camada.clipe) ? null : versaoDosPixels(camada.clipe);
@@ -368,7 +370,10 @@ export function PreviaDaImagem({
         if (camada.clipe.vetor) {
           // A forma desenhada no tamanho da tela, para ficar nítida em qualquer zoom
           const { caixa, recorte } = camada;
-          const fonte = vetorNoTamanho(camada.clipe.id, camada.clipe.vetor, (caixa.largura * densidade) / recorte.largura, (caixa.altura * densidade) / recorte.altura);
+          const fonte = vetorNoTamanho(camada.clipe.id, camada.clipe.vetor, (caixa.largura * densidade) / recorte.largura, (caixa.altura * densidade) / recorte.altura, {
+            imagem: (midiaId) => bitmaps.get(fonteDa(midiaId)) ?? null,
+            marcador: true,
+          });
           return [[camada.faixa.id, camadaDoCompositor(camada, fonte, null, mascaraDe(camada))] as const];
         }
         if (camada.clipe.pixels) {
@@ -453,7 +458,7 @@ export function PreviaDaImagem({
       else aoClicarTexto?.(ponto.x / escala, ponto.y / escala);
       return;
     }
-    if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada") {
+    if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro") {
       evento.currentTarget.setPointerCapture(evento.pointerId);
       setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
@@ -498,7 +503,7 @@ export function PreviaDaImagem({
   }
 
   const ajustada = zoom === null;
-  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? "crosshair" : undefined;
+  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
   const arrastoDoDesenho = desenho ? arrastoNaImagem(desenho) : null;
   const caminhoDoDesenho = arrastoDoDesenho ? (caminhoDoArrasto?.(arrastoDoDesenho) ?? null) : null;

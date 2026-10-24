@@ -130,12 +130,15 @@ export function PainelBiblioteca({
   quadro,
   aoPorImagem,
   aoGerada,
+  noQuadro = false,
 }: {
   imagens: Midia[];
   erro: string | null;
   quadro: { largura: number; altura: number };
   aoPorImagem: (midia: Midia) => void;
   aoGerada: (midia: Midia) => void;
+  /** Um quadro está escolhido: o clique põe a foto dentro dele. */
+  noQuadro?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -143,7 +146,7 @@ export function PainelBiblioteca({
       <ListaEnvios />
       <GerarImagem formato={formatoMaisPerto(quadro.largura, quadro.altura)} aoPedir={aoGerada} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
-      <p className="text-[11px] text-suave">{imagens.length ? "Clique numa imagem para pôr como camada." : "Envie fotos, logos e PNGs com fundo transparente."}</p>
+      <p className="text-[11px] text-suave">{imagens.length ? (noQuadro ? "Clique numa imagem para pôr dentro do quadro escolhido." : "Clique numa imagem para pôr como camada.") : "Envie fotos, logos e PNGs com fundo transparente."}</p>
       <div className="grid grid-cols-3 gap-1.5">
         {imagens.map((midia) => (
           <button

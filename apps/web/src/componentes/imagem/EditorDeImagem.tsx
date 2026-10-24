@@ -230,6 +230,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
   const [nomeDaForma, setNomeDaForma] = useState(false);
+  // A ferramenta Quadro: retangular ou elíptico
+  const [formaDoQuadro, setFormaDoQuadro] = useState<"retangulo" | "elipse">("retangulo");
   // O clique sem arrastar de uma ferramenta de forma: a janela com as medidas
   const [criandoForma, setCriandoForma] = useState<{ tipo: TipoDaFormaViva; ponto: { x: number; y: number } } | null>(null);
   // O painel Caminhos: o caminho escolhido (a caneta soma nele; null, um caminho de trabalho novo), as opções das canetas
@@ -2001,6 +2003,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const { caminhos, id } = porNoCaminho(atual.caminhos ?? [], caminhoEscolhido, sub, () => crypto.randomUUID().slice(0, 12));
     if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) setCaminhoEscolhido(id);
   };
+  /** A foto no quadro: cobrindo, sem zoom, no meio (as propriedades mudam depois). */
+  const porFotoNoQuadro = (clipeId: string, midiaId: string) => {
+    const clipe = projetoRef.current ? acharClipe(projetoRef.current, clipeId)?.clipe : null;
+    if (!clipe?.vetor) return;
+    executar({ comando: "imagem.mudarVetor", parametros: { clipeId, vetor: { ...clipe.vetor, preenchimento: { tipo: "imagem", midia_id: midiaId, ajuste: "cobrir", escala: 1, x: 0, y: 0 } } } });
+  };
   /** Camada › Máscara vetorial (e as ações da miniatura e das propriedades dela). */
   const acaoMascaraVetorial = (acao: AcaoDaMascaraVetorial | "selecionar", clipeId = selecionado?.clipe.id, modo: ModoDaSelecao = "nova") => {
     const atual = projetoRef.current;
@@ -2088,6 +2096,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (viva) {
       if (clique) setCriandoForma({ tipo: viva, ponto: arrasto.de });
       else criarFormaViva(viva, arrasto);
+      return;
+    }
+    if (ferramenta === "quadro") {
+      const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 3 : 100;
+      const caixa = clique ? arrastoDaForma({ x: arrasto.x - lado / 2, y: arrasto.y - lado / 2 }, { x: arrasto.x + lado / 2, y: arrasto.y + lado / 2 }) : arrasto;
+      const { vetor, centro } = camadaDoArrasto(formaDoQuadro, caixa, { ...OPCOES_DAS_FORMAS_PADRAO, traco: { ...OPCOES_DAS_FORMAS_PADRAO.traco, tinta: { tipo: "nenhuma" } } }, cores.primeiroPlano);
+      const numero = (projeto?.faixas.filter((faixa) => faixa.clipes[0]?.vetor?.quadro).length ?? 0) + 1;
+      executar({ comando: "imagem.adicionarVetor", parametros: { vetor: { ...vetor, preenchimento: { tipo: "nenhuma" }, traco: null, quadro: true }, centro, nome: `Quadro ${numero}`, acima: escolhidas[0]?.id ?? null } });
       return;
     }
     if (ferramenta !== "formaPersonalizada") return;
@@ -3444,7 +3460,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoExecutar={executar}
           pedidoDeAba={pedidoDeAba}
           semSelecao={<PropriedadesDoDocumento projeto={projetoNaTela} aoPrever={preverDoPainel} aoExecutar={executar} />}
-          formas={{ quadro: tamanho, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, degrades: degradesDoEspaco.recursos.map((recurso) => recurso.dados) }}
+          formas={{ quadro: tamanho, primeiroPlano: cores.primeiroPlano, fundo: cores.fundo, degrades: degradesDoEspaco.recursos.map((recurso) => recurso.dados), aoEscolherFoto: setTrocando }}
           className="h-full"
         />
         ),
@@ -3457,7 +3473,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           imagens={imagensProntas}
           erro={biblioteca.erro}
           quadro={tamanho}
-          aoPorImagem={(midia) => executar({ comando: "imagem.adicionarMidia", parametros: { midiaId: midia.id } })}
+          aoPorImagem={(midia) => (selecionado?.clipe.vetor?.quadro ? porFotoNoQuadro(selecionado.clipe.id, midia.id) : executar({ comando: "imagem.adicionarMidia", parametros: { midiaId: midia.id } }))}
+          noQuadro={Boolean(selecionado?.clipe.vetor?.quadro)}
           aoGerada={(midia) => {
             esperarMidia(midia);
             mostrarAviso("Gerando a imagem: ela entra como camada quando ficar pronta (uns 3 min).");
@@ -3794,7 +3811,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramentaDeCaminho ? (
+          ferramenta === "quadro" ? (
+            <>
+              <span className="text-suave">Quadro:</span>
+              <span className="flex items-center gap-0.5" role="group" aria-label="Forma do quadro">
+                {(
+                  [
+                    ["retangulo", "Retangular"],
+                    ["elipse", "Elíptico"],
+                  ] as const
+                ).map(([id, nome]) => (
+                  <button key={id} type="button" aria-pressed={formaDoQuadro === id} className={`rounded px-1.5 py-0.5 text-xs ${formaDoQuadro === id ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`} onClick={() => setFormaDoQuadro(id)}>
+                    {nome}
+                  </button>
+                ))}
+              </span>
+              <span className="text-suave">Com o quadro escolhido, clique numa foto da biblioteca para pôr nele.</span>
+            </>
+          ) : ferramentaDeCaminho ? (
             <OpcoesDaCanetaNaBarra
               ferramenta={ferramenta}
               caneta={caneta}
@@ -4112,6 +4146,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             caminhoDoArrasto={(arrasto) => {
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
               if (viva) return formaDoArrasto(viva, arrasto).naImagem;
+              if (ferramenta === "quadro") return formaDoArrasto(formaDoQuadro, arrasto).naImagem;
               const personalizada = ferramenta === "formaPersonalizada" ? caminhosDaFormaPersonalizada(forma.personalizada, formasDoEspaco) : null;
               return personalizada ? caminhosNaCaixa(personalizada.caminhos, arrasto, Boolean(arrasto.proporcional)) : null;
             }}
@@ -4137,6 +4172,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             const clipe = acharClipe(projeto, trocando)?.clipe;
             const atual = clipe?.midia_id ? midias.get(clipe.midia_id) : undefined;
             setTrocando(null);
+            if (clipe?.vetor?.quadro) return void porFotoNoQuadro(clipe.id, nova.id);
             if (!clipe || !atual?.video || !nova.video) return;
             executar({
               comando: "imagem.trocarImagem",

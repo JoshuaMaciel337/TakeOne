@@ -84,7 +84,11 @@ export async function exportarImagem(
       if (camada.clipe.vetor) {
         // A forma desenhada no tamanho em que sai (a caixa já está em pixels do arquivo)
         const { caixa, recorte } = camada;
-        const fonte = vetorNoTamanho(camada.clipe.id, camada.clipe.vetor, caixa.largura / recorte.largura, caixa.altura / recorte.altura);
+        // A foto do quadro em resolução cheia (o quadro vazio sai sem nada)
+        const tinta = camada.clipe.vetor.preenchimento;
+        const daFoto = tinta.tipo === "imagem" ? midias.get(tinta.midia_id) : undefined;
+        const foto = daFoto ? await fonteDa(daFoto) : null;
+        const fonte = vetorNoTamanho(`exportar:${camada.clipe.id}`, camada.clipe.vetor, caixa.largura / recorte.largura, caixa.altura / recorte.altura, { imagem: () => foto });
         return [camada.faixa.id, camadaDoCompositor(camada, fonte, null, await mascaraDe(camada.clipe))] as const;
       }
       if (camada.clipe.pixels) {

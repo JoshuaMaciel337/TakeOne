@@ -37,9 +37,46 @@ function novoCanvas(largura: number, altura: number): [HTMLCanvasElement, Contex
   return [canvas, canvas.getContext("2d")!];
 }
 
-/** Pinta o canvas inteiro com a tinta (as coordenadas são da caixa da camada, pela transformação de `ctx`). */
-function pintar(ctx: Contexto, tinta: TintaDaForma, camada: CamadaVetorial, escala: { x: number; y: number }) {
+/** De onde vêm as fotos dos quadros, e se o lugar do quadro vazio aparece (na prévia, não no arquivo). */
+export type OpcoesDoDesenho = { imagem?: (midiaId: string) => (CanvasImageSource & { width: number; height: number }) | null; marcador?: boolean };
+
+/** A foto do quadro na caixa da forma (sem a margem), cobrindo ou cabendo, com o zoom e o deslocamento. */
+function pintarImagem(ctx: Contexto, foto: CanvasImageSource & { width: number; height: number }, tinta: Extract<TintaDaForma, { tipo: "imagem" }>, camada: CamadaVetorial) {
+  const margem = camada.margem ?? 0;
+  const w = Math.max(1, camada.caixa.largura - 2 * margem);
+  const h = Math.max(1, camada.caixa.altura - 2 * margem);
+  const base = tinta.ajuste === "cobrir" ? Math.max(w / foto.width, h / foto.height) : Math.min(w / foto.width, h / foto.height);
+  const s = base * tinta.escala;
+  const cx = margem + w / 2 + tinta.x * w;
+  const cy = margem + h / 2 + tinta.y * h;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(foto, cx - (foto.width * s) / 2, cy - (foto.height * s) / 2, foto.width * s, foto.height * s);
+}
+
+/** O lugar do quadro sem foto: cinza claro com as duas diagonais (só na prévia). */
+function pintarMarcador(ctx: Contexto, camada: CamadaVetorial, escala: { x: number; y: number }) {
   const { largura, altura } = camada.caixa;
+  ctx.fillStyle = "#d4d6db";
+  ctx.fillRect(0, 0, largura, altura);
+  ctx.strokeStyle = "#9aa0aa";
+  ctx.lineWidth = 1.5 / Math.max(1e-6, Math.min(escala.x, escala.y));
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(largura, altura);
+  ctx.moveTo(largura, 0);
+  ctx.lineTo(0, altura);
+  ctx.stroke();
+}
+
+/** Pinta o canvas inteiro com a tinta (as coordenadas são da caixa da camada, pela transformação de `ctx`). */
+function pintar(ctx: Contexto, tinta: TintaDaForma, camada: CamadaVetorial, escala: { x: number; y: number }, opcoes: OpcoesDoDesenho = {}) {
+  const { largura, altura } = camada.caixa;
+  if (tinta.tipo === "imagem") {
+    const foto = opcoes.imagem?.(tinta.midia_id);
+    if (foto) pintarImagem(ctx, foto, tinta, camada);
+    else if (opcoes.marcador) pintarMarcador(ctx, camada, escala);
+    return;
+  }
   if (tinta.tipo === "cor") {
     ctx.fillStyle = tinta.cor;
     ctx.fillRect(0, 0, largura, altura);
@@ -177,7 +214,7 @@ export function regiaoNoCanvas(subcaminhos: Subcaminho[], largura: number, altur
 }
 
 /** A camada desenhada num canvas de `largura` × `altura` (a caixa dela esticada até esse tamanho). */
-export function desenharVetor(camada: CamadaVetorial, largura: number, altura: number): HTMLCanvasElement {
+export function desenharVetor(camada: CamadaVetorial, largura: number, altura: number, opcoes: OpcoesDoDesenho = {}): HTMLCanvasElement {
   const pl = Math.max(1, Math.round(largura));
   const pa = Math.max(1, Math.round(altura));
   const escala = { x: pl / camada.caixa.largura, y: pa / camada.caixa.altura };
@@ -188,10 +225,13 @@ export function desenharVetor(camada: CamadaVetorial, largura: number, altura: n
   const comArea = camada.subcaminhos.filter(temArea);
   const regiao = path2dDe(camada.subcaminhos.filter((sub) => sub.fechado));
 
-  if (camada.preenchimento.tipo !== "nenhuma" && comArea.length) {
+  // O quadro vazio mostra o lugar da foto na prévia
+  const vazio = camada.quadro && camada.preenchimento.tipo !== "imagem";
+  if ((camada.preenchimento.tipo !== "nenhuma" || (vazio && opcoes.marcador)) && comArea.length) {
     const [tinta, tctx] = novoCanvas(pl, pa);
     transformar(tctx);
-    pintar(tctx, camada.preenchimento, camada, escala);
+    if (vazio && opcoes.marcador) pintarMarcador(tctx, camada, escala);
+    else pintar(tctx, camada.preenchimento, camada, escala, opcoes);
     tctx.setTransform(1, 0, 0, 1, 0, 0);
     tctx.globalCompositeOperation = "destination-in";
     tctx.drawImage(regiaoCanvas, 0, 0);
@@ -205,7 +245,7 @@ export function desenharVetor(camada: CamadaVetorial, largura: number, altura: n
     const mascara = mascaraDoTraco(camada, traco, transformar, pl, pa, cortar);
     const [tinta, tctx] = novoCanvas(pl, pa);
     transformar(tctx);
-    pintar(tctx, traco.tinta, camada, escala);
+    pintar(tctx, traco.tinta, camada, escala, opcoes);
     tctx.setTransform(1, 0, 0, 1, 0, 0);
     tctx.globalCompositeOperation = "destination-in";
     tctx.drawImage(mascara, 0, 0);
@@ -215,20 +255,28 @@ export function desenharVetor(camada: CamadaVetorial, largura: number, altura: n
 }
 
 const DESENHADOS = new Map<string, { chave: string; canvas: HTMLCanvasElement }>();
+const IDS_DAS_FOTOS = new WeakMap<object, number>();
+let proximaFoto = 1;
+const idDaFoto = (foto: object) => {
+  if (!IDS_DAS_FOTOS.has(foto)) IDS_DAS_FOTOS.set(foto, proximaFoto++);
+  return IDS_DAS_FOTOS.get(foto)!;
+};
 const LADO_MAXIMO = 8192;
 
 /**
  * A camada de um clipe no tamanho em que ela aparece (`largura` × `altura` em pixels de destino, já sem o recorte),
  * guardada enquanto nada muda: arrastar ou mudar o zoom não redesenha a cada quadro se o tamanho é o mesmo.
  */
-export function vetorNoTamanho(id: string, camada: CamadaVetorial, largura: number, altura: number): HTMLCanvasElement {
+export function vetorNoTamanho(id: string, camada: CamadaVetorial, largura: number, altura: number, opcoes: OpcoesDoDesenho = {}): HTMLCanvasElement {
   const reducao = Math.min(1, LADO_MAXIMO / Math.max(largura, altura), Math.sqrt(36_000_000 / Math.max(1, largura * altura)));
   const pl = Math.max(1, Math.round(largura * reducao));
   const pa = Math.max(1, Math.round(altura * reducao));
-  const chave = `${pl}x${pa}:${JSON.stringify(camada)}`;
+  // A foto do quadro entra na chave pela identidade dela (a cópia leve e a de resolução cheia são outras)
+  const foto = camada.preenchimento.tipo === "imagem" ? (opcoes.imagem?.(camada.preenchimento.midia_id) ?? null) : null;
+  const chave = `${pl}x${pa}:${opcoes.marcador ? 1 : 0}:${foto ? idDaFoto(foto) : 0}:${JSON.stringify(camada)}`;
   const guardado = DESENHADOS.get(id);
   if (guardado?.chave === chave) return guardado.canvas;
-  const canvas = desenharVetor(camada, pl, pa);
+  const canvas = desenharVetor(camada, pl, pa, opcoes);
   DESENHADOS.delete(id);
   DESENHADOS.set(id, { chave, canvas });
   // As mais antigas saem (a ordem do Map é a de inserção)

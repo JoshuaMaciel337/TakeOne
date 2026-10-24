@@ -194,7 +194,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Combinar formas (unir, subtrair, intersectar, excluir sobreposição, mesclar componentes)
 - [x] Máscara vetorial (revelar tudo, ocultar tudo, caminho atual, ativar, vincular, excluir)
 - [x] Converter a seleção em forma (o texto em forma e em caminho de trabalho vai com o texto desenhado no navegador, na 13.8)
-- [ ] Quadro (K): lugar retangular ou elíptico que recorta a foto posta dentro
+- [x] Quadro (K): lugar retangular ou elíptico que recorta a foto posta dentro
 - [ ] Prancheta (V): várias pranchetas num documento, tamanhos prontos, retrato e paisagem, prancheta a partir de grupo e de camadas, exportar cada uma
 
 ### Onda 13.8 — Texto

@@ -14,7 +14,7 @@ import { type CamadaVetorial, type FormaViva, redimensionar, refazerForma, taman
 
 import { NumeroDaForma, TintasDaForma } from "./OpcoesDaForma";
 
-export type ContextoDasFormas = { quadro: Tamanho; primeiroPlano: string; fundo: string; degrades: Degrade[] };
+export type ContextoDasFormas = { quadro: Tamanho; primeiroPlano: string; fundo: string; degrades: Degrade[]; aoEscolherFoto?: (clipeId: string) => void };
 
 const NOMES: Record<FormaViva["tipo"], string> = { retangulo: "Retângulo", elipse: "Elipse", triangulo: "Triângulo", poligono: "Polígono", linha: "Linha" };
 
@@ -37,12 +37,47 @@ export function SecaoDaFormaVetorial({ clipe, travada, contexto, aoExecutar }: {
         <span className="font-semibold">Forma</span>
         <span className="text-suave">{forma ? NOMES[forma.tipo] : "Caminho"}</span>
       </div>
+      {vetor.quadro ? (
+        <div className="mt-1.5 space-y-1.5 rounded border border-borda/60 p-1.5" data-quadro>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-suave">Foto do quadro:</span>
+            <button type="button" className="botao-secundario px-2 py-0.5 text-xs" onClick={() => contexto.aoEscolherFoto?.(clipe.id)}>
+              {vetor.preenchimento.tipo === "imagem" ? "Trocar…" : "Escolher…"}
+            </button>
+            {vetor.preenchimento.tipo === "imagem" ? (
+              <button type="button" className="botao-secundario px-2 py-0.5 text-xs" onClick={() => mudar({ ...vetor, preenchimento: { tipo: "nenhuma" } })}>
+                Tirar
+              </button>
+            ) : null}
+          </div>
+          {vetor.preenchimento.tipo === "imagem"
+            ? (() => {
+                const foto = vetor.preenchimento;
+                const mudarFoto = (mudanca: Partial<typeof foto>) => mudar({ ...vetor, preenchimento: { ...foto, ...mudanca } });
+                return (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <label className="flex items-center gap-1 text-suave">
+                      Ajuste:
+                      <select className="rounded border border-borda bg-painel-2 px-1.5 py-0.5 text-xs text-texto" value={foto.ajuste} onChange={(evento) => mudarFoto({ ajuste: evento.currentTarget.value as typeof foto.ajuste })} aria-label="Ajuste da foto">
+                        <option value="cobrir">Cobrir o quadro</option>
+                        <option value="conter">Caber no quadro</option>
+                      </select>
+                    </label>
+                    <NumeroDaForma rotulo="Zoom" valor={Math.round(foto.escala * 100)} minimo={10} maximo={2000} sufixo="%" aoMudar={(valor) => mudarFoto({ escala: valor / 100 })} />
+                    <NumeroDaForma rotulo="X" valor={Math.round(foto.x * 1000) / 10} minimo={-500} maximo={500} sufixo="%" aoMudar={(valor) => mudarFoto({ x: valor / 100 })} />
+                    <NumeroDaForma rotulo="Y" valor={Math.round(foto.y * 1000) / 10} minimo={-500} maximo={500} sufixo="%" aoMudar={(valor) => mudarFoto({ y: valor / 100 })} />
+                  </div>
+                );
+              })()
+            : null}
+        </div>
+      ) : null}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <TintasDaForma
-          preenchimento={vetor.preenchimento}
+          preenchimento={vetor.preenchimento.tipo === "imagem" ? { tipo: "nenhuma" } : vetor.preenchimento}
           // A largura do traço em pixels da imagem
           traco={{ ...traco, largura: Math.round(traco.largura * k * 100) / 100 }}
-          semPreenchimento={linha}
+          semPreenchimento={linha || Boolean(vetor.quadro)}
           primeiroPlano={contexto.primeiroPlano}
           fundo={contexto.fundo}
           doEspaco={contexto.degrades}

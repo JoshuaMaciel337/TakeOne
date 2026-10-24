@@ -15,7 +15,9 @@ export type TintaDaForma =
   | { tipo: "nenhuma" }
   | { tipo: "cor"; cor: string }
   | { tipo: "degrade"; degrade: Degrade; forma: FormaDoDegrade; angulo: number; escala: number; inverter: boolean }
-  | { tipo: "padrao"; padrao: IdDoPadrao; escala: number };
+  | { tipo: "padrao"; padrao: IdDoPadrao; escala: number }
+  /** Uma foto da biblioteca dentro da forma (o quadro): cobrindo ou cabendo, com o zoom e o deslocamento do meio. */
+  | { tipo: "imagem"; midia_id: string; ajuste: "cobrir" | "conter"; escala: number; x: number; y: number };
 
 export type TracoDaForma = {
   tinta: TintaDaForma;
@@ -44,6 +46,8 @@ export type CamadaVetorial = {
   /** As medidas da forma viva, enquanto ela é viva, e a margem em volta dela na caixa. */
   forma?: FormaViva | null;
   margem?: number;
+  /** Um quadro (ferramenta Quadro, K): sem foto, a prévia mostra o lugar dela (o arquivo sai sem nada). */
+  quadro?: boolean;
 };
 
 export const TRACO_PADRAO: TracoDaForma = { tinta: { tipo: "cor", cor: "#000000" }, largura: 3, alinhamento: "dentro", tipo: "solido", pontas: "reta", cantos: "vivo", mitra: 4 };

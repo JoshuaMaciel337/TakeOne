@@ -58,6 +58,7 @@ import {
   ChevronUp,
   MousePointer2,
   MousePointer,
+  Frame,
 } from "lucide-react";
 
 import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
@@ -65,6 +66,7 @@ import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
 
 export type IdFerramentaDaImagem =
   | "corteDePerspectiva"
+  | "quadro"
   | "regua"
   | "substituicaoDeCor"
   | "misturador"
@@ -155,6 +157,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("corte", "Ferramenta Corte", "C", Crop, "Arraste a caixa e os cantos; fora dela gira. Enter corta, Esc cancela."),
     F("corteDePerspectiva", "Ferramenta Corte de perspectiva", "C", Scan, "Arraste um retângulo e leve os cantos aos do que deveria ser reto; Enter endireita e corta."),
   ],
+  [F("quadro", "Ferramenta Quadro", "K", Frame, "Arraste para desenhar um quadro (retangular ou elíptico) e ponha uma foto nele: com o quadro escolhido, clique numa foto da biblioteca.")],
   [
     F("contaGotas", "Ferramenta Conta-gotas", "I", Pipette, "Clique na imagem para pegar a cor do primeiro plano; com Alt, a do fundo."),
     F("regua", "Ferramenta Régua", "I", Ruler, "Arraste para medir a distância e o ângulo; Endireitar camada deixa a linha medida reta."),
