@@ -11,6 +11,7 @@ import type { ModoDeCor } from "../imagem/modos.ts";
 import type { VariaveisDoDocumento } from "./variaveis.ts";
 import type { Guias } from "./geometria.ts";
 import type { Contagem, EscalaDeMedida, Nota } from "../imagem/medicao.ts";
+import { aplicarComp, type CompDeCamada } from "../imagem/comps.ts";
 import {
   adicionarAjuste,
   adicionarClipe,
@@ -278,6 +279,8 @@ export type Comando =
   | { comando: "imagem.guias"; parametros: { guias: Guias } }
   | { comando: "imagem.contagem"; parametros: { contagem: Contagem | null; nome?: string } }
   | { comando: "imagem.notas"; parametros: { notas: Nota[] } }
+  | { comando: "imagem.comps"; parametros: { comps: CompDeCamada[]; nome?: string } }
+  | { comando: "imagem.aplicarComp"; parametros: { comp: CompDeCamada } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
   | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
@@ -432,6 +435,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.guias": "mudar as guias",
   "imagem.contagem": "mudar a contagem",
   "imagem.notas": "mudar as notas",
+  "imagem.comps": "mudar as comps de camada",
+  "imagem.aplicarComp": "aplicar a comp de camada",
   "imagem.escalaDeMedida": "definir a escala de medida",
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
@@ -821,6 +826,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, contagem: parametros.contagem?.grupos.length ? parametros.contagem : null } };
     case "imagem.notas":
       return { projeto: { ...projeto, notas: parametros.notas } };
+    case "imagem.comps":
+      return { projeto: { ...projeto, comps: parametros.comps } };
+    case "imagem.aplicarComp":
+      return { projeto: aplicarComp(projeto, parametros.comp) };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
     case "imagem.marcadorDeEscala": {

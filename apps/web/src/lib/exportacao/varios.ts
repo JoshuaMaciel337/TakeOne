@@ -3,6 +3,7 @@
 // Os arquivos de uma vez do editor de imagem (ADR 0003, onda 13.13): Camadas em arquivos (cada camada sozinha, no
 // tamanho do documento ou cortada no conteúdo), Pranchetas em arquivos (em qualquer formato, ou todas num PDF) e Gerar
 // ativos de imagem (as camadas e grupos com o nome terminado numa extensão). Um arquivo só baixa direto; vários, um ZIP.
+import { aplicarComp, type CompDeCamada } from "../imagem/comps";
 import { comDescendentes } from "../projeto/arvore";
 import { tamanhoDaImagem } from "../projeto/imagem";
 import type { Faixa, Projeto } from "../projeto/modelo";
@@ -66,6 +67,21 @@ export async function exportarCamadas(projeto: Projeto, midias: ReadonlyMap<stri
     arquivos.push({ nome: nome(`${opcoes.prefixo}${numero} ${nomeDaFaixa(faixa)}`.trim(), extensao), blob: await codificarCanvas(canvas, exportacao, ppi, comPpi) });
   }
   return pacote(arquivos, "camadas.zip");
+}
+
+/** Comps de camada em arquivos: o documento com cada comp aplicada, um arquivo por comp, num ZIP. */
+export async function exportarComps(projeto: Projeto, midias: ReadonlyMap<string, Midia>, comps: CompDeCamada[], opcoes: { exportacao: OpcoesDeExportacao; prefixo: string }, fontes: FontesDaExportacao, aoProgresso: (texto: string) => void): Promise<Arquivo> {
+  if (!comps.length) throw new Error("O documento não tem comps de camada.");
+  const nome = nomesSemRepetir();
+  const extensao = formatoDe(opcoes.exportacao.formato).extensao;
+  const arquivos: Arquivo[] = [];
+  for (const [indice, comp] of comps.entries()) {
+    aoProgresso(`Exportando a comp ${indice + 1} de ${comps.length}…`);
+    const blob = await gerarArquivo(aplicarComp(projeto, comp), midias, { ...opcoes.exportacao, informacoes: projeto.informacoes ?? null, modo: projeto.modo ?? null }, fontes);
+    const numero = String(indice + 1).padStart(String(comps.length).length, "0");
+    arquivos.push({ nome: nome(`${opcoes.prefixo}${numero} ${comp.nome}`.trim(), extensao), blob });
+  }
+  return pacote(arquivos, "comps.zip");
 }
 
 /** Pranchetas em arquivos: cada prancheta sozinha no formato pedido, ou todas num PDF, uma página cada. */

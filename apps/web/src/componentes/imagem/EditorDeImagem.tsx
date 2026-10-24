@@ -123,7 +123,8 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
 import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
-import { JanelaCamadasEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPranchetas } from "./JanelaExportarPranchetas";
+import { PainelComps } from "./PainelComps";
 import { gerarAtivos } from "@/lib/exportacao/varios";
 import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
@@ -162,6 +163,7 @@ import {
 import { abrirDocumento, assinarDocumentos, documentosAbertos, documentosNoServidor, documentoVizinho, fecharDocumento, mudarDocumentos } from "@/lib/imagem/documentos";
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { type CamadasEscolhidas, mesmaTecla, teclaDoEventoDaAcao } from "@/lib/imagem/acoes";
+import { atualizarComp, camadasQueSumiram, type CompDeCamada, novaComp } from "@/lib/imagem/comps";
 import { carregarOpcoesDoHistorico, guardarOpcoesDoHistorico, type OpcoesDoHistorico } from "@/lib/imagem/opcoesDoHistorico";
 import { ESCALA_PADRAO, type Medicao, medicaoDaContagem, medicaoDaRegua, medicaoDaSelecao, medirSelecao, type Nota, novoGrupo, tirarGrupo, totalDaContagem } from "@/lib/imagem/medicao";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
@@ -504,6 +506,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [exportando, setExportando] = useState<false | "exportar" | "web">(false);
   const [preferenciasDeExportacao, setPreferenciasDeExportacao] = useState(false);
   const [camadasEmArquivos, setCamadasEmArquivos] = useState(false);
+  // As comps de camada: a aplicada por último e a última posição do documento (o estado de antes), só na sessão
+  const [compsEmArquivos, setCompsEmArquivos] = useState(false);
+  const [compAplicada, setCompAplicada] = useState<string | null>(null);
+  const [ultimaPosicao, setUltimaPosicao] = useState<CompDeCamada | null>(null);
   const [janelaDoArquivo, setJanelaDoArquivo] = useState<"informacoes" | "duplicar" | "imprimir" | null>(null);
   // A prova de cores e o alerta de gama são da tela (como o zoom): não entram no projeto
   const [prova, setProva] = useState<{ tipo: TipoDaProva; ligada: boolean }>({ tipo: "cmyk", ligada: false });
@@ -4994,6 +5000,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     prancheta: (como) => void novaPrancheta(como),
     exportarPranchetas: () => setExportandoPranchetas(true),
     camadasEmArquivos: () => setCamadasEmArquivos(true),
+    temComps: Boolean(projeto?.comps?.length),
+    compsEmArquivos: () => setCompsEmArquivos(true),
     informacoesDoArquivo: () => setJanelaDoArquivo("informacoes"),
     vista,
     mudarVista,
@@ -5314,7 +5322,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const ponto = { x: margem, y: embaixo ? topoDaBarra + altura + Math.round(opcoes.fonte * 1.05) : topoDaBarra - Math.round(opcoes.fonte * 0.35) };
     executar({ comando: "imagem.marcadorDeEscala", parametros: { barra, centro, texto, ponto, acima: null } });
   };
-  const janelaAberta = exportando || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
+  const janelaAberta = exportando || compsEmArquivos || paradaDaAcao !== null || janelaDoHistorico !== null || janelaDaMedicao !== null || janelaDaVista !== null || janelaDasVariaveis !== null || automatizando !== null || ajustandoImagem || preferenciasDeExportacao || camadasEmArquivos || janelaDoArquivo !== null || janelaDoModo !== null || exportandoPranchetas || atalhos || trocando !== null || modificando !== null || janelaDaSelecao !== null || janelaDoCanal !== null || nomeDoPincel || nomeDoPadrao || nomeDaForma || janelaDoDocumento !== null || dissolvendo !== null || escalando !== null || pontoDeFuga !== null || janelaDasCamadas !== null || refinando !== null || janelaDePixels !== null || editandoDegrade;
 
   // As teclas sem Ctrl: as ferramentas, as cores, as setas e o Enter e o Esc do corte e da seleção
   const teclas = useEffectEvent((evento: KeyboardEvent) => {
@@ -5539,6 +5547,43 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     navegador: {
       nome: PAINEIS_DA_IMAGEM.navegador,
       conteudo: <PainelNavegador miniatura={miniaturaDoNavegador} documento={tamanho} zoom={zoomNaTela} aoMudarZoom={setZoom} />,
+    },
+    comps: {
+      nome: PAINEIS_DA_IMAGEM.comps,
+      conteudo: (
+        <PainelComps
+          comps={projeto.comps ?? []}
+          aplicada={compAplicada}
+          temUltimaPosicao={Boolean(ultimaPosicao)}
+          sumidas={(comp) => camadasQueSumiram(projeto, comp)}
+          aoAplicar={(id) => {
+            if (id === null) {
+              if (ultimaPosicao) executar({ comando: "imagem.aplicarComp", parametros: { comp: ultimaPosicao } });
+              setUltimaPosicao(null);
+              setCompAplicada(null);
+              return;
+            }
+            const comp = projeto.comps?.find((item) => item.id === id);
+            if (!comp) return;
+            // A primeira comp aplicada guarda o estado de antes, para a última posição do documento
+            if (!ultimaPosicao) setUltimaPosicao(novaComp(projeto, "ultima", { nome: "Última posição do documento", comentario: "", visibilidade: true, posicao: true, aparencia: true }));
+            executar({ comando: "imagem.aplicarComp", parametros: { comp } });
+            setCompAplicada(id);
+          }}
+          aoCriar={(opcoes) => {
+            const id = crypto.randomUUID().slice(0, 12);
+            executar({ comando: "imagem.comps", parametros: { comps: [...(projeto.comps ?? []), novaComp(projeto, id, opcoes)], nome: "nova comp de camada" } });
+            setCompAplicada(id);
+            setUltimaPosicao(null);
+          }}
+          aoAtualizar={(id) => executar({ comando: "imagem.comps", parametros: { comps: (projeto.comps ?? []).map((comp) => (comp.id === id ? atualizarComp(comp, projeto) : comp)), nome: "atualizar a comp de camada" } })}
+          aoMudar={(id, opcoes) => executar({ comando: "imagem.comps", parametros: { comps: (projeto.comps ?? []).map((comp) => (comp.id === id ? { ...comp, ...opcoes } : comp)), nome: "mudar a comp de camada" } })}
+          aoExcluir={(id) => {
+            executar({ comando: "imagem.comps", parametros: { comps: (projeto.comps ?? []).filter((comp) => comp.id !== id), nome: "excluir a comp de camada" } });
+            if (compAplicada === id) setCompAplicada(null);
+          }}
+        />
+      ),
     },
     acoes: {
       nome: PAINEIS_DA_IMAGEM.acoes,
@@ -6558,6 +6603,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascara={pinturas.fonteDaMascara}
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
+          aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {compsEmArquivos && projeto ? (
+        <JanelaCompsEmArquivos
+          midias={midias}
+          comps={projeto.comps ?? []}
+          aoPreparar={() => pinturas.esperar().then(() => projetoRef.current ?? projeto)}
+          fonteDosPixels={pinturas.fonte}
+          fonteDaMascara={pinturas.fonteDaMascara}
+          fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
+          aoFechar={() => setCompsEmArquivos(false)}
           aoAvisar={mostrarAviso}
         />
       ) : null}

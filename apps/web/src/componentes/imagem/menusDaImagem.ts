@@ -29,6 +29,7 @@ export const PAINEIS_DA_IMAGEM = {
   glifos: "Glifos",
   histograma: "Histograma",
   acoes: "Ações",
+  comps: "Comps de camada",
   informacoes: "Informações",
   notas: "Notas",
   registro: "Registro de medições",
@@ -240,6 +241,9 @@ export type AcoesDosMenus = {
   exportarPranchetas: () => void;
   /** Arquivo › Exportar › Camadas em arquivos e Arquivo › Gerar › Ativos de imagem. */
   camadasEmArquivos: () => void;
+  /** Arquivo › Exportar › Comps de camada em arquivos. */
+  temComps: boolean;
+  compsEmArquivos: () => void;
   gerarAtivos: () => void;
   /** Arquivo › Exportar › PSD com as camadas. */
   exportarPsd: () => void;
@@ -445,6 +449,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Preferências de exportação…", aoEscolher: a.preferenciasDeExportacao },
             "-",
             { nome: "Camadas em arquivos…", aoEscolher: a.camadasEmArquivos, titulo: "Cada camada sozinha num arquivo (num ZIP)" },
+            { nome: "Comps de camada em arquivos…", desativado: !a.temComps, aoEscolher: a.compsEmArquivos, titulo: "O documento com cada comp de camada, um arquivo por comp (num ZIP)" },
             { nome: "Pranchetas em arquivos…", desativado: !a.temPranchetas, aoEscolher: a.exportarPranchetas, titulo: "Cada prancheta num arquivo, ou todas num PDF" },
             { nome: "PSD com as camadas", aoEscolher: a.exportarPsd, titulo: "As camadas, as pastas, as máscaras, os modos e os ajustes, para abrir em outro editor" },
           ],

@@ -5,7 +5,8 @@
 import { useState } from "react";
 
 import { baixarBlob, type FontesDaExportacao, formatoDe, FORMATOS_DE_EXPORTACAO, type FormatoDeExportacao, OPCOES_PADRAO_DE_EXPORTACAO } from "@/lib/exportacao/exportarComo";
-import { exportarCamadas, exportarPranchetasComo } from "@/lib/exportacao/varios";
+import { exportarCamadas, exportarComps, exportarPranchetasComo } from "@/lib/exportacao/varios";
+import type { CompDeCamada } from "@/lib/imagem/comps";
 import type { Projeto } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
@@ -76,6 +77,36 @@ export function JanelaExportarPranchetas({ quantas, midias, aoPreparar, aoFechar
         {opcoes.formato === "pdf" ? "As pranchetas saem num PDF, uma página cada, no tamanho delas." : quantas === 1 ? "A prancheta sai num arquivo." : `As ${quantas} pranchetas saem num ZIP, um arquivo por prancheta, com o nome dela.`}
       </p>
       <CamposDoFormato formato={opcoes.formato} escala={opcoes.escala} qualidade={opcoes.qualidade} comPdf aoMudar={(mudanca) => setOpcoes({ ...opcoes, ...mudanca })} />
+      {gerando ? <p className="text-suave">{gerando}</p> : null}
+    </Moldura>
+  );
+}
+
+/** Arquivo › Exportar › Comps de camada em arquivos. */
+export function JanelaCompsEmArquivos({ midias, comps, aoPreparar, aoFechar, aoAvisar, ...fontes }: Props & { comps: CompDeCamada[] }) {
+  const [opcoes, setOpcoes] = useState({ ...OPCOES_PADRAO_DE_EXPORTACAO });
+  const [prefixo, setPrefixo] = useState("");
+  const [gerando, setGerando] = useState("");
+  const exportar = async () => {
+    setGerando("Gerando…");
+    try {
+      const { nome, blob } = await exportarComps(await aoPreparar(), midias, comps, { exportacao: opcoes, prefixo }, fontes, setGerando);
+      baixarBlob(blob, nome);
+      aoFechar();
+    } catch (e) {
+      aoAvisar(e instanceof Error ? e.message : "Não foi possível exportar as comps.");
+    } finally {
+      setGerando("");
+    }
+  };
+  return (
+    <Moldura titulo="Comps de camada em arquivos" aoFechar={aoFechar} aoConfirmar={() => void exportar()}>
+      <p className="text-suave">{comps.length === 1 ? "A comp sai num arquivo." : `As ${comps.length} comps saem num ZIP, um arquivo por comp, com o nome dela.`}</p>
+      <label className="flex items-center gap-2">
+        Prefixo:
+        <input className={`${CAMPO} flex-1`} value={prefixo} maxLength={40} onChange={(evento) => setPrefixo(evento.currentTarget.value)} aria-label="Prefixo dos arquivos das comps" />
+      </label>
+      <CamposDoFormato formato={opcoes.formato} escala={opcoes.escala} qualidade={opcoes.qualidade} comPdf={false} aoMudar={(mudanca) => setOpcoes({ ...opcoes, ...mudanca })} />
       {gerando ? <p className="text-suave">{gerando}</p> : null}
     </Moldura>
   );

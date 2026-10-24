@@ -262,7 +262,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Abrir e salvar PSD com as camadas (grupos, máscaras, mesclagens, textos e ajustes quando der). Os textos vão e voltam como pixels (com o nome da camada): o texto do arquivo depende das fontes de quem o fez
 - [x] Colocar incorporado (do computador ou da biblioteca)
 - [x] Exportar como (PNG, JPG com qualidade, WebP com e sem perda, GIF, TIFF, AVIF, BMP, ICO, PDF), Exportação rápida, Salvar para web (GIF e PNG-8 com paleta), Preferências de exportação
-- [x] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem (as comps em arquivos vêm com as comps de camada, na 13.15)
+- [x] Exportar camadas, pranchetas e comps em arquivos; pranchetas em PDF; Gerar ativos de imagem; comps de camada em arquivos (com as comps, na 13.15)
 - [x] Duplicar documento; Informações do arquivo; Imprimir
 - [x] Modo: Escala de cinza, Bitmap (limiar, pontilhado, meio-tom), Duotone, Cores indexadas (paletas, pontilhado, tabela de cores); CMYK e Lab na prova e na exportação; 16 e 32 bits desligados com o motivo. O CMYK é uma aproximação sem perfil ICC (não há perfil de gráfica com licença livre para redistribuir)
 - [x] Prova de cores e alerta de gama; simulação de daltonismo
@@ -285,7 +285,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 
 - [x] Histórico completo (avançar e voltar passos, instantâneos, documento novo a partir de um estado, opções)
 - [x] Ações: gravar, tocar, parar, inserir pausa, conjuntos, salvar e carregar (os traços de pincel e os pixels pintados não entram, como lá; no Lote, a ação vale pelas camadas de ajuste e pelo modo de cor)
-- [ ] Comps de camada
+- [x] Comps de camada (e Comps de camada em arquivos)
 - [ ] Predefinições de ferramenta e Redefinir ferramenta
 - [ ] Pesquisar (Ctrl+F): paleta com todos os comandos e ferramentas
 - [ ] Atalhos de teclado personalizáveis; Menus (esconder e colorir itens); Barra de ferramentas personalizável (uma ou duas colunas, esconder ferramentas); segurar a tecla de uma ferramenta usa ela só enquanto está apertada
