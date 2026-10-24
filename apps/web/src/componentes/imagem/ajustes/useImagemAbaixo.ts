@@ -10,6 +10,7 @@ import { exportarImagem } from "@/lib/exportacao/imagem";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { ancestrais, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { tamanhoDaImagem } from "@/lib/projeto/imagem";
+import { projetoSoCom } from "@/lib/projeto/rasterizar";
 import type { Projeto } from "@/lib/projeto/modelo";
 import type { ImagemRgba } from "@/lib/selecao/varinha";
 import type { Midia } from "@/lib/tipos";
@@ -28,7 +29,8 @@ export function projetoAbaixo(projeto: Projeto, faixaId: string | null): Projeto
   return { ...projeto, faixas: projeto.faixas.map((faixa) => (somem.has(faixa.id) ? { ...faixa, oculta: true } : faixa)) };
 }
 
-export function useImagemAbaixo(projeto: Projeto | null, midias: ReadonlyMap<string, Midia>, faixaId: string | null, ativo: boolean): ImagemRgba | null {
+/** `so`: em vez do que está embaixo, a camada sozinha (a origem "Camada escolhida" do painel Histograma). */
+export function useImagemAbaixo(projeto: Projeto | null, midias: ReadonlyMap<string, Midia>, faixaId: string | null, ativo: boolean, so = false): ImagemRgba | null {
   const [imagem, setImagem] = useState<ImagemRgba | null>(null);
   useEffect(() => {
     if (!ativo || !projeto) return;
@@ -36,7 +38,8 @@ export function useImagemAbaixo(projeto: Projeto | null, midias: ReadonlyMap<str
     const espera = window.setTimeout(() => {
       const documento = tamanhoDaImagem(projeto);
       const escala = Math.min(1, LADO / Math.max(documento.largura, documento.altura));
-      exportarImagem(projetoAbaixo(projeto, faixaId), midias, { formato: "png", escala, fonteDa: (midia) => carregarBitmap(arquivoDaMidia(midia.id, "proxy.webp")) })
+      const desenhar = so && faixaId ? projetoSoCom(projeto, [faixaId], { neutras: new Set([faixaId]), semEstilo: true, semMascara: true }) : projetoAbaixo(projeto, faixaId);
+      exportarImagem(desenhar, midias, { formato: "png", escala, fonteDa: (midia) => carregarBitmap(arquivoDaMidia(midia.id, "proxy.webp")) })
         .then((blob) => createImageBitmap(blob))
         .then((bitmap) => {
           const canvas = document.createElement("canvas");
@@ -53,6 +56,6 @@ export function useImagemAbaixo(projeto: Projeto | null, midias: ReadonlyMap<str
       cancelado = true;
       window.clearTimeout(espera);
     };
-  }, [projeto, midias, faixaId, ativo]);
+  }, [projeto, midias, faixaId, ativo, so]);
   return ativo ? imagem : null;
 }

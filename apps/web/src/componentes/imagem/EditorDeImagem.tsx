@@ -131,6 +131,7 @@ import {
 import { histogramas, niveisAutomaticos } from "@/lib/imagem/histograma";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { useImagemAbaixo } from "./ajustes/useImagemAbaixo";
+import { PainelHistograma } from "./ajustes/PainelHistograma";
 import { type AjusteDaImagem, ajustePadrao, aplicarAjusteNosPixels, compilarAjuste, NOMES_DOS_AJUSTES, type Rgb } from "@/lib/imagem/ajustes";
 import { alcasDoDegrade, type CamadaDePreenchimento } from "@/lib/imagem/camadaDePreenchimento";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
@@ -200,6 +201,7 @@ const AREAS: Record<string, EstadoDaArea> = {
   },
   fotografia: {
     direita: [
+      { id: "g-histograma", abas: ["histograma"], ativa: "histograma", altura: 230 },
       { id: "g-propriedades", abas: ["propriedades", "ajustes", "filtros"], ativa: "propriedades", altura: 360 },
       { id: "g-biblioteca", abas: ["biblioteca", "fotoIA"], ativa: "biblioteca", altura: 220 },
       { id: "g-camadas", abas: ["camadas", "canais", "caminhos", "historico"], ativa: "camadas" },
@@ -2067,6 +2069,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   const criarAjuste = (ajuste: Ajuste) => criarAjustePronto(ajustePadrao(ajuste.id, cores.primeiroPlano, cores.fundo));
   // ——— A camada de ajuste escolhida: o que está embaixo dela (histograma, conta-gotas) e o conta-gotas ———
+  // O painel Histograma: a imagem inteira ou a camada escolhida, contada só com o painel aberto
+  const [origemDoHistograma, setOrigemDoHistograma] = useState<"imagem" | "camada">("imagem");
+  const camadaDoHistograma = origemDoHistograma === "camada" ? (selecionado?.faixa.id ?? null) : null;
+  const imagemDoHistograma = useImagemAbaixo(projeto, midias, camadaDoHistograma, area.aberto("histograma"), Boolean(camadaDoHistograma));
   const ajusteEscolhido = selecionado?.clipe.ajuste_imagem ? selecionado : null;
   const imagemAbaixo = useImagemAbaixo(projeto, midias, ajusteEscolhido?.faixa.id ?? null, Boolean(ajusteEscolhido));
   // O pedido vale só para o ajuste que pediu: trocar de camada desiste dele
@@ -4326,6 +4332,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           className="h-full"
         />
         ),
+    },
+    histograma: {
+      nome: PAINEIS_DA_IMAGEM.histograma,
+      conteudo: <PainelHistograma imagem={imagemDoHistograma} selecao={selecaoNoDocumento} origem={origemDoHistograma} temCamada={Boolean(selecionado)} aoMudarOrigem={setOrigemDoHistograma} />,
     },
     ajustes: { nome: PAINEIS_DA_IMAGEM.ajustes, conteudo: <PainelAjustes aoCriar={criarAjuste} aoCriarPronto={criarAjustePronto} /> },
     biblioteca: {

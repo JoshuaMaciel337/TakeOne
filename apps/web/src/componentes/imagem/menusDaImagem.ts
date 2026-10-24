@@ -22,6 +22,7 @@ export const PAINEIS_DA_IMAGEM = {
   canais: "Canais",
   caractere: "Caractere",
   glifos: "Glifos",
+  histograma: "Histograma",
   paragrafo: "Parágrafo",
   degrades: "Degradês",
   fonteDeClonagem: "Fonte de clonagem",

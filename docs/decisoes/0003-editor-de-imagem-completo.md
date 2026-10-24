@@ -229,7 +229,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Os clássicos que vão direto nos pixels: Sombras/Realces, Tonalização HDR, Dessaturar (Ctrl+Shift+U), Corresponder cor, Substituir cor, Equalizar
 - [x] Tom, Contraste e Cor automáticos (Ctrl+Shift+L, Ctrl+Alt+Shift+L, Ctrl+Shift+B)
 - [x] Painel Ajustes com predefinições de cada tipo; máscara da camada de ajuste e recorte na de baixo
-- [ ] Painel Histograma (por canal, média, desvio, mediana, pixels)
+- [x] Painel Histograma (por canal, média, desvio, mediana, pixels)
 
 ### Onda 13.11 — Filtros
 
