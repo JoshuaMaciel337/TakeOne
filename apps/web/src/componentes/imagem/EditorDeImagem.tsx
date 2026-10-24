@@ -38,7 +38,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem } from "./JanelaExportarImagem";
@@ -102,7 +102,8 @@ import { OpcoesDaPranchetaNaBarra } from "./OpcoesDaForma";
 import { type SelecaoDoTexto, textoMedido } from "./EdicaoDeTextoNaPrevia";
 import { OpcoesDoTextoNaBarra } from "./OpcoesDoTexto";
 import { PainelCaractere, PainelParagrafo } from "./PaineisDoTexto";
-import { esperarFontes, useVersaoDasFontes } from "@/lib/texto/fontes";
+import { esperarFontes, fonteDoEstilo, useVersaoDasFontes } from "@/lib/texto/fontes";
+import { converterModo } from "@/lib/texto/converter";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
 import { novoId } from "@/componentes/editor/contexto";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -221,8 +222,8 @@ function porcentagem(zoom: number): string {
  */
 type EdicaoDeTexto = {
   clipeId: string;
-  /** Um texto novo: onde ele começa (pixels da imagem) e acima de que camada entra. */
-  novo: { ponto: { x: number; y: number }; acima: string | null } | null;
+  /** Um texto novo: onde ele começa (pixels da imagem) e acima de que camada entra; a máscara vira seleção, não camada. */
+  novo: { ponto: { x: number; y: number }; acima: string | null; mascara?: boolean } | null;
   texto: TextoRico;
   /** O texto como estava (cancelar e "nada mudou"). */
   original: TextoRico | null;
@@ -423,7 +424,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // O texto em edição na tela (ADR 0003, onda 13.8): fica fora do histórico até terminar, e aí vira um passo só
   const [edicaoDeTexto, setEdicaoDeTexto] = useState<EdicaoDeTexto | null>(null);
   // As opções da ferramenta Texto para o próximo texto, e a fonte sob o mouse no seletor (a prévia mostra nela)
-  const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo>; orientacao: TextoRico["orientacao"] }>({ estilo: {}, paragrafo: {}, orientacao: "horizontal" });
+  const [opcoesDoTexto, setOpcoesDoTexto] = useState<{ estilo: Partial<EstiloDoCaractere>; paragrafo: Partial<EstiloDoParagrafo> }>({ estilo: {}, paragrafo: {} });
   const [fonteEmPrevia, setFonteEmPrevia] = useState<string | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
   // As mídias pedidas (formas, fotos da IA) entram como camada quando ficam prontas; a troca de uma foto também espera
@@ -1990,9 +1991,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const documento = tamanhoDaImagem(projeto);
     const estilo = { tamanho: Math.max(12, Math.round(Math.min(documento.largura, documento.altura) / 18)), ...opcoesDoTexto.estilo, cor: cores.primeiroPlano };
     const base = textoNovo("", estilo, caixa ? "paragrafo" : "ponto");
-    const texto = textoMedido({ ...base, orientacao: opcoesDoTexto.orientacao, paragrafo: { ...base.paragrafo, ...opcoesDoTexto.paragrafo }, caixa: caixa ?? base.caixa });
+    const orientacao = ferramenta === "textoVertical" || ferramenta === "mascaraDeTextoVertical" ? "vertical" : "horizontal";
+    const mascara = ferramenta === "mascaraDeTexto" || ferramenta === "mascaraDeTextoVertical";
+    const texto = textoMedido({ ...base, orientacao, paragrafo: { ...base.paragrafo, ...opcoesDoTexto.paragrafo }, caixa: caixa ?? base.caixa });
     setSelecao([]);
-    setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x, y }, acima: escolhidas[0]?.id ?? null }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
+    setEdicaoDeTexto({ clipeId: novoId(), novo: { ponto: { x, y }, acima: escolhidas[0]?.id ?? null, mascara }, texto, original: null, selecao: { de: 0, ate: 0 }, estiloPendente: null });
   };
   /** Abre a edição de um texto que já existe, com o cursor no caractere do clique. */
   const editarTexto = (clipeId: string, indice: number) => {
@@ -2018,11 +2021,37 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       return;
     }
     if (!atual.novo && JSON.stringify(atual.texto) === JSON.stringify(atual.original)) return;
+    if (atual.novo?.mascara) {
+      void selecaoDoTexto(atual);
+      return;
+    }
     // As fontes chegam antes da medida final (o texto não fica com a caixa de uma fonte que faltava)
     void esperarFontes([atual.texto]).then(() => {
       executar(comandoDaEdicao({ ...atual, texto: textoMedido(atual.texto) }, null));
       setSelecao([atual.clipeId]);
     });
+  };
+  /**
+   * A máscara de texto: o texto, desenhado sozinho como seria a camada, vira a seleção do documento (pela transparência,
+   * como o Ctrl + clique na miniatura); Shift soma, Alt tira, como nas outras seleções.
+   */
+  const selecaoDoTexto = async (edicao: EdicaoDeTexto) => {
+    const atual = projetoRef.current;
+    if (!atual) return;
+    try {
+      await esperarFontes([edicao.texto]);
+      const comTexto = executarComando(atual, comandoDaEdicao({ ...edicao, texto: textoMedido(edicao.texto) }, null), ctx).projeto;
+      const faixa = acharClipe(comTexto, edicao.clipeId)?.faixa;
+      if (!faixa) return;
+      const documento = tamanhoDaImagem(comTexto);
+      const sozinha = projetoSoCom(comTexto, [faixa.id], { neutras: new Set([faixa.id]), semEstilo: true, semMascara: true });
+      const imagem = await createImageBitmap(await exportarImagem(sozinha, midias, { formato: "png" }));
+      const nova = imagemNoDocumento(imagem, [documento.largura / imagem.width, 0, 0, documento.altura / imagem.height, 0, 0], documento, "alfa");
+      imagem.close();
+      selecionarNoDocumento(combinar(selecaoNoDocumento, nova, opcoesDaSelecao.modo));
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível fazer a seleção do texto.");
+    }
   };
   /** Uma mudança de estilo da barra ou dos painéis: na seleção do texto em edição, no texto escolhido inteiro ou no próximo. */
   const mudarEstiloDoTexto = (mudanca: Partial<EstiloDoCaractere>) => {
@@ -2077,10 +2106,26 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: estiloEmTudo(textoEscolhido.texto_rico, { suavizacao }) } });
     else setOpcoesDoTexto((atual) => ({ ...atual, estilo: { ...atual.estilo, suavizacao } }));
   };
+  /** Texto de ponto em parágrafo e de volta, com as letras no lugar (a edição em andamento termina antes). */
+  const converterTexto = () => {
+    const alvo = edicaoDeTexto ? (edicaoDeTexto.novo ? null : edicaoDeTexto.texto) : textoEscolhido?.texto_rico;
+    const clipeId = edicaoDeTexto?.clipeId ?? textoEscolhido?.id;
+    if (!alvo || !clipeId) return;
+    if (edicaoDeTexto) setEdicaoDeTexto(null);
+    void esperarFontes([alvo]).then(() => {
+      const { texto, deslocamento } = converterModo(alvo, fonteDoEstilo);
+      executar({ comando: "imagem.textoRico", parametros: { clipeId, texto, deslocamento } });
+      setSelecao([clipeId]);
+    });
+  };
   const mudarOrientacaoDoTexto = (orientacao: TextoRico["orientacao"]) => {
     if (edicaoDeTexto) setEdicaoDeTexto({ ...edicaoDeTexto, texto: textoMedido({ ...edicaoDeTexto.texto, orientacao }) });
     else if (textoEscolhido?.texto_rico) executar({ comando: "imagem.textoRico", parametros: { clipeId: textoEscolhido.id, texto: textoMedido({ ...textoEscolhido.texto_rico, orientacao }) } });
-    else setOpcoesDoTexto((atual) => ({ ...atual, orientacao }));
+    // Sem texto, o botão troca a ferramenta (horizontal e vertical, texto ou máscara), como nos editores de imagem
+    else {
+      const mascara = ferramenta === "mascaraDeTexto" || ferramenta === "mascaraDeTextoVertical";
+      escolherFerramenta(mascara ? (orientacao === "vertical" ? "mascaraDeTextoVertical" : "mascaraDeTexto") : orientacao === "vertical" ? "textoVertical" : "texto");
+    }
   };
   // O que a barra mostra: o estilo comum da seleção do texto em edição, o do texto escolhido ou as opções do próximo
   const estiloNaBarra: Partial<EstiloDoCaractere> = edicaoDeTexto
@@ -2104,7 +2149,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const kernNoCursor = edicaoDeTexto && edicaoDeTexto.selecao.de === edicaoDeTexto.selecao.ate && edicaoDeTexto.selecao.de > 0 ? (estiloComum(edicaoDeTexto.texto, edicaoDeTexto.selecao.de - 1, edicaoDeTexto.selecao.de).kern ?? 0) : null;
   // Trocar de ferramenta termina a edição
   useEffect(() => {
-    if (ferramenta !== "texto" && edicaoDeTexto) terminarTexto();
+    if (!FERRAMENTAS_DE_TEXTO.has(ferramenta) && edicaoDeTexto) terminarTexto();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só a troca de ferramenta
   }, [ferramenta]);
 
@@ -3509,6 +3554,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     todasAsCamadas: () => projeto && setSelecao(camadasDaImagem(projeto).map(({ clipe }) => clipe.id)),
     desmarcarCamadas: () => setSelecao([]),
     texto: (texto) => porTexto(texto),
+    textoRico: {
+      modo: (edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico)?.modo ?? null,
+      orientacao: (edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico)?.orientacao ?? (ferramenta === "textoVertical" || ferramenta === "mascaraDeTextoVertical" ? "vertical" : "horizontal"),
+      suavizacao: (edicaoDeTexto?.texto ?? textoEscolhido?.texto_rico)?.estilo.suavizacao ?? opcoesDoTexto.estilo.suavizacao ?? "nitida",
+      aoConverter: converterTexto,
+      aoOrientacao: mudarOrientacaoDoTexto,
+      aoSuavizacao: mudarSuavizacao,
+    },
     filtro: aplicarFiltro,
     zoom: mudarZoom,
     area_: area.escolherArea,
@@ -4055,11 +4108,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : undefined
         }
         opcoesProprias={
-          ferramenta === "texto" && !selecionado?.clipe.texto ? (
+          FERRAMENTAS_DE_TEXTO.has(ferramenta) && !selecionado?.clipe.texto ? (
             <OpcoesDoTextoNaBarra
               estilo={estiloNaBarra}
               alinhamento={alinhamentoNaBarra}
-              orientacao={textoDaBarra?.orientacao ?? opcoesDoTexto.orientacao}
+              orientacao={textoDaBarra?.orientacao ?? (ferramenta === "textoVertical" || ferramenta === "mascaraDeTextoVertical" ? "vertical" : "horizontal")}
               aoEstilo={mudarEstiloDoTexto}
               aoPreverFonte={setFonteEmPrevia}
               aoAlinhamento={(alinhamento) => mudarParagrafoDoTexto({ alinhamento })}

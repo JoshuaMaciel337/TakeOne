@@ -256,7 +256,7 @@ export type Comando =
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
   | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null; id?: string } }
-  | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico } }
+  | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico; deslocamento?: { x: number; y: number } } }
   | { comando: "imagem.adicionarPrancheta"; parametros: { retangulo: RetanguloDaImagem; nome: string; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.prancheta"; parametros: { clipeId: string; mudanca: Partial<Prancheta>; tamanhos: Record<string, Tamanho> } }
   | { comando: "imagem.pranchetaDoGrupo"; parametros: { faixaId: string; retangulo: RetanguloDaImagem; fundo: Prancheta["fundo"]; tamanhos: Record<string, Tamanho> } }
@@ -679,7 +679,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "imagem.textoRico":
-      return { projeto: mudarTextoRico(projeto, parametros.clipeId, parametros.texto) };
+      return { projeto: mudarTextoRico(projeto, parametros.clipeId, parametros.texto, parametros.deslocamento) };
     case "imagem.adicionarPrancheta": {
       const resultado = adicionarPrancheta(projeto, ctx, parametros.retangulo, parametros.nome, parametros.fundo, parametros.tamanhos);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };

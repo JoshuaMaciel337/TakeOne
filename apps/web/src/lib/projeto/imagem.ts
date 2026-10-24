@@ -230,13 +230,16 @@ export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: Texto
   return { projeto: porNoTopo(projeto, { ...faixaNova(ctx, "video", clipe), nome }, acima), clipeId: clipe.id };
 }
 
-/** Troca o texto (já medido): a origem dele (o começo da primeira linha de base, ou o canto da caixa) fica no lugar. */
-export function mudarTextoRico(projeto: Projeto, clipeId: string, texto: TextoRico): Projeto {
+/**
+ * Troca o texto (já medido): a origem dele (o começo da primeira linha de base, ou o canto da caixa) fica no lugar, ou o
+ * ponto que `deslocamento` diz (o ponto da caixa antiga vira ele mais o deslocamento na nova: a conversão de modo).
+ */
+export function mudarTextoRico(projeto: Projeto, clipeId: string, texto: TextoRico, deslocamento?: { x: number; y: number }): Projeto {
   const quadro = tamanhoDaImagem(projeto);
   return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
     const antigo = clipe.texto_rico;
     if (!antigo) throw new ErroEdicao("Esta camada não é um texto.");
-    const d = { x: texto.origem.x - antigo.origem.x, y: texto.origem.y - antigo.origem.y };
+    const d = deslocamento ?? { x: texto.origem.x - antigo.origem.x, y: texto.origem.y - antigo.origem.y };
     return { ...clipe, texto_rico: texto, recorte: { ...RECORTE_PADRAO }, transformacao: transformacaoNaCaixaNova(clipe, antigo.caixa, texto.caixa, d, quadro) };
   });
 }

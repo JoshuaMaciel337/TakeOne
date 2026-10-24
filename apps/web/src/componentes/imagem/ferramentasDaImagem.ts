@@ -43,6 +43,9 @@ import {
   SquareDashedMousePointer,
   Triangle,
   Type,
+  AArrowDown,
+  SquareDashedText,
+  TypeOutline,
   Wand,
   WandSparkles,
   ZoomIn,
@@ -64,6 +67,9 @@ import {
 
 import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
 
+
+/** As ferramentas que escrevem: o texto e as máscaras de texto, horizontais e verticais. */
+export const FERRAMENTAS_DE_TEXTO: ReadonlySet<string> = new Set(["texto", "textoVertical", "mascaraDeTexto", "mascaraDeTextoVertical"]);
 
 export type IdFerramentaDaImagem =
   | "corteDePerspectiva"
@@ -108,6 +114,9 @@ export type IdFerramentaDaImagem =
   | "carimboDePadrao"
   | "historicoArtistico"
   | "texto"
+  | "textoVertical"
+  | "mascaraDeTexto"
+  | "mascaraDeTextoVertical"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -215,7 +224,12 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("excluirPonto", "Ferramenta Excluir ponto de ancoragem", "", DiamondMinus, "Clique num ponto do caminho para tirá-lo."),
     F("converterPonto", "Ferramenta Converter ponto", "", ChevronUp, "Clique num ponto liso para virar canto; arraste de um canto para puxar alças. Arrastar uma alça move só ela."),
   ],
-  [F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique na imagem para escrever um texto ali.")],
+  [
+    F("texto", "Ferramenta Texto horizontal", "T", Type, "Clique para escrever um texto ali, ou arraste uma caixa de parágrafo. Clique num texto para editá-lo."),
+    F("textoVertical", "Ferramenta Texto vertical", "T", AArrowDown, "Clique para escrever em coluna, de cima para baixo, ou arraste uma caixa."),
+    F("mascaraDeTexto", "Ferramenta Máscara de texto horizontal", "T", SquareDashedText, "Escreva e o texto vira uma seleção no formato das letras (Ctrl+Enter termina)."),
+    F("mascaraDeTextoVertical", "Ferramenta Máscara de texto vertical", "T", TypeOutline, "Escreva em coluna e o texto vira uma seleção no formato das letras."),
+  ],
   [
     F("selecaoDeCaminho", "Ferramenta Seleção de caminho", "A", MousePointer2, "Clique num componente do caminho para escolhê-lo e arraste para mover; Shift soma, Alt arrastando duplica, Delete apaga."),
     F("selecaoDireta", "Ferramenta Seleção direta", "A", MousePointer, "Clique nos pontos (ou arraste em volta) e arraste para mover; as alças mudam a curva (Alt quebra). Delete apaga, as setas empurram."),

@@ -5,6 +5,7 @@ import type { Alinhamento, Distribuicao } from "@/lib/projeto/alinhar";
 import type { TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { EFEITOS, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { ESTILOS_DE_TEXTO, type Texto } from "@/lib/projeto/texto";
+import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
 import type { IdFerramentaDaImagem } from "./ferramentasDaImagem";
@@ -238,6 +239,15 @@ export type AcoesDosMenus = {
   todasAsCamadas: () => void;
   desmarcarCamadas: () => void;
   texto: (texto?: Texto) => void;
+  /** O texto do navegador escolhido (ou em edição): o modo, a orientação e a suavização, e o que muda neles. */
+  textoRico: {
+    modo: TextoRico["modo"] | null;
+    orientacao: TextoRico["orientacao"];
+    suavizacao: Suavizacao;
+    aoConverter: () => void;
+    aoOrientacao: (orientacao: TextoRico["orientacao"]) => void;
+    aoSuavizacao: (suavizacao: Suavizacao) => void;
+  };
   filtro: (efeito: TipoEfeito) => void;
   zoom: (para: "mais" | "menos" | "ajustar" | 1) => void;
   area_: (nome: string) => void;
@@ -488,7 +498,38 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         { nome: "Nova camada de texto", aoEscolher: () => a.texto() },
         { nome: "Estilos prontos", itens: ESTILOS_DE_TEXTO.map((estilo) => ({ nome: estilo.nome, aoEscolher: () => a.texto(estilo.texto) })) },
         "-",
-        { nome: "Painéis", itens: [{ nome: "Caractere", aoEscolher: () => a.painel("propriedades") }, { nome: "Estilos de texto", aoEscolher: () => a.painel("estilos") }] },
+        {
+          nome: "Painéis",
+          itens: [
+            { nome: "Caractere", aoEscolher: () => a.painel("caractere") },
+            { nome: "Parágrafo", aoEscolher: () => a.painel("paragrafo") },
+            { nome: "Estilos de texto", aoEscolher: () => a.painel("estilos") },
+          ],
+        },
+        "-",
+        {
+          nome: "Orientação",
+          itens: [
+            { nome: "Horizontal", marcado: a.textoRico.orientacao === "horizontal", aoEscolher: () => a.textoRico.aoOrientacao("horizontal") },
+            { nome: "Vertical", marcado: a.textoRico.orientacao === "vertical", aoEscolher: () => a.textoRico.aoOrientacao("vertical") },
+          ],
+        },
+        {
+          nome: "Suavização",
+          itens: (
+            [
+              ["nenhuma", "Nenhum"],
+              ["nitida", "Nítido"],
+              ["forte", "Forte"],
+              ["suave", "Suave"],
+            ] as const
+          ).map(([id, nome]) => ({ nome, marcado: a.textoRico.suavizacao === id, aoEscolher: () => a.textoRico.aoSuavizacao(id) })),
+        },
+        {
+          nome: a.textoRico.modo === "paragrafo" ? "Converter em texto de ponto" : "Converter em texto de parágrafo",
+          desativado: !a.textoRico.modo,
+          aoEscolher: a.textoRico.aoConverter,
+        },
       ],
     },
     {

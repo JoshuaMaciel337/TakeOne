@@ -34,7 +34,7 @@ import type { ImagemRgba } from "@/lib/selecao/varinha";
 import type { ModoDaSelecao, Selecao } from "@/lib/selecao/mascara";
 import type { Midia } from "@/lib/tipos";
 
-import { FORMA_VIVA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
+import { FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, type IdFerramentaDaImagem, MODO_DA_SELECAO } from "./ferramentasDaImagem";
 import { ObjetoNaPrevia } from "./ObjetoNaPrevia";
 import { type AlvoDaPintura, PinturaNaPrevia } from "./PinturaNaPrevia";
 import { RecorteNaPrevia } from "./RecorteNaPrevia";
@@ -478,13 +478,15 @@ export function PreviaDaImagem({
       pegarCor(ponto, evento.altKey);
       return;
     }
-    if (ferramenta === "texto") {
-      const rico = camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto_rico));
+    if (FERRAMENTAS_DE_TEXTO.has(ferramenta)) {
+      // As máscaras de texto não editam as camadas de texto: sempre começam uma seleção nova
+      const mascara = ferramenta.startsWith("mascara");
+      const rico = mascara ? undefined : camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto_rico));
       if (rico?.clipe.texto_rico) {
         aoEditarTexto?.(rico.clipe.id, indiceNaTela(rico.clipe.texto_rico, rico.caixa, rico.clipe.virar, ponto));
         return;
       }
-      const texto = camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto));
+      const texto = mascara ? undefined : camadaNoPonto(ponto, (camada) => Boolean(camada.clipe.texto));
       if (texto) {
         aoSelecionar([texto.clipe.id]);
         return;
@@ -528,7 +530,7 @@ export function PreviaDaImagem({
     setArrastandoMao(false);
     if (!desenho) return;
     setDesenho(null);
-    if (ferramenta === "texto") {
+    if (FERRAMENTAS_DE_TEXTO.has(ferramenta)) {
       const x0 = Math.min(desenho.inicio.x, desenho.fim.x) / escala;
       const y0 = Math.min(desenho.inicio.y, desenho.fim.y) / escala;
       const largura = Math.abs(desenho.fim.x - desenho.inicio.x) / escala;
@@ -548,7 +550,7 @@ export function PreviaDaImagem({
   }
 
   const ajustada = zoom === null;
-  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || ferramenta === "texto" || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
+  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || FERRAMENTAS_DE_TEXTO.has(ferramenta) || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
   const arrastoDoDesenho = desenho ? arrastoNaImagem(desenho) : null;
   const caminhoDoDesenho = arrastoDoDesenho ? (caminhoDoArrasto?.(arrastoDoDesenho) ?? null) : null;

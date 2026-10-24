@@ -82,3 +82,30 @@ test("a caixa do texto de ponto cobre as linhas com folga, e a origem fica onde 
   // A linha vai de x 0 a 22,5 e de y −8 (a subida) a 2 (a descida); a folga é 2
   assert.deepEqual(medida, { caixa: { largura: 26.5, altura: 14 }, origem: { x: 2, y: 10 } });
 });
+
+test("ponto em parágrafo e de volta: as quebras da caixa viram quebras de verdade e o começo fica no lugar", async () => {
+  const { converterModo } = await import("./converter.ts");
+  const base = { ...textoNovo("aa bb cc dd", { tamanho: 10 }, "paragrafo"), caixa: { largura: 26, altura: 100 } };
+  const ponto = converterModo(base, fontes);
+  assert.equal(ponto.texto.modo, "ponto");
+  assert.deepEqual(ponto.texto.paragrafos.map((p) => p.trechos.map((t) => t.texto).join("")), ["aa bb", "cc dd"]);
+  // O começo da primeira linha: (0, 8) na caixa de parágrafo, a origem (folga) no ponto
+  assert.deepEqual(ponto.deslocamento, { x: ponto.texto.origem.x - 0, y: ponto.texto.origem.y - 8 });
+  const volta = converterModo(ponto.texto, fontes);
+  assert.equal(volta.texto.modo, "paragrafo");
+  assert.equal(disporTexto(volta.texto, fontes).linhas.length, 2, "a caixa nova cabe as linhas, sem quebrar de novo");
+  // Hifenizado: a quebra no meio da palavra ganha o hífen
+  const hifen = converterModo({ ...textoNovo("abcdefgh", { tamanho: 10 }, "paragrafo"), caixa: { largura: 22, altura: 100 } }, fontes);
+  assert.ok(hifen.texto.paragrafos.length > 1 && hifen.texto.paragrafos[0].trechos[0].texto.endsWith("-"));
+});
+
+test("texto vertical: as colunas da direita para a esquerda e a caixa do tamanho delas", () => {
+  const texto = { ...textoNovo("abc\nd", { tamanho: 10 }), orientacao: "vertical" as const };
+  const d = disporTexto(texto, fontes);
+  assert.equal(d.linhas.length, 2);
+  assert.ok(d.linhas[1].baseX < d.linhas[0].baseX, "a segunda coluna fica à esquerda");
+  const { caixa } = medirTexto(texto, d);
+  // Três letras de 10 de altura (a primeira coluna) e duas colunas de 12 (a entrelinha) de largura, mais a folga
+  assert.ok(caixa.altura < 3 * 12 + 2 * 3, `altura ${caixa.altura}`);
+  assert.ok(caixa.largura < 2 * 12 + 10 + 2 * 3, `largura ${caixa.largura}`);
+});
