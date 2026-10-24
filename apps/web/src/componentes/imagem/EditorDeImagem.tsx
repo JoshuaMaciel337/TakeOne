@@ -28,11 +28,13 @@ import { INTENSIDADE_PADRAO, type TipoEfeito } from "@/lib/projeto/efeitos";
 import { alinhar, type CaixaNoQuadro, deslocar, distribuir, type MudancaDePosicao, mudancaComVinculadas, unidadesDaSelecao } from "@/lib/projeto/alinhar";
 import { camadaTravada, camadaVisivel, comDescendentes, faixasEmOrdem } from "@/lib/projeto/arvore";
 import { type CaixaDoCorte, camadasDaImagem, type RetanguloDaImagem, tamanhoDaImagem } from "@/lib/projeto/imagem";
-import { acharClipe, type Canal, type Clipe, type Faixa, type GeracaoDoClipe, MASCARA_PADRAO, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
+import { acharClipe, type Canal, type Clipe, type Faixa, type GeracaoDoClipe, MASCARA_PADRAO, type Mesclagem, type Projeto, type Transformacao } from "@/lib/projeto/modelo";
 import { camadasDoModelo, fundoDoModelo, type MidiasDoModelo, type ModeloDeImagem, modeloDeImagem, pedidosDoModelo } from "@/lib/projeto/modelosDeImagem";
 import { ESTILOS_DE_TEXTO, type Texto, TEXTO_PADRAO } from "@/lib/projeto/texto";
 import type { Midia } from "@/lib/tipos";
 import { JanelaPreenchimentoGenerativo } from "./ia/JanelaPreenchimentoGenerativo";
+import { JanelaSubstituirCeu } from "./ia/JanelaSubstituirCeu";
+import { baseDaMascara, corDoCeuNovo, desenharCeuNovo, mascaraDoCeu, type OpcoesDoCeu } from "@/lib/imagem/substituirCeu";
 import { useMidias } from "@/lib/useMidias";
 
 import type { Ajuste } from "./ajustesDaImagem";
@@ -1578,25 +1580,110 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     return resposta.arquivo;
   };
-  /** Selecionar › Céu numa foto: o longe que toca a borda de cima (pela profundidade), com a borda acertada pela cor. */
+  /** O céu da foto escolhida: o longe que toca a borda de cima (pela profundidade), com a borda acertada pela cor. */
+  const acharCeu = async (): Promise<Selecao | null> => {
+    if (!foto) return null;
+    const arquivo = await profundidadeDaFoto(foto.id);
+    const [disparidade, cobertura, imagem] = await Promise.all([mascaraDaFotoNoDocumento(arquivo), mascaraDaFotoNoDocumento(arquivo, "alfa"), imagemParaSelecao(true)]);
+    if (!disparidade || !cobertura) return null;
+    // Fora da foto não é céu (o cinza ali seria zero, o mais longe)
+    for (let i = 0; i < disparidade.dados.length; i++) if (cobertura.dados[i] < 128) disparidade.dados[i] = 255;
+    const ceuBruto = ceuPelaProfundidade(disparidade);
+    if (!temAlgo(ceuBruto)) return null;
+    // A profundidade vem num tamanho pequeno: a borda é refeita pela cor numa faixa em volta
+    const raio = Math.max(3, Math.round(Math.max(imagem.largura, imagem.altura) / 250));
+    return refinarSelecao(imagem, ampliarSelecao(ceuBruto, { largura: imagem.largura, altura: imagem.altura }), { ...REFINAMENTO_PADRAO, raio, raioInteligente: true });
+  };
+  /** Selecionar › Céu numa foto: o céu dela vira a seleção. */
   const selecionarCeuPelaProfundidade = async () => {
     if (!foto || achandoAssunto) return;
     setAchandoAssunto(true);
     try {
-      const arquivo = await profundidadeDaFoto(foto.id);
-      const [disparidade, cobertura, imagem] = await Promise.all([mascaraDaFotoNoDocumento(arquivo), mascaraDaFotoNoDocumento(arquivo, "alfa"), imagemParaSelecao(true)]);
-      if (!disparidade || !cobertura) return;
-      // Fora da foto não é céu (o cinza ali seria zero, o mais longe)
-      for (let i = 0; i < disparidade.dados.length; i++) if (cobertura.dados[i] < 128) disparidade.dados[i] = 255;
-      const ceuBruto = ceuPelaProfundidade(disparidade);
-      if (!temAlgo(ceuBruto)) return mostrarAviso("Nenhum céu foi achado (o céu precisa tocar a borda de cima).");
-      // A profundidade vem num tamanho pequeno: a borda é refeita pela cor numa faixa em volta
-      const raio = Math.max(3, Math.round(Math.max(imagem.largura, imagem.altura) / 250));
-      selecionarNoDocumento(refinarSelecao(imagem, ampliarSelecao(ceuBruto, { largura: imagem.largura, altura: imagem.altura }), { ...REFINAMENTO_PADRAO, raio, raioInteligente: true }));
+      const ceuAchado = await acharCeu();
+      if (!ceuAchado) mostrarAviso("Nenhum céu foi achado (o céu precisa tocar a borda de cima).");
+      else selecionarNoDocumento(ceuAchado);
     } catch (e) {
       mostrarAviso(e instanceof Error ? e.message : "Não foi possível achar o céu.");
     } finally {
       setAchandoAssunto(false);
+    }
+  };
+  // Editar › Substituição do céu: a janela com a imagem e o céu pequenos, e o céu no tamanho do documento para o OK
+  const [substituindoCeu, setSubstituindoCeu] = useState<{ base: ImagemRgba; mascara: Selecao; escala: number; ceu: Selecao; faixaId: string } | null>(null);
+  const abrirSubstituicaoDoCeu = async () => {
+    if (!foto || !selecionado || selecionado.clipe.pixels) return mostrarAviso("Escolha uma foto: o céu é achado na foto escolhida.");
+    if (achandoAssunto) return;
+    setAchandoAssunto(true);
+    try {
+      const ceuAchado = await acharCeu();
+      if (!ceuAchado) return mostrarAviso("Nenhum céu foi achado (o céu precisa tocar a borda de cima).");
+      const imagem = await imagemParaSelecao(true);
+      const base = imagemMenor(imagem, 900);
+      const k = base.largura / imagem.largura;
+      const mascara = imagemNoDocumento(selecaoParaCanvas(ceuAchado), [k, 0, 0, k, 0, 0], { largura: base.largura, altura: base.altura }, "alfa");
+      setSubstituindoCeu({ base, mascara, escala: k, ceu: ceuAchado, faixaId: selecionado.faixa.id });
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível achar o céu.");
+    } finally {
+      setAchandoAssunto(false);
+    }
+  };
+  /** O OK da substituição: um grupo com a luz do primeiro plano e o céu novo, cada um com a máscara dele (pintável). */
+  const confirmarSubstituicaoDoCeu = async (opcoes: OpcoesDoCeu) => {
+    const dados = substituindoCeu;
+    setSubstituindoCeu(null);
+    const atual = projetoRef.current;
+    if (!dados || !atual) return;
+    setGerandoPixels(true);
+    try {
+      const { largura, altura } = tamanhoDaImagem(atual);
+      const mascara = mascaraDoCeu(dados.ceu, opcoes.deslocar);
+      const imagem = opcoes.fonte.tipo === "midia" ? await carregarBitmap(arquivoDaMidia(opcoes.fonte.id, "imagem.png")) : null;
+      const ceuNovo = desenharCeuNovo(opcoes, largura, altura, baseDaMascara(mascara), imagem);
+      const cor = corDoCeuNovo(ceuNovo, mascara);
+      const luz = document.createElement("canvas");
+      luz.width = largura;
+      luz.height = altura;
+      const ctxDaLuz = luz.getContext("2d")!;
+      ctxDaLuz.fillStyle = `rgb(${Math.round(cor[0] * 255)}, ${Math.round(cor[1] * 255)}, ${Math.round(cor[2] * 255)})`;
+      ctxDaLuz.fillRect(0, 0, largura, altura);
+      const comoPng = (canvas: HTMLCanvasElement) => new Promise<Blob>((pronto, falhou) => canvas.toBlob((blob) => (blob ? pronto(blob) : falhou(new Error("O navegador não conseguiu gravar a camada."))), "image/png"));
+      const matriz = matrizDaCaixa({ cx: largura / 2, cy: altura / 2, largura, altura, rotacao: 0 }, { largura, altura });
+      const novas: string[] = [];
+      // A luz primeiro (fica logo acima da foto), depois o céu (acima da luz)
+      const camadas: { nome: string; canvas: HTMLCanvasElement; invertida: boolean; opacidade: number; mesclagem: Mesclagem }[] = [
+        { nome: "Luz do primeiro plano", canvas: luz, invertida: true, opacidade: opcoes.luz / 100, mesclagem: opcoes.modoDaLuz },
+        { nome: "Céu", canvas: ceuNovo, invertida: false, opacidade: 1, mesclagem: "normal" },
+      ];
+      for (const camada of camadas) {
+        const daMascara = await subirMascara(pngDoDocumento((ctx2d) => pintarSelecao(ctx2d, mascara, camada.invertida)));
+        const midia = await criarCamadaDePixels(largura, altura, camada.nome);
+        setCriadas((anteriores) => new Map([...anteriores, [midia.id, midia]]));
+        const versao = await enviarVersao(midia.id, await comoPng(camada.canvas));
+        const depois = executar({
+          comando: "imagem.substituirPorPixels",
+          parametros: {
+            remover: [],
+            lugar: dados.faixaId,
+            nome: camada.nome,
+            manter: { opacidade: camada.opacidade, mesclagem: camada.mesclagem, faixa: {}, mascara: { midia_id: daMascara.midia.id, versao: daMascara.versao, ligada: true, vinculada: true, densidade: 1, difusao: opcoes.esmaecer / 2, matriz } },
+            midiaId: midia.id,
+            versao,
+          },
+        });
+        const faixa = depois?.projeto.faixas.find((f) => f.clipes[0]?.midia_id === midia.id);
+        if (faixa) novas.push(faixa.id);
+      }
+      void biblioteca.recarregar();
+      if (novas.length === 2) {
+        const agrupado = executar({ comando: "imagem.agrupar", parametros: { faixaIds: novas } });
+        const pai = agrupado?.projeto.faixas.find((f) => f.id === novas[0])?.pai;
+        if (pai) executar({ comando: "imagem.camada", parametros: { faixaIds: [pai], mudanca: { nome: "Substituição do céu" } } });
+      }
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível trocar o céu.");
+    } finally {
+      setGerandoPixels(false);
     }
   };
   const levarObjeto = useEffectEvent((arquivo: string) => {
@@ -4533,6 +4620,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     viaRecorte: () => void usarSelecao("recortar"),
     preencher: () => setJanelaDePixels("preencher"),
+    substituicaoDoCeu: () => void abrirSubstituicaoDoCeu(),
     preenchimentoGenerativo: () => (selecaoNoDocumento ? setPreenchendoComIA(true) : mostrarAviso("Marque a área a preencher com uma ferramenta de seleção.")),
     copiar: (mesclado) => void copiar(mesclado),
     recortarPixels: () => void recortarPixels(),
@@ -5610,6 +5698,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
       </div>
 
+      {substituindoCeu ? (
+        <JanelaSubstituirCeu base={substituindoCeu.base} mascara={substituindoCeu.mascara} escala={substituindoCeu.escala} imagens={imagensProntas} aoConfirmar={(opcoes) => void confirmarSubstituicaoDoCeu(opcoes)} aoCancelar={() => setSubstituindoCeu(null)} />
+      ) : null}
       {preenchendoComIA ? <JanelaPreenchimentoGenerativo aoGerar={(descricao, variacoes) => void pedirPreenchimento(descricao, variacoes)} aoCancelar={() => setPreenchendoComIA(false)} /> : null}
       {trocando ? (
         <JanelaEscolherImagem

@@ -253,6 +253,8 @@ export type AcoesDosMenus = {
   viaRecorte: () => void;
   /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
   preencher: () => void;
+  /** Editar › Substituição do céu: o céu da foto escolhida trocado por um pronto ou uma imagem. */
+  substituicaoDoCeu: () => void;
   /** Editar › Preenchimento generativo: a área marcada refeita pelo texto, no worker de GPU. */
   preenchimentoGenerativo: () => void;
   preencherRapido: (com: "primeiroPlano" | "fundo", preservar: boolean) => void;
@@ -345,6 +347,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Preencher…", atalho: "Shift+F5", aoEscolher: a.preencher },
         { nome: "Preenchimento generativo…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.preenchimentoGenerativo, titulo: "Marque a área com uma ferramenta de seleção" },
+        { nome: "Substituição do céu…", aoEscolher: a.substituicaoDoCeu, titulo: "Escolha uma foto: o céu dela é achado pela profundidade" },
         { nome: "Traçado…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.tracado },
         { nome: "Limpar", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.limpar },
         {
