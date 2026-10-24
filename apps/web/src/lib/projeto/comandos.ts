@@ -945,7 +945,7 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
 // -----------------------------------------------
 // Histórico
 // -----------------------------------------------
-const LIMITE_HISTORICO = 200;
+export const LIMITE_HISTORICO = 200;
 
 type Passo = { projeto: Projeto; nome: string };
 
@@ -958,10 +958,39 @@ export function iniciarHistorico(projeto: Projeto): Historico {
   return { passado: [], presente: projeto, futuro: [] };
 }
 
-export function registrar(historico: Historico, projeto: Projeto, nome: string): Historico {
+/**
+ * Um passo novo. No histórico linear, o que tinha sido desfeito some; no não linear (as opções do Histórico do editor
+ * de imagem), os estados desfeitos ficam na lista e o passo novo entra no fim dela, feito a partir do estado escolhido.
+ * Passando do limite, os passos mais antigos saem.
+ */
+export function registrar(historico: Historico, projeto: Projeto, nome: string, { limite = LIMITE_HISTORICO, naoLinear = false }: { limite?: number; naoLinear?: boolean } = {}): Historico {
   if (projeto === historico.presente) return historico;
-  const passado = [...historico.passado, { projeto: historico.presente, nome }].slice(-LIMITE_HISTORICO);
+  // Cada passo guarda o estado de antes e o nome da mudança que levou ao seguinte
+  const estados = naoLinear ? [historico.presente, ...historico.futuro.map((passo) => passo.projeto)] : [historico.presente];
+  const nomes = naoLinear ? [...historico.futuro.map((passo) => passo.nome), nome] : [nome];
+  const passado = [...historico.passado, ...estados.map((estado, i) => ({ projeto: estado, nome: nomes[i] }))].slice(-Math.max(1, limite));
   return { passado, presente: projeto, futuro: [] };
+}
+
+/** Os passos mais antigos que passam do limite saem (as opções do Histórico mudaram o número de estados). */
+export function limitarHistorico(historico: Historico, limite: number): Historico {
+  const maximo = Math.max(1, limite);
+  return historico.passado.length > maximo ? { ...historico, passado: historico.passado.slice(-maximo) } : historico;
+}
+
+/**
+ * Excluir o estado de agora (o botão do Histórico): no linear, ele e os que vieram depois saem e o anterior fica; no
+ * não linear, só ele sai.
+ */
+export function excluirEstado(historico: Historico, naoLinear = false): Historico {
+  const anterior = historico.passado.at(-1);
+  if (!anterior) return historico;
+  return { passado: historico.passado.slice(0, -1), presente: anterior.projeto, futuro: naoLinear ? historico.futuro : [] };
+}
+
+/** O estado de agora muda sem virar passo (as mudanças de visibilidade, quando as opções do Histórico mandam). */
+export function substituirPresente(historico: Historico, projeto: Projeto): Historico {
+  return projeto === historico.presente ? historico : { ...historico, presente: projeto };
 }
 
 export function desfazer(historico: Historico): Historico {

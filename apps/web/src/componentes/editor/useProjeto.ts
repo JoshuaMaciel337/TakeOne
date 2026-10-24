@@ -6,12 +6,16 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import {
   type Comando,
   desfazer,
+  excluirEstado,
   executarComando,
   type Historico,
   iniciarHistorico,
+  LIMITE_HISTORICO,
+  limitarHistorico,
   NOMES_DOS_COMANDOS,
   refazer,
   registrar,
+  substituirPresente,
 } from "@/lib/projeto/comandos";
 import { type Contexto, ErroEdicao } from "@/lib/projeto/edicao";
 import { completarProjeto, type Projeto } from "@/lib/projeto/modelo";
@@ -37,7 +41,10 @@ type Estado = {
 
 type Acao =
   | { tipo: "carregar"; projeto: Projeto; rascunho: Rascunho | null }
-  | { tipo: "executar"; projeto: Projeto; nome: string }
+  | { tipo: "executar"; projeto: Projeto; nome: string; limite: number; naoLinear: boolean }
+  | { tipo: "substituir"; projeto: Projeto }
+  | { tipo: "excluirEstado"; naoLinear: boolean }
+  | { tipo: "limitar"; limite: number }
   | { tipo: "desfazer" }
   | { tipo: "refazer" }
   | { tipo: "renomear"; nome: string }
@@ -56,7 +63,13 @@ function reduzir(estado: Estado | null, acao: Acao): Estado | null {
   if (!estado) return estado;
   switch (acao.tipo) {
     case "executar":
-      return { ...estado, historico: registrar(estado.historico, acao.projeto, acao.nome) };
+      return { ...estado, historico: registrar(estado.historico, acao.projeto, acao.nome, { limite: acao.limite, naoLinear: acao.naoLinear }) };
+    case "substituir":
+      return { ...estado, historico: substituirPresente(estado.historico, acao.projeto) };
+    case "excluirEstado":
+      return { ...estado, historico: excluirEstado(estado.historico, acao.naoLinear) };
+    case "limitar":
+      return { ...estado, historico: limitarHistorico(estado.historico, acao.limite) };
     case "desfazer":
       return { ...estado, historico: desfazer(estado.historico) };
     case "refazer":
@@ -214,13 +227,18 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
     maisNovo.current = estado?.historico.presente ?? null;
   }, [estado]);
 
+  // As opções do Histórico (o editor de imagem as muda): o número de estados e o histórico não linear
+  const opcoesDoHistorico = useRef({ limite: LIMITE_HISTORICO, naoLinear: false });
+
+  /** Executa o comando; com `semPasso`, a mudança não vira passo do desfazer (a visibilidade, quando as opções mandam). */
   const executar = useCallback(
-    (comando: Comando): { projeto: Projeto; selecao?: string[] } | null => {
+    (comando: Comando, { semPasso = false }: { semPasso?: boolean } = {}): { projeto: Projeto; selecao?: string[] } | null => {
       if (!estado) return null;
       try {
         const resultado = executarComando(maisNovo.current ?? estado.historico.presente, comando, ctx);
         maisNovo.current = resultado.projeto;
-        despachar({ tipo: "executar", projeto: resultado.projeto, nome: comando.comando === "imagem.contagem" && comando.parametros.nome ? comando.parametros.nome : NOMES_DOS_COMANDOS[comando.comando] });
+        if (semPasso) despachar({ tipo: "substituir", projeto: resultado.projeto });
+        else despachar({ tipo: "executar", projeto: resultado.projeto, nome: comando.comando === "imagem.contagem" && comando.parametros.nome ? comando.parametros.nome : NOMES_DOS_COMANDOS[comando.comando], ...opcoesDoHistorico.current });
         setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
         return resultado;
       } catch (e) {
@@ -276,6 +294,16 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
       },
       [estado],
     ),
+    /** As opções do Histórico: o número de estados (os de mais saem já) e o histórico não linear. */
+    configurarHistorico: useCallback((opcoes: { limite: number; naoLinear: boolean }) => {
+      opcoesDoHistorico.current = opcoes;
+      despachar({ tipo: "limitar", limite: opcoes.limite });
+    }, []),
+    /** Exclui o estado de agora (e, no histórico linear, os que vieram depois). */
+    excluirEstado: useCallback(() => {
+      despachar({ tipo: "excluirEstado", naoLinear: opcoesDoHistorico.current.naoLinear });
+      setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
+    }, []),
     /** Volta ou avança até o passo: desfaz ou refaz um de cada vez, como os botões. */
     irParaPasso: useCallback((desfazer: number, refazer: number) => {
       for (let i = 0; i < desfazer; i++) despachar({ tipo: "desfazer" });
