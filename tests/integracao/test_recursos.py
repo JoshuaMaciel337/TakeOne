@@ -123,3 +123,13 @@ def test_conjuntos_de_acoes(cliente, db_limpo):
     assert cliente.put(f"/api/recursos/{degrade['id']}", json={"nome": "Outro"}).status_code == 422
     assert cliente.delete(url).status_code == 204
     assert cliente.get("/api/recursos?tipo=acoes").json() == []
+
+
+def test_predefinicoes_de_ferramenta(cliente, db_limpo):
+    cadastrar(cliente)
+    dados = {"ferramenta": "pincel", "opcoes": {"pincel": {"tamanho": 80, "dureza": 0.2}}}
+    criada = cliente.post("/api/recursos", json={"tipo": "ferramenta", "nome": "Pincel macio 80", "dados": dados})
+    assert criada.status_code == 201, criada.text
+    assert [r["dados"]["ferramenta"] for r in cliente.get("/api/recursos?tipo=ferramenta").json()] == ["pincel"]
+    sem = cliente.post("/api/recursos", json={"tipo": "ferramenta", "nome": "Sem", "dados": {"ferramenta": "pincel"}})
+    assert sem.status_code == 422

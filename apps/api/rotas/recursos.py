@@ -157,6 +157,9 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
         dados.dados = _conferir_estilo(dados.tipo, dados.dados)
     if dados.tipo == "acoes":
         dados.dados = _conferir_acoes(dados.dados)
+    if dados.tipo == "ferramenta" and (not isinstance(dados.dados.get("ferramenta"), str)
+                                       or not isinstance(dados.dados.get("opcoes"), dict)):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A predefinição precisa da ferramenta e das opções.")
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -183,7 +186,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
     return para_saida(doc)
 
 
-TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes)$"
+TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes|ferramenta)$"
 
 
 @router.get("", response_model=list[RecursoSaida])
