@@ -4,6 +4,7 @@ import type { Contorno, Sombra } from "./silhueta.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
+import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -275,6 +276,8 @@ export type Clipe = {
   pixels?: { versao: number };
   /** Só no projeto de imagem: a máscara de camada pintável (lib/projeto/mascaraDePixels.ts). */
   mascara_pixels?: MascaraDePixels | null;
+  /** Só no projeto de imagem: a máscara vetorial (lib/vetor/mascaraVetorial.ts), ao lado da de pixels. */
+  mascara_vetorial?: MascaraVetorial | null;
   /** Só no projeto de imagem: a camada vetorial (forma viva ou caminho, lib/vetor/modelo.ts), sem mídia nem texto. */
   vetor?: CamadaVetorial | null;
   /** Mistura com o que está embaixo; sem ela, normal. */

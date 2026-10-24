@@ -11,6 +11,7 @@ import { type Clipe, type CorDoRotulo, type Faixa, type Projeto, RECORTE_PADRAO,
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
+import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -290,6 +291,19 @@ export function juntarAoVetor(projeto: Projeto, clipeId: string, caminhos: Subca
   if (!clipe?.vetor) throw new ErroEdicao("Escolha uma camada de forma para juntar a forma nova.");
   const novos = levarCaminhos(caminhos, (p) => pontoNaForma(clipe, p, quadro)).map((sub) => ({ ...sub, operacao }));
   return trocarCaminhosLocais(projeto, clipe, [...clipe.vetor.subcaminhos, ...novos]);
+}
+
+/** Põe, troca ou tira (null) a máscara vetorial. */
+export function definirMascaraVetorial(projeto: Projeto, clipeId: string, mascara: MascaraVetorial | null): Projeto {
+  return mudarClipeDaCamada(projeto, clipeId, (clipe) => {
+    if ((clipe.pasta || clipe.ajuste) && mascara) throw new ErroEdicao("A máscara vetorial vale para camadas com imagem, texto ou forma.");
+    if (!mascara) {
+      const sem = { ...clipe };
+      delete sem.mascara_vetorial;
+      return sem;
+    }
+    return { ...clipe, mascara_vetorial: mascara };
+  });
 }
 
 /** Põe, troca ou tira (null) a máscara de camada pintável. */

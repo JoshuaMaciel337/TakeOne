@@ -365,8 +365,12 @@ export function camadaDoCompositor(
   camada: CamadaNaTela,
   fonte: TexImageSource | typeof FUNDO,
   mascaraDoFundo: TexImageSource | null,
-  /** A máscara de camada pintável (editor de imagem): a imagem dela e o quadro em que a caixa da camada foi medida. */
-  mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho } | null,
+  /**
+   * A máscara de camada (editor de imagem): a imagem dela e o quadro em que a caixa da camada foi medida. Sem `matriz`,
+   * ela é a de pixels do clipe (a matriz, a densidade e a difusão vêm dela); com, é a vetorial ou as duas juntas
+   * (lib/previa/mascaraCombinada.ts).
+   */
+  mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho; matriz?: [number, number, number, number, number, number]; densidade?: number; difusao?: number } | null,
 ): Camada {
   const mascara = camada.clipe.mascara_pixels;
   const comEstilos = temSilhueta(camada.clipe) && !camada.clipe.ajuste;
@@ -378,8 +382,9 @@ export function camadaDoCompositor(
     virar: fonte === FUNDO ? { horizontal: false, vertical: true } : camada.clipe.virar,
     cantos: camada.clipe.cantos,
     mascaraDeForma: camada.clipe.mascara,
-    mascaraDaCamada:
-      mascara && mascara.ligada && mascaraDaCamada
+    mascaraDaCamada: mascaraDaCamada?.matriz
+      ? { fonte: mascaraDaCamada.fonte, matriz: mascaraDaCamada.matriz, densidade: mascaraDaCamada.densidade ?? 1, difusao: mascaraDaCamada.difusao ?? 0 }
+      : mascara && mascara.ligada && mascaraDaCamada
         ? { fonte: mascaraDaCamada.fonte, matriz: matrizEmUso(mascara, camada.caixa, mascaraDaCamada.quadro), densidade: mascara.densidade, difusao: mascara.difusao }
         : null,
     // O preenchimento (só na imagem) esconde a camada sem os estilos; sem estilos, é mais uma opacidade

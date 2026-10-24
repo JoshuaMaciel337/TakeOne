@@ -97,6 +97,9 @@ import { CORTE_PADRAO, type OpcoesDoCorte, OpcoesDoCorteNaBarra } from "./Opcoes
 import { CANETA_PADRAO, type FerramentaDoTracado, JanelaCaminhoDaSelecao, JanelaCriarForma, JanelaTracarCaminho, type OpcoesDaCaneta, OpcoesDaCanetaNaBarra, OpcoesDaFormaNaBarra } from "./OpcoesDaForma";
 import type { FerramentaDeCaminho } from "./CaminhosNaPrevia";
 import { PainelCaminhos } from "./PainelCaminhos";
+import { type AcaoDaMascaraVetorial, PropriedadesDaMascaraVetorial } from "./PropriedadesDaMascaraVetorial";
+import { inverterMascaraVetorial, novaMascaraVetorial, vincularMascaraVetorial, caminhosDaMascaraNoDocumento } from "@/lib/vetor/mascaraVetorial";
+import { canvasDaMascaraVetorial } from "@/lib/previa/mascaraCombinada";
 import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
 import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
@@ -132,7 +135,7 @@ import { JanelaCarregarSelecao, JanelaSalvarSelecao } from "./JanelasDaSelecao";
 import type { AlvoDoMotor } from "./usePinturas";
 import { Pintura } from "@/lib/pintura/motor";
 import { arquivoDaVersao } from "@/lib/pixels";
-import { type Afim, compor, IDENTIDADE, inverter, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
+import { type Afim, compor, type MascaraDePixels, IDENTIDADE, inverter, matrizDaCaixa, matrizDaMascaraNoDocumento, matrizDaMidiaNoDocumento, matrizParaOutraCaixa } from "@/lib/projeto/mascaraDePixels";
 import { borda, cheia, combinar, limites, vazia, contrair, difusao, expandir, inverter as inverterSelecao, type ModoDaSelecao, type Selecao, suavizar, temAlgo } from "@/lib/selecao/mascara";
 import { imagemDoBlob, imagemNoDocumento, selecaoDoCanvas, selecaoNaMidia, selecaoParaCanvas } from "@/lib/selecao/naTela";
 import { mapaDeBordas, type MapaDeBordas } from "@/lib/selecao/magnetico";
@@ -233,6 +236,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   // e as janelas de traçar, preencher e criar da seleção
   const [caminhoEscolhido, setCaminhoEscolhido] = useState<string | null>(null);
   const [caneta, setCaneta] = useState<OpcoesDaCaneta>(CANETA_PADRAO);
+  // A camada cuja máscara vetorial as ferramentas de caminho editam (o clique na miniatura dela, no painel Camadas)
+  const [mascaraVetorialEmFoco, setMascaraVetorialEmFoco] = useState<string | null>(null);
   // Os componentes escolhidos pela Seleção de caminho (a barra muda a operação deles)
   const [componentesEscolhidos, setComponentesEscolhidos] = useState<number[]>([]);
   const [janelaDoCaminho, setJanelaDoCaminho] = useState<{ tipo: "tracar" | "preencher"; id: string } | { tipo: "daSelecao" } | null>(null);
@@ -1946,12 +1951,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const caminhoDaVez = caminhoEscolhido ? (caminhosDoDocumento.find((caminho) => caminho.id === caminhoEscolhido) ?? null) : null;
   const ferramentaDeCaminho = FERRAMENTAS_DE_CAMINHO.has(ferramenta) ? (ferramenta as FerramentaDeCaminho) : null;
   // O que as ferramentas de caminho editam: o caminho escolhido no painel, ou o da camada de forma escolhida
-  const formaEmEdicao = !caminhoDaVez && escolhidoNaTela?.clipe.vetor ? escolhidoNaTela.clipe : null;
+  const mascaraEmEdicao = mascaraVetorialEmFoco && escolhidoNaTela?.clipe.id === mascaraVetorialEmFoco && escolhidoNaTela.clipe.mascara_vetorial ? escolhidoNaTela.clipe : null;
+  const formaEmEdicao = !mascaraEmEdicao && !caminhoDaVez && escolhidoNaTela?.clipe.vetor ? escolhidoNaTela.clipe : null;
   const caminhosEditaveis = caminhoDaVez ? caminhoDaVez.subcaminhos : formaEmEdicao && projetoNaTela ? caminhosDoVetorNaImagem(formaEmEdicao, tamanhoDaImagem(projetoNaTela)) : null;
   const mudarCaminhos = (subcaminhos: Subcaminho[], provisorio: boolean) => {
     const atual = projetoRef.current;
     if (!atual) return;
-    const comando: Comando | null = caminhoDaVez
+    const comando: Comando | null = mascaraEmEdicao?.mascara_vetorial
+      ? { comando: "imagem.mascaraVetorial", parametros: { clipeId: mascaraEmEdicao.id, mascara: { ...mascaraEmEdicao.mascara_vetorial, subcaminhos } } }
+      : caminhoDaVez
       ? { comando: "imagem.caminhos", parametros: { caminhos: comCaminho(atual.caminhos ?? [], { ...caminhoDaVez, subcaminhos }) } }
       : formaEmEdicao
         ? { comando: "imagem.caminhosDoVetor", parametros: { clipeId: formaEmEdicao.id, caminhos: subcaminhos } }
@@ -1974,6 +1982,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const criarCaminho = (sub: Subcaminho) => {
     const atual = projetoRef.current;
     if (!atual) return;
+    // Com a máscara vetorial em foco, o caminho novo entra nela (já no espaço da máscara)
+    if (mascaraEmEdicao?.mascara_vetorial) {
+      const mascara = mascaraEmEdicao.mascara_vetorial;
+      executar({ comando: "imagem.mascaraVetorial", parametros: { clipeId: mascaraEmEdicao.id, mascara: { ...mascara, subcaminhos: [...mascara.subcaminhos, { ...sub, operacao: mascara.base === "revelar" ? "subtrair" : "somar" }] } } });
+      return;
+    }
     if (caneta.modo === "forma") {
       if (forma.operacao !== "nova" && selecionado?.clipe.vetor && !caminhoDaVez) executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos: [sub], operacao: forma.operacao } });
       else formaDosCaminhos([sub]);
@@ -1986,6 +2000,47 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     const { caminhos, id } = porNoCaminho(atual.caminhos ?? [], caminhoEscolhido, sub, () => crypto.randomUUID().slice(0, 12));
     if (executar({ comando: "imagem.caminhos", parametros: { caminhos } })) setCaminhoEscolhido(id);
+  };
+  /** Camada › Máscara vetorial (e as ações da miniatura e das propriedades dela). */
+  const acaoMascaraVetorial = (acao: AcaoDaMascaraVetorial | "selecionar", clipeId = selecionado?.clipe.id, modo: ModoDaSelecao = "nova") => {
+    const atual = projetoRef.current;
+    if (!atual || !clipeId) return;
+    const achado = acharClipe(atual, clipeId);
+    const medida = caixasRef.current.get(clipeId);
+    if (!achado) return;
+    if (acao === "foco") return void setMascaraVetorialEmFoco(null);
+    const documento = tamanhoDaImagem(atual);
+    const mascara = achado.clipe.mascara_vetorial ?? null;
+    const executarMascara = (nova: typeof mascara) => executar({ comando: "imagem.mascaraVetorial", parametros: { clipeId, mascara: nova } });
+    if (acao === "revelar" || acao === "ocultar" || acao === "caminho") {
+      if (!medida?.bruta || !medida.quadro) return void mostrarAviso("A camada ainda não apareceu na prévia. Tente de novo.");
+      const caminhos = acao === "caminho" ? (caminhoDaVez?.subcaminhos ?? []) : [];
+      if (acao === "caminho" && !caminhos.length) return void mostrarAviso("Escolha um caminho no painel Caminhos.");
+      if (executarMascara(novaMascaraVetorial(acao === "revelar" ? "revelar" : "ocultar", caminhos, medida.bruta, medida.quadro))) setMascaraVetorialEmFoco(clipeId);
+      return;
+    }
+    if (!mascara) return;
+    if (acao === "excluir") {
+      if (executarMascara(null)) setMascaraVetorialEmFoco(null);
+    } else if (acao === "ligar") executarMascara({ ...mascara, ligada: !mascara.ligada });
+    else if (acao === "inverter") executarMascara(inverterMascaraVetorial(mascara));
+    else if (acao === "vincular") {
+      if (!medida?.bruta || !medida.quadro) return;
+      executarMascara(vincularMascaraVetorial(mascara, !mascara.vinculada, medida.bruta, medida.quadro, documento));
+    } else if (acao === "selecionar") {
+      if (!medida?.bruta || !medida.quadro) return;
+      const lida = selecaoDoCanvas(canvasDaMascaraVetorial(caminhosDaMascaraNoDocumento(mascara, medida.bruta, medida.quadro, documento), mascara.base, documento), "cinza");
+      setSelecaoDoDocumento(combinar(selecaoNoDocumento, lida, modo));
+      setBordasDaSelecao(true);
+    }
+  };
+  /** Selecionar › Converter em forma: os contornos da seleção viram uma camada de forma (a seleção sai). */
+  const converterSelecaoEmForma = () => {
+    if (!selecaoNoDocumento) return;
+    const caminhos = caminhosDaMascara(selecaoNoDocumento, 1);
+    if (!caminhos.length) return void mostrarAviso("A seleção não tem pixels selecionados mais da metade.");
+    formaDosCaminhos(caminhos);
+    setSelecaoDoDocumento(null);
   };
   /** A seleção dos caminhos (a região deles, com a borda suave). */
   const selecaoDosCaminhos = (subcaminhos: Subcaminho[]): Selecao | null => {
@@ -2548,9 +2603,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const nomeDaFaixa = (faixa: Faixa) => nomeDaCamada(faixa.clipes[0], midias, faixa);
   const alturaDaCaixa = (faixa: Faixa) => caixasRef.current.get(faixa.clipes[0].id)?.altura ?? null;
   /** A matriz da máscara de camada para o quadro inteiro (a camada que rasterizar cria), pela caixa de agora. */
-  const matrizNoQuadro = (faixa: Faixa) => {
+  const matrizNoQuadro = (faixa: Faixa, qual?: Pick<MascaraDePixels, "vinculada" | "matriz">) => {
     const medida = caixasRef.current.get(faixa.clipes[0].id);
-    const mascara = faixa.clipes[0].mascara_pixels;
+    const mascara = qual ?? faixa.clipes[0].mascara_pixels;
     if (!medida?.bruta || !medida.quadro || !mascara) return null;
     const inteira = { cx: medida.quadro.largura / 2, cy: medida.quadro.altura / 2, largura: medida.quadro.largura, altura: medida.quadro.altura, rotacao: 0, opacidade: 1 };
     return matrizParaOutraCaixa(mascara, medida.bruta, inteira, medida.quadro);
@@ -3126,6 +3181,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     podeVirarFundo: escolhidas.length === 1 && Boolean(escolhidas[0].clipes[0].pixels) && !camadaDeFundoAtual,
     gerandoPixels,
     temMascara: Boolean(mascaraDaEscolhida),
+    temMascaraVetorial: Boolean(selecionado?.clipe.mascara_vetorial),
+    mascaraVetorialLigada: Boolean(selecionado?.clipe.mascara_vetorial?.ligada),
+    mascaraVetorialVinculada: Boolean(selecionado?.clipe.mascara_vetorial?.vinculada),
+    mascaraVetorial: (acao) => acaoMascaraVetorial(acao),
+    converterSelecaoEmForma,
     mascaraLigada: Boolean(mascaraDaEscolhida?.ligada),
     mascaraVinculada: Boolean(mascaraDaEscolhida?.vinculada),
     mascaraEmFoco: Boolean(selecionado && mascaraEmFoco === selecionado.clipe.id),
@@ -3347,7 +3407,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     propriedades: {
       nome: PAINEIS_DA_IMAGEM.propriedades,
       conteudo:
-        selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels ? (
+        selecionado && mascaraVetorialEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_vetorial ? (
+          <PropriedadesDaMascaraVetorial
+            clipeId={selecionado.clipe.id}
+            mascara={escolhidoNaTela?.clipe.mascara_vetorial ?? selecionado.clipe.mascara_vetorial}
+            travada={selecionado.faixa.travada}
+            aoPrever={preverDoPainel}
+            aoExecutar={executar}
+            aoAcao={(acao) => acaoMascaraVetorial(acao)}
+          />
+        ) : selecionado && mascaraEmFoco === selecionado.clipe.id && selecionado.clipe.mascara_pixels ? (
           <PropriedadesDaMascara
             clipeId={selecionado.clipe.id}
             mascara={selecionado.clipe.mascara_pixels}
@@ -3540,7 +3609,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     },
     camadas: {
       nome: PAINEIS_DA_IMAGEM.camadas,
-      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} pedido={pedidoAsCamadas} />,
+      conteudo: <PainelCamadas projeto={projetoNaTela} midias={midias} selecao={selecaoValida} aoSelecionar={setSelecao} aoExecutar={executar} aoCriarAjuste={criarAjuste} aoAbrirPropriedades={() => abrirAba("basico")} aoNovaCamada={() => void novaCamada()} aoCamadaDoFundo={acoes.camadaDoFundo} mascaraEmFoco={mascaraEmFoco} mascaraAVista={mascaraAVista} aoFocarMascara={setMascaraEmFoco} aoVerMascara={setMascaraAVista} aoCriarMascara={(como) => void criarMascara(selecaoNoDocumento ? (como === "revelar" ? "revelarSelecao" : "ocultarSelecao") : como)} aoVincularMascara={vincularMascara} mascaraVetorialEmFoco={mascaraVetorialEmFoco} aoFocarMascaraVetorial={(clipeId) => {
+            setMascaraVetorialEmFoco(clipeId);
+            if (clipeId) {
+              setMascaraEmFoco(null);
+              if (!FERRAMENTAS_DE_CAMINHO.has(ferramenta)) escolherFerramenta("selecaoDireta");
+            }
+          }} aoAcaoMascaraVetorial={(clipeId, acao, modo) => acaoMascaraVetorial(acao, clipeId, modo)} aoSelecionarDaCamada={(clipeId, modo, de) => void selecionarDaCamada(clipeId, modo, de)} pedido={pedidoAsCamadas} />,
     },
     pinceis: {
       nome: PAINEIS_DA_IMAGEM.pinceis,
@@ -4030,6 +4105,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     aoMudar: mudarCaminhos,
                     aoCriar: criarCaminho,
                     aoEscolherComponentes: setComponentesEscolhidos,
+                    mascaraDe: mascaraEmEdicao?.id ?? null,
                   }
                 : null
             }

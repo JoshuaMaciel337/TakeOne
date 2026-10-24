@@ -15,6 +15,8 @@ import type { Midia } from "@/lib/tipos";
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import type { CamadaVetorial, TintaDaForma } from "@/lib/vetor/modelo";
+import type { MascaraVetorial } from "@/lib/vetor/mascaraVetorial";
+import { tamanhoDaImagem } from "@/lib/projeto/imagem";
 
 type Props = {
   projeto: Projeto;
@@ -38,6 +40,10 @@ type Props = {
   aoVerMascara: (clipeId: string | null) => void;
   aoCriarMascara: (como: "revelar" | "ocultar") => void;
   aoVincularMascara: (clipeId: string, ligar: boolean) => void;
+  /** A máscara vetorial: a camada cuja máscara as ferramentas de caminho editam, e as ações da miniatura dela. */
+  mascaraVetorialEmFoco?: string | null;
+  aoFocarMascaraVetorial?: (clipeId: string | null) => void;
+  aoAcaoMascaraVetorial?: (clipeId: string, acao: "ligar" | "vincular" | "selecionar", modo?: ModoDaSelecao) => void;
   /** Ctrl + clique na miniatura: a seleção do documento pela transparência da camada (ou pelo cinza da máscara). */
   aoSelecionarDaCamada?: (clipeId: string, modo: ModoDaSelecao, de: "camada" | "mascara") => void;
   /** Selecionar › Encontrar camadas (o campo da busca) e Isolar camadas (só as faixas pedidas no painel). */
@@ -66,6 +72,17 @@ function MiniaturaDoVetor({ vetor }: { vetor: CamadaVetorial }) {
   return (
     <svg viewBox={`0 0 ${vetor.caixa.largura} ${vetor.caixa.altura}`} className="size-full" style={{ background: "repeating-conic-gradient(#c8cad0 0% 25%, #ffffff 0% 50%) 50% / 8px 8px" }} aria-hidden>
       <path d={svgDosCaminhos(vetor.subcaminhos)} fill={cor(vetor.preenchimento)} fillRule="evenodd" stroke={traco} strokeWidth={vetor.traco?.largura ?? 0} />
+    </svg>
+  );
+}
+
+/** A miniatura da máscara vetorial: a base e os caminhos (que somam em branco, que subtraem em preto). */
+function MiniaturaDaMascaraVetorial({ mascara, documento }: { mascara: MascaraVetorial; documento: { largura: number; altura: number } }) {
+  return (
+    <svg viewBox={`0 0 ${documento.largura} ${documento.altura}`} className="size-full" preserveAspectRatio="xMidYMid meet" style={{ background: mascara.base === "revelar" ? "#fff" : "#000" }} aria-hidden>
+      {mascara.subcaminhos.map((sub, i) => (
+        <path key={i} d={svgDosCaminhos([{ ...sub, fechado: true }])} fill={sub.operacao === "somar" ? "#fff" : sub.operacao === "subtrair" ? "#000" : "#888"} />
+      ))}
     </svg>
   );
 }
@@ -236,6 +253,9 @@ export function PainelCamadas({
   aoVerMascara,
   aoCriarMascara,
   aoVincularMascara,
+  mascaraVetorialEmFoco = null,
+  aoFocarMascaraVetorial,
+  aoAcaoMascaraVetorial,
   aoSelecionarDaCamada,
   pedido = null,
 }: Props) {
@@ -695,6 +715,37 @@ export function PainelCamadas({
                       {/* eslint-disable-next-line @next/next/no-img-element -- a versão da API com a sessão do cookie */}
                       <img src={arquivoDaMidia(clipe.mascara_pixels.midia_id, arquivoDaVersao(clipe.mascara_pixels.versao))} alt="" className="size-full object-contain" />
                       {!clipe.mascara_pixels.ligada ? <span className="absolute inset-0 grid place-items-center text-sm font-bold text-erro" aria-label="Desativada">✕</span> : null}
+                    </button>
+                  </>
+                ) : null}
+                {clipe.mascara_vetorial ? (
+                  <>
+                    <button
+                      type="button"
+                      className={`grid size-4 shrink-0 place-items-center ${clipe.mascara_vetorial.vinculada ? "text-suave" : "text-suave/30"} hover:text-texto`}
+                      title={clipe.mascara_vetorial.vinculada ? "Máscara vetorial vinculada (clique para soltar)" : "Máscara vetorial solta (clique para vincular)"}
+                      aria-label={clipe.mascara_vetorial.vinculada ? `Desvincular a máscara vetorial de ${nome}` : `Vincular a máscara vetorial de ${nome}`}
+                      onClick={() => aoAcaoMascaraVetorial?.(clipe.id, "vincular")}
+                    >
+                      <Link2 className="size-3" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(evento) => {
+                        if (evento.ctrlKey || evento.metaKey) aoAcaoMascaraVetorial?.(clipe.id, "selecionar", modoDoCtrl(evento));
+                        else if (evento.shiftKey) aoAcaoMascaraVetorial?.(clipe.id, "ligar");
+                        else {
+                          if (!marcada) aoSelecionar([clipe.id]);
+                          aoFocarMascaraVetorial?.(mascaraVetorialEmFoco === clipe.id ? null : clipe.id);
+                        }
+                      }}
+                      title="Máscara vetorial: clique para editar os caminhos dela, Shift + clique para desativar, Ctrl + clique para selecionar por ela"
+                      aria-label={`Máscara vetorial de ${nome}`}
+                      aria-pressed={mascaraVetorialEmFoco === clipe.id}
+                      className={`relative size-7 shrink-0 overflow-hidden rounded-sm border ${mascaraVetorialEmFoco === clipe.id ? "border-2 border-texto" : "border-borda"}`}
+                    >
+                      <MiniaturaDaMascaraVetorial mascara={clipe.mascara_vetorial} documento={tamanhoDaImagem(projeto)} />
+                      {!clipe.mascara_vetorial.ligada ? <span className="absolute inset-0 grid place-items-center text-sm font-bold text-erro" aria-label="Desativada">✕</span> : null}
                     </button>
                   </>
                 ) : null}

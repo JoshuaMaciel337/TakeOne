@@ -17,6 +17,8 @@ import type { Clipe, Projeto, Transformacao } from "@/lib/projeto/modelo";
 import type { FerramentaDePintura, OpcoesDoPincel, Simetria } from "@/lib/pintura/traco";
 import { arquivoDaVersao } from "@/lib/pixels";
 import { vetorNoTamanho } from "@/lib/vetor/desenhar";
+import { mascaraFinal } from "@/lib/previa/mascaraCombinada";
+import { caminhosDaMascaraNoDocumento, caminhosNoEspacoDaMascara } from "@/lib/vetor/mascaraVetorial";
 import { arrastoDaForma, type ArrastoDaForma } from "@/lib/vetor/arrasto";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import { CaminhosNaPrevia, type FerramentaDeCaminho, type OpcoesDosCaminhos } from "./CaminhosNaPrevia";
@@ -94,7 +96,19 @@ type Props = {
    */
   aoDesenharForma?: (arrasto: ArrastoDaForma, clique: boolean) => void;
   /** As ferramentas de caminho (canetas, pontos e seleções de caminho), com o caminho editado e o que fazer com ele. */
-  caminhos?: { ferramenta: FerramentaDeCaminho; caminhos: Subcaminho[] | null; opcoes: OpcoesDosCaminhos; aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void; aoCriar: (sub: Subcaminho) => void; aoEscolherComponentes?: (indices: number[]) => void } | null;
+  caminhos?: {
+    ferramenta: FerramentaDeCaminho;
+    caminhos: Subcaminho[] | null;
+    opcoes: OpcoesDosCaminhos;
+    aoMudar: (caminhos: Subcaminho[], provisorio: boolean) => void;
+    aoCriar: (sub: Subcaminho) => void;
+    aoEscolherComponentes?: (indices: number[]) => void;
+    /**
+     * Editando a máscara vetorial desta camada: a prévia leva os caminhos do espaço da máscara ao documento (pela caixa
+     * da camada) e de volta, e `aoMudar` e `aoCriar` recebem os caminhos no espaço da máscara.
+     */
+    mascaraDe?: string | null;
+  } | null;
   /** O contorno da forma que está sendo arrastada, em pixels da imagem (sem ele, um retângulo tracejado). */
   caminhoDoArrasto?: (arrasto: ArrastoDaForma) => Subcaminho[] | null;
   /** Conta-gotas: a cor do ponto (com Alt, vai para o fundo). */
@@ -332,10 +346,10 @@ export function PreviaDaImagem({
     if (!atual || tamanho.largura <= 1) return;
     // A máscara de camada de cada uma (null enquanto a imagem dela não chegou)
     const mascaraDe = (camada: (typeof camadas)[number]) => {
-      if (!camada.clipe.mascara_pixels) return null;
-      const endereco = versaoDaMascara(camada.clipe);
-      const fonte = fonteDaMascara?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null);
-      return fonte ? { fonte, quadro: tamanho } : null;
+      const endereco = camada.clipe.mascara_pixels ? versaoDaMascara(camada.clipe) : null;
+      const fonte = camada.clipe.mascara_pixels ? (fonteDaMascara?.(camada.clipe) ?? (endereco ? bitmaps.get(endereco) : null)) : null;
+      // A vetorial (e as duas juntas) passam pela máscara combinada; só a de pixels vai como sempre
+      return mascaraFinal(camada.clipe, camada.caixa, tamanho, imagem, fonte ?? null);
     };
     // Alt + clique na miniatura da máscara: só a máscara, em cinza, no lugar da imagem
     const avista = mascaraAVista ? camadas.find((camada) => camada.clipe.id === mascaraAVista) : undefined;
@@ -752,9 +766,28 @@ export function PreviaDaImagem({
                 selecao={veu ? null : selecaoDoDocumento?.selecao}
               />
             ) : null}
-            {caminhos && !maoAtiva && !transformacao && !recorte && tamanho.largura > 1 ? (
-              <CaminhosNaPrevia ferramenta={caminhos.ferramenta} caminhos={caminhos.caminhos} quadro={tamanho} documento={imagem} opcoes={caminhos.opcoes} aoMudar={caminhos.aoMudar} aoCriar={caminhos.aoCriar} aoEscolherComponentes={caminhos.aoEscolherComponentes} />
-            ) : null}
+            {caminhos && !maoAtiva && !transformacao && !recorte && tamanho.largura > 1
+              ? (() => {
+                  // A máscara vetorial: os caminhos vão do espaço dela ao documento e voltam
+                  const daMascara = caminhos.mascaraDe ? camadas.find((camada) => camada.clipe.id === caminhos.mascaraDe) : undefined;
+                  const mascara = daMascara?.clipe.mascara_vetorial;
+                  if (caminhos.mascaraDe && (!daMascara || !mascara)) return null;
+                  const noDocumento = mascara && daMascara ? caminhosDaMascaraNoDocumento(mascara, daMascara.caixa, tamanho, imagem) : caminhos.caminhos;
+                  const paraMascara = (subs: Subcaminho[]) => (mascara && daMascara ? caminhosNoEspacoDaMascara(subs, mascara, daMascara.caixa, tamanho, imagem) : subs);
+                  return (
+                    <CaminhosNaPrevia
+                      ferramenta={caminhos.ferramenta}
+                      caminhos={noDocumento}
+                      quadro={tamanho}
+                      documento={imagem}
+                      opcoes={caminhos.opcoes}
+                      aoMudar={(subs, provisorio) => caminhos.aoMudar(paraMascara(subs), provisorio)}
+                      aoCriar={(sub) => caminhos.aoCriar(paraMascara([sub])[0])}
+                      aoEscolherComponentes={caminhos.aoEscolherComponentes}
+                    />
+                  );
+                })()
+              : null}
             {retanguloDoDesenho ? <div className="pointer-events-none absolute border border-dashed border-white outline outline-1 outline-black/60" style={retanguloDoDesenho} aria-hidden /> : null}
             {caminhoDoDesenho ? (
               <svg className="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden>

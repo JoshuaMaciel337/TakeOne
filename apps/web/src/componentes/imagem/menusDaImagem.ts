@@ -183,6 +183,13 @@ export type AcoesDosMenus = {
   /** O pincel pinta a máscara (Ctrl+\). */
   mascaraEmFoco: boolean;
   mascaraDePixels: (acao: "revelar" | "ocultar" | "revelarSelecao" | "ocultarSelecao" | "transparencia" | "excluir" | "aplicar" | "ligar" | "vincular" | "inverter" | "foco") => void;
+  /** A máscara vetorial da camada escolhida (Camada › Máscara vetorial). */
+  temMascaraVetorial: boolean;
+  mascaraVetorialLigada: boolean;
+  mascaraVetorialVinculada: boolean;
+  mascaraVetorial: (acao: "revelar" | "ocultar" | "caminho" | "ligar" | "vincular" | "excluir") => void;
+  /** Selecionar › Converter em forma (a seleção vira uma camada de forma). */
+  converterSelecaoEmForma: () => void;
   apagarVazias: () => void;
   selecionarVinculadas: () => void;
   ordenar: (para: "topo" | "cima" | "baixo" | "fundo") => void;
@@ -395,6 +402,19 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: a.mascaraVinculada || !a.temMascara ? "Desvincular" : "Vincular", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("vincular") },
             { nome: "Aplicar", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("aplicar") },
             { nome: "Excluir", desativado: !a.temMascara, aoEscolher: () => a.mascaraDePixels("excluir") },
+          ],
+        },
+        {
+          nome: "Máscara vetorial",
+          desativado: semCamada,
+          itens: [
+            { nome: "Revelar tudo", desativado: a.temMascaraVetorial, aoEscolher: () => a.mascaraVetorial("revelar") },
+            { nome: "Ocultar tudo", desativado: a.temMascaraVetorial, aoEscolher: () => a.mascaraVetorial("ocultar") },
+            { nome: "Caminho atual", desativado: a.temMascaraVetorial || !a.temCaminho, aoEscolher: () => a.mascaraVetorial("caminho"), titulo: "Escolha um caminho no painel Caminhos" },
+            "-",
+            { nome: a.mascaraVetorialLigada || !a.temMascaraVetorial ? "Desativar" : "Ativar", desativado: !a.temMascaraVetorial, aoEscolher: () => a.mascaraVetorial("ligar") },
+            { nome: a.mascaraVetorialVinculada || !a.temMascaraVetorial ? "Desvincular" : "Vincular", desativado: !a.temMascaraVetorial, aoEscolher: () => a.mascaraVetorial("vincular") },
+            { nome: "Excluir", desativado: !a.temMascaraVetorial, aoEscolher: () => a.mascaraVetorial("excluir") },
             "-",
             { nome: "Máscara de forma (elipse ou retângulo)…", aoEscolher: a.mascara },
           ],
@@ -499,6 +519,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Carregar o caminho como seleção", atalho: "Ctrl+Enter", desativado: !a.temCaminho, aoEscolher: a.caminhoComoSelecao },
         { nome: "Criar caminho de trabalho…", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.caminhoDaSelecao },
+        { nome: "Converter em forma", desativado: !a.temSelecaoDoDocumento, aoEscolher: a.converterSelecaoEmForma },
         { nome: "Luminosidade", atalho: "Ctrl+Alt+2", aoEscolher: () => a.canalDaSelecao("luminosidade") },
       ],
     },

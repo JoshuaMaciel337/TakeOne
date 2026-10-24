@@ -10,6 +10,7 @@ import { arquivoDaVersao } from "@/lib/pixels";
 import type { Midia } from "@/lib/tipos";
 
 import { vetorNoTamanho } from "../vetor/desenhar";
+import { mascaraFinal } from "../previa/mascaraCombinada";
 import { carregarBitmap } from "../previa/bitmaps";
 import { camadaDoCompositor, camadasDaImagem, camadasEmArvore, textosParaImagens } from "../previa/camadas";
 import { Compositor, FUNDO } from "../previa/compositor";
@@ -72,9 +73,9 @@ export async function exportarImagem(
   // A máscara de camada pintável de cada uma: o canvas sendo pintado, ou a versão do servidor
   const mascaraDe = async (clipe: Clipe) => {
     const mascara = clipe.mascara_pixels;
-    if (!mascara || !mascara.ligada) return null;
-    const fonte = fonteDaMascara?.(clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))));
-    return { fonte, quadro: tamanho };
+    const fonte = mascara && mascara.ligada ? (fonteDaMascara?.(clipe) ?? (await carregarBitmap(arquivoDaMidia(mascara.midia_id, arquivoDaVersao(mascara.versao))))) : null;
+    const camada = camadas.find((item) => item.clipe.id === clipe.id);
+    return camada ? mascaraFinal(clipe, camada.caixa, tamanho, base, fonte) : fonte ? { fonte, quadro: tamanho } : null;
   };
   const prontas = await Promise.all(
     camadas.map(async (camada) => {

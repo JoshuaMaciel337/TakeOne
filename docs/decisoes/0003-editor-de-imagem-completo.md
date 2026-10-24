@@ -118,7 +118,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Seleção rápida (pincel que cresce a seleção, aprimorar borda)
 - [x] Seleção de objeto com o localizador de objetos (passar o mouse realça), por retângulo ou por clique
 - [x] Selecionar › Tudo, Desmarcar, Selecionar novamente, Inverter
-- [ ] Selecionar › Converter em forma (vai com os caminhos, na 13.7)
+- [x] Selecionar › Converter em forma (feito com os caminhos, na 13.7)
 - [x] Intervalo de cores (cores amostradas, as faixas de cor, realces, meios-tons, sombras, tons de pele; imprecisão; conta-gotas + e −)
 - [x] Área de foco; Assunto (a pessoa, pelo MODNet); Céu (pela linha do céu, sem modelo)
 - [x] Modificar › Borda, Suavizar, Expandir, Contrair, Difusão (Shift+F6)
@@ -192,8 +192,8 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Formas vivas (retângulo com raio por canto, elipse, triângulo com raio, polígono com lados e estrela, linha com espessura e pontas de seta): preenchimento e traçado (cor, degradê, padrão), opções de traçado (sólido, tracejado, pontilhado, pontas, cantos, limite de mitra, alinhado dentro, no centro ou fora)
 - [x] Forma personalizada com uma biblioteca grande e Definir forma personalizada
 - [x] Combinar formas (unir, subtrair, intersectar, excluir sobreposição, mesclar componentes)
-- [ ] Máscara vetorial (revelar tudo, ocultar tudo, caminho atual, ativar, vincular, excluir)
-- [ ] Converter texto e seleção em forma; Criar caminho de trabalho a partir do texto
+- [x] Máscara vetorial (revelar tudo, ocultar tudo, caminho atual, ativar, vincular, excluir)
+- [x] Converter a seleção em forma (o texto em forma e em caminho de trabalho vai com o texto desenhado no navegador, na 13.8)
 - [ ] Quadro (K): lugar retangular ou elíptico que recorta a foto posta dentro
 - [ ] Prancheta (V): várias pranchetas num documento, tamanhos prontos, retrato e paisagem, prancheta a partir de grupo e de camadas, exportar cada uma
 

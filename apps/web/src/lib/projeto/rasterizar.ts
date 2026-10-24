@@ -5,6 +5,7 @@ import { ancestrais, camadaVisivel, comDescendentes, paiDaCamada } from "./arvor
 import { ErroEdicao } from "./edicao.ts";
 import type { Clipe, Faixa, Mesclagem, Projeto } from "./modelo.ts";
 import type { Afim, MascaraDePixels } from "./mascaraDePixels.ts";
+import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 
 export type TipoDaMesclagem =
   | "aplicarMascara"
@@ -28,6 +29,7 @@ export type ManterNaCamada = {
   preenchimento?: number;
   /** A máscara de camada que continua separada (rasterizar), já com a matriz da caixa nova. */
   mascara?: MascaraDePixels;
+  mascaraVetorial?: MascaraVetorial;
   faixa: Pick<Faixa, "nome" | "rotulo" | "travas" | "vinculo" | "recortada">;
 };
 
@@ -57,7 +59,10 @@ function camadas(projeto: Projeto): Faixa[] {
 function neutra(faixa: Faixa, semEstilo: boolean, semMascara = false): Faixa {
   const clipe: Clipe = { ...faixa.clipes[0], transformacao: { ...faixa.clipes[0].transformacao, opacidade: 1 } };
   delete clipe.mesclagem;
-  if (semMascara) delete clipe.mascara_pixels;
+  if (semMascara) {
+    delete clipe.mascara_pixels;
+    delete clipe.mascara_vetorial;
+  }
   if (semEstilo) {
     delete clipe.contorno;
     delete clipe.sombra;
@@ -119,8 +124,11 @@ export function planoDosPixels(
   nomeDe: (faixa: Faixa) => string,
   /** A altura da caixa da camada em frações do quadro (a prévia mede): o estilo guardado é refeito na caixa nova. */
   alturaDaCaixa: (faixa: Faixa) => number | null = () => null,
-  /** A matriz da máscara de camada para a caixa do quadro inteiro (a camada nova): ela continua no mesmo lugar. */
-  matrizNoQuadro: (faixa: Faixa) => Afim | null = () => null,
+  /**
+   * A matriz de uma máscara da camada (a de pixels, sem `mascara`) para a caixa do quadro inteiro (a camada nova): ela
+   * continua no mesmo lugar.
+   */
+  matrizNoQuadro: (faixa: Faixa, mascara?: Pick<MascaraDePixels, "vinculada" | "matriz">) => Afim | null = () => null,
 ): PlanoDosPixels {
   const todas = camadas(projeto);
   const escolhidas = todas.filter((faixa) => faixaIds.includes(faixa.id));
@@ -156,8 +164,12 @@ export function planoDosPixels(
       const mascara = clipe.mascara_pixels;
       const matriz = mascara ? matrizNoQuadro(primeira) : null;
       if (mascara && matriz) manter.mascara = { ...mascara, vinculada: true, matriz };
+      // A vetorial também continua vetorial, na caixa nova
+      const vetorial = clipe.mascara_vetorial;
+      const matrizVetorial = vetorial ? matrizNoQuadro(primeira, vetorial) : null;
+      if (vetorial && matrizVetorial) manter.mascaraVetorial = { ...vetorial, vinculada: true, matriz: matrizVetorial };
       return {
-        desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: !comEstilo, semMascara: Boolean(manter.mascara) }),
+        desenhar: projetoSoCom(projeto, [primeira.id], { neutras: new Set([primeira.id]), semEstilo: !comEstilo, semMascara: Boolean(manter.mascara || manter.mascaraVetorial) }),
         remover: [primeira.id],
         lugar: primeira.id,
         nome: nomeDe(primeira),
@@ -170,7 +182,7 @@ export function planoDosPixels(
       if (escolhidas.length !== 1) throw new ErroEdicao("Escolha uma camada para transformar.");
       const clipe = primeira.clipes[0];
       if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Grupos e camadas de ajuste não se transformam assim.");
-      if (clipe.mascara_pixels) throw new ErroEdicao("Aplique ou exclua a máscara da camada antes de distorcer.");
+      if (clipe.mascara_pixels || clipe.mascara_vetorial) throw new ErroEdicao("Aplique ou exclua a máscara da camada antes de distorcer.");
       const manter = propriedadesDe(primeira, true);
       const fator = alturaDaCaixa(primeira) ?? 1;
       if (manter.contorno) manter.contorno = { ...manter.contorno, largura: manter.contorno.largura * fator };
@@ -262,6 +274,7 @@ export function substituirPorPixels(
     ...(manter.sombra ? { sombra: manter.sombra } : {}),
     ...(manter.preenchimento !== undefined && manter.preenchimento < 1 ? { preenchimento: manter.preenchimento } : {}),
     ...(manter.mascara ? { mascara_pixels: manter.mascara } : {}),
+    ...(manter.mascaraVetorial ? { mascara_vetorial: manter.mascaraVetorial } : {}),
   };
   if (!clipe.duracao) clipe.duracao = projeto.faixas.flatMap((faixa) => faixa.clipes).reduce((maior, item) => Math.max(maior, item.duracao), 1);
   const faixa: Faixa = {
