@@ -8,6 +8,7 @@ import { caixa, desfoques, forma, gaussiano, movimento, preservandoBordas, radia
 import { cisalhamento, coordenadasPolares, deslocamentoPorMapa, esfera, onda, ondulacao, pincar, redemoinho, type Sobra, ziguezague } from "./distorcao.ts";
 import { coresNtsc, desentrelacar, difusao, encontrarBordas, entalhe, extrusao, ladrilhos, pinturaAOleo, solarizar, tracarContorno, vento } from "./estilizacao.ts";
 import { cristalizar, fragmentar, kuwahara, meiaTinta, meioTomEmCores, mosaico, pontilhismo } from "./pixelizacao.ts";
+import { arvore, chamas, efeitosDeIluminacao, fibras, moldura, nuvens as nuvensRender, nuvensPorDiferenca, reflexoDeLente, reiluminar } from "./renderizacao.ts";
 import {
   adicionarRuido,
   altaFrequencia,
@@ -300,6 +301,112 @@ export const FILTROS: DefinicaoDoFiltro[] = [
     aplicar: (imagem, v) => desentrelacar(imagem, s(v, "eliminar"), s(v, "criar")),
   },
   { id: "cores_ntsc", nome: "Cores NTSC", grupo: "video", opcoes: [], semJanela: true, aplicar: (imagem) => coresNtsc(imagem) },
+  // ——— Renderização ———
+  {
+    id: "nuvens",
+    nome: "Nuvens",
+    grupo: "renderizacao",
+    opcoes: [{ id: "cor_frente", nome: "Cor da frente", tipo: "cor", padrao: "#000000" }, { id: "cor_fundo", nome: "Cor do fundo", tipo: "cor", padrao: "#ffffff" }, numero("tamanho", "Tamanho", 4, 2000, 180, "px"), numero("semente", "Variação", 0, 9999, 1)],
+    aplicar: (imagem, v, ctx) => nuvensRender(imagem, hexParaRgb(s(v, "cor_frente")), hexParaRgb(s(v, "cor_fundo")), n(v, "tamanho"), n(v, "semente"), ctx),
+  },
+  {
+    id: "nuvens_diferenca",
+    nome: "Nuvens por diferença",
+    grupo: "renderizacao",
+    opcoes: [{ id: "cor_frente", nome: "Cor da frente", tipo: "cor", padrao: "#000000" }, { id: "cor_fundo", nome: "Cor do fundo", tipo: "cor", padrao: "#ffffff" }, numero("tamanho", "Tamanho", 4, 2000, 180, "px"), numero("semente", "Variação", 0, 9999, 1)],
+    aplicar: (imagem, v, ctx) => nuvensPorDiferenca(imagem, hexParaRgb(s(v, "cor_frente")), hexParaRgb(s(v, "cor_fundo")), n(v, "tamanho"), n(v, "semente"), ctx),
+  },
+  {
+    id: "fibras",
+    nome: "Fibras",
+    grupo: "renderizacao",
+    opcoes: [{ id: "cor_frente", nome: "Cor da frente", tipo: "cor", padrao: "#000000" }, { id: "cor_fundo", nome: "Cor do fundo", tipo: "cor", padrao: "#ffffff" }, numero("variancia", "Variância", 1, 64, 16), numero("forca", "Força", 1, 64, 4), numero("semente", "Variação", 0, 9999, 1)],
+    aplicar: (imagem, v, ctx) => fibras(imagem, hexParaRgb(s(v, "cor_frente")), hexParaRgb(s(v, "cor_fundo")), n(v, "variancia"), n(v, "forca"), n(v, "semente"), ctx),
+  },
+  {
+    id: "reflexo_de_lente",
+    nome: "Reflexo de lente",
+    grupo: "renderizacao",
+    opcoes: [numero("brilho", "Brilho", 10, 300, 100, "%"), numero("centro_x", "Centro (horizontal)", 0, 100, 30, "%"), numero("centro_y", "Centro (vertical)", 0, 100, 30, "%"), escolha("tipo", "Tipo de lente", [["zoom", "Zoom de 50 a 300 mm"], ["35mm", "35 mm"], ["105mm", "105 mm"], ["filme", "De filme"]])],
+    aplicar: (imagem, v, ctx) => reflexoDeLente(imagem, n(v, "brilho"), noFiltro(v, ctx, "centro_x", "centro_y"), s(v, "tipo"), ctx),
+  },
+  {
+    id: "efeitos_de_iluminacao",
+    nome: "Efeitos de iluminação",
+    grupo: "renderizacao",
+    opcoes: [
+      escolha("tipo", "Luz", [["spot", "Holofote"], ["ponto", "Ponto"], ["infinita", "Infinita"]]),
+      { id: "cor", nome: "Cor da luz", tipo: "cor", padrao: "#ffffff" },
+      numero("intensidade", "Intensidade", -100, 100, 35),
+      numero("foco", "Foco", -100, 100, 69),
+      numero("centro_x", "Centro (horizontal)", 0, 100, 50, "%"),
+      numero("centro_y", "Centro (vertical)", 0, 100, 50, "%"),
+      numero("raio", "Alcance", 5, 200, 45, "%"),
+      numero("angulo", "Ângulo (infinita)", -180, 180, -60, "°"),
+      numero("altura", "Altura (infinita)", 0, 100, 50, "%"),
+      numero("ambiente", "Ambiente", -100, 100, 8),
+      numero("exposicao", "Exposição", -100, 100, 0),
+      escolha("textura", "Textura (relevo)", [["nenhuma", "Nenhuma"], ["luz", "A luz da imagem"], ["alfa", "A transparência"]]),
+      numero("relevo", "Altura do relevo", 0, 100, 50),
+    ],
+    aplicar: (imagem, v, ctx) =>
+      efeitosDeIluminacao(
+        imagem,
+        {
+          tipo: s(v, "tipo"),
+          cor: hexParaRgb(s(v, "cor")),
+          intensidade: n(v, "intensidade"),
+          foco: n(v, "foco"),
+          centro: noFiltro(v, ctx, "centro_x", "centro_y"),
+          raio: (n(v, "raio") / 100) * Math.min(ctx.documento.largura, ctx.documento.altura),
+          angulo: n(v, "angulo"),
+          altura: n(v, "altura"),
+          ambiente: n(v, "ambiente"),
+          exposicao: n(v, "exposicao"),
+          textura: s(v, "textura"),
+          relevo: n(v, "relevo"),
+        },
+        ctx,
+      ),
+  },
+  {
+    id: "reiluminar",
+    nome: "Reiluminar",
+    grupo: "renderizacao",
+    opcoes: [numero("angulo", "Direção da luz", -180, 180, 135, "°"), numero("elevacao", "Elevação", 5, 90, 45, "°"), numero("intensidade", "Intensidade", 0, 100, 60, "%"), numero("preenchimento", "Luz de preenchimento", 0, 100, 30, "%"), { id: "cor", nome: "Cor da luz", tipo: "cor", padrao: "#fff2e0" }],
+    aplicar: (imagem, v, ctx) => reiluminar(imagem, n(v, "angulo"), n(v, "elevacao"), n(v, "intensidade"), n(v, "preenchimento"), hexParaRgb(s(v, "cor")), ctx),
+  },
+  {
+    id: "chamas",
+    nome: "Chamas",
+    grupo: "renderizacao",
+    opcoes: [numero("base", "Linha de baixo", 0, 100, 100, "%"), numero("comprimento", "Comprimento", 10, 2000, 120, "px"), numero("largura", "Largura das línguas", 4, 400, 20, "px"), numero("turbulencia", "Turbulência", 0, 200, 40), escolha("cor", "Cor", [["laranja", "Laranja"], ["azul", "Azul"], ["verde", "Verde"]]), numero("semente", "Variação", 0, 9999, 1)],
+    aplicar: (imagem, v, ctx) => chamas(imagem, n(v, "base"), n(v, "comprimento"), n(v, "largura"), n(v, "turbulencia"), s(v, "cor"), n(v, "semente"), ctx),
+  },
+  {
+    id: "moldura",
+    nome: "Moldura",
+    grupo: "renderizacao",
+    opcoes: [escolha("tipo", "Moldura", [["simples", "Simples"], ["dupla", "Dupla"], ["chanfrada", "Chanfrada"], ["madeira", "Madeira"], ["vinhas", "Vinhas"], ["pontilhada", "Pontilhada"]]), numero("largura", "Largura", 1, 500, 24, "px"), { id: "cor", nome: "Cor", tipo: "cor", padrao: "#3a2a1a" }, { id: "cor2", nome: "Segunda cor", tipo: "cor", padrao: "#c8a060" }],
+    aplicar: (imagem, v, ctx) => moldura(imagem, s(v, "tipo"), n(v, "largura"), hexParaRgb(s(v, "cor")), hexParaRgb(s(v, "cor2")), ctx),
+  },
+  {
+    id: "arvore",
+    nome: "Árvore",
+    grupo: "renderizacao",
+    opcoes: [
+      escolha("tipo", "Tipo", [["folhosa", "Com folhas"], ["conifera", "Pinheiro"], ["sem_folhas", "Sem folhas"]]),
+      numero("base_x", "Base (horizontal)", 0, 100, 50, "%"),
+      numero("base_y", "Base (vertical)", 0, 100, 95, "%"),
+      numero("tamanho", "Altura", 5, 200, 60, "%"),
+      { id: "tronco", nome: "Cor do tronco", tipo: "cor", padrao: "#5b3a1e" },
+      { id: "folhas", nome: "Cor das folhas", tipo: "cor", padrao: "#2f7d32" },
+      numero("folhagem", "Folhagem", 0, 100, 70, "%"),
+      numero("semente", "Variação", 0, 9999, 1),
+    ],
+    aplicar: (imagem, v, ctx) =>
+      arvore(imagem, { x: (n(v, "base_x") / 100) * ctx.documento.largura, y: (n(v, "base_y") / 100) * ctx.documento.altura }, (n(v, "tamanho") / 100) * ctx.documento.altura, s(v, "tipo"), hexParaRgb(s(v, "tronco")), hexParaRgb(s(v, "folhas")), n(v, "folhagem"), n(v, "semente"), ctx),
+  },
   // ——— Nitidez ———
   { id: "tornar_nitido", nome: "Tornar nítido", grupo: "nitidez", opcoes: [], semJanela: true, aplicar: (imagem, _v, ctx) => nitidez(imagem, 0.6, Math.max(0.5, 0.6 * ctx.escala)) },
   { id: "mais_nitido", nome: "Mais nítido", grupo: "nitidez", opcoes: [], semJanela: true, aplicar: (imagem, _v, ctx) => nitidez(imagem, 1.4, Math.max(0.5, 0.6 * ctx.escala)) },

@@ -240,7 +240,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Distorção: deslocamento (mapa), pinçar, coordenadas polares, ondulação, cisalhamento, esfera, redemoinho, onda, ziguezague
 - [x] Ruído: adicionar, remover manchas, poeira e riscos, mediana, reduzir ruído
 - [x] Pixelização: meio-tom em cores, cristalizar, facetar, fragmentar, meia-tinta, mosaico, pontilhismo
-- [ ] Renderização: chamas, moldura, árvore, nuvens, nuvens por diferença, fibras, reflexo de lente, efeitos de iluminação (spot, ponto, infinita, canal de textura), reiluminar
+- [x] Renderização: chamas, moldura, árvore, nuvens, nuvens por diferença, fibras, reflexo de lente, efeitos de iluminação (spot, ponto, infinita, canal de textura), reiluminar
 - [x] Nitidez: tornar nítido, mais nítido, nitidez nas bordas, nitidez inteligente, máscara de nitidez
 - [x] Estilização: difusão, entalhe, extrusão, encontrar bordas, pintura a óleo, solarizar, ladrilhos, traçar contorno, vento
 - [x] Vídeo: desentrelaçar, cores NTSC

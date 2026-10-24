@@ -2344,7 +2344,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const achado = acharClipe(atual, selecionado.clipe.id);
     if (!achado) return;
     if (achado.clipe.ajuste || achado.clipe.pasta) return mostrarAviso("Os filtros valem para camadas com conteúdo, não para ajustes nem grupos.");
-    const valores = valoresDoFiltro(definicao, opcoes ?? {});
+    // As cores da frente e do fundo (nuvens, fibras) começam com as da paleta
+    const valores = valoresDoFiltro(definicao, { cor_frente: cores.primeiroPlano, cor_fundo: cores.fundo, ...opcoes });
     const direto = definicao.semJanela || semJanela;
     if (achado.clipe.pixels && !achado.clipe.filtros_inteligentes) {
       if (!direto) return void abrirNosPixels({ tipo: "filtro", filtro: tipo, opcoes: valores });
