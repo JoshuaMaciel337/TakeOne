@@ -1061,6 +1061,28 @@ class EstiloDeCamadaEntrada(SoOQueVeio):
     mesclar_se: MesclarSeEntrada | None = None
 
 
+class PontoNoDocumentoEntrada(BaseModel):
+    """Um ponto em frações do documento (pode sair dele: a alça do degradê arrastada para fora)."""
+    x: float = Field(ge=-10, le=10)
+    y: float = Field(ge=-10, le=10)
+
+
+class CamadaDePreenchimentoEntrada(BaseModel):
+    """
+    Camada de preenchimento (editor de imagem): cobre o documento com uma cor, um degradê ou um padrão; no degradê,
+    o começo e o fim das alças, em frações do documento.
+    """
+    tinta: TintaDaFormaEntrada
+    de: PontoNoDocumentoEntrada | None = None
+    ate: PontoNoDocumentoEntrada | None = None
+
+    @model_validator(mode="after")
+    def _tinta(self):
+        if self.tinta.tipo not in ("cor", "degrade", "padrao"):
+            raise ValueError("A camada de preenchimento é de cor, degradê ou padrão.")
+        return self
+
+
 class LuzGlobalEntrada(BaseModel):
     """A luz global do documento: o ângulo e a altitude que os efeitos com "usar a luz global" seguem."""
     angulo: float = Field(default=120, ge=-360, le=360)
@@ -1191,6 +1213,8 @@ class ClipeEntrada(BaseModel):
     ajuste: bool = False
     # Só no projeto de imagem: o estilo de camada (sombra, brilhos, chanfro, cetim, sobreposições, traçado)
     estilo_camada: EstiloDeCamadaEntrada | None = None
+    # Só no projeto de imagem: a camada de preenchimento (cor sólida, degradê ou padrão, cobrindo o documento)
+    camada_de_preenchimento: CamadaDePreenchimentoEntrada | None = None
     # Só no projeto de imagem: a pasta (grupo de camadas) e o preenchimento (a opacidade sem os estilos)
     pasta: bool = False
     preenchimento: float | None = Field(default=None, ge=0, le=1)

@@ -277,3 +277,22 @@ def test_estilo_de_camada_e_luz_global(cliente):
     assert salvar(cliente, aberto, [ruim, faixas[1]]).status_code == 422
     demais = {"efeitos": [{"tipo": "sombra", "id": "x", "opacidade": 2}]}
     assert salvar(cliente, aberto, [camada("video", {**forma, "estilo_camada": demais}), faixas[1]]).status_code == 422
+
+
+def test_camada_de_preenchimento(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    degrade = {"nome": "", "tipo": "solido",
+               "cores": [{"posicao": 0, "cor": "#000000"}, {"posicao": 1, "cor": "#ffffff"}],
+               "opacidades": [{"posicao": 0, "opacidade": 1}, {"posicao": 1, "opacidade": 1}]}
+    preenchimento = {"tinta": {"tipo": "degrade", "degrade": degrade, "forma": "linear", "angulo": 0, "escala": 1,
+                               "inverter": False}, "de": {"x": 0.1, "y": 0.5}, "ate": {"x": 0.9, "y": 0.5}}
+    camada_ = {**clipe(None, 0, 5, id_="p1"), "midia_id": None, "camada_de_preenchimento": preenchimento}
+    faixas = [camada("video", camada_), {**projeto["faixas"][0], "clipes": []}]
+    salvo = salvar(cliente, projeto, faixas)
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["faixas"][0]["clipes"][0]["camada_de_preenchimento"]["ate"] == {"x": 0.9, "y": 0.5}
+    # Com foto não vale; a tinta "nenhuma" também não
+    com_foto = camada("video", {**camada_, "camada_de_preenchimento": {"tinta": {"tipo": "nenhuma"}}})
+    assert salvar(cliente, aberto, [com_foto, faixas[1]]).status_code == 422
