@@ -151,6 +151,8 @@ import {
   textoEmForma,
   mudarTextosRicos,
   definirEstiloDeCamada,
+  mostrarEfeitos,
+  dimensionarEfeitos,
 } from "./imagem.ts";
 import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import type { TextoRico } from "../texto/modelo.ts";
@@ -260,7 +262,9 @@ export type Comando =
   | { comando: "imagem.caminhos"; parametros: { caminhos: CaminhoDoDocumento[] } }
   | { comando: "imagem.mascaraVetorial"; parametros: { clipeId: string; mascara: MascaraVetorial | null } }
   | { comando: "imagem.adicionarTextoRico"; parametros: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; acima?: string | null; id?: string } }
-  | { comando: "imagem.estiloDeCamada"; parametros: { clipeIds: string[]; estilo: EstiloDeCamada | null; luz?: LuzGlobal } }
+  | { comando: "imagem.mostrarEfeitos"; parametros: { visiveis: boolean } }
+  | { comando: "imagem.dimensionarEfeitos"; parametros: { clipeIds: string[]; fator: number } }
+  | { comando: "imagem.estiloDeCamada"; parametros: { clipeIds: string[]; estilo: EstiloDeCamada | null; luz?: LuzGlobal; camada?: { mesclagem?: Mesclagem; opacidade?: number; preenchimento?: number } } }
   | { comando: "imagem.textosRicos"; parametros: { mudancas: { clipeId: string; texto: TextoRico }[]; nome: "substituir" | "atualizar" } }
   | { comando: "imagem.textoEmForma"; parametros: { clipeId: string; vetor: CamadaVetorial; centro: { x: number; y: number } } }
   | { comando: "imagem.textoRico"; parametros: { clipeId: string; texto: TextoRico; deslocamento?: { x: number; y: number } } }
@@ -401,6 +405,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.textoEmForma": "converter o texto em forma",
   "imagem.textosRicos": "mudar os textos",
   "imagem.estiloDeCamada": "mudar o estilo de camada",
+  "imagem.mostrarEfeitos": "mostrar ou ocultar os efeitos",
+  "imagem.dimensionarEfeitos": "dimensionar os efeitos",
   "imagem.adicionarPrancheta": "pôr a prancheta",
   "imagem.prancheta": "mudar a prancheta",
   "imagem.pranchetaDoGrupo": "prancheta a partir do grupo",
@@ -688,8 +694,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       const resultado = adicionarTextoRico(projeto, ctx, parametros.texto, parametros.ponto, parametros.nome, parametros.acima, parametros.id);
       return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
+    case "imagem.mostrarEfeitos":
+      return { projeto: mostrarEfeitos(projeto, parametros.visiveis) };
+    case "imagem.dimensionarEfeitos":
+      return { projeto: dimensionarEfeitos(projeto, parametros.clipeIds, parametros.fator) };
     case "imagem.estiloDeCamada":
-      return { projeto: definirEstiloDeCamada(projeto, parametros.clipeIds, parametros.estilo, parametros.luz) };
+      return { projeto: definirEstiloDeCamada(projeto, parametros.clipeIds, parametros.estilo, parametros.luz, parametros.camada) };
     case "imagem.textosRicos":
       return { projeto: mudarTextosRicos(projeto, parametros.mudancas) };
     case "imagem.textoEmForma": {

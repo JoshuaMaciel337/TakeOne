@@ -169,5 +169,15 @@ export function efeitoPadrao(tipo: TipoDoEfeito, id: string): Efeito {
   }
 }
 
+export const MESCLAR_SE_PADRAO: MesclarSe = { canal: "cinza", esta: [0, 0, 255, 255], abaixo: [0, 0, 255, 255] };
+
+/** Se o estilo muda alguma coisa: efeitos ou alguma opção de mesclagem fora do padrão. */
+export function estiloFazAlgo(estilo: EstiloDeCamada | null | undefined): boolean {
+  if (!estilo) return false;
+  const mesclarSe = estilo.mesclar_se && JSON.stringify([estilo.mesclar_se.esta, estilo.mesclar_se.abaixo]) !== JSON.stringify([MESCLAR_SE_PADRAO.esta, MESCLAR_SE_PADRAO.abaixo]);
+  const canais = estilo.canais && !(estilo.canais.vermelho && estilo.canais.verde && estilo.canais.azul);
+  return Boolean(estilo.efeitos.length || mesclarSe || canais || (estilo.vazamento && estilo.vazamento !== "nenhum") || estilo.internos_como_grupo || estilo.mascara_esconde_efeitos);
+}
+
 /** Os efeitos que valem (ligados, num estilo ligado). */
 export const efeitosLigados = (estilo: EstiloDeCamada | null | undefined): Efeito[] => (estilo && estilo.ligado !== false ? estilo.efeitos.filter((efeito) => efeito.ligado) : []);

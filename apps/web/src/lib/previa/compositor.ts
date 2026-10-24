@@ -30,7 +30,26 @@ export type Camada = {
    * Estilo de camada do editor de imagem (lib/imagem/estiloDeCamada.ts): os efeitos ligados, a escala deles, a luz
    * global do documento e o preenchimento (a opacidade do conteúdo sem os efeitos).
    */
-  estiloDeCamada?: { efeitos: Efeito[]; escala: number; luz: LuzGlobal; preenchimento: number };
+  estiloDeCamada?: {
+    efeitos: Efeito[];
+    escala: number;
+    luz: LuzGlobal;
+    preenchimento: number;
+    /** Os efeitos de dentro (sobreposições, cetim, brilho e sombra internos) também no preenchimento. */
+    internosComoGrupo?: boolean;
+    /** Os efeitos saem da camada sem a máscara, e a máscara corta tudo depois. */
+    mascaraEscondeEfeitos?: boolean;
+    /** Vazamento: onde o conteúdo cobre (vezes o que o preenchimento esconde), aparece o fundo do documento. */
+    vazamento?: boolean;
+    /** O fundo do documento (null: transparente), para o vazamento. */
+    fundo?: string | null;
+  };
+  /** Opções de mesclagem › Mesclar se: o canal (0 cinza, 1 a 3 R, G e B) e as faixas, de 0 a 1. */
+  mesclarSe?: { canal: number; esta: [number, number, number, number]; abaixo: [number, number, number, number] } | null;
+  /** Opções de mesclagem › Canais: os que a camada muda (R, G, B). */
+  canais?: [boolean, boolean, boolean] | null;
+  /** Interno: a camada apaga o destino pelo alfa dela (o vazamento num documento transparente). */
+  apagar?: boolean;
   /** O do que aparece; virado, o compositor lê o pedaço espelhado da textura. */
   recorte: Recorte;
   virar?: Virar | null;
@@ -292,6 +311,21 @@ uniform int u_mesclagem;
 uniform sampler2D u_fundo;
 // Máscara de corte (o editor de imagem): a camada só aparece onde o que já está no destino (a base) tem alfa
 uniform bool u_recortada;
+// Opções de mesclagem (estilo de camada): Mesclar se (o canal: 0 cinza, 1 a 3 R, G e B; as faixas desta camada e da
+// de baixo, de 0 a 1, com as metades) e os canais que a camada muda; u_comFundo pede a cópia do destino
+uniform bool u_comFundo;
+uniform int u_mesclarSe;
+uniform int u_mesclarSeCanal;
+uniform vec4 u_mesclarSeEsta;
+uniform vec4 u_mesclarSeAbaixo;
+uniform vec3 u_canais;
+float valorDoCanal(vec3 c, int canal) { return canal == 1 ? c.r : canal == 2 ? c.g : canal == 3 ? c.b : dot(c, vec3(0.3, 0.59, 0.11)); }
+// O quanto o valor passa na faixa: entra de [0] a [1] e sai de [2] a [3]
+float naFaixa(float v, vec4 f) {
+  float entra = f.y > f.x ? clamp((v - f.x) / (f.y - f.x), 0.0, 1.0) : (v >= f.x ? 1.0 : 0.0);
+  float sai = f.w > f.z ? clamp((f.w - v) / (f.w - f.z), 0.0, 1.0) : (v <= f.z ? 1.0 : 0.0);
+  return entra * sai;
+}
 
 // Os modos de mesclagem por canal (b o fundo, s a camada, sem o alfa), nas contas dos editores de imagem
 float queimarCor(float b, float s) { return b >= 1.0 ? 1.0 : s <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - b) / s); }
@@ -650,13 +684,15 @@ void main() {
     texel *= clamp((u_transicaoLimiar - campoDaTransicao(v_local, u_tamanho)) / SUAVIDADE_DA_TRANSICAO + 0.5, 0.0, 1.0);
   }
   cor = texel * u_opacidade;
-  bool comFundo = u_mesclagem >= 4 || u_recortada;
+  bool comFundo = u_mesclagem >= 4 || u_recortada || u_comFundo;
   if (u_mesclagem == 1 && !comFundo) cor = vec4(cor.rgb + (1.0 - cor.a), 1.0);
   if (comFundo) {
     // O blend do render: o primeiro é o fundo (b), o segundo a camada (s), sem o alfa; o alfa mistura depois
     vec4 fundo = texelFetch(u_fundo, ivec2(gl_FragCoord.xy), 0);
     vec3 b = fundo.a > 0.0 ? fundo.rgb / fundo.a : vec3(0.0);
     vec3 s = cor.a > 0.0 ? clamp(cor.rgb / cor.a, 0.0, 1.0) : vec3(0.0);
+    // Mesclar se: a camada some onde o valor dela ou o do fundo sai das faixas
+    if (u_mesclarSe == 1) cor *= naFaixa(valorDoCanal(s, u_mesclarSeCanal), u_mesclarSeEsta) * mix(1.0, naFaixa(valorDoCanal(b, u_mesclarSeCanal), u_mesclarSeAbaixo), fundo.a);
     if (u_mesclagem == 10) {
       // Dissolver: cada pixel aparece inteiro ou some, com a chance da opacidade (o sorteio é fixo por pixel)
       float sorte = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
@@ -670,8 +706,27 @@ void main() {
       vec3 misturada = (1.0 - fundo.a) * s + fundo.a * m;
       cor = vec4(cor.a * misturada + (1.0 - cor.a) * fundo.rgb, cor.a + fundo.a * (1.0 - cor.a));
     }
+    // Os canais desligados ficam como estavam
+    cor.rgb = mix(fundo.rgb, cor.rgb, u_canais);
   }
 }`;
+
+/** Uma cor sólida no alfa dos pixels lidos do framebuffer (linhas de baixo para cima), pré-multiplicada e de cima para baixo. */
+function camadaDeCorNoAlfa(pixels: Uint8Array, w: number, h: number, cor: string): Uint8Array {
+  const [r, g, b] = corParaRgb(cor);
+  const saida = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = pixels[((h - 1 - y) * w + x) * 4 + 3];
+      const i = (y * w + x) * 4;
+      saida[i] = Math.round(r * a);
+      saida[i + 1] = Math.round(g * a);
+      saida[i + 2] = Math.round(b * a);
+      saida[i + 3] = a;
+    }
+  }
+  return saida;
+}
 
 /** Largura e altura em pixels de uma fonte de textura. */
 function tamanhoDaFonte(fonte: TexImageSource): { largura: number; altura: number } {
@@ -751,7 +806,7 @@ type Recursos = {
   /** As máscaras de camada pintáveis, uma por camada (unidade 5). */
   mascarasDaCamada: WebGLTexture[];
   uniformes: Record<
-    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono" | "comMascaraCamada" | "mascaraCamada" | "mascaraCamadaMatriz" | "mascaraCamadaDensidade",
+    "recortada" | "quadro" | "centro" | "tamanho" | "rotacao" | "recorte" | "virar" | "opacidade" | "textura" | "comLut" | "lut" | "vinheta" | "revelado" | "corteDe" | "corteAte" | "mesclagem" | "brilho" | "nitidez" | "meiosTons" | "desfocada" | "lente" | "transicao" | "transicaoLimiar" | "borrao" | "borraoForca" | "zoomTransicao" | "celulas" | "desvio" | "linhas" | "luz" | "luzPosicao" | "grao" | "graoColunas" | "graoDeslocamento" | "graoTextura" | "comChroma" | "chromaCor" | "semelhanca" | "suavidade" | "luma" | "lumaLimiar" | "lumaSuavidade" | "cantos" | "mascaraForma" | "mascara" | "mascaraSuave" | "corDaBorda" | "pixelsPorUnidade" | "comMascaraDoFundo" | "mascaraDoFundo" | "fundo" | "poligono" | "pontosDoPoligono" | "comMascaraCamada" | "mascaraCamada" | "mascaraCamadaMatriz" | "mascaraCamadaDensidade" | "comFundo" | "mesclarSe" | "mesclarSeCanal" | "mesclarSeEsta" | "mesclarSeAbaixo" | "canais",
     WebGLUniformLocation | null
   >;
   texturas: WebGLTexture[];
@@ -883,6 +938,12 @@ export class Compositor {
       programa,
       uniformes: {
         recortada: local("u_recortada"),
+        comFundo: local("u_comFundo"),
+        mesclarSe: local("u_mesclarSe"),
+        mesclarSeCanal: local("u_mesclarSeCanal"),
+        mesclarSeEsta: local("u_mesclarSeEsta"),
+        mesclarSeAbaixo: local("u_mesclarSeAbaixo"),
+        canais: local("u_canais"),
         quadro: local("u_quadro"),
         centro: local("u_centro"),
         tamanho: local("u_tamanho"),
@@ -1128,7 +1189,7 @@ export class Compositor {
   private desenharNo(camada: Camada) {
     if (camada.recortadas?.length) this.desenharComRecorte(camada);
     else if (camada.pasta) this.desenharPasta(camada);
-    else if (camada.estiloDeCamada?.efeitos.length && camada.fonte !== FUNDO) this.desenharComEstilo(camada, this.proximaFolha++);
+    else if (camada.estiloDeCamada && camada.fonte !== FUNDO) this.desenharComEstilo(camada, this.proximaFolha++);
     else if (camada.silhueta && camada.fonte !== FUNDO) this.desenharComSilhueta(camada, this.proximaFolha++);
     else this.desenharCamada(camada, this.proximaFolha++);
   }
@@ -1441,12 +1502,24 @@ export class Compositor {
     const mesclagem = camada.mesclagem ?? "normal";
     const codigo = CODIGO_DA_MESCLAGEM[mesclagem];
     const recortada = Boolean(camada.recortada);
+    // As opções de mesclagem precisam do fundo (o caminho que lê a cópia do destino)
+    const canais = camada.canais && !camada.canais.every(Boolean) ? camada.canais : null;
+    const opcoes = Boolean(camada.mesclarSe || canais);
     gl.uniform1i(uniformes.mesclagem, codigo);
     gl.uniform1i(uniformes.recortada, recortada ? 1 : 0);
-    if (mesclagem === "multiplicar" && !recortada) gl.blendFunc(gl.DST_COLOR, gl.ZERO);
-    else if (mesclagem === "tela" && !recortada) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
-    else if (mesclagem === "somar" && !recortada) gl.blendFunc(gl.ONE, gl.ONE);
-    else if (codigo >= MESCLAGEM_COM_O_FUNDO || recortada) {
+    gl.uniform1i(uniformes.comFundo, opcoes ? 1 : 0);
+    gl.uniform1i(uniformes.mesclarSe, camada.mesclarSe ? 1 : 0);
+    if (camada.mesclarSe) {
+      gl.uniform1i(uniformes.mesclarSeCanal, camada.mesclarSe.canal);
+      gl.uniform4f(uniformes.mesclarSeEsta, ...camada.mesclarSe.esta);
+      gl.uniform4f(uniformes.mesclarSeAbaixo, ...camada.mesclarSe.abaixo);
+    }
+    gl.uniform3f(uniformes.canais, ...((canais ?? [true, true, true]).map((ligado) => (ligado ? 1 : 0)) as [number, number, number]));
+    if (camada.apagar) gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+    else if (mesclagem === "multiplicar" && !recortada && !opcoes) gl.blendFunc(gl.DST_COLOR, gl.ZERO);
+    else if (mesclagem === "tela" && !recortada && !opcoes) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+    else if (mesclagem === "somar" && !recortada && !opcoes) gl.blendFunc(gl.ONE, gl.ONE);
+    else if (codigo >= MESCLAGEM_COM_O_FUNDO || recortada || opcoes) {
       // O fundo até aqui (o canvas, ou o framebuffer da pasta ou do recorte), copiado pelo blit como na camada de
       // ajuste: o shader mistura e escreve o resultado no lugar
       const copia = this.copiarDestino(ALVO_DA_MESCLAGEM, ALVO_DA_MESCLAGEM_EM_FRAMEBUFFER);
@@ -1457,8 +1530,13 @@ export class Compositor {
       gl.blendFunc(gl.ONE, gl.ZERO);
     }
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    if (mesclagem !== "normal" || recortada) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    if (mesclagem !== "normal" || recortada || opcoes || camada.apagar) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     if (recortada) gl.uniform1i(uniformes.recortada, 0);
+    if (opcoes) {
+      gl.uniform1i(uniformes.comFundo, 0);
+      gl.uniform1i(uniformes.mesclarSe, 0);
+      gl.uniform3f(uniformes.canais, 1, 1, 1);
+    }
   }
 
   /**
@@ -1569,20 +1647,37 @@ export class Compositor {
     const w = Math.max(1, Math.round(quadroLocal.largura * escala));
     const h = Math.max(1, Math.round(quadroLocal.altura * escala));
     const local = this.alvo(ALVO_DA_SILHUETA, w, h);
-    this.destino = { buffer: local.buffer, largura: w, altura: h, quadro: quadroLocal };
-    this.irAoDestino();
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    this.desenharCamada(
-      { ...camada, estiloDeCamada: undefined, silhueta: undefined, mesclagem: "normal", recortada: false, caixa: { ...caixa, cx: quadroLocal.largura / 2, cy: quadroLocal.altura / 2, rotacao: 0, opacidade: 1 } },
-      indice,
-    );
-    const pixels = new Uint8Array(w * h * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, local.buffer);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const caixaLocal = { ...caixa, cx: quadroLocal.largura / 2, cy: quadroLocal.altura / 2, rotacao: 0, opacidade: 1 };
+    const lerLocal = (desenho: Camada) => {
+      this.destino = { buffer: local.buffer, largura: w, altura: h, quadro: quadroLocal };
+      this.irAoDestino();
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      this.desenharCamada(desenho, indice);
+      const lidos = new Uint8Array(w * h * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, local.buffer);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, lidos);
+      return lidos;
+    };
+    const sozinha: Camada = { ...camada, estiloDeCamada: undefined, silhueta: undefined, mesclagem: "normal", mesclarSe: null, canais: null, recortada: false, caixa: caixaLocal };
+    // Com "a máscara esconde os efeitos", os efeitos saem da camada sem a máscara, e a máscara (lida num quadro branco)
+    // corta cada um deles depois
+    const esconder = Boolean(estilo.mascaraEscondeEfeitos && camada.mascaraDaCamada);
+    let mascara: Uint8Array | null = null;
+    if (esconder) {
+      const branco = document.createElement("canvas");
+      branco.width = branco.height = 1;
+      const ctx2d = branco.getContext("2d")!;
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.fillRect(0, 0, 1, 1);
+      mascara = lerLocal({ fonte: branco, recorte: RECORTE_INTEIRO, caixa: caixaLocal, mascaraDaCamada: camada.mascaraDaCamada, mascaraDeForma: camada.mascaraDeForma });
+    }
+    const semMascara = esconder ? lerLocal({ ...sozinha, mascaraDaCamada: null }) : null;
+    // O conteúdo (com a máscara) fica no framebuffer para entrar como camada
+    const pixels = lerLocal(sozinha);
     this.destino = tela;
     this.irAoDestino();
-    const camadas = this.camadasDosEfeitos(pixels, w, h, estilo, caixa.rotacao);
+    const camadas = this.camadasDosEfeitos(semMascara ?? pixels, w, h, estilo, caixa.rotacao, mascara);
     const comoCamada = (dados: Uint8Array, opacidade: number, mesclagem: Mesclagem) => {
       const textura = gl.createTexture()!;
       gl.activeTexture(gl.TEXTURE0);
@@ -1609,6 +1704,22 @@ export class Compositor {
       gl.deleteTexture(textura);
     };
     for (const efeito of camadas.abaixo) comoCamada(efeito.dados, efeito.opacidade, efeito.modo);
+    // O vazamento: onde o conteúdo cobre (no que o preenchimento esconde), o fundo do documento aparece por baixo dele
+    if (estilo.vazamento && estilo.preenchimento < 1) {
+      this.desenharCamada(
+        {
+          fonte: camada.fonte,
+          texturaPronta: { textura: local.textura, largura: w, altura: h },
+          recorte: RECORTE_INTEIRO,
+          virar: { horizontal: false, vertical: true },
+          caixa: { ...caixa, largura: quadroLocal.largura, altura: quadroLocal.altura, opacidade: 1 - estilo.preenchimento },
+          apagar: !estilo.fundo,
+          recortada: camada.recortada,
+        },
+        indice,
+      );
+      if (estilo.fundo) comoCamada(camadaDeCorNoAlfa(pixels, w, h, estilo.fundo), 1 - estilo.preenchimento, "normal");
+    }
     // O conteúdo, no preenchimento; a textura do framebuffer vem de baixo para cima
     this.desenharCamada(
       {
@@ -1618,25 +1729,46 @@ export class Compositor {
         virar: { horizontal: false, vertical: true },
         caixa: { ...caixa, largura: quadroLocal.largura, altura: quadroLocal.altura, opacidade: caixa.opacidade * estilo.preenchimento },
         mesclagem: camada.mesclagem,
+        mesclarSe: camada.mesclarSe,
+        canais: camada.canais,
         recortada: camada.recortada,
       },
       indice,
     );
-    for (const efeito of camadas.acima) comoCamada(efeito.dados, efeito.opacidade, efeito.modo);
+    // Os de dentro como grupo: também no preenchimento
+    const internos: TipoDoEfeito[] = ["sobreposicao_padrao", "sobreposicao_degrade", "sobreposicao_cor", "cetim", "brilho_interno", "sombra_interna"];
+    for (const efeito of camadas.acima) comoCamada(efeito.dados, efeito.opacidade * (estilo.internosComoGrupo && internos.includes(efeito.tipo) ? estilo.preenchimento : 1), efeito.modo);
+    // Opções de mesclagem: o conteúdo com o Mesclar se e os canais passa por cima de novo (no lugar do de antes)
   }
 
   /** As contas dos efeitos guardadas: o mesmo alfa com o mesmo estilo dá as mesmas camadas. */
   private efeitosGuardados = new Map<string, ReturnType<Compositor["calcularEfeitos"]>>();
 
-  private camadasDosEfeitos(pixels: Uint8Array, w: number, h: number, estilo: NonNullable<Camada["estiloDeCamada"]>, giro: number) {
+  private camadasDosEfeitos(pixels: Uint8Array, w: number, h: number, estilo: NonNullable<Camada["estiloDeCamada"]>, giro: number, mascara: Uint8Array | null = null) {
     // Um resumo dos pixels (FNV-1a de 32 bits nas palavras de 4 bytes) e do estilo
     const palavras = new Uint32Array(pixels.buffer);
     let resumo = 0x811c9dc5;
     for (let i = 0; i < palavras.length; i++) resumo = Math.imul(resumo ^ palavras[i], 0x01000193) >>> 0;
+    if (mascara) {
+      const daMascara = new Uint32Array(mascara.buffer);
+      for (let i = 0; i < daMascara.length; i += 7) resumo = Math.imul(resumo ^ daMascara[i], 0x01000193) >>> 0;
+    }
     const chave = `${w}x${h}:${resumo}:${giro}:${JSON.stringify(estilo)}`;
     let pronto = this.efeitosGuardados.get(chave);
     if (!pronto) {
       pronto = this.calcularEfeitos(pixels, w, h, estilo, giro);
+      // A máscara corta cada efeito (as linhas da máscara vêm de baixo para cima)
+      if (mascara) {
+        for (const feita of [...pronto.abaixo, ...pronto.acima]) {
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const m = mascara[((h - 1 - y) * w + x) * 4 + 3] / 255;
+              const i = (y * w + x) * 4;
+              for (let c = 0; c < 4; c++) feita.dados[i + c] = Math.round(feita.dados[i + c] * m);
+            }
+          }
+        }
+      }
       this.efeitosGuardados.set(chave, pronto);
       while (this.efeitosGuardados.size > 24) this.efeitosGuardados.delete(this.efeitosGuardados.keys().next().value!);
     }
@@ -1653,7 +1785,14 @@ export class Compositor {
     type Feita = { dados: Uint8Array; opacidade: number; modo: Mesclagem; tipo: TipoDoEfeito };
     const feitas: Feita[] = [];
     for (const efeito of estilo.efeitos) {
-      const campo = campoDoEfeito(efeito, ctx);
+      // A textura do chanfro: a luminância do padrão na escala dele
+      let textura: Campo | null = null;
+      if (efeito.tipo === "chanfro" && efeito.textura) {
+        const pixels = pixelsDaTinta({ tipo: "padrao", padrao: efeito.textura.padrao as never, escala: efeito.textura.escala }, w, h, retangulo, escala, giro);
+        textura = { largura: w, altura: h, dados: new Float32Array(w * h) };
+        for (let i = 0; i < w * h; i++) textura.dados[i] = (0.2126 * pixels[i * 4] + 0.7152 * pixels[i * 4 + 1] + 0.0722 * pixels[i * 4 + 2]) / 255;
+      }
+      const campo = campoDoEfeito(efeito, ctx, { textura });
       const modo = efeito.modo;
       if (efeito.tipo === "chanfro") {
         if (campo.sombra) feitas.push({ tipo: "chanfro", dados: camadaDoEfeito(campo.sombra, { cor: efeito.cor_sombra ?? "#000000" }), opacidade: (efeito.opacidade_sombra ?? 0.75) * efeito.opacidade, modo: efeito.modo_sombra ?? "multiplicar" });

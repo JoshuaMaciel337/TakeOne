@@ -217,6 +217,19 @@ export type AcoesDosMenus = {
   bloquear: () => void;
   /** Camada › Estilo de camada: a janela, aberta num efeito (ou nas opções de mesclagem). */
   estilo: (foco: TipoDoEfeito | "mesclagem") => void;
+  /** As outras ações do estilo de camada. */
+  estiloDeCamada: {
+    temEstilo: boolean;
+    temCopiado: boolean;
+    efeitosVisiveis: boolean;
+    copiar: () => void;
+    colar: () => void;
+    limpar: () => void;
+    luzGlobal: () => void;
+    criarCamadas: () => void;
+    alternarVisiveis: () => void;
+    dimensionar: () => void;
+  };
   mascara: () => void;
   viaRecorte: () => void;
   /** Editar › Preencher (a janela) e os preenchimentos rápidos (Alt e Ctrl + Backspace). */
@@ -422,6 +435,15 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Opções de mesclagem…", aoEscolher: () => a.estilo("mesclagem") },
             "-",
             ...NOMES_DOS_EFEITOS.map(({ tipo, nome }) => ({ nome: `${nome}…`, aoEscolher: () => a.estilo(tipo) })),
+            "-",
+            { nome: "Copiar estilo de camada", desativado: !a.estiloDeCamada.temEstilo, aoEscolher: a.estiloDeCamada.copiar },
+            { nome: "Colar estilo de camada", desativado: !a.estiloDeCamada.temCopiado, aoEscolher: a.estiloDeCamada.colar },
+            { nome: "Limpar estilo de camada", desativado: !a.estiloDeCamada.temEstilo, aoEscolher: a.estiloDeCamada.limpar },
+            "-",
+            { nome: "Luz global…", aoEscolher: a.estiloDeCamada.luzGlobal },
+            { nome: "Criar camadas", desativado: !a.estiloDeCamada.temEstilo, aoEscolher: a.estiloDeCamada.criarCamadas },
+            { nome: a.estiloDeCamada.efeitosVisiveis ? "Ocultar todos os efeitos" : "Mostrar todos os efeitos", aoEscolher: a.estiloDeCamada.alternarVisiveis },
+            { nome: "Dimensionar efeitos…", desativado: !a.estiloDeCamada.temEstilo, aoEscolher: a.estiloDeCamada.dimensionar },
           ],
         },
         {

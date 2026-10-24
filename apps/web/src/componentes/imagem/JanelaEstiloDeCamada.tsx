@@ -6,25 +6,32 @@
 // Cancelar volta como estava.
 import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { Degrade } from "@/lib/pintura/degrade";
 import { MESCLAGENS_DA_IMAGEM, type Mesclagem } from "@/lib/projeto/modelo";
-import { CONTORNOS_PRONTOS, type ContornoDoEfeito, type Efeito, efeitoPadrao, type EstiloDeCamada, LINEAR, type LuzGlobal, NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
+import { CONTORNOS_PRONTOS, type ContornoDoEfeito, type Efeito, efeitoPadrao, type EstiloDeCamada, LINEAR, type LuzGlobal, MESCLAR_SE_PADRAO, type MesclarSe, NOMES_DOS_EFEITOS, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import { tabelaDoContorno } from "@/lib/imagem/efeitos";
 import type { TintaDaForma } from "@/lib/vetor/modelo";
 import { usePadroes } from "@/lib/pintura/padroes";
 import { SeletorDeTinta } from "./OpcoesDaForma";
+import { Moldura } from "./JanelasDePixels";
+import { JanelaEditorDeContorno } from "./EditorDeContorno";
+
+export type GeralDaCamada = { mesclagem: Exclude<Mesclagem, "passagem">; opacidade: number; preenchimento: number };
 
 type Props = {
   inicial: EstiloDeCamada | null;
   luz: LuzGlobal;
+  /** O modo, a opacidade e o preenchimento da camada (as opções de mesclagem gerais). */
+  geral: GeralDaCamada;
   /** O efeito que a janela abre escolhido ("mesclagem": as opções de mesclagem). */
   foco?: TipoDoEfeito | "mesclagem";
   primeiroPlano: string;
   fundo: string;
   degradesDoEspaco: Degrade[];
-  aoPrever: (estilo: EstiloDeCamada, luz: LuzGlobal) => void;
-  aoConfirmar: (estilo: EstiloDeCamada, luz: LuzGlobal) => void;
+  aoPrever: (estilo: EstiloDeCamada, luz: LuzGlobal, geral: GeralDaCamada) => void;
+  aoConfirmar: (estilo: EstiloDeCamada, luz: LuzGlobal, geral: GeralDaCamada) => void;
   aoCancelar: () => void;
 };
 
@@ -105,8 +112,23 @@ function DesenhoDoContorno({ contorno }: { contorno: ContornoDoEfeito }) {
 
 function SeletorDeContorno({ rotulo = "Contorno", valor, aoMudar }: { rotulo?: string; valor: ContornoDoEfeito | undefined; aoMudar: (contorno: ContornoDoEfeito) => void }) {
   const atual = valor ?? LINEAR;
+  const [editando, setEditando] = useState(false);
   return (
     <Linha rotulo={rotulo}>
+      {editando
+        ? // Fora da linha (um <label>, que desviaria os cliques), por cima da janela do estilo
+          createPortal(
+            <JanelaEditorDeContorno
+              inicial={atual}
+              aoCancelar={() => setEditando(false)}
+              aoConfirmar={(contorno) => {
+                aoMudar(contorno);
+                setEditando(false);
+              }}
+            />,
+            document.body,
+          )
+        : null}
       <DesenhoDoContorno contorno={atual} />
       <select aria-label={rotulo} className={`${campo} flex-1`} value={atual.nome ?? ""} onChange={(evento) => aoMudar(CONTORNOS_PRONTOS.find((item) => item.nome === evento.currentTarget.value) ?? LINEAR)}>
         {atual.nome && CONTORNOS_PRONTOS.some((item) => item.nome === atual.nome) ? null : <option value={atual.nome ?? ""}>Personalizado</option>}
@@ -116,6 +138,9 @@ function SeletorDeContorno({ rotulo = "Contorno", valor, aoMudar }: { rotulo?: s
           </option>
         ))}
       </select>
+      <button type="button" className="botao-secundario px-2 py-0.5 text-xs" onClick={() => setEditando(true)} title={`Editar a curva: ${rotulo}`}>
+        Editar…
+      </button>
     </Linha>
   );
 }
@@ -129,7 +154,64 @@ function Caixa({ rotulo, valor, aoMudar }: { rotulo: string; valor: boolean; aoM
   );
 }
 
-export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, foco, primeiroPlano, fundo, degradesDoEspaco, aoPrever, aoConfirmar, aoCancelar }: Props) {
+/** Camada › Estilo de camada › Luz global: o ângulo e a altitude que os efeitos com "usar a luz global" seguem. */
+export function JanelaLuzGlobal({ luz, aoConfirmar, aoCancelar }: { luz: LuzGlobal; aoConfirmar: (luz: LuzGlobal) => void; aoCancelar: () => void }) {
+  const [atual, setAtual] = useState(luz);
+  return (
+    <Moldura titulo="Luz global" aoFechar={aoCancelar} aoConfirmar={() => aoConfirmar(atual)}>
+      <Deslizante rotulo="Ângulo" valor={atual.angulo} min={-180} max={180} unidade="°" aoMudar={(angulo) => setAtual((a) => ({ ...a, angulo }))} />
+      <Deslizante rotulo="Altitude" valor={atual.altitude} min={0} max={90} unidade="°" aoMudar={(altitude) => setAtual((a) => ({ ...a, altitude }))} />
+    </Moldura>
+  );
+}
+
+/** Camada › Estilo de camada › Dimensionar efeitos: a escala dos efeitos em porcentagem. */
+export function JanelaDimensionarEfeitos({ aoConfirmar, aoCancelar }: { aoConfirmar: (fator: number) => void; aoCancelar: () => void }) {
+  const [fator, setFator] = useState(1);
+  return (
+    <Moldura titulo="Dimensionar efeitos" aoFechar={aoCancelar} aoConfirmar={() => aoConfirmar(fator)}>
+      <Deslizante rotulo="Escala" valor={fator} min={0.01} max={10} fator={100} unidade="%" aoMudar={setFator} />
+    </Moldura>
+  );
+}
+
+/** As faixas do Mesclar se: entra de [0] a [1] e sai de [2] a [3], de 0 a 255, com a barra do canal embaixo. */
+function FaixaDoMesclarSe({ rotulo, valor, aoMudar }: { rotulo: string; valor: [number, number, number, number]; aoMudar: (valor: [number, number, number, number]) => void }) {
+  const nomes = ["Preto (começo)", "Preto (fim)", "Branco (começo)", "Branco (fim)"];
+  return (
+    <div className="flex flex-col gap-1 text-xs text-suave">
+      <span>{rotulo}</span>
+      <div className="relative h-3 rounded" style={{ background: "linear-gradient(to right, #000, #fff)" }} aria-hidden>
+        {valor.map((v, i) => (
+          <span key={i} className="absolute -bottom-1.5 size-0 border-x-4 border-b-[6px] border-x-transparent border-b-destaque" style={{ left: `calc(${(v / 255) * 100}% - 4px)` }} />
+        ))}
+      </div>
+      <div className="mt-1 grid grid-cols-4 gap-1">
+        {valor.map((v, i) => (
+          <input
+            key={i}
+            aria-label={`${rotulo}: ${nomes[i]}`}
+            className={`${campo} text-right`}
+            value={Math.round(v)}
+            inputMode="numeric"
+            onChange={(evento) => {
+              const numero = Math.min(255, Math.max(0, Number(evento.currentTarget.value) || 0));
+              const novo = [...valor] as [number, number, number, number];
+              novo[i] = numero;
+              // Em ordem: os de antes não passam deste, os de depois não ficam antes
+              for (let k = 0; k < i; k++) novo[k] = Math.min(novo[k], numero);
+              for (let k = i + 1; k < 4; k++) novo[k] = Math.max(novo[k], numero);
+              aoMudar(novo);
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, geral: geralInicial, foco, primeiroPlano, fundo, degradesDoEspaco, aoPrever, aoConfirmar, aoCancelar }: Props) {
+  const [geral, setGeral] = useState(geralInicial);
   const [estilo, setEstilo] = useState<EstiloDeCamada>(() => {
     const base = inicial ?? { efeitos: [] };
     // Aberta num efeito que a camada ainda não tem: ele entra ligado, com os padrões
@@ -140,11 +222,12 @@ export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, foco, primeiroP
   const [escolhido, setEscolhido] = useState<string>(() => (foco && foco !== "mesclagem" ? (estilo.efeitos.find((efeito) => efeito.tipo === foco)?.id ?? "mesclagem") : "mesclagem"));
   const padroes = usePadroes();
   useEffect(() => {
-    aoPrever(estilo, luz);
-  }, [estilo, luz, aoPrever]);
+    aoPrever(estilo, luz, geral);
+  }, [estilo, luz, geral, aoPrever]);
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
-      if (evento.key === "Escape") aoCancelar();
+      // Com o editor de contorno aberto por cima, o Esc é dele
+      if (evento.key === "Escape" && document.querySelectorAll("[role='dialog']").length < 2) aoCancelar();
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
@@ -353,6 +436,27 @@ export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, foco, primeiroP
             <CampoDeCor rotulo="Cor da sombra" valor={e.cor_sombra ?? "#000000"} aoMudar={(cor_sombra) => mudarEfeito(e.id, { cor_sombra })} />
             <Deslizante rotulo="Opacidade da sombra" valor={e.opacidade_sombra ?? 0.75} min={0} max={1} fator={100} unidade="%" aoMudar={(opacidade_sombra) => mudarEfeito(e.id, { opacidade_sombra })} />
             <div className="pl-[8.5rem]">
+              <Caixa rotulo="Textura" valor={Boolean(e.textura)} aoMudar={(ligado) => mudarEfeito(e.id, { textura: ligado ? { padrao: padroes[0]?.id ?? "xadrez", escala: 1, profundidade: 1, inverter: false } : undefined })} />
+            </div>
+            {e.textura ? (
+              <>
+                <Linha rotulo="Padrão da textura">
+                  <select aria-label="Padrão da textura" className={`${campo} flex-1`} value={e.textura.padrao} onChange={(evento) => mudarEfeito(e.id, { textura: { ...e.textura!, padrao: evento.currentTarget.value } })}>
+                    {padroes.map((padrao) => (
+                      <option key={padrao.id} value={padrao.id}>
+                        {padrao.nome}
+                      </option>
+                    ))}
+                  </select>
+                </Linha>
+                <Deslizante rotulo="Escala da textura" valor={e.textura.escala} min={0.01} max={10} fator={100} unidade="%" aoMudar={(escala) => mudarEfeito(e.id, { textura: { ...e.textura!, escala } })} />
+                <Deslizante rotulo="Profundidade da textura" valor={e.textura.profundidade} min={-10} max={10} fator={100} unidade="%" aoMudar={(profundidade) => mudarEfeito(e.id, { textura: { ...e.textura!, profundidade } })} />
+                <div className="pl-[8.5rem]">
+                  <Caixa rotulo="Inverter a textura" valor={e.textura.inverter} aoMudar={(inverter) => mudarEfeito(e.id, { textura: { ...e.textura!, inverter } })} />
+                </div>
+              </>
+            ) : null}
+            <div className="pl-[8.5rem]">
               <Caixa rotulo="Contorno do relevo" valor={Boolean(e.contorno_chanfro)} aoMudar={(ligado) => mudarEfeito(e.id, { contorno_chanfro: ligado ? LINEAR : undefined })} />
             </div>
             {e.contorno_chanfro ? <SeletorDeContorno rotulo="Contorno do relevo" valor={e.contorno_chanfro} aoMudar={(contorno_chanfro) => mudarEfeito(e.id, { contorno_chanfro })} /> : null}
@@ -409,6 +513,63 @@ export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, foco, primeiroP
             ) : (
               <>
                 <h3 className="text-xs font-semibold text-texto">Opções de mesclagem</h3>
+                <h4 className="text-[11px] font-semibold text-suave">Mesclagem geral</h4>
+                <SeletorDeModo valor={geral.mesclagem} aoMudar={(mesclagem) => setGeral((atual) => ({ ...atual, mesclagem }))} />
+                <Deslizante rotulo="Opacidade" valor={geral.opacidade} min={0} max={1} fator={100} unidade="%" aoMudar={(opacidade) => setGeral((atual) => ({ ...atual, opacidade }))} />
+                <h4 className="text-[11px] font-semibold text-suave">Mesclagem avançada</h4>
+                <Deslizante rotulo="Preenchimento" valor={geral.preenchimento} min={0} max={1} fator={100} unidade="%" aoMudar={(preenchimento) => setGeral((atual) => ({ ...atual, preenchimento }))} />
+                <Linha rotulo="Canais">
+                  {(
+                    [
+                      ["vermelho", "R"],
+                      ["verde", "G"],
+                      ["azul", "B"],
+                    ] as const
+                  ).map(([chave, nome]) => (
+                    <label key={chave} className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        aria-label={`Canal ${nome}`}
+                        checked={estilo.canais?.[chave] !== false}
+                        onChange={(evento) => {
+                          const ligado = evento.currentTarget.checked;
+                          setEstilo((atual) => ({ ...atual, canais: { vermelho: true, verde: true, azul: true, ...atual.canais, [chave]: ligado } }));
+                        }}
+                      />
+                      {nome}
+                    </label>
+                  ))}
+                </Linha>
+                <Linha rotulo="Vazamento">
+                  <select aria-label="Vazamento" className={campo} value={estilo.vazamento ?? "nenhum"} onChange={(evento) => {
+                    const vazamento = evento.currentTarget.value as EstiloDeCamada["vazamento"];
+                    setEstilo((atual) => ({ ...atual, vazamento }));
+                  }}>
+                    <option value="nenhum">Nenhum</option>
+                    <option value="raso">Raso</option>
+                    <option value="profundo">Profundo</option>
+                  </select>
+                </Linha>
+                <div className="flex flex-col gap-1 pl-[8.5rem]">
+                  <Caixa rotulo="Mesclar os efeitos internos como grupo" valor={Boolean(estilo.internos_como_grupo)} aoMudar={(internos_como_grupo) => setEstilo((atual) => ({ ...atual, internos_como_grupo }))} />
+                  <Caixa rotulo="Mesclar as camadas recortadas como grupo" valor={estilo.recortadas_como_grupo !== false} aoMudar={(recortadas_como_grupo) => setEstilo((atual) => ({ ...atual, recortadas_como_grupo }))} />
+                  <Caixa rotulo="A máscara de camada esconde os efeitos" valor={Boolean(estilo.mascara_esconde_efeitos)} aoMudar={(mascara_esconde_efeitos) => setEstilo((atual) => ({ ...atual, mascara_esconde_efeitos }))} />
+                </div>
+                <h4 className="text-[11px] font-semibold text-suave">Mesclar se</h4>
+                <Linha rotulo="Canal">
+                  <select aria-label="Canal do Mesclar se" className={campo} value={estilo.mesclar_se?.canal ?? "cinza"} onChange={(evento) => {
+                    const canal = evento.currentTarget.value as MesclarSe["canal"];
+                    setEstilo((atual) => ({ ...atual, mesclar_se: { ...(atual.mesclar_se ?? MESCLAR_SE_PADRAO), canal } }));
+                  }}>
+                    <option value="cinza">Cinza</option>
+                    <option value="vermelho">Vermelho</option>
+                    <option value="verde">Verde</option>
+                    <option value="azul">Azul</option>
+                  </select>
+                </Linha>
+                <FaixaDoMesclarSe rotulo="Esta camada" valor={(estilo.mesclar_se ?? MESCLAR_SE_PADRAO).esta} aoMudar={(esta) => setEstilo((atual) => ({ ...atual, mesclar_se: { ...(atual.mesclar_se ?? MESCLAR_SE_PADRAO), esta } }))} />
+                <FaixaDoMesclarSe rotulo="Camada de baixo" valor={(estilo.mesclar_se ?? MESCLAR_SE_PADRAO).abaixo} aoMudar={(abaixo) => setEstilo((atual) => ({ ...atual, mesclar_se: { ...(atual.mesclar_se ?? MESCLAR_SE_PADRAO), abaixo } }))} />
+                <h4 className="text-[11px] font-semibold text-suave">Efeitos</h4>
                 <div className="pl-[8.5rem]">
                   <Caixa rotulo="Mostrar os efeitos" valor={estilo.ligado !== false} aoMudar={(ligado) => setEstilo((atual) => ({ ...atual, ligado }))} />
                 </div>
@@ -423,7 +584,7 @@ export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, foco, primeiroP
           <button type="button" className="botao-secundario px-3 py-1 text-xs" onClick={aoCancelar}>
             Cancelar
           </button>
-          <button type="button" className="botao-principal px-3 py-1 text-xs" onClick={() => aoConfirmar(estilo, luz)}>
+          <button type="button" className="botao-principal px-3 py-1 text-xs" onClick={() => aoConfirmar(estilo, luz, geral)}>
             OK
           </button>
         </div>

@@ -1,6 +1,7 @@
 // Rasterizar, mesclar, achatar e carimbar (ADR 0003, onda 13.2): o plano de cada um, sem desenhar. O editor desenha
 // o projeto do plano (`desenhar`) com a exportação do editor de imagem, sobe o PNG como camada de pixels e o comando
 // `imagem.substituirPorPixels` troca as camadas pela nova, num passo só do desfazer.
+import { type Efeito, efeitosLigados, nomeDoEfeito } from "../imagem/estiloDeCamada.ts";
 import { ancestrais, camadaVisivel, comDescendentes, paiDaCamada } from "./arvore.ts";
 import { ErroEdicao } from "./edicao.ts";
 import type { Clipe, Faixa, Mesclagem, Projeto } from "./modelo.ts";
@@ -26,6 +27,8 @@ export type ManterNaCamada = {
   mesclagem?: Mesclagem;
   contorno?: Clipe["contorno"];
   sombra?: Clipe["sombra"];
+  /** O estilo de camada do editor de imagem (as medidas são em pixels do documento: valem na caixa nova). */
+  estilo_camada?: Clipe["estilo_camada"];
   preenchimento?: number;
   /** A máscara de camada que continua separada (rasterizar), já com a matriz da caixa nova. */
   mascara?: MascaraDePixels;
@@ -40,6 +43,8 @@ export type PlanoDosPixels = {
   remover: string[];
   /** A camada nova entra no lugar desta (com a mesma pasta); null: no topo de tudo. */
   lugar: string | null;
+  /** Sem tirar o `lugar`, a camada nova fica logo abaixo dele (e não logo acima). */
+  abaixo?: boolean;
   nome: string;
   manter: ManterNaCamada;
   /** A camada nova é o fundo (Achatar imagem): fica embaixo, com a transparência e a posição travadas. */
@@ -66,6 +71,7 @@ function neutra(faixa: Faixa, semEstilo: boolean, semMascara = false): Faixa {
   if (semEstilo) {
     delete clipe.contorno;
     delete clipe.sombra;
+    delete clipe.estilo_camada;
     delete clipe.preenchimento;
   }
   return { ...faixa, oculta: false, clipes: [clipe] };
@@ -103,9 +109,52 @@ function propriedadesDe(faixa: Faixa, comEstilo: boolean): ManterNaCamada {
   return {
     opacidade: clipe.transformacao.opacidade,
     mesclagem,
-    ...(comEstilo ? { contorno: clipe.contorno, sombra: clipe.sombra, preenchimento: clipe.preenchimento } : {}),
+    ...(comEstilo ? { contorno: clipe.contorno, sombra: clipe.sombra, estilo_camada: clipe.estilo_camada, preenchimento: clipe.preenchimento } : {}),
     faixa: { nome: faixa.nome, rotulo: faixa.rotulo, travas: faixa.travas, vinculo: faixa.vinculo, recortada: faixa.recortada },
   };
+}
+
+/**
+ * Camada › Estilo de camada › Criar camadas: um plano por efeito (o chanfro dá dois, o realce e a sombra), cada um com
+ * a camada sozinha, só aquele efeito (normal e inteiro) e o conteúdo escondido; a camada nova guarda o modo e a
+ * opacidade do efeito. Os de fora entram logo abaixo da camada e os de dentro logo acima, na ordem dos editores de
+ * imagem (os planos já vêm na ordem de criar: cada camada nova encosta na original).
+ */
+export function planosDosEfeitos(projeto: Projeto, faixaId: string, nomeDe: (faixa: Faixa) => string): PlanoDosPixels[] {
+  const faixa = projeto.faixas.find((item) => item.id === faixaId);
+  const clipe = faixa?.clipes[0];
+  if (!faixa || !clipe) throw new ErroEdicao("Escolha uma camada.");
+  if (faixa.travada) throw new ErroEdicao("A camada está travada.");
+  const efeitos = efeitosLigados(clipe.estilo_camada);
+  if (!efeitos.length) throw new ErroEdicao("A camada não tem efeitos para virar camadas.");
+  type Parte = { efeito: Efeito; nome: string; modo: Mesclagem; opacidade: number; abaixo: boolean };
+  const partes: Parte[] = efeitos.flatMap((efeito): Parte[] => {
+    const abaixo = efeito.tipo === "sombra" || efeito.tipo === "brilho_externo";
+    if (efeito.tipo !== "chanfro") return [{ efeito: { ...efeito, opacidade: 1, modo: "normal" }, nome: nomeDoEfeito(efeito.tipo), modo: efeito.modo, opacidade: efeito.opacidade, abaixo }];
+    return [
+      { efeito: { ...efeito, opacidade: 1, opacidade_sombra: 0, opacidade_realce: 1, modo_realce: "normal" }, nome: "Realce do chanfro", modo: efeito.modo_realce ?? "tela", opacidade: (efeito.opacidade_realce ?? 0.75) * efeito.opacidade, abaixo: false },
+      { efeito: { ...efeito, opacidade: 1, opacidade_realce: 0, opacidade_sombra: 1, modo_sombra: "normal" }, nome: "Sombra do chanfro", modo: efeito.modo_sombra ?? "multiplicar", opacidade: (efeito.opacidade_sombra ?? 0.75) * efeito.opacidade, abaixo: false },
+    ];
+  });
+  const ordem: Efeito["tipo"][] = ["sombra", "brilho_externo", "sobreposicao_padrao", "sobreposicao_degrade", "sobreposicao_cor", "cetim", "brilho_interno", "sombra_interna", "tracado", "chanfro"];
+  const porOrdem = (a: Parte, b: Parte) => ordem.indexOf(a.efeito.tipo) - ordem.indexOf(b.efeito.tipo);
+  // Os de baixo de baixo para cima (cada um encosta embaixo da original); os de cima de cima para baixo
+  const emOrdem = [...partes.filter((parte) => parte.abaixo).sort(porOrdem), ...partes.filter((parte) => !parte.abaixo).sort(porOrdem).reverse()];
+  return emOrdem.map((parte) => {
+    const so: Clipe = { ...clipe, transformacao: { ...clipe.transformacao, opacidade: 1 }, preenchimento: 0, estilo_camada: { ...clipe.estilo_camada!, ligado: true, efeitos: [parte.efeito] } };
+    delete so.mesclagem;
+    delete so.contorno;
+    delete so.sombra;
+    const comSo = { ...projeto, faixas: projeto.faixas.map((item) => (item.id === faixa.id ? { ...item, oculta: false, clipes: [so] } : item)) };
+    return {
+      desenhar: projetoSoCom(comSo, [faixa.id]),
+      remover: [],
+      lugar: faixa.id,
+      abaixo: parte.abaixo,
+      nome: `${parte.nome} de ${nomeDe(faixa)}`,
+      manter: { opacidade: parte.opacidade, ...(parte.modo === "normal" ? {} : { mesclagem: parte.modo }), faixa: {} },
+    };
+  });
 }
 
 /** As visíveis da raiz (as de dentro vêm com elas), de cima para baixo. */
@@ -152,7 +201,7 @@ export function planoDosPixels(
       const clipe = primeira.clipes[0];
       if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Grupos e camadas de ajuste não têm pixels para rasterizar.");
       if (tipo === "rasterizar" && clipe.pixels) throw new ErroEdicao("A camada já é de pixels.");
-      if (tipo === "rasterizarEstilo" && !clipe.contorno && !clipe.sombra) throw new ErroEdicao("A camada não tem estilo para rasterizar.");
+      if (tipo === "rasterizarEstilo" && !clipe.contorno && !clipe.sombra && !clipe.estilo_camada?.efeitos.length) throw new ErroEdicao("A camada não tem estilo para rasterizar.");
       const comEstilo = tipo === "rasterizarEstilo";
       // Rasterizar a camada guarda o estilo para continuar editável; rasterizar o estilo grava ele nos pixels
       const manter = propriedadesDe(primeira, !comEstilo);
@@ -252,7 +301,7 @@ export function planoDosPixels(
 export function substituirPorPixels(
   projeto: Projeto,
   novoId: () => string,
-  { remover, lugar, nome, manter, fundo, doFundoDoDocumento, midiaId, versao }: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number },
+  { remover, lugar, nome, manter, fundo, doFundoDoDocumento, abaixo, midiaId, versao }: Omit<PlanoDosPixels, "desenhar"> & { midiaId: string; versao: number },
 ): { projeto: Projeto; clipeId: string } {
   const referencia = lugar ? projeto.faixas.find((faixa) => faixa.id === lugar) : null;
   if (lugar && !referencia) throw new ErroEdicao("A camada mudou enquanto os pixels eram gerados. Tente de novo.");
@@ -272,6 +321,7 @@ export function substituirPorPixels(
     ...(manter.mesclagem ? { mesclagem: manter.mesclagem } : {}),
     ...(manter.contorno ? { contorno: manter.contorno } : {}),
     ...(manter.sombra ? { sombra: manter.sombra } : {}),
+    ...(manter.estilo_camada ? { estilo_camada: manter.estilo_camada } : {}),
     ...(manter.preenchimento !== undefined && manter.preenchimento < 1 ? { preenchimento: manter.preenchimento } : {}),
     ...(manter.mascara ? { mascara_pixels: manter.mascara } : {}),
     ...(manter.mascaraVetorial ? { mascara_vetorial: manter.mascaraVetorial } : {}),
@@ -294,8 +344,9 @@ export function substituirPorPixels(
   const saem = new Set(remover.flatMap((id) => comDescendentes(projeto, id).map((item) => item.id)));
   const lista: Faixa[] = [];
   for (const item of projeto.faixas) {
-    if (referencia && item.id === referencia.id) lista.push(faixa);
+    if (referencia && item.id === referencia.id && !abaixo) lista.push(faixa);
     if (!saem.has(item.id)) lista.push(item);
+    if (referencia && item.id === referencia.id && abaixo) lista.push(faixa);
   }
   if (!referencia) {
     // Sem lugar: no topo (carimbo) ou embaixo de tudo, logo acima da principal (achatar)

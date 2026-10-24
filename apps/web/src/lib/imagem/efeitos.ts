@@ -306,7 +306,10 @@ const multiplicar = (campo: Campo, f: (i: number) => number) => {
   return campo;
 };
 
-export function campoDoEfeito(efeito: Efeito, ctx: Contexto): CampoDoEfeito {
+/** O que vem de fora das contas: a textura do chanfro, em luminância de 0 a 1 por pixel do campo. */
+export type Extras = { textura?: Campo | null };
+
+export function campoDoEfeito(efeito: Efeito, ctx: Contexto, extras: Extras = {}): CampoDoEfeito {
   const { alfa, distancias: d, escala } = ctx;
   const { largura, altura } = alfa;
   const tamanho = (efeito.tamanho ?? 0) * escala;
@@ -387,7 +390,7 @@ export function campoDoEfeito(efeito: Efeito, ctx: Contexto): CampoDoEfeito {
       return { cobertura: s };
     }
     case "chanfro":
-      return chanfro(efeito, ctx, tamanho);
+      return chanfro(efeito, ctx, tamanho, extras.textura ?? null);
   }
 }
 
@@ -395,7 +398,7 @@ export function campoDoEfeito(efeito: Efeito, ctx: Contexto): CampoDoEfeito {
  * Chanfro e entalhe: uma altura (o relevo) pela forma, a normal dela e a luz do ângulo e da altitude. O que fica mais
  * claro que o plano vira realce; o mais escuro, sombra.
  */
-function chanfro(efeito: Efeito, ctx: Contexto, tamanho: number): CampoDoEfeito {
+function chanfro(efeito: Efeito, ctx: Contexto, tamanho: number, textura: Campo | null): CampoDoEfeito {
   const { alfa, distancias: d } = ctx;
   const { largura, altura } = alfa;
   const estilo = efeito.estilo ?? "interno";
@@ -415,6 +418,8 @@ function chanfro(efeito: Efeito, ctx: Contexto, tamanho: number): CampoDoEfeito 
     else if (estilo === "almofada") v = alfa.dados[i] >= 0.5 ? subidaDentro : 1 - descidaFora;
     else v = alfa.dados[i] >= 0.5 ? subidaDentro : 0;
     if (contornoDoRelevo) v = lerTabela(contornoDoRelevo, v);
+    // A textura soma ao relevo dentro da forma (o claro sobe; invertida, desce)
+    if (textura && efeito.textura) v += (textura.dados[i] - 0.5) * 0.25 * efeito.textura.profundidade * (efeito.textura.inverter ? -1 : 1) * alfa.dados[i];
     h.dados[i] = v;
   }
   const relevo = (efeito.suavidade ?? 0) > 0 ? desfocar(h, ((efeito.suavidade ?? 0) * ctx.escala) / 2) : h;

@@ -56,7 +56,7 @@ import { comPredefinicao, PainelConfiguracoesDoPincel, PainelPinceis } from "./P
 import { criarPincel, excluirPincel, importarAbr, pincelDaPonta, predefinicaoDoEspaco, usePinceisDoEspaco } from "@/lib/pinceis";
 import { criarCamadaDePixels, enviarVersao } from "@/lib/pixels";
 import { exportarImagem } from "@/lib/exportacao/imagem";
-import { planoDosPixels, type PlanoDosPixels, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
+import { planoDosPixels, type PlanoDosPixels, planosDosEfeitos, projetoSoCom, type TipoDaMesclagem } from "@/lib/projeto/rasterizar";
 import { carregarBitmap } from "@/lib/previa/bitmaps";
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { ceu, imagemMenor } from "@/lib/selecao/cores";
@@ -108,7 +108,7 @@ import { LOREM_IPSUM, ocorrencias, type OpcoesDaBusca, substituirTodas } from "@
 import { estiloNoIndice, nomeDoTexto, substituir } from "@/lib/texto/modelo";
 import { JanelaLocalizarTexto } from "./JanelaLocalizarTexto";
 import { JanelaDeformarTexto } from "./JanelaDeformarTexto";
-import { JanelaEstiloDeCamada } from "./JanelaEstiloDeCamada";
+import { type GeralDaCamada, JanelaDimensionarEfeitos, JanelaEstiloDeCamada, JanelaLuzGlobal } from "./JanelaEstiloDeCamada";
 import { type EstiloDeCamada, LUZ_GLOBAL_PADRAO, type LuzGlobal, type TipoDoEfeito } from "@/lib/imagem/estiloDeCamada";
 import type { Deformacao } from "@/lib/texto/deformar";
 import { aplicarEstilo, aplicarParagrafo, ESTILO_PADRAO, type EstiloDoCaractere, type EstiloDoParagrafo, estiloComum, estiloEmTudo, estiloDoParagrafo, PARAGRAFO_PADRAO, paragrafoDoIndice, paragrafoEmTudo, type Suavizacao, textoCorrido, textoNovo, type TextoRico } from "@/lib/texto/modelo";
@@ -437,6 +437,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [localizandoTexto, setLocalizandoTexto] = useState(false);
   // Camada › Estilo de camada: a camada e o efeito em que a janela abriu
   const [estiloAberto, setEstiloAberto] = useState<{ clipeId: string; foco: TipoDoEfeito | "mesclagem" } | null>(null);
+  // Copiar estilo de camada guarda aqui; as janelas pequenas do estilo
+  const [estiloCopiado, setEstiloCopiado] = useState<EstiloDeCamada | null>(null);
+  const [janelaDoEstilo, setJanelaDoEstilo] = useState<"luz" | "dimensionar" | null>(null);
   // Texto › Deformar texto: a deformação de antes (para o Cancelar) enquanto a janela está aberta
   const [deformando, setDeformando] = useState<{ clipeId: string; antes: Deformacao | null } | null>(null);
   const versaoDasFontes = useVersaoDasFontes();
@@ -2331,10 +2334,10 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     }
     setEstiloAberto({ clipeId: clipe.id, foco });
   };
-  const preverEstilo = useCallback((estilo: EstiloDeCamada, luz: LuzGlobal) => {
+  const preverEstilo = useCallback((estilo: EstiloDeCamada, luz: LuzGlobal, camada: GeralDaCamada) => {
     setProvisorio((atual) => {
       const clipeId = estiloAberto?.clipeId;
-      return clipeId ? { comando: "imagem.estiloDeCamada", parametros: { clipeIds: [clipeId], estilo, luz } } : atual;
+      return clipeId ? { comando: "imagem.estiloDeCamada", parametros: { clipeIds: [clipeId], estilo, luz, camada } } : atual;
     });
   }, [estiloAberto?.clipeId]);
   /** Abre o Deformar texto no texto em edição ou no escolhido. */
@@ -3439,6 +3442,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       await gerarPixels({ desenhar, ...dados }, dados);
     }
   };
+  /** Camada › Estilo de camada › Criar camadas: cada efeito vira uma camada de pixels, e a camada fica sem o estilo. */
+  const criarCamadasDosEfeitos = async () => {
+    const atual = projetoRef.current ?? projeto;
+    const faixa = escolhidas[0];
+    if (!atual || !faixa || gerandoPixels) return;
+    let planos: PlanoDosPixels[];
+    try {
+      planos = planosDosEfeitos(atual, faixa.id, nomeDaFaixa);
+    } catch (e) {
+      mostrarAviso(e instanceof Error ? e.message : "Não foi possível.");
+      return;
+    }
+    for (const plano of planos) {
+      const { desenhar, ...dados } = plano;
+      await gerarPixels({ desenhar, ...dados }, dados);
+    }
+    executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [faixa.clipes[0].id], estilo: null } });
+  };
   /** Rasterizar › Todas as camadas: cada camada que não é de pixels (nem grupo nem ajuste), uma por vez. */
   const rasterizarTodas = async () => {
     if (!projeto) return;
@@ -3766,6 +3787,24 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     distribuir: (como) => projeto && posicoes(distribuir(projeto, selecaoValida, caixasRef.current, como)),
     camadaVizinha,
     estilo: (foco) => abrirEstiloDeCamada(foco),
+    estiloDeCamada: {
+      temEstilo: Boolean(escolhidoNaTela?.clipe.estilo_camada?.efeitos.length),
+      temCopiado: Boolean(estiloCopiado),
+      efeitosVisiveis: !projeto?.faixas.some((faixa) => faixa.clipes[0]?.estilo_camada && faixa.clipes[0].estilo_camada.ligado === false),
+      copiar: () => setEstiloCopiado(escolhidoNaTela?.clipe.estilo_camada ?? null),
+      colar: () => {
+        const ids = escolhidas.map((faixa) => faixa.clipes[0]).filter((clipe) => !clipe.pasta && !clipe.ajuste).map((clipe) => clipe.id);
+        if (estiloCopiado && ids.length) executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: ids, estilo: estiloCopiado } });
+      },
+      limpar: () => {
+        const ids = escolhidas.map((faixa) => faixa.clipes[0]).filter((clipe) => clipe.estilo_camada).map((clipe) => clipe.id);
+        if (ids.length) executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: ids, estilo: null } });
+      },
+      luzGlobal: () => setJanelaDoEstilo("luz"),
+      criarCamadas: () => void criarCamadasDosEfeitos(),
+      alternarVisiveis: () => executar({ comando: "imagem.mostrarEfeitos", parametros: { visiveis: Boolean(projeto?.faixas.some((faixa) => faixa.clipes[0]?.estilo_camada?.ligado === false)) } }),
+      dimensionar: () => setJanelaDoEstilo("dimensionar"),
+    },
     mascara: () => {
       if (camadaEscolhida && executar({ comando: "clipe.mascara", parametros: { clipeIds: [camadaEscolhida.clipe.id], mascara: camadaEscolhida.clipe.mascara ?? MASCARA_PADRAO } })) abrirAba("basico");
     },
@@ -4808,18 +4847,42 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           aoAvisar={mostrarAviso}
         />
       ) : null}
+      {janelaDoEstilo === "luz" && projeto ? (
+        <JanelaLuzGlobal
+          luz={projeto.luz_global ?? LUZ_GLOBAL_PADRAO}
+          aoCancelar={() => setJanelaDoEstilo(null)}
+          aoConfirmar={(luz) => {
+            executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [], estilo: null, luz } });
+            setJanelaDoEstilo(null);
+          }}
+        />
+      ) : null}
+      {janelaDoEstilo === "dimensionar" ? (
+        <JanelaDimensionarEfeitos
+          aoCancelar={() => setJanelaDoEstilo(null)}
+          aoConfirmar={(fator) => {
+            const ids = escolhidas.map((faixa) => faixa.clipes[0]).filter((clipe) => clipe.estilo_camada).map((clipe) => clipe.id);
+            if (ids.length) executar({ comando: "imagem.dimensionarEfeitos", parametros: { clipeIds: ids, fator } });
+            setJanelaDoEstilo(null);
+          }}
+        />
+      ) : null}
       {estiloAberto && projeto ? (
         <JanelaEstiloDeCamada
           inicial={acharClipe(projeto, estiloAberto.clipeId)?.clipe.estilo_camada ?? null}
           luz={projeto.luz_global ?? LUZ_GLOBAL_PADRAO}
+          geral={(() => {
+            const clipe = acharClipe(projeto, estiloAberto.clipeId)?.clipe;
+            return { mesclagem: clipe?.mesclagem && clipe.mesclagem !== "passagem" ? clipe.mesclagem : "normal", opacidade: clipe?.transformacao.opacidade ?? 1, preenchimento: clipe?.preenchimento ?? 1 };
+          })()}
           foco={estiloAberto.foco}
           primeiroPlano={cores.primeiroPlano}
           fundo={cores.fundo}
           degradesDoEspaco={degradesDoEspaco.recursos.map((recurso) => recurso.dados)}
           aoPrever={preverEstilo}
-          aoConfirmar={(estilo, luz) => {
+          aoConfirmar={(estilo, luz, camada) => {
             setProvisorio(null);
-            executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [estiloAberto.clipeId], estilo, luz } });
+            executar({ comando: "imagem.estiloDeCamada", parametros: { clipeIds: [estiloAberto.clipeId], estilo, luz, camada } });
             setEstiloAberto(null);
           }}
           aoCancelar={() => {

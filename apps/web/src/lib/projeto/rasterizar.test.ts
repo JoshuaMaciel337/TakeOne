@@ -133,3 +133,27 @@ test("a máscara de camada: rasterizar a guarda (com a matriz da caixa nova); ap
   // Num projeto de vídeo, não
   assert.match(problemaNaArvore({ ...projeto, tipo: undefined }) ?? "", /editor de imagem/);
 });
+
+test("criar camadas a partir dos efeitos: um plano por efeito (dois no chanfro), na ordem de encostar na original", async () => {
+  const { efeitoPadrao } = await import("../imagem/estiloDeCamada.ts");
+  const { planosDosEfeitos } = await import("./rasterizar.ts");
+  const { ctx, projeto: inicio, b } = tres();
+  const clipeId = inicio.faixas.find((f) => f.id === b)!.clipes[0].id;
+  const estilo = { efeitos: [efeitoPadrao("sombra", "s"), efeitoPadrao("tracado", "t"), efeitoPadrao("chanfro", "c"), { ...efeitoPadrao("brilho_externo", "g"), ligado: false }] };
+  const projeto = executarComando(inicio, { comando: "imagem.estiloDeCamada", parametros: { clipeIds: [clipeId], estilo } }, ctx).projeto;
+  const planos = planosDosEfeitos(projeto, b, nome);
+  assert.deepEqual(planos.map((p) => [p.nome, p.abaixo]), [
+    ["Sombra projetada de b", true],
+    ["Sombra do chanfro de b", false],
+    ["Realce do chanfro de b", false],
+    ["Traçado de b", false],
+  ]);
+  // A sombra guarda o modo e a opacidade dela; no desenho, só ela, inteira e normal, com o conteúdo escondido
+  assert.deepEqual([planos[0].manter.mesclagem, planos[0].manter.opacidade], ["multiplicar", 0.75]);
+  const desenhada = planos[0].desenhar.faixas.find((f) => f.id === b)!.clipes[0];
+  assert.deepEqual([desenhada.preenchimento, desenhada.estilo_camada!.efeitos.map((e) => [e.tipo, e.modo, e.opacidade])], [0, [["sombra", "normal", 1]]]);
+  // A camada nova de um efeito de fora entra logo abaixo da original
+  const { projeto: comSombra } = substituirPorPixels(projeto, ctx.novoId, { ...planos[0], midiaId: "m1", versao: 1 });
+  const ordem = comSombra.faixas.map((f) => f.nome ?? f.clipes[0]?.texto?.conteudo ?? f.tipo);
+  assert.equal(ordem.indexOf("Sombra projetada de b"), ordem.indexOf("b") + 1);
+});

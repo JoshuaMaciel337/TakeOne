@@ -7,13 +7,13 @@ import { type Contexto, ErroEdicao } from "./edicao.ts";
 import { COR_PADRAO } from "./cor.ts";
 import { caixaDoClipe, type Tamanho } from "./geometria.ts";
 import { ancestrais, comDescendentes, paiDaCamada } from "./arvore.ts";
-import { acharClipe, type Clipe, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
+import { acharClipe, type Clipe, type Mesclagem, type CorDoRotulo, type Faixa, type Prancheta, type Projeto, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, type TravasDaCamada, type Virar } from "./modelo.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
 import { type CamadaPronta, encaixarNaCaixa } from "./modelosDeImagem.ts";
 import type { Texto } from "./texto.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import { nomeDoTexto, type TextoRico } from "../texto/modelo.ts";
-import type { EstiloDeCamada, LuzGlobal } from "../imagem/estiloDeCamada.ts";
+import { type EstiloDeCamada, estiloFazAlgo, type LuzGlobal } from "../imagem/estiloDeCamada.ts";
 import { caixaDosCaminhos, deslocar, margemDoTraco, type CamadaVetorial, type OperacaoDoCaminho, type Subcaminho } from "../vetor/modelo.ts";
 
 /** Quanto dura o clipe de cada camada: a imagem não tem tempo, mas a linha do tempo pede uma duração. */
@@ -235,15 +235,43 @@ export function adicionarTextoRico(projeto: Projeto, ctx: Contexto, texto: Texto
  * O estilo de camada das camadas (null tira), e a luz global do documento quando um efeito com "usar a luz global"
  * mudou o ângulo ou a altitude (a luz vale para todos os efeitos que a usam).
  */
-export function definirEstiloDeCamada(projeto: Projeto, clipeIds: string[], estilo: EstiloDeCamada | null, luz?: LuzGlobal): Projeto {
+export function definirEstiloDeCamada(
+  projeto: Projeto,
+  clipeIds: string[],
+  estilo: EstiloDeCamada | null,
+  luz?: LuzGlobal,
+  /** As opções de mesclagem gerais (o modo, a opacidade e o preenchimento da camada), da mesma janela. */
+  camada?: { mesclagem?: Mesclagem; opacidade?: number; preenchimento?: number },
+): Projeto {
   let resultado = projeto;
   for (const clipeId of clipeIds) {
     resultado = mudarClipeDaCamada(resultado, clipeId, (clipe) => {
       if (clipe.pasta || clipe.ajuste) throw new ErroEdicao("Pastas e camadas de ajuste não têm estilo de camada.");
-      return { ...clipe, estilo_camada: estilo && estilo.efeitos.length ? estilo : null };
+      const novo: Clipe = { ...clipe, estilo_camada: estiloFazAlgo(estilo) ? estilo : null };
+      if (camada?.mesclagem) novo.mesclagem = camada.mesclagem;
+      if (camada?.opacidade !== undefined) novo.transformacao = { ...novo.transformacao, opacidade: Math.min(1, Math.max(0, camada.opacidade)) };
+      if (camada?.preenchimento !== undefined) {
+        if (camada.preenchimento >= 1) delete novo.preenchimento;
+        else novo.preenchimento = Math.max(0, camada.preenchimento);
+      }
+      return novo;
     });
   }
   return luz ? { ...resultado, luz_global: luz } : resultado;
+}
+
+/** Camada › Estilo de camada › Ocultar (ou Mostrar) todos os efeitos: em todas as camadas com estilo. */
+export function mostrarEfeitos(projeto: Projeto, visiveis: boolean): Projeto {
+  return { ...projeto, faixas: projeto.faixas.map((faixa) => ({ ...faixa, clipes: faixa.clipes.map((clipe) => (clipe.estilo_camada ? { ...clipe, estilo_camada: { ...clipe.estilo_camada, ligado: visiveis } } : clipe)) })) };
+}
+
+/** Camada › Estilo de camada › Dimensionar efeitos: a escala dos efeitos das camadas vezes o fator (de 1% a 1000%). */
+export function dimensionarEfeitos(projeto: Projeto, clipeIds: string[], fator: number): Projeto {
+  let resultado = projeto;
+  for (const clipeId of clipeIds) {
+    resultado = mudarClipeDaCamada(resultado, clipeId, (clipe) => (clipe.estilo_camada ? { ...clipe, estilo_camada: { ...clipe.estilo_camada, escala: Math.min(10, Math.max(0.01, (clipe.estilo_camada.escala ?? 1) * fator)) } } : clipe));
+  }
+  return resultado;
 }
 
 /** Vários textos trocados de uma vez (Substituir tudo, Atualizar todas as camadas de texto): um passo só. */

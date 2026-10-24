@@ -24,6 +24,7 @@ import {
 import { type Caixa, caixaDoClipe, caixaDoTexto, type Tamanho } from "@/lib/projeto/geometria";
 import { temSilhueta } from "@/lib/projeto/silhueta";
 import { efeitosLigados, LUZ_GLOBAL_PADRAO, type LuzGlobal } from "@/lib/imagem/estiloDeCamada";
+
 import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
@@ -37,6 +38,9 @@ import type { Midia } from "@/lib/tipos";
 
 import { type Camada, FUNDO } from "./compositor";
 import type { ImagemDeTexto } from "./imagensDeTexto";
+
+/** O que a camada do compositor precisa do documento (editor de imagem): a luz global e o fundo. */
+export const documentoDaCamada = (projeto: Pick<Projeto, "luz_global" | "fundo">) => ({ luz: projeto.luz_global ?? null, fundo: projeto.fundo.transparente ? null : projeto.fundo.cor });
 
 /** Um clipe de mídia que precisa de uma fonte de quadros agora (o atual ou o próximo da faixa). */
 export type ItemDaPrevia = {
@@ -410,12 +414,14 @@ export function camadaDoCompositor(
    * (lib/previa/mascaraCombinada.ts).
    */
   mascaraDaCamada?: { fonte: TexImageSource; quadro: Tamanho; matriz?: [number, number, number, number, number, number]; densidade?: number; difusao?: number } | null,
-  /** A luz global do documento (editor de imagem), que os efeitos com "usar a luz global" seguem. */
-  luzGlobal?: LuzGlobal | null,
+  /** O documento (editor de imagem): a luz global dos efeitos e o fundo (null: transparente), para o vazamento. */
+  documento?: { luz?: LuzGlobal | null; fundo?: string | null } | null,
 ): Camada {
   const mascara = camada.clipe.mascara_pixels;
   // O estilo de camada do editor de imagem fica no lugar do contorno e da sombra de antes
   const efeitos = camada.clipe.ajuste ? [] : efeitosLigados(camada.clipe.estilo_camada);
+  const opcoes = camada.clipe.ajuste ? null : camada.clipe.estilo_camada;
+  const vazamento = Boolean(opcoes?.vazamento && opcoes.vazamento !== "nenhum");
   const comEstilos = !efeitos.length && temSilhueta(camada.clipe) && !camada.clipe.ajuste;
   const preenchimento = Math.min(1, Math.max(0, camada.clipe.preenchimento ?? 1));
   return {
@@ -432,8 +438,22 @@ export function camadaDoCompositor(
         : null,
     // O preenchimento (só na imagem) esconde a camada sem os estilos; sem estilos, é mais uma opacidade
     silhueta: comEstilos ? { contorno: camada.clipe.contorno, sombra: camada.clipe.sombra, preenchimento } : undefined,
-    estiloDeCamada: efeitos.length ? { efeitos, escala: camada.clipe.estilo_camada?.escala ?? 1, luz: luzGlobal ?? LUZ_GLOBAL_PADRAO, preenchimento } : undefined,
-    caixa: comEstilos || efeitos.length || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
+    estiloDeCamada:
+      efeitos.length || vazamento
+        ? {
+            efeitos,
+            escala: opcoes?.escala ?? 1,
+            luz: documento?.luz ?? LUZ_GLOBAL_PADRAO,
+            preenchimento,
+            internosComoGrupo: opcoes?.internos_como_grupo,
+            mascaraEscondeEfeitos: opcoes?.mascara_esconde_efeitos,
+            vazamento,
+            fundo: documento?.fundo ?? null,
+          }
+        : undefined,
+    mesclarSe: opcoes?.mesclar_se ? { canal: ["cinza", "vermelho", "verde", "azul"].indexOf(opcoes.mesclar_se.canal), esta: opcoes.mesclar_se.esta.map((v) => v / 255) as [number, number, number, number], abaixo: opcoes.mesclar_se.abaixo.map((v) => v / 255) as [number, number, number, number] } : null,
+    canais: opcoes?.canais ? [opcoes.canais.vermelho, opcoes.canais.verde, opcoes.canais.azul] : null,
+    caixa: comEstilos || efeitos.length || vazamento || preenchimento >= 1 ? camada.caixa : { ...camada.caixa, opacidade: camada.caixa.opacidade * preenchimento },
     lut: camada.lut,
     vinheta: camada.vinheta,
     revelado: camada.revelado,
