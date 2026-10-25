@@ -91,6 +91,16 @@ def test_camada_vetorial(cliente):
     aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
     guardado = aberto["faixas"][0]["clipes"][0]["vetor"]
     assert guardado == vetor, "as alças que faltam continuam faltando"
+    # A largura variável do traço volta como foi; lados acima de 20 não valem
+    perfil = [{"t": 0, "esquerda": 0, "direita": 0}, {"t": 0.5, "esquerda": 2, "direita": 1.5},
+              {"t": 1, "esquerda": 0, "direita": 0}]
+    com_perfil = {**vetor, "traco": {**vetor["traco"], "perfil": perfil}}
+    salvo = salvar(cliente, aberto, [camada("video", {**forma, "vetor": com_perfil}), faixas[1]])
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["faixas"][0]["clipes"][0]["vetor"]["traco"]["perfil"] == perfil
+    largo = {**vetor, "traco": {**vetor["traco"], "perfil": [{"t": 0.5, "esquerda": 30, "direita": 1}]}}
+    assert salvar(cliente, aberto, [camada("video", {**forma, "vetor": largo}), faixas[1]]).status_code == 422
 
     # Sem a tinta inteira, numa faixa de texto, ou no projeto de vídeo, não vale
     incompleta = {**vetor, "preenchimento": {"tipo": "cor"}}

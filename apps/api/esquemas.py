@@ -806,6 +806,13 @@ class TintaDaFormaEntrada(BaseModel):
         return self
 
 
+class PontoDeLarguraEntrada(BaseModel):
+    """Um ponto da largura variável do traço (apps/web/src/lib/vetor/largura.ts)."""
+    t: float = Field(ge=0, le=1)
+    esquerda: float = Field(ge=0, le=20)
+    direita: float = Field(ge=0, le=20)
+
+
 class TracoDaFormaEntrada(BaseModel):
     tinta: TintaDaFormaEntrada
     largura: float = Field(ge=0, le=1000)
@@ -814,6 +821,12 @@ class TracoDaFormaEntrada(BaseModel):
     pontas: Literal["reta", "redonda", "quadrada"] = "reta"
     cantos: Literal["vivo", "redondo", "chanfrado"] = "vivo"
     mitra: float = Field(default=4, ge=1, le=100)
+    perfil: list[PontoDeLarguraEntrada] | None = Field(default=None, max_length=100)
+
+    @model_serializer(mode="wrap")
+    def _sem_vazios(self, serializar):
+        # Sem o perfil, o traço volta como era antes da largura variável
+        return {chave: valor for chave, valor in serializar(self).items() if valor is not None or chave != "perfil"}
 
 
 class FormaVivaEntrada(BaseModel):
