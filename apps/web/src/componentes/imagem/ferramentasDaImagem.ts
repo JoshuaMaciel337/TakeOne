@@ -29,6 +29,9 @@ import {
   Magnet,
   type LucideIcon,
   Minus,
+  Slash,
+  Tornado,
+  Target,
   Move,
   Pencil,
   PaintBucket,
@@ -75,6 +78,7 @@ import {
 } from "lucide-react";
 
 import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
+import type { GeradorDeCaminhos } from "@/lib/vetor/geradores";
 
 
 /** As ferramentas que escrevem: o texto e as máscaras de texto, horizontais e verticais. */
@@ -135,6 +139,11 @@ export type IdFerramentaDaImagem =
   | "mascaraDeTexto"
   | "mascaraDeTextoVertical"
   | "toqueNoTexto"
+  | "segmento"
+  | "arco"
+  | "espiral"
+  | "gradeRetangular"
+  | "gradePolar"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -271,6 +280,13 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("formaPersonalizada", "Ferramenta Forma personalizada", "U", Shapes, "Escolha a forma na barra de opções e arraste para desenhar."),
   ],
   [
+    F("segmento", "Ferramenta Segmento de linha", "N", Slash, "Arraste para traçar um segmento na cor do primeiro plano (Shift de 45°, Alt a partir do meio)."),
+    F("arco", "Ferramenta Arco", "N", Spline, "Arraste do começo ao fim do arco; a barra muda a base, a inclinação (côncavo ou convexo) e o fechado."),
+    F("espiral", "Ferramenta Espiral", "N", Tornado, "Arraste do meio para fora: o ponto de fora é o começo da espiral. A barra muda o decaimento, os segmentos e o sentido."),
+    F("gradeRetangular", "Ferramenta Grade retangular", "N", Grid3x3, "Arraste para desenhar uma grade; a barra muda as divisões e a inclinação delas (Shift: quadrada, Alt: do meio)."),
+    F("gradePolar", "Ferramenta Grade polar", "N", Target, "Arraste para desenhar elipses concêntricas com os raios; a barra muda as divisões e a inclinação delas."),
+  ],
+  [
     F("mao", "Ferramenta Mão", "H", Hand, "Arraste para andar pela imagem ampliada. Espaço segura a Mão em qualquer ferramenta."),
     F("girarVista", "Ferramenta Girar vista", "R", RotateCw, "Arraste para girar a vista (a imagem não muda); Shift vai de 15° em 15°. Redefinir a vista volta ao normal."),
   ],
@@ -293,6 +309,15 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
   triangulo: "triangulo",
   poligono: "poligono",
   linha: "linha",
+};
+
+/** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
+export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {
+  segmento: "segmento",
+  arco: "arco",
+  espiral: "espiral",
+  gradeRetangular: "gradeRetangular",
+  gradePolar: "gradePolar",
 };
 
 /** As ferramentas que marcam na foto escolhida (e o jeito de marcar de cada uma). */

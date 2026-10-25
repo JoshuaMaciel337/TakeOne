@@ -41,7 +41,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
@@ -127,6 +127,8 @@ import { JanelaCamadasEmArquivos, JanelaCompsEmArquivos, JanelaExportarPrancheta
 import { JanelaDividirFatia, JanelaOpcoesDaFatia, OpcoesDasFatiasNaBarra } from "./JanelasDasFatias";
 import { PainelComps } from "./PainelComps";
 import { OpcoesDaVarinhaVetorialNaBarra } from "./OpcoesDaVarinhaVetorial";
+import { OpcoesDosGeradoresNaBarra } from "./OpcoesDosGeradores";
+import { caminhosDoGerador, type GeradorDeCaminhos, GERADORES_PADRAO, NOME_DO_GERADOR, type OpcoesDosGeradores } from "@/lib/vetor/geradores";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
 import { PainelTeclasModificadoras, useTeclasPresas } from "./TeclasPresas";
 import { JanelaPesquisar } from "@/componentes/area/JanelaPesquisar";
@@ -203,7 +205,7 @@ import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
 import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
-import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea } from "@/lib/vetor/modelo";
+import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea, TRACO_PADRAO } from "@/lib/vetor/modelo";
 import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
@@ -384,6 +386,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
   const [cores, setCores] = useState<{ primeiroPlano: string; fundo: string; editando: "primeiroPlano" | "fundo" }>({ primeiroPlano: "#000000", fundo: "#ffffff", editando: "primeiroPlano" });
   const [forma, setForma] = useState<OpcoesDaForma>(FORMA_PADRAO);
+  const [opcoesDosGeradores, setOpcoesDosGeradores] = useState<OpcoesDosGeradores>(GERADORES_PADRAO);
   // As formas personalizadas do espaço (Editar › Definir forma personalizada) e o nome da que está sendo definida
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
@@ -3872,6 +3875,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else criarFormaViva(viva, arrasto);
       return;
     }
+    const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
+    if (gerador) {
+      // Um clique sem arrastar: um quarto do lado menor da imagem a partir do ponto
+      const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
+      const ate = gerador === "espiral" || gerador === "segmento" ? { x: arrasto.x + lado, y: arrasto.y } : { x: arrasto.x + lado, y: arrasto.y + lado };
+      porGerador(gerador, clique ? arrastoDaForma(arrasto.de, ate) : arrasto);
+      return;
+    }
     if (ferramenta === "quadro") {
       const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 3 : 100;
       const caixa = clique ? arrastoDaForma({ x: arrasto.x - lado / 2, y: arrasto.y - lado / 2 }, { x: arrasto.x + lado / 2, y: arrasto.y + lado / 2 }) : arrasto;
@@ -3884,6 +3895,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     // Um clique sem arrastar: a forma com um quarto do lado menor da imagem, no ponto, na proporção dela
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
     porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
+  };
+  /** As ferramentas de linha: caminhos comuns com o traço na cor de primeiro plano (e o fundo no preenchimento). */
+  const porGerador = (gerador: GeradorDeCaminhos, arrasto: ArrastoDaForma) => {
+    const caminhos = caminhosDoGerador(gerador, arrasto, opcoesDosGeradores);
+    if (forma.operacao !== "nova" && selecionado?.clipe.vetor) {
+      executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos, operacao: forma.operacao } });
+      return;
+    }
+    const traco = { ...TRACO_PADRAO, tinta: { tipo: "cor" as const, cor: cores.primeiroPlano }, largura: opcoesDosGeradores.espessura, alinhamento: "centro" as const };
+    const preenchimento = opcoesDosGeradores.preencher && gerador !== "segmento" && gerador !== "espiral" ? { tipo: "cor" as const, cor: cores.fundo } : { tipo: "nenhuma" as const };
+    const { vetor, centro } = camadaDosCaminhos(caminhos, preenchimento, traco);
+    const base = NOME_DO_GERADOR[gerador];
+    const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1;
+    executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `${base} ${numero}`, acima: escolhidas[0]?.id ?? null } });
   };
   /** A forma personalizada escolhida na caixa (com as tintas e a operação da barra). */
   const porFormaPersonalizada = (id: string, caixa: RetanguloDaImagem, proporcional: boolean) => {
@@ -6433,6 +6458,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : GERADOR_DA_FERRAMENTA[ferramenta] ? (
+            <OpcoesDosGeradoresNaBarra tipo={GERADOR_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDosGeradores} aoMudar={setOpcoesDosGeradores} />
           ) : ferramenta === "varinhaVetorial" ? (
             <OpcoesDaVarinhaVetorialNaBarra opcoes={opcoesDaVarinhaVetorial} aoMudar={setOpcoesDaVarinhaVetorial} />
           ) : ferramenta === "fatia" || ferramenta === "selecaoDeFatia" ? (
@@ -6868,6 +6895,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
               if (viva) return formaDoArrasto(viva, arrasto).naImagem;
               if (ferramenta === "quadro") return formaDoArrasto(formaDoQuadro, arrasto).naImagem;
+              const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
+              if (gerador) return caminhosDoGerador(gerador, arrasto, opcoesDosGeradores);
               const personalizada = ferramenta === "formaPersonalizada" ? caminhosDaFormaPersonalizada(forma.personalizada, formasDoEspaco) : null;
               return personalizada ? caminhosNaCaixa(personalizada.caminhos, arrasto, Boolean(arrasto.proporcional)) : null;
             }}
