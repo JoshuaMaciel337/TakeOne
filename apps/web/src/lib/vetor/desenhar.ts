@@ -5,6 +5,7 @@
 import { ladrilhoDoPadrao } from "../pintura/padroes.ts";
 import { pixelsDoDegrade, tabelaDoDegrade } from "../pintura/degrade.ts";
 import { caminhosDaRegiao, precisaDaRegiao, regiaoDosCaminhos } from "./contorno.ts";
+import { contornoDaLargura, larguraEm } from "./largura.ts";
 import { type CamadaVetorial, type Subcaminho, temArea, type TintaDaForma, type TracoDaForma } from "./modelo.ts";
 
 type Contexto = CanvasRenderingContext2D;
@@ -142,6 +143,28 @@ function mascaraDoTraco(camada: CamadaVetorial, traco: TracoDaForma, transformar
   const w = traco.largura;
   ctx.strokeStyle = "#ffffff";
   ctx.fillStyle = "#ffffff";
+  if (traco.perfil?.length) {
+    // A largura variável: o contorno entre as duas bordas de cada caminho (e as pontas redondas, no aberto)
+    const perfil = traco.perfil;
+    for (const sub of camada.subcaminhos) {
+      const aneis = contornoDaLargura(sub, w, perfil);
+      const caminho = new Path2D();
+      for (const anel of aneis) {
+        anel.forEach((p, i) => (i ? caminho.lineTo(p.x, p.y) : caminho.moveTo(p.x, p.y)));
+        caminho.closePath();
+      }
+      ctx.fill(caminho, "evenodd");
+      if (!sub.fechado && traco.pontas === "redonda" && sub.nos.length >= 2) {
+        for (const [no, t] of [[sub.nos[0], 0], [sub.nos[sub.nos.length - 1], 1]] as const) {
+          const lados = larguraEm(perfil, t);
+          ctx.beginPath();
+          ctx.arc(no.x, no.y, (w / 2) * ((lados.esquerda + lados.direita) / 2), 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+    }
+    return canvas;
+  }
   ctx.lineJoin = traco.cantos === "vivo" ? "miter" : traco.cantos === "redondo" ? "round" : "bevel";
   ctx.miterLimit = Math.max(1, traco.mitra);
   const tracejar = (largura: number) => {

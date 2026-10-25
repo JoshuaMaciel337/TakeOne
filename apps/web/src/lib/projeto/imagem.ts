@@ -169,7 +169,7 @@ function mudarClipeDaCamada(projeto: Projeto, clipeId: string, mudar: (clipe: Cl
 }
 
 /** Pixels da imagem por unidade da caixa da forma (com a escala da camada). */
-function pixelsPorUnidade(caixa: Tamanho, escala: number, quadro: Tamanho): number {
+export function pixelsPorUnidade(caixa: Tamanho, escala: number, quadro: Tamanho): number {
   return Math.min(quadro.largura / caixa.largura, quadro.altura / caixa.altura) * escala;
 }
 

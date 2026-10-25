@@ -5,6 +5,7 @@
 // já com a margem do traço), que vai para o quadro como uma imagem desse tamanho.
 import type { Degrade, FormaDoDegrade } from "../pintura/degrade.ts";
 import type { IdDoPadrao } from "../pintura/padroes.ts";
+import { maiorDoPerfil, type PontoDeLargura } from "./largura.ts";
 
 /** Um nó: a âncora e as alças de entrada (e) e de saída (s), absolutas; sem alça, o nó é um canto. */
 export type No = { x: number; y: number; ex?: number; ey?: number; sx?: number; sy?: number };
@@ -28,6 +29,8 @@ export type TracoDaForma = {
   cantos: "vivo" | "redondo" | "chanfrado";
   /** O limite de mitra (os cantos vivos mais finos que isso viram chanfrados). */
   mitra: number;
+  /** A largura variável (a ferramenta Largura do traço, largura.ts): com pontos, o traço vai no meio do caminho. */
+  perfil?: PontoDeLargura[] | null;
 };
 
 export type FormaViva =
@@ -173,7 +176,8 @@ export function caixaDosCaminhos(subcaminhos: Subcaminho[]): { x0: number; y0: n
 /** O quanto o traço (e as setas) passam da forma: a margem da caixa. */
 export function margemDoTraco(traco: TracoDaForma | null, forma?: FormaViva | null): number {
   if (!traco || traco.tinta.tipo === "nenhuma" || traco.largura <= 0) return 1;
-  const fator = traco.alinhamento === "dentro" ? 0 : traco.alinhamento === "centro" ? 0.5 : 1;
+  // Com a largura variável, o traço vai no meio e pode passar da largura (o maior lado do perfil)
+  const fator = traco.perfil?.length ? 0.5 * maiorDoPerfil(traco.perfil) : traco.alinhamento === "dentro" ? 0 : traco.alinhamento === "centro" ? 0.5 : 1;
   // Os cantos vivos passam até metade do limite de mitra além do traço
   const mitra = traco.cantos === "vivo" ? Math.max(1, traco.mitra / 2) : 1;
   const seta = forma?.tipo === "linha" && (forma.setaInicio || forma.setaFim) ? forma.tamanhoDaSeta * traco.largura : 0;

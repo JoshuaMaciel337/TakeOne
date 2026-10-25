@@ -37,6 +37,7 @@ import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
 import { ToqueNoTextoNaPrevia } from "./ToqueNoTextoNaPrevia";
 import { TracoLivreNaPrevia } from "./TracoLivreNaPrevia";
 import { TransformarNaPrevia } from "./TransformarNaPrevia";
+import { LarguraNaPrevia } from "./LarguraNaPrevia";
 import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
 import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -103,6 +104,8 @@ type Props = {
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
   /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
   aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
+  /** A ferramenta Largura do traço, na forma escolhida (null fora dela, ou sem forma com traço). */
+  larguraDoTraco?: Omit<React.ComponentProps<typeof LarguraNaPrevia>, "quadro" | "documento"> | null;
   /** Girar, Refletir, Escalar e Inclinar: as camadas que andam (os clipes) e o que fazer com a afim (null fora delas). */
   transformarComFerramenta?: (Omit<React.ComponentProps<typeof TransformarNaPrevia>, "quadro" | "documento" | "caixas"> & { clipeIds: string[] }) | null;
   /** Os pincéis e o lápis do editor vetorial: o traço livre (null fora deles). */
@@ -338,6 +341,7 @@ export function PreviaDaImagem({
   toqueNoTexto,
   tracoLivre,
   transformarComFerramenta,
+  larguraDoTraco,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -1093,6 +1097,7 @@ export function PreviaDaImagem({
                 <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
               </svg>
             ) : null}
+            {larguraDoTraco && tamanho.largura > 1 ? <LarguraNaPrevia quadro={tamanho} documento={imagem} {...larguraDoTraco} /> : null}
             {transformarComFerramenta && tamanho.largura > 1
               ? (() => {
                   const { clipeIds, ...resto } = transformarComFerramenta;

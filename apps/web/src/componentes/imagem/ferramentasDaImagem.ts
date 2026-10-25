@@ -53,6 +53,7 @@ import {
   Expand,
   Cloudy,
   Activity,
+  Diameter,
   Tornado,
   Target,
   Move,
@@ -193,6 +194,7 @@ export type IdFerramentaDaImagem =
   | "recortar"
   | "cristalizar"
   | "enrugar"
+  | "larguraDoTraco"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -341,6 +343,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("refletir", "Ferramenta Refletir", "", SquareSplitHorizontal, "Arraste da origem na direção do eixo do espelho (Shift de 45°; Alt solta uma cópia; Alt + clique, os números)."),
     F("escalar", "Ferramenta Escalar", "", Scaling, "Arraste para mudar o tamanho em volta da origem (Shift por igual; Alt solta uma cópia; Alt + clique, os números)."),
     F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
+    F("larguraDoTraco", "Ferramenta Largura do traço", "", Diameter, "Arraste a partir do caminho da forma escolhida para engrossar ou afinar o traço ali (Alt: um lado só); clique duplo num ponto o tira."),
     F("deformarVetor", "Ferramenta Deformar", "", Wind, "Arraste sobre a forma escolhida para empurrar o contorno com o pincel."),
     F("torcer", "Ferramenta Torcer", "", RefreshCcwDot, "Segure ou arraste sobre a forma escolhida para torcer o contorno debaixo do pincel."),
     F("franzir", "Ferramenta Franzir", "", Shrink, "Segure ou arraste sobre a forma escolhida para puxar o contorno para o meio do pincel."),

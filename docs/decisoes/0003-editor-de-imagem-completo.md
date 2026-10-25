@@ -304,7 +304,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Pincel de traço, Pincel de bolha, Lápis vetorial, Suavizar, Borracha de caminho, Unir, Modelador
 - [x] Borracha vetorial, Tesoura, Faca, cortes em linha e em retângulo
 - [x] Girar, Refletir, Escalar, Inclinar, Remodelar
-- [ ] Largura do traço, Deformar, Torcer, Franzir, Inflar, Recortar, Cristalizar, Enrugar
+- [x] Largura do traço, Deformar, Torcer, Franzir, Inflar, Recortar, Cristalizar, Enrugar
 - [ ] Construtor de formas e Pintura viva
 - [ ] Grade de perspectiva
 - [ ] Malha de degradê, Mesclar objetos, Objetos no caminho, Cotas

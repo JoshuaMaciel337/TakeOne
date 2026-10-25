@@ -135,6 +135,8 @@ import { regiaoDosCaminhos } from "@/lib/vetor/contorno";
 import { type Afim as AfimDaFerramenta, aplicarAfim, type FerramentaDeTransformar, posicaoPelaAfim, remodelarCaminhos } from "@/lib/transformar/ferramentas";
 import { JanelaTransformarNumeros } from "./JanelaTransformarNumeros";
 import { OpcoesDoLiquefazerNaBarra } from "./OpcoesDoLiquefazer";
+import { OpcoesDaLarguraNaBarra } from "./OpcoesDaLargura";
+import type { PontoDeLargura } from "@/lib/vetor/largura";
 import { caminhosDoLiquefazer, comecarLiquefazer, type EstadoDoLiquefazer, LIQUEFAZER_PADRAO, type OpcoesDoLiquefazer, passoDoLiquefazer, terminarLiquefazer } from "@/lib/vetor/liquefazer";
 import { comVinculadas } from "@/lib/projeto/alinhar";
 import { apagarArea, cortarComFaca, cortarComTesoura, regiaoDoCorte, regiaoDoRetangulo } from "@/lib/vetor/cortes";
@@ -216,8 +218,8 @@ import { tracarNoAlvo, tracosDoCaminho } from "./tracarCaminho";
 import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho, salvarTrabalho } from "@/lib/vetor/caminhos";
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
-import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea, TRACO_PADRAO } from "@/lib/vetor/modelo";
-import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
+import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, refazerForma, type Subcaminho, temArea, TRACO_PADRAO } from "@/lib/vetor/modelo";
+import { caminhosDoVetorNaImagem, pixelsPorUnidade, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, opcoesDaVariante, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { caixaDosCaminhos, deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
@@ -4078,6 +4080,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const { x, y, largura, altura } = reconhecida.caixa;
     criarFormaViva(reconhecida.tipo, arrastoDaForma({ x, y }, { x: x + largura, y: y + altura }));
   };
+  /** A Largura do traço: o perfil novo no traço da forma escolhida (a margem da caixa acompanha o maior lado). */
+  const mudarPerfilDoTraco = (perfil: PontoDeLargura[], provisorio: boolean) => {
+    const clipe = formaEmEdicao;
+    if (!clipe?.vetor?.traco) return;
+    const original = projetoRef.current ? acharClipe(projetoRef.current, clipe.id)?.clipe.vetor : null;
+    if (!original?.traco) return;
+    const comando: Comando = { comando: "imagem.mudarVetor", parametros: { clipeId: clipe.id, vetor: refazerForma(original, { traco: { ...original.traco, perfil: perfil.length ? perfil : null } }) } };
+    if (provisorio) setProvisorio(comando);
+    else {
+      setProvisorio(null);
+      executar(comando);
+    }
+  };
   /** As camadas que Girar, Refletir, Escalar e Inclinar levam: as escolhidas, as de dentro das pastas e as vinculadas. */
   const alvosDaTransformacao = (() => {
     if (!projetoNaTela || !FERRAMENTAS_DE_TRANSFORMAR.has(ferramenta)) return [];
@@ -6671,6 +6686,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "larguraDoTraco" ? (
+            <OpcoesDaLarguraNaBarra perfil={formaEmEdicao?.vetor ? (formaEmEdicao.vetor.traco?.perfil ?? []) : null} comTraco={Boolean(formaEmEdicao?.vetor?.traco)} aoMudar={(perfil) => mudarPerfilDoTraco(perfil, false)} />
           ) : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? (
             <OpcoesDoLiquefazerNaBarra ferramenta={LIQUEFAZER_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDoLiquefazer} aoMudar={setOpcoesDoLiquefazer} />
           ) : FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta) ? (
@@ -6989,6 +7006,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            larguraDoTraco={
+              ferramenta === "larguraDoTraco" && formaEmEdicao?.vetor?.traco && caminhosEditaveis
+                ? { caminhos: caminhosEditaveis, largura: formaEmEdicao.vetor.traco.largura * (projetoNaTela ? pixelsPorUnidade(formaEmEdicao.vetor.caixa, formaEmEdicao.transformacao.escala, tamanhoDaImagem(projetoNaTela)) : 1), perfil: formaEmEdicao.vetor.traco.perfil ?? [], aoMudar: mudarPerfilDoTraco }
+                : null
+            }
             transformarComFerramenta={
               FERRAMENTAS_DE_TRANSFORMAR.has(ferramenta)
                 ? {
