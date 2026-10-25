@@ -551,3 +551,23 @@ def test_fatias(cliente):
     assert salvo.json()["fatias"] == fatias
     ruim = [{**fatias[0], "largura": 0}]
     assert salvar(cliente, salvo.json(), [vazia], fatias=ruim).status_code == 422
+
+
+def test_grade_de_perspectiva(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    grade = {"tipo": 2, "horizonte": 270, "fuga": [{"x": -200, "y": 270}, {"x": 1000, "y": 270}],
+             "origem": {"x": 400, "y": 510}, "distancia": 400, "celula": 50, "extensao": 1000, "visivel": True,
+             "plano": "esquerdo"}
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json={**projeto, "perspectiva": grade})
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["perspectiva"] == grade
+    # Um ponto de fuga por tipo
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    errada = {**grade, "tipo": 3}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json={**aberto, "perspectiva": errada}).status_code == 422
+    # No projeto de vídeo, não fica
+    video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
+    salvo = cliente.put(f"/api/projetos/{video['id']}", json={**video, "perspectiva": grade})
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{video['id']}").json()["perspectiva"] is None

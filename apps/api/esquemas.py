@@ -2020,6 +2020,30 @@ class AnimacaoEntrada(BaseModel):
     repetir: int = Field(default=0, ge=0, le=1000)
 
 
+class PontoDaPerspectivaEntrada(BaseModel):
+    x: float = Field(ge=-1_000_000, le=1_000_000)
+    y: float = Field(ge=-1_000_000, le=1_000_000)
+
+
+class GradeDePerspectivaEntrada(BaseModel):
+    """A grade de perspectiva do editor de imagem (apps/web/src/lib/vetor/perspectiva.ts)."""
+    tipo: Literal[1, 2, 3]
+    horizonte: float = Field(ge=-1_000_000, le=1_000_000)
+    fuga: list[PontoDaPerspectivaEntrada] = Field(min_length=1, max_length=3)
+    origem: PontoDaPerspectivaEntrada
+    distancia: float = Field(gt=0, le=1_000_000)
+    celula: float = Field(gt=0, le=100_000)
+    extensao: float = Field(gt=0, le=1_000_000)
+    visivel: bool
+    plano: Literal["esquerdo", "direito", "chao"]
+
+    @model_validator(mode="after")
+    def _um_ponto_por_tipo(self):
+        if len(self.fuga) != self.tipo:
+            raise ValueError("A grade de perspectiva tem um ponto de fuga por tipo (1, 2 ou 3).")
+        return self
+
+
 class FatiaEntrada(BaseModel):
     """Uma fatia do editor de imagem (ferramenta Fatia): um retângulo em pixels do documento, que sai num arquivo."""
     id: str = Field(min_length=1, max_length=64)
@@ -2056,6 +2080,7 @@ class ProjetoSalvarEntrada(BaseModel):
     comps: list[CompDeCamadaEntrada] = Field(default=[], max_length=100)
     animacao: AnimacaoEntrada | None = None
     fatias: list[FatiaEntrada] = Field(default=[], max_length=500)
+    perspectiva: GradeDePerspectivaEntrada | None = None
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -2102,6 +2127,7 @@ class ProjetoSaida(BaseModel):
     comps: list[CompDeCamadaEntrada] = []
     animacao: AnimacaoEntrada | None = None
     fatias: list[FatiaEntrada] = []
+    perspectiva: GradeDePerspectivaEntrada | None = None
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
