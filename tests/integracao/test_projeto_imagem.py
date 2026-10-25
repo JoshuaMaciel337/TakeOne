@@ -580,3 +580,25 @@ def test_grade_de_perspectiva(cliente):
     salvo = cliente.put(f"/api/projetos/{video['id']}", json={**video, "perspectiva": grade})
     assert salvo.status_code == 200, salvo.text
     assert cliente.get(f"/api/projetos/{video['id']}").json()["perspectiva"] is None
+
+
+def test_simbolos(cliente):
+    cadastrar(cliente)
+    projeto = cliente.post("/api/projetos", json={"tamanho": {"largura": 800, "altura": 600}}).json()
+    vetor = {"caixa": {"largura": 20, "altura": 20}, "margem": 1,
+             "subcaminhos": [{"nos": [{"x": 1, "y": 1}, {"x": 19, "y": 1}, {"x": 10, "y": 19}], "fechado": True,
+                              "operacao": "somar"}],
+             "preenchimento": {"tipo": "cor", "cor": "#ff0000"}, "traco": None}
+    simbolos = [{"id": "s1", "nome": "Triângulo", "vetor": vetor}]
+    instancia = {**clipe(None, 0, 5, id_="i1"), "midia_id": None, "vetor": vetor,
+                 "simbolo": {"id": "s1", "tinta": {"cor": "#0000ff", "quantidade": 0.5}}}
+    faixas = [camada("video", instancia), {**projeto["faixas"][0], "clipes": []}]
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}", json={**projeto, "faixas": faixas, "simbolos": simbolos})
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["simbolos"][0]["nome"] == "Triângulo"
+    assert aberto["faixas"][0]["clipes"][0]["simbolo"] == {"id": "s1", "tinta": {"cor": "#0000ff", "quantidade": 0.5}}
+    # No projeto de vídeo, a instância não vale
+    video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
+    so_simbolo = {**clipe(None, 0, 5, id_="i2"), "midia_id": None, "texto": None, "simbolo": {"id": "s1"}}
+    assert salvar(cliente, video, [camada("video", so_simbolo), *video["faixas"]]).status_code == 422

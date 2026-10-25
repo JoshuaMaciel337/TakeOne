@@ -194,7 +194,7 @@ def problema_na_arvore(faixas: list[dict], imagem: bool) -> str | None:
                                 or c.get("mascara_pixels") or c.get("vetor") or c.get("mascara_vetorial")
                                 or c.get("prancheta") or c.get("texto_rico") or c.get("estilo_camada")
                                 or c.get("camada_de_preenchimento") or c.get("ajuste_imagem")
-                                or c.get("filtros_inteligentes") or c.get("geracao")
+                                or c.get("filtros_inteligentes") or c.get("geracao") or c.get("simbolo")
                                 or c.get("mesclagem") in MESCLAGENS_SO_DA_IMAGEM for c in clipes):
                 return ("Grupos, recortes, travas parciais, camadas de pixels, formas vetoriais e os modos de mesclagem"
                         " novos só existem no editor de imagem.")

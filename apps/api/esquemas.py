@@ -1609,6 +1609,24 @@ class CaminhoDoDocumento(BaseModel):
         return _limpar_espacos(valor)
 
 
+class TintaDaInstanciaEntrada(BaseModel):
+    cor: str = Field(pattern=COR)
+    quantidade: float = Field(ge=0, le=1)
+
+
+class InstanciaDeSimboloEntrada(BaseModel):
+    """A ligação de uma forma com um símbolo do documento (apps/web/src/lib/vetor/simbolos.ts)."""
+    id: str = Field(min_length=1, max_length=64)
+    tinta: TintaDaInstanciaEntrada | None = None
+
+
+class SimboloEntrada(BaseModel):
+    """Um símbolo do documento: a forma de referência das instâncias."""
+    id: str = Field(min_length=1, max_length=64)
+    nome: str = Field(min_length=1, max_length=80)
+    vetor: VetorEntrada
+
+
 class ClipeEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     # Clipe de texto não tem mídia: tem o texto
@@ -1666,6 +1684,8 @@ class ClipeEntrada(BaseModel):
     ajuste_imagem: AjusteDaImagemEntrada | None = None
     # Só no projeto de imagem: o estilo de camada (sombra, brilhos, chanfro, cetim, sobreposições, traçado)
     estilo_camada: EstiloDeCamadaEntrada | None = None
+    # Só no projeto de imagem: a instância de um símbolo do documento (a forma é a do símbolo, com a tinta)
+    simbolo: InstanciaDeSimboloEntrada | None = None
     # Só no projeto de imagem: a camada de preenchimento (cor sólida, degradê ou padrão, cobrindo o documento)
     camada_de_preenchimento: CamadaDePreenchimentoEntrada | None = None
     # Só no projeto de imagem: os filtros inteligentes (a pilha não destrutiva de filtros, com a máscara dela)
@@ -2095,6 +2115,7 @@ class ProjetoSalvarEntrada(BaseModel):
     animacao: AnimacaoEntrada | None = None
     fatias: list[FatiaEntrada] = Field(default=[], max_length=500)
     perspectiva: GradeDePerspectivaEntrada | None = None
+    simbolos: list[SimboloEntrada] = Field(default=[], max_length=200)
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -2142,6 +2163,7 @@ class ProjetoSaida(BaseModel):
     animacao: AnimacaoEntrada | None = None
     fatias: list[FatiaEntrada] = []
     perspectiva: GradeDePerspectivaEntrada | None = None
+    simbolos: list[SimboloEntrada] = []
     versao: int
     duracao: int
     tipo: Literal["video", "imagem"] = "video"
