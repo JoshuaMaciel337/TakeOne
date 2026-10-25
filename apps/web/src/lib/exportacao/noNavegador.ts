@@ -167,7 +167,7 @@ class Fontes {
     let registro = this.decodificadores.get(nome);
     if (!registro) {
       const avisos: (() => void)[] = [];
-      const decodificador = new DecodificadorDeVideo(url, () => avisos.splice(0).forEach((avisar) => avisar()));
+      const decodificador = new DecodificadorDeVideo(url, () => avisos.splice(0).forEach((avisar) => avisar()), { paraTras: false });
       registro = { decodificador, avisos, usadoEm: quadroAtual };
       this.decodificadores.set(nome, registro);
     }

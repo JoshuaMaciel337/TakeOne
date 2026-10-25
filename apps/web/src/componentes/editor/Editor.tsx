@@ -48,6 +48,7 @@ import { MedidoresDeAudio } from "./MedidoresDeAudio";
 import { duracaoNaFonte, MonitorDeOrigem } from "./MonitorDeOrigem";
 import { type AcoesDoVideo, AREAS_DO_VIDEO, type IdPainelDoVideo, menusDoVideo, PAINEIS_DO_VIDEO } from "./menusDoVideo";
 import { ConteudoDaFerramenta, PainelConteudo } from "./PainelConteudo";
+import { PainelEscopos } from "./PainelEscopos";
 import { PainelComRolagem, PainelEfeitosDoVideo, PainelGraficosEssenciais, PainelSomEssencial, PainelTextoDoVideo } from "./PaineisDoVideo";
 import { PainelMarcadores } from "./PainelMarcadores";
 import { type IdAba, PainelPropriedades } from "./PainelPropriedades";
@@ -77,9 +78,9 @@ const AREAS: Record<string, EstadoDaArea> = {
     cimaDireita: [],
     baixoEsquerda: [{ id: "g-efeitos", abas: ["efeitos", "marcadores", "historico"], ativa: "marcadores" }],
   },
-  // Cor: o painel de cor à direita, os controles de efeito e a fonte à esquerda
+  // Cor: o painel de cor à direita, os escopos, os controles de efeito e a fonte à esquerda
   cor: {
-    cimaEsquerda: [{ id: "g-controles", abas: ["controles", "fonte"], ativa: "controles" }],
+    cimaEsquerda: [{ id: "g-controles", abas: ["escopos", "controles", "fonte"], ativa: "escopos" }],
     cimaDireita: [{ id: "g-cor", abas: ["cor", "propriedades"], ativa: "cor" }],
     baixoEsquerda: [{ id: "g-projeto", abas: ["projeto", "efeitos", "historico"], ativa: "projeto" }],
   },
@@ -133,20 +134,28 @@ function useTelaLarga(): boolean {
   );
 }
 
-/** Relógio da reprodução. O tempo anda pelo relógio do navegador; os vídeos da prévia seguem ele. */
+/** Andamentos do J e do L: cada toque na mesma tecla dobra, até 8×. */
+const ANDAMENTOS = [1, 2, 4, 8];
+
+/**
+ * Relógio da reprodução. O tempo anda pelo relógio do navegador; os vídeos da prévia seguem ele. O andamento é
+ * negativo tocando para trás (J) e passa de 1 tocando mais rápido (L de novo), como nos editores profissionais.
+ */
 function useReproducao(duracao: Tick, taxa: Taxa) {
   const [tempo, setTempo] = useState<Tick>(0);
   const [tocando, setTocando] = useState(false);
+  const [andamento, setAndamento] = useState(1);
   const partida = useRef({ tempo: 0, relogio: 0 });
 
   useEffect(() => {
     if (!tocando) return;
     let pedido = 0;
     const avancar = () => {
-      const t = partida.current.tempo + ((performance.now() - partida.current.relogio) / 1000) * TICKS_POR_SEGUNDO;
-      if (t >= duracao) {
-        setTempo(duracao);
+      const t = partida.current.tempo + ((performance.now() - partida.current.relogio) / 1000) * andamento * TICKS_POR_SEGUNDO;
+      if (t >= duracao || t <= 0) {
+        setTempo(t <= 0 ? 0 : duracao);
         setTocando(false);
+        setAndamento(1);
         return;
       }
       setTempo(Math.round(t));
@@ -154,7 +163,7 @@ function useReproducao(duracao: Tick, taxa: Taxa) {
     };
     pedido = requestAnimationFrame(avancar);
     return () => cancelAnimationFrame(pedido);
-  }, [tocando, duracao]);
+  }, [tocando, duracao, andamento]);
 
   // O limite é aplicado na leitura: logo depois de um comando, `duracao` ainda é a de antes
   const buscar = useCallback((t: Tick) => {
@@ -164,22 +173,42 @@ function useReproducao(duracao: Tick, taxa: Taxa) {
   }, []);
 
   const atual = Math.min(tempo, duracao);
+  /** Toca no andamento pedido a partir de onde está (ou do começo, se está no fim e vai para a frente). */
+  const tocar = useCallback(
+    (novo: number) => {
+      if (duracao <= 0) return;
+      if (novo < 0 && atual <= 0) return;
+      // O navegador só libera o som dentro do clique ou da tecla da pessoa
+      retomarAudio();
+      const inicio = novo > 0 && atual >= duracao ? 0 : atual;
+      partida.current = { tempo: inicio, relogio: performance.now() };
+      setTempo(inicio);
+      setAndamento(novo);
+      setTocando(true);
+    },
+    [atual, duracao],
+  );
+  const parar = useCallback(() => {
+    setTocando(false);
+    setAndamento(1);
+    setTempo((t) => Math.min(quadroMaisProximo(taxa, t), duracao));
+  }, [duracao, taxa]);
   const alternar = useCallback(() => {
-    if (tocando) {
-      setTocando(false);
-      setTempo((t) => Math.min(quadroMaisProximo(taxa, t), duracao));
-      return;
-    }
-    if (duracao <= 0) return;
-    // O navegador só libera o som dentro do clique ou da tecla da pessoa
-    retomarAudio();
-    const inicio = atual >= duracao ? 0 : atual;
-    partida.current = { tempo: inicio, relogio: performance.now() };
-    setTempo(inicio);
-    setTocando(true);
-  }, [tocando, atual, duracao, taxa]);
+    if (tocando) parar();
+    else tocar(1);
+  }, [tocando, parar, tocar]);
+  /** J (sentido -1) e L (sentido 1): parado ou no outro sentido, toca a 1×; no mesmo sentido, dobra até 8×. */
+  const acelerar = useCallback(
+    (sentido: 1 | -1) => {
+      const agora = tocando ? andamento : 0;
+      if (Math.sign(agora) !== sentido) return tocar(sentido);
+      const proximo = ANDAMENTOS[Math.min(ANDAMENTOS.indexOf(Math.abs(agora)) + 1, ANDAMENTOS.length - 1)];
+      tocar(proximo * sentido);
+    },
+    [tocando, andamento, tocar],
+  );
 
-  return { tempo: atual, tocando, buscar, alternar };
+  return { tempo: atual, tocando, andamento: tocando ? andamento : 1, buscar, alternar, parar, acelerar };
 }
 
 /**
@@ -236,6 +265,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     }
   }, [projeto, provisorio, ctx]);
   const reproducao = useReproducao(projeto?.duracao ?? 0, projeto?.taxa ?? { num: 30, den: 1 });
+  const kApertado = useRef(false);
   const { tempo, buscar, alternar } = reproducao;
   const objeto = useSeguirObjeto({ projeto, midias, tempo, executar: (comando) => executar(comando), aoAvisar: mostrarAviso });
   // O desenho da máscara de um clipe, na prévia (o painel começa; a prévia devolve os pontos)
@@ -562,15 +592,16 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if (evento.key === ";" && !ctrl) tirarTrecho(false);
     else if (evento.key === "'" && !ctrl) tirarTrecho(true);
     else if (tecla === "k" && !ctrl) {
-      if (reproducao.tocando) alternar();
-    } else if (tecla === "l" && !ctrl) {
-      if (!reproducao.tocando) alternar();
-    } else if (tecla === "j" && !ctrl) {
-      // O editor não toca para trás: o J para e volta um segundo
-      if (reproducao.tocando) alternar();
-      buscar(Math.max(0, tempo - TICKS_POR_SEGUNDO));
-    } else if (telaLarga && !ctrl && !evento.altKey && !evento.shiftKey && FERRAMENTAS_DA_LINHA.some((item) => item.tecla.toLowerCase() === tecla)) {
-      setFerramentaDaLinha(FERRAMENTAS_DA_LINHA.find((item) => item.tecla.toLowerCase() === tecla)!.id);
+      kApertado.current = true;
+      if (reproducao.tocando) reproducao.parar();
+    } else if ((tecla === "l" || tecla === "j") && !ctrl) {
+      // Com o K apertado, um quadro por toque; sem ele, toca (o mesmo sentido de novo dobra o andamento)
+      if (kApertado.current) {
+        if (reproducao.tocando) reproducao.parar();
+        buscar(quadroMaisProximo(projeto.taxa, tempo) + (tecla === "l" ? 1 : -1) * quadro);
+      } else reproducao.acelerar(tecla === "l" ? 1 : -1);
+    } else if (telaLarga && !ctrl && !evento.altKey && FERRAMENTAS_DA_LINHA.some((item) => item.tecla.toLowerCase() === (evento.shiftKey ? `shift+${tecla}` : tecla))) {
+      setFerramentaDaLinha(FERRAMENTAS_DA_LINHA.find((item) => item.tecla.toLowerCase() === (evento.shiftKey ? `shift+${tecla}` : tecla))!.id);
     }
     else if ((tecla === "delete" || tecla === "backspace") && !evento.shiftKey && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
     else if (ctrl && evento.shiftKey && (evento.key === "/" || evento.key === "?") && selecaoValida.length) executar({ comando: "clipe.duplicar", parametros: { clipeIds: selecaoValida } });
@@ -613,8 +644,19 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
 
   useEffect(() => {
     const ouvir = (evento: KeyboardEvent) => aoTeclar(evento);
+    // O K segurado faz o J e o L andarem um quadro; soltar (ou sair da janela) volta ao normal
+    const soltar = (evento: KeyboardEvent) => {
+      if (evento.key.toLowerCase() === "k") kApertado.current = false;
+    };
+    const esquecer = () => (kApertado.current = false);
     window.addEventListener("keydown", ouvir);
-    return () => window.removeEventListener("keydown", ouvir);
+    window.addEventListener("keyup", soltar);
+    window.addEventListener("blur", esquecer);
+    return () => {
+      window.removeEventListener("keydown", ouvir);
+      window.removeEventListener("keyup", soltar);
+      window.removeEventListener("blur", esquecer);
+    };
   }, []);
 
   if (edicao.erroCarga) {
@@ -723,6 +765,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     midias,
     tempo,
     tocando: reproducao.tocando,
+    andamento: reproducao.andamento,
     aoAlternar: alternar,
     selecao: selecaoValida,
     aoSelecionar: aoSelecionarClipes,
@@ -913,6 +956,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           />
         ),
       },
+      escopos: { nome: PAINEIS_DO_VIDEO.escopos, conteudo: <PainelEscopos /> },
       metadados: { nome: PAINEIS_DO_VIDEO.metadados, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} somenteAbas={["info"]} className="h-full" /> },
       propriedades: { nome: PAINEIS_DO_VIDEO.propriedades, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} pedidoDeAba={pedidoDeAba} className="h-full" /> },
       graficos: { nome: PAINEIS_DO_VIDEO.graficos, conteudo: <PainelGraficosEssenciais conteudo={conteudo} pedido={pedidoGraficos} /> },
@@ -1056,7 +1100,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             ) : null}
             <ColunaDeFerramentas ativa={ferramentaDaLinha} aoEscolher={setFerramentaDaLinha} />
             <LinhaDoTempo {...propsDaLinha} profissional pedidoDeZoom={pedidoDeZoom} ferramenta={ferramentaDaLinha} entradaSaida={entradaSaida} className="min-w-0 flex-1" />
-            <MedidoresDeAudio tocando={reproducao.tocando} className="w-12" />
+            <MedidoresDeAudio tocando={reproducao.tocando && reproducao.andamento === 1} className="w-12" />
           </div>
           {janelas}
         </div>

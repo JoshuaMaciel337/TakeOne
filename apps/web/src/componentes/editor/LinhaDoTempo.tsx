@@ -140,6 +140,7 @@ export function codigoDaFaixa(faixa: Faixa, projeto: Projeto): string {
 const CURSOR_DA_FERRAMENTA: Record<IdFerramentaDaLinha, string | undefined> = {
   selecao: undefined,
   faixaAdiante: "e-resize",
+  faixaAtras: "w-resize",
   ondulacao: undefined,
   continua: undefined,
   velocidade: undefined,
@@ -317,9 +318,10 @@ export function LinhaDoTempo({
       aoExecutar({ comando: "linha.dividir", parametros: { tempo: t, clipeIds: ids } });
       return;
     }
-    if (ferramenta === "faixaAdiante") {
+    if (ferramenta === "faixaAdiante" || ferramenta === "faixaAtras") {
       const faixas = evento.shiftKey ? exibido.faixas : [faixa];
-      aoSelecionar(faixas.flatMap((item) => item.clipes.filter((c) => c.inicio >= clipe.inicio).map((c) => c.id)));
+      const escolhido = (c: Clipe) => (ferramenta === "faixaAdiante" ? c.inicio >= clipe.inicio : fimDoClipe(c) <= fimDoClipe(clipe));
+      aoSelecionar(faixas.flatMap((item) => item.clipes.filter(escolhido).map((c) => c.id)));
       return;
     }
     const multiplo = evento.shiftKey || evento.ctrlKey || evento.metaKey;

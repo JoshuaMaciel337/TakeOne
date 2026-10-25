@@ -8,7 +8,7 @@ export type Atalho = { teclas: string; acao: string };
 /** A lista da janela de atalhos, na ordem em que aparece. */
 export const ATALHOS: Atalho[] = [
   { teclas: "Espaço", acao: "Tocar e parar" },
-  { teclas: "J  K  L", acao: "Voltar um segundo, parar e tocar (o editor não toca para trás)" },
+  { teclas: "J  K  L", acao: "Tocar para trás, parar e tocar; J ou L de novo dobra o andamento até 8× (K segurado com J ou L: um quadro)" },
   { teclas: "← →", acao: "Um quadro para trás ou para a frente (Shift: cinco)" },
   { teclas: "↑ ↓", acao: "Corte anterior ou seguinte" },
   { teclas: "Home End", acao: "Começo ou fim da sequência" },
@@ -19,7 +19,7 @@ export const ATALHOS: Atalho[] = [
   { teclas: "Ctrl+K  ou  Ctrl+B", acao: "Adicionar edição: dividir no cursor" },
   { teclas: "Q", acao: "Apagar do começo do clipe até o cursor" },
   { teclas: "W", acao: "Apagar do cursor até o fim do clipe" },
-  { teclas: "V A B N R C Y H Z T", acao: "Ferramentas da linha do tempo: seleção, faixa adiante, ondulação, contínua, esticar a velocidade, navalha, deslizar, mão, zoom e texto (na tela larga)" },
+  { teclas: "V A Shift+A B N R C Y H Z T", acao: "Ferramentas da linha do tempo: seleção, faixa adiante, faixa para trás, ondulação, contínua, esticar a velocidade, navalha, deslizar, mão, zoom e texto (na tela larga)" },
   { teclas: "Alt+← Alt+→", acao: "Empurrar os clipes marcados um quadro (Shift: cinco)" },
   { teclas: "Alt + arrastar o clipe", acao: "Deslizar o conteúdo: o clipe fica no lugar e mostra outro trecho da mídia" },
   { teclas: "Alt + arrastar a borda", acao: "Mover o corte entre dois clipes encostados: um cresce o que o outro encolhe" },

@@ -7,6 +7,7 @@ export const PAINEIS_DO_VIDEO = {
   controles: "Controles de efeito",
   cor: "Cor",
   efeitos: "Efeitos",
+  escopos: "Escopos de cor",
   fonte: "Fonte",
   graficos: "Gráficos essenciais",
   historico: "Histórico",

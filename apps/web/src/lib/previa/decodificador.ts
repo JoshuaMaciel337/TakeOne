@@ -33,6 +33,20 @@ const MAXIMO_A_FRENTE = 6;
 /** Amostras esperando dentro do decodificador. */
 const MAXIMO_NA_FILA = 8;
 const GRUPOS_GUARDADOS = 3;
+/**
+ * Tocando para trás (o J), cada quadro pedido fica antes dos decodificados, e o decodificador só anda para a frente:
+ * sem guardar nada, cada passo decodificava o grupo inteiro desde o quadro-chave (uns 60 quadros) para mostrar um.
+ * Os quadros do grupo são copiados em imagens menores (os VideoFrame abertos travam o decodificador), uma passada por
+ * grupo, até este tanto deles.
+ */
+const MAXIMO_PARA_TRAS = 75;
+const LADO_PARA_TRAS = 854;
+/** Parado depois de andar para trás (o ← quadro a quadro), o quadro volta a ser decodificado em resolução cheia. */
+const REFINAR_PARADO_MS = 200;
+/** A mesma folga do `quadroParaMostrar`. */
+const FOLGA_PARA_TRAS_US = 500;
+
+type QuadroParaTras = { tempo: number; fim: number; imagem: ImageBitmap | null };
 const QUADRO_PADRAO_US = 33_333;
 
 export function webCodecsDisponivel(): boolean {
@@ -127,6 +141,16 @@ export class DecodificadorDeVideo {
   /** O último quadro entregue. Fica aberto até ser trocado, para a prévia não piscar durante uma busca. */
   private mostrado: VideoFrame | null = null;
   private alvo = 0;
+  /** O instante pedido anda para trás: os quadros vêm das imagens guardadas do grupo (`atras`). */
+  private paraTras = false;
+  private readonly comParaTras: boolean;
+  /** Os quadros do grupo, copiados enquanto anda para trás, em ordem de tempo (a imagem chega depois da cópia). */
+  private atras: QuadroParaTras[] = [];
+  /** A imagem mostrada para trás: fica até ser trocada, como o `mostrado`. */
+  private mostradoAtras: ImageBitmap | null = null;
+  /** Na passada para trás, já saiu um quadro depois do instante pedido: a passada pode parar. */
+  private saiuDepoisDoAlvo = false;
+  private refinar: ReturnType<typeof setTimeout> | null = null;
   /** Próxima amostra a enviar, na ordem de decodificação. */
   private proxima = 0;
   /** Instante do quadro-chave onde a decodificação atual começou. */
@@ -140,9 +164,11 @@ export class DecodificadorDeVideo {
   private grupos = new Map<number, Promise<Grupo>>();
   private fechado = false;
 
-  constructor(url: string, aoMudar: () => void) {
+  /** `paraTras`: a prévia anda para trás com o J; a exportação só anda para a frente e não guarda imagens. */
+  constructor(url: string, aoMudar: () => void, { paraTras = true }: { paraTras?: boolean } = {}) {
     this.url = url;
     this.aoMudar = aoMudar;
+    this.comParaTras = paraTras;
     void this.abrir();
   }
 
@@ -174,11 +200,15 @@ export class DecodificadorDeVideo {
    * O quadro do instante `segundos` da mídia, se já estiver decodificado; senão o último entregue
    * (ou null), e a decodificação continua em segundo plano, avisando por `aoMudar`.
    */
-  quadroEm(segundos: number): VideoFrame | null {
+  quadroEm(segundos: number): VideoFrame | ImageBitmap | null {
     if (this.fechado || this.falhou) return null;
     const cabecalho = this.cabecalho;
     const alvo = Math.round(segundos * 1_000_000);
+    const anterior = this.alvo;
     this.alvo = cabecalho ? Math.min(Math.max(alvo, cabecalho.primeiroTempo), cabecalho.ultimoTempo) : alvo;
+    if (this.comParaTras && this.alvo < anterior && !this.paraTras) this.entrarParaTras();
+    else if (this.alvo > anterior && this.paraTras) this.sairDoParaTras();
+    if (this.paraTras) return this.quadroParaTras();
 
     const indice = this.indiceQueCobre();
     if (indice >= 0) {
@@ -194,7 +224,87 @@ export class DecodificadorDeVideo {
       if (antes) this.podar(antes);
     }
     void this.trabalhar();
-    return indice >= 0 ? this.quadros[0] : this.mostrado;
+    // Logo depois de voltar do para trás, a imagem de lá segura a tela até o quadro de verdade chegar
+    if (indice >= 0) this.soltarImagemAtras();
+    return indice >= 0 ? this.quadros[0] : (this.mostrado ?? this.mostradoAtras);
+  }
+
+  private entrarParaTras() {
+    this.paraTras = true;
+    // Os decodificados para a frente não servem: a próxima passada começa no quadro-chave do instante
+    for (const quadro of this.quadros) if (quadro !== this.mostrado) quadro.close();
+    this.quadros = [];
+    this.saiuDepoisDoAlvo = true;
+  }
+
+  private sairDoParaTras() {
+    this.paraTras = false;
+    if (this.refinar) clearTimeout(this.refinar);
+    this.refinar = null;
+    for (const quadro of this.atras) if (quadro.imagem !== this.mostradoAtras) quadro.imagem?.close();
+    this.atras = [];
+    // A passada para trás parou depois do instante: para a frente, começa de novo no quadro-chave dele
+    this.inicioDaDecodificacao = Number.POSITIVE_INFINITY;
+    this.mostrado?.close();
+    this.mostrado = null;
+  }
+
+  private soltarImagemAtras() {
+    if (!this.mostradoAtras) return;
+    this.mostradoAtras.close();
+    this.mostradoAtras = null;
+  }
+
+  /** Para trás: a imagem guardada que cobre o instante (ou a última mostrada, enquanto a passada não chega a ele). */
+  private quadroParaTras(): ImageBitmap | VideoFrame | null {
+    // Os que ficaram depois do instante já passaram
+    while (this.atras.length && this.atras[this.atras.length - 1].tempo > this.alvo + FOLGA_PARA_TRAS_US) {
+      const quadro = this.atras.pop()!;
+      if (quadro.imagem !== this.mostradoAtras) quadro.imagem?.close();
+    }
+    const quadro = this.atras[this.atras.length - 1];
+    if (quadro?.imagem && this.alvo < quadro.fim && quadro.imagem !== this.mostradoAtras) {
+      this.mostradoAtras?.close();
+      this.mostradoAtras = quadro.imagem;
+    }
+    // Parado (o ← quadro a quadro, ou o J que parou), o quadro volta a sair em resolução cheia
+    if (this.refinar) clearTimeout(this.refinar);
+    this.refinar = setTimeout(() => {
+      this.refinar = null;
+      if (this.fechado || !this.paraTras) return;
+      this.sairDoParaTras();
+      void this.trabalhar();
+    }, REFINAR_PARADO_MS);
+    void this.trabalhar();
+    return this.mostradoAtras ?? this.mostrado;
+  }
+
+  /** Para trás: o quadro decodificado vira uma imagem menor guardada, e o VideoFrame é fechado logo. */
+  private guardarParaTras(quadro: VideoFrame) {
+    if (quadro.timestamp > this.alvo + FOLGA_PARA_TRAS_US) this.saiuDepoisDoAlvo = true;
+    const jaTem = this.atras.some((item) => item.tempo === quadro.timestamp);
+    if (quadro.timestamp > this.alvo + FOLGA_PARA_TRAS_US || jaTem) {
+      quadro.close();
+      return;
+    }
+    const entrada: QuadroParaTras = { tempo: quadro.timestamp, fim: quadro.timestamp + (quadro.duration ?? QUADRO_PADRAO_US), imagem: null };
+    const lugar = this.atras.findIndex((item) => item.tempo > entrada.tempo);
+    if (lugar < 0) this.atras.push(entrada);
+    else this.atras.splice(lugar, 0, entrada);
+    // O fim de cada um é o começo do seguinte
+    for (let i = 0; i + 1 < this.atras.length; i++) this.atras[i].fim = this.atras[i + 1].tempo;
+    while (this.atras.length > MAXIMO_PARA_TRAS) this.atras.shift()?.imagem?.close();
+    const escala = Math.min(1, LADO_PARA_TRAS / Math.max(quadro.displayWidth, quadro.displayHeight));
+    createImageBitmap(quadro, { resizeWidth: Math.round(quadro.displayWidth * escala), resizeHeight: Math.round(quadro.displayHeight * escala), resizeQuality: "medium" })
+      .then((imagem) => {
+        if (this.fechado || !this.atras.includes(entrada)) imagem.close();
+        else {
+          entrada.imagem = imagem;
+          this.aoMudar();
+        }
+      })
+      .catch(() => {})
+      .finally(() => quadro.close());
   }
 
   /**
@@ -203,7 +313,8 @@ export class DecodificadorDeVideo {
    */
   quadroExatoEm(segundos: number): VideoFrame | null {
     const quadro = this.quadroEm(segundos);
-    return this.indiceQueCobre() >= 0 ? quadro : null;
+    // Sem o para trás (a exportação), o quadro é sempre um VideoFrame
+    return !this.paraTras && this.indiceQueCobre() >= 0 ? (quadro as VideoFrame) : null;
   }
 
   /** Índice do quadro guardado que está na tela no instante pedido, ou -1. */
@@ -227,6 +338,11 @@ export class DecodificadorDeVideo {
       quadro.close();
       return;
     }
+    if (this.paraTras) {
+      this.guardarParaTras(quadro);
+      void this.trabalhar();
+      return;
+    }
     this.quadros.push(quadro);
     const indice = quadroParaMostrar(
       this.quadros.map((item) => item.timestamp),
@@ -248,9 +364,16 @@ export class DecodificadorDeVideo {
     // Com GOP aberto, um quadro B pode aparecer antes do quadro-chave: o mínimo evita buscar de novo sem fim
     this.inicioDaDecodificacao = Math.min(cabecalho.amostras[this.proxima].tempo, this.alvo);
     this.terminou = false;
+    this.saiuDepoisDoAlvo = false;
   }
 
   private precisaBuscar(cabecalho: Cabecalho): boolean {
+    if (this.paraTras) {
+      // Uma guardada cobre (ou vai cobrir, quando a cópia terminar) o instante, ou a passada ainda chega nele
+      const quadro = this.atras.findLast((item) => item.tempo <= this.alvo + FOLGA_PARA_TRAS_US);
+      if (quadro && this.alvo < quadro.fim) return false;
+      return !(this.inicioDaDecodificacao <= this.alvo && !this.saiuDepoisDoAlvo);
+    }
     if (this.indiceQueCobre() >= 0) return false;
     if (this.inicioDaDecodificacao === Number.POSITIVE_INFINITY) return true;
     // Para trás: o decodificador só anda para a frente
@@ -284,7 +407,7 @@ export class DecodificadorDeVideo {
         !this.fechado &&
         this.proxima < amostras.length &&
         decodificador.decodeQueueSize < MAXIMO_NA_FILA &&
-        this.quadrosAFrente() < MAXIMO_A_FRENTE
+        (this.paraTras ? !this.saiuDepoisDoAlvo : this.quadrosAFrente() < MAXIMO_A_FRENTE)
       ) {
         const geracao = this.geracao;
         const indice = this.proxima;
@@ -335,6 +458,10 @@ export class DecodificadorDeVideo {
 
   fechar() {
     this.fechado = true;
+    if (this.refinar) clearTimeout(this.refinar);
+    for (const quadro of this.atras) if (quadro.imagem !== this.mostradoAtras) quadro.imagem?.close();
+    this.atras = [];
+    this.soltarImagemAtras();
     if (this.decodificador && this.decodificador.state !== "closed") this.decodificador.close();
     for (const quadro of this.quadros) if (quadro !== this.mostrado) quadro.close();
     this.mostrado?.close();

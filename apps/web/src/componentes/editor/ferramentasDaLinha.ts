@@ -1,13 +1,14 @@
 // As ferramentas da linha do tempo (ADR 0002), com os nomes e as teclas dos editores de vídeo profissionais.
-import { ArrowRightToLine, Hand, type LucideIcon, MousePointer2, MoveHorizontal, Scissors, StretchHorizontal, Type, UnfoldHorizontal, ZoomIn, Columns2 } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Hand, type LucideIcon, MousePointer2, MoveHorizontal, Scissors, StretchHorizontal, Type, UnfoldHorizontal, ZoomIn, Columns2 } from "lucide-react";
 
-export type IdFerramentaDaLinha = "selecao" | "faixaAdiante" | "ondulacao" | "continua" | "velocidade" | "navalha" | "deslizar" | "mao" | "zoom" | "texto";
+export type IdFerramentaDaLinha = "selecao" | "faixaAdiante" | "faixaAtras" | "ondulacao" | "continua" | "velocidade" | "navalha" | "deslizar" | "mao" | "zoom" | "texto";
 
 export type FerramentaDaLinha = { id: IdFerramentaDaLinha; nome: string; tecla: string; icone: LucideIcon; dica: string };
 
 export const FERRAMENTAS_DA_LINHA: FerramentaDaLinha[] = [
   { id: "selecao", nome: "Ferramenta Seleção", tecla: "V", icone: MousePointer2, dica: "Escolhe, move e apara os clipes." },
   { id: "faixaAdiante", nome: "Ferramenta Seleção de faixa adiante", tecla: "A", icone: ArrowRightToLine, dica: "Clique num clipe: ele e os seguintes da faixa ficam escolhidos (Shift: de todas as faixas)." },
+  { id: "faixaAtras", nome: "Ferramenta Seleção de faixa para trás", tecla: "Shift+A", icone: ArrowLeftToLine, dica: "Clique num clipe: ele e os anteriores da faixa ficam escolhidos (Shift: de todas as faixas)." },
   { id: "ondulacao", nome: "Ferramenta Edição em ondulação", tecla: "B", icone: UnfoldHorizontal, dica: "Arraste a borda do clipe escolhido: os seguintes da faixa andam junto." },
   { id: "continua", nome: "Ferramenta Edição contínua", tecla: "N", icone: Columns2, dica: "Arraste a borda entre dois clipes encostados: um cresce o que o outro encolhe." },
   { id: "velocidade", nome: "Ferramenta Esticar a velocidade", tecla: "R", icone: StretchHorizontal, dica: "Arraste a borda do clipe escolhido: a velocidade muda para o mesmo trecho caber." },

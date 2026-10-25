@@ -39,15 +39,24 @@ function segundosNaMidia(item: ItemDaPrevia, tempo: Tick): number {
   return (item.ativo ? tempoNaMidia(item.clipe, tempo) : item.clipe.entrada) / TICKS_POR_SEGUNDO;
 }
 
-/** Faz um `<video>` ou `<audio>` tocar, parar e pular junto com o relógio do editor. */
-function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>, item: ItemDaPrevia, tempo: Tick, tocando: boolean) {
+/** O maior `playbackRate` que o Chrome aceita. */
+const ANDAMENTO_MAXIMO_DO_ELEMENTO = 16;
+
+/**
+ * Faz um `<video>` ou `<audio>` tocar, parar e pular junto com o relógio do editor. Com o andamento do J e do L,
+ * o elemento toca mais rápido (sem mudar o tom); para trás ele não toca: o vídeo pula quadro a quadro e o som,
+ * como nos editores profissionais com o som em silêncio para trás, fica parado onde está (`som`).
+ */
+function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>, item: ItemDaPrevia, tempo: Tick, tocando: boolean, andamento: number, som: boolean) {
   const alvo = segundosNaMidia(item, tempo);
-  const tocar = item.ativo && tocando;
   // Com curva, a velocidade do instante (o elemento muda o andamento sem mudar o tom)
   const { clipe } = item;
-  const velocidade = clipe.curva_velocidade
+  const velocidadeDoClipe = clipe.curva_velocidade
     ? Math.max(ANDAMENTO_MINIMO, velocidadeNaCurva(clipe.curva_velocidade, clipe.velocidade, (tempo - clipe.inicio) / clipe.duracao))
     : clipe.velocidade;
+  const velocidade = velocidadeDoClipe * Math.max(andamento, 1);
+  const tocar = item.ativo && tocando && andamento > 0 && velocidade <= ANDAMENTO_MAXIMO_DO_ELEMENTO;
+  const mudo = som && tocando && !tocar;
 
   // O clipe que o elemento segue (trocou: a próxima conferência usa o limite de um quadro) e onde ele estava ao
   // começar a tocar. O elemento só anda uns 250 ms depois do play (no primeiro, o contexto de áudio nasce ali),
@@ -77,15 +86,16 @@ function useSeguirRelogio(elementoRef: React.RefObject<HTMLMediaElement | null>,
       }
     } else {
       if (!elemento.paused) elemento.pause();
-      if (desvio > 0.01) elemento.currentTime = alvo;
+      if (desvio > 0.01 && !mudo) elemento.currentTime = alvo;
     }
-  }, [elementoRef, alvo, tocar, velocidade, clipe.id]);
+  }, [elementoRef, alvo, tocar, mudo, velocidade, clipe.id]);
 }
 
 type PropsFonte = {
   item: ItemDaPrevia;
   tempo: Tick;
   tocando: boolean;
+  andamento?: number;
   aoRegistrar: (fonte: FonteDeQuadros | null) => void;
   /** Chamado quando há um quadro novo para desenhar com a prévia parada. */
   aoTerQuadro: () => void;
@@ -186,9 +196,9 @@ function FonteWebCodecs({ item, tempo, aoRegistrar, aoTerQuadro, aoFalhar, arqui
   return null;
 }
 
-function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFonte) {
+function FonteVideo({ item, tempo, tocando, andamento = 1, aoRegistrar, aoTerQuadro }: PropsFonte) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  useSeguirRelogio(videoRef, item, tempo, tocando);
+  useSeguirRelogio(videoRef, item, tempo, tocando, andamento, false);
 
   const registrarRef = useRef(aoRegistrar);
   useEffect(() => {
@@ -217,9 +227,9 @@ function FonteVideo({ item, tempo, tocando, aoRegistrar, aoTerQuadro }: PropsFon
 }
 
 /** O som de um clipe, com o volume e os fades pelo Web Audio (até 400%). */
-export function SomDoClipe({ item, tempo, tocando }: { item: ItemDaPrevia; tempo: Tick; tocando: boolean }) {
+export function SomDoClipe({ item, tempo, tocando, andamento = 1 }: { item: ItemDaPrevia; tempo: Tick; tocando: boolean; andamento?: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  useSeguirRelogio(audioRef, item, tempo, tocando);
+  useSeguirRelogio(audioRef, item, tempo, tocando, andamento, true);
 
   // Os fades, o abaixar na fala e a mistura das transições mudam o ganho a cada quadro da tela enquanto toca, como
   // no render. Na janela de uma transição o clipe toca a sobra da mídia; onde ela não tem (antes do começo ou

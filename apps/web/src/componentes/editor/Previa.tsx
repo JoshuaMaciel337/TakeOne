@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type CamadaNaTela, camadaDoCompositor, camadasNoTempo, itensNoTempo, textosParaImagens, visuaisNoTempo } from "@/lib/previa/camadas";
 import { Compositor, FUNDO } from "@/lib/previa/compositor";
 import { useImagensDeTexto } from "@/lib/previa/imagensDeTexto";
+import { avisarQuadroDesenhado } from "@/lib/previa/quadroAoVivo";
 import { contemPonto, type Guias, pontoNaCaixa, type Tamanho } from "@/lib/projeto/geometria";
 import { MODOS_DAS_GUIAS, type ModoDasGuias, modoValido, proximoModo } from "@/lib/projeto/margens";
 import type { Projeto, Transformacao } from "@/lib/projeto/modelo";
@@ -30,6 +31,8 @@ type Props = {
   midias: ReadonlyMap<string, Midia>;
   tempo: Tick;
   tocando: boolean;
+  /** Tocando: 1 é o normal; mais que 1, mais rápido (L de novo); negativo, para trás (J). */
+  andamento?: number;
   aoAlternar: () => void;
   selecao: string[];
   aoSelecionar: (ids: string[]) => void;
@@ -115,7 +118,7 @@ function webgl2Disponivel(): boolean {
   }
 }
 
-export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, aoClicarParaTexto, className = "" }: Props) {
+export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andamento = 1, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, aoClicarParaTexto, className = "" }: Props) {
   // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
   const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao), [projetoDaEdicao]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
@@ -195,7 +198,10 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
       estado.sujo = false;
       const densidade = Math.min(window.devicePixelRatio || 1, DENSIDADE_MAXIMA);
       const resolucao = { largura: Math.round(estado.quadro.largura * densidade), altura: Math.round(estado.quadro.altura * densidade) };
-      if (resolucao.largura > 0 && resolucao.altura > 0) compositor.desenhar(prontas, estado.fundo, estado.quadro, resolucao);
+      if (resolucao.largura > 0 && resolucao.altura > 0) {
+        compositor.desenhar(prontas, estado.fundo, estado.quadro, resolucao);
+        avisarQuadroDesenhado(canvas);
+      }
     };
     pedido = requestAnimationFrame(desenhar);
     return () => {
@@ -254,6 +260,7 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
                   item={item}
                   tempo={tempo}
                   tocando={tocando}
+                  andamento={andamento}
                   aoRegistrar={(fonte) => {
                     if (fonte) fontes.current.set(item.chave, fonte);
                     else fontes.current.delete(item.chave);
@@ -281,10 +288,16 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
                 ))}
               {sons.map((item) => (
                 // A voz limpa é outro arquivo: outro elemento, para não recarregar o som ao trocar de clipe
-                <SomDoClipe key={`som:${item.chave}${usaVozLimpa(item) ? ":limpa" : ""}${arquivoDoTom(item) ? `:${arquivoDoTom(item)}` : ""}`} item={item} tempo={tempo} tocando={tocando} />
+                <SomDoClipe key={`som:${item.chave}${usaVozLimpa(item) ? ":limpa" : ""}${arquivoDoTom(item) ? `:${arquivoDoTom(item)}` : ""}`} item={item} tempo={tempo} tocando={tocando} andamento={andamento} />
               ))}
             </div>
 
+            {tocando && andamento !== 1 ? (
+              <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/70 px-1.5 py-0.5 font-mono text-xs text-white" aria-live="polite">
+                {andamento < 0 ? "◀ " : "▶ "}
+                {Math.abs(andamento)}×
+              </span>
+            ) : null}
             {suportado ? (
               <canvas ref={canvasRef} className="absolute inset-0 size-full bg-black object-contain" />
             ) : (
@@ -446,7 +459,7 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, aoAlt
           </button>
         </div>
         <div className="flex min-w-40 items-center justify-end gap-1">
-          <MedidorDeLoudness tocando={tocando} />
+          <MedidorDeLoudness tocando={tocando && andamento === 1} />
           <button
             type="button"
             className={`botao-icone ${modoDasGuias === "desligadas" ? "" : "text-destaque"}`}
