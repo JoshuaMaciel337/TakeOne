@@ -41,7 +41,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FERRAMENTAS_DE_TRANSFORMAR, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FERRAMENTAS_DE_TRANSFORMAR, LIQUEFAZER_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
@@ -134,6 +134,8 @@ import { apagarDoCaminho, caminhoLivre, caminhosDaRegiaoEmCurvas, continuarCamin
 import { regiaoDosCaminhos } from "@/lib/vetor/contorno";
 import { type Afim as AfimDaFerramenta, aplicarAfim, type FerramentaDeTransformar, posicaoPelaAfim, remodelarCaminhos } from "@/lib/transformar/ferramentas";
 import { JanelaTransformarNumeros } from "./JanelaTransformarNumeros";
+import { OpcoesDoLiquefazerNaBarra } from "./OpcoesDoLiquefazer";
+import { caminhosDoLiquefazer, comecarLiquefazer, type EstadoDoLiquefazer, LIQUEFAZER_PADRAO, type OpcoesDoLiquefazer, passoDoLiquefazer, terminarLiquefazer } from "@/lib/vetor/liquefazer";
 import { comVinculadas } from "@/lib/projeto/alinhar";
 import { apagarArea, cortarComFaca, cortarComTesoura, regiaoDoCorte, regiaoDoRetangulo } from "@/lib/vetor/cortes";
 import { camadasDoReflexo, type OpcoesDoReflexo, REFLEXO_PADRAO } from "@/lib/vetor/reflexo";
@@ -400,6 +402,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
   const baseDoTracoLivre = useRef<Subcaminho[] | null>(null);
+  const [opcoesDoLiquefazer, setOpcoesDoLiquefazer] = useState<OpcoesDoLiquefazer>(LIQUEFAZER_PADRAO);
+  const liquefazendo = useRef<EstadoDoLiquefazer | null>(null);
   // A origem de Girar, Refletir, Escalar e Inclinar (vale para a escolha em que foi posta) e os números abertos
   const [origemDaTransformacao, setOrigemDaTransformacao] = useState<{ escolha: string; ponto: { x: number; y: number } } | null>(null);
   const [numerosDaTransformacao, setNumerosDaTransformacao] = useState<{ ferramenta: FerramentaDeTransformar; origem: { x: number; y: number } } | null>(null);
@@ -3943,6 +3947,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const perto = pincelVetorial.distancia / Math.max(1e-6, escalaDaTela);
     const editaveis = !mascaraEmEdicao && caminhosEditaveis?.length ? caminhosEditaveis : null;
     const nomeNovo = (base: string) => `${base} ${(projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1}`;
+    const liquefazer = LIQUEFAZER_DA_FERRAMENTA[ferramenta];
+    if (liquefazer) {
+      if (pontos.length === 1) liquefazendo.current = editaveis ? comecarLiquefazer(editaveis, opcoesDoLiquefazer.raio) : null;
+      const estado = liquefazendo.current;
+      if (!estado) {
+        if (final) mostrarAviso("Escolha uma forma (ou um caminho no painel Caminhos) para deformar.");
+        return;
+      }
+      const agora = pontos[pontos.length - 1];
+      const novo = passoDoLiquefazer(estado, liquefazer, agora, pontos[pontos.length - 2] ?? agora, opcoesDoLiquefazer);
+      liquefazendo.current = final ? null : novo;
+      // Sem tocar nenhum caminho, nada muda (a forma continua viva)
+      if (!novo.pontos.some(Boolean)) return void (final && setProvisorio(null));
+      mudarCaminhos(final ? terminarLiquefazer(novo) : caminhosDoLiquefazer(novo), !final);
+      return;
+    }
     if (ferramenta === "remodelar") {
       if (pontos.length === 1) baseDoTracoLivre.current = editaveis;
       const base = baseDoTracoLivre.current;
@@ -5538,6 +5558,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     perspectiva: opcoesDaPerspectiva,
     linhas: opcoesDosGeradores,
     reflexo: opcoesDoReflexo,
+    pincelVetorial,
+    liquefazer: opcoesDoLiquefazer,
   });
   /** Põe as partes nas opções da ferramenta; o que falta (uma predefinição de antes de uma opção nova) fica no padrão. */
   const aplicarPartes = (id: string, partes: Partial<Record<ParteDasOpcoes, unknown>>) => {
@@ -5562,6 +5584,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else if (parte === "corte") setOpcoesDoCorte(com(CORTE_PADRAO, valor));
       else if (parte === "perspectiva") setOpcoesDaPerspectiva(com(PERSPECTIVA_PADRAO, valor));
       else if (parte === "reflexo") setOpcoesDoReflexo(com(REFLEXO_PADRAO, valor));
+      else if (parte === "pincelVetorial") setPincelVetorial(com(PINCEL_VETORIAL_PADRAO, valor));
+      else if (parte === "liquefazer") setOpcoesDoLiquefazer(com(LIQUEFAZER_PADRAO, valor));
       else if (parte === "linhas") {
         const v = (valor && typeof valor === "object" ? valor : {}) as Partial<OpcoesDosGeradores>;
         // Cada ferramenta tem as medidas num objeto: o que falta fica no padrão
@@ -6647,6 +6671,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? (
+            <OpcoesDoLiquefazerNaBarra ferramenta={LIQUEFAZER_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDoLiquefazer} aoMudar={setOpcoesDoLiquefazer} />
           ) : FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta) ? (
             <OpcoesDoPincelVetorialNaBarra ferramenta={ferramenta as FerramentaDoPincelVetorial} opcoes={pincelVetorial} aoMudar={setPincelVetorial} />
           ) : ferramenta === "reflexo" ? (
@@ -6981,11 +7007,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             tracoLivre={
               FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta)
                 ? {
-                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" || ferramenta === "remodelar" ? (caminhosEditaveis ?? null) : null,
+                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" || ferramenta === "remodelar" || Boolean(LIQUEFAZER_DA_FERRAMENTA[ferramenta]) ? (caminhosEditaveis ?? null) : null,
                     largura: ferramenta === "pincelDeBolha" ? 2 * pincelVetorial.raioDaBolha : ferramenta === "borrachaVetorial" ? 2 * pincelVetorial.raio : ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? pincelVetorial.espessura : 0,
                     cor: ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "pincelDeBolha" ? cores.primeiroPlano : "#2f80ff",
-                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : ferramenta === "remodelar" ? pincelVetorial.alcance : undefined,
+                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : ferramenta === "remodelar" ? pincelVetorial.alcance : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? opcoesDoLiquefazer.raio : undefined,
                     comAlt: ferramenta === "borrachaVetorial" ? "retangulo" : ferramenta === "faca" ? "linha" : undefined,
+                    continuo: Boolean(LIQUEFAZER_DA_FERRAMENTA[ferramenta]) && ferramenta !== "deformarVetor",
                     aoTraco: aoTracoLivre,
                   }
                 : null

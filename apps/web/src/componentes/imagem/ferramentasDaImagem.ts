@@ -46,7 +46,13 @@ import {
   SquareSplitHorizontal,
   Scaling,
   Italic,
-  Spline as Waypoints,
+  Waypoints,
+  Wind,
+  RefreshCcwDot,
+  Shrink,
+  Expand,
+  Cloudy,
+  Activity,
   Tornado,
   Target,
   Move,
@@ -96,6 +102,7 @@ import {
 
 import type { TipoDaFormaViva, VarianteDaForma } from "@/lib/vetor/arrasto";
 import type { GeradorDeCaminhos } from "@/lib/vetor/geradores";
+import type { FerramentaDeLiquefazer } from "@/lib/vetor/liquefazer";
 
 
 /** As ferramentas que escrevem: o texto e as máscaras de texto, horizontais e verticais. */
@@ -179,6 +186,13 @@ export type IdFerramentaDaImagem =
   | "escalar"
   | "inclinar"
   | "remodelar"
+  | "deformarVetor"
+  | "torcer"
+  | "franzir"
+  | "inflar"
+  | "recortar"
+  | "cristalizar"
+  | "enrugar"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -327,6 +341,13 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("refletir", "Ferramenta Refletir", "", SquareSplitHorizontal, "Arraste da origem na direção do eixo do espelho (Shift de 45°; Alt solta uma cópia; Alt + clique, os números)."),
     F("escalar", "Ferramenta Escalar", "", Scaling, "Arraste para mudar o tamanho em volta da origem (Shift por igual; Alt solta uma cópia; Alt + clique, os números)."),
     F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
+    F("deformarVetor", "Ferramenta Deformar", "", Wind, "Arraste sobre a forma escolhida para empurrar o contorno com o pincel."),
+    F("torcer", "Ferramenta Torcer", "", RefreshCcwDot, "Segure ou arraste sobre a forma escolhida para torcer o contorno debaixo do pincel."),
+    F("franzir", "Ferramenta Franzir", "", Shrink, "Segure ou arraste sobre a forma escolhida para puxar o contorno para o meio do pincel."),
+    F("inflar", "Ferramenta Inflar", "", Expand, "Segure ou arraste sobre a forma escolhida para empurrar o contorno para fora do meio do pincel."),
+    F("recortar", "Ferramenta Recortar", "", Cloudy, "Segure ou arraste sobre a forma escolhida para recortar o contorno em ondas."),
+    F("cristalizar", "Ferramenta Cristalizar", "", Sparkles, "Segure ou arraste sobre a forma escolhida para tirar pontas finas do contorno."),
+    F("enrugar", "Ferramenta Enrugar", "", Activity, "Segure ou arraste sobre a forma escolhida para enrugar o contorno."),
     F("remodelar", "Ferramenta Remodelar", "", Waypoints, "Arraste um ponto do caminho escolhido: os vizinhos vão junto, menos quanto mais longe."),
   ],
   [
@@ -372,10 +393,21 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
 export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
 
 /** Os pincéis e o lápis do editor vetorial (componentes/imagem/TracoLivreNaPrevia.tsx e lib/vetor/pincelVetorial.ts). */
-export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca", "remodelar"]);
+export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca", "remodelar", "deformarVetor", "torcer", "franzir", "inflar", "recortar", "cristalizar", "enrugar"]);
 
 /** As ferramentas que levam as camadas escolhidas por uma afim (componentes/imagem/TransformarNaPrevia.tsx). */
 export const FERRAMENTAS_DE_TRANSFORMAR: ReadonlySet<IdFerramentaDaImagem> = new Set(["girar", "refletir", "escalar", "inclinar"]);
+
+/** As ferramentas de deformar do editor vetorial e o nome de cada uma na conta (lib/vetor/liquefazer.ts). */
+export const LIQUEFAZER_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, FerramentaDeLiquefazer>> = {
+  deformarVetor: "deformar",
+  torcer: "torcer",
+  franzir: "franzir",
+  inflar: "inflar",
+  recortar: "recortar",
+  cristalizar: "cristalizar",
+  enrugar: "enrugar",
+};
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
 export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {

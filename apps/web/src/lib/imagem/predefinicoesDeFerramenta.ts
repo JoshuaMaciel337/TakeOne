@@ -3,7 +3,7 @@
 // retoque, a seleção, a forma, o balde...). A predefinição é a ferramenta e um objeto com essas partes; aplicar devolve
 // cada parte ao estado dela, e redefinir volta as partes ao padrão.
 
-export type ParteDasOpcoes = "pincel" | "retoque" | "misturador" | "substituicao" | "borrachaDeFundo" | "carimbo" | "manchas" | "selecao" | "forma" | "caneta" | "balde" | "borrachaMagica" | "degrade" | "texto" | "corte" | "perspectiva" | "linhas" | "reflexo";
+export type ParteDasOpcoes = "pincel" | "retoque" | "misturador" | "substituicao" | "borrachaDeFundo" | "carimbo" | "manchas" | "selecao" | "forma" | "caneta" | "balde" | "borrachaMagica" | "degrade" | "texto" | "corte" | "perspectiva" | "linhas" | "reflexo" | "pincelVetorial" | "liquefazer";
 
 const PINTURA = ["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao", "recuperacao", "recuperacaoParaManchas", "desfoque", "nitidez", "borrar", "subexposicao", "superexposicao", "esponja", "misturador", "substituicaoDeCor", "borrachaDeFundo"];
 const RETOQUE = ["desfoque", "nitidez", "borrar", "subexposicao", "superexposicao", "esponja"];
@@ -36,6 +36,8 @@ export function partesDaFerramenta(id: string): ParteDasOpcoes[] {
   // As ferramentas de linha: as medidas delas e a operação das formas
   if (LINHAS.includes(id)) partes.push("linhas", "forma");
   if (id === "reflexo") partes.push("reflexo");
+  if (["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "remodelar"].includes(id)) partes.push("pincelVetorial");
+  if (["deformarVetor", "torcer", "franzir", "inflar", "recortar", "cristalizar", "enrugar"].includes(id)) partes.push("liquefazer");
   return partes;
 }
 

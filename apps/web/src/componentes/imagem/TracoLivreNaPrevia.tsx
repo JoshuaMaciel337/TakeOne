@@ -3,7 +3,7 @@
 // O traço livre dos pincéis e do lápis do editor vetorial (ADR 0003, onda 13.16): o arrasto vira uma lista de pontos
 // em pixels da imagem, mostrada na tela enquanto anda (grosso no Pincel de bolha), com o círculo do raio nas ferramentas
 // que trabalham numa área e o contorno do caminho que o Suavizar, a Borracha de caminho e o Unir editam.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Tamanho } from "@/lib/projeto/geometria";
 import { svgDosCaminhos } from "@/lib/vetor/contorno";
@@ -22,6 +22,8 @@ type Props = {
   cor: string;
   /** O raio do círculo do cursor, em pixels da imagem (nas ferramentas que trabalham numa área). */
   raio?: number;
+  /** Segurando parado, o último ponto se repete a cada 50 ms (as ferramentas de deformar continuam agindo). */
+  continuo?: boolean;
   /** Com Alt, o traço vira um retângulo (a Borracha vetorial) ou uma linha reta (a Faca) do começo até o ponteiro. */
   comAlt?: "retangulo" | "linha";
   /**
@@ -31,11 +33,31 @@ type Props = {
   aoTraco: (pontos: Ponto[], final: boolean, escala: number, reto: boolean) => void;
 };
 
-export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, raio, comAlt, aoTraco }: Props) {
+export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, raio, comAlt, continuo, aoTraco }: Props) {
   const escala = quadro.largura / documento.largura;
   const [pontos, setPontos] = useState<Ponto[] | null>(null);
   const [cursor, setCursor] = useState<Ponto | null>(null);
   const [reto, setReto] = useState(false);
+  // Segurando parado: o último ponto de novo, de tempos em tempos
+  const pontosRef = useRef<Ponto[] | null>(null);
+  const aoTracoRef = useRef(aoTraco);
+  useEffect(() => {
+    pontosRef.current = pontos;
+    aoTracoRef.current = aoTraco;
+  });
+  const apertado = pontos !== null;
+  useEffect(() => {
+    if (!continuo || !apertado) return;
+    const relogio = window.setInterval(() => {
+      const atuais = pontosRef.current;
+      if (!atuais?.length) return;
+      const novos = [...atuais, atuais[atuais.length - 1]];
+      pontosRef.current = novos;
+      setPontos(novos);
+      aoTracoRef.current(novos, false, escala, false);
+    }, 50);
+    return () => window.clearInterval(relogio);
+  }, [continuo, apertado, escala]);
   const noDocumento = (evento: React.PointerEvent<HTMLDivElement>) => {
     const p = pontoNoElemento(evento, evento.currentTarget);
     return { x: p.x / escala, y: p.y / escala };
