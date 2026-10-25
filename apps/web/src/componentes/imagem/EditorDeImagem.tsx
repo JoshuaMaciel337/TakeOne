@@ -140,6 +140,8 @@ import { construirPecas, facesDasFormas } from "@/lib/vetor/construtor";
 import { OpcoesDaPerspectivaNaBarra } from "./OpcoesDaPerspectiva";
 import { COTA_PADRAO, geometriaDaCota, type OpcoesDaCota, textoDaCota } from "@/lib/vetor/cota";
 import { OpcoesDaCotaNaBarra } from "./OpcoesDaCota";
+import { JanelaMesclarObjetos } from "./JanelaMesclarObjetos";
+import { passosDaMescla } from "@/lib/vetor/mesclar";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
 import { caminhosDoPlano, type GradeDePerspectiva, gradePadrao, type PlanoDaPerspectiva, retanguloNoPlano } from "@/lib/vetor/perspectiva";
 import { subcaminhosDaForma } from "@/lib/vetor/modelo";
@@ -410,6 +412,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDosGeradores, setOpcoesDosGeradores] = useState<OpcoesDosGeradores>(GERADORES_PADRAO);
   const [opcoesDoReflexo, setOpcoesDoReflexo] = useState<OpcoesDoReflexo>(REFLEXO_PADRAO);
   const [opcoesDaCota, setOpcoesDaCota] = useState<OpcoesDaCota>(COTA_PADRAO);
+  const [mesclando, setMesclando] = useState(false);
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
   const baseDoTracoLivre = useRef<Subcaminho[] | null>(null);
@@ -3973,6 +3976,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
     porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
   };
+  /** As duas formas escolhidas para Mesclar objetos, a de baixo primeiro. */
+  const formasDaMescla = () => (projeto ? [...projeto.faixas].reverse().filter((faixa) => faixa.clipes[0]?.vetor && selecao.includes(faixa.clipes[0].id)).map((faixa) => faixa.clipes[0]) : []);
+  const mesclarObjetos = (passos: number) => {
+    const [de, ate] = formasDaMescla();
+    if (!projeto || !de?.vetor || !ate?.vetor) return;
+    const quadro = tamanhoDaImagem(projeto);
+    const comoForma = (clipe: typeof de) => ({ caminhos: caminhosDoVetorNaImagem(clipe, quadro), preenchimento: clipe.vetor!.preenchimento, traco: clipe.vetor!.traco, opacidade: clipe.transformacao.opacidade });
+    const meio = passosDaMescla(comoForma(de), comoForma(ate), passos);
+    if (!meio.length) return void mostrarAviso("Essas formas não têm um contorno para mesclar.");
+    executar({ comando: "imagem.mesclarObjetos", parametros: { de: de.id, ate: ate.id, passos: meio.map((passo) => ({ ...camadaDosCaminhos(passo.caminhos, passo.preenchimento, passo.traco), opacidade: passo.opacidade })) } });
+  };
   /** A Cota: a linha com as setas (uma forma) e o número na escala de medida (um texto girado com ela), num grupo. */
   const criarCota = async (de: { x: number; y: number }, ate: { x: number; y: number }) => {
     if (!projeto) return;
@@ -5591,6 +5605,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     bloquear: () => escolhidas.length && executar({ comando: "imagem.camada", parametros: { faixaIds, mudanca: { travada: !escolhidas.every((faixa) => faixa.travada) } } }),
     grupo: () => executar({ comando: "imagem.agrupar", parametros: { faixaIds: [] } }),
     agrupar: () => escolhidas.length && executar({ comando: "imagem.agrupar", parametros: { faixaIds } }),
+    duasFormas: formasDaMescla().length === 2,
+    mesclarObjetos: () => (formasDaMescla().length === 2 ? setMesclando(true) : mostrarAviso("Escolha duas formas para mesclar.")),
     desagrupar: () => {
       for (const faixa of escolhidas) if (faixa.clipes[0].pasta) executar({ comando: "imagem.desagrupar", parametros: { faixaId: faixa.id } });
     },
@@ -7433,6 +7449,15 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {mesclando ? (
+        <JanelaMesclarObjetos
+          aoFechar={() => setMesclando(false)}
+          aoConfirmar={(passos) => {
+            setMesclando(false);
+            mesclarObjetos(passos);
+          }}
         />
       ) : null}
       {numerosDaTransformacao ? (

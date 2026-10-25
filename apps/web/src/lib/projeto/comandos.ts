@@ -292,6 +292,7 @@ export type Comando =
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.mesclarObjetos"; parametros: { de: string; ate: string; passos: { vetor: CamadaVetorial; centro: { x: number; y: number }; opacidade: number }[] } }
   | { comando: "imagem.adicionarCota"; parametros: { linha: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico; ponto: { x: number; y: number }; giro: number; acima?: string | null } }
   | { comando: "imagem.construirFormas"; parametros: { apagar: string[]; pecas: { origem: string; caminhos: Subcaminho[]; cor?: string }[] } }
   | { comando: "imagem.transformarCamadas"; parametros: { clipeIds: string[]; afim: Afim; copiar: boolean } }
@@ -465,6 +466,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.transformarCamadas": "transformar as camadas",
   "imagem.construirFormas": "construir as formas",
   "imagem.adicionarCota": "pôr a cota",
+  "imagem.mesclarObjetos": "mesclar os objetos",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -865,6 +867,30 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.mesclarObjetos": {
+      // Os passos entre as duas formas, cada um acima do anterior, e tudo num grupo "Mescla"
+      const faixaDe = faixaDoClipeNoProjeto(projeto, parametros.de);
+      const faixaAte = faixaDoClipeNoProjeto(projeto, parametros.ate);
+      if (!faixaDe || !faixaAte) return { projeto };
+      let atual = projeto;
+      let acima = faixaDe;
+      const faixas = [faixaDe];
+      parametros.passos.forEach((passo, i) => {
+        const posto = adicionarCamadaVetorial(atual, ctx, passo.vetor, passo.centro, `Passo ${i + 1}`, acima);
+        atual = { ...posto.projeto, faixas: posto.projeto.faixas.map((faixa) => (faixa.clipes[0]?.id === posto.clipeId ? { ...faixa, clipes: [{ ...faixa.clipes[0], transformacao: { ...faixa.clipes[0].transformacao, opacidade: passo.opacidade } }] } : faixa)) };
+        const faixa = faixaDoClipeNoProjeto(atual, posto.clipeId);
+        if (faixa) {
+          faixas.push(faixa);
+          acima = faixa;
+        }
+      });
+      faixas.push(faixaAte);
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const numero = projeto.faixas.filter((faixa) => faixa.nome?.startsWith("Mescla")).length + 1;
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: `Mescla ${numero}` } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
     case "imagem.adicionarCota": {
       // A linha e o número num grupo "Cota", num passo só (o número girado com a linha)
       const linha = executarComando(projeto, { comando: "imagem.adicionarVetor", parametros: { vetor: parametros.linha, centro: parametros.centro, nome: "Linha da cota", acima: parametros.acima } }, ctx);

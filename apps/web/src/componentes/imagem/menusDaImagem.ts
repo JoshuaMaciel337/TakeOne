@@ -325,6 +325,9 @@ export type AcoesDosMenus = {
   inverter: () => void;
   grupo: () => void;
   agrupar: () => void;
+  /** Camada › Mesclar objetos: há duas formas escolhidas, e a janela dos passos. */
+  duasFormas: boolean;
+  mesclarObjetos: () => void;
   desagrupar: () => void;
   recortar: () => void;
   vincular: () => void;
@@ -752,6 +755,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Agrupar camadas", atalho: "Ctrl+G", desativado: semCamada, aoEscolher: a.agrupar },
         { nome: "Desagrupar camadas", atalho: "Ctrl+Shift+G", desativado: !a.temPasta, aoEscolher: a.desagrupar },
+        { nome: "Mesclar objetos…", atalho: "Ctrl+Alt+B", desativado: !a.duasFormas, aoEscolher: a.mesclarObjetos, titulo: "Os passos entre as duas formas escolhidas" },
         { nome: "Ocultar camadas", atalho: "Ctrl+,", desativado: semCamada, aoEscolher: a.esconder },
         "-",
         {
