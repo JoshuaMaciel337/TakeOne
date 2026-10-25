@@ -20,6 +20,7 @@ import type { AnimacaoDaImagem } from "../imagem/animacao.ts";
 import type { Fatia } from "../imagem/fatias.ts";
 import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
 import type { InstanciaDeSimbolo, Simbolo } from "../vetor/simbolos.ts";
+import type { Grafico } from "../imagem/graficos.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -311,6 +312,8 @@ export type Clipe = {
   estilo_camada?: EstiloDeCamada | null;
   /** Só no projeto de imagem: a instância de um símbolo do documento (lib/vetor/simbolos.ts): a forma vem dele. */
   simbolo?: InstanciaDeSimbolo | null;
+  /** Só no projeto de imagem, numa pasta: a tabela do gráfico que ela desenha (lib/imagem/graficos.ts), para refazer. */
+  grafico?: Grafico | null;
   /** Só no projeto de imagem: a camada de preenchimento (cor, degradê ou padrão cobrindo o documento), sem mídia. */
   camada_de_preenchimento?: CamadaDePreenchimento | null;
   /** Só no projeto de imagem: os filtros inteligentes (lib/imagem/filtros/pilha.ts), a pilha não destrutiva da camada. */

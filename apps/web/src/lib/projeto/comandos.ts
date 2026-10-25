@@ -182,6 +182,7 @@ import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/mod
 import { transformarCaminhos } from "../vetor/edicao.ts";
 import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
 import { type Simbolo, type TintaDaInstancia, vetorDaInstancia } from "../vetor/simbolos.ts";
+import type { Grafico } from "../imagem/graficos.ts";
 import { type Afim, aplicarAfim, posicaoPelaAfim } from "../transformar/ferramentas.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
@@ -294,6 +295,7 @@ export type Comando =
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.grafico"; parametros: { pasta: string | null; grafico: Grafico; formas: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string }[]; textos: { texto: TextoRico; ponto: { x: number; y: number }; nome: string; giro: number }[]; acima?: string | null } }
   | { comando: "imagem.simbolos"; parametros: { simbolos: Simbolo[]; nome?: string } }
   | { comando: "imagem.novoSimbolo"; parametros: { clipeId: string; simbolo: Simbolo } }
   | { comando: "imagem.redefinirSimbolo"; parametros: { id: string; vetor: CamadaVetorial } }
@@ -479,6 +481,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.mesclarObjetos": "mesclar os objetos",
   "imagem.repetirNoCaminho": "pôr os objetos no caminho",
   "imagem.simbolos": "mudar os símbolos",
+  "imagem.grafico": "desenhar o gráfico",
   "imagem.novoSimbolo": "criar o símbolo",
   "imagem.redefinirSimbolo": "redefinir o símbolo",
   "imagem.excluirSimbolo": "excluir o símbolo",
@@ -892,6 +895,43 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
     case "imagem.simbolos":
       return { projeto: { ...projeto, simbolos: parametros.simbolos } };
+    case "imagem.grafico": {
+      // As formas e os textos do gráfico; refeito, entram na pasta dele no lugar dos de antes
+      const antigas = parametros.pasta ? projeto.faixas.filter((faixa) => faixa.pai === parametros.pasta).map((faixa) => faixa.id) : [];
+      let atual = projeto;
+      let acima: string | null = antigas[antigas.length - 1] ?? parametros.acima ?? null;
+      const novas: string[] = [];
+      const anotar = (clipeId: string) => {
+        const faixa = faixaDoClipeNoProjeto(atual, clipeId);
+        if (faixa) {
+          novas.push(faixa);
+          acima = faixa;
+        }
+      };
+      for (const forma of parametros.formas) {
+        const posta = adicionarCamadaVetorial(atual, ctx, forma.vetor, forma.centro, forma.nome, acima);
+        atual = posta.projeto;
+        anotar(posta.clipeId);
+      }
+      for (const texto of parametros.textos) {
+        const id = ctx.novoId();
+        atual = executarComando(atual, { comando: "imagem.adicionarTextoRico", parametros: { texto: texto.texto, ponto: texto.ponto, nome: texto.nome, acima, id } }, ctx).projeto;
+        if (texto.giro) atual = transformarCamada(atual, id, { rotacao: texto.giro });
+        anotar(id);
+      }
+      if (parametros.pasta) {
+        const pasta = parametros.pasta;
+        atual = executarComando(atual, { comando: "imagem.apagarVarias", parametros: { faixaIds: antigas } }, ctx).projeto;
+        atual = { ...atual, faixas: atual.faixas.map((faixa) => (faixa.id === pasta ? { ...faixa, clipes: [{ ...faixa.clipes[0], grafico: parametros.grafico }] } : faixa)) };
+        return { projeto: atual, selecao: [projeto.faixas.find((faixa) => faixa.id === pasta)?.clipes[0].id].filter((id): id is string => Boolean(id)) };
+      }
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: novas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      if (!pasta) return agrupado;
+      const numero = projeto.faixas.filter((faixa) => faixa.clipes[0]?.grafico).length + 1;
+      const nomeado = executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: `Gráfico ${numero}` } } }, ctx).projeto;
+      return { projeto: mudarClipesDasInstancias(nomeado, (clipe) => (clipe.id === agrupado.selecao?.[0] ? { ...clipe, grafico: parametros.grafico } : clipe)), selecao: agrupado.selecao };
+    }
     case "imagem.novoSimbolo": {
       // O símbolo novo, e a forma de onde ele veio passa a ser a primeira instância
       const comSimbolo = { ...projeto, simbolos: [...(projeto.simbolos ?? []), parametros.simbolo] };

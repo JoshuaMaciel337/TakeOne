@@ -147,6 +147,8 @@ import { espacoDoBorrifo, type InstanciaNoPincel, lugarDoBorrifo, type OpcoesDos
 import { ESTILOS_PRONTOS } from "@/lib/imagem/estilosProntos";
 import { PainelSimbolos } from "./PainelSimbolos";
 import { OpcoesDosSimbolosNaBarra } from "./OpcoesDosSimbolos";
+import { JanelaDadosDoGrafico } from "./JanelaDadosDoGrafico";
+import { CORES_DO_GRAFICO, elementosDoGrafico, type Grafico, TIPOS_DE_GRAFICO, type TipoDeGrafico } from "@/lib/imagem/graficos";
 import { type MalhaDeDegrade, malhaNova, pontoDaMalhaPerto, remalhar } from "@/lib/vetor/malhaDeDegrade";
 import { passosDaMescla } from "@/lib/vetor/mesclar";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
@@ -423,6 +425,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [divisoesDaMalha, setDivisoesDaMalha] = useState({ linhas: 3, colunas: 3 });
   const [opcoesDosSimbolos, setOpcoesDosSimbolos] = useState<OpcoesDosSimbolos>(SIMBOLOS_PADRAO);
   const [simboloEscolhido, setSimboloEscolhido] = useState<string | null>(null);
+  const [tipoDoGrafico, setTipoDoGrafico] = useState<TipoDeGrafico>("colunas");
+  const [graficoAberto, setGraficoAberto] = useState<{ pasta: string | null; grafico: Grafico } | null>(null);
   // O borrifo em andamento (os lugares soltos e o quanto o pincel andou desde o último) e a base dos outros pincéis
   const borrifo = useRef<{ lugares: { x: number; y: number; escala: number; giro: number }[]; andado: number; n: number } | null>(null);
   const pincelDeSimbolo = useRef<{ base: InstanciaNoPincel[]; atual: InstanciaNoPincel[] } | null>(null);
@@ -3956,6 +3960,13 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else criarFormaViva(viva, arrasto);
       return;
     }
+    if (ferramenta === "grafico") {
+      if (!projeto) return;
+      // O clique sem arrastar: um gráfico de 400 × 300 a partir do ponto
+      const caixa = clique ? { x: arrasto.x, y: arrasto.y, largura: 400, altura: 300 } : { x: arrasto.x, y: arrasto.y, largura: Math.max(80, arrasto.largura), altura: Math.max(60, arrasto.altura) };
+      setGraficoAberto({ pasta: null, grafico: { tipo: tipoDoGrafico, rotulos: ["Jan", "Fev", "Mar", "Abr"], series: [{ nome: "Série 1", valores: [12, 19, 8, 15] }, { nome: "Série 2", valores: [7, 11, 14, 9] }], caixa, legenda: true, cores: CORES_DO_GRAFICO } });
+      return;
+    }
     if (ferramenta === "cota") {
       if (clique || !projeto) return;
       void criarCota(arrasto.de, arrasto.ate);
@@ -4095,6 +4106,23 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const meio = passosDaMescla(comoForma(de), comoForma(ate), passos);
     if (!meio.length) return void mostrarAviso("Essas formas não têm um contorno para mesclar.");
     executar({ comando: "imagem.mesclarObjetos", parametros: { de: de.id, ate: ate.id, passos: meio.map((passo) => ({ ...camadaDosCaminhos(passo.caminhos, passo.preenchimento, passo.traco), opacidade: passo.opacidade })) } });
+  };
+  /** O gráfico: as formas e os textos da tabela (os textos medidos, com as fontes carregadas), num grupo ou no de antes. */
+  const desenharGrafico = async (pasta: string | null, grafico: Grafico) => {
+    const elementos = elementosDoGrafico(grafico);
+    const formas = elementos.flatMap((elemento) => {
+      if (elemento.tipo !== "forma" || !elemento.caminhos.length) return [];
+      const traco = elemento.traco ? { ...TRACO_PADRAO, tinta: { tipo: "cor" as const, cor: elemento.traco.cor }, largura: elemento.traco.largura, alinhamento: "centro" as const, cantos: "redondo" as const, pontas: "redonda" as const } : null;
+      const { vetor, centro } = camadaDosCaminhos(elemento.caminhos, elemento.cor ? { tipo: "cor", cor: elemento.cor } : { tipo: "nenhuma" }, traco);
+      return [{ vetor, centro, nome: elemento.nome }];
+    });
+    const crus = elementos.flatMap((elemento) => (elemento.tipo === "texto" ? [{ elemento, texto: (() => {
+      const novo = textoNovo(elemento.texto, { tamanho: elemento.tamanho, cor: elemento.cor }, "ponto");
+      return { ...novo, paragrafo: { ...novo.paragrafo, alinhamento: elemento.alinhamento } };
+    })() }] : []));
+    await esperarFontes(crus.map((item) => item.texto));
+    const textos = crus.map(({ elemento, texto }) => ({ texto: textoMedido(texto), ponto: { x: elemento.x, y: elemento.y }, nome: elemento.nome, giro: elemento.giro }));
+    executar({ comando: "imagem.grafico", parametros: { pasta, grafico, formas, textos, acima: escolhidas[0]?.id ?? null } });
   };
   /** A Cota: a linha com as setas (uma forma) e o número na escala de medida (um texto girado com ela), num grupo. */
   const criarCota = async (de: { x: number; y: number }, ate: { x: number; y: number }) => {
@@ -5718,6 +5746,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     agrupar: () => escolhidas.length && executar({ comando: "imagem.agrupar", parametros: { faixaIds } }),
     duasFormas: formasDaMescla().length === 2,
     mesclarObjetos: () => (formasDaMescla().length === 2 ? setMesclando(true) : mostrarAviso("Escolha duas formas para mesclar.")),
+    comGrafico: Boolean(escolhidas.find((faixa) => faixa.clipes[0]?.grafico)),
+    dadosDoGrafico: () => {
+      const faixa = escolhidas.find((item) => item.clipes[0]?.grafico);
+      if (faixa?.clipes[0].grafico) setGraficoAberto({ pasta: faixa.id, grafico: faixa.clipes[0].grafico });
+    },
     objetosNoCaminho: () => {
       if (!projeto) return;
       // As escolhidas de cima para baixo: a de cima vai ao longo do caminho; o caminho é o escolhido no painel Caminhos
@@ -7037,6 +7070,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             <OpcoesDoLiquefazerNaBarra ferramenta={LIQUEFAZER_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDoLiquefazer} aoMudar={setOpcoesDoLiquefazer} />
           ) : FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta) ? (
             <OpcoesDoPincelVetorialNaBarra ferramenta={ferramenta as FerramentaDoPincelVetorial} opcoes={pincelVetorial} aoMudar={setPincelVetorial} />
+          ) : ferramenta === "grafico" ? (
+            <label className="flex items-center gap-1 text-xs">
+              Tipo
+              <select aria-label="Tipo de gráfico" className="rounded border border-borda bg-painel-2 px-1 py-0.5 text-xs text-texto" value={tipoDoGrafico} onChange={(e) => setTipoDoGrafico(e.currentTarget.value as TipoDeGrafico)}>
+                {TIPOS_DE_GRAFICO.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>
+                    {tipo.nome}
+                  </option>
+                ))}
+              </select>
+              <span className="text-suave">Arraste o retângulo do gráfico; a tabela abre em seguida</span>
+            </label>
           ) : ferramenta === "cota" ? (
             <OpcoesDaCotaNaBarra opcoes={opcoesDaCota} escala={projetoNaTela?.escala_de_medida ?? null} aoMudar={setOpcoesDaCota} />
           ) : ferramenta === "reflexo" ? (
@@ -7659,6 +7704,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {graficoAberto ? (
+        <JanelaDadosDoGrafico
+          inicial={graficoAberto.grafico}
+          aoFechar={() => setGraficoAberto(null)}
+          aoConfirmar={(grafico) => {
+            const pasta = graficoAberto.pasta;
+            setGraficoAberto(null);
+            void desenharGrafico(pasta, grafico);
+          }}
         />
       ) : null}
       {repetindo ? (
