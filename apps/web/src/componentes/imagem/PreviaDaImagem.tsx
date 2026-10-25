@@ -741,7 +741,7 @@ export function PreviaDaImagem({
       setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
     }
-    if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || GERADOR_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro") {
+    if (FORMA_VIVA_DA_FERRAMENTA[ferramenta] || GERADOR_DA_FERRAMENTA[ferramenta] || ferramenta === "reflexo" || ferramenta === "formaPersonalizada" || ferramenta === "quadro") {
       evento.currentTarget.setPointerCapture(evento.pointerId);
       setDesenho({ inicio: ponto, fim: ponto, shift: evento.shiftKey, alt: evento.altKey });
       return;
@@ -807,8 +807,8 @@ export function PreviaDaImagem({
   function arrastoNaImagem(atual: NonNullable<typeof desenho>) {
     const naImagem = (p: { x: number; y: number }) => ({ x: p.x / escala, y: p.y / escala });
     // A linha, o segmento e a espiral (do meio para fora) prendem o ângulo; a espiral já começa no meio
-    const deLinha = ferramenta === "linha" || ferramenta === "segmento" || ferramenta === "espiral";
-    return arrastoDaForma(naImagem(atual.inicio), naImagem(atual.fim), { proporcional: atual.shift, doMeio: atual.alt && ferramenta !== "espiral", linha: deLinha });
+    const deLinha = ferramenta === "linha" || ferramenta === "segmento" || ferramenta === "espiral" || ferramenta === "reflexo";
+    return arrastoDaForma(naImagem(atual.inicio), naImagem(atual.fim), { proporcional: atual.shift, doMeio: atual.alt && ferramenta !== "espiral" && ferramenta !== "reflexo", linha: deLinha });
   }
 
   /**
@@ -871,7 +871,7 @@ export function PreviaDaImagem({
   }
 
   const ajustada = zoom === null;
-  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || FERRAMENTAS_DE_TEXTO.has(ferramenta) || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || GERADOR_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
+  const cursor = maoAtiva ? (arrastandoMao ? "grabbing" : "grab") : ferramenta === "zoom" ? "zoom-in" : ferramenta === "contaGotas" || FERRAMENTAS_DE_TEXTO.has(ferramenta) || FORMA_VIVA_DA_FERRAMENTA[ferramenta] || GERADOR_DA_FERRAMENTA[ferramenta] || ferramenta === "reflexo" || ferramenta === "formaPersonalizada" || ferramenta === "quadro" ? "crosshair" : undefined;
   const mostrarAlcas = ferramenta === "mover" && !espaco;
   const arrastoDoDesenho = desenho ? arrastoNaImagem(desenho) : null;
   const caminhoDoDesenho = arrastoDoDesenho ? (caminhoDoArrasto?.(arrastoDoDesenho) ?? null) : null;

@@ -3,12 +3,13 @@
 // retoque, a seleção, a forma, o balde...). A predefinição é a ferramenta e um objeto com essas partes; aplicar devolve
 // cada parte ao estado dela, e redefinir volta as partes ao padrão.
 
-export type ParteDasOpcoes = "pincel" | "retoque" | "misturador" | "substituicao" | "borrachaDeFundo" | "carimbo" | "manchas" | "selecao" | "forma" | "caneta" | "balde" | "borrachaMagica" | "degrade" | "texto" | "corte" | "perspectiva";
+export type ParteDasOpcoes = "pincel" | "retoque" | "misturador" | "substituicao" | "borrachaDeFundo" | "carimbo" | "manchas" | "selecao" | "forma" | "caneta" | "balde" | "borrachaMagica" | "degrade" | "texto" | "corte" | "perspectiva" | "linhas" | "reflexo";
 
 const PINTURA = ["pincel", "lapis", "borracha", "historico", "historicoArtistico", "carimbo", "carimboDePadrao", "recuperacao", "recuperacaoParaManchas", "desfoque", "nitidez", "borrar", "subexposicao", "superexposicao", "esponja", "misturador", "substituicaoDeCor", "borrachaDeFundo"];
 const RETOQUE = ["desfoque", "nitidez", "borrar", "subexposicao", "superexposicao", "esponja"];
 const SELECAO = ["letreiro", "letreiroEliptico", "linhaUnica", "colunaUnica", "laco", "lacoPoligonal", "lacoMagnetico", "varinha", "selecaoRapida", "objeto"];
-const FORMAS = ["retangulo", "elipse", "triangulo", "poligono", "linha", "formaPersonalizada"];
+const FORMAS = ["retangulo", "retanguloArredondado", "elipse", "triangulo", "poligono", "estrela", "linha", "formaPersonalizada"];
+const LINHAS = ["segmento", "arco", "espiral", "gradeRetangular", "gradePolar"];
 const CANETAS = ["caneta", "canetaLivre", "canetaDeCurvatura"];
 const TEXTOS = ["texto", "textoVertical", "mascaraDeTexto", "mascaraDeTextoVertical"];
 
@@ -32,6 +33,9 @@ export function partesDaFerramenta(id: string): ParteDasOpcoes[] {
   if (TEXTOS.includes(id)) partes.push("texto");
   if (id === "corte") partes.push("corte");
   if (id === "corteDePerspectiva") partes.push("perspectiva");
+  // As ferramentas de linha: as medidas delas e a operação das formas
+  if (LINHAS.includes(id)) partes.push("linhas", "forma");
+  if (id === "reflexo") partes.push("reflexo");
   return partes;
 }
 

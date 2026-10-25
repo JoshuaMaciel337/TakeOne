@@ -41,7 +41,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
@@ -128,6 +128,8 @@ import { JanelaDividirFatia, JanelaOpcoesDaFatia, OpcoesDasFatiasNaBarra } from 
 import { PainelComps } from "./PainelComps";
 import { OpcoesDaVarinhaVetorialNaBarra } from "./OpcoesDaVarinhaVetorial";
 import { OpcoesDosGeradoresNaBarra } from "./OpcoesDosGeradores";
+import { OpcoesDoReflexoNaBarra } from "./OpcoesDoReflexo";
+import { camadasDoReflexo, type OpcoesDoReflexo, REFLEXO_PADRAO } from "@/lib/vetor/reflexo";
 import { caminhosDoGerador, type GeradorDeCaminhos, GERADORES_PADRAO, NOME_DO_GERADOR, type OpcoesDosGeradores } from "@/lib/vetor/geradores";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
 import { PainelTeclasModificadoras, useTeclasPresas } from "./TeclasPresas";
@@ -208,7 +210,7 @@ import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
 import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, type Subcaminho, temArea, TRACO_PADRAO } from "@/lib/vetor/modelo";
 import { caminhosDoVetorNaImagem, pontoDaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
-import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
+import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, opcoesDaVariante, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { caixaDosCaminhos, deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
 import { SOBREPOSICOES_DO_CORTE } from "./RecorteNaPrevia";
 import { type Medida, OpcoesDaReguaNaBarra, OpcoesDoCortePerspectivaNaBarra } from "./OpcoesDaGeometria";
@@ -387,6 +389,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [cores, setCores] = useState<{ primeiroPlano: string; fundo: string; editando: "primeiroPlano" | "fundo" }>({ primeiroPlano: "#000000", fundo: "#ffffff", editando: "primeiroPlano" });
   const [forma, setForma] = useState<OpcoesDaForma>(FORMA_PADRAO);
   const [opcoesDosGeradores, setOpcoesDosGeradores] = useState<OpcoesDosGeradores>(GERADORES_PADRAO);
+  const [opcoesDoReflexo, setOpcoesDoReflexo] = useState<OpcoesDoReflexo>(REFLEXO_PADRAO);
   // As formas personalizadas do espaço (Editar › Definir forma personalizada) e o nome da que está sendo definida
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
@@ -3659,7 +3662,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   /** A forma viva do arrasto, com os caminhos já em pixels da imagem (para o contorno na prévia e para juntar). */
   const formaDoArrasto = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
-    const { vetor, centro } = camadaDoArrasto(tipo, arrasto, forma, cores.primeiroPlano);
+    const { vetor, centro } = camadaDoArrasto(tipo, arrasto, opcoesDaVariante(VARIANTE_DA_FERRAMENTA[ferramenta], forma), cores.primeiroPlano);
     return { vetor, centro, naImagem: deslocarCaminhos(vetor.subcaminhos, centro.x - vetor.caixa.largura / 2, centro.y - vetor.caixa.altura / 2) };
   };
   /** Desenha a forma viva: numa camada nova, ou junta à camada de forma escolhida (as operações da barra). */
@@ -3669,7 +3672,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos: naImagem, operacao: forma.operacao } });
       return;
     }
-    const base = NOME_DA_FORMA[tipo];
+    const variante = VARIANTE_DA_FERRAMENTA[ferramenta];
+    const base = variante === "retanguloArredondado" ? "Retângulo arredondado" : variante === "estrela" ? "Estrela" : NOME_DA_FORMA[tipo];
     const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1;
     executar({ comando: "imagem.adicionarVetor", parametros: { vetor, centro, nome: `${base} ${numero}`, acima: escolhidas[0]?.id ?? null } });
   };
@@ -3873,6 +3877,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (viva) {
       if (clique) setCriandoForma({ tipo: viva, ponto: arrasto.de });
       else criarFormaViva(viva, arrasto);
+      return;
+    }
+    if (ferramenta === "reflexo") {
+      // Um clique sem arrastar: os anéis vão para baixo e para a direita, a três diâmetros do meio
+      const fim = clique ? { x: arrasto.de.x + opcoesDoReflexo.diametro * 2.1, y: arrasto.de.y + opcoesDoReflexo.diametro * 2.1 } : arrasto.ate;
+      const camadas = camadasDoReflexo(arrasto.de, fim, opcoesDoReflexo).map((camada) => ({ ...camadaDosCaminhos(camada.caminhos, camada.preenchimento, null), nome: camada.nome, opacidade: camada.opacidade }));
+      const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith("Reflexo")).length ?? 0) + 1;
+      executar({ comando: "imagem.adicionarReflexo", parametros: { camadas, nome: `Reflexo ${numero}`, acima: escolhidas[0]?.id ?? null } });
       return;
     }
     const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
@@ -5362,6 +5374,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     texto: opcoesDoTexto,
     corte: opcoesDoCorte,
     perspectiva: opcoesDaPerspectiva,
+    linhas: opcoesDosGeradores,
+    reflexo: opcoesDoReflexo,
   });
   /** Põe as partes nas opções da ferramenta; o que falta (uma predefinição de antes de uma opção nova) fica no padrão. */
   const aplicarPartes = (id: string, partes: Partial<Record<ParteDasOpcoes, unknown>>) => {
@@ -5385,6 +5399,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else if (parte === "texto") setOpcoesDoTexto(com({ estilo: {}, paragrafo: {} }, valor));
       else if (parte === "corte") setOpcoesDoCorte(com(CORTE_PADRAO, valor));
       else if (parte === "perspectiva") setOpcoesDaPerspectiva(com(PERSPECTIVA_PADRAO, valor));
+      else if (parte === "reflexo") setOpcoesDoReflexo(com(REFLEXO_PADRAO, valor));
+      else if (parte === "linhas") {
+        const v = (valor && typeof valor === "object" ? valor : {}) as Partial<OpcoesDosGeradores>;
+        // Cada ferramenta tem as medidas num objeto: o que falta fica no padrão
+        setOpcoesDosGeradores({
+          ...com(GERADORES_PADRAO, v),
+          arco: com(GERADORES_PADRAO.arco, v.arco),
+          espiral: com(GERADORES_PADRAO.espiral, v.espiral),
+          grade: com(GERADORES_PADRAO.grade, v.grade),
+          polar: com(GERADORES_PADRAO.polar, v.polar),
+        });
+      }
     }
   };
   /** Redefinir: as partes da ferramenta voltam ao padrão (um objeto vazio em cada uma). */
@@ -6450,6 +6476,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           ) : FORMA_VIVA_DA_FERRAMENTA[ferramenta] || ferramenta === "formaPersonalizada" ? (
             <OpcoesDaFormaNaBarra
               tipo={FORMA_VIVA_DA_FERRAMENTA[ferramenta] ?? "personalizada"}
+              variante={VARIANTE_DA_FERRAMENTA[ferramenta]}
               seletor={ferramenta === "formaPersonalizada" ? <SeletorDeFormaPersonalizada escolhida={forma.personalizada} doEspaco={formasDoEspaco} aoEscolher={(personalizada) => setForma((atual) => ({ ...atual, personalizada }))} /> : undefined}
               opcoes={forma}
               primeiroPlano={cores.primeiroPlano}
@@ -6458,6 +6485,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "reflexo" ? (
+            <OpcoesDoReflexoNaBarra opcoes={opcoesDoReflexo} aoMudar={setOpcoesDoReflexo} />
           ) : GERADOR_DA_FERRAMENTA[ferramenta] ? (
             <OpcoesDosGeradoresNaBarra tipo={GERADOR_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDosGeradores} aoMudar={setOpcoesDosGeradores} />
           ) : ferramenta === "varinhaVetorial" ? (
@@ -6897,6 +6926,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               if (ferramenta === "quadro") return formaDoArrasto(formaDoQuadro, arrasto).naImagem;
               const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
               if (gerador) return caminhosDoGerador(gerador, arrasto, opcoesDosGeradores);
+              if (ferramenta === "reflexo") return camadasDoReflexo(arrasto.de, arrasto.ate, opcoesDoReflexo).flatMap((camada) => camada.caminhos);
               const personalizada = ferramenta === "formaPersonalizada" ? caminhosDaFormaPersonalizada(forma.personalizada, formasDoEspaco) : null;
               return personalizada ? caminhosNaCaixa(personalizada.caminhos, arrasto, Boolean(arrasto.proporcional)) : null;
             }}

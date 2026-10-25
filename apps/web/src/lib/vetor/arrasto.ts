@@ -46,6 +46,11 @@ export type OpcoesDasFormas = {
   setaFim: boolean;
   /** O tamanho da seta, em vezes a espessura da linha. */
   tamanhoDaSeta: number;
+  /** As ferramentas Retângulo arredondado e Estrela guardam as medidas delas à parte. */
+  raioArredondado: number;
+  pontas: number;
+  /** De 0,01 a 0,99: o quanto as pontas de dentro da estrela entram. */
+  reentrancia: number;
 };
 
 export const OPCOES_DAS_FORMAS_PADRAO: OpcoesDasFormas = {
@@ -60,7 +65,20 @@ export const OPCOES_DAS_FORMAS_PADRAO: OpcoesDasFormas = {
   setaInicio: false,
   setaFim: false,
   tamanhoDaSeta: 3,
+  raioArredondado: 12,
+  pontas: 5,
+  reentrancia: 0.5,
 };
+
+/** O Retângulo arredondado e a Estrela: um retângulo e um polígono vivos com as medidas deles. */
+export type VarianteDaForma = "retanguloArredondado" | "estrela";
+
+/** As opções que a variante usa para desenhar (o raio do arredondado, as pontas e a reentrância da estrela). */
+export function opcoesDaVariante(variante: VarianteDaForma | null | undefined, opcoes: OpcoesDasFormas): OpcoesDasFormas {
+  if (variante === "retanguloArredondado") return { ...opcoes, raio: opcoes.raioArredondado };
+  if (variante === "estrela") return { ...opcoes, lados: opcoes.pontas, estrela: Math.max(0.01, Math.min(0.99, opcoes.reentrancia)) };
+  return opcoes;
+}
 
 /** A forma viva do arrasto, nas opções da barra. */
 export function formaDoArrasto(tipo: TipoDaFormaViva, arrasto: ArrastoDaForma, opcoes: OpcoesDasFormas): FormaViva {

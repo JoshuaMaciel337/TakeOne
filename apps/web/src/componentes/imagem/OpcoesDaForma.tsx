@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type Degrade, degradeComCores, DEGRADES_PRONTOS, FORMAS_DO_DEGRADE } from "@/lib/pintura/degrade";
 import { type IdDoPadrao, usePadroes } from "@/lib/pintura/padroes";
-import type { OpcoesDasFormas, TipoDaFormaViva } from "@/lib/vetor/arrasto";
+import type { OpcoesDasFormas, TipoDaFormaViva, VarianteDaForma } from "@/lib/vetor/arrasto";
 import type { OperacaoDoCaminho, TintaDaForma, TracoDaForma } from "@/lib/vetor/modelo";
 
 import { AmostraDoDegrade } from "./Degrades";
@@ -285,6 +285,7 @@ export function OpcoesDaFormaNaBarra({
   comFormaEscolhida,
   aoMudar,
   seletor,
+  variante,
 }: {
   tipo: TipoDaFormaViva | "personalizada";
   opcoes: OpcoesDasFormas;
@@ -296,6 +297,8 @@ export function OpcoesDaFormaNaBarra({
   aoMudar: (mudanca: Partial<OpcoesDasFormas>) => void;
   /** A Forma personalizada: o seletor da forma, antes das tintas. */
   seletor?: ReactNode;
+  /** O Retângulo arredondado e a Estrela: as medidas delas no lugar das do retângulo e do polígono. */
+  variante?: VarianteDaForma | null;
 }) {
   const linha = tipo === "linha";
   return (
@@ -328,9 +331,17 @@ export function OpcoesDaFormaNaBarra({
         aoMudarTraco={(traco) => (linha ? aoMudar({ traco: { ...traco, largura: opcoes.traco.largura }, espessuraDaLinha: Math.max(0.5, traco.largura) }) : aoMudar({ traco }))}
       />
       {SEPARADOR}
-      {tipo === "retangulo" ? <NumeroDaForma rotulo="Raio dos cantos" valor={opcoes.raio} minimo={0} maximo={10000} sufixo="px" aoMudar={(raio) => aoMudar({ raio })} /> : null}
+      {variante === "retanguloArredondado" ? <NumeroDaForma rotulo="Raio dos cantos" valor={opcoes.raioArredondado} minimo={0} maximo={10000} sufixo="px" aoMudar={(raioArredondado) => aoMudar({ raioArredondado })} /> : null}
+      {variante === "estrela" ? (
+        <>
+          <NumeroDaForma rotulo="Pontas" valor={opcoes.pontas} minimo={3} maximo={100} aoMudar={(pontas) => aoMudar({ pontas: Math.round(pontas) })} largura="w-10" />
+          <NumeroDaForma rotulo="Reentrância" valor={Math.round(opcoes.reentrancia * 100)} minimo={1} maximo={99} sufixo="%" aoMudar={(reentrancia) => aoMudar({ reentrancia: reentrancia / 100 })} largura="w-10" />
+          <NumeroDaForma rotulo="Raio dos cantos" valor={opcoes.raioDoPoligono} minimo={0} maximo={10000} sufixo="px" aoMudar={(raioDoPoligono) => aoMudar({ raioDoPoligono })} />
+        </>
+      ) : null}
+      {tipo === "retangulo" && !variante ? <NumeroDaForma rotulo="Raio dos cantos" valor={opcoes.raio} minimo={0} maximo={10000} sufixo="px" aoMudar={(raio) => aoMudar({ raio })} /> : null}
       {tipo === "triangulo" ? <NumeroDaForma rotulo="Raio dos cantos" valor={opcoes.raioDoPoligono} minimo={0} maximo={10000} sufixo="px" aoMudar={(raioDoPoligono) => aoMudar({ raioDoPoligono })} /> : null}
-      {tipo === "poligono" ? (
+      {tipo === "poligono" && !variante ? (
         <>
           <NumeroDaForma rotulo="Lados" valor={opcoes.lados} minimo={3} maximo={100} aoMudar={(lados) => aoMudar({ lados: Math.round(lados) })} largura="w-10" />
           <NumeroDaForma rotulo="Estrela" valor={Math.round(opcoes.estrela * 100)} minimo={0} maximo={99} sufixo="%" aoMudar={(estrela) => aoMudar({ estrela: estrela / 100 })} largura="w-10" />

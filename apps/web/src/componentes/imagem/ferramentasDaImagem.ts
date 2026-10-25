@@ -30,6 +30,9 @@ import {
   type LucideIcon,
   Minus,
   Slash,
+  SquareRoundCorner,
+  Star,
+  SunDim,
   Tornado,
   Target,
   Move,
@@ -77,7 +80,7 @@ import {
   LayoutTemplate,
 } from "lucide-react";
 
-import type { TipoDaFormaViva } from "@/lib/vetor/arrasto";
+import type { TipoDaFormaViva, VarianteDaForma } from "@/lib/vetor/arrasto";
 import type { GeradorDeCaminhos } from "@/lib/vetor/geradores";
 
 
@@ -144,6 +147,9 @@ export type IdFerramentaDaImagem =
   | "espiral"
   | "gradeRetangular"
   | "gradePolar"
+  | "retanguloArredondado"
+  | "estrela"
+  | "reflexo"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -273,9 +279,12 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   ],
   [
     F("retangulo", "Ferramenta Retângulo", "U", Square, "Arraste para desenhar um retângulo na cor do primeiro plano."),
+    F("retanguloArredondado", "Ferramenta Retângulo arredondado", "U", SquareRoundCorner, "Arraste para desenhar um retângulo de cantos redondos; o raio fica na barra."),
     F("elipse", "Ferramenta Elipse", "U", Circle, "Arraste para desenhar uma elipse na cor do primeiro plano."),
     F("triangulo", "Ferramenta Triângulo", "U", Triangle, "Arraste para desenhar um triângulo na cor do primeiro plano."),
-    F("poligono", "Ferramenta Polígono", "U", Pentagon, "Arraste para desenhar uma estrela na cor do primeiro plano."),
+    F("poligono", "Ferramenta Polígono", "U", Pentagon, "Arraste para desenhar um polígono (ou uma estrela) na cor do primeiro plano."),
+    F("estrela", "Ferramenta Estrela", "U", Star, "Arraste para desenhar uma estrela; as pontas e o quanto elas entram ficam na barra."),
+    F("reflexo", "Ferramenta Reflexo", "U", SunDim, "Arraste do meio do brilho até onde vão os anéis: o halo, os raios, o centro e os anéis entram num grupo de formas em tela."),
     F("linha", "Ferramenta Linha", "U", Minus, "Arraste para desenhar uma linha na cor do primeiro plano."),
     F("formaPersonalizada", "Ferramenta Forma personalizada", "U", Shapes, "Escolha a forma na barra de opções e arraste para desenhar."),
   ],
@@ -309,7 +318,12 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
   triangulo: "triangulo",
   poligono: "poligono",
   linha: "linha",
+  retanguloArredondado: "retangulo",
+  estrela: "poligono",
 };
+
+/** As ferramentas que desenham uma forma viva com as medidas delas (lib/vetor/arrasto.ts). */
+export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
 export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {

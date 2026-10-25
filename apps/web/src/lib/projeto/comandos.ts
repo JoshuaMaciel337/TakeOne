@@ -286,6 +286,7 @@ export type Comando =
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.adicionarReflexo"; parametros: { camadas: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string; opacidade: number }[]; nome: string; acima?: string | null } }
   | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
   | { comando: "imagem.tamanho"; parametros: TamanhoDaImagem }
@@ -445,6 +446,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.fatias": "mudar as fatias",
   "imagem.escalaDeMedida": "definir a escala de medida",
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
+  "imagem.adicionarReflexo": "desenhar o reflexo",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
@@ -842,6 +844,30 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.adicionarReflexo": {
+      // As camadas em "tela", uma acima da outra, numa pasta, num passo só
+      let atual = projeto;
+      let acima = parametros.acima ?? null;
+      const faixas: string[] = [];
+      for (const camada of parametros.camadas) {
+        const posta = adicionarCamadaVetorial(atual, ctx, camada.vetor, camada.centro, camada.nome, acima);
+        atual = {
+          ...posta.projeto,
+          faixas: posta.projeto.faixas.map((faixa) =>
+            faixa.clipes[0]?.id === posta.clipeId ? { ...faixa, clipes: [{ ...faixa.clipes[0], mesclagem: "tela", transformacao: { ...faixa.clipes[0].transformacao, opacidade: camada.opacidade } }] } : faixa,
+          ),
+        };
+        const faixa = faixaDoClipeNoProjeto(atual, posta.clipeId);
+        if (faixa) {
+          faixas.push(faixa);
+          acima = faixa;
+        }
+      }
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: parametros.nome } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
     case "imagem.marcadorDeEscala": {
       // A barra e o número numa pasta "Marcador de escala de medida", num passo só
       const barra = executarComando(projeto, { comando: "imagem.adicionarVetor", parametros: { vetor: parametros.barra, centro: parametros.centro, nome: "Barra de escala", acima: parametros.acima } }, ctx);
