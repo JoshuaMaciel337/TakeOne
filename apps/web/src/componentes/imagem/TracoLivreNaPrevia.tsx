@@ -30,7 +30,7 @@ type Props = {
    * Os pontos do traço (pixels da imagem) a cada movimento e no fim; `escala` é quantos pixels da tela vale um da
    * imagem, e `reto`, que o Alt fez dele os dois cantos do retângulo ou as pontas da linha.
    */
-  aoTraco: (pontos: Ponto[], final: boolean, escala: number, reto: boolean) => void;
+  aoTraco: (pontos: Ponto[], final: boolean, escala: number, reto: boolean, alt: boolean) => void;
 };
 
 export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, raio, comAlt, continuo, aoTraco }: Props) {
@@ -40,6 +40,7 @@ export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, 
   const [reto, setReto] = useState(false);
   // Segurando parado: o último ponto de novo, de tempos em tempos
   const pontosRef = useRef<Ponto[] | null>(null);
+  const altRef = useRef(false);
   const aoTracoRef = useRef(aoTraco);
   useEffect(() => {
     pontosRef.current = pontos;
@@ -54,7 +55,7 @@ export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, 
       const novos = [...atuais, atuais[atuais.length - 1]];
       pontosRef.current = novos;
       setPontos(novos);
-      aoTracoRef.current(novos, false, escala, false);
+      aoTracoRef.current(novos, false, escala, false, altRef.current);
     }, 50);
     return () => window.clearInterval(relogio);
   }, [continuo, apertado, escala]);
@@ -76,17 +77,19 @@ export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, 
         setPontos([p]);
         const comReta = Boolean(comAlt && evento.altKey);
         setReto(comReta);
-        aoTraco([p], false, escala, comReta);
+        altRef.current = evento.altKey;
+        aoTraco([p], false, escala, comReta, evento.altKey);
       }}
       onPointerMove={(evento) => {
         const p = noDocumento(evento);
         setCursor(p);
+        altRef.current = evento.altKey;
         if (!pontos) return;
         if (reto) {
           // Com Alt, só o começo e o ponto de agora
           const novos = [pontos[0], p];
           setPontos(novos);
-          aoTraco(novos, false, escala, true);
+          aoTraco(novos, false, escala, true, evento.altKey);
           return;
         }
         const ultimo = pontos[pontos.length - 1];
@@ -94,10 +97,10 @@ export function TracoLivreNaPrevia({ quadro, documento, caminhos, largura, cor, 
         if (Math.hypot(p.x - ultimo.x, p.y - ultimo.y) * escala < 1) return;
         const novos = [...pontos, p];
         setPontos(novos);
-        aoTraco(novos, false, escala, false);
+        aoTraco(novos, false, escala, false, evento.altKey);
       }}
-      onPointerUp={() => {
-        if (pontos) aoTraco(pontos, true, escala, reto);
+      onPointerUp={(evento) => {
+        if (pontos) aoTraco(pontos, true, escala, reto, evento.altKey);
         setPontos(null);
       }}
       onPointerCancel={() => setPontos(null)}

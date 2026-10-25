@@ -41,7 +41,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FERRAMENTAS_DE_TRANSFORMAR, LIQUEFAZER_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FERRAMENTAS_DE_TRANSFORMAR, LIQUEFAZER_DA_FERRAMENTA, SIMBOLO_DA_FERRAMENTA, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
@@ -143,6 +143,10 @@ import { OpcoesDaCotaNaBarra } from "./OpcoesDaCota";
 import { JanelaMesclarObjetos } from "./JanelaMesclarObjetos";
 import { JanelaObjetosNoCaminho } from "./JanelaObjetosNoCaminho";
 import { lugaresNoCaminho } from "@/lib/vetor/repetir";
+import { espacoDoBorrifo, type InstanciaNoPincel, lugarDoBorrifo, type OpcoesDosSimbolos, passoDoPincelDeSimbolo, SIMBOLOS_PADRAO } from "@/lib/vetor/simbolos";
+import { ESTILOS_PRONTOS } from "@/lib/imagem/estilosProntos";
+import { PainelSimbolos } from "./PainelSimbolos";
+import { OpcoesDosSimbolosNaBarra } from "./OpcoesDosSimbolos";
 import { type MalhaDeDegrade, malhaNova, pontoDaMalhaPerto, remalhar } from "@/lib/vetor/malhaDeDegrade";
 import { passosDaMescla } from "@/lib/vetor/mesclar";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
@@ -417,6 +421,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDaCota, setOpcoesDaCota] = useState<OpcoesDaCota>(COTA_PADRAO);
   const [mesclando, setMesclando] = useState(false);
   const [divisoesDaMalha, setDivisoesDaMalha] = useState({ linhas: 3, colunas: 3 });
+  const [opcoesDosSimbolos, setOpcoesDosSimbolos] = useState<OpcoesDosSimbolos>(SIMBOLOS_PADRAO);
+  const [simboloEscolhido, setSimboloEscolhido] = useState<string | null>(null);
+  // O borrifo em andamento (os lugares soltos e o quanto o pincel andou desde o último) e a base dos outros pincéis
+  const borrifo = useRef<{ lugares: { x: number; y: number; escala: number; giro: number }[]; andado: number; n: number } | null>(null);
+  const pincelDeSimbolo = useRef<{ base: InstanciaNoPincel[]; atual: InstanciaNoPincel[] } | null>(null);
   const [repetindo, setRepetindo] = useState<{ clipeId: string; caminho: Subcaminho; origem: string } | null>(null);
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
@@ -3981,6 +3990,80 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
     porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
   };
+  /** As instâncias que os pincéis de símbolo mexem: as do conjunto escolhido, as instâncias escolhidas, ou todas. */
+  const instanciasDoPincel = (): InstanciaNoPincel[] => {
+    if (!projeto) return [];
+    const quadro = tamanhoDaImagem(projeto);
+    const pastas = new Set(projeto.faixas.filter((faixa) => faixa.clipes[0]?.pasta && selecao.includes(faixa.clipes[0].id)).map((faixa) => faixa.id));
+    const dentroDeUma = (faixa: (typeof projeto.faixas)[number]) => {
+      for (let pai = faixa.pai; pai; pai = projeto.faixas.find((item) => item.id === pai)?.pai ?? undefined) if (pastas.has(pai)) return true;
+      return false;
+    };
+    const todas = projeto.faixas.filter((faixa) => !faixa.oculta && faixa.clipes[0]?.simbolo && faixa.clipes[0].vetor);
+    const escolhidasAqui = todas.filter((faixa) => selecao.includes(faixa.clipes[0].id));
+    const alvo = pastas.size ? todas.filter(dentroDeUma) : escolhidasAqui.length ? escolhidasAqui : todas;
+    return alvo.map((faixa) => {
+      const clipe = faixa.clipes[0];
+      const t = clipe.transformacao;
+      return { clipeId: clipe.id, x: (t.x + 0.5) * quadro.largura, y: (t.y + 0.5) * quadro.altura, escala: t.escala, rotacao: t.rotacao, opacidade: t.opacidade, tinta: clipe.simbolo?.tinta ?? null, estilo: "atual" };
+    });
+  };
+  /** Os pincéis de símbolo: o Borrifar põe instâncias; os outros mexem nas que ficam debaixo do pincel. */
+  const pincelDosSimbolos = (qual: NonNullable<(typeof SIMBOLO_DA_FERRAMENTA)[keyof typeof SIMBOLO_DA_FERRAMENTA]>, pontos: { x: number; y: number }[], final: boolean, alt: boolean) => {
+    if (!projeto) return;
+    const quadro = tamanhoDaImagem(projeto);
+    const agora = pontos[pontos.length - 1];
+    const antes = pontos[pontos.length - 2] ?? agora;
+    const aplicar = (comando: Comando) => {
+      if (!final) return setProvisorio(comando);
+      setProvisorio(null);
+      executar(comando);
+    };
+    if (qual === "borrifar") {
+      const simbolo = (projeto.simbolos ?? []).find((item) => item.id === simboloEscolhido);
+      if (!simbolo) {
+        if (final) mostrarAviso("Escolha um símbolo no painel Símbolos (Janela › Símbolos).");
+        return;
+      }
+      if (pontos.length === 1) borrifo.current = { lugares: [], andado: 0, n: 0 };
+      const atual = borrifo.current;
+      if (!atual) return;
+      const espaco = espacoDoBorrifo(opcoesDosSimbolos);
+      const passo = Math.hypot(agora.x - antes.x, agora.y - antes.y);
+      // Parado, o borrifo continua mais devagar
+      atual.andado += passo > 0 ? passo : espaco / 4;
+      if (pontos.length === 1) atual.andado = espaco;
+      while (atual.andado >= espaco) {
+        atual.andado -= espaco;
+        atual.lugares.push({ ...lugarDoBorrifo(agora, opcoesDosSimbolos, atual.n++), giro: 0 });
+      }
+      const conjunto = projeto.faixas.find((faixa) => faixa.clipes[0]?.pasta && selecao.includes(faixa.clipes[0].id))?.id ?? null;
+      const numero = projeto.faixas.filter((faixa) => faixa.nome?.startsWith("Conjunto de símbolos")).length + 1;
+      if (atual.lugares.length) aplicar({ comando: "imagem.porInstancias", parametros: { id: simbolo.id, lugares: atual.lugares, conjunto, nomeDoConjunto: `Conjunto de símbolos ${numero}` } });
+      if (final) borrifo.current = null;
+      return;
+    }
+    if (pontos.length === 1) {
+      const base = instanciasDoPincel();
+      pincelDeSimbolo.current = { base, atual: base };
+    }
+    const estado = pincelDeSimbolo.current;
+    if (!estado) return;
+    estado.atual = passoDoPincelDeSimbolo(qual, estado.atual, agora, antes, opcoesDosSimbolos, alt, cores.primeiroPlano);
+    const mudancas = estado.atual.flatMap((inst, i) => {
+      const antes = estado.base[i];
+      const mudanca: { clipeId: string; transformacao?: Partial<Transformacao>; tinta?: typeof inst.tinta; estilo?: EstiloDeCamada | null } = { clipeId: inst.clipeId };
+      if (inst.x !== antes.x || inst.y !== antes.y || inst.escala !== antes.escala || inst.rotacao !== antes.rotacao || inst.opacidade !== antes.opacidade) {
+        mudanca.transformacao = { x: inst.x / quadro.largura - 0.5, y: inst.y / quadro.altura - 0.5, escala: inst.escala, rotacao: inst.rotacao, opacidade: inst.opacidade };
+      }
+      if (JSON.stringify(inst.tinta) !== JSON.stringify(antes.tinta)) mudanca.tinta = inst.tinta;
+      if (inst.estilo !== antes.estilo) mudanca.estilo = inst.estilo ? (ESTILOS_PRONTOS.find((pronto) => pronto.id === inst.estilo)?.estilo ?? null) : null;
+      return Object.keys(mudanca).length > 1 ? [mudanca] : [];
+    });
+    if (mudancas.length) aplicar({ comando: "imagem.instancias", parametros: { mudancas } });
+    else if (final) setProvisorio(null);
+    if (final) pincelDeSimbolo.current = null;
+  };
   /** A Malha de degradê: a malha nova (ou mudada) no preenchimento da forma escolhida. */
   const mudarMalha = (malha: MalhaDeDegrade | null, provisorio: boolean) => {
     const clipe = formaEmEdicao;
@@ -4044,7 +4127,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Os pincéis e o lápis do editor vetorial: o traço (pixels da imagem) a cada movimento e no fim. O Suavizar e a
    * Borracha de caminho mostram o resultado enquanto andam e viram um passo ao soltar; os outros agem no fim.
    */
-  const aoTracoLivre = (pontos: { x: number; y: number }[], final: boolean, escalaDaTela: number, reto: boolean) => {
+  const aoTracoLivre = (pontos: { x: number; y: number }[], final: boolean, escalaDaTela: number, reto: boolean, alt: boolean) => {
+    const deSimbolo = SIMBOLO_DA_FERRAMENTA[ferramenta];
+    if (deSimbolo) return void pincelDosSimbolos(deSimbolo, pontos, final, alt);
     const perto = pincelVetorial.distancia / Math.max(1e-6, escalaDaTela);
     const editaveis = !mascaraEmEdicao && caminhosEditaveis?.length ? caminhosEditaveis : null;
     const nomeNovo = (base: string) => `${base} ${(projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1}`;
@@ -6480,6 +6565,40 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
       ),
     },
+    simbolos: {
+      nome: PAINEIS_DA_IMAGEM.simbolos,
+      conteudo: (
+        <PainelSimbolos
+          simbolos={projetoNaTela?.simbolos ?? []}
+          escolhido={simboloEscolhido}
+          aoEscolher={setSimboloEscolhido}
+          comForma={Boolean(selecionado?.clipe.vetor)}
+          comInstancias={escolhidas.some((faixa) => faixa.clipes[0]?.simbolo)}
+          aoCriar={() => {
+            const clipe = selecionado?.clipe;
+            if (!clipe?.vetor || !projeto) return;
+            const id = crypto.randomUUID().slice(0, 12);
+            executar({ comando: "imagem.novoSimbolo", parametros: { clipeId: clipe.id, simbolo: { id, nome: `Símbolo ${(projeto.simbolos?.length ?? 0) + 1}`, vetor: clipe.vetor } } });
+            setSimboloEscolhido(id);
+          }}
+          aoPor={() => {
+            if (!projeto || !simboloEscolhido) return;
+            const quadro = tamanhoDaImagem(projeto);
+            executar({ comando: "imagem.porInstancias", parametros: { id: simboloEscolhido, lugares: [{ x: quadro.largura / 2, y: quadro.altura / 2, escala: 1, giro: 0 }], conjunto: null } });
+          }}
+          aoRedefinir={() => {
+            const clipe = selecionado?.clipe;
+            if (clipe?.vetor && simboloEscolhido) executar({ comando: "imagem.redefinirSimbolo", parametros: { id: simboloEscolhido, vetor: clipe.vetor } });
+          }}
+          aoRomper={() => executar({ comando: "imagem.romperSimbolo", parametros: { clipeIds: escolhidas.map((faixa) => faixa.clipes[0]).filter((clipe) => clipe?.simbolo).map((clipe) => clipe.id) } })}
+          aoExcluir={(id) => {
+            executar({ comando: "imagem.excluirSimbolo", parametros: { id } });
+            setSimboloEscolhido(null);
+          }}
+          aoRenomear={(id, nome) => executar({ comando: "imagem.simbolos", parametros: { simbolos: (projeto?.simbolos ?? []).map((simbolo) => (simbolo.id === id ? { ...simbolo, nome } : simbolo)), nome: "renomear o símbolo" } })}
+        />
+      ),
+    },
     estilosDeCamada: {
       nome: PAINEIS_DA_IMAGEM.estilosDeCamada,
       conteudo: (
@@ -6876,6 +6995,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : SIMBOLO_DA_FERRAMENTA[ferramenta] ? (
+            <OpcoesDosSimbolosNaBarra ferramenta={SIMBOLO_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDosSimbolos} simbolos={projetoNaTela?.simbolos ?? []} escolhido={simboloEscolhido} aoEscolher={setSimboloEscolhido} aoMudar={setOpcoesDosSimbolos} />
           ) : ferramenta === "malhaDeDegrade" ? (
             <span className="flex items-center gap-2">
               {(["linhas", "colunas"] as const).map((chave) => (
@@ -7296,9 +7417,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                     caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" || ferramenta === "remodelar" || Boolean(LIQUEFAZER_DA_FERRAMENTA[ferramenta]) ? (caminhosEditaveis ?? null) : null,
                     largura: ferramenta === "pincelDeBolha" ? 2 * pincelVetorial.raioDaBolha : ferramenta === "borrachaVetorial" ? 2 * pincelVetorial.raio : ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? pincelVetorial.espessura : 0,
                     cor: ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "pincelDeBolha" ? cores.primeiroPlano : "#2f80ff",
-                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : ferramenta === "remodelar" ? pincelVetorial.alcance : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? opcoesDoLiquefazer.raio : undefined,
+                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : ferramenta === "remodelar" ? pincelVetorial.alcance : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? opcoesDoLiquefazer.raio : SIMBOLO_DA_FERRAMENTA[ferramenta] ? opcoesDosSimbolos.raio : undefined,
                     comAlt: ferramenta === "borrachaVetorial" ? "retangulo" : ferramenta === "faca" ? "linha" : undefined,
-                    continuo: Boolean(LIQUEFAZER_DA_FERRAMENTA[ferramenta]) && ferramenta !== "deformarVetor",
+                    continuo: (Boolean(LIQUEFAZER_DA_FERRAMENTA[ferramenta]) && ferramenta !== "deformarVetor") || (Boolean(SIMBOLO_DA_FERRAMENTA[ferramenta]) && ferramenta !== "moverSimbolos" && ferramenta !== "girarSimbolos"),
                     aoTraco: aoTracoLivre,
                   }
                 : null

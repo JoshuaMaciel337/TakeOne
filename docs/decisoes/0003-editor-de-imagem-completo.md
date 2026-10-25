@@ -308,7 +308,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Construtor de formas e Pintura viva
 - [x] Grade de perspectiva
 - [x] Malha de degradê, Mesclar objetos, Objetos no caminho, Cotas
-- [ ] Símbolos (borrifar, mover, juntar, redimensionar, girar, tingir, transparência, estilo)
+- [x] Símbolos (borrifar, mover, juntar, redimensionar, girar, tingir, transparência, estilo)
 - [ ] Gráficos (colunas, colunas empilhadas, barras, barras empilhadas, linha, área, dispersão, pizza, radar)
 
 ## Ordem e regras de trabalho

@@ -138,6 +138,7 @@ import {
   transformarCamada,
   tamanhoDaImagem,
   caminhosDoVetorNaImagem,
+  pixelsPorUnidade,
   tamanhoComPixels,
   tamanhoDaTela,
   girarImagem,
@@ -180,6 +181,7 @@ import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
 import { transformarCaminhos } from "../vetor/edicao.ts";
 import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
+import { type Simbolo, type TintaDaInstancia, vetorDaInstancia } from "../vetor/simbolos.ts";
 import { type Afim, aplicarAfim, posicaoPelaAfim } from "../transformar/ferramentas.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
@@ -292,6 +294,13 @@ export type Comando =
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.simbolos"; parametros: { simbolos: Simbolo[]; nome?: string } }
+  | { comando: "imagem.novoSimbolo"; parametros: { clipeId: string; simbolo: Simbolo } }
+  | { comando: "imagem.redefinirSimbolo"; parametros: { id: string; vetor: CamadaVetorial } }
+  | { comando: "imagem.excluirSimbolo"; parametros: { id: string } }
+  | { comando: "imagem.romperSimbolo"; parametros: { clipeIds: string[] } }
+  | { comando: "imagem.porInstancias"; parametros: { id: string; lugares: { x: number; y: number; escala: number; giro: number }[]; conjunto: string | null; nomeDoConjunto?: string } }
+  | { comando: "imagem.instancias"; parametros: { mudancas: { clipeId: string; transformacao?: Partial<Transformacao>; tinta?: TintaDaInstancia | null; estilo?: EstiloDeCamada | null }[] } }
   | { comando: "imagem.repetirNoCaminho"; parametros: { clipeId: string; lugares: { x: number; y: number; giro: number }[] } }
   | { comando: "imagem.mesclarObjetos"; parametros: { de: string; ate: string; passos: { vetor: CamadaVetorial; centro: { x: number; y: number }; opacidade: number }[] } }
   | { comando: "imagem.adicionarCota"; parametros: { linha: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico; ponto: { x: number; y: number }; giro: number; acima?: string | null } }
@@ -469,6 +478,13 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.adicionarCota": "pôr a cota",
   "imagem.mesclarObjetos": "mesclar os objetos",
   "imagem.repetirNoCaminho": "pôr os objetos no caminho",
+  "imagem.simbolos": "mudar os símbolos",
+  "imagem.novoSimbolo": "criar o símbolo",
+  "imagem.redefinirSimbolo": "redefinir o símbolo",
+  "imagem.excluirSimbolo": "excluir o símbolo",
+  "imagem.romperSimbolo": "romper o vínculo com o símbolo",
+  "imagem.porInstancias": "pôr as instâncias do símbolo",
+  "imagem.instancias": "mudar as instâncias",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -540,6 +556,11 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
 /** A faixa de um clipe (o marcador de escala junta as camadas que acabou de criar). */
+/** Muda os clipes das camadas (o primeiro de cada faixa), para os comandos dos símbolos. */
+const mudarClipesDasInstancias = (projeto: Projeto, mudar: (clipe: Clipe) => Clipe): Projeto => ({
+  ...projeto,
+  faixas: projeto.faixas.map((faixa) => (faixa.clipes[0] ? { ...faixa, clipes: [mudar(faixa.clipes[0]), ...faixa.clipes.slice(1)] } : faixa)),
+});
 const faixaDoClipeNoProjeto = (projeto: Projeto, clipeId: string | undefined) => (clipeId ? projeto.faixas.find((faixa) => faixa.clipes.some((clipe) => clipe.id === clipeId))?.id : undefined);
 
 export function executarComando(projeto: Projeto, comando: Comando, ctx: Contexto): { projeto: Projeto; selecao?: string[] } {
@@ -869,6 +890,77 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.simbolos":
+      return { projeto: { ...projeto, simbolos: parametros.simbolos } };
+    case "imagem.novoSimbolo": {
+      // O símbolo novo, e a forma de onde ele veio passa a ser a primeira instância
+      const comSimbolo = { ...projeto, simbolos: [...(projeto.simbolos ?? []), parametros.simbolo] };
+      return { projeto: mudarClipesDasInstancias(comSimbolo, (clipe) => (clipe.id === parametros.clipeId ? { ...clipe, simbolo: { id: parametros.simbolo.id } } : clipe)) };
+    }
+    case "imagem.redefinirSimbolo": {
+      // A forma nova no símbolo e em todas as instâncias (com a tinta de cada uma; uma unidade continua valendo o mesmo)
+      const simbolos = (projeto.simbolos ?? []).map((simbolo) => (simbolo.id === parametros.id ? { ...simbolo, vetor: parametros.vetor } : simbolo));
+      const simbolo = simbolos.find((item) => item.id === parametros.id);
+      if (!simbolo) return { projeto };
+      const quadro = tamanhoDaImagem(projeto);
+      return {
+        projeto: mudarClipesDasInstancias({ ...projeto, simbolos }, (clipe) => {
+          if (clipe.simbolo?.id !== parametros.id || !clipe.vetor) return clipe;
+          const vetor = vetorDaInstancia(simbolo, clipe.simbolo.tinta);
+          const escala = clipe.transformacao.escala * (pixelsPorUnidade(clipe.vetor.caixa, 1, quadro) / pixelsPorUnidade(vetor.caixa, 1, quadro));
+          return { ...clipe, vetor, transformacao: { ...clipe.transformacao, escala } };
+        }),
+      };
+    }
+    case "imagem.excluirSimbolo":
+      return {
+        projeto: mudarClipesDasInstancias({ ...projeto, simbolos: (projeto.simbolos ?? []).filter((simbolo) => simbolo.id !== parametros.id) }, (clipe) =>
+          clipe.simbolo?.id === parametros.id ? { ...clipe, simbolo: null } : clipe,
+        ),
+      };
+    case "imagem.romperSimbolo":
+      return { projeto: mudarClipesDasInstancias(projeto, (clipe) => (parametros.clipeIds.includes(clipe.id) ? { ...clipe, simbolo: null } : clipe)) };
+    case "imagem.porInstancias": {
+      // As instâncias novas; num conjunto que já existe, dentro dele; senão, várias viram um conjunto novo
+      const simbolo = (projeto.simbolos ?? []).find((item) => item.id === parametros.id);
+      if (!simbolo || !parametros.lugares.length) return { projeto };
+      const dentro = parametros.conjunto ? projeto.faixas.find((faixa) => faixa.pai === parametros.conjunto) : undefined;
+      let atual = projeto;
+      let acima: string | null = dentro?.id ?? null;
+      const ids: string[] = [];
+      for (const lugar of parametros.lugares) {
+        const posta = adicionarCamadaVetorial(atual, ctx, simbolo.vetor, { x: lugar.x, y: lugar.y }, simbolo.nome, acima);
+        atual = mudarClipesDasInstancias(posta.projeto, (clipe) =>
+          clipe.id === posta.clipeId ? { ...clipe, simbolo: { id: simbolo.id }, transformacao: { ...clipe.transformacao, escala: clipe.transformacao.escala * lugar.escala, rotacao: lugar.giro } } : clipe,
+        );
+        ids.push(posta.clipeId);
+        acima = faixaDoClipeNoProjeto(atual, posta.clipeId) ?? acima;
+      }
+      if (dentro || ids.length < 2) return { projeto: atual, selecao: ids };
+      const faixas = ids.map((id) => faixaDoClipeNoProjeto(atual, id)).filter((f): f is string => Boolean(f));
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: parametros.nomeDoConjunto ?? "Conjunto de símbolos" } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
+    case "imagem.instancias": {
+      // Os pincéis de símbolo: a posição, a tinta (a forma de novo, do símbolo) e o estilo de cada instância
+      const porId = new Map(parametros.mudancas.map((mudanca) => [mudanca.clipeId, mudanca]));
+      const simbolos = projeto.simbolos ?? [];
+      return {
+        projeto: mudarClipesDasInstancias(projeto, (clipe) => {
+          const mudanca = porId.get(clipe.id);
+          if (!mudanca) return clipe;
+          let novo = mudanca.transformacao ? { ...clipe, transformacao: { ...clipe.transformacao, ...mudanca.transformacao } } : clipe;
+          if (mudanca.tinta !== undefined && novo.simbolo) {
+            const simbolo = simbolos.find((item) => item.id === novo.simbolo!.id);
+            novo = { ...novo, simbolo: { ...novo.simbolo, tinta: mudanca.tinta }, ...(simbolo ? { vetor: vetorDaInstancia(simbolo, mudanca.tinta) } : {}) };
+          }
+          if (mudanca.estilo !== undefined) novo = { ...novo, estilo_camada: mudanca.estilo };
+          return novo;
+        }),
+      };
+    }
     case "imagem.repetirNoCaminho": {
       // As cópias da camada, cada uma com o meio num lugar do caminho e o giro somado, num grupo "Repetição"
       const faixaId = faixaDoClipeNoProjeto(projeto, parametros.clipeId);

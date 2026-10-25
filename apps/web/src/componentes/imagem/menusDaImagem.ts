@@ -52,6 +52,7 @@ export const PAINEIS_DA_IMAGEM = {
   padroes: "Padrões",
   pinceis: "Pincéis",
   propriedades: "Propriedades",
+  simbolos: "Símbolos",
 } as const;
 export type IdPainelDaImagem = keyof typeof PAINEIS_DA_IMAGEM;
 

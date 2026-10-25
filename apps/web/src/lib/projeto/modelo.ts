@@ -19,6 +19,7 @@ import type { CompDeCamada } from "../imagem/comps.ts";
 import type { AnimacaoDaImagem } from "../imagem/animacao.ts";
 import type { Fatia } from "../imagem/fatias.ts";
 import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
+import type { InstanciaDeSimbolo, Simbolo } from "../vetor/simbolos.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -308,6 +309,8 @@ export type Clipe = {
   vetor?: CamadaVetorial | null;
   /** Só no projeto de imagem: o estilo de camada (lib/imagem/estiloDeCamada.ts), no lugar do contorno e da sombra. */
   estilo_camada?: EstiloDeCamada | null;
+  /** Só no projeto de imagem: a instância de um símbolo do documento (lib/vetor/simbolos.ts): a forma vem dele. */
+  simbolo?: InstanciaDeSimbolo | null;
   /** Só no projeto de imagem: a camada de preenchimento (cor, degradê ou padrão cobrindo o documento), sem mídia. */
   camada_de_preenchimento?: CamadaDePreenchimento | null;
   /** Só no projeto de imagem: os filtros inteligentes (lib/imagem/filtros/pilha.ts), a pilha não destrutiva da camada. */
@@ -477,6 +480,8 @@ export type Projeto = {
   fatias?: Fatia[];
   /** Só no projeto de imagem: a grade de perspectiva (lib/vetor/perspectiva.ts). */
   perspectiva?: GradeDePerspectiva | null;
+  /** Só no projeto de imagem: os símbolos do documento (a forma de referência das instâncias). */
+  simbolos?: Simbolo[];
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

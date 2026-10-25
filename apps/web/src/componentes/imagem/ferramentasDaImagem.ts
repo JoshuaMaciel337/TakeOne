@@ -56,6 +56,12 @@ import {
   Diameter,
   Grid2x2Check,
   RulerDimensionLine,
+  SprayCan,
+  MoveDiagonal,
+  Minimize2,
+  Maximize2,
+  RotateCcw,
+  Ghost,
   Grip,
   Tornado,
   Target,
@@ -107,6 +113,7 @@ import {
 import type { TipoDaFormaViva, VarianteDaForma } from "@/lib/vetor/arrasto";
 import type { GeradorDeCaminhos } from "@/lib/vetor/geradores";
 import type { FerramentaDeLiquefazer } from "@/lib/vetor/liquefazer";
+import type { FerramentaDeSimbolo } from "@/lib/vetor/simbolos";
 
 
 /** As ferramentas que escrevem: o texto e as máscaras de texto, horizontais e verticais. */
@@ -204,6 +211,14 @@ export type IdFerramentaDaImagem =
   | "selecaoDePerspectiva"
   | "cota"
   | "malhaDeDegrade"
+  | "borrifarSimbolos"
+  | "moverSimbolos"
+  | "juntarSimbolos"
+  | "redimensionarSimbolos"
+  | "girarSimbolos"
+  | "tingirSimbolos"
+  | "transparenciaDeSimbolos"
+  | "estiloDeSimbolos"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -369,6 +384,16 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("remodelar", "Ferramenta Remodelar", "", Waypoints, "Arraste um ponto do caminho escolhido: os vizinhos vão junto, menos quanto mais longe."),
   ],
   [
+    F("borrifarSimbolos", "Ferramenta Borrifar símbolos", "", SprayCan, "Arraste (ou segure) para borrifar instâncias do símbolo escolhido no painel Símbolos; com um conjunto escolhido, elas entram nele."),
+    F("moverSimbolos", "Ferramenta Mover símbolos", "", MoveDiagonal, "Arraste sobre as instâncias para levá-las com o pincel."),
+    F("juntarSimbolos", "Ferramenta Juntar símbolos", "", Minimize2, "Segure ou arraste sobre as instâncias para juntá-las no meio do pincel (Alt afasta)."),
+    F("redimensionarSimbolos", "Ferramenta Redimensionar símbolos", "", Maximize2, "Segure ou arraste sobre as instâncias para aumentá-las (Alt diminui)."),
+    F("girarSimbolos", "Ferramenta Girar símbolos", "", RotateCcw, "Arraste sobre as instâncias para girá-las na direção do arrasto."),
+    F("tingirSimbolos", "Ferramenta Tingir símbolos", "", Droplet, "Segure ou arraste sobre as instâncias para tingi-las com a cor de primeiro plano (Alt tira a tinta)."),
+    F("transparenciaDeSimbolos", "Ferramenta Transparência de símbolos", "", Ghost, "Segure ou arraste sobre as instâncias para deixá-las transparentes (Alt devolve)."),
+    F("estiloDeSimbolos", "Ferramenta Estilo de símbolos", "", Palette, "Passe sobre as instâncias para pôr nelas o estilo escolhido na barra (Alt tira)."),
+  ],
+  [
     F("lapisVetorial", "Ferramenta Lápis vetorial", "N", PencilLine, "Desenhe um caminho à mão livre; começando na ponta de um caminho aberto escolhido, ele continua, e perto do começo, fecha."),
     F("modelador", "Ferramenta Modelador", "N", Hexagon, "Desenhe a forma à mão: vira linha, retângulo, elipse, triângulo ou polígono. Um rabisco sobre uma forma a apaga; sobre várias, as junta."),
     F("suavizar", "Ferramenta Suavizar", "N", Rainbow, "Passe sobre o caminho escolhido para alisá-lo onde o pincel passa."),
@@ -411,7 +436,7 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
 export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
 
 /** Os pincéis e o lápis do editor vetorial (componentes/imagem/TracoLivreNaPrevia.tsx e lib/vetor/pincelVetorial.ts). */
-export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca", "remodelar", "deformarVetor", "torcer", "franzir", "inflar", "recortar", "cristalizar", "enrugar"]);
+export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca", "remodelar", "deformarVetor", "torcer", "franzir", "inflar", "recortar", "cristalizar", "enrugar", "borrifarSimbolos", "moverSimbolos", "juntarSimbolos", "redimensionarSimbolos", "girarSimbolos", "tingirSimbolos", "transparenciaDeSimbolos", "estiloDeSimbolos"]);
 
 /** As ferramentas que levam as camadas escolhidas por uma afim (componentes/imagem/TransformarNaPrevia.tsx). */
 export const FERRAMENTAS_DE_TRANSFORMAR: ReadonlySet<IdFerramentaDaImagem> = new Set(["girar", "refletir", "escalar", "inclinar"]);
@@ -425,6 +450,18 @@ export const LIQUEFAZER_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Ferr
   recortar: "recortar",
   cristalizar: "cristalizar",
   enrugar: "enrugar",
+};
+
+/** Os pincéis de símbolo e o nome de cada um na conta (lib/vetor/simbolos.ts). */
+export const SIMBOLO_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, FerramentaDeSimbolo>> = {
+  borrifarSimbolos: "borrifar",
+  moverSimbolos: "mover",
+  juntarSimbolos: "juntar",
+  redimensionarSimbolos: "redimensionar",
+  girarSimbolos: "girar",
+  tingirSimbolos: "tingir",
+  transparenciaDeSimbolos: "transparencia",
+  estiloDeSimbolos: "estilo",
 };
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
