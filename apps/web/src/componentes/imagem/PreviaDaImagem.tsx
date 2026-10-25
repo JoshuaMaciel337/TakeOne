@@ -35,6 +35,7 @@ import { svgDosCaminhos } from "@/lib/vetor/contorno";
 import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
 import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
 import { ToqueNoTextoNaPrevia } from "./ToqueNoTextoNaPrevia";
+import { TracoLivreNaPrevia } from "./TracoLivreNaPrevia";
 import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
 import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -101,6 +102,8 @@ type Props = {
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
   /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
   aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
+  /** Os pincéis e o lápis do editor vetorial: o traço livre (null fora deles). */
+  tracoLivre?: Omit<React.ComponentProps<typeof TracoLivreNaPrevia>, "quadro" | "documento"> | null;
   /** A ferramenta Toque no texto: a letra mudada (final ao soltar) e o aviso. */
   toqueNoTexto?: Pick<React.ComponentProps<typeof ToqueNoTextoNaPrevia>, "aoMudar" | "aoAviso"> | null;
   /** As fatias (ferramentas Fatia e Seleção de fatia, C). */
@@ -330,6 +333,7 @@ export function PreviaDaImagem({
   fatias = null,
   aoVarinhaVetorial,
   toqueNoTexto,
+  tracoLivre,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -1085,6 +1089,7 @@ export function PreviaDaImagem({
                 <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
               </svg>
             ) : null}
+            {tracoLivre && tamanho.largura > 1 ? <TracoLivreNaPrevia quadro={tamanho} documento={imagem} {...tracoLivre} /> : null}
             {toqueNoTexto && ferramenta === "toqueNoTexto" && tamanho.largura > 1 ? (
               <ToqueNoTextoNaPrevia
                 textos={[...camadas]

@@ -33,6 +33,13 @@ import {
   SquareRoundCorner,
   Star,
   SunDim,
+  Highlighter,
+  Droplets,
+  PencilLine,
+  Hexagon,
+  Rainbow,
+  Delete,
+  Link2,
   Tornado,
   Target,
   Move,
@@ -150,6 +157,13 @@ export type IdFerramentaDaImagem =
   | "retanguloArredondado"
   | "estrela"
   | "reflexo"
+  | "pincelDeTraco"
+  | "pincelDeBolha"
+  | "lapisVetorial"
+  | "modelador"
+  | "suavizar"
+  | "borrachaDeCaminho"
+  | "unir"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -227,6 +241,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("pincel", "Ferramenta Pincel", "B", Brush, "Pinte na camada de pixels (sem uma, ela é criada). [ e ] mudam o tamanho; Shift + [ e ], a dureza."),
     F("lapis", "Ferramenta Lápis", "B", Pencil, "Pinte com a borda dura, pixel a pixel. [ e ] mudam o tamanho."),
     F("substituicaoDeCor", "Ferramenta Substituição de cor", "B", Replace, "Pinte sobre uma cor: ela vira a do primeiro plano (pela tolerância), com a luz de cada pixel."),
+    F("pincelDeTraco", "Ferramenta Pincel de traço", "B", Highlighter, "Pinte um traço vetorial (um caminho com o traço na cor de primeiro plano); começando na ponta de um caminho aberto escolhido, ele continua."),
+    F("pincelDeBolha", "Ferramenta Pincel de bolha", "B", Droplets, "Pinte uma forma preenchida que segue o pincel; tocando a forma escolhida da mesma cor, as duas viram uma."),
     F("misturador", "Ferramenta Pincel misturador", "B", Palette, "Pinte misturando o primeiro plano com as cores da tela, como tinta molhada."),
   ],
   [
@@ -289,6 +305,11 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("formaPersonalizada", "Ferramenta Forma personalizada", "U", Shapes, "Escolha a forma na barra de opções e arraste para desenhar."),
   ],
   [
+    F("lapisVetorial", "Ferramenta Lápis vetorial", "N", PencilLine, "Desenhe um caminho à mão livre; começando na ponta de um caminho aberto escolhido, ele continua, e perto do começo, fecha."),
+    F("modelador", "Ferramenta Modelador", "N", Hexagon, "Desenhe a forma à mão: vira linha, retângulo, elipse, triângulo ou polígono. Um rabisco sobre uma forma a apaga; sobre várias, as junta."),
+    F("suavizar", "Ferramenta Suavizar", "N", Rainbow, "Passe sobre o caminho escolhido para alisá-lo onde o pincel passa."),
+    F("borrachaDeCaminho", "Ferramenta Borracha de caminho", "N", Delete, "Passe sobre o caminho escolhido para apagar o pedaço por onde o pincel passa."),
+    F("unir", "Ferramenta Unir", "N", Link2, "Passe sobre duas pontas abertas do caminho escolhido para juntá-las (as duas de um mesmo caminho o fecham)."),
     F("segmento", "Ferramenta Segmento de linha", "N", Slash, "Arraste para traçar um segmento na cor do primeiro plano (Shift de 45°, Alt a partir do meio)."),
     F("arco", "Ferramenta Arco", "N", Spline, "Arraste do começo ao fim do arco; a barra muda a base, a inclinação (côncavo ou convexo) e o fechado."),
     F("espiral", "Ferramenta Espiral", "N", Tornado, "Arraste do meio para fora: o ponto de fora é o começo da espiral. A barra muda o decaimento, os segmentos e o sentido."),
@@ -324,6 +345,9 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
 
 /** As ferramentas que desenham uma forma viva com as medidas delas (lib/vetor/arrasto.ts). */
 export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
+
+/** Os pincéis e o lápis do editor vetorial (componentes/imagem/TracoLivreNaPrevia.tsx e lib/vetor/pincelVetorial.ts). */
+export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir"]);
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
 export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {

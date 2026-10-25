@@ -286,6 +286,7 @@ export type Comando =
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.unirFormas"; parametros: { clipeId: string; caminhos: Subcaminho[]; apagar: string[] } }
   | { comando: "imagem.adicionarReflexo"; parametros: { camadas: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string; opacidade: number }[]; nome: string; acima?: string | null } }
   | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
   | { comando: "imagem.aplicarConjunto"; parametros: { faixas: Faixa[] } }
@@ -447,6 +448,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.escalaDeMedida": "definir a escala de medida",
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.adicionarReflexo": "desenhar o reflexo",
+  "imagem.unirFormas": "juntar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
@@ -844,6 +846,11 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.unirFormas": {
+      // As formas debaixo do rabisco do Modelador: os caminhos delas somados à primeira, e as outras saem
+      const juntado = juntarAoVetor(projeto, parametros.clipeId, parametros.caminhos, "somar");
+      return executarComando(juntado, { comando: "imagem.apagarVarias", parametros: { faixaIds: parametros.apagar } }, ctx);
+    }
     case "imagem.adicionarReflexo": {
       // As camadas em "tela", uma acima da outra, numa pasta, num passo só
       let atual = projeto;

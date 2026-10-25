@@ -98,6 +98,7 @@ export function ToqueNoTextoNaPrevia({ textos, aoMudar, aoSelecionarCamada, aoAv
 
   function aoApertar(evento: React.PointerEvent<HTMLDivElement>) {
     if (evento.button !== 0) return;
+    evento.stopPropagation();
     const p = pontoNoElemento(evento, evento.currentTarget);
     evento.currentTarget.setPointerCapture(evento.pointerId);
     // Primeiro as alças da letra escolhida
