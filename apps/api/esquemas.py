@@ -774,10 +774,18 @@ class DegradeDoEditorEntrada(BaseModel):
     semente: int = Field(default=1, ge=0, le=2**31)
 
 
+class PontoDaMalhaEntrada(BaseModel):
+    """Um ponto da malha de degradê: o lugar (em frações da caixa da forma) e a cor."""
+    x: float = Field(ge=-1, le=2)
+    y: float = Field(ge=-1, le=2)
+    cor: str = Field(pattern=COR)
+
+
 class TintaDaFormaEntrada(BaseModel):
-    """A tinta do preenchimento ou do traço de uma forma: nenhuma, uma cor, um degradê, um padrão ou a foto de um
-    quadro (a mídia, cobrindo ou cabendo, com o zoom e o deslocamento do meio)."""
-    tipo: Literal["nenhuma", "cor", "degrade", "padrao", "imagem"]
+    """A tinta do preenchimento ou do traço de uma forma: nenhuma, uma cor, um degradê, um padrão, a foto de um quadro
+    (a mídia, cobrindo ou cabendo, com o zoom e o deslocamento do meio) ou a malha de degradê (os pontos em linhas e
+    colunas, cada um com a cor)."""
+    tipo: Literal["nenhuma", "cor", "degrade", "padrao", "imagem", "malha"]
     cor: str | None = Field(default=None, pattern=COR)
     degrade: DegradeDoEditorEntrada | None = None
     forma: Literal["linear", "radial", "angulo", "refletido", "losango"] | None = None
@@ -789,6 +797,9 @@ class TintaDaFormaEntrada(BaseModel):
     ajuste: Literal["cobrir", "conter"] | None = None
     x: float | None = Field(default=None, ge=-10, le=10)
     y: float | None = Field(default=None, ge=-10, le=10)
+    linhas: int | None = Field(default=None, ge=1, le=20)
+    colunas: int | None = Field(default=None, ge=1, le=20)
+    pontos: list[PontoDaMalhaEntrada] | None = Field(default=None, max_length=441)
 
     @model_serializer(mode="wrap")
     def _sem_vazios(self, serializar):
@@ -796,6 +807,9 @@ class TintaDaFormaEntrada(BaseModel):
 
     @model_validator(mode="after")
     def _completa(self):
+        if self.tipo == "malha" and not (self.linhas and self.colunas and self.pontos
+                                         and len(self.pontos) == (self.linhas + 1) * (self.colunas + 1)):
+            raise ValueError("A malha de degradê precisa de um ponto em cada cruzamento das linhas e colunas.")
         faltando = (self.tipo == "cor" and not self.cor) or (self.tipo == "padrao" and not self.padrao) or (
             self.tipo == "degrade" and not (self.degrade and self.forma and self.angulo is not None
                                             and self.escala is not None)) or (

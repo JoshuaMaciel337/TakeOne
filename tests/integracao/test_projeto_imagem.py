@@ -101,6 +101,15 @@ def test_camada_vetorial(cliente):
     assert aberto["faixas"][0]["clipes"][0]["vetor"]["traco"]["perfil"] == perfil
     largo = {**vetor, "traco": {**vetor["traco"], "perfil": [{"t": 0.5, "esquerda": 30, "direita": 1}]}}
     assert salvar(cliente, aberto, [camada("video", {**forma, "vetor": largo}), faixas[1]]).status_code == 422
+    # A malha de degradê: um ponto em cada cruzamento
+    pontos = [{"x": c / 2, "y": lin, "cor": "#ff0000" if c == 0 else "#0000ff"} for lin in (0, 1) for c in (0, 1, 2)]
+    malha = {**vetor, "preenchimento": {"tipo": "malha", "linhas": 1, "colunas": 2, "pontos": pontos}}
+    salvo = salvar(cliente, aberto, [camada("video", {**forma, "vetor": malha}), faixas[1]])
+    assert salvo.status_code == 200, salvo.text
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    assert aberto["faixas"][0]["clipes"][0]["vetor"]["preenchimento"]["pontos"] == pontos
+    faltando = {**vetor, "preenchimento": {"tipo": "malha", "linhas": 2, "colunas": 2, "pontos": pontos}}
+    assert salvar(cliente, aberto, [camada("video", {**forma, "vetor": faltando}), faixas[1]]).status_code == 422
 
     # Sem a tinta inteira, numa faixa de texto, ou no projeto de vídeo, não vale
     incompleta = {**vetor, "preenchimento": {"tipo": "cor"}}
