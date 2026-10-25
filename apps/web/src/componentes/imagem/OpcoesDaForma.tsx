@@ -54,6 +54,13 @@ export function AmostraDaTinta({ tinta, className = "size-5" }: { tinta: TintaDa
   if (tinta.tipo === "degrade") return <AmostraDoDegrade degrade={tinta.degrade} primeiroPlano="#000000" fundo="#ffffff" className={className} />;
   if (tinta.tipo === "padrao") return <span className={`block rounded border border-borda ${className}`} style={{ background: XADREZ }} aria-hidden />;
   if (tinta.tipo === "imagem") return <span className={`block rounded border border-borda bg-painel-3 ${className}`} aria-hidden />;
+  // A malha: as cores dos quatro cantos
+  if (tinta.tipo === "malha") {
+    const canto = (i: number) => tinta.pontos[i]?.cor ?? "#000000";
+    const ultimo = tinta.pontos.length - 1;
+    const largura = tinta.colunas;
+    return <span className={`block rounded border border-borda ${className}`} style={{ backgroundImage: `linear-gradient(to bottom, ${canto(0)}, ${canto(ultimo - largura)}), linear-gradient(to bottom, ${canto(largura)}, ${canto(ultimo)})`, backgroundSize: "50% 100%", backgroundPosition: "left, right", backgroundRepeat: "no-repeat" }} aria-hidden />;
+  }
   // Nenhuma: o quadrado branco cortado pela diagonal vermelha
   return <span className={`block rounded border border-borda ${className}`} style={{ background: "linear-gradient(to top right, #fff calc(50% - 1px), #e5484d calc(50% - 1px), #e5484d calc(50% + 1px), #fff calc(50% + 1px))" }} aria-hidden />;
 }
@@ -77,13 +84,13 @@ export function SeletorDeTinta({
   const [ancora, setAncora] = useState<HTMLElement | null>(null);
   const padroes = usePadroes();
   const degrades = [...DEGRADES_PRONTOS.flatMap((pasta) => pasta.degrades), ...doEspaco];
-  const tipos: { id: Exclude<TintaDaForma["tipo"], "imagem">; nome: string }[] = [
+  const tipos: { id: Exclude<TintaDaForma["tipo"], "imagem" | "malha">; nome: string }[] = [
     { id: "nenhuma", nome: "Nenhuma" },
     { id: "cor", nome: "Cor" },
     { id: "degrade", nome: "Degradê" },
     { id: "padrao", nome: "Padrão" },
   ];
-  const paraTipo = (tipo: Exclude<TintaDaForma["tipo"], "imagem">): TintaDaForma => {
+  const paraTipo = (tipo: Exclude<TintaDaForma["tipo"], "imagem" | "malha">): TintaDaForma => {
     if (tipo === "nenhuma") return { tipo };
     if (tipo === "cor") return { tipo, cor: primeiroPlano };
     if (tipo === "degrade") return { tipo, degrade: degradeComCores(DEGRADES_PRONTOS[0].degrades[0], primeiroPlano, fundo), forma: "linear", angulo: 90, escala: 1, inverter: false };

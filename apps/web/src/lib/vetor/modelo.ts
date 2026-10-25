@@ -6,6 +6,7 @@
 import type { Degrade, FormaDoDegrade } from "../pintura/degrade.ts";
 import type { IdDoPadrao } from "../pintura/padroes.ts";
 import { maiorDoPerfil, type PontoDeLargura } from "./largura.ts";
+import type { MalhaDeDegrade } from "./malhaDeDegrade.ts";
 
 /** Um nó: a âncora e as alças de entrada (e) e de saída (s), absolutas; sem alça, o nó é um canto. */
 export type No = { x: number; y: number; ex?: number; ey?: number; sx?: number; sy?: number };
@@ -18,7 +19,9 @@ export type TintaDaForma =
   | { tipo: "degrade"; degrade: Degrade; forma: FormaDoDegrade; angulo: number; escala: number; inverter: boolean }
   | { tipo: "padrao"; padrao: IdDoPadrao; escala: number }
   /** Uma foto da biblioteca dentro da forma (o quadro): cobrindo ou cabendo, com o zoom e o deslocamento do meio. */
-  | { tipo: "imagem"; midia_id: string; ajuste: "cobrir" | "conter"; escala: number; x: number; y: number };
+  | { tipo: "imagem"; midia_id: string; ajuste: "cobrir" | "conter"; escala: number; x: number; y: number }
+  /** A malha de degradê (malhaDeDegrade.ts): os pontos em frações da caixa da forma, cada um com a cor. */
+  | MalhaDeDegrade;
 
 export type TracoDaForma = {
   tinta: TintaDaForma;

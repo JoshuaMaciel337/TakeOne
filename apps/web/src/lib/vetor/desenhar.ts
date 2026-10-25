@@ -6,6 +6,7 @@ import { ladrilhoDoPadrao } from "../pintura/padroes.ts";
 import { pixelsDoDegrade, tabelaDoDegrade } from "../pintura/degrade.ts";
 import { caminhosDaRegiao, precisaDaRegiao, regiaoDosCaminhos } from "./contorno.ts";
 import { contornoDaLargura, larguraEm } from "./largura.ts";
+import { pixelsDaMalha } from "./malhaDeDegrade.ts";
 import { type CamadaVetorial, type Subcaminho, temArea, type TintaDaForma, type TracoDaForma } from "./modelo.ts";
 
 type Contexto = CanvasRenderingContext2D;
@@ -89,6 +90,17 @@ function pintar(ctx: Contexto, tinta: TintaDaForma, camada: CamadaVetorial, esca
     padrao.setTransform(new DOMMatrix().scaleSelf(tinta.escala, tinta.escala));
     ctx.fillStyle = padrao;
     ctx.fillRect(0, 0, largura, altura);
+    return;
+  }
+  if (tinta.tipo === "malha") {
+    // A malha vai na caixa da forma (sem a margem), nos pixels do canvas de destino
+    const margem = camada.margem ?? 0;
+    const pl = Math.max(1, Math.round(largura * escala.x));
+    const pa = Math.max(1, Math.round(altura * escala.y));
+    const dados = pixelsDaMalha(tinta, pl, pa, { x: margem * escala.x, y: margem * escala.y, largura: Math.max(1, largura - 2 * margem) * escala.x, altura: Math.max(1, altura - 2 * margem) * escala.y });
+    const [imagem, ictx] = novoCanvas(pl, pa);
+    ictx.putImageData(new ImageData(new Uint8ClampedArray(dados), pl, pa), 0, 0);
+    ctx.drawImage(imagem, 0, 0, largura, altura);
     return;
   }
   if (tinta.tipo === "degrade") {

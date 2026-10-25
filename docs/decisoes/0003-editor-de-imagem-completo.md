@@ -307,7 +307,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Largura do traço, Deformar, Torcer, Franzir, Inflar, Recortar, Cristalizar, Enrugar
 - [x] Construtor de formas e Pintura viva
 - [x] Grade de perspectiva
-- [ ] Malha de degradê, Mesclar objetos, Objetos no caminho, Cotas
+- [x] Malha de degradê, Mesclar objetos, Objetos no caminho, Cotas
 - [ ] Símbolos (borrifar, mover, juntar, redimensionar, girar, tingir, transparência, estilo)
 - [ ] Gráficos (colunas, colunas empilhadas, barras, barras empilhadas, linha, área, dispersão, pizza, radar)
 

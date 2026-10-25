@@ -143,6 +143,7 @@ import { OpcoesDaCotaNaBarra } from "./OpcoesDaCota";
 import { JanelaMesclarObjetos } from "./JanelaMesclarObjetos";
 import { JanelaObjetosNoCaminho } from "./JanelaObjetosNoCaminho";
 import { lugaresNoCaminho } from "@/lib/vetor/repetir";
+import { type MalhaDeDegrade, malhaNova, pontoDaMalhaPerto, remalhar } from "@/lib/vetor/malhaDeDegrade";
 import { passosDaMescla } from "@/lib/vetor/mesclar";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
 import { caminhosDoPlano, type GradeDePerspectiva, gradePadrao, type PlanoDaPerspectiva, retanguloNoPlano } from "@/lib/vetor/perspectiva";
@@ -231,7 +232,7 @@ import { caminhoDeRecorte, comCaminho, nomeLivre, NOME_DO_TRABALHO, porNoCaminho
 import { caminhosDaMascara, mesclarComponentes, transformarCaminhos } from "@/lib/vetor/edicao";
 import { regiaoNoCanvas } from "@/lib/vetor/desenhar";
 import { camadaDaForma, camadaDosCaminhos, type OperacaoDoCaminho, refazerForma, type Subcaminho, temArea, TRACO_PADRAO } from "@/lib/vetor/modelo";
-import { caminhosDoVetorNaImagem, pixelsPorUnidade, pontoDaForma } from "@/lib/projeto/imagem";
+import { caminhosDoVetorNaImagem, pixelsPorUnidade, pontoDaForma, pontoNaForma } from "@/lib/projeto/imagem";
 import { caixaDoClipe, cantosDaCaixa } from "@/lib/projeto/geometria";
 import { type ArrastoDaForma, arrastoDaForma, camadaDoArrasto, NOME_DA_FORMA, OPCOES_DAS_FORMAS_PADRAO, opcoesDaVariante, type TipoDaFormaViva } from "@/lib/vetor/arrasto";
 import { caixaDosCaminhos, deslocar as deslocarCaminhos } from "@/lib/vetor/modelo";
@@ -415,6 +416,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoReflexo, setOpcoesDoReflexo] = useState<OpcoesDoReflexo>(REFLEXO_PADRAO);
   const [opcoesDaCota, setOpcoesDaCota] = useState<OpcoesDaCota>(COTA_PADRAO);
   const [mesclando, setMesclando] = useState(false);
+  const [divisoesDaMalha, setDivisoesDaMalha] = useState({ linhas: 3, colunas: 3 });
   const [repetindo, setRepetindo] = useState<{ clipeId: string; caminho: Subcaminho; origem: string } | null>(null);
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
@@ -3979,6 +3981,27 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
     porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
   };
+  /** A Malha de degradê: a malha nova (ou mudada) no preenchimento da forma escolhida. */
+  const mudarMalha = (malha: MalhaDeDegrade | null, provisorio: boolean) => {
+    const clipe = formaEmEdicao;
+    const original = clipe && projetoRef.current ? acharClipe(projetoRef.current, clipe.id)?.clipe.vetor : null;
+    if (!clipe || !original) return;
+    const preenchimento = malha ?? { tipo: "cor" as const, cor: original.preenchimento.tipo === "malha" ? (original.preenchimento.pontos[0]?.cor ?? cores.primeiroPlano) : cores.primeiroPlano };
+    const comando: Comando = { comando: "imagem.mudarVetor", parametros: { clipeId: clipe.id, vetor: { ...original, preenchimento } } };
+    if (provisorio) setProvisorio(comando);
+    else {
+      setProvisorio(null);
+      executar(comando);
+    }
+  };
+  /** A malha nova sobre a cor de agora da forma, com a cor de primeiro plano no ponto mais perto do clique. */
+  const criarMalha = (onde: { x: number; y: number }) => {
+    const atual = formaEmEdicao?.vetor?.preenchimento;
+    const base = atual?.tipo === "cor" ? atual.cor : cores.fundo;
+    const malha = malhaNova(divisoesDaMalha.linhas, divisoesDaMalha.colunas, () => base);
+    const perto = pontoDaMalhaPerto(malha, onde, 2);
+    mudarMalha({ ...malha, pontos: malha.pontos.map((p, i) => (i === perto ? { ...p, cor: cores.primeiroPlano } : p)) }, false);
+  };
   /** As duas formas escolhidas para Mesclar objetos, a de baixo primeiro. */
   const formasDaMescla = () => (projeto ? [...projeto.faixas].reverse().filter((faixa) => faixa.clipes[0]?.vetor && selecao.includes(faixa.clipes[0].id)).map((faixa) => faixa.clipes[0]) : []);
   const mesclarObjetos = (passos: number) => {
@@ -6853,6 +6876,32 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "malhaDeDegrade" ? (
+            <span className="flex items-center gap-2">
+              {(["linhas", "colunas"] as const).map((chave) => (
+                <label key={chave} className="flex items-center gap-1">
+                  {chave === "linhas" ? "Linhas" : "Colunas"}
+                  <input
+                    type="number"
+                    aria-label={chave === "linhas" ? "Linhas da malha" : "Colunas da malha"}
+                    className="w-12 rounded border border-borda bg-painel-2 px-1 py-0.5 text-xs text-texto"
+                    min={1}
+                    max={20}
+                    value={formaEmEdicao?.vetor?.preenchimento.tipo === "malha" ? formaEmEdicao.vetor.preenchimento[chave] : divisoesDaMalha[chave]}
+                    onChange={(e) => {
+                      const valor = Math.min(20, Math.max(1, Math.round(Number(e.currentTarget.value) || 1)));
+                      const atual = formaEmEdicao?.vetor?.preenchimento;
+                      setDivisoesDaMalha((d) => ({ ...d, [chave]: valor }));
+                      if (atual?.tipo === "malha") mudarMalha(remalhar(atual, chave === "linhas" ? valor : atual.linhas, chave === "colunas" ? valor : atual.colunas), false);
+                    }}
+                  />
+                </label>
+              ))}
+              <button type="button" className="botao-secundario px-2 py-0.5 text-xs" disabled={formaEmEdicao?.vetor?.preenchimento.tipo !== "malha"} onClick={() => mudarMalha(null, false)}>
+                Tirar a malha
+              </button>
+              <span className="text-suave">{formaEmEdicao?.vetor ? "Clique num ponto para pintá-lo com a cor de primeiro plano; arraste para movê-lo" : "Escolha uma forma"}</span>
+            </span>
           ) : ferramenta === "gradeDePerspectiva" || ferramenta === "selecaoDePerspectiva" ? (
             <OpcoesDaPerspectivaNaBarra grade={projetoNaTela?.perspectiva ?? null} documento={projetoNaTela ? tamanhoDaImagem(projetoNaTela) : { largura: 1, altura: 1 }} levar={ferramenta === "selecaoDePerspectiva"} aoMudar={(grade, nome) => mudarGrade(grade, false, nome)} />
           ) : ferramenta === "construtorDeFormas" || ferramenta === "pinturaViva" ? (
@@ -7183,6 +7232,29 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            malhaDeDegrade={
+              ferramenta === "malhaDeDegrade" && formaEmEdicao?.vetor && projetoNaTela
+                ? (() => {
+                    const clipe = formaEmEdicao;
+                    const vetor = clipe.vetor!;
+                    const quadro = tamanhoDaImagem(projetoNaTela);
+                    const margem = vetor.margem ?? 0;
+                    const w = Math.max(1, vetor.caixa.largura - 2 * margem);
+                    const h = Math.max(1, vetor.caixa.altura - 2 * margem);
+                    return {
+                      malha: vetor.preenchimento.tipo === "malha" ? vetor.preenchimento : null,
+                      paraImagem: (p: { x: number; y: number }) => pontoDaForma(clipe, { x: margem + p.x * w, y: margem + p.y * h }, quadro),
+                      daImagem: (p: { x: number; y: number }) => {
+                        const u = pontoNaForma(clipe, p, quadro);
+                        return { x: (u.x - margem) / w, y: (u.y - margem) / h };
+                      },
+                      cor: cores.primeiroPlano,
+                      aoCriar: criarMalha,
+                      aoMudar: mudarMalha,
+                    };
+                  })()
+                : null
+            }
             perspectiva={
               projetoNaTela?.perspectiva && (projetoNaTela.perspectiva.visivel || ferramenta === "gradeDePerspectiva")
                 ? {

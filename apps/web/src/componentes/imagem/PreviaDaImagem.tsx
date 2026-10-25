@@ -40,6 +40,7 @@ import { TransformarNaPrevia } from "./TransformarNaPrevia";
 import { LarguraNaPrevia } from "./LarguraNaPrevia";
 import { ConstrutorNaPrevia } from "./ConstrutorNaPrevia";
 import { PerspectivaNaPrevia } from "./PerspectivaNaPrevia";
+import { MalhaNaPrevia } from "./MalhaNaPrevia";
 import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
 import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -106,6 +107,8 @@ type Props = {
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
   /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
   aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
+  /** A ferramenta Malha de degradê, na forma escolhida (null fora dela). */
+  malhaDeDegrade?: Omit<React.ComponentProps<typeof MalhaNaPrevia>, "quadro" | "documento"> | null;
   /** A grade de perspectiva, quando está à vista (o tamanho da camada escolhida sai das caixas da prévia). */
   perspectiva?: Omit<React.ComponentProps<typeof PerspectivaNaPrevia>, "quadro" | "documento" | "tamanhoDaCamada"> | null;
   /** O Construtor de formas e a Pintura viva (null fora deles). */
@@ -350,6 +353,7 @@ export function PreviaDaImagem({
   larguraDoTraco,
   construtor,
   perspectiva,
+  malhaDeDegrade,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -1105,6 +1109,7 @@ export function PreviaDaImagem({
                 <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
               </svg>
             ) : null}
+            {malhaDeDegrade && tamanho.largura > 1 ? <MalhaNaPrevia quadro={tamanho} documento={imagem} {...malhaDeDegrade} /> : null}
             {perspectiva && tamanho.largura > 1
               ? (() => {
                   // O tamanho da camada escolhida, sem o giro (a Seleção de perspectiva a leva deitada para o plano)

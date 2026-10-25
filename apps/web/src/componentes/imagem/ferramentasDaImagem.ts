@@ -56,6 +56,7 @@ import {
   Diameter,
   Grid2x2Check,
   RulerDimensionLine,
+  Grip,
   Tornado,
   Target,
   Move,
@@ -202,6 +203,7 @@ export type IdFerramentaDaImagem =
   | "gradeDePerspectiva"
   | "selecaoDePerspectiva"
   | "cota"
+  | "malhaDeDegrade"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -353,6 +355,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
     F("construtorDeFormas", "Ferramenta Construtor de formas", "", Combine, "Com várias formas escolhidas, arraste pelas faces para juntá-las numa forma só (Alt: apaga as faces); cada face vira uma forma."),
     F("pinturaViva", "Ferramenta Pintura viva", "", PaintBucket, "Com várias formas escolhidas, clique numa face (o pedaço entre as sobreposições) para enchê-la com a cor de primeiro plano."),
+    F("malhaDeDegrade", "Ferramenta Malha de degradê", "", Grip, "Na forma escolhida, o clique cria a malha de degradê; depois, o clique num ponto o pinta com a cor de primeiro plano e o arrasto o leva para outro lugar."),
     F("gradeDePerspectiva", "Ferramenta Grade de perspectiva", "", Grid2x2Check, "Mostra a grade de perspectiva: arraste os pontos de fuga, o horizonte e o pé dela. Com a grade à vista, as formas desenhadas vão para o plano ativo."),
     F("selecaoDePerspectiva", "Ferramenta Seleção de perspectiva", "", Move3d, "Arraste para levar a camada escolhida ao plano ativo da grade, com o ponteiro no canto de baixo dela."),
     F("larguraDoTraco", "Ferramenta Largura do traço", "", Diameter, "Arraste a partir do caminho da forma escolhida para engrossar ou afinar o traço ali (Alt: um lado só); clique duplo num ponto o tira."),
