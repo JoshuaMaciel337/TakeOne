@@ -137,6 +137,11 @@ import { JanelaTransformarNumeros } from "./JanelaTransformarNumeros";
 import { OpcoesDoLiquefazerNaBarra } from "./OpcoesDoLiquefazer";
 import { OpcoesDaLarguraNaBarra } from "./OpcoesDaLargura";
 import { construirPecas, facesDasFormas } from "@/lib/vetor/construtor";
+import { OpcoesDaPerspectivaNaBarra } from "./OpcoesDaPerspectiva";
+import { cantosNoPlano } from "./PerspectivaNaPrevia";
+import { caminhosDoPlano, type GradeDePerspectiva, gradePadrao, type PlanoDaPerspectiva, retanguloNoPlano } from "@/lib/vetor/perspectiva";
+import { subcaminhosDaForma } from "@/lib/vetor/modelo";
+import { formaDoArrasto as formaVivaDoArrasto } from "@/lib/vetor/arrasto";
 import type { PontoDeLargura } from "@/lib/vetor/largura";
 import { caminhosDoLiquefazer, comecarLiquefazer, type EstadoDoLiquefazer, LIQUEFAZER_PADRAO, type OpcoesDoLiquefazer, passoDoLiquefazer, terminarLiquefazer } from "@/lib/vetor/liquefazer";
 import { comVinculadas } from "@/lib/projeto/alinhar";
@@ -3680,6 +3685,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const resultado = executar({ comando: "imagem.adicionarTexto", parametros: { texto: base, transformacao: onde } });
     if (resultado) abrirAba("texto");
   };
+  /**
+   * Com a grade de perspectiva à vista, a forma vai para o plano ativo: o retângulo arrastado vira a caixa dela no plano
+   * e os caminhos voltam para a imagem pela homografia (null sem a grade, ou na linha).
+   */
+  const formaNaGrade = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
+    const grade = projetoNaTela?.perspectiva;
+    if (!grade?.visivel || tipo === "linha") return null;
+    const { largura, altura, paraPlano } = retanguloNoPlano(grade, grade.plano, { x: arrasto.x, y: arrasto.y }, { x: arrasto.x + arrasto.largura, y: arrasto.y + arrasto.altura });
+    if (largura < 1 || altura < 1) return null;
+    const viva = formaVivaDoArrasto(tipo, { x: 0, y: 0, largura, altura, de: { x: 0, y: 0 }, ate: { x: largura, y: altura } }, opcoesDaVariante(VARIANTE_DA_FERRAMENTA[ferramenta], forma));
+    const noPlanoDaGrade = subcaminhosDaForma(viva).map((sub) => ({
+      ...sub,
+      nos: sub.nos.map((no) => {
+        const p = paraPlano(no.x, no.y);
+        const saida: Subcaminho["nos"][number] = { x: p.x, y: p.y };
+        if (no.ex !== undefined && no.ey !== undefined) Object.assign(saida, (({ x, y }) => ({ ex: x, ey: y }))(paraPlano(no.ex, no.ey)));
+        if (no.sx !== undefined && no.sy !== undefined) Object.assign(saida, (({ x, y }) => ({ sx: x, sy: y }))(paraPlano(no.sx, no.sy)));
+        return saida;
+      }),
+    }));
+    return caminhosDoPlano(grade, grade.plano, noPlanoDaGrade);
+  };
   /** A forma viva do arrasto, com os caminhos já em pixels da imagem (para o contorno na prévia e para juntar). */
   const formaDoArrasto = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
     const { vetor, centro } = camadaDoArrasto(tipo, arrasto, opcoesDaVariante(VARIANTE_DA_FERRAMENTA[ferramenta], forma), cores.primeiroPlano);
@@ -3687,6 +3714,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   };
   /** Desenha a forma viva: numa camada nova, ou junta à camada de forma escolhida (as operações da barra). */
   const criarFormaViva = (tipo: TipoDaFormaViva, arrasto: ArrastoDaForma) => {
+    const naGrade = formaNaGrade(tipo, arrasto);
+    if (naGrade) {
+      // Na grade de perspectiva: um caminho comum, com as tintas da barra
+      const preenchimento = forma.preenchimento ?? { tipo: "cor" as const, cor: cores.primeiroPlano };
+      const desenhada = camadaDosCaminhos(naGrade, preenchimento, forma.traco.tinta.tipo === "nenhuma" ? null : forma.traco);
+      const base = NOME_DA_FORMA[tipo];
+      const numero = (projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1;
+      executar({ comando: "imagem.adicionarVetor", parametros: { vetor: desenhada.vetor, centro: desenhada.centro, nome: `${base} ${numero}`, acima: escolhidas[0]?.id ?? null } });
+      return;
+    }
     const { vetor, centro, naImagem } = formaDoArrasto(tipo, arrasto);
     if (forma.operacao !== "nova" && selecionado?.clipe.vetor) {
       executar({ comando: "imagem.juntarAoVetor", parametros: { clipeId: selecionado.clipe.id, caminhos: naImagem, operacao: forma.operacao } });
@@ -4100,6 +4137,51 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         apagar: formasDoConstrutor.map((forma) => forma.faixaId),
         // Na pintura, a peça da face pintada (a última) leva a cor
         pecas: pecas.map((peca, i) => ({ origem: formasDoConstrutor[peca.origem].clipeId, caminhos: peca.caminhos, ...(cor && i === pecas.length - 1 ? { cor } : {}) })),
+      },
+    });
+  };
+  /** A grade de perspectiva: mudar (provisório enquanto arrasta uma alça) e a Seleção de perspectiva. */
+  const mudarGrade = (grade: GradeDePerspectiva | null, provisorio: boolean, nome = "mudar a grade de perspectiva") => {
+    const comando: Comando = { comando: "imagem.perspectiva", parametros: { grade, nome } };
+    if (provisorio) setProvisorio(comando);
+    else {
+      setProvisorio(null);
+      executar(comando);
+    }
+  };
+  const levarParaOPlano = (plano: PlanoDaPerspectiva, a: number, b: number) => {
+    const grade = projetoNaTela?.perspectiva;
+    const atual = projetoRef.current;
+    if (!grade || !atual || !selecionado) return void mostrarAviso("Escolha a camada que vai para o plano.");
+    const achado = acharClipe(atual, selecionado.clipe.id);
+    if (!achado) return;
+    if (achado.clipe.vetor) {
+      // A forma continua vetorial: cada ponto da caixa dela vai para o lugar no plano
+      const caminhos = caminhosDoVetorNaImagem(achado.clipe, tamanhoDaImagem(atual));
+      const caixa = caixaDosCaminhos(caminhos);
+      if (!caixa) return;
+      const altura = caixa.y1 - caixa.y0;
+      const espelhar = plano === "esquerdo" && grade.tipo !== 1;
+      const levar = (x: number, y: number) => ({ x: espelhar ? a - (x - caixa.x0) : a + (x - caixa.x0), y: b + altura - (y - caixa.y0) });
+      const noPlanoDaGrade = caminhos.map((sub) => ({
+        ...sub,
+        nos: sub.nos.map((no) => {
+          const p = levar(no.x, no.y);
+          const saida: Subcaminho["nos"][number] = { x: p.x, y: p.y };
+          if (no.ex !== undefined && no.ey !== undefined) Object.assign(saida, (({ x, y }) => ({ ex: x, ey: y }))(levar(no.ex, no.ey)));
+          if (no.sx !== undefined && no.sy !== undefined) Object.assign(saida, (({ x, y }) => ({ sx: x, sy: y }))(levar(no.sx, no.sy)));
+          return saida;
+        }),
+      }));
+      executar({ comando: "imagem.caminhosDoVetor", parametros: { clipeId: achado.clipe.id, caminhos: caminhosDoPlano(grade, plano, noPlanoDaGrade) } });
+      return;
+    }
+    // As outras camadas vão pelos pixels (como a Transformação livre), do retângulo delas para o plano
+    void comecarTransformacaoDaCamada({
+      imediata: (q) => {
+        const largura = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y);
+        const altura = Math.hypot(q[3].x - q[0].x, q[3].y - q[0].y);
+        return { quad: cantosNoPlano(grade, plano, a, b, largura, altura) as Quadrilatero, malha: null };
       },
     });
   };
@@ -5305,6 +5387,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     pesquisar: () => setPesquisando(true),
     personalizar: setPersonalizando,
     preferencias: () => setPreferindo(true),
+    gradeDePerspectiva: projeto?.perspectiva ? (projeto.perspectiva.visivel ? "visivel" : "oculta") : "nenhuma",
+    mudarGradeDePerspectiva: (como) => {
+      if (!projeto) return;
+      const atual = projeto.perspectiva;
+      const documento = tamanhoDaImagem(projeto);
+      if (como === "alternar") mudarGrade(atual ? { ...atual, visivel: !atual.visivel } : gradePadrao(2, documento.largura, documento.altura), false, atual?.visivel ? "ocultar a grade de perspectiva" : "mostrar a grade de perspectiva");
+      else mudarGrade({ ...gradePadrao(como, documento.largura, documento.altura), ...(atual ? { celula: atual.celula, extensao: atual.extensao } : {}) }, false);
+    },
     clarearInterface: (passo) => {
       const indice = TEMAS.findIndex((item) => item.id === temaAtual());
       const proximo = TEMAS[Math.min(TEMAS.length - 1, Math.max(0, indice + passo))];
@@ -6709,6 +6799,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "gradeDePerspectiva" || ferramenta === "selecaoDePerspectiva" ? (
+            <OpcoesDaPerspectivaNaBarra grade={projetoNaTela?.perspectiva ?? null} documento={projetoNaTela ? tamanhoDaImagem(projetoNaTela) : { largura: 1, altura: 1 }} levar={ferramenta === "selecaoDePerspectiva"} aoMudar={(grade, nome) => mudarGrade(grade, false, nome)} />
           ) : ferramenta === "construtorDeFormas" || ferramenta === "pinturaViva" ? (
             <span className="text-suave">
               {formasDoConstrutor.length
@@ -7035,6 +7127,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            perspectiva={
+              projetoNaTela?.perspectiva && (projetoNaTela.perspectiva.visivel || ferramenta === "gradeDePerspectiva")
+                ? {
+                    grade: projetoNaTela.perspectiva,
+                    modo: ferramenta === "gradeDePerspectiva" ? "editar" : ferramenta === "selecaoDePerspectiva" ? "levar" : "ver",
+                    aoMudar: (grade, provisorio) => mudarGrade(grade, provisorio),
+                    aoLevar: levarParaOPlano,
+                  }
+                : null
+            }
             construtor={
               construindo && facesDoConstrutor.length
                 ? { modo: ferramenta === "pinturaViva" ? "pinturaViva" : "construtor", faces: facesDoConstrutor, cor: cores.primeiroPlano, aoConstruir: (juntar, apagar) => construirFormas(juntar, apagar), aoPintar: (face) => construirFormas([face], [], cores.primeiroPlano) }
@@ -7196,7 +7298,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             pranchetas={{ ativa: ferramenta === "prancheta", aoCriar: (retangulo) => novaPrancheta("nova", retangulo) }}
             caminhoDoArrasto={(arrasto) => {
               const viva = FORMA_VIVA_DA_FERRAMENTA[ferramenta];
-              if (viva) return formaDoArrasto(viva, arrasto).naImagem;
+              if (viva) return formaNaGrade(viva, arrasto) ?? formaDoArrasto(viva, arrasto).naImagem;
               if (ferramenta === "quadro") return formaDoArrasto(formaDoQuadro, arrasto).naImagem;
               const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
               if (gerador) return caminhosDoGerador(gerador, arrasto, opcoesDosGeradores);

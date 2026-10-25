@@ -18,6 +18,7 @@ import type { Contagem, EscalaDeMedida, Nota } from "../imagem/medicao.ts";
 import type { CompDeCamada } from "../imagem/comps.ts";
 import type { AnimacaoDaImagem } from "../imagem/animacao.ts";
 import type { Fatia } from "../imagem/fatias.ts";
+import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
 import { type Taxa, type Tick, TICKS_POR_SEGUNDO as TICKS_POR_SEGUNDO_MODELO } from "../tempo.ts";
 import type { Abaixamento } from "./abaixar.ts";
 import type { Nivelamento } from "./nivelar.ts";
@@ -474,6 +475,8 @@ export type Projeto = {
   animacao?: AnimacaoDaImagem | null;
   /** Só no projeto de imagem: as fatias (ferramenta Fatia), cada uma sai num arquivo. */
   fatias?: Fatia[];
+  /** Só no projeto de imagem: a grade de perspectiva (lib/vetor/perspectiva.ts). */
+  perspectiva?: GradeDePerspectiva | null;
   /** Criado de um modelo do espaço: as vagas que a ferramenta Modelos oferece para preencher. */
   modelo_origem?: { id: string; nome: string; vagas: VagaDoModelo[] } | null;
   criado_em: string;

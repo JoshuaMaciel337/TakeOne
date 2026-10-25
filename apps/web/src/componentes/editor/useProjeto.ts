@@ -187,6 +187,7 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
           comps: projeto.comps ?? [],
           animacao: projeto.animacao ?? undefined,
           fatias: projeto.fatias ?? [],
+          perspectiva: projeto.perspectiva ?? null,
           tamanho: projeto.tamanho ?? undefined,
         },
       })
@@ -241,7 +242,7 @@ export function useProjeto(projetoId: string, ctx: Contexto) {
         const resultado = executarComando(maisNovo.current ?? estado.historico.presente, comando, ctx);
         maisNovo.current = resultado.projeto;
         if (semPasso) despachar({ tipo: "substituir", projeto: resultado.projeto });
-        else despachar({ tipo: "executar", projeto: resultado.projeto, nome: (comando.comando === "imagem.contagem" || comando.comando === "imagem.comps" || comando.comando === "imagem.animacao" || comando.comando === "imagem.fatias") && comando.parametros.nome ? comando.parametros.nome : NOMES_DOS_COMANDOS[comando.comando], ...opcoesDoHistorico.current });
+        else despachar({ tipo: "executar", projeto: resultado.projeto, nome: (comando.comando === "imagem.contagem" || comando.comando === "imagem.comps" || comando.comando === "imagem.animacao" || comando.comando === "imagem.fatias" || comando.comando === "imagem.perspectiva") && comando.parametros.nome ? comando.parametros.nome : NOMES_DOS_COMANDOS[comando.comando], ...opcoesDoHistorico.current });
         setSituacao((atual) => (atual === "erro" ? "ocioso" : atual));
         return resultado;
       } catch (e) {

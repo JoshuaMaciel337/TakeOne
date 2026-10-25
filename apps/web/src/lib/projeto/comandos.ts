@@ -179,6 +179,7 @@ import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
 import { transformarCaminhos } from "../vetor/edicao.ts";
+import type { GradeDePerspectiva } from "../vetor/perspectiva.ts";
 import { type Afim, aplicarAfim, posicaoPelaAfim } from "../transformar/ferramentas.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
@@ -289,6 +290,7 @@ export type Comando =
   | { comando: "imagem.aplicarComp"; parametros: { comp: CompDeCamada } }
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
+  | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
   | { comando: "imagem.construirFormas"; parametros: { apagar: string[]; pecas: { origem: string; caminhos: Subcaminho[]; cor?: string }[] } }
   | { comando: "imagem.transformarCamadas"; parametros: { clipeIds: string[]; afim: Afim; copiar: boolean } }
@@ -453,6 +455,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.aplicarComp": "aplicar a comp de camada",
   "imagem.animacao": "mudar a animação",
   "imagem.fatias": "mudar as fatias",
+  "imagem.perspectiva": "mudar a grade de perspectiva",
   "imagem.escalaDeMedida": "definir a escala de medida",
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.adicionarReflexo": "desenhar o reflexo",
@@ -852,6 +855,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, comps: parametros.comps } };
     case "imagem.aplicarComp":
       return { projeto: aplicarComp(projeto, parametros.comp) };
+    case "imagem.perspectiva":
+      return { projeto: { ...projeto, perspectiva: parametros.grade } };
     case "imagem.fatias":
       return { projeto: { ...projeto, fatias: parametros.fatias } };
     case "imagem.animacao":

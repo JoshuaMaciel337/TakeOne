@@ -194,6 +194,9 @@ export type AcoesDosMenus = {
   fecharTodos: () => void;
   /** Editar › Atalhos de teclado e menus e Barra de ferramentas: a janela da personalização, na aba pedida. */
   personalizar: (aba: "atalhos" | "menus" | "ferramentas") => void;
+  /** Exibir › Grade de perspectiva: se ela está à vista, mostrar ou ocultar e começar uma de um, dois ou três pontos. */
+  gradeDePerspectiva: "visivel" | "oculta" | "nenhuma";
+  mudarGradeDePerspectiva: (como: "alternar" | 1 | 2 | 3) => void;
   /** Exibir › Interface mais escura e mais clara (os quatro temas, em ordem). */
   clarearInterface: (passo: -1 | 1) => void;
   /** Editar › Preferências (Ctrl+K). */
@@ -977,6 +980,16 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
             { nome: "Malha de pixels", marcado: a.vista.malhaDePixels, aoEscolher: () => a.mudarVista({ malhaDePixels: !a.vista.malhaDePixels }), titulo: "Um quadriculado em cada pixel, com o zoom a partir de 800%" },
             "-",
             { nome: "Configurar a grade…", aoEscolher: () => a.janelaDaVista("grade") },
+          ],
+        },
+        {
+          nome: "Grade de perspectiva",
+          itens: [
+            { nome: "Mostrar a grade", marcado: a.gradeDePerspectiva === "visivel", aoEscolher: () => a.mudarGradeDePerspectiva("alternar") },
+            "-",
+            { nome: "Um ponto", aoEscolher: () => a.mudarGradeDePerspectiva(1) },
+            { nome: "Dois pontos", aoEscolher: () => a.mudarGradeDePerspectiva(2) },
+            { nome: "Três pontos", aoEscolher: () => a.mudarGradeDePerspectiva(3) },
           ],
         },
         { nome: "Réguas", atalho: "Ctrl+R", marcado: a.vista.reguas, aoEscolher: () => a.mudarVista({ reguas: !a.vista.reguas }) },

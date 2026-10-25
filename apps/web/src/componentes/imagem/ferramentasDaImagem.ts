@@ -54,6 +54,7 @@ import {
   Cloudy,
   Activity,
   Diameter,
+  Grid2x2Check,
   Tornado,
   Target,
   Move,
@@ -197,6 +198,8 @@ export type IdFerramentaDaImagem =
   | "larguraDoTraco"
   | "construtorDeFormas"
   | "pinturaViva"
+  | "gradeDePerspectiva"
+  | "selecaoDePerspectiva"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -347,6 +350,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
     F("construtorDeFormas", "Ferramenta Construtor de formas", "", Combine, "Com várias formas escolhidas, arraste pelas faces para juntá-las numa forma só (Alt: apaga as faces); cada face vira uma forma."),
     F("pinturaViva", "Ferramenta Pintura viva", "", PaintBucket, "Com várias formas escolhidas, clique numa face (o pedaço entre as sobreposições) para enchê-la com a cor de primeiro plano."),
+    F("gradeDePerspectiva", "Ferramenta Grade de perspectiva", "", Grid2x2Check, "Mostra a grade de perspectiva: arraste os pontos de fuga, o horizonte e o pé dela. Com a grade à vista, as formas desenhadas vão para o plano ativo."),
+    F("selecaoDePerspectiva", "Ferramenta Seleção de perspectiva", "", Move3d, "Arraste para levar a camada escolhida ao plano ativo da grade, com o ponteiro no canto de baixo dela."),
     F("larguraDoTraco", "Ferramenta Largura do traço", "", Diameter, "Arraste a partir do caminho da forma escolhida para engrossar ou afinar o traço ali (Alt: um lado só); clique duplo num ponto o tira."),
     F("deformarVetor", "Ferramenta Deformar", "", Wind, "Arraste sobre a forma escolhida para empurrar o contorno com o pincel."),
     F("torcer", "Ferramenta Torcer", "", RefreshCcwDot, "Segure ou arraste sobre a forma escolhida para torcer o contorno debaixo do pincel."),
