@@ -41,7 +41,7 @@ import { useMidias } from "@/lib/useMidias";
 import type { Ajuste } from "./ajustesDaImagem";
 import { BarraDeOpcoes, type OpcoesDaForma } from "./BarraDeOpcoes";
 import { CaixaDeFerramentas } from "./CaixaDeFerramentas";
-import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
+import { ferramenta as dadosDa, FERRAMENTAS_DA_SELECAO, FERRAMENTAS_DE_PINTURA, FERRAMENTAS_DE_CAMINHO, FERRAMENTAS_DE_PONTO, FERRAMENTAS_DE_TEXTO, FERRAMENTAS_DE_TRACO_LIVRE, FERRAMENTAS_DE_TRANSFORMAR, FORMA_VIVA_DA_FERRAMENTA, GERADOR_DA_FERRAMENTA, VARIANTE_DA_FERRAMENTA, GRUPOS_DE_FERRAMENTAS, grupoDa, type IdFerramentaDaImagem, MODO_DA_SELECAO, TODAS_AS_FERRAMENTAS } from "./ferramentasDaImagem";
 import { type FerramentaDeSelecao, OPCOES_DA_SELECAO, type OpcoesDaSelecao } from "./SelecaoNaPrevia";
 import { JanelaEscolherImagem } from "./JanelaEscolherImagem";
 import { JanelaExportarImagem, JanelaPreferenciasDeExportacao } from "./JanelaExportarImagem";
@@ -132,6 +132,9 @@ import { OpcoesDoReflexoNaBarra } from "./OpcoesDoReflexo";
 import { type FerramentaDoPincelVetorial, OpcoesDoPincelVetorialNaBarra } from "./OpcoesDoPincelVetorial";
 import { apagarDoCaminho, caminhoLivre, caminhosDaRegiaoEmCurvas, continuarCaminho, juntarBolha, type OpcoesDoPincelVetorial, PINCEL_VETORIAL_PADRAO, pontoNaRegiao, reconhecerForma, regiaoDaBolha, suavizarCaminhos, toleranciaDaFidelidade, unirCaminhos } from "@/lib/vetor/pincelVetorial";
 import { regiaoDosCaminhos } from "@/lib/vetor/contorno";
+import { type Afim as AfimDaFerramenta, aplicarAfim, type FerramentaDeTransformar, posicaoPelaAfim, remodelarCaminhos } from "@/lib/transformar/ferramentas";
+import { JanelaTransformarNumeros } from "./JanelaTransformarNumeros";
+import { comVinculadas } from "@/lib/projeto/alinhar";
 import { apagarArea, cortarComFaca, cortarComTesoura, regiaoDoCorte, regiaoDoRetangulo } from "@/lib/vetor/cortes";
 import { camadasDoReflexo, type OpcoesDoReflexo, REFLEXO_PADRAO } from "@/lib/vetor/reflexo";
 import { caminhosDoGerador, type GeradorDeCaminhos, GERADORES_PADRAO, NOME_DO_GERADOR, type OpcoesDosGeradores } from "@/lib/vetor/geradores";
@@ -397,6 +400,9 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
   const baseDoTracoLivre = useRef<Subcaminho[] | null>(null);
+  // A origem de Girar, Refletir, Escalar e Inclinar (vale para a escolha em que foi posta) e os números abertos
+  const [origemDaTransformacao, setOrigemDaTransformacao] = useState<{ escolha: string; ponto: { x: number; y: number } } | null>(null);
+  const [numerosDaTransformacao, setNumerosDaTransformacao] = useState<{ ferramenta: FerramentaDeTransformar; origem: { x: number; y: number } } | null>(null);
   // As formas personalizadas do espaço (Editar › Definir forma personalizada) e o nome da que está sendo definida
   const recursosDasFormas = useRecursos<{ subcaminhos: Subcaminho[] }>("forma");
   const formasDoEspaco: FormaDoEspaco[] = recursosDasFormas.recursos.map((recurso) => ({ id: recurso.id, nome: recurso.nome, subcaminhos: recurso.dados.subcaminhos ?? [] }));
@@ -3937,6 +3943,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const perto = pincelVetorial.distancia / Math.max(1e-6, escalaDaTela);
     const editaveis = !mascaraEmEdicao && caminhosEditaveis?.length ? caminhosEditaveis : null;
     const nomeNovo = (base: string) => `${base} ${(projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1}`;
+    if (ferramenta === "remodelar") {
+      if (pontos.length === 1) baseDoTracoLivre.current = editaveis;
+      const base = baseDoTracoLivre.current;
+      if (!base) {
+        if (final) mostrarAviso("Escolha uma forma (ou um caminho no painel Caminhos) para remodelar.");
+        return;
+      }
+      const ultimo = pontos[pontos.length - 1];
+      mudarCaminhos(remodelarCaminhos(base, pontos[0], { x: ultimo.x - pontos[0].x, y: ultimo.y - pontos[0].y }, pincelVetorial.alcance), !final);
+      if (final) baseDoTracoLivre.current = null;
+      return;
+    }
     if (ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho") {
       if (pontos.length === 1) baseDoTracoLivre.current = editaveis;
       const base = baseDoTracoLivre.current;
@@ -4039,6 +4057,32 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     if (reconhecida.tipo === "linha") return void criarFormaViva("linha", arrastoDaForma(reconhecida.de, reconhecida.ate));
     const { x, y, largura, altura } = reconhecida.caixa;
     criarFormaViva(reconhecida.tipo, arrastoDaForma({ x, y }, { x: x + largura, y: y + altura }));
+  };
+  /** As camadas que Girar, Refletir, Escalar e Inclinar levam: as escolhidas, as de dentro das pastas e as vinculadas. */
+  const alvosDaTransformacao = (() => {
+    if (!projetoNaTela || !FERRAMENTAS_DE_TRANSFORMAR.has(ferramenta)) return [];
+    return comVinculadas(projetoNaTela, selecaoValida).filter((id) => {
+      const achado = acharClipe(projetoNaTela, id);
+      return achado && !achado.clipe.pasta && !achado.clipe.ajuste && !achado.faixa.travas?.posicao && !camadaTravada(projetoNaTela, achado.faixa);
+    });
+  })();
+  /**
+   * Leva as camadas pela afim: a posição delas quando é só girar, refletir ou escalar por igual; as formas pelos pontos;
+   * uma camada só que não é forma, pelos pixels (como a Transformação livre).
+   */
+  const aplicarAfimNasCamadas = (afim: AfimDaFerramenta, copiar: boolean) => {
+    const atual = projetoRef.current;
+    if (!atual || !alvosDaTransformacao.length) return void mostrarAviso("Escolha as camadas que vai transformar.");
+    const semelhante = posicaoPelaAfim(afim, { x: 0, y: 0 }, 1, 0) !== null;
+    const naoFormas = alvosDaTransformacao.filter((id) => !acharClipe(atual, id)?.clipe.vetor);
+    if (!semelhante && naoFormas.length) {
+      if (alvosDaTransformacao.length === 1 && selecionado?.clipe.id === alvosDaTransformacao[0]) {
+        void comecarTransformacaoDaCamada({ copia: copiar, imediata: (q) => ({ quad: q.map((p) => aplicarAfim(afim, p)) as Quadrilatero, malha: null }) });
+        return;
+      }
+      return void mostrarAviso("Esticar e inclinar várias camadas juntas só vale nas formas: transforme as outras uma de cada vez.");
+    }
+    executar({ comando: "imagem.transformarCamadas", parametros: { clipeIds: alvosDaTransformacao, afim, copiar } });
   };
   /** A forma personalizada escolhida na caixa (com as tintas e a operação da barra). */
   const porFormaPersonalizada = (id: string, caixa: RetanguloDaImagem, proporcional: boolean) => {
@@ -6919,13 +6963,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            transformarComFerramenta={
+              FERRAMENTAS_DE_TRANSFORMAR.has(ferramenta)
+                ? {
+                    ferramenta: ferramenta as FerramentaDeTransformar,
+                    clipeIds: alvosDaTransformacao,
+                    origem: origemDaTransformacao?.escolha === alvosDaTransformacao.join() ? origemDaTransformacao.ponto : null,
+                    aoMudarOrigem: (ponto) => setOrigemDaTransformacao({ escolha: alvosDaTransformacao.join(), ponto }),
+                    aoAplicar: aplicarAfimNasCamadas,
+                    aoNumeros: (origem) => {
+                      setOrigemDaTransformacao({ escolha: alvosDaTransformacao.join(), ponto: origem });
+                      setNumerosDaTransformacao({ ferramenta: ferramenta as FerramentaDeTransformar, origem });
+                    },
+                  }
+                : null
+            }
             tracoLivre={
               FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta)
                 ? {
-                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" ? (caminhosEditaveis ?? null) : null,
+                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" || ferramenta === "remodelar" ? (caminhosEditaveis ?? null) : null,
                     largura: ferramenta === "pincelDeBolha" ? 2 * pincelVetorial.raioDaBolha : ferramenta === "borrachaVetorial" ? 2 * pincelVetorial.raio : ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? pincelVetorial.espessura : 0,
                     cor: ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "pincelDeBolha" ? cores.primeiroPlano : "#2f80ff",
-                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : undefined,
+                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : ferramenta === "remodelar" ? pincelVetorial.alcance : undefined,
                     comAlt: ferramenta === "borrachaVetorial" ? "retangulo" : ferramenta === "faca" ? "linha" : undefined,
                     aoTraco: aoTracoLivre,
                   }
@@ -7165,6 +7224,17 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {numerosDaTransformacao ? (
+        <JanelaTransformarNumeros
+          ferramenta={numerosDaTransformacao.ferramenta}
+          origem={numerosDaTransformacao.origem}
+          aoFechar={() => setNumerosDaTransformacao(null)}
+          aoAplicar={(afim, copiar) => {
+            setNumerosDaTransformacao(null);
+            aplicarAfimNasCamadas(afim, copiar);
+          }}
         />
       ) : null}
       {preferindo ? (

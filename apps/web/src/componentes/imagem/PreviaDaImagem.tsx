@@ -36,6 +36,7 @@ import { PranchetasNaPrevia } from "./PranchetasNaPrevia";
 import { EdicaoDeTextoNaPrevia, indiceNaTela } from "./EdicaoDeTextoNaPrevia";
 import { ToqueNoTextoNaPrevia } from "./ToqueNoTextoNaPrevia";
 import { TracoLivreNaPrevia } from "./TracoLivreNaPrevia";
+import { TransformarNaPrevia } from "./TransformarNaPrevia";
 import { intervalosNaAltura, pontoMaisPerto } from "@/lib/texto/caminho";
 import { achatar } from "@/lib/vetor/contorno";
 import { pranchetasDoProjeto } from "@/lib/exportacao/pranchetas";
@@ -102,6 +103,8 @@ type Props = {
   amostradores?: Omit<React.ComponentProps<typeof AmostradoresNaPrevia>, "escala"> | null;
   /** A Varinha mágica vetorial: o clique numa camada (ou no vazio) e o modo (Shift soma, Alt tira). */
   aoVarinhaVetorial?: (clipeId: string | null, modo: "nova" | "somar" | "subtrair") => void;
+  /** Girar, Refletir, Escalar e Inclinar: as camadas que andam (os clipes) e o que fazer com a afim (null fora delas). */
+  transformarComFerramenta?: (Omit<React.ComponentProps<typeof TransformarNaPrevia>, "quadro" | "documento" | "caixas"> & { clipeIds: string[] }) | null;
   /** Os pincéis e o lápis do editor vetorial: o traço livre (null fora deles). */
   tracoLivre?: Omit<React.ComponentProps<typeof TracoLivreNaPrevia>, "quadro" | "documento"> | null;
   /** A ferramenta Toque no texto: a letra mudada (final ao soltar) e o aviso. */
@@ -334,6 +337,7 @@ export function PreviaDaImagem({
   aoVarinhaVetorial,
   toqueNoTexto,
   tracoLivre,
+  transformarComFerramenta,
   tamanhoDaAmostra = 1,
   aoGirarVista,
   enquadrar = null,
@@ -1089,6 +1093,28 @@ export function PreviaDaImagem({
                 <path d={svgDosCaminhos(caminhosDoTexto)} transform={`scale(${escala})`} fill="none" stroke="#2f80ff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
               </svg>
             ) : null}
+            {transformarComFerramenta && tamanho.largura > 1
+              ? (() => {
+                  const { clipeIds, ...resto } = transformarComFerramenta;
+                  // Os cantos das caixas das camadas, em pixels da imagem
+                  const caixas = camadas
+                    .filter((camada) => clipeIds.includes(camada.clipe.id))
+                    .map(({ caixa }) => {
+                      const r = (caixa.rotacao * Math.PI) / 180;
+                      return [
+                        [-1, -1],
+                        [1, -1],
+                        [1, 1],
+                        [-1, 1],
+                      ].map(([sx, sy]) => {
+                        const dx = (sx * caixa.largura) / 2;
+                        const dy = (sy * caixa.altura) / 2;
+                        return { x: (caixa.cx + dx * Math.cos(r) - dy * Math.sin(r)) / escala, y: (caixa.cy + dx * Math.sin(r) + dy * Math.cos(r)) / escala };
+                      });
+                    });
+                  return <TransformarNaPrevia quadro={tamanho} documento={imagem} caixas={caixas} {...resto} />;
+                })()
+              : null}
             {tracoLivre && tamanho.largura > 1 ? <TracoLivreNaPrevia quadro={tamanho} documento={imagem} {...tracoLivre} /> : null}
             {toqueNoTexto && ferramenta === "toqueNoTexto" && tamanho.largura > 1 ? (
               <ToqueNoTextoNaPrevia

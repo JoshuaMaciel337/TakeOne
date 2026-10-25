@@ -42,6 +42,11 @@ import {
   Link2,
   PencilOff,
   Axe,
+  RotateCcwSquare,
+  SquareSplitHorizontal,
+  Scaling,
+  Italic,
+  Spline as Waypoints,
   Tornado,
   Target,
   Move,
@@ -169,6 +174,11 @@ export type IdFerramentaDaImagem =
   | "borrachaVetorial"
   | "tesoura"
   | "faca"
+  | "girar"
+  | "refletir"
+  | "escalar"
+  | "inclinar"
+  | "remodelar"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -313,6 +323,13 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("formaPersonalizada", "Ferramenta Forma personalizada", "U", Shapes, "Escolha a forma na barra de opções e arraste para desenhar."),
   ],
   [
+    F("girar", "Ferramenta Girar", "", RotateCcwSquare, "Arraste para girar as camadas escolhidas em volta da origem (o clique muda a origem; Shift de 45°; Alt solta uma cópia; Alt + clique, os números)."),
+    F("refletir", "Ferramenta Refletir", "", SquareSplitHorizontal, "Arraste da origem na direção do eixo do espelho (Shift de 45°; Alt solta uma cópia; Alt + clique, os números)."),
+    F("escalar", "Ferramenta Escalar", "", Scaling, "Arraste para mudar o tamanho em volta da origem (Shift por igual; Alt solta uma cópia; Alt + clique, os números)."),
+    F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
+    F("remodelar", "Ferramenta Remodelar", "", Waypoints, "Arraste um ponto do caminho escolhido: os vizinhos vão junto, menos quanto mais longe."),
+  ],
+  [
     F("lapisVetorial", "Ferramenta Lápis vetorial", "N", PencilLine, "Desenhe um caminho à mão livre; começando na ponta de um caminho aberto escolhido, ele continua, e perto do começo, fecha."),
     F("modelador", "Ferramenta Modelador", "N", Hexagon, "Desenhe a forma à mão: vira linha, retângulo, elipse, triângulo ou polígono. Um rabisco sobre uma forma a apaga; sobre várias, as junta."),
     F("suavizar", "Ferramenta Suavizar", "N", Rainbow, "Passe sobre o caminho escolhido para alisá-lo onde o pincel passa."),
@@ -355,7 +372,10 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
 export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
 
 /** Os pincéis e o lápis do editor vetorial (componentes/imagem/TracoLivreNaPrevia.tsx e lib/vetor/pincelVetorial.ts). */
-export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca"]);
+export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca", "remodelar"]);
+
+/** As ferramentas que levam as camadas escolhidas por uma afim (componentes/imagem/TransformarNaPrevia.tsx). */
+export const FERRAMENTAS_DE_TRANSFORMAR: ReadonlySet<IdFerramentaDaImagem> = new Set(["girar", "refletir", "escalar", "inclinar"]);
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
 export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {

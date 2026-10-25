@@ -6,7 +6,7 @@ import type { OpcoesDoPincelVetorial } from "@/lib/vetor/pincelVetorial";
 
 const CAMPO = "w-14 rounded border border-borda bg-painel-2 px-1 py-0.5 text-xs text-texto";
 
-export type FerramentaDoPincelVetorial = "pincelDeTraco" | "pincelDeBolha" | "lapisVetorial" | "modelador" | "suavizar" | "borrachaDeCaminho" | "unir" | "borrachaVetorial" | "tesoura" | "faca";
+export type FerramentaDoPincelVetorial = "pincelDeTraco" | "pincelDeBolha" | "lapisVetorial" | "modelador" | "suavizar" | "borrachaDeCaminho" | "unir" | "borrachaVetorial" | "tesoura" | "faca" | "remodelar";
 
 const EDITA_A_ESCOLHIDA = "Vale na forma ou no caminho escolhido";
 const DICA: Record<FerramentaDoPincelVetorial, string> = {
@@ -20,10 +20,11 @@ const DICA: Record<FerramentaDoPincelVetorial, string> = {
   borrachaVetorial: "Apaga da forma escolhida, ou de todas debaixo do pincel; Alt apaga um retângulo",
   tesoura: "Clique no caminho escolhido",
   faca: "Corta a forma escolhida, ou todas que o traço atravessa; Alt corta em linha reta",
+  remodelar: "Arraste um ponto do caminho escolhido: os vizinhos vão junto, menos quanto mais longe",
 };
 
 export function OpcoesDoPincelVetorialNaBarra({ ferramenta, opcoes, aoMudar }: { ferramenta: FerramentaDoPincelVetorial; opcoes: OpcoesDoPincelVetorial; aoMudar: (opcoes: OpcoesDoPincelVetorial) => void }) {
-  const numero = (chave: "espessura" | "distancia" | "raioDaBolha" | "raio" | "suavidade", rotulo: string, min: number, max: number, sufixo = "") => (
+  const numero = (chave: "espessura" | "distancia" | "raioDaBolha" | "raio" | "suavidade" | "alcance", rotulo: string, min: number, max: number, sufixo = "") => (
     <label className="flex items-center gap-1">
       {rotulo}
       <input type="number" aria-label={rotulo} className={CAMPO} min={min} max={max} value={opcoes[chave]} onChange={(e) => aoMudar({ ...opcoes, [chave]: Math.min(max, Math.max(min, Number(e.currentTarget.value) || 0)) })} />
@@ -61,6 +62,7 @@ export function OpcoesDoPincelVetorialNaBarra({ ferramenta, opcoes, aoMudar }: {
       ) : null}
       {ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? numero("raio", "Raio", 1, 1000, "px") : null}
       {ferramenta === "suavizar" ? numero("suavidade", "Suavidade", 0, 100, "%") : null}
+      {ferramenta === "remodelar" ? numero("alcance", "Alcance", 1, 5000, "px") : null}
       {desenha || ferramenta === "unir" ? numero("distancia", "Distância", 1, 100, "px da tela") : null}
       <span className="text-suave">{DICA[ferramenta]}</span>
     </>

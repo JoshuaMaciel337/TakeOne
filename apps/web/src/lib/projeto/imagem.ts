@@ -783,10 +783,11 @@ export function apagarCamadasOcultas(projeto: Projeto): Projeto {
 }
 
 /**
- * A cópia entra logo acima da original, com ids novos e um pouco deslocada (para dar para ver que são duas). Uma
- * pasta é copiada com tudo o que há dentro (as cópias ficam na pasta copiada).
+ * A cópia entra logo acima da original, com ids novos e um pouco deslocada (para dar para ver que são duas), ou no
+ * mesmo lugar com `noLugar` (as cópias das ferramentas de transformar). Uma pasta é copiada com tudo o que há dentro
+ * (as cópias ficam na pasta copiada).
  */
-export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string): { projeto: Projeto; clipeId: string } {
+export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string, noLugar = false): { projeto: Projeto; clipeId: string } {
   const indice = indiceDaCamada(projeto, faixaId);
   const original = projeto.faixas[indice];
   const bloco = comDescendentes(projeto, faixaId);
@@ -794,7 +795,7 @@ export function duplicarCamada(projeto: Projeto, ctx: Contexto, faixaId: string)
   const copias = bloco.map((faixa) => {
     const clipe = structuredClone(faixa.clipes[0]);
     const t = clipe.transformacao;
-    const deslocar = faixa === original && !clipe.pasta;
+    const deslocar = !noLugar && faixa === original && !clipe.pasta;
     return {
       ...faixa,
       id: novosIds.get(faixa.id)!,

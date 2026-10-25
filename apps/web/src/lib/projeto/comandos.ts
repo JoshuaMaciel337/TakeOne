@@ -136,6 +136,8 @@ import {
   mudarTamanhoDaImagem,
   recortarImagem,
   transformarCamada,
+  tamanhoDaImagem,
+  caminhosDoVetorNaImagem,
   tamanhoComPixels,
   tamanhoDaTela,
   girarImagem,
@@ -176,6 +178,8 @@ import type { TextoRico } from "../texto/modelo.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { CamadaVetorial, OperacaoDoCaminho, Subcaminho } from "../vetor/modelo.ts";
+import { transformarCaminhos } from "../vetor/edicao.ts";
+import { type Afim, aplicarAfim, posicaoPelaAfim } from "../transformar/ferramentas.ts";
 import type { Cor } from "./cor.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
 import { type PlanoDosPixels, substituirPorPixels } from "./rasterizar.ts";
@@ -286,6 +290,7 @@ export type Comando =
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.transformarCamadas"; parametros: { clipeIds: string[]; afim: Afim; copiar: boolean } }
   | { comando: "imagem.caminhosDasFormas"; parametros: { trocas: { clipeId: string; caminhos: Subcaminho[] }[]; apagar: string[] } }
   | { comando: "imagem.dividirFormas"; parametros: { divisoes: { clipeId: string; pedacos: Subcaminho[][] }[] } }
   | { comando: "imagem.unirFormas"; parametros: { clipeId: string; caminhos: Subcaminho[]; apagar: string[] } }
@@ -452,6 +457,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.adicionarReflexo": "desenhar o reflexo",
   "imagem.unirFormas": "juntar as formas",
   "imagem.caminhosDasFormas": "apagar das formas",
+  "imagem.transformarCamadas": "transformar as camadas",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -850,6 +856,35 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.transformarCamadas": {
+      // Girar, Refletir, Escalar e Inclinar: a posição da camada quando dá; as formas, pelos pontos; com copiar, nas cópias
+      const documento = tamanhoDaImagem(projeto);
+      let atual = projeto;
+      const selecao: string[] = [];
+      for (const id of parametros.clipeIds) {
+        let alvo = id;
+        if (parametros.copiar) {
+          const faixaId = faixaDoClipeNoProjeto(atual, id);
+          if (!faixaId) continue;
+          const copia = duplicarCamada(atual, ctx, faixaId, true);
+          atual = copia.projeto;
+          alvo = copia.clipeId;
+        }
+        const clipe = atual.faixas.find((faixa) => faixa.clipes[0]?.id === alvo)?.clipes[0];
+        if (!clipe) continue;
+        const tr = clipe.transformacao;
+        const posicao = posicaoPelaAfim(parametros.afim, { x: (tr.x + 0.5) * documento.largura, y: (tr.y + 0.5) * documento.altura }, tr.escala, tr.rotacao);
+        if (posicao) {
+          const virar = clipe.virar ?? { horizontal: false, vertical: false };
+          const nova = { x: posicao.centro.x / documento.largura - 0.5, y: posicao.centro.y / documento.altura - 0.5, escala: posicao.escala, rotacao: posicao.rotacao };
+          atual = transformarCamada(atual, alvo, nova, posicao.espelhado ? { ...virar, horizontal: !virar.horizontal } : undefined);
+        } else if (clipe.vetor) {
+          atual = trocarCaminhosDoVetor(atual, alvo, transformarCaminhos(caminhosDoVetorNaImagem(clipe, documento), (p) => aplicarAfim(parametros.afim, p)));
+        }
+        selecao.push(alvo);
+      }
+      return { projeto: atual, selecao };
+    }
     case "imagem.caminhosDasFormas": {
       // A Borracha vetorial: cada forma com o que sobrou, e as que sumiram de todo saem
       let atual = projeto;

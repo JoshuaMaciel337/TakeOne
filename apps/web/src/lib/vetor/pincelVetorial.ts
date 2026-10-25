@@ -30,9 +30,11 @@ export type OpcoesDoPincelVetorial = {
   raio: number;
   /** De 0 a 100: o quanto cada passada do Suavizar alisa. */
   suavidade: number;
+  /** Até onde o Remodelar leva os vizinhos do ponto agarrado, em pixels. */
+  alcance: number;
 };
 
-export const PINCEL_VETORIAL_PADRAO: OpcoesDoPincelVetorial = { fidelidade: 3, espessura: 4, editarSelecionados: true, distancia: 12, fechar: true, raioDaBolha: 12, mesclarBolha: true, raio: 12, suavidade: 50 };
+export const PINCEL_VETORIAL_PADRAO: OpcoesDoPincelVetorial = { fidelidade: 3, espessura: 4, editarSelecionados: true, distancia: 12, fechar: true, raioDaBolha: 12, mesclarBolha: true, raio: 12, suavidade: 50, alcance: 80 };
 
 /** A tolerância do ajuste de curvas (pixels da imagem) para a fidelidade. */
 export const toleranciaDaFidelidade = (fidelidade: number) => [0.5, 1, 2.5, 5, 10][Math.max(0, Math.min(4, Math.round(fidelidade) - 1))];
