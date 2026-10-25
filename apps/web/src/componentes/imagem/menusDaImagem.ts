@@ -328,6 +328,8 @@ export type AcoesDosMenus = {
   /** Camada › Mesclar objetos: há duas formas escolhidas, e a janela dos passos. */
   duasFormas: boolean;
   mesclarObjetos: () => void;
+  /** Camada › Objetos no caminho: a janela das cópias. */
+  objetosNoCaminho: () => void;
   desagrupar: () => void;
   recortar: () => void;
   vincular: () => void;
@@ -755,6 +757,7 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
         "-",
         { nome: "Agrupar camadas", atalho: "Ctrl+G", desativado: semCamada, aoEscolher: a.agrupar },
         { nome: "Desagrupar camadas", atalho: "Ctrl+Shift+G", desativado: !a.temPasta, aoEscolher: a.desagrupar },
+        { nome: "Objetos no caminho…", desativado: semCamada, aoEscolher: a.objetosNoCaminho, titulo: "Cópias da camada escolhida ao longo do caminho escolhido no painel Caminhos (ou de outra forma escolhida)" },
         { nome: "Mesclar objetos…", atalho: "Ctrl+Alt+B", desativado: !a.duasFormas, aoEscolher: a.mesclarObjetos, titulo: "Os passos entre as duas formas escolhidas" },
         { nome: "Ocultar camadas", atalho: "Ctrl+,", desativado: semCamada, aoEscolher: a.esconder },
         "-",

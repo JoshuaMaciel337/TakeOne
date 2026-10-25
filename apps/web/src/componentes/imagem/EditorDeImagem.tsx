@@ -141,6 +141,8 @@ import { OpcoesDaPerspectivaNaBarra } from "./OpcoesDaPerspectiva";
 import { COTA_PADRAO, geometriaDaCota, type OpcoesDaCota, textoDaCota } from "@/lib/vetor/cota";
 import { OpcoesDaCotaNaBarra } from "./OpcoesDaCota";
 import { JanelaMesclarObjetos } from "./JanelaMesclarObjetos";
+import { JanelaObjetosNoCaminho } from "./JanelaObjetosNoCaminho";
+import { lugaresNoCaminho } from "@/lib/vetor/repetir";
 import { passosDaMescla } from "@/lib/vetor/mesclar";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
 import { caminhosDoPlano, type GradeDePerspectiva, gradePadrao, type PlanoDaPerspectiva, retanguloNoPlano } from "@/lib/vetor/perspectiva";
@@ -413,6 +415,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [opcoesDoReflexo, setOpcoesDoReflexo] = useState<OpcoesDoReflexo>(REFLEXO_PADRAO);
   const [opcoesDaCota, setOpcoesDaCota] = useState<OpcoesDaCota>(COTA_PADRAO);
   const [mesclando, setMesclando] = useState(false);
+  const [repetindo, setRepetindo] = useState<{ clipeId: string; caminho: Subcaminho; origem: string } | null>(null);
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
   const baseDoTracoLivre = useRef<Subcaminho[] | null>(null);
@@ -5607,6 +5610,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     agrupar: () => escolhidas.length && executar({ comando: "imagem.agrupar", parametros: { faixaIds } }),
     duasFormas: formasDaMescla().length === 2,
     mesclarObjetos: () => (formasDaMescla().length === 2 ? setMesclando(true) : mostrarAviso("Escolha duas formas para mesclar.")),
+    objetosNoCaminho: () => {
+      if (!projeto) return;
+      // As escolhidas de cima para baixo: a de cima vai ao longo do caminho; o caminho é o escolhido no painel Caminhos
+      // ou o da forma escolhida mais embaixo
+      const escolhidasNaOrdem = projeto.faixas.map((faixa) => faixa.clipes[0]).filter((clipe) => clipe && !clipe.pasta && selecao.includes(clipe.id));
+      const objeto = escolhidasNaOrdem[0];
+      if (!objeto) return void mostrarAviso("Escolha a camada que vai ao longo do caminho.");
+      const doPainel = caminhoDaVez?.subcaminhos.find((sub) => sub.nos.length >= 2);
+      const forma = escolhidasNaOrdem.length > 1 ? escolhidasNaOrdem[escolhidasNaOrdem.length - 1] : null;
+      const daForma = forma?.vetor ? caminhosDoVetorNaImagem(forma, tamanhoDaImagem(projeto)).find((sub) => sub.nos.length >= 2) : undefined;
+      const caminho = doPainel ?? daForma;
+      if (!caminho) return void mostrarAviso("Escolha um caminho no painel Caminhos, ou escolha também (embaixo) a forma do caminho.");
+      setRepetindo({ clipeId: objeto.id, caminho, origem: doPainel ? `o caminho "${caminhoDaVez?.nome ?? "de trabalho"}"` : "a forma escolhida de baixo" });
+    },
     desagrupar: () => {
       for (const faixa of escolhidas) if (faixa.clipes[0].pasta) executar({ comando: "imagem.desagrupar", parametros: { faixaId: faixa.id } });
     },
@@ -7449,6 +7466,18 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           fonteDaMascaraDosFiltros={pinturas.fonteDaMascaraDosFiltros}
           aoFechar={() => setExportandoPranchetas(false)}
           aoAvisar={mostrarAviso}
+        />
+      ) : null}
+      {repetindo ? (
+        <JanelaObjetosNoCaminho
+          origem={repetindo.origem}
+          aoFechar={() => setRepetindo(null)}
+          aoConfirmar={(quantidade, girar) => {
+            const { clipeId, caminho } = repetindo;
+            setRepetindo(null);
+            const lugares = lugaresNoCaminho(caminho, quantidade).map((lugar) => ({ x: lugar.x, y: lugar.y, giro: girar ? lugar.angulo : 0 }));
+            executar({ comando: "imagem.repetirNoCaminho", parametros: { clipeId, lugares } });
+          }}
         />
       ) : null}
       {mesclando ? (

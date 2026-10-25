@@ -292,6 +292,7 @@ export type Comando =
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.repetirNoCaminho"; parametros: { clipeId: string; lugares: { x: number; y: number; giro: number }[] } }
   | { comando: "imagem.mesclarObjetos"; parametros: { de: string; ate: string; passos: { vetor: CamadaVetorial; centro: { x: number; y: number }; opacidade: number }[] } }
   | { comando: "imagem.adicionarCota"; parametros: { linha: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico; ponto: { x: number; y: number }; giro: number; acima?: string | null } }
   | { comando: "imagem.construirFormas"; parametros: { apagar: string[]; pecas: { origem: string; caminhos: Subcaminho[]; cor?: string }[] } }
@@ -467,6 +468,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.construirFormas": "construir as formas",
   "imagem.adicionarCota": "pôr a cota",
   "imagem.mesclarObjetos": "mesclar os objetos",
+  "imagem.repetirNoCaminho": "pôr os objetos no caminho",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -867,6 +869,27 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.repetirNoCaminho": {
+      // As cópias da camada, cada uma com o meio num lugar do caminho e o giro somado, num grupo "Repetição"
+      const faixaId = faixaDoClipeNoProjeto(projeto, parametros.clipeId);
+      const original = projeto.faixas.find((faixa) => faixa.id === faixaId)?.clipes[0];
+      if (!faixaId || !original) return { projeto };
+      const documento = tamanhoDaImagem(projeto);
+      let atual = projeto;
+      const faixas: string[] = [];
+      for (const lugar of parametros.lugares) {
+        const copia = duplicarCamada(atual, ctx, faixaId, true);
+        atual = transformarCamada(copia.projeto, copia.clipeId, { x: lugar.x / documento.largura - 0.5, y: lugar.y / documento.altura - 0.5, rotacao: original.transformacao.rotacao + lugar.giro });
+        const faixa = faixaDoClipeNoProjeto(atual, copia.clipeId);
+        if (faixa) faixas.push(faixa);
+      }
+      if (!faixas.length) return { projeto: atual };
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const numero = projeto.faixas.filter((faixa) => faixa.nome?.startsWith("Repetição")).length + 1;
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: `Repetição ${numero}` } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
     case "imagem.mesclarObjetos": {
       // Os passos entre as duas formas, cada um acima do anterior, e tudo num grupo "Mescla"
       const faixaDe = faixaDoClipeNoProjeto(projeto, parametros.de);
