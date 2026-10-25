@@ -195,6 +195,8 @@ export type IdFerramentaDaImagem =
   | "cristalizar"
   | "enrugar"
   | "larguraDoTraco"
+  | "construtorDeFormas"
+  | "pinturaViva"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -343,6 +345,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("refletir", "Ferramenta Refletir", "", SquareSplitHorizontal, "Arraste da origem na direção do eixo do espelho (Shift de 45°; Alt solta uma cópia; Alt + clique, os números)."),
     F("escalar", "Ferramenta Escalar", "", Scaling, "Arraste para mudar o tamanho em volta da origem (Shift por igual; Alt solta uma cópia; Alt + clique, os números)."),
     F("inclinar", "Ferramenta Inclinar", "", Italic, "Arraste para o lado (ou para cima e para baixo) para inclinar em volta da origem (Alt solta uma cópia; Alt + clique, os números)."),
+    F("construtorDeFormas", "Ferramenta Construtor de formas", "", Combine, "Com várias formas escolhidas, arraste pelas faces para juntá-las numa forma só (Alt: apaga as faces); cada face vira uma forma."),
+    F("pinturaViva", "Ferramenta Pintura viva", "", PaintBucket, "Com várias formas escolhidas, clique numa face (o pedaço entre as sobreposições) para enchê-la com a cor de primeiro plano."),
     F("larguraDoTraco", "Ferramenta Largura do traço", "", Diameter, "Arraste a partir do caminho da forma escolhida para engrossar ou afinar o traço ali (Alt: um lado só); clique duplo num ponto o tira."),
     F("deformarVetor", "Ferramenta Deformar", "", Wind, "Arraste sobre a forma escolhida para empurrar o contorno com o pincel."),
     F("torcer", "Ferramenta Torcer", "", RefreshCcwDot, "Segure ou arraste sobre a forma escolhida para torcer o contorno debaixo do pincel."),

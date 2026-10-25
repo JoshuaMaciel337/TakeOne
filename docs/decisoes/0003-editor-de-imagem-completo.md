@@ -305,7 +305,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Borracha vetorial, Tesoura, Faca, cortes em linha e em retângulo
 - [x] Girar, Refletir, Escalar, Inclinar, Remodelar
 - [x] Largura do traço, Deformar, Torcer, Franzir, Inflar, Recortar, Cristalizar, Enrugar
-- [ ] Construtor de formas e Pintura viva
+- [x] Construtor de formas e Pintura viva
 - [ ] Grade de perspectiva
 - [ ] Malha de degradê, Mesclar objetos, Objetos no caminho, Cotas
 - [ ] Símbolos (borrifar, mover, juntar, redimensionar, girar, tingir, transparência, estilo)

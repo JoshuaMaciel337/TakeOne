@@ -290,6 +290,7 @@ export type Comando =
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.construirFormas"; parametros: { apagar: string[]; pecas: { origem: string; caminhos: Subcaminho[]; cor?: string }[] } }
   | { comando: "imagem.transformarCamadas"; parametros: { clipeIds: string[]; afim: Afim; copiar: boolean } }
   | { comando: "imagem.caminhosDasFormas"; parametros: { trocas: { clipeId: string; caminhos: Subcaminho[] }[]; apagar: string[] } }
   | { comando: "imagem.dividirFormas"; parametros: { divisoes: { clipeId: string; pedacos: Subcaminho[][] }[] } }
@@ -458,6 +459,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.unirFormas": "juntar as formas",
   "imagem.caminhosDasFormas": "apagar das formas",
   "imagem.transformarCamadas": "transformar as camadas",
+  "imagem.construirFormas": "construir as formas",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -856,6 +858,27 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.construirFormas": {
+      // O Construtor de formas e a Pintura viva: cada peça é uma cópia da forma de onde veio (a aparência dela) com os
+      // caminhos da peça (e, na pintura, a cor nova); as formas de antes saem
+      let atual = projeto;
+      const selecao: string[] = [];
+      for (const peca of parametros.pecas) {
+        const faixaId = faixaDoClipeNoProjeto(atual, peca.origem);
+        if (!faixaId) continue;
+        const copia = duplicarCamada(atual, ctx, faixaId, true);
+        // A peça fica com o nome da forma de onde veio (sem o "cópia")
+        const nome = atual.faixas.find((faixa) => faixa.id === faixaId)?.nome;
+        atual = trocarCaminhosDoVetor(copia.projeto, copia.clipeId, peca.caminhos);
+        atual = { ...atual, faixas: atual.faixas.map((faixa) => (faixa.clipes[0]?.id === copia.clipeId ? { ...faixa, nome } : faixa)) };
+        if (peca.cor) {
+          const cor = peca.cor;
+          atual = { ...atual, faixas: atual.faixas.map((faixa) => (faixa.clipes[0]?.id === copia.clipeId && faixa.clipes[0].vetor ? { ...faixa, clipes: [{ ...faixa.clipes[0], vetor: { ...faixa.clipes[0].vetor, preenchimento: { tipo: "cor" as const, cor } } }] } : faixa)) };
+        }
+        selecao.push(copia.clipeId);
+      }
+      return { projeto: executarComando(atual, { comando: "imagem.apagarVarias", parametros: { faixaIds: parametros.apagar } }, ctx).projeto, selecao };
+    }
     case "imagem.transformarCamadas": {
       // Girar, Refletir, Escalar e Inclinar: a posição da camada quando dá; as formas, pelos pontos; com copiar, nas cópias
       const documento = tamanhoDaImagem(projeto);

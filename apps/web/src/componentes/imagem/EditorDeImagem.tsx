@@ -136,6 +136,7 @@ import { type Afim as AfimDaFerramenta, aplicarAfim, type FerramentaDeTransforma
 import { JanelaTransformarNumeros } from "./JanelaTransformarNumeros";
 import { OpcoesDoLiquefazerNaBarra } from "./OpcoesDoLiquefazer";
 import { OpcoesDaLarguraNaBarra } from "./OpcoesDaLargura";
+import { construirPecas, facesDasFormas } from "@/lib/vetor/construtor";
 import type { PontoDeLargura } from "@/lib/vetor/largura";
 import { caminhosDoLiquefazer, comecarLiquefazer, type EstadoDoLiquefazer, LIQUEFAZER_PADRAO, type OpcoesDoLiquefazer, passoDoLiquefazer, terminarLiquefazer } from "@/lib/vetor/liquefazer";
 import { comVinculadas } from "@/lib/projeto/alinhar";
@@ -4080,6 +4081,28 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     const { x, y, largura, altura } = reconhecida.caixa;
     criarFormaViva(reconhecida.tipo, arrastoDaForma({ x, y }, { x: x + largura, y: y + altura }));
   };
+  // O Construtor de formas e a Pintura viva: as formas escolhidas (de baixo para cima) e as faces delas
+  const construindo = ferramenta === "construtorDeFormas" || ferramenta === "pinturaViva";
+  const formasDoConstrutor = useMemo(() => {
+    if (!construindo || !projetoNaTela) return [];
+    const quadro = tamanhoDaImagem(projetoNaTela);
+    return [...projetoNaTela.faixas]
+      .reverse()
+      .filter((faixa) => !faixa.oculta && faixa.clipes[0]?.vetor && !faixa.clipes[0].vetor.quadro && selecao.includes(faixa.clipes[0].id))
+      .map((faixa) => ({ clipeId: faixa.clipes[0].id, faixaId: faixa.id, caminhos: caminhosDoVetorNaImagem(faixa.clipes[0], quadro) }));
+  }, [construindo, projetoNaTela, selecao]);
+  const facesDoConstrutor = useMemo(() => facesDasFormas(formasDoConstrutor.map((forma) => forma.caminhos)), [formasDoConstrutor]);
+  const construirFormas = (juntar: number[], apagar: number[], cor?: string) => {
+    const pecas = construirPecas(facesDoConstrutor, juntar, apagar);
+    executar({
+      comando: "imagem.construirFormas",
+      parametros: {
+        apagar: formasDoConstrutor.map((forma) => forma.faixaId),
+        // Na pintura, a peça da face pintada (a última) leva a cor
+        pecas: pecas.map((peca, i) => ({ origem: formasDoConstrutor[peca.origem].clipeId, caminhos: peca.caminhos, ...(cor && i === pecas.length - 1 ? { cor } : {}) })),
+      },
+    });
+  };
   /** A Largura do traço: o perfil novo no traço da forma escolhida (a margem da caixa acompanha o maior lado). */
   const mudarPerfilDoTraco = (perfil: PontoDeLargura[], provisorio: boolean) => {
     const clipe = formaEmEdicao;
@@ -6686,6 +6709,12 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               comFormaEscolhida={Boolean(selecionado?.clipe.vetor)}
               aoMudar={(mudanca) => setForma((atual) => ({ ...atual, ...mudanca }))}
             />
+          ) : ferramenta === "construtorDeFormas" || ferramenta === "pinturaViva" ? (
+            <span className="text-suave">
+              {formasDoConstrutor.length
+                ? `${facesDoConstrutor.length} faces em ${formasDoConstrutor.length} ${formasDoConstrutor.length === 1 ? "forma" : "formas"}. ${ferramenta === "pinturaViva" ? "Clique numa face para enchê-la com a cor de primeiro plano." : "Arraste pelas faces para juntá-las; com Alt, para apagá-las."}`
+                : "Escolha as formas (Shift + clique no Mover, ou no painel Camadas)."}
+            </span>
           ) : ferramenta === "larguraDoTraco" ? (
             <OpcoesDaLarguraNaBarra perfil={formaEmEdicao?.vetor ? (formaEmEdicao.vetor.traco?.perfil ?? []) : null} comTraco={Boolean(formaEmEdicao?.vetor?.traco)} aoMudar={(perfil) => mudarPerfilDoTraco(perfil, false)} />
           ) : LIQUEFAZER_DA_FERRAMENTA[ferramenta] ? (
@@ -7006,6 +7035,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             aoMedirZoom={setZoomMedido}
             regua={ferramenta === "regua" ? { medida, aoMudar: setMedida } : null}
             tamanhoDaAmostra={ladoDaAmostra}
+            construtor={
+              construindo && facesDoConstrutor.length
+                ? { modo: ferramenta === "pinturaViva" ? "pinturaViva" : "construtor", faces: facesDoConstrutor, cor: cores.primeiroPlano, aoConstruir: (juntar, apagar) => construirFormas(juntar, apagar), aoPintar: (face) => construirFormas([face], [], cores.primeiroPlano) }
+                : null
+            }
             larguraDoTraco={
               ferramenta === "larguraDoTraco" && formaEmEdicao?.vetor?.traco && caminhosEditaveis
                 ? { caminhos: caminhosEditaveis, largura: formaEmEdicao.vetor.traco.largura * (projetoNaTela ? pixelsPorUnidade(formaEmEdicao.vetor.caixa, formaEmEdicao.transformacao.escala, tamanhoDaImagem(projetoNaTela)) : 1), perfil: formaEmEdicao.vetor.traco.perfil ?? [], aoMudar: mudarPerfilDoTraco }
