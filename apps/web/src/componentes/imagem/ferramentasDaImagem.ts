@@ -55,6 +55,7 @@ import {
   Activity,
   Diameter,
   Grid2x2Check,
+  RulerDimensionLine,
   Tornado,
   Target,
   Move,
@@ -200,6 +201,7 @@ export type IdFerramentaDaImagem =
   | "pinturaViva"
   | "gradeDePerspectiva"
   | "selecaoDePerspectiva"
+  | "cota"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -267,6 +269,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("nota", "Ferramenta Nota", "I", StickyNote, "Clique para pôr uma nota na imagem; o painel Notas mostra o texto dela."),
     F("amostradorDeCor", "Ferramenta Amostrador de cor", "I", Crosshair, "Clique para pôr um ponto (até 10) cuja cor o painel Informações mostra; arraste para mover e Alt + clique para tirar."),
     F("regua", "Ferramenta Régua", "I", Ruler, "Arraste para medir a distância e o ângulo; Endireitar camada deixa a linha medida reta."),
+    F("cota", "Ferramenta Cota", "I", RulerDimensionLine, "Arraste entre dois pontos para pôr a cota: a linha com as setas e a distância, na escala de medida (Shift de 45°)."),
   ],
   [
     F("recuperacaoParaManchas", "Ferramenta Pincel de recuperação para manchas", "J", Sparkle, "Pinte por cima da mancha: ela é refeita com o que está em volta."),

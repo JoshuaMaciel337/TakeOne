@@ -292,6 +292,7 @@ export type Comando =
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.perspectiva"; parametros: { grade: GradeDePerspectiva | null; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.adicionarCota"; parametros: { linha: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico; ponto: { x: number; y: number }; giro: number; acima?: string | null } }
   | { comando: "imagem.construirFormas"; parametros: { apagar: string[]; pecas: { origem: string; caminhos: Subcaminho[]; cor?: string }[] } }
   | { comando: "imagem.transformarCamadas"; parametros: { clipeIds: string[]; afim: Afim; copiar: boolean } }
   | { comando: "imagem.caminhosDasFormas"; parametros: { trocas: { clipeId: string; caminhos: Subcaminho[] }[]; apagar: string[] } }
@@ -463,6 +464,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.caminhosDasFormas": "apagar das formas",
   "imagem.transformarCamadas": "transformar as camadas",
   "imagem.construirFormas": "construir as formas",
+  "imagem.adicionarCota": "pôr a cota",
   "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
@@ -863,6 +865,20 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.adicionarCota": {
+      // A linha e o número num grupo "Cota", num passo só (o número girado com a linha)
+      const linha = executarComando(projeto, { comando: "imagem.adicionarVetor", parametros: { vetor: parametros.linha, centro: parametros.centro, nome: "Linha da cota", acima: parametros.acima } }, ctx);
+      const faixaDaLinha = faixaDoClipeNoProjeto(linha.projeto, linha.selecao?.[0]);
+      const idDoTexto = ctx.novoId();
+      let atual = executarComando(linha.projeto, { comando: "imagem.adicionarTextoRico", parametros: { texto: parametros.texto, ponto: parametros.ponto, nome: "Número da cota", acima: faixaDaLinha, id: idDoTexto } }, ctx).projeto;
+      if (parametros.giro) atual = transformarCamada(atual, idDoTexto, { rotacao: parametros.giro });
+      const faixas = [faixaDaLinha, faixaDoClipeNoProjeto(atual, idDoTexto)].filter((f): f is string => Boolean(f));
+      const agrupado = executarComando(atual, { comando: "imagem.agrupar", parametros: { faixaIds: faixas } }, ctx);
+      const pasta = faixaDoClipeNoProjeto(agrupado.projeto, agrupado.selecao?.[0]);
+      const numero = projeto.faixas.filter((faixa) => faixa.nome?.startsWith("Cota")).length + 1;
+      const nomeado = pasta ? executarComando(agrupado.projeto, { comando: "imagem.camada", parametros: { faixaIds: [pasta], mudanca: { nome: `Cota ${numero}` } } }, ctx).projeto : agrupado.projeto;
+      return { projeto: nomeado, selecao: agrupado.selecao };
+    }
     case "imagem.construirFormas": {
       // O Construtor de formas e a Pintura viva: cada peça é uma cópia da forma de onde veio (a aparência dela) com os
       // caminhos da peça (e, na pintura, a cor nova); as formas de antes saem

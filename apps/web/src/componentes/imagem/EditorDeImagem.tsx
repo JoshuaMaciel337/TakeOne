@@ -138,6 +138,8 @@ import { OpcoesDoLiquefazerNaBarra } from "./OpcoesDoLiquefazer";
 import { OpcoesDaLarguraNaBarra } from "./OpcoesDaLargura";
 import { construirPecas, facesDasFormas } from "@/lib/vetor/construtor";
 import { OpcoesDaPerspectivaNaBarra } from "./OpcoesDaPerspectiva";
+import { COTA_PADRAO, geometriaDaCota, type OpcoesDaCota, textoDaCota } from "@/lib/vetor/cota";
+import { OpcoesDaCotaNaBarra } from "./OpcoesDaCota";
 import { cantosNoPlano } from "./PerspectivaNaPrevia";
 import { caminhosDoPlano, type GradeDePerspectiva, gradePadrao, type PlanoDaPerspectiva, retanguloNoPlano } from "@/lib/vetor/perspectiva";
 import { subcaminhosDaForma } from "@/lib/vetor/modelo";
@@ -407,6 +409,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const [forma, setForma] = useState<OpcoesDaForma>(FORMA_PADRAO);
   const [opcoesDosGeradores, setOpcoesDosGeradores] = useState<OpcoesDosGeradores>(GERADORES_PADRAO);
   const [opcoesDoReflexo, setOpcoesDoReflexo] = useState<OpcoesDoReflexo>(REFLEXO_PADRAO);
+  const [opcoesDaCota, setOpcoesDaCota] = useState<OpcoesDaCota>(COTA_PADRAO);
   const [pincelVetorial, setPincelVetorial] = useState<OpcoesDoPincelVetorial>(PINCEL_VETORIAL_PADRAO);
   // O caminho do começo do traço do Suavizar e da Borracha de caminho (cada movimento refaz a partir dele)
   const baseDoTracoLivre = useRef<Subcaminho[] | null>(null);
@@ -3936,6 +3939,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       else criarFormaViva(viva, arrasto);
       return;
     }
+    if (ferramenta === "cota") {
+      if (clique || !projeto) return;
+      void criarCota(arrasto.de, arrasto.ate);
+      return;
+    }
     if (ferramenta === "reflexo") {
       // Um clique sem arrastar: os anéis vão para baixo e para a direita, a três diâmetros do meio
       const fim = clique ? { x: arrasto.de.x + opcoesDoReflexo.diametro * 2.1, y: arrasto.de.y + opcoesDoReflexo.diametro * 2.1 } : arrasto.ate;
@@ -3964,6 +3972,19 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
     // Um clique sem arrastar: a forma com um quarto do lado menor da imagem, no ponto, na proporção dela
     const lado = projeto ? Math.min(tamanhoDaImagem(projeto).largura, tamanhoDaImagem(projeto).altura) / 4 : 100;
     porFormaPersonalizada(forma.personalizada, clique ? { x: arrasto.x - lado / 2, y: arrasto.y - lado / 2, largura: lado, altura: lado } : arrasto, clique || Boolean(arrasto.proporcional));
+  };
+  /** A Cota: a linha com as setas (uma forma) e o número na escala de medida (um texto girado com ela), num grupo. */
+  const criarCota = async (de: { x: number; y: number }, ate: { x: number; y: number }) => {
+    if (!projeto) return;
+    const { caminhos, meioDoTexto, giro } = geometriaDaCota(de, ate, opcoesDaCota);
+    const traco = { ...TRACO_PADRAO, tinta: { tipo: "cor" as const, cor: opcoesDaCota.cor }, largura: opcoesDaCota.espessura, alinhamento: "centro" as const };
+    const { vetor, centro } = camadaDosCaminhos(caminhos, { tipo: "cor", cor: opcoesDaCota.cor }, traco);
+    const novo = textoNovo(textoDaCota(Math.hypot(ate.x - de.x, ate.y - de.y), projeto.escala_de_medida, opcoesDaCota.casas), { tamanho: opcoesDaCota.tamanhoDoTexto, cor: opcoesDaCota.cor }, "ponto");
+    await esperarFontes([novo]);
+    const texto = textoMedido({ ...novo, paragrafo: { ...novo.paragrafo, alinhamento: "centro" } });
+    // O ponto do texto é o começo da linha de base: o meio da caixa fica no meio do número
+    const ponto = { x: meioDoTexto.x - texto.caixa.largura / 2 + texto.origem.x, y: meioDoTexto.y - texto.caixa.altura / 2 + texto.origem.y };
+    executar({ comando: "imagem.adicionarCota", parametros: { linha: vetor, centro, texto, ponto, giro, acima: escolhidas[0]?.id ?? null } });
   };
   /** As ferramentas de linha: caminhos comuns com o traço na cor de primeiro plano (e o fundo no preenchimento). */
   const porGerador = (gerador: GeradorDeCaminhos, arrasto: ArrastoDaForma) => {
@@ -6813,6 +6834,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             <OpcoesDoLiquefazerNaBarra ferramenta={LIQUEFAZER_DA_FERRAMENTA[ferramenta]!} opcoes={opcoesDoLiquefazer} aoMudar={setOpcoesDoLiquefazer} />
           ) : FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta) ? (
             <OpcoesDoPincelVetorialNaBarra ferramenta={ferramenta as FerramentaDoPincelVetorial} opcoes={pincelVetorial} aoMudar={setPincelVetorial} />
+          ) : ferramenta === "cota" ? (
+            <OpcoesDaCotaNaBarra opcoes={opcoesDaCota} escala={projetoNaTela?.escala_de_medida ?? null} aoMudar={setOpcoesDaCota} />
           ) : ferramenta === "reflexo" ? (
             <OpcoesDoReflexoNaBarra opcoes={opcoesDoReflexo} aoMudar={setOpcoesDoReflexo} />
           ) : GERADOR_DA_FERRAMENTA[ferramenta] ? (
@@ -7302,6 +7325,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
               if (ferramenta === "quadro") return formaDoArrasto(formaDoQuadro, arrasto).naImagem;
               const gerador = GERADOR_DA_FERRAMENTA[ferramenta];
               if (gerador) return caminhosDoGerador(gerador, arrasto, opcoesDosGeradores);
+              if (ferramenta === "cota") return geometriaDaCota(arrasto.de, arrasto.ate, opcoesDaCota).caminhos;
               if (ferramenta === "reflexo") return camadasDoReflexo(arrasto.de, arrasto.ate, opcoesDoReflexo).flatMap((camada) => camada.caminhos);
               const personalizada = ferramenta === "formaPersonalizada" ? caminhosDaFormaPersonalizada(forma.personalizada, formasDoEspaco) : null;
               return personalizada ? caminhosNaCaixa(personalizada.caminhos, arrasto, Boolean(arrasto.proporcional)) : null;
