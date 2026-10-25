@@ -598,6 +598,17 @@ def test_simbolos(cliente):
     aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
     assert aberto["simbolos"][0]["nome"] == "Triângulo"
     assert aberto["faixas"][0]["clipes"][0]["simbolo"] == {"id": "s1", "tinta": {"cor": "#0000ff", "quantidade": 0.5}}
+    # O gráfico guarda a tabela no grupo
+    grafico = {"tipo": "colunas", "rotulos": ["Jan", "Fev"], "series": [{"nome": "Vendas", "valores": [10.0, 20.5]}],
+               "caixa": {"x": 10.0, "y": 20.0, "largura": 300.0, "altura": 200.0}, "legenda": True,
+               "cores": ["#2f6fdd"]}
+    pasta = {**clipe(None, 0, 5, id_="g1"), "midia_id": None, "pasta": True, "mesclagem": "passagem",
+             "grafico": grafico}
+    aberto = cliente.get(f"/api/projetos/{projeto['id']}").json()
+    salvo = cliente.put(f"/api/projetos/{projeto['id']}",
+                        json={**aberto, "faixas": [camada("video", pasta), {**faixas[0], "pai": "f-g1"}, faixas[1]]})
+    assert salvo.status_code == 200, salvo.text
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["faixas"][0]["clipes"][0]["grafico"] == grafico
     # No projeto de vídeo, a instância não vale
     video = cliente.post("/api/projetos", json={"nome": "Vídeo", "proporcao": "16:9"}).json()
     so_simbolo = {**clipe(None, 0, 5, id_="i2"), "midia_id": None, "texto": None, "simbolo": {"id": "s1"}}

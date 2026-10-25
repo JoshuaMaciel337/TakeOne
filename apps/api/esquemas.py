@@ -1609,6 +1609,29 @@ class CaminhoDoDocumento(BaseModel):
         return _limpar_espacos(valor)
 
 
+class SerieDoGraficoEntrada(BaseModel):
+    nome: str = Field(max_length=80)
+    valores: list[float] = Field(max_length=100)
+
+
+class CaixaDoGraficoEntrada(BaseModel):
+    x: float = Field(ge=-100_000, le=100_000)
+    y: float = Field(ge=-100_000, le=100_000)
+    largura: float = Field(gt=0, le=100_000)
+    altura: float = Field(gt=0, le=100_000)
+
+
+class GraficoEntrada(BaseModel):
+    """A tabela e o tipo de um gráfico do editor de imagem (apps/web/src/lib/imagem/graficos.ts)."""
+    tipo: Literal["colunas", "colunasEmpilhadas", "barras", "barrasEmpilhadas", "linha", "area", "dispersao", "pizza",
+                  "radar"]
+    rotulos: list[Annotated[str, Field(max_length=80)]] = Field(max_length=100)
+    series: list[SerieDoGraficoEntrada] = Field(max_length=20)
+    caixa: CaixaDoGraficoEntrada
+    legenda: bool = True
+    cores: list[Annotated[str, Field(pattern=COR)]] = Field(min_length=1, max_length=20)
+
+
 class TintaDaInstanciaEntrada(BaseModel):
     cor: str = Field(pattern=COR)
     quantidade: float = Field(ge=0, le=1)
@@ -1686,6 +1709,8 @@ class ClipeEntrada(BaseModel):
     estilo_camada: EstiloDeCamadaEntrada | None = None
     # Só no projeto de imagem: a instância de um símbolo do documento (a forma é a do símbolo, com a tinta)
     simbolo: InstanciaDeSimboloEntrada | None = None
+    # Só no projeto de imagem: a tabela do gráfico que o grupo desenha (para refazer)
+    grafico: GraficoEntrada | None = None
     # Só no projeto de imagem: a camada de preenchimento (cor sólida, degradê ou padrão, cobrindo o documento)
     camada_de_preenchimento: CamadaDePreenchimentoEntrada | None = None
     # Só no projeto de imagem: os filtros inteligentes (a pilha não destrutiva de filtros, com a máscara dela)
