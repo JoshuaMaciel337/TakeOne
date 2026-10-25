@@ -40,6 +40,8 @@ import {
   Rainbow,
   Delete,
   Link2,
+  PencilOff,
+  Axe,
   Tornado,
   Target,
   Move,
@@ -164,6 +166,9 @@ export type IdFerramentaDaImagem =
   | "suavizar"
   | "borrachaDeCaminho"
   | "unir"
+  | "borrachaVetorial"
+  | "tesoura"
+  | "faca"
   | "caneta"
   | "canetaLivre"
   | "canetaDeCurvatura"
@@ -220,6 +225,8 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
     F("corte", "Ferramenta Corte", "C", Crop, "Arraste a caixa e os cantos; fora dela gira. Enter corta, Esc cancela."),
     F("corteDePerspectiva", "Ferramenta Corte de perspectiva", "C", Scan, "Arraste um retângulo e leve os cantos aos do que deveria ser reto; Enter endireita e corta."),
     F("fatia", "Ferramenta Fatia", "C", Slice, "Arraste para desenhar uma fatia; cada fatia sai num arquivo (Arquivo › Exportar › Fatias em arquivos)."),
+    F("tesoura", "Ferramenta Tesoura", "C", Scissors, "Clique no caminho escolhido para cortá-lo ali: o fechado abre, o aberto vira dois."),
+    F("faca", "Ferramenta Faca", "C", Axe, "Passe através das formas para cortá-las em pedaços (cada pedaço vira uma camada); Alt corta em linha reta."),
     F("selecaoDeFatia", "Ferramenta Seleção de fatia", "C", SquareMousePointer, "Clique para escolher uma fatia; arraste para mover, os cantos mudam o tamanho, Delete exclui e o duplo clique abre as opções."),
   ],
   [F("quadro", "Ferramenta Quadro", "K", Frame, "Arraste para desenhar um quadro (retangular ou elíptico) e ponha uma foto nele: com o quadro escolhido, clique numa foto da biblioteca.")],
@@ -256,6 +263,7 @@ export const GRUPOS_DE_FERRAMENTAS: FerramentaDaImagem[][] = [
   [
     F("borracha", "Ferramenta Borracha", "E", Eraser, "Apague pintando na camada de pixels; com a transparência travada, pinta a cor de fundo."),
     F("borrachaDeFundo", "Ferramenta Borracha de fundo", "E", Scissors, "Pinte em volta do que quer guardar: a cor do meio do pincel (e as parecidas) é apagada."),
+    F("borrachaVetorial", "Ferramenta Borracha vetorial", "E", PencilOff, "Apague das formas (a escolhida, ou todas debaixo do pincel) a área por onde passa; Alt apaga um retângulo."),
     F("borrachaMagica", "Ferramenta Borracha mágica", "E", Wand, "Clique numa cor da camada de pixels para apagar os pixels parecidos (pela tolerância)."),
   ],
   [
@@ -347,7 +355,7 @@ export const FORMA_VIVA_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, Tipo
 export const VARIANTE_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, VarianteDaForma>> = { retanguloArredondado: "retanguloArredondado", estrela: "estrela" };
 
 /** Os pincéis e o lápis do editor vetorial (componentes/imagem/TracoLivreNaPrevia.tsx e lib/vetor/pincelVetorial.ts). */
-export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir"]);
+export const FERRAMENTAS_DE_TRACO_LIVRE: ReadonlySet<IdFerramentaDaImagem> = new Set(["pincelDeTraco", "pincelDeBolha", "lapisVetorial", "modelador", "suavizar", "borrachaDeCaminho", "unir", "borrachaVetorial", "tesoura", "faca"]);
 
 /** As ferramentas de linha (lib/vetor/geradores.ts): caminhos comuns, com o traço na cor de primeiro plano. */
 export const GERADOR_DA_FERRAMENTA: Partial<Record<IdFerramentaDaImagem, GeradorDeCaminhos>> = {

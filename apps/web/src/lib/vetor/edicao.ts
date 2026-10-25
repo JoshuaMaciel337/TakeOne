@@ -88,7 +88,8 @@ export function dividirTrecho(sub: Subcaminho, k: number, t: number): Subcaminho
   const temCurva = a.sx !== undefined || b.ex !== undefined;
   let novo: No;
   if (!temCurva) {
-    const m = entre(a, b, t);
+    // O t é o da cúbica com as alças nas âncoras (a conta do acharTrecho), que anda 3t² − 2t³ da reta
+    const m = entre(a, b, t * t * (3 - 2 * t));
     novo = { x: m.x, y: m.y };
   } else {
     const [p1, p2] = alcasDoTrecho(a, b);

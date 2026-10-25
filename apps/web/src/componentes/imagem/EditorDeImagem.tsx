@@ -132,6 +132,7 @@ import { OpcoesDoReflexoNaBarra } from "./OpcoesDoReflexo";
 import { type FerramentaDoPincelVetorial, OpcoesDoPincelVetorialNaBarra } from "./OpcoesDoPincelVetorial";
 import { apagarDoCaminho, caminhoLivre, caminhosDaRegiaoEmCurvas, continuarCaminho, juntarBolha, type OpcoesDoPincelVetorial, PINCEL_VETORIAL_PADRAO, pontoNaRegiao, reconhecerForma, regiaoDaBolha, suavizarCaminhos, toleranciaDaFidelidade, unirCaminhos } from "@/lib/vetor/pincelVetorial";
 import { regiaoDosCaminhos } from "@/lib/vetor/contorno";
+import { apagarArea, cortarComFaca, cortarComTesoura, regiaoDoCorte, regiaoDoRetangulo } from "@/lib/vetor/cortes";
 import { camadasDoReflexo, type OpcoesDoReflexo, REFLEXO_PADRAO } from "@/lib/vetor/reflexo";
 import { caminhosDoGerador, type GeradorDeCaminhos, GERADORES_PADRAO, NOME_DO_GERADOR, type OpcoesDosGeradores } from "@/lib/vetor/geradores";
 import { PainelLinhaDoTempo } from "./PainelLinhaDoTempo";
@@ -3932,7 +3933,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
    * Os pincéis e o lápis do editor vetorial: o traço (pixels da imagem) a cada movimento e no fim. O Suavizar e a
    * Borracha de caminho mostram o resultado enquanto andam e viram um passo ao soltar; os outros agem no fim.
    */
-  const aoTracoLivre = (pontos: { x: number; y: number }[], final: boolean, escalaDaTela: number) => {
+  const aoTracoLivre = (pontos: { x: number; y: number }[], final: boolean, escalaDaTela: number, reto: boolean) => {
     const perto = pincelVetorial.distancia / Math.max(1e-6, escalaDaTela);
     const editaveis = !mascaraEmEdicao && caminhosEditaveis?.length ? caminhosEditaveis : null;
     const nomeNovo = (base: string) => `${base} ${(projeto?.faixas.filter((faixa) => faixa.nome?.startsWith(base)).length ?? 0) + 1}`;
@@ -3949,6 +3950,42 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       return;
     }
     if (!final) return;
+    if (ferramenta === "tesoura") {
+      if (!editaveis) return void mostrarAviso("Escolha uma forma (ou um caminho no painel Caminhos) para usar a Tesoura.");
+      const cortados = cortarComTesoura(editaveis, pontos[pontos.length - 1], 7 / Math.max(1e-6, escalaDaTela));
+      if (cortados) mudarCaminhos(cortados, false);
+      else mostrarAviso("Clique em cima do caminho escolhido (não na ponta de um caminho aberto).");
+      return;
+    }
+    if ((ferramenta === "faca" || ferramenta === "borrachaVetorial") && projeto) {
+      // A forma escolhida, ou todas as formas à vista (as travadas não)
+      const quadro = tamanhoDaImagem(projeto);
+      const alvos = projeto.faixas
+        .filter((faixa) => !faixa.oculta && !faixa.travas?.pixels && faixa.clipes[0]?.vetor && !faixa.clipes[0].vetor.quadro)
+        .filter((faixa) => !formaEmEdicao || faixa.clipes[0].id === formaEmEdicao.id)
+        .map((faixa) => ({ faixa, caminhos: caminhosDoVetorNaImagem(faixa.clipes[0], quadro) }));
+      if (ferramenta === "faca") {
+        const corte = regiaoDoCorte(reto ? [pontos[0], pontos[pontos.length - 1]] : pontos);
+        const divisoes = alvos.flatMap(({ faixa, caminhos }) => {
+          const pedacos = cortarComFaca(caminhos, corte);
+          return pedacos ? [{ clipeId: faixa.clipes[0].id, pedacos }] : [];
+        });
+        if (divisoes.length) executar({ comando: "imagem.dividirFormas", parametros: { divisoes } });
+        else mostrarAviso("Passe a Faca através de uma forma, de um lado ao outro.");
+        return;
+      }
+      const area = reto ? regiaoDoRetangulo(pontos[0], pontos[pontos.length - 1]) : regiaoDaBolha(pontos, pincelVetorial.raio);
+      const trocas: { clipeId: string; caminhos: Subcaminho[] }[] = [];
+      const apagar: string[] = [];
+      for (const { faixa, caminhos } of alvos) {
+        const sobra = apagarArea(caminhos, area);
+        if (!sobra) continue;
+        if (sobra.length) trocas.push({ clipeId: faixa.clipes[0].id, caminhos: sobra });
+        else apagar.push(faixa.id);
+      }
+      if (trocas.length || apagar.length) executar({ comando: "imagem.caminhosDasFormas", parametros: { trocas, apagar } });
+      return;
+    }
     if (ferramenta === "unir") {
       if (!editaveis) return void mostrarAviso("Escolha uma forma (ou um caminho no painel Caminhos) para usar esta ferramenta.");
       const unidos = unirCaminhos(editaveis, pontos, perto);
@@ -6885,10 +6922,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             tracoLivre={
               FERRAMENTAS_DE_TRACO_LIVRE.has(ferramenta)
                 ? {
-                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? (caminhosEditaveis ?? null) : null,
-                    largura: ferramenta === "pincelDeBolha" ? 2 * pincelVetorial.raioDaBolha : ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? pincelVetorial.espessura : 0,
-                    cor: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "modelador" ? "#2f80ff" : cores.primeiroPlano,
-                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : undefined,
+                    caminhos: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "unir" || ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "tesoura" ? (caminhosEditaveis ?? null) : null,
+                    largura: ferramenta === "pincelDeBolha" ? 2 * pincelVetorial.raioDaBolha : ferramenta === "borrachaVetorial" ? 2 * pincelVetorial.raio : ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" ? pincelVetorial.espessura : 0,
+                    cor: ferramenta === "pincelDeTraco" || ferramenta === "lapisVetorial" || ferramenta === "pincelDeBolha" ? cores.primeiroPlano : "#2f80ff",
+                    raio: ferramenta === "suavizar" || ferramenta === "borrachaDeCaminho" || ferramenta === "borrachaVetorial" ? pincelVetorial.raio : ferramenta === "pincelDeBolha" ? pincelVetorial.raioDaBolha : undefined,
+                    comAlt: ferramenta === "borrachaVetorial" ? "retangulo" : ferramenta === "faca" ? "linha" : undefined,
                     aoTraco: aoTracoLivre,
                   }
                 : null

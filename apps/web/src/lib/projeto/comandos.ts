@@ -286,6 +286,8 @@ export type Comando =
   | { comando: "imagem.animacao"; parametros: { animacao: AnimacaoDaImagem | null; nome?: string } }
   | { comando: "imagem.fatias"; parametros: { fatias: Fatia[]; nome?: string } }
   | { comando: "imagem.escalaDeMedida"; parametros: { escala: EscalaDeMedida | null } }
+  | { comando: "imagem.caminhosDasFormas"; parametros: { trocas: { clipeId: string; caminhos: Subcaminho[] }[]; apagar: string[] } }
+  | { comando: "imagem.dividirFormas"; parametros: { divisoes: { clipeId: string; pedacos: Subcaminho[][] }[] } }
   | { comando: "imagem.unirFormas"; parametros: { clipeId: string; caminhos: Subcaminho[]; apagar: string[] } }
   | { comando: "imagem.adicionarReflexo"; parametros: { camadas: { vetor: CamadaVetorial; centro: { x: number; y: number }; nome: string; opacidade: number }[]; nome: string; acima?: string | null } }
   | { comando: "imagem.marcadorDeEscala"; parametros: { barra: CamadaVetorial; centro: { x: number; y: number }; texto: TextoRico | null; ponto: { x: number; y: number }; acima?: string | null } }
@@ -449,6 +451,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "imagem.marcadorDeEscala": "inserir o marcador de escala",
   "imagem.adicionarReflexo": "desenhar o reflexo",
   "imagem.unirFormas": "juntar as formas",
+  "imagem.caminhosDasFormas": "apagar das formas",
+  "imagem.dividirFormas": "cortar as formas",
   "imagem.aplicarConjunto": "aplicar o conjunto de dados",
   "imagem.tamanho": "mudar o tamanho",
   "imagem.recortar": "recortar a imagem",
@@ -846,6 +850,29 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: { ...projeto, animacao: parametros.animacao?.quadros.length ? parametros.animacao : null } };
     case "imagem.escalaDeMedida":
       return { projeto: { ...projeto, escala_de_medida: parametros.escala } };
+    case "imagem.caminhosDasFormas": {
+      // A Borracha vetorial: cada forma com o que sobrou, e as que sumiram de todo saem
+      let atual = projeto;
+      for (const troca of parametros.trocas) atual = trocarCaminhosDoVetor(atual, troca.clipeId, troca.caminhos);
+      return parametros.apagar.length ? executarComando(atual, { comando: "imagem.apagarVarias", parametros: { faixaIds: parametros.apagar } }, ctx) : { projeto: atual };
+    }
+    case "imagem.dividirFormas": {
+      // A Faca: o primeiro pedaço fica na camada; cada outro é uma cópia dela com os caminhos do pedaço
+      let atual = projeto;
+      const selecao: string[] = [];
+      for (const divisao of parametros.divisoes) {
+        const faixaId = faixaDoClipeNoProjeto(atual, divisao.clipeId);
+        if (!faixaId) continue;
+        for (const pedaco of divisao.pedacos.slice(1)) {
+          const copia = duplicarCamada(atual, ctx, faixaId);
+          atual = trocarCaminhosDoVetor(copia.projeto, copia.clipeId, pedaco);
+          selecao.push(copia.clipeId);
+        }
+        atual = trocarCaminhosDoVetor(atual, divisao.clipeId, divisao.pedacos[0]);
+        selecao.unshift(divisao.clipeId);
+      }
+      return { projeto: atual, selecao };
+    }
     case "imagem.unirFormas": {
       // As formas debaixo do rabisco do Modelador: os caminhos delas somados à primeira, e as outras saem
       const juntado = juntarAoVetor(projeto, parametros.clipeId, parametros.caminhos, "somar");

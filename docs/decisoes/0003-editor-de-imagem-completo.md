@@ -302,7 +302,7 @@ melhorar; modelos, biblioteca, exportação em PNG, JPG e WebP.
 - [x] Segmento de linha, Arco, Espiral, Grade retangular, Grade polar
 - [x] Retângulo arredondado, Estrela, Reflexo (brilho)
 - [x] Pincel de traço, Pincel de bolha, Lápis vetorial, Suavizar, Borracha de caminho, Unir, Modelador
-- [ ] Borracha vetorial, Tesoura, Faca, cortes em linha e em retângulo
+- [x] Borracha vetorial, Tesoura, Faca, cortes em linha e em retângulo
 - [ ] Girar, Refletir, Escalar, Inclinar, Remodelar
 - [ ] Largura do traço, Deformar, Torcer, Franzir, Inflar, Recortar, Cristalizar, Enrugar
 - [ ] Construtor de formas e Pintura viva
