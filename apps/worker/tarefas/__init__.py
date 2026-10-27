@@ -30,6 +30,7 @@ from worker.tarefas.geracao_video import (
 from worker.tarefas.importacao import executar_importacao
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
+from worker.tarefas.legenda_animada import executar_legenda_animada
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.objeto import executar_objeto, executar_selecao
@@ -75,6 +76,7 @@ REGISTRO = {
     "batidas": Tarefa(executar_batidas, ao_falhar=marcar_batidas_com_erro),
     "fala": Tarefa(executar_fala, ao_falhar=marcar_geracao_com_erro),
     "animacao_html": Tarefa(executar_animacao_html, ao_falhar=marcar_animacao_com_erro),
+    "legenda_animada": Tarefa(executar_legenda_animada, ao_falhar=marcar_animacao_com_erro),
     "selecao": Tarefa(executar_selecao),
     "objeto": Tarefa(executar_objeto, ao_falhar=marcar_geracao_com_erro),
     "quadro": Tarefa(executar_quadro, ao_falhar=marcar_geracao_com_erro),

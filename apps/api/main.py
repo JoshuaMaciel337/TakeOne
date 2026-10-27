@@ -28,6 +28,7 @@ from api.rotas import (
     foto_ia,
     intercambio,
     jobs,
+    legendas_animadas,
     luts,
     marca,
     midias,
@@ -164,3 +165,4 @@ app.include_router(fontes.router)
 app.include_router(chaves.router)
 app.include_router(conversoes.router)
 app.include_router(clipagens.router)
+app.include_router(legendas_animadas.router)

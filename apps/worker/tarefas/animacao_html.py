@@ -53,16 +53,21 @@ TIPOS = {".js": "text/javascript; charset=utf-8", ".ttf": "font/ttf", ".html": "
 
 
 class _Servidor:
-    """Serve a página da animação, as fontes e os arquivos comuns (comum.js, vendor/) em 127.0.0.1."""
+    """Serve a página da animação, as fontes e os arquivos comuns (comum.js, vendor/) em 127.0.0.1. extras: mais
+    arquivos, pelo caminho da URL (as legendas animadas servem o motor e as fontes da biblioteca)."""
 
-    def __init__(self, pagina_html: str):
+    def __init__(self, pagina_html: str, extras: dict[str, Path] | None = None):
         pagina = pagina_html.encode("utf-8")
+        extras = extras or {}
 
         class Atendente(BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802 (nome do http.server)
                 caminho = unquote(urlparse(self.path).path)
                 if caminho == "/pagina.html":
                     self._enviar(pagina, TIPOS[".html"])
+                elif caminho in extras:
+                    arquivo = extras[caminho]
+                    self._enviar(arquivo.read_bytes(), TIPOS.get(arquivo.suffix, "application/octet-stream"))
                 elif caminho.startswith("/fontes/") and caminho[8:] in FONTES:
                     self._enviar((PASTA_FONTES / caminho[8:]).read_bytes(), TIPOS[".ttf"])
                 elif caminho.startswith("/animacoes/") and ARQUIVOS_COMUNS.fullmatch(caminho[11:]):
@@ -104,15 +109,17 @@ class Estudio:
     """Abre a página de uma animação e devolve qualquer quadro dela (BGRA, fundo transparente).
     Uso: with Estudio(pagina, largura, altura) as estudio: quadro = estudio.quadro(1.5)"""
 
-    def __init__(self, pagina_html: str, largura: int, altura: int, navegador=None):
+    def __init__(self, pagina_html: str, largura: int, altura: int, navegador=None,
+                 extras: dict[str, Path] | None = None):
         """navegador: um Chromium já aberto (os testes abrem um para todos os modelos); sem ele, abre e fecha."""
         self.pagina_html, self.largura, self.altura = pagina_html, largura, altura
+        self.extras = extras
         self._emprestado = navegador
         self.navegador = navegador
         self._playwright = self.servidor = self.pagina = None
 
     def __enter__(self):
-        self.servidor = _Servidor(self.pagina_html)
+        self.servidor = _Servidor(self.pagina_html, self.extras)
         try:
             if self.navegador is None:
                 self._playwright, self.navegador = abrir_navegador()
@@ -131,6 +138,10 @@ class Estudio:
             self.__exit__(None, None, None)
             raise
         return self
+
+    def avaliar(self, codigo: str, argumento=None):
+        """Roda uma função da página (as legendas animadas perguntam o estado de cada instante)."""
+        return self.pagina.evaluate(codigo, argumento)
 
     def quadro(self, segundos: float) -> np.ndarray:
         self.pagina.evaluate(_IR_PARA, segundos * 1000)

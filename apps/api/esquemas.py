@@ -14,6 +14,7 @@ from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROC
 from core.modelos.exportacao import TAXAS_DO_GIF, TAXAS_DO_VIDEO
 from core.modelos.geracao import DESCRICAO_MAXIMA, DESCRICAO_MINIMA, DURACOES
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
+from core.modelos.legenda_animada import ESTILOS as ESTILOS_DE_LEGENDA_ANIMADA
 from core.modelos.midia import STATUS_ERRO, STATUS_PROCESSANDO, arquivo_publico
 from core.utils.tempo import TICKS_POR_SEGUNDO
 from core.utils.texto import texto_cabe
@@ -128,6 +129,8 @@ class MidiaSaida(BaseModel):
     elemento: dict | None = None
     # Animação em HTML: {modelo, campos, proporcao, duracao}
     animacao: dict | None = None
+    # Legenda animada do Clipar: {estilo, proporcao, duracao, palavras}
+    legenda_animada: dict | None = None
     # Camada de pixels do editor de imagem: {largura, altura, ultima} (a última versão enviada)
     camada_pixels: dict | None = None
     # Importada pelo link: {origem, url, titulo, canal, duracao, miniatura}
@@ -2384,11 +2387,20 @@ class OpcoesDaClipagem(BaseModel):
     edicao: str = Field(default="", max_length=500)
     formato: Literal["9:16", "1:1", "4:5", "16:9"] = "9:16"
     maximo: int | None = Field(default=None, ge=1, le=50)
+    # O estilo da legenda animada dos cortes (core/modelos/legenda_animada.py); None: as legendas de sempre
+    legenda_animada: str | None = Field(default=None, max_length=30)
 
     @field_validator("instrucoes", "momentos", "genero", "edicao", mode="before")
     @classmethod
     def limpar_textos(cls, valor):
         return " ".join(valor.split()) if isinstance(valor, str) else valor
+
+    @field_validator("legenda_animada")
+    @classmethod
+    def conferir_legenda_animada(cls, valor):
+        if valor is not None and valor not in ESTILOS_DE_LEGENDA_ANIMADA:
+            raise ValueError("Estilo de legenda animada desconhecido.")
+        return valor
 
     @model_validator(mode="after")
     def conferir_trecho(self):
