@@ -1,0 +1,98 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cartela de impacto",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "tela_cheia": true,
+ "descricao": "A cartela do fim em duas partes sobre uma grade escura: a primeira palavra entra, e a segunda cai grande, com um tranco.",
+ "campos": [
+  {"id": "linha_1", "rotulo": "Primeira parte", "tipo": "texto", "padrao": "MENTIRA", "maximo": 22},
+  {"id": "linha_2", "rotulo": "Segunda parte (grande)", "tipo": "texto", "padrao": "SAI", "maximo": 14},
+  {"id": "cor_fundo", "rotulo": "Fundo", "tipo": "cor", "padrao": "#0b0b10"},
+  {"id": "cor_texto", "rotulo": "Primeira parte", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Segunda parte", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_1", "rotulo": "Grade e brilho", "tipo": "cor", "padrao": "#f5c84b"}
+ ]
+}
+</script>
+<!-- Cartela de impacto: o fundo escuro com uma grade que anda devagar e um brilho no meio. A primeira parte sobe e
+     aparece; a segunda cai de 2,2 vezes o tamanho até o lugar em 0,25 s, e o quadro treme um pouco e para (o tremido
+     é o ruído suave do comum.js, então o mesmo instante dá o mesmo quadro). -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const QUEDA = 1.0;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = TO.envelope(t, 0.2, 0.35, dur);
+    // O tranco da segunda parte: o quadro inteiro treme e para em 0,4 s
+    const forca = Math.max(0, 1 - TO.prog(t, QUEDA + 0.22, QUEDA + 0.62)) * (t >= QUEDA + 0.22 ? 1 : 0);
+    const dx = TO.noise(t * 38, 3) * forca * 1.6 * u;
+    const dy = TO.noise(t * 38, 9) * forca * 1.6 * u;
+    ctx.translate(dx, dy);
+    ctx.fillStyle = C.cor_fundo;
+    ctx.fillRect(-4 * u, -4 * u, W + 8 * u, H + 8 * u);
+    // A grade, andando devagar para baixo
+    const passo = 9 * u;
+    const anda = (t * 1.2 * u) % passo;
+    ctx.strokeStyle = TO.rgba(C.cor_1, 0.09);
+    ctx.lineWidth = Math.max(1, 0.12 * u);
+    ctx.beginPath();
+    for (let x = (W / 2) % passo; x < W; x += passo) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+    }
+    for (let y = anda - passo; y < H; y += passo) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+    // O brilho atrás das palavras, mais forte na queda
+    const luz = 0.35 + 0.4 * forca;
+    ctx.globalAlpha *= 1;
+    ctx.save();
+    ctx.globalAlpha = TO.envelope(t, 0.2, 0.35, dur) * luz;
+    const r = Math.min(W, H) * 0.55;
+    ctx.drawImage(TO.brilho(C.cor_1), W / 2 - r, H / 2 - r, r * 2, r * 2);
+    ctx.restore();
+    // As palavras
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const larguraMax = W * 0.84;
+    const tam1 = TO.caber(ctx, C.linha_1, 900, 13, larguraMax, "Montserrat");
+    const tam2 = TO.caber(ctx, C.linha_2, 900, 34, larguraMax, "Montserrat");
+    const y1 = H / 2 - tam2 * u * 0.62;
+    const y2 = H / 2 + tam1 * u * 0.55;
+    const a1 = TO.ease.outCubic(TO.prog(t, 0.25, 0.75));
+    if (a1 > 0 && C.linha_1) {
+      ctx.save();
+      ctx.globalAlpha *= a1;
+      ctx.translate(W / 2, y1 + (1 - a1) * 4 * u);
+      ctx.font = TO.fonte(900, tam1, "Montserrat");
+      ctx.fillStyle = C.cor_texto;
+      ctx.letterSpacing = `${0.6 * u}px`;
+      ctx.fillText(C.linha_1, 0, 0);
+      ctx.restore();
+    }
+    const p2 = TO.prog(t, QUEDA, QUEDA + 0.25);
+    if (p2 > 0 && C.linha_2) {
+      const escala = 1 + 1.2 * (1 - TO.ease.outExpo(p2));
+      ctx.save();
+      ctx.globalAlpha *= Math.min(1, p2 * 3);
+      ctx.translate(W / 2, y2);
+      ctx.scale(escala, escala);
+      ctx.font = TO.fonte(900, tam2, "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 2 * u;
+      ctx.fillStyle = C.cor_2;
+      ctx.fillText(C.linha_2, 0, 0);
+      ctx.restore();
+    }
+  };
+})();
+</script>

@@ -177,6 +177,7 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     processos, só a faixa das linhas fotografada e os quadros parados repetidos); prévia e exportação a 2,5–2,8
     níveis em 255 no meio da entrada das palavras.
   - b) **Cartela final** de frase de impacto (duas partes, a segunda grande, sobre a grade escura) e outros ganchos.
+    **Pronta (27/10/2026):** a cartela de impacto e dois ganchos (tela tingida e caixas) na biblioteca de animações.
   - c) **Transições Flash e Clarão** (o branco de um quadro e o brilho de luz que passa), na prévia e no render.
     **Prontas (27/10/2026):** corte seco com uma camada de ajuste por cima na janela da transição (o branco no
     Flash, a luz quente do canto no Clarão); prévia e exportação a 0–1,5 nível em 255 no Flash e 2,7–2,9 no Clarão.
@@ -184,7 +185,8 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     gerados por síntese, sem arquivos de terceiros, numa biblioteca do espaço. **Prontos (27/10/2026):** nove
     efeitos na ferramenta Áudio (ouvir e pôr no cursor), cada um uma mídia do espaço criada no primeiro pedido.
   - e) **Gráficos de pregação** (coração que se abre, mente, Bíblia, cruz de luz, chama, pomba, corrente que se
-    quebra, céu que se abre), escolhidos pelas palavras da fala.
+    quebra, céu que se abre), escolhidos pelas palavras da fala. **Prontos (27/10/2026):** os oito na categoria "Pregação e fé" de
+    Elementos, e a escolha pelas palavras em `lib/clipar/graficosDaFala.ts`, que o modelo de pregação usa.
   - f) **Banco da Pixabay** (imagens e vídeos, pela chave do dono no `.env`): a busca no painel com a fonte mostrada, a
     busca guardada 24 h e o que for usado baixado para a biblioteca, como pedem as regras da API; a montagem escolhe as
     imagens de apoio pelas palavras da fala.

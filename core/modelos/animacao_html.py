@@ -54,6 +54,7 @@ CATEGORIAS = {
     "transicoes": "Vinhetas e transições",
     "fundos": "Fundos e partículas",
     "adesivos": "Adesivos",
+    "pregacao": "Pregação e fé",
 }
 MOTORES = {"css", "canvas"}
 TIPOS = {"texto", "linhas", "cor", "numero"}

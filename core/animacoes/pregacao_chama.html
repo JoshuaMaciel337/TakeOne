@@ -1,0 +1,91 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Chama viva",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma chama que acende, tremula e solta faíscas que sobem, com a palavra embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra (opcional)", "tipo": "texto", "padrao": "AVIVAMENTO", "maximo": 22},
+  {"id": "cor_1", "rotulo": "Miolo", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Borda", "tipo": "cor", "padrao": "#ff4d1f"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Chama viva: três gotas sobrepostas (a de fora na cor da borda, a do meio misturada e o miolo), cada uma com a
+     ponta e os lados balançando pelo ruído suave do comum.js. As faíscas são sorteadas por índice e sobem num ciclo
+     de 1,4 s; a posição vem do tempo, então o mesmo instante dá o mesmo quadro. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const A = 34 * u;
+  const cx = W / 2;
+  const base = H / 2 + 0.4 * A - (C.texto ? 4 * u : 0);
+  function gota(escala, t, semente, cor) {
+    const h = A * escala;
+    const w = h * 0.42;
+    const ponta = TO.noise(t * 2.6, semente) * 0.18 * w;
+    const lado = TO.noise(t * 3.1, semente + 5) * 0.08 * w;
+    ctx.beginPath();
+    ctx.moveTo(cx, base);
+    ctx.bezierCurveTo(cx - w - lado, base, cx - w * 0.9 + lado, base - h * 0.55, cx + ponta, base - h);
+    ctx.bezierCurveTo(cx + w * 0.9 + lado, base - h * 0.55, cx + w - lado, base, cx, base);
+    ctx.closePath();
+    ctx.fillStyle = cor;
+    ctx.fill();
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.01, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const acende = TO.ease.outBack(TO.prog(t, 0, 0.7), 1.4);
+    if (acende <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = geral * 0.7 * Math.min(1, acende);
+    const r = 0.75 * A;
+    ctx.drawImage(TO.brilho(C.cor_2), cx - r, base - 0.55 * A - r, r * 2, r * 2);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, base);
+    ctx.scale(acende, acende);
+    ctx.translate(-cx, -base);
+    gota(1, t, 1, C.cor_2);
+    gota(0.74, t + 0.3, 2, TO.mix(C.cor_2, C.cor_1, 0.55));
+    gota(0.46, t + 0.6, 3, C.cor_1);
+    ctx.restore();
+    // As faíscas
+    for (let i = 0; i < 16; i++) {
+      const ciclo = 1.4;
+      const fase = (t / ciclo + TO.hash(i, 9)) % 1;
+      const inicio = 0.35 + TO.hash(i, 2) * 0.5;
+      if (t < inicio) continue;
+      const x = cx + (TO.hash(i, 4) - 0.5) * 0.5 * A + TO.noise(t * 2 + i, 7) * 0.06 * A;
+      const y = base - 0.4 * A - fase * 0.7 * A;
+      ctx.globalAlpha = geral * (1 - fase) * Math.min(1, (t - inicio) * 3);
+      ctx.fillStyle = fase < 0.4 ? C.cor_1 : C.cor_2;
+      ctx.beginPath();
+      ctx.arc(x, y, (0.6 + TO.hash(i, 6) * 0.6) * u * (1 - fase * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = geral;
+    if (C.texto) {
+      const p = TO.ease.outCubic(TO.prog(t, 0.9, 1.5));
+      ctx.save();
+      ctx.globalAlpha = geral * p;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 6.5, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.texto, cx, base + 0.22 * A);
+      ctx.restore();
+    }
+  };
+})();
+</script>

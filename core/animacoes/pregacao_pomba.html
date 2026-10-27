@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Pomba da paz",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma pomba branca atravessa batendo as asas e deixa um rastro de luz, com a palavra no meio.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra (opcional)", "tipo": "texto", "padrao": "ESPÍRITO SANTO", "maximo": 24},
+  {"id": "cor_1", "rotulo": "Pomba", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Rastro", "tipo": "cor", "padrao": "#bfe3ff"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Pomba da paz: o corpo e as duas asas são caminhos numa caixa de -1 a 1; a asa de cima sobe e desce pelo seno
+     (o batido), a de trás vai junto, mais escura. A pomba faz um arco suave da esquerda para a direita e o rastro é
+     uma fila de brilhos nas posições por onde ela passou (a mesma conta de posição, voltando no tempo). -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const T = 13 * u;
+  const lado = Math.min(W, H) * 0.28;
+  function posicao(p) {
+    return [W / 2 + (p - 0.5) * 2 * lado, H / 2 - 6 * u - Math.sin(p * Math.PI) * 9 * u];
+  }
+  function asa(batida, cor) {
+    ctx.save();
+    ctx.scale(1, batida);
+    ctx.beginPath();
+    ctx.moveTo(-0.15, 0);
+    ctx.bezierCurveTo(-0.5, -0.5, -0.4, -1.1, 0.1, -1.25);
+    ctx.bezierCurveTo(0.05, -0.85, 0.3, -0.45, 0.35, -0.05);
+    ctx.closePath();
+    ctx.fillStyle = cor;
+    ctx.fill();
+    ctx.restore();
+  }
+  function pomba(x, y, t) {
+    const batida = Math.sin(t * 9);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(T, T);
+    asa(-0.6 * batida, TO.mix(C.cor_1, "#9aa7b8", 0.45));
+    // O corpo: a cabeça à direita, o rabo à esquerda
+    ctx.beginPath();
+    ctx.moveTo(-1.0, 0.05);
+    ctx.lineTo(-0.55, -0.12);
+    ctx.bezierCurveTo(-0.2, -0.2, 0.35, -0.25, 0.6, -0.2);
+    ctx.bezierCurveTo(0.72, -0.38, 0.95, -0.36, 1.0, -0.2);
+    ctx.lineTo(1.18, -0.12);
+    ctx.lineTo(0.98, -0.06);
+    ctx.bezierCurveTo(0.9, 0.12, 0.6, 0.2, 0.2, 0.2);
+    ctx.bezierCurveTo(-0.25, 0.2, -0.55, 0.15, -1.0, 0.05);
+    ctx.closePath();
+    ctx.fillStyle = C.cor_1;
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 0.8 * u;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    asa(batida, C.cor_1);
+    ctx.restore();
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.3, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const voo = (p) => TO.ease.inOutSine(TO.clamp(p, 0, 1));
+    const p = (t - 0.1) / (dur - 0.5);
+    // O rastro
+    for (let k = 1; k <= 14; k++) {
+      const q = p - k * 0.022;
+      if (q <= 0) continue;
+      const [x, y] = posicao(voo(q));
+      ctx.globalAlpha = geral * (1 - k / 15) * 0.5;
+      const r = (2.4 - k * 0.1) * u;
+      ctx.drawImage(TO.brilho(C.cor_2), x - r, y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = geral;
+    const [x, y] = posicao(voo(p));
+    pomba(x, y, t);
+    if (C.texto) {
+      const a = TO.ease.outCubic(TO.prog(t, 0.8, 1.4));
+      ctx.save();
+      ctx.globalAlpha = geral * a;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 6.5, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.texto, W / 2, H / 2 + 14 * u);
+      ctx.restore();
+    }
+  };
+})();
+</script>

@@ -1,0 +1,101 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Coração que se abre",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Um coração se abre ao meio, solta as palavras que estavam dentro (os pecados, as dores) e se fecha de novo com um tranco.",
+ "campos": [
+  {"id": "palavras", "rotulo": "Palavras que saem", "tipo": "linhas", "padrao": "INVEJA\nIRA\nORGULHO\nIMORALIDADE", "maximo": 70},
+  {"id": "cor_1", "rotulo": "Coração", "tipo": "cor", "padrao": "#c81e3a"},
+  {"id": "cor_2", "rotulo": "Luz de dentro", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Palavras", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Coração que se abre: o coração é um caminho só, desenhado duas vezes, cada metade recortada e girada em volta da
+     ponta de baixo. Entre 0,7 s e 2,9 s as metades ficam abertas, a luz aparece no meio e cada palavra sai do centro
+     numa direção fixa, encolhendo e sumindo; em 2,9 s o coração fecha e dá um pulo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const palavras = String(C.palavras || "").split("\n").map((p) => p.trim()).filter(Boolean).slice(0, 6);
+  const R = 17 * u;
+  function coracao() {
+    // Na caixa de -1 a 1, com a ponta embaixo em (0, 0.95)
+    ctx.beginPath();
+    ctx.moveTo(0, 0.95);
+    ctx.bezierCurveTo(-0.6, 0.55, -1.0, 0.15, -1.0, -0.25);
+    ctx.bezierCurveTo(-1.0, -0.7, -0.6, -0.95, -0.35, -0.95);
+    ctx.bezierCurveTo(-0.15, -0.95, 0, -0.8, 0, -0.6);
+    ctx.bezierCurveTo(0, -0.8, 0.15, -0.95, 0.35, -0.95);
+    ctx.bezierCurveTo(0.6, -0.95, 1.0, -0.7, 1.0, -0.25);
+    ctx.bezierCurveTo(1.0, 0.15, 0.6, 0.55, 0, 0.95);
+    ctx.closePath();
+  }
+  function metade(lado, abertura, pulso) {
+    ctx.save();
+    ctx.translate(W / 2, H / 2 + 0.95 * R);
+    ctx.rotate(lado * abertura * (22 * Math.PI) / 180);
+    ctx.translate(lado * abertura * 1.2 * u, 0);
+    ctx.scale(R * pulso, R * pulso);
+    ctx.translate(0, -0.95);
+    ctx.beginPath();
+    ctx.rect(lado < 0 ? -1.2 : 0, -1.2, 1.2, 2.4);
+    ctx.clip();
+    coracao();
+    const g = ctx.createLinearGradient(-1, -1, 1, 1);
+    g.addColorStop(0, TO.mix(C.cor_1, "#ffffff", 0.18));
+    g.addColorStop(1, TO.mix(C.cor_1, "#000000", 0.35));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 0.035;
+    ctx.strokeStyle = TO.rgba("#ffffff", 0.25);
+    ctx.stroke();
+    ctx.restore();
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = TO.envelope(t, 0.01, 0.35, dur);
+    const entra = TO.ease.outBack(TO.prog(t, 0, 0.5), 2);
+    const abre = TO.ease.outCubic(TO.prog(t, 0.6, 1.0)) * (1 - TO.ease.inCubic(TO.prog(t, 2.7, 2.95)));
+    const fechou = TO.prog(t, 2.95, 3.35);
+    const pulso = entra * (1 + 0.12 * Math.sin(Math.PI * fechou) * (fechou > 0 && fechou < 1 ? 1 : 0));
+    if (pulso <= 0) return;
+    // A luz de dentro, enquanto está aberto
+    if (abre > 0) {
+      ctx.save();
+      ctx.globalAlpha *= abre;
+      const r = R * 1.8;
+      ctx.drawImage(TO.brilho(C.cor_2), W / 2 - r, H / 2 - r, r * 2, r * 2);
+      ctx.restore();
+    }
+    metade(-1, abre, pulso);
+    metade(1, abre, pulso);
+    // As palavras saem do meio, cada uma numa direção, uma a cada 0,3 s
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    palavras.forEach((palavra, i) => {
+      const p = TO.prog(t, 0.95 + i * 0.3, 2.35 + i * 0.3);
+      if (p <= 0 || p >= 1) return;
+      const angulo = -Math.PI / 2 + (i - (palavras.length - 1) / 2) * 0.62;
+      const anda = TO.ease.outCubic(p) * 30 * u;
+      ctx.save();
+      ctx.globalAlpha *= Math.min(1, p * 5) * (1 - TO.ease.inQuad(TO.prog(p, 0.55, 1)));
+      ctx.translate(W / 2 + Math.cos(angulo) * anda, H / 2 + Math.sin(angulo) * anda * 0.9);
+      const escala = 1.15 - 0.45 * p;
+      ctx.scale(escala, escala);
+      ctx.font = TO.fonte(900, 5.2, "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 1.2 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(palavra, 0, 0);
+      ctx.restore();
+    });
+  };
+})();
+</script>

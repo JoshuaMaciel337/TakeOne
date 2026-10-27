@@ -1,0 +1,57 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Gancho na tela tingida",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3,
+ "tela_cheia": true,
+ "descricao": "A tela inteira tingida numa cor, e as linhas da pergunta entram uma a uma, de lados alternados, para segurar quem chega.",
+ "campos": [
+  {"id": "linhas", "rotulo": "Linhas", "tipo": "linhas", "padrao": "VOCÊ ESTÁ\nLONGE\nDE DEUS?", "maximo": 60},
+  {"id": "cor_1", "rotulo": "Cor da tela", "tipo": "cor", "padrao": "#c81e4a"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_2", "rotulo": "Última linha", "tipo": "cor", "padrao": "#ffd166"}
+ ]
+}
+</script>
+<!-- Gancho na tela tingida: a cor cobre o quadro a 78%, deixando o vídeo aparecer por baixo, e cada linha entra
+     deslizando de um lado (a primeira da esquerda, a segunda da direita...), com 0,22 s entre elas. A última linha
+     ganha a cor de destaque. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const linhas = String(C.linhas || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 5);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.2, 0.3, dur);
+    ctx.globalAlpha = geral * 0.78;
+    ctx.fillStyle = C.cor_1;
+    ctx.fillRect(0, 0, W, H);
+    if (!linhas.length) return;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const larguraMax = W * 0.84;
+    const tamanho = Math.min(...linhas.map((l) => TO.caber(ctx, l, 900, 15, larguraMax, "Montserrat")));
+    const entrelinha = tamanho * u * 1.08;
+    const topo = H / 2 - (entrelinha * (linhas.length - 1)) / 2;
+    ctx.font = TO.fonte(900, tamanho, "Montserrat");
+    linhas.forEach((linha, i) => {
+      const p = TO.ease.outCubic(TO.prog(t, 0.2 + i * 0.22, 0.55 + i * 0.22));
+      if (p <= 0) return;
+      const lado = i % 2 ? 1 : -1;
+      ctx.save();
+      ctx.globalAlpha = geral * Math.min(1, p * 1.5);
+      ctx.translate(W / 2 + lado * (1 - p) * W * 0.35, topo + i * entrelinha);
+      ctx.fillStyle = i === linhas.length - 1 && linhas.length > 1 ? C.cor_2 : C.cor_texto;
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 1.2 * u;
+      ctx.fillText(linha, 0, 0);
+      ctx.restore();
+    });
+  };
+})();
+</script>

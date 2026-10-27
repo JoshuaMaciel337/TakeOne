@@ -1,0 +1,104 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Céu que se abre",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4.5,
+ "tela_cheia": true,
+ "descricao": "Nuvens escuras cobrem a tela e se abrem para os lados, e feixes de luz descem pelo meio, com a palavra na luz.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra (opcional)", "tipo": "texto", "padrao": "GLÓRIA", "maximo": 22},
+  {"id": "cor_1", "rotulo": "Nuvens", "tipo": "cor", "padrao": "#2b3245"},
+  {"id": "cor_2", "rotulo": "Luz", "tipo": "cor", "padrao": "#fff1c1"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Céu que se abre: cada nuvem é um punhado de círculos sorteados por índice, com a borda clara do lado da luz.
+     As nuvens começam cobrindo o meio e andam para fora (as da esquerda para a esquerda), e no vão os feixes descem
+     abrindo em leque. O que fica fora das nuvens e da luz é transparente: o vídeo aparece por baixo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const nuvens = [];
+  for (let i = 0; i < 18; i++) {
+    const lado = i % 2 ? 1 : -1;
+    const bolhas = [];
+    for (let k = 0; k < 7; k++) {
+      bolhas.push([(TO.hash(i * 10 + k, 3) - 0.5) * 1.6, (TO.hash(i * 10 + k, 5) - 0.5) * 0.6, 0.35 + TO.hash(i * 10 + k, 7) * 0.4]);
+    }
+    nuvens.push({ lado, x: TO.hash(i, 11) * 0.5, y: TO.hash(i, 19), tamanho: 0.12 + TO.hash(i, 29) * 0.12, bolhas });
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.3, 0.5, dur);
+    const abre = TO.ease.inOutCubic(TO.prog(t, 0.5, 3.0));
+    const lado = Math.max(W, H);
+    // Os feixes de luz no vão
+    if (abre > 0) {
+      ctx.save();
+      ctx.globalAlpha = geral * abre;
+      for (let i = 0; i < 7; i++) {
+        const angulo = (i - 3) * 0.09 + Math.sin(t * 0.8 + i) * 0.015;
+        const largura = (0.05 + 0.04 * TO.hash(i, 31)) * W * (0.6 + abre * 0.6);
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, TO.rgba(C.cor_2, 0.75));
+        g.addColorStop(1, TO.rgba(C.cor_2, 0));
+        ctx.save();
+        ctx.translate(W / 2, -0.05 * H);
+        ctx.rotate(angulo);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(-largura * 0.2, 0);
+        ctx.lineTo(largura * 0.2, 0);
+        ctx.lineTo(largura, H * 1.1);
+        ctx.lineTo(-largura, H * 1.1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      const r = Math.min(W, H) * 0.5;
+      ctx.drawImage(TO.brilho(C.cor_2), W / 2 - r, -r * 0.6, r * 2, r * 2);
+      ctx.restore();
+    }
+    // As nuvens, andando para fora
+    for (const n of nuvens) {
+      const x = W / 2 + n.lado * (n.x * 0.4 * W + abre * (0.55 * W + n.tamanho * lado));
+      const y = n.y * H;
+      const tam = n.tamanho * lado;
+      ctx.save();
+      ctx.globalAlpha = geral * 0.96;
+      for (const [bx, by, br] of n.bolhas) {
+        const cx = x + bx * tam;
+        const cy = y + by * tam;
+        const g = ctx.createRadialGradient(cx - n.lado * br * tam * 0.3, cy - br * tam * 0.3, 0, cx, cy, br * tam);
+        g.addColorStop(0, TO.mix(C.cor_1, C.cor_2, 0.35 * abre));
+        g.addColorStop(0.8, C.cor_1);
+        g.addColorStop(1, TO.rgba(C.cor_1, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, br * tam, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (C.texto) {
+      const p = TO.ease.outCubic(TO.prog(t, 2.0, 2.7));
+      ctx.save();
+      ctx.globalAlpha = geral * p;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 10, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.shadowColor = TO.rgba(C.cor_2, 0.9);
+      ctx.shadowBlur = 3 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.texto, W / 2, H / 2 + (1 - p) * 3 * u);
+      ctx.restore();
+    }
+  };
+})();
+</script>

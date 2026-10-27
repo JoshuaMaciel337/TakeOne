@@ -1,0 +1,86 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Gancho em caixas",
+ "categoria": "titulos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "Cada palavra da frase pula numa caixa de cor, uma depois da outra, levemente torta, como um bilhete.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "PARE DE ADIAR O SEU CHAMADO", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Caixa 1", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_2", "rotulo": "Caixa 2", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Texto nas caixas escuras", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Gancho em caixas: as palavras vão em linhas que cabem em 80% da largura; cada caixa entra com a mola (0,13 s
+     entre uma e outra), girada ±3°, e alterna as duas cores, o branco e o quase preto. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const palavras = String(C.texto || "").split(/\s+/).filter(Boolean).slice(0, 12);
+  const cores = [C.cor_1, C.cor_2, "#ffffff", "#141414"];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (!palavras.length) return;
+    const geral = TO.envelope(t, 0.05, 0.3, dur);
+    const tam = 8;
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    const folga = 2.2 * u;
+    const espaco = 1.4 * u;
+    const larguras = palavras.map((p) => ctx.measureText(p).width + folga * 2);
+    const larguraMax = W * 0.8;
+    const linhas = [];
+    let atual = [];
+    let soma = 0;
+    larguras.forEach((l, i) => {
+      if (atual.length && soma + espaco + l > larguraMax) {
+        linhas.push(atual);
+        atual = [];
+        soma = 0;
+      }
+      atual.push(i);
+      soma += (atual.length > 1 ? espaco : 0) + l;
+    });
+    if (atual.length) linhas.push(atual);
+    const altura = tam * u * 1.35;
+    const passo = altura + espaco;
+    const escala = Math.min(1, larguraMax / Math.max(...linhas.map((l) => l.reduce((s, i) => s + larguras[i], 0) + espaco * (l.length - 1))));
+    const topo = H / 2 - ((linhas.length - 1) * passo * escala) / 2;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    linhas.forEach((linha, j) => {
+      const total = linha.reduce((s, i) => s + larguras[i], 0) + espaco * (linha.length - 1);
+      let x = W / 2 - (total * escala) / 2;
+      for (const i of linha) {
+        const p = TO.prog(t, 0.15 + i * 0.13, 0.6 + i * 0.13);
+        const largura = larguras[i] * escala;
+        if (p > 0) {
+          const k = TO.ease.outBack(p, 2.2);
+          ctx.save();
+          ctx.globalAlpha = geral * Math.min(1, p * 4);
+          ctx.translate(x + largura / 2, topo + j * passo * escala);
+          ctx.rotate(((i % 2 ? 3 : -3) + (1 - p) * -12) * (Math.PI / 180));
+          ctx.scale(k * escala, k * escala);
+          const cor = cores[i % 4];
+          ctx.fillStyle = cor;
+          ctx.shadowColor = "rgba(0,0,0,0.3)";
+          ctx.shadowBlur = 1.5 * u;
+          ctx.shadowOffsetY = 0.5 * u;
+          TO.retangulo(ctx, -larguras[i] / 2, -altura / 2, larguras[i], altura, 1.2 * u);
+          ctx.fill();
+          ctx.shadowColor = "transparent";
+          ctx.fillStyle = cor === "#141414" || cor === C.cor_1 ? C.cor_texto : "#141414";
+          ctx.fillText(palavras[i], 0, 0.04 * altura);
+          ctx.restore();
+        }
+        x += largura + espaco * escala;
+      }
+    });
+  };
+})();
+</script>

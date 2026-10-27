@@ -1,0 +1,112 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Corrente que se quebra",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma corrente esticada treme, o elo do meio estoura com faíscas e as duas pontas caem, com a palavra que fica.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra (opcional)", "tipo": "texto", "padrao": "LIBERDADE", "maximo": 22},
+  {"id": "cor_1", "rotulo": "Corrente", "tipo": "cor", "padrao": "#b8bec9"},
+  {"id": "cor_2", "rotulo": "Faíscas", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Corrente que se quebra: os elos são elipses vazadas, alternando de frente e de lado. Até 1,6 s a corrente treme
+     cada vez mais; aí o elo do meio some, as faíscas saem dele em direções sorteadas e cada metade gira para baixo em
+     volta da ponta de fora, com a gravidade. A palavra fica em cima, longe das pontas que caem. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const ELOS = 9;
+  const passo = Math.min(W * 0.8, 72 * u) / ELOS;
+  const cy = H / 2 + (C.texto ? 6 * u : 0);
+  const QUEBRA = 1.6;
+  function elo(x, y, deFrente, angulo) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angulo);
+    ctx.lineWidth = passo * 0.16;
+    const g = ctx.createLinearGradient(0, -passo * 0.4, 0, passo * 0.4);
+    g.addColorStop(0, TO.mix(C.cor_1, "#ffffff", 0.5));
+    g.addColorStop(0.5, C.cor_1);
+    g.addColorStop(1, TO.mix(C.cor_1, "#000000", 0.45));
+    ctx.strokeStyle = g;
+    ctx.beginPath();
+    if (deFrente) ctx.ellipse(0, 0, passo * 0.62, passo * 0.32, 0, 0, Math.PI * 2);
+    else ctx.ellipse(0, 0, passo * 0.62, passo * 0.08, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function metade(lado, t) {
+    // Os elos de um lado, girando em volta da ponta de fora depois da quebra
+    const queda = TO.ease.inQuad(TO.prog(t, QUEBRA, QUEBRA + 0.9));
+    const ancora = W / 2 + lado * (ELOS / 2) * passo;
+    ctx.save();
+    ctx.translate(ancora, cy);
+    ctx.rotate(-lado * queda * 1.1);
+    for (let i = 0; i < Math.floor(ELOS / 2); i++) {
+      const x = -lado * (i + 0.5) * passo;
+      elo(x, 0, (i + (lado > 0 ? 1 : 0)) % 2 === 0, 0);
+    }
+    ctx.restore();
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.3, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const tensao = TO.prog(t, 0.4, QUEBRA) * (t < QUEBRA ? 1 : 0);
+    const dx = TO.noise(t * 40, 2) * tensao * 0.6 * u;
+    const dy = TO.noise(t * 40, 8) * tensao * 0.6 * u;
+    ctx.translate(dx, dy);
+    metade(-1, t);
+    metade(1, t);
+    if (t < QUEBRA) {
+      elo(W / 2, cy, true, 0);
+    } else {
+      // O clarão e as faíscas do elo que estourou
+      const p = TO.prog(t, QUEBRA, QUEBRA + 0.9);
+      ctx.save();
+      ctx.globalAlpha = geral * (1 - p);
+      const r = (6 + 10 * p) * u;
+      ctx.drawImage(TO.brilho(C.cor_2), W / 2 - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+      for (let i = 0; i < 22; i++) {
+        const a = TO.hash(i, 13) * Math.PI * 2;
+        const v = (8 + TO.hash(i, 17) * 16) * u;
+        const x = W / 2 + Math.cos(a) * v * p;
+        const y = cy + Math.sin(a) * v * p + 14 * u * p * p;
+        ctx.globalAlpha = geral * (1 - p);
+        ctx.fillStyle = i % 3 ? C.cor_2 : "#ffffff";
+        ctx.beginPath();
+        ctx.arc(x, y, 0.55 * u, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = geral;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (C.texto) {
+      const a = TO.ease.outBack(TO.prog(t, QUEBRA + 0.2, QUEBRA + 0.7), 1.8);
+      if (a > 0) {
+        ctx.save();
+        ctx.globalAlpha = geral * Math.min(1, a);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.translate(W / 2, cy - 14 * u);
+        ctx.scale(a, a);
+        ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 8, W * 0.8, "Montserrat"), "Montserrat");
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 1.5 * u;
+        ctx.fillStyle = C.cor_texto;
+        ctx.fillText(C.texto, 0, 0);
+        ctx.restore();
+      }
+    }
+  };
+})();
+</script>

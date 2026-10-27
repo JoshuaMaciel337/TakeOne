@@ -1,0 +1,130 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Mente em holograma",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma cabeça de perfil em holograma, com o cérebro feito de pontos ligados que acendem, e a palavra embaixo.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra", "tipo": "texto", "padrao": "MENTE", "maximo": 18},
+  {"id": "cor_1", "rotulo": "Holograma", "tipo": "cor", "padrao": "#38e1ff"},
+  {"id": "cor_2", "rotulo": "Pontos acesos", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Mente em holograma: o perfil é um caminho só (crânio, testa, nariz, boca, queixo e pescoço), traçado aos poucos
+     no começo. Os pontos do cérebro são sorteados com semente dentro de uma elipse e ligados aos vizinhos mais
+     perto; o pulso que acende cada um é uma onda que anda pela elipse. As linhas horizontais do holograma descem
+     devagar. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const S = 24 * u;
+  const cx = W / 2;
+  const cy = H / 2 - 4 * u;
+  // O perfil, olhando para a direita, numa caixa de -1 a 1
+  const PERFIL = [
+    [-0.15, 1.0], [-0.2, 0.62], [-0.55, 0.42], [-0.78, 0.05], [-0.8, -0.38], [-0.55, -0.8], [-0.05, -0.98],
+    [0.42, -0.86], [0.68, -0.52], [0.72, -0.2], [0.86, 0.04], [0.74, 0.12], [0.76, 0.3], [0.68, 0.36],
+    [0.71, 0.46], [0.6, 0.6], [0.36, 0.64], [0.3, 1.0],
+  ];
+  const pontos = [];
+  for (let i = 0; pontos.length < 34 && i < 400; i++) {
+    const x = TO.hash(i, 11) * 2 - 1;
+    const y = TO.hash(i, 23) * 2 - 1;
+    if ((x * x) / 1 + (y * y) / 1 < 1) pontos.push([-0.08 + x * 0.48, -0.4 + y * 0.36]);
+  }
+  const ligacoes = [];
+  pontos.forEach((a, i) => {
+    const perto = pontos
+      .map((b, j) => [Math.hypot(a[0] - b[0], a[1] - b[1]), j])
+      .filter(([, j]) => j > i)
+      .sort((p, q) => p[0] - q[0])
+      .slice(0, 2);
+    for (const [, j] of perto) ligacoes.push([i, j]);
+  });
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.3, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const tremor = TO.noise(t * 20, 4) > 0.85 ? 0.4 : 1;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(S, S);
+    // O perfil traçado aos poucos
+    const traco = TO.ease.inOutCubic(TO.prog(t, 0.1, 1.2));
+    const n = Math.max(2, Math.ceil(PERFIL.length * traco));
+    ctx.beginPath();
+    PERFIL.slice(0, n).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 0.025;
+    ctx.strokeStyle = TO.rgba(C.cor_1, 0.95 * tremor);
+    ctx.shadowColor = C.cor_1;
+    ctx.shadowBlur = 1.5 * u;
+    ctx.stroke();
+    if (traco >= 1) {
+      ctx.closePath();
+      ctx.fillStyle = TO.rgba(C.cor_1, 0.08);
+      ctx.fill();
+    }
+    // O cérebro: as ligações e os pontos, acesos por uma onda que anda
+    const acende = TO.prog(t, 0.8, 1.6);
+    if (acende > 0) {
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 0.008;
+      ctx.strokeStyle = TO.rgba(C.cor_1, 0.55 * acende);
+      ctx.beginPath();
+      for (const [i, j] of ligacoes) {
+        ctx.moveTo(pontos[i][0], pontos[i][1]);
+        ctx.lineTo(pontos[j][0], pontos[j][1]);
+      }
+      ctx.stroke();
+      pontos.forEach(([x, y], i) => {
+        const onda = 0.5 + 0.5 * Math.sin(t * 5 - (x + y) * 6 + i * 0.4);
+        const r = 0.018 + 0.016 * onda;
+        ctx.globalAlpha = geral * acende * (0.45 + 0.55 * onda);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = onda > 0.75 ? C.cor_2 : C.cor_1;
+        ctx.fill();
+      });
+      ctx.globalAlpha = geral;
+    }
+    ctx.restore();
+    // As linhas do holograma, descendo, só dentro da cabeça
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(S, S);
+    ctx.beginPath();
+    PERFIL.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = TO.rgba(C.cor_1, 0.12 * TO.prog(t, 1.0, 1.5));
+    const anda = (t * 0.25) % 0.08;
+    for (let y = -1.1 + anda; y < 1.1; y += 0.08) ctx.fillRect(-1, y, 2, 0.02);
+    ctx.restore();
+    // A palavra embaixo, letra por letra
+    if (C.texto) {
+      // Num save: o espaçamento e a sombra não podem passar para o quadro seguinte (mudariam a medida da palavra)
+      ctx.save();
+      const letras = Array.from(C.texto);
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 6.5, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.letterSpacing = `${1.4 * u}px`;
+      // As letras aparecem uma a uma no lugar delas (o começo fica parado, como numa máquina de escrever)
+      const inteira = ctx.measureText(C.texto).width;
+      const mostradas = Math.floor(letras.length * TO.prog(t, 1.4, 2.0));
+      ctx.textAlign = "left";
+      ctx.fillStyle = C.cor_1;
+      ctx.shadowColor = C.cor_1;
+      ctx.shadowBlur = 2 * u;
+      ctx.fillText(letras.slice(0, mostradas).join(""), W / 2 - inteira / 2, cy + S * 1.18);
+      ctx.restore();
+    }
+  };
+})();
+</script>

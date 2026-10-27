@@ -1,0 +1,125 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Bíblia aberta com luz",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma Bíblia aberta: as páginas viram, raios de luz saem dela e a palavra aparece em cima.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra", "tipo": "texto", "padrao": "A PALAVRA", "maximo": 22},
+  {"id": "cor_1", "rotulo": "Capa", "tipo": "cor", "padrao": "#5b2a1a"},
+  {"id": "cor_2", "rotulo": "Luz", "tipo": "cor", "padrao": "#ffd98a"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Bíblia aberta: as duas páginas são quadriláteros em leve perspectiva sobre a capa; as linhas do texto são barras
+     finas. Três folhas viram da direita para a esquerda (a largura da folha é o cosseno do ângulo, e o lado do meio
+     fica preso). Atrás, um leque de raios gira devagar e acende junto com o brilho. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const L = 22 * u;
+  const cx = W / 2;
+  const cy = H / 2 + 8 * u;
+  function pagina(lado, cor) {
+    // Do meio (x = 0) até a borda, com a borda de fora um pouco mais baixa
+    ctx.beginPath();
+    ctx.moveTo(0, -0.42 * L);
+    ctx.quadraticCurveTo(lado * 0.5 * L, -0.5 * L, lado * L, -0.4 * L);
+    ctx.lineTo(lado * L, 0.3 * L);
+    ctx.quadraticCurveTo(lado * 0.5 * L, 0.2 * L, 0, 0.3 * L);
+    ctx.closePath();
+    ctx.fillStyle = cor;
+    ctx.fill();
+  }
+  function linhas(lado) {
+    ctx.fillStyle = "rgba(60,40,30,0.35)";
+    for (let i = 0; i < 9; i++) {
+      const y = -0.34 * L + i * 0.068 * L;
+      const curto = TO.hash(i + (lado > 0 ? 50 : 0), 5) * 0.2;
+      const x0 = lado > 0 ? 0.1 * L : -0.9 * L;
+      ctx.fillRect(x0, y, (0.8 - curto) * L, 0.022 * L);
+    }
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.01, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const entra = TO.ease.outBack(TO.prog(t, 0, 0.6), 1.6);
+    if (entra <= 0) return;
+    // Os raios atrás
+    const luz = TO.prog(t, 0.5, 1.4);
+    if (luz > 0) {
+      ctx.save();
+      ctx.translate(cx, cy - 0.1 * L);
+      ctx.rotate(t * 0.15);
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2;
+        const g = ctx.createLinearGradient(0, 0, Math.cos(a) * 1.7 * L, Math.sin(a) * 1.7 * L);
+        g.addColorStop(0, TO.rgba(C.cor_2, 0.55 * luz));
+        g.addColorStop(1, TO.rgba(C.cor_2, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, 1.7 * L, a - 0.09, a + 0.09);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = geral * luz;
+      const r = 1.3 * L;
+      ctx.drawImage(TO.brilho(C.cor_2), cx - r, cy - 0.1 * L - r, r * 2, r * 2);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(entra, entra);
+    // A capa, um pouco maior que as páginas
+    ctx.fillStyle = C.cor_1;
+    TO.retangulo(ctx, -1.06 * L, -0.47 * L, 2.12 * L, 0.84 * L, 0.05 * L);
+    ctx.fill();
+    pagina(-1, "#f7efdc");
+    pagina(1, "#f4ead2");
+    linhas(-1);
+    linhas(1);
+    // A dobra do meio
+    const dobra = ctx.createLinearGradient(-0.08 * L, 0, 0.08 * L, 0);
+    dobra.addColorStop(0, "rgba(0,0,0,0)");
+    dobra.addColorStop(0.5, "rgba(0,0,0,0.25)");
+    dobra.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = dobra;
+    ctx.fillRect(-0.08 * L, -0.42 * L, 0.16 * L, 0.72 * L);
+    // As folhas virando
+    for (let i = 0; i < 3; i++) {
+      const p = TO.ease.inOutSine(TO.prog(t, 0.7 + i * 0.35, 1.25 + i * 0.35));
+      if (p <= 0 || p >= 1) continue;
+      const largura = Math.cos(p * Math.PI);
+      ctx.save();
+      ctx.scale(largura, 1);
+      pagina(1, largura > 0 ? "#fbf5e6" : "#efe3c6");
+      ctx.restore();
+    }
+    ctx.restore();
+    // A palavra em cima
+    if (C.texto) {
+      const p = TO.ease.outCubic(TO.prog(t, 1.3, 1.9));
+      ctx.save();
+      ctx.globalAlpha = geral * p;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 7, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.texto, cx, cy - 0.72 * L - (1 - p) * 3 * u);
+      ctx.restore();
+    }
+  };
+})();
+</script>

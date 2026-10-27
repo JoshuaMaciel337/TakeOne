@@ -1,0 +1,91 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Cruz de luz",
+ "categoria": "pregacao",
+ "motor": "canvas",
+ "duracao": 4,
+ "descricao": "Uma cruz desenhada pela luz: a trave de pé cresce, depois a deitada, e raios giram atrás dela.",
+ "campos": [
+  {"id": "texto", "rotulo": "Palavra (opcional)", "tipo": "texto", "padrao": "", "maximo": 22},
+  {"id": "cor_1", "rotulo": "Luz", "tipo": "cor", "padrao": "#fff1c1"},
+  {"id": "cor_2", "rotulo": "Brilho", "tipo": "cor", "padrao": "#ffb547"},
+  {"id": "cor_texto", "rotulo": "Palavra", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Cruz de luz: cada trave é um retângulo claro com um brilho largo por baixo; a de pé cresce do meio para as
+     pontas, depois a deitada. Atrás, um leque de raios finos gira e pulsa devagar. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const A = 30 * u;
+  const cx = W / 2;
+  const cy = H / 2 - (C.texto ? 4 * u : 0);
+  function trave(x, y, w, h) {
+    ctx.save();
+    ctx.shadowColor = C.cor_2;
+    ctx.shadowBlur = 4 * u;
+    ctx.fillStyle = C.cor_1;
+    TO.retangulo(ctx, x, y, w, h, Math.min(w, h) * 0.3);
+    ctx.fill();
+    ctx.shadowBlur = 1.2 * u;
+    ctx.fill();
+    ctx.restore();
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const geral = TO.envelope(t, 0.2, 0.4, dur);
+    ctx.globalAlpha = geral;
+    const meio = cy - 0.18 * A;
+    // Raios atrás
+    const luz = TO.prog(t, 0.6, 1.4);
+    if (luz > 0) {
+      ctx.save();
+      ctx.translate(cx, meio);
+      ctx.rotate(t * 0.12);
+      const pulso = 0.75 + 0.25 * Math.sin(t * 3);
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const comprimento = (0.75 + 0.35 * TO.hash(i, 3)) * A;
+        const g = ctx.createLinearGradient(0, 0, Math.cos(a) * comprimento, Math.sin(a) * comprimento);
+        g.addColorStop(0, TO.rgba(C.cor_2, 0.5 * luz * pulso));
+        g.addColorStop(1, TO.rgba(C.cor_2, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, comprimento, a - 0.035, a + 0.035);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = geral * luz * 0.8;
+      const r = 0.9 * A;
+      ctx.drawImage(TO.brilho(C.cor_2), cx - r, meio - r, r * 2, r * 2);
+      ctx.restore();
+    }
+    const espessura = 0.1 * A;
+    const pe = TO.ease.outExpo(TO.prog(t, 0.15, 0.9));
+    if (pe > 0) trave(cx - espessura / 2, cy - pe * 0.5 * A, espessura, pe * A);
+    const deitada = TO.ease.outExpo(TO.prog(t, 0.65, 1.35));
+    if (deitada > 0) trave(cx - deitada * 0.33 * A, meio - espessura / 2, deitada * 0.66 * A, espessura);
+    if (C.texto) {
+      const p = TO.ease.outCubic(TO.prog(t, 1.3, 1.9));
+      ctx.save();
+      ctx.globalAlpha = geral * p;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, TO.caber(ctx, C.texto, 900, 6.5, W * 0.8, "Montserrat"), "Montserrat");
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.texto, cx, cy + 0.62 * A);
+      ctx.restore();
+    }
+  };
+})();
+</script>
