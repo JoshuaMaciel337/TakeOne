@@ -22,7 +22,7 @@ async function todasAsMidias(): Promise<Midia[]> {
   }
 }
 /** Jobs que criam uma mídia nova (processando): o fim de cada um recarrega a biblioteca. */
-const JOBS_QUE_CRIAM_MIDIA = ["ingestao", "geracao_video", "geracao_imagem", "animacao_html", "animacao_descrita", "fala", "objeto", "quadro", "ampliar", "expandir", "foto_3d"];
+const JOBS_QUE_CRIAM_MIDIA = ["ingestao", "importar_link", "geracao_video", "geracao_imagem", "animacao_html", "animacao_descrita", "fala", "objeto", "quadro", "ampliar", "expandir", "foto_3d"];
 // Jobs que geram um arquivo a mais para uma mídia pronta, e o campo da mídia que mostra o andamento.
 // null: o andamento fica num dicionário (um por tom ou por versão); só o fim recarrega.
 const CAMPO_DO_JOB: Record<string, "voz_limpa" | "imagem_limpa" | "recorte_fundo" | "esconder_rostos" | null> = {

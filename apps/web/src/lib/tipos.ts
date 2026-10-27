@@ -93,6 +93,8 @@ export type Midia = {
   elemento?: PedidoDeForma | null;
   /** Camada de pixels do editor de imagem (lib/pixels.ts): o tamanho e a última versão enviada. Fora da biblioteca. */
   camada_pixels?: { largura: number; altura: number; ultima: number } | null;
+  /** Importada pelo link (lib/importacao.ts): o site, o vídeo e o que se leu dele. */
+  importacao?: { origem: string; id: string; url: string; titulo?: string; canal?: string; duracao?: number; miniatura?: string } | null;
   /** Vídeo gerado com IA (Wan 2.2): o pedido que o gerou. */
   /** Gerada com IA: o texto, o formato e a duração (vídeo e imagem), a imagem de partida e se é um preenchimento. */
   gerada?: { descricao: string; formato: string | null; duracao?: number | null; imagem_id?: string | null; preenchimento?: boolean } | null;

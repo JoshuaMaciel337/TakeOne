@@ -42,6 +42,14 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
     destino: { tipo: "editor", ferramenta: "midia" },
   },
   {
+    id: "clipar",
+    nome: "Clipar",
+    descricao: "Cole o link de um vídeo longo, ou envie o arquivo, e saia com os cortes prontos.",
+    categorias: ["video", "ia"],
+    destino: { tipo: "pagina", href: "/app/clipar" },
+    selo: "novo",
+  },
+  {
     id: "editor-imagem",
     nome: "Editor de imagem",
     descricao: "Posts, capas e stories em camadas, com cor, texto, formas e fundo removido.",
@@ -230,7 +238,7 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
 ];
 
 /** As que aparecem na fileira de cartões da página inicial, nesta ordem. */
-export const NO_INICIO = ["editor-video", "criar-automaticamente", "legendas", "gerar-video", "texto-em-fala", "montar", "modelos", "editor-imagem"];
+export const NO_INICIO = ["editor-video", "clipar", "criar-automaticamente", "legendas", "gerar-video", "texto-em-fala", "modelos", "editor-imagem"];
 
 export function ferramentaDoHub(id: string): FerramentaDoHub {
   const achada = FERRAMENTAS_DO_HUB.find((ferramenta) => ferramenta.id === id);
@@ -268,6 +276,7 @@ export const SECOES_DO_MENU: { titulo: string | null; itens: ItemDoMenu[] }[] = 
     titulo: "Criar",
     itens: [
       { nome: "Editor de vídeo", acao: "editor-video", icone: "editor-video" },
+      { nome: "Clipar", href: "/app/clipar", icone: "clipar" },
       { nome: "Editor de imagem", href: "/app/ferramentas/editor-de-imagem", icone: "editor-imagem" },
       { nome: "Gerar vídeo com IA", href: "/app/ferramentas/gerar-video", icone: "gerar-video" },
       { nome: "Gerar imagem com IA", href: "/app/ferramentas/gerar-imagem", icone: "gerar-imagem" },

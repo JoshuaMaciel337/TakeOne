@@ -91,7 +91,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 
 Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que foi medido escrito no CLAUDE.md.
 
-- [ ] **14.1 Entrada.** O "Clipar" no hub (menu Criar e página inicial). Colar o link (YouTube, Vimeo, Twitch, Drive e
+- [x] **14.1 Entrada.** O "Clipar" no hub (menu Criar e página inicial). Colar o link (YouTube, Vimeo, Twitch, Drive e
   os outros que o yt-dlp lê) ou enviar o arquivo; os dados do vídeo antes de confirmar; a tarefa de importar (do
   HolyCut, sem o monitor da igreja) com o progresso; o aviso de direitos. Medir: um vídeo de 10 min e um de 1 h
   baixados no Nitro, com o tempo; um link privado ou removido dando a mensagem certa.
