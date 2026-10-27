@@ -2,12 +2,12 @@
 
 // Os degradês, os padrões e as formas personalizadas do espaço (api/rotas/recursos.py): os salvos pela pessoa no
 // Editor de degradês, em Editar › Definir padrão e em Editar › Definir forma personalizada. Os dados são do editor;
-// a API só guarda.
+// a API só guarda. As estratégias do Clipar também ficam aqui.
 import { useCallback, useEffect, useState } from "react";
 
 import { chamarApi } from "./api";
 
-export type TipoDoRecurso = "degrade" | "padrao" | "forma" | "estilo_caractere" | "estilo_paragrafo" | "estilo_camada" | "acoes" | "ferramenta";
+export type TipoDoRecurso = "degrade" | "padrao" | "forma" | "estilo_caractere" | "estilo_paragrafo" | "estilo_camada" | "acoes" | "ferramenta" | "estrategia";
 
 export type Recurso<T = Record<string, unknown>> = {
   id: string;

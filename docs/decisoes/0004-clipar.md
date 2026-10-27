@@ -95,7 +95,7 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   os outros que o yt-dlp lê) ou enviar o arquivo; os dados do vídeo antes de confirmar; a tarefa de importar (do
   HolyCut, sem o monitor da igreja) com o progresso; o aviso de direitos. Medir: um vídeo de 10 min e um de 1 h
   baixados no Nitro, com o tempo; um link privado ou removido dando a mensagem certa.
-- [ ] **14.2 A página de opções.** Estratégias prontas (ganchos rápidos, humor, ideia completa de podcast, aula,
+- [x] **14.2 A página de opções.** Estratégias prontas (ganchos rápidos, humor, ideia completa de podcast, aula,
   entrevista, pregação) e a própria (o que buscar e o estilo do título, em texto curto, guardadas no espaço); o gênero;
   a faixa de duração (menos de 30 s, 30 a 59 s, 60 a 89 s, 90 s a 3 min, 3 a 5 min, ou livre); o trecho a analisar
   (duas pontas sobre a forma de onda); o idioma; "incluir momentos" em texto livre; um .srt próprio no lugar da

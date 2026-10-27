@@ -1,13 +1,17 @@
 "use client";
 
-// O Clipar (ADR 0004): do link, ou do arquivo, de um vídeo longo aos cortes prontos. Nesta parte (14.1), a
-// entrada e os vídeos chegando; as opções e os cortes vêm nas próximas.
-import { AlertCircle, Link2, Loader2 } from "lucide-react";
+// O Clipar (ADR 0004): do link, ou do arquivo, de um vídeo longo aos cortes prontos. A entrada, os vídeos chegando
+// (cada um pronto leva às opções) e as clipagens já pedidas.
+import { AlertCircle, ChevronRight, Link2, Loader2, Scissors } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { EntradaDoClipar } from "@/componentes/clipar/EntradaDoClipar";
 import { SecaoDoHub, TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { arquivoDaMidia } from "@/lib/api";
+import { type Clipagem, listarClipagens } from "@/lib/clipagens";
+import { useEventosJobs } from "@/lib/eventos";
 import { formatarTempo } from "@/lib/formatar";
 import type { Midia } from "@/lib/tipos";
 import { useMidias } from "@/lib/useMidias";
@@ -60,13 +64,34 @@ function LinhaDoVideo({ midia }: { midia: Midia }) {
           {situacao(midia)}
         </p>
       </div>
+      {midia.status === "pronta" ? (
+        <Link href={`/app/clipar/novo/${midia.id}`} className="botao-principal shrink-0">
+          <Scissors className="size-4" aria-hidden /> Gerar cortes
+        </Link>
+      ) : null}
     </li>
   );
+}
+
+function situacaoDaClipagem(clipagem: Clipagem): string {
+  if (clipagem.status === "pronta") return `${clipagem.total_de_cortes} cortes`;
+  if (clipagem.status === "erro") return clipagem.erro || "Não deu para achar os cortes";
+  return clipagem.andamento ? `${clipagem.andamento.mensagem} · ${clipagem.andamento.progresso}%` : "Na fila";
 }
 
 export default function PaginaClipar() {
   const { midias, recarregar } = useMidias();
   const videos = videosParaClipar(midias ?? []);
+  const [clipagens, setClipagens] = useState<Clipagem[]>([]);
+  const [versao, setVersao] = useState(0);
+  useEffect(() => {
+    listarClipagens()
+      .then(setClipagens)
+      .catch(() => setClipagens([]));
+  }, [versao]);
+  useEventosJobs((job) => {
+    if (job.tipo === "clipagem" || job.tipo === "transcricao") setVersao((n) => n + 1);
+  });
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-8">
       <TituloDaPagina
@@ -75,6 +100,24 @@ export default function PaginaClipar() {
       />
       <EntradaDoClipar aoImportar={() => void recarregar()} />
       <ListaEnvios />
+      {clipagens.length ? (
+        <SecaoDoHub titulo="Suas clipagens">
+          <ul className="flex flex-col gap-2">
+            {clipagens.map((clipagem) => (
+              <li key={clipagem.id}>
+                <Link href={`/app/clipar/${clipagem.id}`} className="flex items-center gap-3 rounded-lg border border-borda bg-painel p-3 hover:border-suave/60">
+                  <Scissors className="size-4 shrink-0 text-destaque" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{clipagem.nome}</span>
+                    <span className={`block truncate text-xs ${clipagem.status === "erro" ? "text-erro" : "text-suave"}`}>{situacaoDaClipagem(clipagem)}</span>
+                  </span>
+                  <ChevronRight className="size-4 text-suave" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </SecaoDoHub>
+      ) : null}
       <SecaoDoHub titulo="Seus vídeos">
         {midias === null ? (
           <p className="text-sm text-suave">Carregando…</p>
