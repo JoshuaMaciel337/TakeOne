@@ -1,10 +1,13 @@
 // Abrir um corte no editor (ADR 0004, 14.5): o corte montado vira um projeto novo no formato da clipagem, ligado
 // ao corte, e abrir de novo vai ao mesmo projeto. O "Como quer a edição" da clipagem muda as opções da montagem.
 // A fala vem da clipagem (a transcrição ou o .srt da pessoa) e o rosto da busca de sempre (worker de CPU); a
-// montagem é pura (montarCorte.ts).
+// montagem é pura (montarCorte.ts). Com a legenda animada pedida, a trilha é gravada antes de salvar o projeto.
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { type Clipagem, type Corte, falaDaClipagem } from "@/lib/clipagens";
+import { esperarLegenda, pedirLegendaAnimada } from "@/lib/legendasAnimadas";
+import { executarComando } from "@/lib/projeto/comandos";
+import { faixaDasLegendas, pedidoDasLegendas } from "@/lib/projeto/legendaAnimada";
 import type { Marca } from "@/lib/projeto/marca";
 import type { Projeto } from "@/lib/projeto/modelo";
 import { buscarRosto } from "@/lib/rosto";
@@ -66,7 +69,7 @@ export async function projetoDoCorte(
 
   aoAndamento("Montando o corte");
   const vazio = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome: corte.titulo.slice(0, 120) || "Corte", proporcao: formato } });
-  const { projeto } = montarCorte({
+  const { projeto: montado } = montarCorte({
     projeto: vazio,
     ctx: contextoDasMidias(new Map([[midia.id, midia]])),
     midia: { id: midia.id, largura: midia.video.largura, altura: midia.video.altura },
@@ -77,6 +80,17 @@ export async function projetoDoCorte(
     // O "Como quer a edição" da clipagem muda as opções; a cor que ele pede vale mais que a do kit
     opcoes: opcoesDoPlano(clipagem.plano_da_edicao, { ...opcoes, corDeDestaque: marca.cores[0] ?? opcoes.corDeDestaque }, marca.cores[0] ?? null),
   });
+  // A legenda animada: as legendas montadas viram a trilha gravada pelo worker, por cima, antes de abrir
+  let projeto = montado;
+  const estiloAnimado = clipagem.opcoes.legenda_animada;
+  if (estiloAnimado && faixaDasLegendas(montado)) {
+    const pedido = pedidoDasLegendas(montado);
+    aoAndamento("Gravando a legenda animada");
+    const trilha = await esperarLegenda(await pedirLegendaAnimada(pedido, estiloAnimado, montado.proporcao), aoAndamento, ativo);
+    if (!trilha) return null;
+    const ctx = contextoDasMidias(new Map([[midia.id, midia], [trilha.id, trilha]]));
+    projeto = executarComando(montado, { comando: "legenda.animar", parametros: { midiaId: trilha.id, inicio: pedido.inicio, faixaId: pedido.faixaId } }, ctx).projeto;
+  }
   await chamarApi<Projeto>(`/projetos/${vazio.id}`, {
     metodo: "PUT",
     corpo: { versao: vazio.versao, nome: vazio.nome, proporcao: projeto.proporcao, taxa: projeto.taxa, fundo: projeto.fundo, faixas: projeto.faixas, marcadores: [] },

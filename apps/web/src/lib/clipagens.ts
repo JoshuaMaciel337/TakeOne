@@ -20,6 +20,8 @@ export type OpcoesDaClipagem = {
   edicao: string;
   formato: "9:16" | "1:1" | "4:5" | "16:9";
   maximo: number | null;
+  /** O estilo da legenda animada dos cortes (ESTILOS_ANIMADOS); null: as legendas de sempre. */
+  legenda_animada: string | null;
 };
 
 export const OPCOES_PADRAO: OpcoesDaClipagem = {
@@ -34,6 +36,7 @@ export const OPCOES_PADRAO: OpcoesDaClipagem = {
   edicao: "",
   formato: "9:16",
   maximo: null,
+  legenda_animada: null,
 };
 
 export const FAIXAS: { id: Faixa; nome: string; segundos: [number, number] }[] = [

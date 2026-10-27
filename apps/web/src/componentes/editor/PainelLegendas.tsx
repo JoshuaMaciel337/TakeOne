@@ -8,6 +8,7 @@ import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLeg
 import type { Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 
+import { LegendaAnimada } from "./LegendaAnimada";
 import { LegendasDaFala } from "./LegendasDaFala";
 import { PalavrasChaveDaIA } from "./PalavrasChaveDaIA";
 
@@ -20,6 +21,8 @@ export type PropsLegendas = {
   aoBuscar: (tempo: Tick) => void;
   aoSelecionar: (ids: string[]) => void;
   aoAvisar: (mensagem: string) => void;
+  /** Para a legenda animada: o comando roda quando a trilha gravada fica pronta. */
+  aoExecutarQuandoProntas?: (midiaIds: string[], comando: Comando) => void;
 };
 
 function baixar(nome: string, conteudo: string, tipo: string) {
@@ -44,7 +47,7 @@ function nomeDeArquivo(nome: string): string {
 }
 
 /** Painel da ferramenta Legendas: automáticas pela fala (Whisper no worker de GPU), manuais e SRT/VTT. */
-export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar }: PropsLegendas) {
+export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar, aoExecutarQuandoProntas }: PropsLegendas) {
   const [estiloId, setEstiloId] = useState(ESTILOS_DE_LEGENDA[0].id);
   const arquivoRef = useRef<HTMLInputElement>(null);
   const estilo = ESTILOS_DE_LEGENDA.find((item) => item.id === estiloId)!.texto;
@@ -106,6 +109,7 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
 
       <LegendasDaFala projeto={projeto} estilo={estilo} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       <PalavrasChaveDaIA projeto={projeto} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+      {aoExecutarQuandoProntas ? <LegendaAnimada projeto={projeto} aoExecutarQuandoProntas={aoExecutarQuandoProntas} aoAvisar={aoAvisar} /> : null}
 
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="botao-secundario px-3 py-2 text-xs" onClick={() => aoExecutar({ comando: "legenda.adicionar", parametros: { inicio: tempo, estilo } })}>

@@ -100,6 +100,8 @@ export type Midia = {
   gerada?: { descricao: string; formato: string | null; duracao?: number | null; imagem_id?: string | null; preenchimento?: boolean } | null;
   /** Animação em HTML gravada pelo worker (traz a transparência em mascara.mp4). */
   animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
+  /** Legenda animada gravada pelo worker (lib/projeto/legendaAnimada.ts), com a transparência em mascara.mp4. */
+  legenda_animada?: { estilo: string; proporcao: string; duracao: number; palavras: number } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;

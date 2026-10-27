@@ -23,7 +23,7 @@ export function contextoDasMidias(midias: ReadonlyMap<string, Midia>): Contexto 
         duracao: segundosParaTicks(midia.duracao),
         video: Boolean(midia.video),
         audio: Boolean(midia.audio),
-        transparente: Boolean(midia.animacao) && midia.arquivos.includes("mascara.mp4"),
+        transparente: Boolean(midia.animacao || midia.legenda_animada) && midia.arquivos.includes("mascara.mp4"),
       };
     },
   };

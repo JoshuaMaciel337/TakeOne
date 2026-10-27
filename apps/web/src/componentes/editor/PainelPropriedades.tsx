@@ -552,7 +552,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           Trocar a imagem
         </button>
       ) : null}
-      {modo === "imagem" && midia?.imagem && !midia.animacao && !midia.elemento && !clipe.pixels ? (
+      {modo === "imagem" && midia?.imagem && !midia.animacao && !midia.legenda_animada && !midia.elemento && !clipe.pixels ? (
         <Secao titulo="Ações rápidas">
           <div className="flex flex-col gap-1.5">
             <button
@@ -703,7 +703,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         {midia?.elemento && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
         ) : null}
-        {comTempo && aoTrocarPorVideo && midia?.imagem && !midia.elemento && !midia.animacao && !midia.video?.transparente && !clipe.texto ? (
+        {comTempo && aoTrocarPorVideo && midia?.imagem && !midia.elemento && !midia.animacao && !midia.legenda_animada && !midia.video?.transparente && !clipe.texto ? (
           <FotoEm3D clipe={clipe} midia={midia} travada={travada} aoPedir={aoTrocarPorVideo} aoAvisar={aoAvisar} />
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
@@ -718,13 +718,13 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             desfocar={!comTempo && midia.imagem && !midia.video.transparente ? () => aoExecutar({ comando: "imagem.desfocarFundo", parametros: { faixaId: faixa.id } }) : undefined}
           />
         ) : null}
-        {!clipe.texto && midia?.video && !midia.imagem && !midia.elemento && !midia.animacao && comTempo ? (
+        {!clipe.texto && midia?.video && !midia.imagem && !midia.elemento && !midia.animacao && !midia.legenda_animada && comTempo ? (
           <>
             <EsconderRostos clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
             <EsconderObjetos clipe={clipe} midia={midia} travada={travada} estado={seguirObjeto} aoExecutar={aoExecutar} />
           </>
         ) : null}
-        {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao ? (
+        {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao && !midia.legenda_animada ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
         ) : null}
         {pontosDoClipe.length ? (

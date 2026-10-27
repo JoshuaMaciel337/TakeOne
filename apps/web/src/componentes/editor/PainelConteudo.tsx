@@ -193,7 +193,7 @@ export function ConteudoDaFerramenta({
     ) : ferramenta.id === "texto" ? (
       <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} animacaoInicial={animacaoInicial} />
     ) : ferramenta.id === "legendas" ? (
-      <PainelLegendas {...legendas} />
+      <PainelLegendas {...legendas} aoExecutarQuandoProntas={aoExecutarQuandoProntas} />
     ) : ferramenta.id === "transcricao" ? (
       <PainelTranscricao
         projeto={legendas.projeto}

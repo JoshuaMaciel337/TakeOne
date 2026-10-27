@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { PreviaDaAnimacao } from "@/componentes/editor/PainelAnimacoes";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
 import {
@@ -27,7 +28,9 @@ import {
   tempoLegivel,
 } from "@/lib/clipagens";
 import { formatarTempo } from "@/lib/formatar";
+import { enderecoDaPrevia } from "@/lib/legendasAnimadas";
 import { lerNiveis } from "@/lib/niveis";
+import { ESTILOS_ANIMADOS } from "@/lib/projeto/legendaAnimada";
 import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
 import type { Midia } from "@/lib/tipos";
 
@@ -347,6 +350,24 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
             </button>
           ))}
         </div>
+      </Secao>
+
+      <Secao titulo="Legenda animada" descricao="As legendas de cada corte gravadas com a palavra entrando no ritmo da fala, e a palavra forte destacada.">
+        <div className="flex flex-wrap gap-2">
+          <Escolha ativo={opcoes.legenda_animada === null} aoEscolher={() => mudar({ legenda_animada: null })}>
+            Sem animação
+          </Escolha>
+          {ESTILOS_ANIMADOS.map((estilo) => (
+            <Escolha key={estilo.id} ativo={opcoes.legenda_animada === estilo.id} aoEscolher={() => mudar({ legenda_animada: estilo.id })}>
+              {estilo.nome}
+            </Escolha>
+          ))}
+        </div>
+        {opcoes.legenda_animada ? (
+          <div className="w-32">
+            <PreviaDaAnimacao endereco={enderecoDaPrevia(opcoes.legenda_animada, opcoes.formato, {}, 0.72)} proporcao={opcoes.formato} alturaMaxima={240} />
+          </div>
+        ) : null}
       </Secao>
 
       <Secao titulo="Duração de cada corte">

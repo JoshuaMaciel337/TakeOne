@@ -200,6 +200,7 @@ import type { Abaixamento } from "./abaixar.ts";
 import type { Efeito } from "./efeitos.ts";
 import type { Cantos, ChaveLuma, Chroma, MascaraDeForma, Mesclagem, Prancheta } from "./modelo.ts";
 import type { PontoDeVelocidade } from "./velocidade.ts";
+import { animarLegendas } from "./legendaAnimada.ts";
 import type { Legenda } from "./legendas.ts";
 import type { Canal, Clipe, Faixa, GeracaoDoClipe, Projeto, Proporcao, Recorte, Transformacao, Virar } from "./modelo.ts";
 import type { FonteTexto, Texto } from "./texto.ts";
@@ -363,6 +364,7 @@ export type Comando =
   | { comando: "texto.mudar"; parametros: { clipeIds: string[]; texto: Partial<Texto> } }
   | { comando: "legenda.adicionar"; parametros: { inicio: Tick; estilo: Texto } }
   | { comando: "legenda.importar"; parametros: { legendas: Legenda[]; estilo: Texto } }
+  | { comando: "legenda.animar"; parametros: { midiaId: string; inicio: Tick; faixaId: string } }
   | { comando: "legenda.estilo"; parametros: { faixaId: string; estilo: Partial<Texto> } }
   | { comando: "legenda.palavrasChave"; parametros: { chaves: Record<string, number[]>; cor: string | null } }
   | { comando: "legenda.juntar"; parametros: { clipeIds: string[] } }
@@ -541,6 +543,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "texto.mudar": "mudar o texto",
   "legenda.adicionar": "adicionar legenda",
   "legenda.importar": "importar legendas",
+  "legenda.animar": "animar as legendas",
   "legenda.estilo": "mudar o estilo das legendas",
   "legenda.palavrasChave": "destacar palavras-chave",
   "legenda.juntar": "juntar legendas",
@@ -1233,6 +1236,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     case "legenda.importar": {
       const resultado = importarLegendas(projeto, ctx, parametros.legendas, parametros.estilo);
       return { projeto: resultado.projeto, selecao: [] };
+    }
+    case "legenda.animar": {
+      const resultado = animarLegendas(projeto, ctx, parametros.midiaId, parametros.inicio, parametros.faixaId);
+      return { projeto: resultado.projeto, selecao: [resultado.clipeId] };
     }
     case "legenda.estilo":
       return { projeto: estiloDasLegendas(projeto, parametros.faixaId, parametros.estilo) };

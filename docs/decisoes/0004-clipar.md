@@ -159,6 +159,36 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   exportação no Chrome a menos de 4 níveis em 255 no meio das animações das palavras, e o tempo de gravar a trilha de um
   corte de 60 s no Nitro.
 
+- [ ] **14.12 O modelo de edição de pregação.** O dono mandou um "antes e depois" de 18,5 s de um corte de pregação
+  editado à mão (analisado quadro a quadro em 27/10/2026): o pregador mais perto e com a cor fria de cinema, a legenda
+  editorial palavra a palavra (serifada condensada em caixa alta, a palavra forte em itálico dourado), trechos com uma
+  palavra por vez, a voz de rádio só na frase de abertura, um corte ou um efeito a cada 1 a 2 s (flash branco com o
+  clique de câmera, clarão de luz, whoosh), um gráfico para cada ideia forte (o coração que se abre e solta os
+  pecados, a cabeça com o cérebro e "MENTE"), imagens de apoio de banco (alguém lendo a Bíblia, escrevendo o
+  devocional), a música de violoncelo por baixo e a cartela final em duas partes ("MENTIRA / SAI"). As partes, nesta
+  ordem, cada uma testada antes da seguinte:
+  - a) **Legendas animadas** (o motor da decisão 8 e os primeiros estilos da 14.11): a trilha das palavras com o tempo
+    e o papel de cada uma, desenhada em Canvas 2D com as fontes livres da biblioteca e gravada pelo worker em cor e
+    transparência, como as animações em HTML (a prévia toca o mesmo vídeo que o render usa). Estilos editorial, uma
+    palavra por vez, minúsculas, palavra pulando, caixa na palavra falada, caixas coloridas, digitação, contorno grosso
+    e néon. **Pronta (27/10/2026):** a trilha sai das legendas do projeto (o tempo de cada palavra e as
+    palavras-chave), pela seção Animada da ferramenta Legendas ou pela "Legenda animada" da página de opções do
+    Clipar; ela entra por cima e a faixa das legendas fica escondida. 60 s de fala gravam em 105 s no Nitro (três
+    processos, só a faixa das linhas fotografada e os quadros parados repetidos).
+  - b) **Cartela final** de frase de impacto (duas partes, a segunda grande, sobre a grade escura) e outros ganchos.
+  - c) **Transições Flash e Clarão** (o branco de um quadro e o brilho de luz que passa), na prévia e no render.
+  - d) **Efeitos sonoros desenhados aqui** (whoosh, swish, clique de câmera, impacto grave, página, teclado, estalo),
+    gerados por síntese, sem arquivos de terceiros, numa biblioteca do espaço.
+  - e) **Gráficos de pregação** (coração que se abre, mente, Bíblia, cruz de luz, chama, pomba, corrente que se
+    quebra, céu que se abre), escolhidos pelas palavras da fala.
+  - f) **Banco da Pixabay** (imagens e vídeos, pela chave do dono no `.env`): a busca no painel com a fonte mostrada, a
+    busca guardada 24 h e o que for usado baixado para a biblioteca, como pedem as regras da API; a montagem escolhe as
+    imagens de apoio pelas palavras da fala.
+  - g) **O modelo de pregação** (14.6) juntando tudo, escolhido na página de opções, e as ações novas do "Peça uma
+    edição" (efeito de voz num trecho, flash nos cortes, gráfico quando fala de algo, cor de cinema, imagem de apoio,
+    cartela final, efeitos sonoros). Medir: um corte do TEDx montado com o modelo, prévia e exportação a menos de 4
+    níveis em 255, e o tempo do link ao corte pronto.
+
 ## Riscos
 
 - **O YouTube muda e o yt-dlp quebra.** A versão fica fixa na imagem, com a atualização como um passo conhecido; a

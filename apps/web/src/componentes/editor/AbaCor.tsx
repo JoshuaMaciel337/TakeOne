@@ -192,7 +192,7 @@ function IgualarCor({
     .flatMap((faixa) => faixa.clipes)
     .filter((outro) => outro.id !== clipe.id && outro.midia_id && !outro.ajuste)
     .map((outro) => ({ clipe: outro, midia: midias.get(outro.midia_id!) }))
-    .filter((opcao): opcao is { clipe: Clipe; midia: Midia } => Boolean(opcao.midia?.video && opcao.midia.status === "pronta" && !opcao.midia.elemento && !opcao.midia.camada_pixels && !opcao.midia.animacao));
+    .filter((opcao): opcao is { clipe: Clipe; midia: Midia } => Boolean(opcao.midia?.video && opcao.midia.status === "pronta" && !opcao.midia.elemento && !opcao.midia.camada_pixels && !opcao.midia.animacao && !opcao.midia.legenda_animada));
   const [referenciaId, setReferenciaId] = useState("");
   const [lendo, setLendo] = useState(false);
   const [aviso, setAviso] = useState("");
@@ -423,7 +423,7 @@ export function AbaCor({ clipe, faixa, midia, faixas, midias, aoPrever, aoExecut
       ))}
     </div>
   );
-  const ehMidia = Boolean(midia?.video && !midia.elemento && !midia.camada_pixels && !midia.animacao);
+  const ehMidia = Boolean(midia?.video && !midia.elemento && !midia.camada_pixels && !midia.animacao && !midia.legenda_animada);
 
   return (
     <div className="-mx-3 -mt-3">
