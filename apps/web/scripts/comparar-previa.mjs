@@ -55,8 +55,9 @@ try {
     const quadro = Math.min(Math.round(quadrosNoTotal * parte), quadrosNoTotal - 2);
     await pagina.keyboard.press("Escape");
     await pagina.keyboard.press("Home");
-    for (let i = 0; i < Math.floor(quadro / fps); i++) await pagina.keyboard.press("Shift+ArrowRight");
-    for (let i = 0; i < Math.round(quadro % fps); i++) await pagina.keyboard.press("ArrowRight");
+    // Shift + seta anda cinco quadros (os atalhos dos editores profissionais, desde a 12.5); a seta, um
+    for (let i = 0; i < Math.floor(quadro / 5); i++) await pagina.keyboard.press("Shift+ArrowRight");
+    for (let i = 0; i < quadro % 5; i++) await pagina.keyboard.press("ArrowRight");
     await pagina.waitForTimeout(2000);
     const medida = await pagina.evaluate(async ({ url, quadro, fps, folga, salvar }) => {
       const previa = document.querySelector("canvas");
