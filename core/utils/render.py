@@ -929,6 +929,15 @@ def _camada_de_ajuste(clipe: dict, anterior: str, numero: int, largura: int, alt
         linhas.append(f"{cadeia}[je{numero}]")
         linhas.append(f"[{indice}:v]format=gray[jf{numero}]")
         cadeia = f"[je{numero}][jf{numero}]alphamerge"
+    # A opacidade que aparece e some (as animações "aparecer" de entrada e saída, como as transições de luz fazem):
+    # o fade do alfa, linear como na prévia
+    animacao = clipe.get("animacao") or {}
+    for nome in ("entrada", "saida"):
+        item = animacao.get(nome) or {}
+        if item.get("tipo") == "aparecer" and item.get("duracao", 0) > 0:
+            duracao = segundos(item["duracao"])
+            cadeia += (f",fade=t=in:st={_numero(inicio)}:d={_numero(duracao)}:alpha=1" if nome == "entrada" else
+                       f",fade=t=out:st={_numero(fim - duracao)}:d={_numero(duracao)}:alpha=1")
     linhas.append(f"{cadeia}[jg{numero}]")
     linhas.append(f"[ja{numero}][jg{numero}]overlay=format=rgb:eof_action=pass:"
                   f"enable='gte(t,{_numero(inicio - meio_quadro)})*lt(t,{_numero(fim - meio_quadro)})'[base{numero}]")

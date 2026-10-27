@@ -5,6 +5,7 @@
 // O clipe guarda só a intenção (`fundo_desfocado`, `esconder_rostos`); duplicar o clipe de verdade deixaria as cópias
 // se desalinharem a cada corte.
 import type { Clipe, Faixa, Projeto } from "./modelo.ts";
+import { comAsLuzesDasTransicoes } from "./transicaoDeLuz.ts";
 
 /** O sufixo do id da cópia recortada e da faixa dela (não aparecem na linha do tempo). */
 export const SUFIXO_DO_RECORTE = "~recorte";
@@ -41,7 +42,9 @@ export function arquivoDaMascara(clipe: Pick<Clipe, "mascara_do_recorte">): stri
 }
 
 /** O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele. */
-export function expandirParaDesenhar(projeto: Projeto): Projeto {
+export function expandirParaDesenhar(projetoDaEdicao: Projeto): Projeto {
+  // As transições de luz viram camadas de ajuste por cima dos vídeos (transicaoDeLuz.ts)
+  const projeto = comAsLuzesDasTransicoes(projetoDaEdicao);
   if (!projeto.faixas.some((faixa) => faixa.clipes.some((clipe) => temFundoDesfocado(clipe) || temRostosEscondidos(clipe) || objetosEscondidos(clipe).length))) return projeto;
   const faixas: Faixa[] = [];
   for (const faixa of projeto.faixas) {

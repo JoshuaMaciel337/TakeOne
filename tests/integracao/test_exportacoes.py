@@ -962,3 +962,45 @@ def test_camada_de_ajuste_muda_a_cor_do_que_esta_embaixo_so_na_mascara_e_no_temp
     assert antes[180, 320][0] > 200 and antes[180, 320][1] < 60, antes[180, 320]
     assert max(abs(int(c) - cinza) for c in durante[180, 320]) <= 20, durante[180, 320]
     assert durante[180, 960][1] > 200 and durante[180, 960][0] < 60, durante[180, 960]
+
+
+def _render_com_transicao(cliente, db_limpo, tipo: str, cor: str):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente, largura=640, altura=360, duracao=2.0, audio=False, gerar=gerar_cor(cor))
+    projeto = cliente.post("/api/projetos", json={"proporcao": "16:9"}).json()
+    base = {"midia_id": midia_id, "velocidade": 1, "volume": 1}
+    clipes = [{**base, "id": "a", "inicio": 0, "duracao": SEGUNDO, "entrada": 0,
+               "transicao": {"tipo": tipo, "duracao": SEGUNDO // 2}},
+              {**base, "id": "b", "inicio": SEGUNDO, "duracao": SEGUNDO, "entrada": SEGUNDO}]
+    corpo = {"versao": projeto["versao"], "nome": "Luz", "proporcao": "16:9", "taxa": projeto["taxa"],
+             "fundo": {"cor": "#000000"}, "faixas": [{**projeto["faixas"][0], "clipes": clipes}]}
+    assert cliente.put(f"/api/projetos/{projeto['id']}", json=corpo).status_code == 200
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"], "resolucao": "720p"}).json()
+    job = pegar_proximo_job(db_limpo, ["renderizacao"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    return storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_flash_sobe_ao_branco_no_corte_e_desce_em_linha_reta(cliente, db_limpo):
+    video = _render_com_transicao(cliente, db_limpo, "flash", "red")
+    # Meio segundo a 30 fps são 15 quadros: 7 antes do corte (de 0,767 s a 1 s) e 8 depois (até 1,267 s)
+    longe, no_corte = quadro_do_video(video, 0.5, 1280, 720)[360, 640], quadro_do_video(video, 1.0, 1280, 720)[360, 640]
+    assert longe[0] > 200 and longe[1] < 40, longe
+    assert min(no_corte) >= 240, no_corte
+    # No meio da subida e da descida, o vermelho misturado ao branco na proporção do fade
+    for segundos, branco in ((0.9, (0.9 - 23 / 30) / (7 / 30)), (1.1, 1 - 0.1 / (8 / 30))):
+        verde = int(quadro_do_video(video, segundos, 1280, 720)[360, 640][1])
+        assert abs(verde - 255 * branco) <= 20, (segundos, verde, 255 * branco)
+
+
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_clarao_acende_o_canto_em_luz_quente_e_deixa_o_outro_lado(cliente, db_limpo):
+    video = _render_com_transicao(cliente, db_limpo, "clarao", "#606060")
+    quadro = quadro_do_video(video, 1.0, 1280, 720).astype(int)
+    canto, longe = quadro[80, 120], quadro[700, 1260]
+    assert canto[0] > 180 and canto[0] > canto[2] + 40, canto
+    assert all(abs(c - 0x60) <= 16 for c in longe), longe
+    antes = quadro_do_video(video, 0.5, 1280, 720).astype(int)[80, 120]
+    assert all(abs(c - 0x60) <= 12 for c in antes), antes

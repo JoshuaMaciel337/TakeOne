@@ -174,9 +174,12 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     e néon. **Pronta (27/10/2026):** a trilha sai das legendas do projeto (o tempo de cada palavra e as
     palavras-chave), pela seção Animada da ferramenta Legendas ou pela "Legenda animada" da página de opções do
     Clipar; ela entra por cima e a faixa das legendas fica escondida. 60 s de fala gravam em 105 s no Nitro (três
-    processos, só a faixa das linhas fotografada e os quadros parados repetidos).
+    processos, só a faixa das linhas fotografada e os quadros parados repetidos); prévia e exportação a 2,5–2,8
+    níveis em 255 no meio da entrada das palavras.
   - b) **Cartela final** de frase de impacto (duas partes, a segunda grande, sobre a grade escura) e outros ganchos.
   - c) **Transições Flash e Clarão** (o branco de um quadro e o brilho de luz que passa), na prévia e no render.
+    **Prontas (27/10/2026):** corte seco com uma camada de ajuste por cima na janela da transição (o branco no
+    Flash, a luz quente do canto no Clarão); prévia e exportação a 0–1,5 nível em 255 no Flash e 2,7–2,9 no Clarão.
   - d) **Efeitos sonoros desenhados aqui** (whoosh, swish, clique de câmera, impacto grave, página, teclado, estalo),
     gerados por síntese, sem arquivos de terceiros, numa biblioteca do espaço.
   - e) **Gráficos de pregação** (coração que se abre, mente, Bíblia, cruz de luz, chama, pomba, corrente que se

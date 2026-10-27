@@ -27,7 +27,9 @@ export type TipoTransicao =
   | "persianas"
   | "diagonal"
   | "blocos"
-  | "zoom_desfoque";
+  | "zoom_desfoque"
+  | "flash"
+  | "clarao";
 /** `misturar_som`: os dois sons se cruzam na janela (janelasDoSom); sem ela, cada clipe soa só entre o começo e o fim dele. */
 export type Transicao = { tipo: TipoTransicao; duracao: Tick; misturar_som?: boolean };
 
@@ -49,6 +51,8 @@ export const TIPOS_TRANSICAO: { id: TipoTransicao; nome: string; descricao: stri
   { id: "diagonal", nome: "Diagonal", descricao: "O próximo é revelado do canto de cima para o de baixo" },
   { id: "blocos", nome: "Blocos", descricao: "O próximo aparece em blocos, numa ordem sorteada" },
   { id: "zoom_desfoque", nome: "Zoom com desfoque", descricao: "Os dois disparam num zoom borrado no corte, e o próximo aparece nele" },
+  { id: "flash", nome: "Flash", descricao: "Um clarão branco no corte, como a luz de uma câmera" },
+  { id: "clarao", nome: "Clarão", descricao: "Uma luz quente entra pelo canto e esconde o corte" },
 ];
 
 /**
@@ -157,7 +161,8 @@ export function janelasDaPrincipal(clipes: Clipe[], quadro: Tick): Map<string, J
   clipes.forEach((clipe, i) => {
     const proximo = clipes[i + 1];
     const transicao = clipe.transicao;
-    if (!proximo || !transicao || transicao.duracao <= 0) return;
+    // As de luz cortam seco: a camada de ajuste por cima faz o efeito (transicaoDeLuz.ts)
+    if (!proximo || !transicao || transicao.duracao <= 0 || transicao.tipo === "flash" || transicao.tipo === "clarao") return;
     const corte = clipe.inicio + clipe.duracao;
     const quadros = Math.max(1, Math.round(transicao.duracao / quadro));
     const duracao = quadros * quadro;

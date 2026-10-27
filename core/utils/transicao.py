@@ -36,7 +36,8 @@ def janelas_da_principal(clipes: list[dict], quadro: float) -> dict[str, dict]:
     janelas = {c["id"]: {"inicio": c["inicio"], "fim": c["inicio"] + c["duracao"], "efeitos": []} for c in clipes}
     for clipe, proximo in zip(clipes, clipes[1:], strict=False):
         transicao = clipe.get("transicao")
-        if not transicao or transicao["duracao"] <= 0:
+        # As de luz cortam seco: a camada de ajuste por cima faz o efeito (transicao_de_luz.py)
+        if not transicao or transicao["duracao"] <= 0 or transicao["tipo"] in ("flash", "clarao"):
             continue
         corte = clipe["inicio"] + clipe["duracao"]
         quadros = max(1, round(transicao["duracao"] / quadro))

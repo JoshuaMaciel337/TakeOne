@@ -209,3 +209,29 @@ def test_geq_da_mascara_faz_a_conta(tipo):
                        for y in range(90)])
     esperado = np.clip((limiar - campos) / 0.04 + 0.5, 0, 1)
     assert np.abs(alfa - esperado).max() < 0.01, np.abs(alfa - esperado).max()
+
+
+def test_transicao_de_luz_corta_seco_e_vira_camada_de_ajuste_por_cima_dos_videos():
+    from core.utils.fundo_desfocado import expandir_para_desenhar
+    from core.utils.tempo import TICKS_POR_SEGUNDO, duracao_do_quadro
+    from core.utils.transicao import janelas_da_principal
+    from core.utils.transicao_de_luz import janela_da_luz
+
+    s, quadro = TICKS_POR_SEGUNDO, duracao_do_quadro(30, 1)
+    # Os mesmos números de lib/projeto/transicaoDeLuz.test.ts
+    assert janela_da_luz(s, s // 2, quadro) == {"inicio": s - 7 * quadro, "duracao": 15 * quadro, "antes": 7 * quadro}
+    assert janela_da_luz(2 * quadro, 10 * quadro, quadro) == {"inicio": 0, "duracao": 10 * quadro,
+                                                               "antes": 2 * quadro}
+    base = {"midia_id": "m", "duracao": s, "entrada": 0, "velocidade": 1}
+    clipes = [{**base, "id": "a", "inicio": 0, "transicao": {"tipo": "flash", "duracao": s // 2}},
+              {**base, "id": "b", "inicio": s}]
+    janelas = janelas_da_principal(clipes, quadro)
+    assert janelas["a"]["fim"] == s and janelas["b"]["inicio"] == s
+    projeto = {"taxa": {"num": 30, "den": 1}, "faixas": [{"id": "t", "tipo": "texto", "clipes": []},
+                                                          {"id": "principal", "tipo": "principal", "clipes": clipes}]}
+    desenhado = expandir_para_desenhar(projeto)
+    assert [f["id"] for f in desenhado["faixas"]] == ["t", "~luzes", "principal"]
+    luz = desenhado["faixas"][1]["clipes"][0]
+    assert luz["ajuste"] and (luz["inicio"], luz["duracao"]) == (s - 7 * quadro, 15 * quadro)
+    assert luz["animacao"]["entrada"] == {"tipo": "aparecer", "duracao": 7 * quadro}
+    assert luz["cor"]["curvas"]["rgb"] == [[0, 1], [1, 1]] and luz["mascara"] is None

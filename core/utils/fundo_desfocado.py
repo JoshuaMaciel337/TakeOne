@@ -5,6 +5,8 @@
 #                    recortada pela máscara da pessoa, sem som;
 #   esconder os rostos: uma faixa acima recebe uma cópia pixelizada ou desfocada, recortada pela máscara dos rostos.
 # -----------------------------------------------
+from core.utils.transicao_de_luz import com_as_luzes_das_transicoes
+
 SUFIXO_DO_RECORTE = "~recorte"
 SUFIXO_DOS_ROSTOS = "~rostos"
 SUFIXO_DOS_OBJETOS = "~objeto"
@@ -32,7 +34,9 @@ def _copia(clipe: dict, sufixo: str) -> dict:
 
 
 def expandir_para_desenhar(projeto: dict) -> dict:
-    """O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele."""
+    """O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele (e as camadas das
+    transições de luz por cima dos vídeos)."""
+    projeto = com_as_luzes_das_transicoes(projeto)
     if not any(tem_fundo_desfocado(c) or tem_rostos_escondidos(c) or objetos_escondidos(c)
                for f in projeto["faixas"] for c in f["clipes"]):
         return projeto
