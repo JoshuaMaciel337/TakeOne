@@ -295,7 +295,7 @@ export function textoEmForma(projeto: Projeto, ctx: Contexto, clipeId: string, v
     ...novo,
     transformacao: { ...novo.transformacao, opacidade: clipe.transformacao.opacidade },
     ...(clipe.mesclagem ? { mesclagem: clipe.mesclagem } : {}),
-    ...(clipe.preenchimento !== undefined ? { preenchimento: clipe.preenchimento } : {}),
+    ...(clipe.preenchimento != null ? { preenchimento: clipe.preenchimento } : {}),
   }));
   return { projeto: apagarCamada(comOsAjustes, faixa.id), clipeId: resultado.clipeId };
 }

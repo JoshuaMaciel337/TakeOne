@@ -115,7 +115,7 @@ export function problemaNaArvore(projeto: Projeto): string | null {
     const clipe = faixa.clipes[0];
     const daImagem = faixa.pai || faixa.recortada || faixa.travas || faixa.rotulo || faixa.vinculo || faixa.nome || faixa.aberta || faixa.fundo;
     if (!imagem) {
-      if (daImagem || faixa.clipes.some((item) => item.pasta || item.pixels || item.mascara_pixels || item.preenchimento !== undefined || (item.mesclagem && MESCLAGENS_SO_DA_IMAGEM.has(item.mesclagem)))) {
+      if (daImagem || faixa.clipes.some((item) => item.pasta || item.pixels || item.mascara_pixels || item.preenchimento != null || (item.mesclagem && MESCLAGENS_SO_DA_IMAGEM.has(item.mesclagem)))) {
         return "Grupos, recortes, travas parciais, camadas de pixels e os modos de mesclagem novos só existem no editor de imagem.";
       }
       continue;

@@ -109,7 +109,7 @@ function propriedadesDe(faixa: Faixa, comEstilo: boolean): ManterNaCamada {
   return {
     opacidade: clipe.transformacao.opacidade,
     mesclagem,
-    ...(comEstilo ? { contorno: clipe.contorno, sombra: clipe.sombra, estilo_camada: clipe.estilo_camada, preenchimento: clipe.preenchimento } : {}),
+    ...(comEstilo ? { contorno: clipe.contorno, sombra: clipe.sombra, estilo_camada: clipe.estilo_camada, preenchimento: clipe.preenchimento ?? undefined } : {}),
     faixa: { nome: faixa.nome, rotulo: faixa.rotulo, travas: faixa.travas, vinculo: faixa.vinculo, recortada: faixa.recortada },
   };
 }

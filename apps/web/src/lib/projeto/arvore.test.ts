@@ -151,4 +151,23 @@ test("travas, nome e regras da árvore", () => {
   const video: Projeto = { ...projeto, tipo: undefined, faixas: projeto.faixas.map((f) => (f.id === b ? { ...f, recortada: true } : f)) };
   assert.match(problemaNaArvore(video) ?? "", /só existem no editor de imagem/);
   assert.equal(problemaNaArvore(projeto), null);
+  // O projeto de vídeo como a API devolve: os campos da imagem vêm com null (e false), não ausentes. Com o
+  // preenchimento conferido por "!== undefined", nenhum comando passava num projeto aberto do servidor
+  const doServidor: Projeto = {
+    ...projeto,
+    tipo: undefined,
+    faixas: projeto.faixas.map((f) => ({
+      ...f,
+      pai: null,
+      recortada: false,
+      travas: null,
+      rotulo: null,
+      vinculo: null,
+      nome: null,
+      aberta: false,
+      fundo: false,
+      clipes: f.clipes.map((clipe) => ({ ...clipe, pasta: false, pixels: null, mascara_pixels: null, preenchimento: null, mesclagem: "normal" })),
+    })),
+  };
+  assert.equal(problemaNaArvore(doServidor), null);
 });

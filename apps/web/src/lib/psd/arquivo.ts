@@ -318,7 +318,7 @@ export async function salvarPsd(projeto: Projeto, midias: ReadonlyMap<string, Mi
     return {
       ...comum(faixa),
       ...(caixa ? { ...caixa, canvas: recortado } : { left: 0, top: 0, right: 0, bottom: 0 }),
-      ...(editavel ? { effects: editavel as Layer["effects"], ...(clipe.preenchimento !== undefined && clipe.preenchimento < 1 ? { fillOpacity: clipe.preenchimento } : {}) } : {}),
+      ...(editavel ? { effects: editavel as Layer["effects"], ...(clipe.preenchimento != null && clipe.preenchimento < 1 ? { fillOpacity: clipe.preenchimento } : {}) } : {}),
       ...(mask ? { mask } : {}),
     };
   };
