@@ -9,3 +9,5 @@ opencv-python-headless==4.13.0.92
 onnxruntime==1.31.0
 # Animações em HTML: um Chromium sem tela grava cada quadro (Apache-2.0)
 playwright==1.63.0
+# Importar pelo link (Unlicense); o extra pin-deno traz o Deno (MIT), que o yt-dlp precisa para o YouTube
+yt-dlp[default,pin-deno]==2026.8.19

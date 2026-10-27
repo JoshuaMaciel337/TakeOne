@@ -26,6 +26,7 @@ from worker.tarefas.geracao_video import (
     executar_preenchimento,
     marcar_geracao_com_erro,
 )
+from worker.tarefas.importacao import executar_importacao
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
@@ -55,6 +56,7 @@ class Tarefa:
 REGISTRO = {
     "teste": Tarefa(executar_teste),
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
+    "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "transcricao": Tarefa(executar_transcricao, ao_falhar=marcar_transcricao_com_erro),
     "limpeza_voz": Tarefa(executar_limpeza_voz, ao_falhar=marcar_voz_com_erro),

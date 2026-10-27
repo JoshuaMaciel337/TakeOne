@@ -51,6 +51,7 @@ TAREFAS = {
     "foto_3d": RECURSO_CPU,
     "profundidade": RECURSO_CPU,
     "restaurar": RECURSO_CPU,
+    "importar_link": RECURSO_CPU,
 }
 
 

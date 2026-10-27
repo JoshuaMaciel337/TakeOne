@@ -21,6 +21,9 @@ from api.esquemas import (
     FluidoEntrada,
     GerarImagemEntrada,
     GerarVideoEntrada,
+    LinkEntrada,
+    LinkImportarEntrada,
+    LinkSaida,
     MaisVariacoesEntrada,
     MidiaAtualizarEntrada,
     MidiaSaida,
@@ -45,8 +48,9 @@ from core.modelos.batidas import STATUS_PRONTO as BATIDAS_PRONTAS
 from core.modelos.batidas import montar_batidas
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
 from core.modelos.geracao import nome_da_midia
+from core.modelos.importacao import MENSAGEM_SITES, dados_do_video, ler_link, montar_importacao, problema_do_video
 from core.modelos.job import STATUS_ERRO as STATUS_JOB_ERRO
-from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, ErroDefinitivo, montar_job
 from core.modelos.midia import (
     ARQUIVO_DA_ENTRADA_DO_PREENCHIMENTO,
     ARQUIVO_IMAGEM_LIMPA_PROXY,
@@ -55,6 +59,7 @@ from core.modelos.midia import (
     ARQUIVO_MASCARA_IMAGEM,
     ARQUIVO_MASCARA_ROSTOS,
     ARQUIVO_VOZ_LIMPA,
+    STATUS_ERRO,
     STATUS_PROCESSANDO,
     STATUS_PRONTA,
     arquivo_da_mascara_do_objeto,
@@ -81,6 +86,7 @@ from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSAN
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
 from core.utils import storage
+from core.utils.link import ErroImportacao, ler_metadados, mensagem_definitiva
 from core.utils.mongo import agora
 from core.utils.preenchimento import EntradaInvalida, ler_entrada
 
@@ -253,6 +259,51 @@ async def mais_variacoes(midia_id: str, dados: MaisVariacoesEntrada, usuario=Dep
     bruto = await run_in_threadpool(storage.caminho_local(chave).read_bytes)
     descricao = gerada.get("descricao") or ""
     return await _pedir_preenchimento(db, usuario, bruto, descricao, dados.variacoes, origem["nome"])
+
+
+async def _dados_do_link(url: str) -> tuple[dict, dict]:
+    """O link canônico e os dados do vídeo, lidos pelo yt-dlp só com o extrator do site (core/utils/link.py)."""
+    link = ler_link(url)
+    if link is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, MENSAGEM_SITES)
+    try:
+        metadados = await run_in_threadpool(ler_metadados, link["url"], link["origem"])
+    except ErroImportacao as erro:
+        mensagem = mensagem_definitiva(erro) or "Não consegui abrir esse link agora. Tente de novo daqui a pouco."
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, mensagem) from erro
+    except ErroDefinitivo as erro:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(erro)) from erro
+    return link, dados_do_video(link, metadados)
+
+
+@router.post("/link/dados", response_model=LinkSaida)
+async def ler_dados_do_link(dados: LinkEntrada, usuario=Depends(usuario_atual)):
+    """O título, o canal, a duração e a miniatura do vídeo, para a pessoa conferir antes de importar."""
+    _link, video = await _dados_do_link(dados.url)
+    return LinkSaida(**video, problema=problema_do_video(video))
+
+
+@router.post("/link", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def importar_link(dados: LinkImportarEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila o download do vídeo do link (worker de CPU). A mídia já entra na biblioteca, processando, e
+    passa pela ingestão como um envio comum quando o vídeo chega. O mesmo vídeo já importado no espaço volta como
+    está, sem baixar de novo."""
+    link = ler_link(dados.url)
+    if link is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, MENSAGEM_SITES)
+    existente = await db.midias.find_one({"organizacao_id": usuario["organizacao_id"],
+                                          "importacao.origem": link["origem"], "importacao.id": link["id"],
+                                          "status": {"$ne": STATUS_ERRO}})
+    if existente is not None:
+        return (await para_saida(db, [existente]))[0]
+    video = {"titulo": dados.titulo} if dados.titulo else None
+    midia, job = montar_importacao(usuario["organizacao_id"], usuario["_id"], link, video)
+    midia["_id"] = (await db.midias.insert_one(midia)).inserted_id
+    job["entrada"]["midia_id"] = str(midia["_id"])
+    job_id = (await db.jobs.insert_one(job)).inserted_id
+    await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"job_ingestao_id": job_id}})
+    logging.info(f"[{usuario['organizacao_id']}] Importação pedida: {link['origem']} {link['id']}")
+    return (await para_saida(db, [{**midia, "job_ingestao_id": job_id}]))[0]
 
 
 @router.post("/fala", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)

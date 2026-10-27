@@ -130,6 +130,8 @@ class MidiaSaida(BaseModel):
     animacao: dict | None = None
     # Camada de pixels do editor de imagem: {largura, altura, ultima} (a última versão enviada)
     camada_pixels: dict | None = None
+    # Importada pelo link: {origem, url, titulo, canal, duracao, miniatura}
+    importacao: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
     enviado_em: datetime | None = None
@@ -1942,6 +1944,31 @@ class ObjetoEntrada(BaseModel):
         if not self.selecao and not self.pincel:
             raise ValueError("Marque o objeto com um clique ou com o pincel.")
         return self
+
+
+class LinkEntrada(BaseModel):
+    url: str = Field(min_length=4, max_length=2000)
+
+
+class LinkImportarEntrada(LinkEntrada):
+    # O título lido antes (POST /api/midias/link/dados), para a biblioteca mostrar o nome enquanto baixa
+    titulo: str | None = Field(default=None, max_length=120)
+
+
+class LinkSaida(BaseModel):
+    """Os dados do vídeo por trás do link, antes de importar."""
+    origem: str
+    id: str
+    url: str
+    site: str
+    titulo: str
+    canal: str | None = None
+    duracao: float | None = None
+    miniatura: str | None = None
+    data: str | None = None
+    ao_vivo: bool = False
+    # Por que não pode entrar (longo demais), ou None
+    problema: str | None = None
 
 
 class FalaEntrada(BaseModel):

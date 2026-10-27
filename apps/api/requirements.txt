@@ -9,3 +9,5 @@ pymongo==4.18.2
 segno==1.6.6
 tzdata==2026.4
 uvicorn[standard]==0.54.0
+# Importar pelo link (Unlicense); o extra pin-deno traz o Deno (MIT), que o yt-dlp precisa para o YouTube
+yt-dlp[default,pin-deno]==2026.8.19

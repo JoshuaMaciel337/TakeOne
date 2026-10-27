@@ -38,7 +38,7 @@ def test_tipos_por_recursos():
                                                 "estabilizacao", "rastreio", "qualidade", "selecao", "objeto",
                                                 "quadro", "inversao", "fluido", "esconder_rostos",
                                                 "esconder_objeto", "ampliar", "expandir", "foto_3d", "profundidade",
-                                                "restaurar"}
+                                                "restaurar", "importar_link"}
     assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video", "direcao", "palavras_chave",
                                            "animacao_descrita", "geracao_imagem", "preenchimento", "foto_neural"]
 
