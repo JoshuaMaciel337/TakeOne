@@ -102,6 +102,8 @@ export type Midia = {
   animacao?: { modelo: string; campos: Record<string, string>; proporcao: string; duracao: number } | null;
   /** Legenda animada gravada pelo worker (lib/projeto/legendaAnimada.ts), com a transparência em mascara.mp4. */
   legenda_animada?: { estilo: string; proporcao: string; duracao: number; palavras: number } | null;
+  /** Efeito sonoro desenhado aqui (core/utils/efeitos_sonoros.py). */
+  efeito_sonoro?: { id: string; chave: string } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;

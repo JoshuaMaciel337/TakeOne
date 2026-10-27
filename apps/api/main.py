@@ -21,6 +21,7 @@ from api.rotas import (
     clipagens,
     conversoes,
     direcoes,
+    efeitos_sonoros,
     elementos,
     eventos,
     exportacoes,
@@ -166,3 +167,4 @@ app.include_router(chaves.router)
 app.include_router(conversoes.router)
 app.include_router(clipagens.router)
 app.include_router(legendas_animadas.router)
+app.include_router(efeitos_sonoros.router)

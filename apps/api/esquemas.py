@@ -131,6 +131,8 @@ class MidiaSaida(BaseModel):
     animacao: dict | None = None
     # Legenda animada do Clipar: {estilo, proporcao, duracao, palavras}
     legenda_animada: dict | None = None
+    # Efeito sonoro desenhado aqui (core/utils/efeitos_sonoros.py): {id, chave}
+    efeito_sonoro: dict | None = None
     # Camada de pixels do editor de imagem: {largura, altura, ultima} (a última versão enviada)
     camada_pixels: dict | None = None
     # Importada pelo link: {origem, url, titulo, canal, duracao, miniatura}

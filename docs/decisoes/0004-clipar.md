@@ -181,7 +181,8 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     **Prontas (27/10/2026):** corte seco com uma camada de ajuste por cima na janela da transição (o branco no
     Flash, a luz quente do canto no Clarão); prévia e exportação a 0–1,5 nível em 255 no Flash e 2,7–2,9 no Clarão.
   - d) **Efeitos sonoros desenhados aqui** (whoosh, swish, clique de câmera, impacto grave, página, teclado, estalo),
-    gerados por síntese, sem arquivos de terceiros, numa biblioteca do espaço.
+    gerados por síntese, sem arquivos de terceiros, numa biblioteca do espaço. **Prontos (27/10/2026):** nove
+    efeitos na ferramenta Áudio (ouvir e pôr no cursor), cada um uma mídia do espaço criada no primeiro pedido.
   - e) **Gráficos de pregação** (coração que se abre, mente, Bíblia, cruz de luz, chama, pomba, corrente que se
     quebra, céu que se abre), escolhidos pelas palavras da fala.
   - f) **Banco da Pixabay** (imagens e vídeos, pela chave do dono no `.env`): a busca no painel com a fonte mostrada, a

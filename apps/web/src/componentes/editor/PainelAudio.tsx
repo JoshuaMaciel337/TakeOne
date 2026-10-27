@@ -7,6 +7,7 @@ import { AvisoErro } from "@/componentes/AvisoErro";
 import { chamarApi, ErroApi } from "@/lib/api";
 import type { Midia } from "@/lib/tipos";
 
+import { EfeitosSonoros } from "./EfeitosSonoros";
 import { GravarNarracao, type PropsGravacao } from "./GravarNarracao";
 
 // As vozes pt-BR do Kokoro (core/utils/fala.py)
@@ -102,9 +103,10 @@ export function PainelAudio({ aoPedir, soNaBiblioteca = false, gravacao }: Props
         </button>
         <p className="text-[11px] text-suave">Vozes abertas, geradas no servidor, sem custo. Não imitam a voz de ninguém.</p>
       </form>
+      {soNaBiblioteca ? null : <EfeitosSonoros aoPedir={aoPedir} />}
       <div className="flex items-start gap-2 rounded-lg border border-dashed border-borda p-3 text-[11px] text-suave">
         <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        Banco de músicas e efeitos sonoros com licença chega na fase 6. Volume, fades, abaixar na fala, ritmo e efeitos de voz estão na aba Áudio de cada clipe.
+        O banco de músicas com licença chega com a Pixabay. Volume, fades, abaixar na fala, ritmo e efeitos de voz estão na aba Áudio de cada clipe.
       </div>
     </div>
   );
