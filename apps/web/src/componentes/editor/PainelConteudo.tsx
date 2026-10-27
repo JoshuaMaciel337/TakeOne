@@ -16,6 +16,7 @@ import type { Texto } from "@/lib/projeto/texto";
 import type { Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
 
+import { BancoPixabay } from "./BancoPixabay";
 import { type Ferramenta } from "./ferramentas";
 import type { PropsGravacao } from "./GravarNarracao";
 import { PainelAudio } from "./PainelAudio";
@@ -75,8 +76,10 @@ function PainelMidia({
   proporcao,
   aoExecutar,
   aoAvisar,
+  aoPedir,
 }: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia" | "aoAbrirMidia"> & {
   proporcao: string;
+  aoPedir: (midia: Midia) => void;
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
 }) {
@@ -92,6 +95,7 @@ function PainelMidia({
         aoPedir={() => void recarregar()}
       />
       <GerarImagem formato={formatoMaisPerto(...(proporcao.split(":").map(Number) as [number, number]))} aoPedir={() => void recarregar()} />
+      <BancoPixabay aoPedir={aoPedir} />
       <MontarClipes midias={biblioteca} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       {erro ? <AvisoErro>{erro}</AvisoErro> : null}
       {biblioteca.length > 0 ? (
@@ -185,6 +189,7 @@ export function ConteudoDaFerramenta({
         proporcao={legendas.projeto.proporcao}
         aoExecutar={legendas.aoExecutar}
         aoAvisar={legendas.aoAvisar}
+        aoPedir={aoPedirAnimacao}
       />
     ) : ferramenta.id === "audio" ? (
       <PainelAudio aoPedir={aoPedirAnimacao} gravacao={gravacao} />

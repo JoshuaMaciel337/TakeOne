@@ -104,6 +104,8 @@ export type Midia = {
   legenda_animada?: { estilo: string; proporcao: string; duracao: number; palavras: number } | null;
   /** Efeito sonoro desenhado aqui (core/utils/efeitos_sonoros.py). */
   efeito_sonoro?: { id: string; chave: string } | null;
+  /** Baixada do banco da Pixabay: o crédito (o autor e a página do item). */
+  pixabay?: { id: number; tipo: "imagem" | "video"; usuario: string; pagina: string } | null;
   criado_em: string;
   atualizado_em: string;
   enviado_em: string | null;

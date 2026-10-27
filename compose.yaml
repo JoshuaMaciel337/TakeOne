@@ -45,6 +45,8 @@ services:
       MODO_IA: ${MODO_IA:-simulado}
       UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-20}
       ESPACO_MINIMO_LIVRE_GB: ${ESPACO_MINIMO_LIVRE_GB:-2}
+      # O banco de imagens e vídeos (vazia, ele fica desligado)
+      PIXABAY_CHAVE: ${PIXABAY_CHAVE:-}
     volumes: ["${PASTA_ARMAZENAMENTO_HOST:-./armazenamento}:/dados/armazenamento"]
     ports: ["127.0.0.1:${API_PORTA:-8010}:8000"]
     depends_on:

@@ -36,6 +36,7 @@ from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.objeto import executar_objeto, executar_selecao
 from worker.tarefas.palavras_chave import executar_palavras_chave
 from worker.tarefas.pedido_edicao import executar_pedido_edicao
+from worker.tarefas.pixabay import executar_pixabay
 from worker.tarefas.quadro import executar_quadro
 from worker.tarefas.qualidade import executar_qualidade, marcar_qualidade_com_erro
 from worker.tarefas.rastreio import executar_rastreio, marcar_rastreio_com_erro
@@ -77,6 +78,7 @@ REGISTRO = {
     "fala": Tarefa(executar_fala, ao_falhar=marcar_geracao_com_erro),
     "animacao_html": Tarefa(executar_animacao_html, ao_falhar=marcar_animacao_com_erro),
     "legenda_animada": Tarefa(executar_legenda_animada, ao_falhar=marcar_animacao_com_erro),
+    "pixabay": Tarefa(executar_pixabay, ao_falhar=marcar_midia_com_erro),
     "selecao": Tarefa(executar_selecao),
     "objeto": Tarefa(executar_objeto, ao_falhar=marcar_geracao_com_erro),
     "quadro": Tarefa(executar_quadro, ao_falhar=marcar_geracao_com_erro),

@@ -94,6 +94,8 @@ INTERVALO_LIMPEZA_SEGUNDOS = 60   # frequência da recuperação de jobs com pos
 # IA (sempre com modelos abertos, rodando na própria máquina)
 # -----------------------------------------------
 MODO_IA = os.environ.get("MODO_IA", "simulado")  # "simulado" ou "real"
+# A chave da API da Pixabay (gratuita, do dono); vazia, o banco de imagens e vídeos fica desligado
+PIXABAY_CHAVE = os.environ.get("PIXABAY_CHAVE", "").strip()
 # O ComfyUI que gera vídeo com o Wan 2.2 (serviço comfyui do Compose, perfil video)
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://comfyui:8188")
 # O LLM local do "Criar automaticamente" (serviço ollama do Compose, perfil gpu)

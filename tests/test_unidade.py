@@ -34,11 +34,11 @@ def test_espera_entre_tentativas_cresce_e_para_em_30_min():
 
 def test_tipos_por_recursos():
     assert set(tipos_por_recursos(["cpu"])) == {"teste", "ingestao", "renderizacao", "limpeza_voz", "rosto", "tom",
-                                                "recorte_fundo", "limpeza_imagem", "animacao_html", "legenda_animada", "batidas", "fala",
-                                                "estabilizacao", "rastreio", "qualidade", "selecao", "objeto",
-                                                "quadro", "inversao", "fluido", "esconder_rostos",
+                                                "recorte_fundo", "limpeza_imagem", "animacao_html", "legenda_animada",
+                                                "batidas", "fala", "estabilizacao", "rastreio", "qualidade", "selecao",
+                                                "objeto", "quadro", "inversao", "fluido", "esconder_rostos",
                                                 "esconder_objeto", "ampliar", "expandir", "foto_3d", "profundidade",
-                                                "restaurar", "importar_link"}
+                                                "pixabay", "restaurar", "importar_link"}
     assert tipos_por_recursos(["gpu"]) == ["transcricao", "geracao_video", "direcao", "pedido_edicao", "palavras_chave",
                                            "animacao_descrita", "geracao_imagem", "preenchimento", "foto_neural",
                                            "clipagem"]

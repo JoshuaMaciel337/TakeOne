@@ -44,6 +44,7 @@ TAREFAS = {
     "fala": RECURSO_CPU,
     "animacao_html": RECURSO_CPU,
     "legenda_animada": RECURSO_CPU,
+    "pixabay": RECURSO_CPU,
     "selecao": RECURSO_CPU,
     "objeto": RECURSO_CPU,
     "quadro": RECURSO_CPU,

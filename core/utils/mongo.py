@@ -14,6 +14,11 @@ from core.config import DATABASE_NAME, MONGO_URI, TZ
 # ÍNDICES — criados sempre na inicialização da API e dos workers
 # -----------------------------------------------
 INDICES = {
+    # As respostas da Pixabay ficam 24 h (as regras da API pedem o cache) e somem sozinhas
+    "pixabay_cache": [
+        ([("chave", 1)], {"unique": True}),
+        ([("criado_em", 1)], {"expireAfterSeconds": 24 * 3600}),
+    ],
     "organizacoes": [
         ([("slug", 1)], {"unique": True}),
     ],

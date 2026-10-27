@@ -189,7 +189,8 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     Elementos, e a escolha pelas palavras em `lib/clipar/graficosDaFala.ts`, que o modelo de pregação usa.
   - f) **Banco da Pixabay** (imagens e vídeos, pela chave do dono no `.env`): a busca no painel com a fonte mostrada, a
     busca guardada 24 h e o que for usado baixado para a biblioteca, como pedem as regras da API; a montagem escolhe as
-    imagens de apoio pelas palavras da fala.
+    imagens de apoio pelas palavras da fala. **O banco está pronto (27/10/2026)** no painel Mídia: busca com a fonte, cache de 24 h e o item
+    baixado para a biblioteca; a escolha automática pela fala vai com o modelo de pregação (g).
   - g) **O modelo de pregação** (14.6) juntando tudo, escolhido na página de opções, e as ações novas do "Peça uma
     edição" (efeito de voz num trecho, flash nos cortes, gráfico quando fala de algo, cor de cinema, imagem de apoio,
     cartela final, efeitos sonoros). Medir: um corte do TEDx montado com o modelo, prévia e exportação a menos de 4

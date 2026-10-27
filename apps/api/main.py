@@ -36,6 +36,7 @@ from api.rotas import (
     modelos,
     objetos,
     pinceis,
+    pixabay,
     pixels,
     projetos,
     quadros,
@@ -168,3 +169,4 @@ app.include_router(conversoes.router)
 app.include_router(clipagens.router)
 app.include_router(legendas_animadas.router)
 app.include_router(efeitos_sonoros.router)
+app.include_router(pixabay.router)
