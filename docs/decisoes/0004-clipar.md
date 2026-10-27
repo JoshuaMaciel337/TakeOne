@@ -70,7 +70,21 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 6. **Sem crédito, com tempo estimado.** Não há custo por uso; no lugar dos créditos, a página mostra quanto vai demorar
    (pelas medidas do Nitro: o download, a transcrição e o LLM por minuto de fala) e a fila de GPU que já está na frente.
    Nada que demora começa sem a pessoa pedir (o defeito do OpusClip).
-7. **Desfazer o pedido inteiro.** O pedido do chat vira uma lista de comandos que entra como um passo só do histórico
+7. **A IA escolhe entre o que o TakeOne já tem.** O corte montado não inventa elementos: o Qwen3 aponta, para cada
+   corte, o estilo de legenda e as palavras de ênfase de cada legenda, o gancho de abertura, os zooms, os emojis e qual
+   modelo da biblioteca de animações (títulos, tarjas, chamadas, adesivos, números) entra onde, preenchendo os campos,
+   como o "Descreva a animação" já faz. O modelo de corte (14.6) diz o que pode entrar; a IA só escolhe e preenche.
+8. **Legendas animadas desenhadas por código, iguais na prévia e no vídeo.** As legendas de hoje são um PNG do servidor
+   com 3 fontes e 6 estilos: não fazem o estilo editorial dos pacotes de legenda para redes (cada palavra com o tamanho,
+   a fonte, a cor e a entrada dela: a palavra de ênfase enorme, um trecho em serifada itálica, os conectivos pequenos,
+   as linhas desencontradas, a digitação com cursor, as caixas de cor atrás das palavras, o número contando). Uma
+   legenda animada passa a ser desenhada por uma função do tempo em TypeScript (Canvas 2D, com as fontes livres da
+   biblioteca pelo fontkit, como o texto do editor de imagem), a partir das palavras com o tempo de cada uma, do papel
+   de cada palavra (ênfase, apoio, conectivo, número) e do estilo. A prévia chama a função a cada quadro; o worker roda
+   o mesmo código no Chromium que já grava as animações em HTML e grava a trilha num vídeo de cor e num de
+   transparência, guardado pelo resumo das palavras e do estilo. Assim a prévia e o render saem do mesmo código, e a
+   diferença é medida como sempre.
+9. **Desfazer o pedido inteiro.** O pedido do chat vira uma lista de comandos que entra como um passo só do histórico
    (um comando composto), que é o que o Cut.Pro promete e não cumpre.
 
 ## As partes
@@ -101,8 +115,8 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   guardados (14.10 usa); selecionar em massa; abrir no editor, exportar, baixar o .srt, duplicar, apagar, "parte 2" (o
   corte que continua a ideia); "Recriar com outras opções" sem transcrever de novo.
 - [ ] **14.5 O corte montado.** Cada corte vira um projeto de vídeo no formato pedido: os trechos da mídia original
-  (sem copiar o arquivo), a limpeza de pausas e hesitações (ligável), as legendas da fala no estilo escolhido (com a
-  palavra falada destacada e as palavras-chave), o título de abertura com as palavras de foco nos primeiros segundos,
+  (sem copiar o arquivo), a limpeza de pausas e hesitações (ligável), as legendas da fala no estilo escolhido (os 6 de
+  hoje ou as animadas da 14.11, com a palavra falada destacada e as palavras de ênfase escolhidas pela IA), o título de abertura com as palavras de foco nos primeiros segundos,
   o reenquadramento (o "Seguir o rosto" no formato em pé), zooms curtos nas frases fortes (o mesmo pedido do "Criar
   automaticamente", agora no trecho do corte), o kit de marca e o modelo de corte. Medir: prévia e exportação no
   Chrome nos níveis de sempre, dentro dos zooms e das legendas.
@@ -132,6 +146,17 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   plano e pergunta com botões quando falta algo, aplica num passo só do desfazer e diz o que mudou e o que não deu. Os
   gostei e não gostei da lista entram aqui e na 14.3 como exemplos do gosto do espaço. Medir: uma lista de 30 pedidos
   comuns, com quantos saem certos.
+
+- [ ] **14.11 Biblioteca de legendas animadas e ganchos.** O motor da decisão 8 e uma biblioteca desenhada aqui, no
+  estilo dos pacotes de legenda para redes (só a ideia, sem copiar nenhum): umas 40 legendas animadas (editorial com
+  tamanhos e fontes misturados, ênfase gigante, serifada itálica de apoio, palavra por palavra com pulo, karaokê em
+  caixa, caixas de cor atrás das palavras, digitação com cursor, número contando, linhas desencontradas, empilhada,
+  néon, contorno grosso, com emoji) e uns 15 ganchos de abertura (o título digitado, as palavras em caixas coloridas, o
+  número grande, a foto num cartão com a borda arredondada, ícones girando em volta, a tela tingida numa cor). Os papéis
+  das palavras saem do LLM (a ênfase de cada legenda, como as palavras-chave de hoje) e de regras (números, conectivos).
+  As cores vêm do kit de marca. Cada estilo tem a miniatura tocando no painel, como as animações. Medir: prévia e
+  exportação no Chrome a menos de 4 níveis em 255 no meio das animações das palavras, e o tempo de gravar a trilha de um
+  corte de 60 s no Nitro.
 
 ## Riscos
 
