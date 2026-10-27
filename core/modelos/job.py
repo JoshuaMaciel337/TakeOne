@@ -28,6 +28,7 @@ TAREFAS = {
     "geracao_imagem": RECURSO_GPU,
     "preenchimento": RECURSO_GPU,
     "foto_neural": RECURSO_GPU,
+    "clipagem": RECURSO_GPU,
     "limpeza_voz": RECURSO_CPU,
     "tom": RECURSO_CPU,
     "recorte_fundo": RECURSO_CPU,

@@ -8,7 +8,8 @@
 #   PUT    /api/recursos/{id}            só os conjuntos de ações: o nome e as ações gravadas
 #   DELETE /api/recursos/{id}
 #
-# Como os pincéis do espaço: os dados são do editor (lib/pintura/degrade.ts) e a API só guarda.
+# Como os pincéis do espaço: os dados são do editor (lib/pintura/degrade.ts) e a API só guarda. As estratégias
+# do Clipar (ADR 0004) também ficam aqui.
 # -----------------------------------------------
 import base64
 import binascii
@@ -35,6 +36,7 @@ from api.esquemas import (
     SubcaminhoEntrada,
 )
 from core.config import TZ
+from core.modelos.cortes import FAIXAS
 from core.utils import storage
 
 router = APIRouter(prefix="/api/recursos", tags=["recursos"])
@@ -142,6 +144,18 @@ def _conferir_acoes(dados: dict) -> dict:
     return {"acoes": acoes}
 
 
+def _conferir_estrategia(dados: dict) -> dict:
+    """A estratégia do Clipar: o que buscar (de 10 a 500 letras, como na página) e a faixa de duração."""
+    instrucoes = " ".join(str(dados.get("instrucoes") or "").split())
+    if not 10 <= len(instrucoes) <= 500:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            "Escreva o que buscar em 10 a 500 letras.")
+    faixa = dados.get("faixa") or "auto"
+    if faixa not in FAIXAS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Faixa de duração desconhecida.")
+    return {"instrucoes": instrucoes, "faixa": faixa}
+
+
 def _limite_dos_dados(tipo: str) -> int:
     return BYTES_DA_FORMA if tipo == "forma" else BYTES_DAS_ACOES if tipo == "acoes" else BYTES_DOS_DADOS
 
@@ -160,6 +174,8 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
     if dados.tipo == "ferramenta" and (not isinstance(dados.dados.get("ferramenta"), str)
                                        or not isinstance(dados.dados.get("opcoes"), dict)):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A predefinição precisa da ferramenta e das opções.")
+    if dados.tipo == "estrategia":
+        dados.dados = _conferir_estrategia(dados.dados)
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -186,7 +202,8 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
     return para_saida(doc)
 
 
-TIPOS_DE_RECURSO = "^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes|ferramenta)$"
+TIPOS_DE_RECURSO = ("^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes|ferramenta|"
+                    "estrategia)$")
 
 
 @router.get("", response_model=list[RecursoSaida])

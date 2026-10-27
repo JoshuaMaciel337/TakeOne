@@ -576,9 +576,10 @@ class RecursoEntrada(BaseModel):
     # do editor de imagem (em dados.estilo, conferido como o estilo de um trecho ou de um parágrafo), ou um estilo de
     # camada (em dados.estilo, conferido como o da camada, e o preenchimento em dados.preenchimento), ou um conjunto
     # de ações (em dados.acoes: cada uma com id, nome e os passos gravados, que são do editor e a API só guarda), ou
-    # uma predefinição de ferramenta (em dados.ferramenta e dados.opcoes, as opções dela, que a API só guarda)
+    # uma predefinição de ferramenta (em dados.ferramenta e dados.opcoes, as opções dela, que a API só guarda), ou
+    # uma estratégia do Clipar (em dados.instrucoes, o que buscar e o estilo do título, e dados.faixa)
     tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo", "estilo_camada", "acoes",
-                  "ferramenta"]
+                  "ferramenta", "estrategia"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)
@@ -2343,6 +2344,87 @@ class SistemaSaida(BaseModel):
 
 def job_para_saida(doc: dict) -> JobSaida:
     return JobSaida.model_validate({**doc, "id": str(doc["_id"])})
+
+
+class OpcoesDaClipagem(BaseModel):
+    """As opções da página do Clipar (core/modelos/clipagem.py)."""
+    estrategia: Literal["ganchos", "historias", "ideia", "dicas", "humor", "pregacao", "propria"] = "ganchos"
+    # O que buscar e o estilo do título, nas palavras da pessoa
+    instrucoes: str = Field(default="", max_length=500)
+    genero: str = Field(default="auto", max_length=40)
+    faixa: Literal["auto", "curto", "medio", "longo", "extra", "muito_longo"] = "auto"
+    # O trecho a analisar, em segundos da mídia (None: até o fim)
+    inicio: float = Field(default=0, ge=0)
+    fim: float | None = Field(default=None, gt=0)
+    idioma: Literal["auto", "pt", "en", "es"] = "auto"
+    momentos: str = Field(default="", max_length=300)
+    formato: Literal["9:16", "1:1", "4:5", "16:9"] = "9:16"
+    maximo: int | None = Field(default=None, ge=1, le=50)
+
+    @field_validator("instrucoes", "momentos", "genero", mode="before")
+    @classmethod
+    def limpar_textos(cls, valor):
+        return " ".join(valor.split()) if isinstance(valor, str) else valor
+
+    @model_validator(mode="after")
+    def conferir_trecho(self):
+        if self.fim is not None and self.fim <= self.inicio:
+            raise ValueError("O fim do trecho precisa vir depois do começo.")
+        return self
+
+
+class LegendaDaClipagem(BaseModel):
+    """Uma legenda do .srt da pessoa, em segundos da mídia."""
+    inicio: float = Field(ge=0)
+    fim: float = Field(gt=0)
+    texto: str = Field(max_length=1000)
+
+
+class ClipagemEntrada(BaseModel):
+    midia_id: str
+    opcoes: OpcoesDaClipagem = Field(default_factory=OpcoesDaClipagem)
+    # O .srt da pessoa (lido no navegador), no lugar da transcrição
+    legendas: list[LegendaDaClipagem] | None = Field(default=None, max_length=20000)
+
+
+class AvaliacaoDoCorteEntrada(BaseModel):
+    avaliacao: Literal["gostei", "nao_gostei"] | None = None
+
+
+class ProjetoDoCorteEntrada(BaseModel):
+    """O projeto em que o corte foi montado (14.5): abrir de novo vai a ele em vez de montar outro."""
+    projeto_id: str | None = None
+
+
+class ClipagemSaida(BaseModel):
+    id: str
+    midia_id: str
+    nome: str
+    duracao: float
+    opcoes: dict
+    # De onde veio a fala: a transcrição da mídia ou o .srt da pessoa
+    fala: str = "transcricao"
+    status: str
+    erro: str | None = None
+    # Enquanto processa: {etapa: transcricao | cortes, progresso, mensagem}
+    andamento: dict | None = None
+    cortes: list[dict] = []
+    total_de_cortes: int = 0
+    criado_em: datetime
+    atualizado_em: datetime
+
+
+def clipagem_para_saida(doc: dict, andamento: dict | None, resumida: bool = False) -> ClipagemSaida:
+    """resumida: a lista das clipagens leva só a contagem (os cortes vêm ao abrir uma)."""
+    cortes = [{chave: valor for chave, valor in corte.items() if chave != "texto"} for corte in doc.get("cortes") or []]
+    return ClipagemSaida.model_validate({
+        **doc,
+        "id": str(doc["_id"]),
+        "midia_id": str(doc["midia_id"]),
+        "andamento": andamento,
+        "cortes": [] if resumida else cortes,
+        "total_de_cortes": len(cortes),
+    })
 
 
 class TranscricaoPedirEntrada(BaseModel):

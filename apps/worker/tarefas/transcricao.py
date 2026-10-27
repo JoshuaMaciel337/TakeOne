@@ -63,6 +63,7 @@ def _ouvir(modelo, caminho: Path, idioma: str | None, deslocamento: float, durac
 FOLGA_DO_TRECHO_S = 0.15
 MAXIMO_DE_TRECHOS = 200
 TAXA_DO_WHISPER = 16000
+VRAM_DO_WHISPER_MB = 3500       # o large-v3-turbo em int8 usa uns 3 GB
 
 
 def recuperar_omitidas(modelo, caminho: Path, palavras: list[dict], niveis, idioma: str | None,
@@ -196,6 +197,9 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
 
     niveis = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS))
     if MODO_IA == "real":
+        from worker.tarefas.llm import esperar_a_placa
+
+        esperar_a_placa(reportar, VRAM_DO_WHISPER_MB, "a transcrição", progresso=2)
         brutas, idioma = transcrever_em_outro_processo(caminho, None if pedido == "auto" else pedido, duracao, reportar,
                                                        niveis if niveis.is_file() else None)
     else:

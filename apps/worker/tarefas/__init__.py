@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from worker.tarefas.animacao_descrita import executar_animacao_descrita
 from worker.tarefas.animacao_html import executar_animacao_html, marcar_animacao_com_erro
 from worker.tarefas.batidas import executar_batidas, marcar_batidas_com_erro
+from worker.tarefas.clipagem import executar_clipagem, marcar_clipagem_com_erro
 from worker.tarefas.direcao import executar_direcao
 from worker.tarefas.esconder_objeto import executar_esconder_objeto
 from worker.tarefas.esconder_objeto import marcar_com_erro as marcar_objeto_escondido_com_erro
@@ -57,6 +58,7 @@ REGISTRO = {
     "teste": Tarefa(executar_teste),
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
+    "clipagem": Tarefa(executar_clipagem, ao_falhar=marcar_clipagem_com_erro),
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "transcricao": Tarefa(executar_transcricao, ao_falhar=marcar_transcricao_com_erro),
     "limpeza_voz": Tarefa(executar_limpeza_voz, ao_falhar=marcar_voz_com_erro),

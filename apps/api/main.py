@@ -18,6 +18,7 @@ from api.rotas import (
     auth,
     celular,
     chaves,
+    clipagens,
     conversoes,
     direcoes,
     elementos,
@@ -162,3 +163,4 @@ app.include_router(recursos.router)
 app.include_router(fontes.router)
 app.include_router(chaves.router)
 app.include_router(conversoes.router)
+app.include_router(clipagens.router)

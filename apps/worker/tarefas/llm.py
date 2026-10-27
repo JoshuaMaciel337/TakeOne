@@ -59,12 +59,15 @@ def garantir_modelo(reportar: Callable[[int, str], None]):
                                                    f"{int(100 * parte)}%")
 
 
-def esperar_a_placa(reportar: Callable[[int, str], None]):
+def esperar_a_placa(reportar: Callable[[int, str], None], minimo_mb: int = VRAM_LIVRE_MINIMA_MB,
+                    para: str = "o LLM", progresso: int = 42):
+    """Espera a placa ter minimo_mb livres (o LLM, ou o Whisper da transcrição, que não esperava e caía com um
+    "CUDA failed" quando o ComfyUI segurava a memória)."""
     from worker.tarefas.geracao_video import soltar_comfyui_parado
 
     inicio = time.monotonic()
     soltou = False
-    while (livre := _vram_livre_mb()) is not None and livre < VRAM_LIVRE_MINIMA_MB:
+    while (livre := _vram_livre_mb()) is not None and livre < minimo_mb:
         # Um Wan esquecido no ComfyUI parado (geração órfã) sai primeiro
         if not soltou:
             soltou = soltar_comfyui_parado()
@@ -73,8 +76,8 @@ def esperar_a_placa(reportar: Callable[[int, str], None]):
         if time.monotonic() - inicio > ESPERA_MAXIMA_PELA_PLACA_S:
             raise ErroDefinitivo("A placa de vídeo ficou ocupada por 15 minutos. "
                                  "Peça de novo quando ela estiver livre.")
-        logging.info(f"Esperando a placa para o LLM: {livre} MB livres.")
-        reportar(42, "Esperando a placa de vídeo ficar livre")
+        logging.info(f"Esperando a placa para {para}: {livre} MB livres.")
+        reportar(progresso, "Esperando a placa de vídeo ficar livre")
         time.sleep(20)
 
 

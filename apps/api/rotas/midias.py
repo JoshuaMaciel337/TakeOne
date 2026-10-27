@@ -379,6 +379,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.rostos.delete_one({"midia_id": midia["_id"]})
     await db.rastreios.delete_many({"midia_id": midia["_id"]})
     await db.qualidades.delete_one({"midia_id": midia["_id"]})
+    await db.clipagens.delete_many({"midia_id": midia["_id"]})
     # O logo do kit de marca que sai da biblioteca sai do kit também
     await db.organizacoes.update_one({"_id": midia["organizacao_id"], "marca.logo_midia_id": midia["_id"]},
                                      {"$set": {"marca.logo_midia_id": None}})
