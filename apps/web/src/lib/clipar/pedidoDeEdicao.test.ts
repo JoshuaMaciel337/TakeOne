@@ -7,6 +7,7 @@ import { falaDosClipes, type Palavra, palavrasDaLinha } from "../projeto/fala.ts
 import type { Projeto } from "../projeto/modelo.ts";
 import { palavrasDoTexto } from "../projeto/texto.ts";
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
+import { PARTES_DA_PREGACAO } from "./modeloDePregacao.ts";
 import { montarCorte, OPCOES_DA_MONTAGEM } from "./montarCorte.ts";
 import {
   aplicarPlano,
@@ -15,7 +16,9 @@ import {
   descreverPlano,
   estadoDoProjeto,
   frasesDaLinha,
+  legendaAnimadaDoPlano,
   opcoesDoPlano,
+  partesDoPlano,
   type PlanoDaEdicao,
 } from "./pedidoDeEdicao.ts";
 
@@ -224,4 +227,42 @@ test("o plano da clipagem vira as opções da montagem, e o resumo para conferir
     'Zoom quando a fala diz "dinheiro"',
     "Enquadrar pelo meio",
   ]);
+});
+
+test("as ações do modelo de pregação viram as partes, e o modelo inteiro liga todas", () => {
+  const frases = [
+    { n: 0, texto: "Quanto menos contato", inicio: 0, fim: 2 * S },
+    { n: 1, texto: "mais longe você fica", inicio: 2.5 * S, fim: 4 * S },
+  ];
+  assert.equal(partesDoPlano(PLANO_NEUTRO, frases), null);
+  assert.equal(legendaAnimadaDoPlano(PLANO_NEUTRO), null);
+  const plano: PlanoDaEdicao = {
+    ...PLANO_NEUTRO,
+    cor_video: "cinema",
+    voz: { efeito: "radio", frases: [1] },
+    transicoes: "luz",
+    sons: "sim",
+    graficos: { acao: "por", assunto: "coração" },
+    imagens: { acao: "por", busca: "" },
+    cartela: { acao: "por", texto: "A mentira sai" },
+    legenda_animada: "neon",
+  };
+  assert.deepEqual(partesDoPlano(plano, frases), {
+    cor: "cinema",
+    voz: { efeito: "radio", trechos: [{ inicio: 2.5 * S, fim: 4 * S }] },
+    transicoes: "luz",
+    sons: true,
+    graficos: { assunto: "coração" },
+    imagens: {},
+    cartela: { texto: "A mentira sai" },
+  });
+  assert.equal(legendaAnimadaDoPlano(plano), "neon");
+  const itens = descreverPlano(plano);
+  assert.ok(itens.includes('Voz "Rádio" em 1 frase'), itens.join(" | "));
+  assert.ok(itens.includes("Clarões e flashes nos cortes"));
+  assert.ok(itens.includes("Legenda animada: Néon"));
+  const inteiro: PlanoDaEdicao = { ...PLANO_NEUTRO, modelo: "pregacao" };
+  assert.equal(partesDoPlano(inteiro, frases), PARTES_DA_PREGACAO);
+  assert.equal(legendaAnimadaDoPlano(inteiro), "editorial");
+  assert.equal(descreverPlano(inteiro).length, 1);
 });

@@ -159,7 +159,7 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   exportação no Chrome a menos de 4 níveis em 255 no meio das animações das palavras, e o tempo de gravar a trilha de um
   corte de 60 s no Nitro.
 
-- [ ] **14.12 O modelo de edição de pregação.** O dono mandou um "antes e depois" de 18,5 s de um corte de pregação
+- [x] **14.12 O modelo de edição de pregação.** O dono mandou um "antes e depois" de 18,5 s de um corte de pregação
   editado à mão (analisado quadro a quadro em 27/10/2026): o pregador mais perto e com a cor fria de cinema, a legenda
   editorial palavra a palavra (serifada condensada em caixa alta, a palavra forte em itálico dourado), trechos com uma
   palavra por vez, a voz de rádio só na frase de abertura, um corte ou um efeito a cada 1 a 2 s (flash branco com o
@@ -195,6 +195,11 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
     edição" (efeito de voz num trecho, flash nos cortes, gráfico quando fala de algo, cor de cinema, imagem de apoio,
     cartela final, efeitos sonoros). Medir: um corte do TEDx montado com o modelo, prévia e exportação a menos de 4
     níveis em 255, e o tempo do link ao corte pronto.
+    **Pronto (27/10/2026):** o "Modelo de edição: Pregação" na página de opções, o "Aplicar o modelo de pregação" no
+    editor e as ações novas do "Peça uma edição" (10 de 10 certas no Qwen3). Prévia e exportação a 2,2–3,5 níveis em
+    255 no gráfico, no clarão e na cartela. Do arquivo ao corte montado com o modelo, numa palestra de 10 min: uns 12 min (91 s de
+    ingestão, 337 s para os cortes e 312 s para montar); no corte, 2,1–2,8 níveis na legenda, no clarão e na cartela, e
+    5,1 num plano ampliado sobre um telão de LED (a prévia lê a cópia de 720p).
 
 ## Riscos
 

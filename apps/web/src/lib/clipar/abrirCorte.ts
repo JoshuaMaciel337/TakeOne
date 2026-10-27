@@ -5,16 +5,16 @@
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { type Clipagem, type Corte, falaDaClipagem } from "@/lib/clipagens";
-import { esperarLegenda, pedirLegendaAnimada } from "@/lib/legendasAnimadas";
-import { executarComando } from "@/lib/projeto/comandos";
-import { faixaDasLegendas, pedidoDasLegendas } from "@/lib/projeto/legendaAnimada";
+import { falaDosClipes, palavrasDaLinha } from "@/lib/projeto/fala";
 import type { Marca } from "@/lib/projeto/marca";
 import type { Projeto } from "@/lib/projeto/modelo";
 import { buscarRosto } from "@/lib/rosto";
 import type { Midia } from "@/lib/tipos";
 
+import { aplicarLegendaEPartes } from "./aplicarPregacao";
+import { PARTES_DA_PREGACAO } from "./modeloDePregacao";
 import { montarCorte, OPCOES_DA_MONTAGEM, type OpcoesDaMontagem } from "./montarCorte";
-import { opcoesDoPlano } from "./pedidoDeEdicao";
+import { frasesDaLinha, legendaAnimadaDoPlano, opcoesDoPlano, partesDoPlano } from "./pedidoDeEdicao";
 
 /** A fala lida um pouco além das pontas do corte, para a última palavra não ficar de fora. */
 const FOLGA_DA_FALA_S = 2;
@@ -80,16 +80,28 @@ export async function projetoDoCorte(
     // O "Como quer a edição" da clipagem muda as opções; a cor que ele pede vale mais que a do kit
     opcoes: opcoesDoPlano(clipagem.plano_da_edicao, { ...opcoes, corDeDestaque: marca.cores[0] ?? opcoes.corDeDestaque }, marca.cores[0] ?? null),
   });
-  // A legenda animada: as legendas montadas viram a trilha gravada pelo worker, por cima, antes de abrir
+  // O que espera mídias novas: a legenda animada (por cima das legendas montadas) e o modelo de pregação, pela
+  // página de opções ou pelo "Como quer a edição" (as ações dele que pedem sons, gráficos, imagens ou a cartela)
   let projeto = montado;
-  const estiloAnimado = clipagem.opcoes.legenda_animada;
-  if (estiloAnimado && faixaDasLegendas(montado)) {
-    const pedido = pedidoDasLegendas(montado);
-    aoAndamento("Gravando a legenda animada");
-    const trilha = await esperarLegenda(await pedirLegendaAnimada(pedido, estiloAnimado, montado.proporcao), aoAndamento, ativo);
-    if (!trilha) return null;
-    const ctx = contextoDasMidias(new Map([[midia.id, midia], [trilha.id, trilha]]));
-    projeto = executarComando(montado, { comando: "legenda.animar", parametros: { midiaId: trilha.id, inicio: pedido.inicio, faixaId: pedido.faixaId } }, ctx).projeto;
+  const plano = clipagem.plano_da_edicao;
+  const pregacao = clipagem.opcoes.modelo_edicao === "pregacao";
+  const principal = montado.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
+  const fala = new Map([[midia.id, palavras]]);
+  const partes = pregacao ? PARTES_DA_PREGACAO : plano ? partesDoPlano(plano, frasesDaLinha(palavrasDaLinha(falaDosClipes(principal, fala)))) : null;
+  const legendaAnimada = clipagem.opcoes.legenda_animada ?? legendaAnimadaDoPlano(plano) ?? (pregacao ? "editorial" : null);
+  if (legendaAnimada || partes) {
+    const editado = await aplicarLegendaEPartes({
+      projeto,
+      palavras: fala,
+      titulo: corte.titulo,
+      midias: new Map([[midia.id, midia]]),
+      legendaAnimada,
+      partes,
+      aoAndamento,
+      ativo,
+    });
+    if (!editado) return null;
+    projeto = editado.projeto;
   }
   await chamarApi<Projeto>(`/projetos/${vazio.id}`, {
     metodo: "PUT",

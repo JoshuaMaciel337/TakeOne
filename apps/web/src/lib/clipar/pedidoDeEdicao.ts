@@ -8,11 +8,13 @@ import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { executarComando, type Comando } from "../projeto/comandos.ts";
 import { type Contexto, ZOOM_DO_DESTAQUE } from "../projeto/edicao.ts";
 import { falaDosClipes, type Palavra, palavrasDaLinha, type PalavraDaLinha } from "../projeto/fala.ts";
+import { ESTILOS_ANIMADOS } from "../projeto/legendaAnimada.ts";
 import { ESTILOS_DE_LEGENDA } from "../projeto/legendas.ts";
 import { legendasDaFala, opcoesParaOQuadro } from "../projeto/legendasDaFala.ts";
 import { trechosParaLimpar } from "../projeto/limpezaDeFala.ts";
 import type { Clipe, Faixa, Projeto, Proporcao } from "../projeto/modelo.ts";
 import { type AmostraDeRosto, reenquadrarPeloRosto } from "../projeto/reenquadrar.ts";
+import { EFEITOS_PRONTOS } from "../projeto/som.ts";
 import type { Texto } from "../projeto/texto.ts";
 import {
   type AjusteDaLegenda,
@@ -23,6 +25,7 @@ import {
   porTitulo,
   zoomsNasPalavrasDeFoco,
 } from "./montarCorte.ts";
+import { PARTES_DA_PREGACAO, type PartesDaEdicao } from "./modeloDePregacao.ts";
 
 type Acao = "manter" | "por" | "tirar";
 
@@ -44,9 +47,47 @@ export type PlanoDaEdicao = {
   formato: "manter" | Proporcao;
   enquadrar: "manter" | "rosto" | "centro" | "inteiro";
   musica: "manter" | "abaixar" | "aumentar" | "tirar";
+  // O modelo de pregação e as ações dele (14.12g); opcionais, porque os planos guardados antes deles não os têm
+  modelo?: "manter" | "pregacao";
+  cor_video?: string;
+  voz?: { efeito: string; frases: number[] };
+  transicoes?: "manter" | "luz" | "flash" | "clarao" | "fusao" | "nenhuma";
+  sons?: "manter" | "sim" | "nao";
+  graficos?: { acao: "manter" | "por"; assunto: string };
+  imagens?: { acao: "manter" | "por"; busca: string };
+  cartela?: { acao: "manter" | "por"; texto: string };
+  legenda_animada?: string;
   pergunta: { texto: string; opcoes: string[] };
   nao_deu: string[];
 };
+
+/**
+ * As partes do modelo de pregação que o plano pede (lib/clipar/modeloDePregacao.ts), ou null quando não pede
+ * nenhuma. O modelo de pregação inteiro liga todas; as frases da voz viram os trechos delas na linha.
+ */
+export function partesDoPlano(plano: PlanoDaEdicao, frases: FraseDaLinha[]): PartesDaEdicao | null {
+  if (plano.modelo === "pregacao") return PARTES_DA_PREGACAO;
+  const partes: PartesDaEdicao = {};
+  if (plano.cor_video && plano.cor_video !== "manter") partes.cor = plano.cor_video;
+  if (plano.voz && plano.voz.efeito !== "manter") {
+    const porNumero = new Map(frases.map((frase) => [frase.n, frase]));
+    const trechos = plano.voz.frases.flatMap((n) => (porNumero.has(n) ? [{ inicio: porNumero.get(n)!.inicio, fim: porNumero.get(n)!.fim }] : []));
+    partes.voz = { efeito: plano.voz.efeito, trechos };
+  }
+  if (plano.transicoes && plano.transicoes !== "manter") partes.transicoes = plano.transicoes;
+  if (plano.sons === "sim") partes.sons = true;
+  if (plano.graficos?.acao === "por") partes.graficos = plano.graficos.assunto ? { assunto: plano.graficos.assunto } : {};
+  if (plano.imagens?.acao === "por") partes.imagens = plano.imagens.busca ? { busca: plano.imagens.busca } : {};
+  if (plano.cartela?.acao === "por") partes.cartela = plano.cartela.texto ? { texto: plano.cartela.texto } : {};
+  return Object.keys(partes).length ? partes : null;
+}
+
+/** O estilo da legenda animada que o plano pede (o modelo de pregação usa a editorial), ou null. */
+export function legendaAnimadaDoPlano(plano: PlanoDaEdicao | null | undefined): string | null {
+  if (!plano) return null;
+  if (plano.legenda_animada && plano.legenda_animada !== "manter") return plano.legenda_animada;
+  return plano.modelo === "pregacao" ? "editorial" : null;
+}
 
 /** As cores do plano (as mesmas de core/modelos/pedido_edicao.py). */
 export const CORES_DO_PLANO: Record<string, string> = {
@@ -476,6 +517,24 @@ export function descreverPlano(plano: PlanoDaEdicao): string[] {
   if (plano.formato !== "manter") itens.push(`Formato ${plano.formato}`);
   if (plano.enquadrar !== "manter") itens.push({ rosto: "Enquadrar no rosto", centro: "Enquadrar pelo meio", inteiro: "Mostrar a imagem inteira" }[plano.enquadrar]);
   if (plano.musica !== "manter") itens.push({ abaixar: "Abaixar a música", aumentar: "Aumentar a música", tirar: "Tirar a música" }[plano.musica]);
+  if (plano.modelo === "pregacao") itens.push("O modelo de pregação inteiro: cor de cinema, voz de rádio, luzes nos cortes com som, gráficos, imagens de apoio, cartela e legenda editorial");
+  else {
+    const cores: Record<string, string> = { cinema: "de cinema", frio: "fria", quente: "quente", pb: "preto e branco", vivido: "viva", drama: "dramática", antigo: "antiga", natural: "natural" };
+    if (plano.cor_video && plano.cor_video !== "manter") itens.push(`Cor ${cores[plano.cor_video] ?? plano.cor_video} no vídeo`);
+    if (plano.voz && plano.voz.efeito !== "manter") {
+      const nome = EFEITOS_PRONTOS.find((efeito) => efeito.id === plano.voz!.efeito)?.nome ?? plano.voz.efeito;
+      const onde = plano.voz.frases.length ? `em ${plural(plano.voz.frases.length, "frase", "frases")}` : "na primeira frase";
+      itens.push(plano.voz.efeito === "nenhum" ? `Tirar o efeito da voz ${onde}` : `Voz "${nome}" ${onde}`);
+    }
+    const transicoes: Record<string, string> = { luz: "Clarões e flashes nos cortes", flash: "Flash nos cortes", clarao: "Clarão nos cortes", fusao: "Fusão nos cortes", nenhuma: "Tirar as transições" };
+    if (plano.transicoes && plano.transicoes !== "manter") itens.push(transicoes[plano.transicoes]);
+    if (plano.sons === "sim") itens.push("Efeitos sonoros nas transições, nos gráficos e na cartela");
+    if (plano.graficos?.acao === "por") itens.push(plano.graficos.assunto ? `Gráfico quando a fala toca em "${plano.graficos.assunto}"` : "Gráficos quando a fala toca nos assuntos");
+    if (plano.imagens?.acao === "por") itens.push(plano.imagens.busca ? `Imagem de apoio: "${plano.imagens.busca}"` : "Imagens de apoio pela fala");
+    if (plano.cartela?.acao === "por") itens.push(plano.cartela.texto ? `Cartela final: "${plano.cartela.texto}"` : "Cartela final com o título");
+  }
+  const animada = legendaAnimadaDoPlano(plano);
+  if (animada && plano.modelo !== "pregacao") itens.push(`Legenda animada: ${ESTILOS_ANIMADOS.find((estilo) => estilo.id === animada)?.nome ?? animada}`);
   return itens;
 }
 

@@ -22,6 +22,8 @@ export type OpcoesDaClipagem = {
   maximo: number | null;
   /** O estilo da legenda animada dos cortes (ESTILOS_ANIMADOS); null: as legendas de sempre. */
   legenda_animada: string | null;
+  /** O modelo de edição dos cortes: "pregacao" (lib/clipar/modeloDePregacao.ts) ou nenhum. */
+  modelo_edicao: "nenhum" | "pregacao";
 };
 
 export const OPCOES_PADRAO: OpcoesDaClipagem = {
@@ -37,6 +39,7 @@ export const OPCOES_PADRAO: OpcoesDaClipagem = {
   formato: "9:16",
   maximo: null,
   legenda_animada: null,
+  modelo_edicao: "nenhum",
 };
 
 export const FAIXAS: { id: Faixa; nome: string; segundos: [number, number] }[] = [

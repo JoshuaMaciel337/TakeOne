@@ -352,6 +352,20 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
         </div>
       </Secao>
 
+      <Secao
+        titulo="Modelo de edição"
+        descricao="Pregação: a cor fria de cinema, a voz de rádio na primeira frase, clarões e flashes nos cortes com o som, gráficos quando a fala toca no assunto (coração, mente, Bíblia, cruz), imagens de apoio da Pixabay e a cartela final com o título."
+      >
+        <div className="flex flex-wrap gap-2">
+          <Escolha ativo={opcoes.modelo_edicao !== "pregacao"} aoEscolher={() => mudar({ modelo_edicao: "nenhum" })}>
+            Sem modelo
+          </Escolha>
+          <Escolha ativo={opcoes.modelo_edicao === "pregacao"} aoEscolher={() => mudar({ modelo_edicao: "pregacao", legenda_animada: opcoes.legenda_animada ?? "editorial" })}>
+            Pregação
+          </Escolha>
+        </div>
+      </Secao>
+
       <Secao titulo="Legenda animada" descricao="As legendas de cada corte gravadas com a palavra entrando no ritmo da fala, e a palavra forte destacada.">
         <div className="flex flex-wrap gap-2">
           <Escolha ativo={opcoes.legenda_animada === null} aoEscolher={() => mudar({ legenda_animada: null })}>

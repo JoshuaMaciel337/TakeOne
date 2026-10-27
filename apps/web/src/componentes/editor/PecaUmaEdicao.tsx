@@ -3,11 +3,13 @@
 // "Peça uma edição" (ADR 0004, 14.10): a pessoa escreve como quer o vídeo, o modelo local devolve um plano de um
 // conjunto fechado de ações (lib/clipar/pedidoDeEdicao.ts), o painel mostra o plano (e pergunta com botões
 // quando falta algo) e "Aplicar" faz tudo num passo só do desfazer, dizendo o que mudou e o que não deu.
-import { Check, LoaderCircle, MessageSquareText, X } from "lucide-react";
+import { Check, LoaderCircle, MessageSquareText, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { contextoDasMidias } from "@/componentes/editor/contexto";
-import { aplicarPlano, descreverPlano, estadoDoProjeto, type FraseDaLinha, frasesCortadas, frasesDaLinha, type PlanoDaEdicao } from "@/lib/clipar/pedidoDeEdicao";
+import { aplicarPlano, descreverPlano, estadoDoProjeto, type FraseDaLinha, frasesCortadas, frasesDaLinha, legendaAnimadaDoPlano, partesDoPlano, type PlanoDaEdicao } from "@/lib/clipar/pedidoDeEdicao";
+import { aplicarLegendaEPartes } from "@/lib/clipar/aplicarPregacao";
+import { PARTES_DA_PREGACAO } from "@/lib/clipar/modeloDePregacao";
 import { pedirPlanoDaEdicao } from "@/lib/clipar/pedirEdicao";
 import { useMarca } from "@/lib/marca";
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
@@ -96,7 +98,8 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
       }
       setAndamento("Aplicando");
       const titulo = atual.nome && !/^Projeto sem título/.test(atual.nome) ? { texto: atual.nome, foco: [] } : null;
-      const { projeto: novo, feitos, naoDeu } = aplicarPlano(projetoAgora.current, plano, {
+      const principalNoComeco = JSON.stringify(principalDe(projetoAgora.current));
+      const aplicado = aplicarPlano(projetoAgora.current, plano, {
         ctx: contextoDasMidias(porId),
         palavras,
         frases,
@@ -105,6 +108,31 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
         corDaMarca: marca.cores[0] ?? null,
         tituloPadrao: titulo,
       });
+      let novo = aplicado.projeto;
+      const feitos = [...aplicado.feitos];
+      const { naoDeu } = aplicado;
+      // O que espera mídias novas: a legenda animada e as partes do modelo de pregação (sons, gráficos, imagens...)
+      const partesPedidas = partesDoPlano(plano, frases);
+      const animada = legendaAnimadaDoPlano(plano);
+      if (partesPedidas || animada) {
+        const editado = await aplicarLegendaEPartes({
+          projeto: novo,
+          palavras,
+          titulo: titulo?.texto ?? "",
+          midias: porId,
+          legendaAnimada: animada,
+          partes: partesPedidas,
+          aoAndamento: setAndamento,
+          ativo: () => ativo.current,
+        });
+        if (!editado) return;
+        if (JSON.stringify(principalDe(projetoAgora.current)) !== principalNoComeco) {
+          aoAvisar("O vídeo mudou enquanto a edição era preparada. Peça de novo.");
+          return;
+        }
+        novo = editado.projeto;
+        feitos.push(...editado.feitos);
+      }
       if (feitos.length) aoExecutar({ comando: "edicao.pedido", parametros: { projeto: novo } });
       const partes = [feitos.length ? `Pronto: ${feitos.join(", ")}. Ctrl+Z desfaz tudo de uma vez.` : "Nada mudou no vídeo."];
       if (naoDeu.length) partes.push(`Não deu: ${naoDeu.join("; ")}.`);
@@ -113,6 +141,40 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
       if (feitos.length) setPedido("");
     } catch (erro) {
       aoAvisar(erro instanceof Error ? erro.message : "Não deu para aplicar o pedido.");
+    } finally {
+      if (ativo.current) setAndamento(null);
+    }
+  }
+
+  /** O modelo de pregação inteiro (lib/clipar/modeloDePregacao.ts), com a legenda editorial se o projeto tem legendas. */
+  async function modeloDePregacao() {
+    if (andamento) return;
+    const principalNoComeco = JSON.stringify(principalDe(projetoAgora.current));
+    try {
+      const ids = midiasDaPrincipal(projetoAgora.current).filter((id) => midias.find((midia) => midia.id === id)?.audio);
+      const palavras = ids.length ? await transcreverMidias(ids, "auto", setAndamento, () => ativo.current) : new Map<string, Palavra[]>();
+      if (!palavras || !ativo.current) return;
+      const atual = projetoAgora.current;
+      const editado = await aplicarLegendaEPartes({
+        projeto: atual,
+        palavras,
+        titulo: atual.nome && !/^Projeto sem título/.test(atual.nome) ? atual.nome : "",
+        midias: new Map(midias.map((midia) => [midia.id, midia])),
+        legendaAnimada: "editorial",
+        partes: PARTES_DA_PREGACAO,
+        aoAndamento: setAndamento,
+        ativo: () => ativo.current,
+      });
+      if (!editado) return;
+      // A edição de agora pode ter mudado durante a espera: o modelo vale sobre o projeto de quando começou
+      if (JSON.stringify(principalDe(projetoAgora.current)) !== principalNoComeco) {
+        aoAvisar("O vídeo mudou enquanto o modelo era preparado. Peça de novo.");
+        return;
+      }
+      aoExecutar({ comando: "edicao.pedido", parametros: { projeto: editado.projeto } });
+      aoAvisar(`Modelo de pregação: ${editado.feitos.join(", ") || "nada mudou"}. Ctrl+Z desfaz tudo de uma vez.`);
+    } catch (erro) {
+      if (ativo.current) aoAvisar(erro instanceof Error ? erro.message : "Não deu para aplicar o modelo de pregação.");
     } finally {
       if (ativo.current) setAndamento(null);
     }
@@ -203,10 +265,21 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
           </div>
         </div>
       ) : (
-        <button type="button" className="botao-principal px-3 py-2 text-xs" disabled={andamento !== null || pedido.trim().length < 3} onClick={() => void pedir(pedido)}>
-          {andamento ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <MessageSquareText className="size-4" aria-hidden />}
-          {andamento ?? "Pedir"}
-        </button>
+        <>
+          <button type="button" className="botao-principal px-3 py-2 text-xs" disabled={andamento !== null || pedido.trim().length < 3} onClick={() => void pedir(pedido)}>
+            {andamento ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <MessageSquareText className="size-4" aria-hidden />}
+            {andamento ?? "Pedir"}
+          </button>
+          <button
+            type="button"
+            className="botao-secundario px-3 py-1.5 text-xs"
+            disabled={andamento !== null}
+            title="A cor de cinema, a voz de rádio na primeira frase, clarões e flashes nos cortes com o som, gráficos pela fala, imagens de apoio, a cartela final e a legenda editorial"
+            onClick={() => void modeloDePregacao()}
+          >
+            <Sparkles className="size-4" aria-hidden /> Aplicar o modelo de pregação
+          </button>
+        </>
       )}
     </section>
   );
