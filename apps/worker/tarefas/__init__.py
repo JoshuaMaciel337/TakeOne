@@ -34,6 +34,7 @@ from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
 from worker.tarefas.objeto import executar_objeto, executar_selecao
 from worker.tarefas.palavras_chave import executar_palavras_chave
+from worker.tarefas.pedido_edicao import executar_pedido_edicao
 from worker.tarefas.quadro import executar_quadro
 from worker.tarefas.qualidade import executar_qualidade, marcar_qualidade_com_erro
 from worker.tarefas.rastreio import executar_rastreio, marcar_rastreio_com_erro
@@ -85,6 +86,7 @@ REGISTRO = {
     "profundidade": Tarefa(executar_profundidade),
     "restaurar": Tarefa(executar_restaurar, ao_falhar=marcar_geracao_com_erro),
     "direcao": Tarefa(executar_direcao),
+    "pedido_edicao": Tarefa(executar_pedido_edicao),
     "palavras_chave": Tarefa(executar_palavras_chave),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),
     "geracao_video": Tarefa(executar_geracao_video, ao_falhar=marcar_geracao_com_erro),

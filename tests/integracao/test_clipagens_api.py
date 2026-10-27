@@ -71,7 +71,8 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
     cadastrar(cliente)
     video = criar_video(db_limpo, duracao=300)
     pedido = {"midia_id": str(video), "opcoes": {"estrategia": "ideia", "faixa": "medio", "inicio": 10, "fim": 290,
-                                                  "instrucoes": "  frases   fortes  ", "maximo": 4}}
+                                                  "instrucoes": "  frases   fortes  ", "maximo": 4,
+                                                  "edicao": "legenda amarela, sem título"}}
     clipagem = cliente.post("/api/clipagens", json=pedido).json()
     assert clipagem["status"] == "processando" and clipagem["opcoes"]["instrucoes"] == "frases fortes"
     assert clipagem["andamento"]["etapa"] == "cortes"
@@ -80,6 +81,9 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
     assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
     pronta = cliente.get(f"/api/clipagens/{clipagem['id']}").json()
     assert pronta["status"] == "pronta" and pronta["andamento"] is None
+    # O "Como quer a edição" vira o plano que a montagem de todos os cortes segue
+    assert pronta["plano_da_edicao"]["legenda"]["cor"] == "amarelo"
+    assert pronta["plano_da_edicao"]["titulo"]["acao"] == "tirar"
     cortes = pronta["cortes"]
     assert 1 <= len(cortes) <= 4 and pronta["total_de_cortes"] == len(cortes)
     assert [c["nota"] for c in cortes] == sorted((c["nota"] for c in cortes), reverse=True)

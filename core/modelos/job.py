@@ -23,6 +23,7 @@ TAREFAS = {
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,
     "direcao": RECURSO_GPU,
+    "pedido_edicao": RECURSO_GPU,
     "palavras_chave": RECURSO_GPU,
     "animacao_descrita": RECURSO_GPU,
     "geracao_imagem": RECURSO_GPU,

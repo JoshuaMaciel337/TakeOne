@@ -36,3 +36,20 @@ def test_palavras_chave_pelo_job(cliente, db_limpo):
     assert processar_job(db_limpo, pego, "w-teste") == "concluido"
     pronto = cliente.get(f"/api/jobs/{job['id']}").json()
     assert pronto["status"] == "concluido" and pronto["saida"]["chaves"] == {"c1": [2]}
+
+
+def test_pedido_de_edicao_pelo_job(cliente, db_limpo):
+    cadastrar(cliente)
+    assert cliente.post("/api/direcoes/pedido", json={"pedido": ""}).status_code == 422
+    frases = [{"n": 0, "texto": "Oi, tudo bem?", "inicio": 0}, {"n": 1, "texto": "Hoje vou contar", "inicio": 2}]
+    corpo = {"pedido": "Legenda amarela e maior, zoom, tira as pausas", "frases": frases,
+             "estado": {"formato": "9:16", "legendas": True}}
+    job = cliente.post("/api/direcoes/pedido", json=corpo).json()
+    assert job["tipo"] == "pedido_edicao" and job["recurso"] == "gpu"
+    # Na frente das clipagens e dos vídeos gerados: a pessoa espera olhando
+    pego = pegar_proximo_job(db_limpo, ["pedido_edicao"], "w-teste")
+    assert pego["prioridade"] == 1
+    assert processar_job(db_limpo, pego, "w-teste") == "concluido"
+    plano = cliente.get(f"/api/jobs/{job['id']}").json()["saida"]["plano"]
+    assert plano["legenda"]["acao"] == "mudar" and plano["legenda"]["cor"] == "amarelo"
+    assert plano["zoom"] == {"acao": "por", "palavras": [], "frases": [0]} and plano["pausas"] == "tirar"

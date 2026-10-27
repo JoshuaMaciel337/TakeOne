@@ -39,6 +39,9 @@ from core.modelos.job import ErroDefinitivo, montar_job
 from core.modelos.palavras_chave import ESQUEMA as ESQUEMA_DAS_CHAVES
 from core.modelos.palavras_chave import MAXIMO_DE_LEGENDAS, conferir_escolhas, escolhas_simuladas
 from core.modelos.palavras_chave import montar_mensagens as mensagens_das_chaves
+from core.modelos.pedido_edicao import ESQUEMA as ESQUEMA_DO_PEDIDO
+from core.modelos.pedido_edicao import conferir_plano, plano_simulado
+from core.modelos.pedido_edicao import montar_mensagens as montar_mensagens_do_pedido
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
 from core.utils.mongo import agora
@@ -129,10 +132,11 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
     cortes = juntar_cortes(pontuados, maximo_das_opcoes(opcoes, duracao))
     if not cortes:
         raise ErroDefinitivo("Nenhum corte se sustentou nesse vídeo. Tente outra estratégia ou outra duração.")
+    plano = _plano_da_edicao(opcoes, reportar, clipagem_id)
     cortes = _com_a_enfase(cortes, frases, palavras, reportar, clipagem_id)
     resultado = db.clipagens.update_one({"_id": clipagem_id}, {"$set": {
         "status": STATUS_PRONTA, "cortes": cortes, "erro": None, "atualizado_em": agora(),
-        "modelo": "simulado" if MODO_IA != "real" else "qwen3",
+        "modelo": "simulado" if MODO_IA != "real" else "qwen3", "plano_da_edicao": plano,
     }})
     if resultado.matched_count == 0:
         raise ErroDefinitivo("A clipagem foi excluída enquanto os cortes eram escolhidos.")
@@ -140,6 +144,26 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
                  f"{len(candidatos)} candidatos.")
     reportar(100, "Cortes prontos")
     return {"clipagem_id": str(clipagem_id), "cortes": len(cortes)}
+
+
+def _plano_da_edicao(opcoes: dict, reportar, clipagem_id) -> dict | None:
+    """Como a pessoa quer a edição, em plano (core/modelos/pedido_edicao.py), para a montagem de todos os cortes.
+    Sem frases: o que é de um corte só (cortar frases, zoom numa frase) fica para o editor."""
+    pedido = str(opcoes.get("edicao") or "").strip()
+    if not pedido:
+        return None
+    if MODO_IA != "real":
+        return plano_simulado(pedido, [])
+    from worker.tarefas.llm import conversar
+
+    try:
+        bruto = conversar(montar_mensagens_do_pedido(pedido, []), ESQUEMA_DO_PEDIDO, reportar,
+                          "Lendo como você quer a edição", temperatura=0.1, primeiro=False, ultimo=False,
+                          progresso=93)
+    except RuntimeError as erro:
+        logging.warning(f"[clipagem {clipagem_id}] O pedido de edição falhou: {erro}")
+        return None
+    return conferir_plano(bruto, [])
 
 
 def _com_a_enfase(cortes: list[dict], frases: list[dict], palavras: list[dict], reportar, clipagem_id) -> list[dict]:

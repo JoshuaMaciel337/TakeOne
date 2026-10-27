@@ -1831,6 +1831,28 @@ class PalavraDaDirecao(BaseModel):
     fim: float = Field(ge=0)
 
 
+class FraseDoPedido(BaseModel):
+    """Uma frase do vídeo, numerada, para o pedido de edição poder apontar onde cortar e dar zoom."""
+    n: int = Field(ge=0, le=100_000)
+    texto: str = Field(max_length=600)
+    inicio: float = Field(ge=0, description="Segundos da linha do tempo")
+
+
+class EstadoDoPedido(BaseModel):
+    """O que o vídeo tem hoje, para o modelo não pôr o que já existe nem tirar o que não há."""
+    formato: str | None = Field(default=None, max_length=8)
+    legendas: bool = False
+    titulo: str | None = Field(default=None, max_length=200)
+    zooms: bool = False
+    musica: bool = False
+
+
+class PedidoEdicaoEntrada(BaseModel):
+    pedido: str = Field(min_length=3, max_length=500)
+    frases: list[FraseDoPedido] = Field(default_factory=list, max_length=160)
+    estado: EstadoDoPedido | None = None
+
+
 class DirecaoEntrada(BaseModel):
     palavras: list[PalavraDaDirecao] = Field(min_length=1, max_length=6000)
     duracao: float = Field(gt=0, le=6 * 3600)
@@ -2358,10 +2380,12 @@ class OpcoesDaClipagem(BaseModel):
     fim: float | None = Field(default=None, gt=0)
     idioma: Literal["auto", "pt", "en", "es"] = "auto"
     momentos: str = Field(default="", max_length=300)
+    # Como a pessoa quer a edição dos cortes, nas palavras dela (o modelo transforma num plano)
+    edicao: str = Field(default="", max_length=500)
     formato: Literal["9:16", "1:1", "4:5", "16:9"] = "9:16"
     maximo: int | None = Field(default=None, ge=1, le=50)
 
-    @field_validator("instrucoes", "momentos", "genero", mode="before")
+    @field_validator("instrucoes", "momentos", "genero", "edicao", mode="before")
     @classmethod
     def limpar_textos(cls, valor):
         return " ".join(valor.split()) if isinstance(valor, str) else valor
@@ -2408,6 +2432,8 @@ class ClipagemSaida(BaseModel):
     erro: str | None = None
     # Enquanto processa: {etapa: transcricao | cortes, progresso, mensagem}
     andamento: dict | None = None
+    # O "Como quer a edição" em plano (core/modelos/pedido_edicao.py), que a montagem dos cortes segue
+    plano_da_edicao: dict | None = None
     cortes: list[dict] = []
     total_de_cortes: int = 0
     criado_em: datetime

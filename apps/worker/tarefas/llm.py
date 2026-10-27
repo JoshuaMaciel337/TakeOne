@@ -59,15 +59,40 @@ def garantir_modelo(reportar: Callable[[int, str], None]):
                                                    f"{int(100 * parte)}%")
 
 
+def _llm_carregado() -> bool:
+    """O Qwen3 já está na placa (um pedido de edição o deixa lá 2 min, para o seguinte não esperar ele subir)."""
+    try:
+        with _pedir("/api/ps", tempo_limite=5) as resposta:
+            nomes = {modelo.get("name") for modelo in json.load(resposta).get("models", [])}
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+    return MODELO_LLM in nomes or f"{MODELO_LLM}:latest" in nomes
+
+
+def _soltar_o_llm():
+    try:
+        _pedir("/api/generate", {"model": MODELO_LLM, "keep_alive": 0}, tempo_limite=30).close()
+    except (urllib.error.URLError, OSError):
+        pass
+
+
 def esperar_a_placa(reportar: Callable[[int, str], None], minimo_mb: int = VRAM_LIVRE_MINIMA_MB,
                     para: str = "o LLM", progresso: int = 42):
     """Espera a placa ter minimo_mb livres (o LLM, ou o Whisper da transcrição, que não esperava e caía com um
-    "CUDA failed" quando o ComfyUI segurava a memória)."""
+    "CUDA failed" quando o ComfyUI segurava a memória). Para o LLM, o modelo já carregado conta como pronto (sem
+    isso, o pedido seguinte esperava o próprio modelo sair da placa); para outra tarefa, o LLM parado sai."""
     from worker.tarefas.geracao_video import soltar_comfyui_parado
 
+    if para == "o LLM" and _llm_carregado():
+        return
     inicio = time.monotonic()
     soltou = False
+    soltou_o_llm = False
     while (livre := _vram_livre_mb()) is not None and livre < minimo_mb:
+        if para != "o LLM" and not soltou_o_llm and _llm_carregado():
+            soltou_o_llm = True
+            _soltar_o_llm()
+            continue
         # Um Wan esquecido no ComfyUI parado (geração órfã) sai primeiro
         if not soltou:
             soltou = soltar_comfyui_parado()
