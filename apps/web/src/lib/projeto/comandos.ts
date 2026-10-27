@@ -63,6 +63,7 @@ import {
   moverKeyframe,
   reenquadrarClipe,
   seguirObjetoClipe,
+  tirarZooms,
   zoomNosTrechos,
   abaixarClipe,
   nivelarClipe,
@@ -225,6 +226,9 @@ export type Comando =
   | { comando: "linha.elevar"; parametros: { intervalo: Intervalo } }
   | { comando: "clipe.inserirTrecho"; parametros: { midiaId: string; de: Tick; ate: Tick; tempo: Tick; modo: "inserir" | "sobrescrever" } }
   | { comando: "linha.zoomNosTrechos"; parametros: { trechos: Intervalo[] } }
+  | { comando: "linha.tirarZooms"; parametros: Record<string, never> }
+  /** O pedido de edição em palavras já aplicado (lib/clipar/pedidoDeEdicao.ts): um passo só do desfazer. */
+  | { comando: "edicao.pedido"; parametros: { projeto: Projeto } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.congelar"; parametros: { clipeId: string; tempo: Tick; midiaId: string; duracao: Tick } }
@@ -401,6 +405,8 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.elevar": "elevar o trecho",
   "clipe.inserirTrecho": "pôr o trecho da fonte",
   "linha.zoomNosTrechos": "dar zoom nos destaques",
+  "linha.tirarZooms": "tirar os zooms",
+  "edicao.pedido": "o pedido de edição",
   "clipe.duplicar": "duplicar",
   "clipe.separarSom": "separar o som",
   "clipe.congelar": "congelar o quadro",
@@ -634,6 +640,10 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     }
     case "linha.zoomNosTrechos":
       return { projeto: zoomNosTrechos(projeto, parametros.trechos) };
+    case "linha.tirarZooms":
+      return { projeto: tirarZooms(projeto) };
+    case "edicao.pedido":
+      return { projeto: parametros.projeto, selecao: [] };
     case "linha.removerIntervalos":
       return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
     case "linha.elevar":

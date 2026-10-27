@@ -3,17 +3,17 @@
 // original entram em fila na principal (sem copiar o arquivo), o clipe cobre o quadro seguindo o rosto, as pausas
 // e as hesitações saem, as legendas da fala entram no estilo escolhido (com as palavras de ênfase pintadas) e o
 // título do corte abre o vídeo com as palavras de foco na outra cor. Os zooms curtos caem onde a fala diz as
-// palavras de foco. Função pura: o que depende da rede (a fala, o rosto, as palavras de ênfase) chega pronto.
+// palavras de foco. O pedido de edição da clipagem (pedidoDeEdicao.ts) muda as opções. Função pura: o que depende da rede (a fala, o rosto, as palavras de ênfase) chega pronto.
 import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { executarComando, type Comando } from "../projeto/comandos.ts";
 import type { Contexto } from "../projeto/edicao.ts";
 import { falaDosClipes, type Palavra, palavrasDaLinha } from "../projeto/fala.ts";
-import { ESTILOS_DE_LEGENDA } from "../projeto/legendas.ts";
+import { ESTILOS_DE_LEGENDA, POSICAO_LEGENDA } from "../projeto/legendas.ts";
 import { legendasDaFala, opcoesParaOQuadro } from "../projeto/legendasDaFala.ts";
 import { trechosParaLimpar } from "../projeto/limpezaDeFala.ts";
 import type { Clipe, Projeto } from "../projeto/modelo.ts";
 import { type AmostraDeRosto, reenquadrarPeloRosto } from "../projeto/reenquadrar.ts";
-import { ESTILOS_DE_TEXTO, palavrasDoTexto } from "../projeto/texto.ts";
+import { ESTILOS_DE_TEXTO, palavrasDoTexto, type Texto } from "../projeto/texto.ts";
 
 export type CorteParaMontar = { trechos: { inicio: number; fim: number }[]; titulo: string; foco: string[] };
 
@@ -28,7 +28,29 @@ export type OpcoesDaMontagem = {
   zooms: boolean;
   /** A cor das palavras de foco e de ênfase (a principal do kit de marca, quando há). */
   corDeDestaque: string;
+  /** O que o pedido de edição muda no estilo das legendas (tamanho, cor, caixa alta, lugar). */
+  ajusteDaLegenda?: AjusteDaLegenda;
+  /** Palavras a mais em que dar zoom, além das de foco do título (o pedido de edição). */
+  palavrasDeZoom?: string[];
+  /** Seguir o rosto (o padrão), cobrir o quadro pelo meio ou deixar a imagem inteira. */
+  enquadrar?: "rosto" | "centro" | "inteiro";
 };
+
+export type AjusteDaLegenda = { tamanho?: "menor" | "maior" | "bem_maior"; cor?: string; caixaAlta?: boolean; posicao?: "baixo" | "meio" | "alto" };
+
+const FATOR_DO_TAMANHO = { menor: 0.8, maior: 1.3, bem_maior: 1.6 } as const;
+/** O centro das legendas em cada lugar, em frações da altura a partir do meio. */
+export const ALTURA_DA_POSICAO = { baixo: POSICAO_LEGENDA, meio: 0, alto: -0.28 } as const;
+
+/** O estilo da legenda com o que o pedido de edição muda: o tamanho é relativo ao do estilo. */
+export function estiloComAjuste(base: Texto, ajuste: AjusteDaLegenda = {}): Texto {
+  return {
+    ...base,
+    ...(ajuste.tamanho ? { tamanho: Math.min(0.2, base.tamanho * FATOR_DO_TAMANHO[ajuste.tamanho]) } : {}),
+    ...(ajuste.cor ? { cor: ajuste.cor } : {}),
+    ...(ajuste.caixaAlta !== undefined ? { caixa_alta: ajuste.caixaAlta } : {}),
+  };
+}
 
 export const OPCOES_DA_MONTAGEM: OpcoesDaMontagem = { limpar: true, legenda: "palavra", titulo: true, zooms: true, corDeDestaque: "#ffd60a" };
 
@@ -100,6 +122,55 @@ export function zoomsNasPalavrasDeFoco(palavras: { texto: string; inicio: Tick; 
 
 const principalDe = (projeto: Projeto): Clipe[] => projeto.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
 
+/**
+ * O título no alto nos primeiros 3 s, em até 3 linhas que cabem no quadro (do tamanho do estilo para baixo), com
+ * as palavras de foco na cor de destaque e a entrada palavra a palavra. null quando nem pequeno ele cabe.
+ */
+export function porTitulo(projeto: Projeto, ctx: Contexto, titulo: string, foco: string[], cor: string): Projeto | null {
+  const s = TICKS_POR_SEGUNDO;
+  const base = ESTILOS_DE_TEXTO.find((estilo) => estilo.id === "titulo")!.texto;
+  let tamanho = base.tamanho;
+  let linhas: string[] | null = null;
+  while (tamanho >= 0.045) {
+    linhas = linhasDoTitulo(titulo.trim().toUpperCase(), opcoesParaOQuadro(projeto.proporcao, { ...base, tamanho }).maxCaracteres, LINHAS_DO_TITULO);
+    if (linhas) break;
+    tamanho -= 0.01;
+  }
+  if (!linhas) return null;
+  const conteudo = linhas.join("\n");
+  const chaves = palavrasDeFoco(conteudo, foco);
+  const resultado = executarComando(
+    projeto,
+    {
+      comando: "texto.adicionar",
+      parametros: {
+        inicio: 0,
+        texto: { ...base, conteudo, tamanho, caixa_alta: true, palavras_chave: chaves.length ? chaves : null, cor_chave: cor },
+        transformacao: { y: ALTURA_DO_TITULO },
+      },
+    },
+    ctx,
+  );
+  const tituloId = resultado.selecao?.[0];
+  if (!tituloId) return resultado.projeto;
+  return executarComando(
+    resultado.projeto,
+    {
+      comando: "clipe.animar",
+      parametros: { clipeIds: [tituloId], animacao: { entrada: { tipo: "palavras", duracao: Math.round(0.6 * s) }, saida: { tipo: "aparecer", duracao: Math.round(0.3 * s) } } },
+    },
+    ctx,
+  ).projeto;
+}
+
+/** As legendas no lugar pedido (elas nascem embaixo). */
+export function moverLegendas(projeto: Projeto, ctx: Contexto, posicao: AjusteDaLegenda["posicao"]): Projeto {
+  if (!posicao) return projeto;
+  const ids = projeto.faixas.filter((faixa) => faixa.tipo === "legenda").flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id));
+  if (!ids.length) return projeto;
+  return executarComando(projeto, { comando: "clipe.transformar", parametros: { clipeIds: ids, transformacao: { y: ALTURA_DA_POSICAO[posicao] } } }, ctx).projeto;
+}
+
 /** O projeto do corte montado e o nome de cada passo (para o aviso do que foi feito). */
 export function montarCorte(entrada: EntradaDaMontagem): { projeto: Projeto; feitos: string[] } {
   const { ctx, midia, corte } = entrada;
@@ -122,8 +193,9 @@ export function montarCorte(entrada: EntradaDaMontagem): { projeto: Projeto; fei
   }
   // Cada clipe cobre o quadro, seguindo o rosto quando ele aparece no trecho (antes da limpeza: um clipe por trecho)
   let seguiu = false;
-  for (const clipe of principalDe(projeto)) {
-    const pelo = reenquadrarPeloRosto(clipe, entrada.rosto, midia, quadro);
+  const enquadrar = opcoes.enquadrar ?? "rosto";
+  for (const clipe of enquadrar === "inteiro" ? [] : principalDe(projeto)) {
+    const pelo = enquadrar === "rosto" ? reenquadrarPeloRosto(clipe, entrada.rosto, midia, quadro) : null;
     const reenquadramento = pelo ?? reenquadrarPeloRosto(clipe, [{ t: clipe.entrada / s, x: 0.5, y: 0.5, a: 1 }], midia, quadro);
     seguiu ||= Boolean(pelo);
     if (reenquadramento && (reenquadramento.escala > 1.001 || pelo)) aplicar({ comando: "clipe.reenquadrar", parametros: { clipeId: clipe.id, reenquadramento } });
@@ -141,7 +213,7 @@ export function montarCorte(entrada: EntradaDaMontagem): { projeto: Projeto; fei
 
   const estiloDaLegenda = ESTILOS_DE_LEGENDA.find((estilo) => estilo.id === opcoes.legenda)?.texto;
   if (estiloDaLegenda) {
-    const estilo = { ...estiloDaLegenda, cor_chave: opcoes.corDeDestaque };
+    const estilo = { ...estiloComAjuste(estiloDaLegenda, opcoes.ajusteDaLegenda), cor_chave: opcoes.corDeDestaque };
     let legendas = legendasDaFala(principalDe(projeto), mapa, opcoesParaOQuadro(projeto.proporcao, estilo));
     if (entrada.enfase?.length) {
       // As palavras de ênfase levadas à linha do tempo (o mesmo caminho das legendas): o começo de cada uma
@@ -155,44 +227,22 @@ export function montarCorte(entrada: EntradaDaMontagem): { projeto: Projeto; fei
     }
     if (legendas.length) {
       aplicar({ comando: "legenda.importar", parametros: { legendas, estilo } });
+      projeto = moverLegendas(projeto, ctx, opcoes.ajusteDaLegenda?.posicao);
       feitos.push(`${legendas.length} legendas`);
     }
   }
 
   if (opcoes.titulo && corte.titulo.trim()) {
-    const base = ESTILOS_DE_TEXTO.find((estilo) => estilo.id === "titulo")!.texto;
-    // Do tamanho do estilo para baixo, até o título caber em 3 linhas
-    let tamanho = base.tamanho;
-    let linhas: string[] | null = null;
-    while (tamanho >= 0.045) {
-      linhas = linhasDoTitulo(corte.titulo.trim().toUpperCase(), opcoesParaOQuadro(projeto.proporcao, { ...base, tamanho }).maxCaracteres, LINHAS_DO_TITULO);
-      if (linhas) break;
-      tamanho -= 0.01;
-    }
-    if (linhas) {
-      const conteudo = linhas.join("\n");
-      const chaves = palavrasDeFoco(conteudo, corte.foco);
-      aplicar({
-        comando: "texto.adicionar",
-        parametros: {
-          inicio: 0,
-          texto: { ...base, conteudo, tamanho, caixa_alta: true, palavras_chave: chaves.length ? chaves : null, cor_chave: opcoes.corDeDestaque },
-          transformacao: { y: ALTURA_DO_TITULO },
-        },
-      });
-      const titulo = projeto.faixas.find((faixa) => faixa.tipo === "texto")?.clipes.at(-1);
-      if (titulo) {
-        aplicar({
-          comando: "clipe.animar",
-          parametros: { clipeIds: [titulo.id], animacao: { entrada: { tipo: "palavras", duracao: Math.round(0.6 * s) }, saida: { tipo: "aparecer", duracao: Math.round(0.3 * s) } } },
-        });
-      }
+    const comTitulo = porTitulo(projeto, ctx, corte.titulo, corte.foco, opcoes.corDeDestaque);
+    if (comTitulo) {
+      projeto = comTitulo;
       feitos.push("título");
     }
   }
 
-  if (opcoes.zooms && corte.foco.length) {
-    const trechos = zoomsNasPalavrasDeFoco(palavrasDaLinha(falaDosClipes(principalDe(projeto), mapa)), corte.foco);
+  const palavrasDeZoom = [...corte.foco, ...(opcoes.palavrasDeZoom ?? [])];
+  if (opcoes.zooms && palavrasDeZoom.length) {
+    const trechos = zoomsNasPalavrasDeFoco(palavrasDaLinha(falaDosClipes(principalDe(projeto), mapa)), palavrasDeZoom);
     if (trechos.length) {
       aplicar({ comando: "linha.zoomNosTrechos", parametros: { trechos } });
       feitos.push(trechos.length === 1 ? "1 zoom" : `${trechos.length} zooms`);

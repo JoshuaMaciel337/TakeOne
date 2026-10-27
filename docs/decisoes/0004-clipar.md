@@ -140,7 +140,8 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   e as legendas em .srt e .vtt; o XML de intercâmbio por corte. A montagem no Node (decisão 1) e as automações: "quando
   eu colar um link", "vídeo novo no canal" (o monitor do feed do HolyCut, genérico) com o modelo de corte padrão, e "no
   horário". A publicação fica esperando o dono.
-- [ ] **14.10 Conversa no editor.** Um campo "peça uma edição" no editor de vídeo: o Qwen3 traduz o pedido numa lista
+- [ ] **14.10 Conversa no editor.** (Adiantada: o campo, o plano, as perguntas, o passo único e a medida dos 30
+  pedidos estão prontos, e o mesmo pedido vale para todos os cortes na página de opções; falta o gosto do espaço.) Um campo "peça uma edição" no editor de vídeo: o Qwen3 traduz o pedido numa lista
   de ações de um conjunto fechado (legenda maior, menor, de outra cor ou outro estilo; título; zoom aqui; reenquadrar
   em quem fala; tirar as pausas; cortar o trecho em que se fala de X; trocar o formato; abaixar a música), mostra o
   plano e pergunta com botões quando falta algo, aplica num passo só do desfazer e diz o que mudou e o que não deu. Os

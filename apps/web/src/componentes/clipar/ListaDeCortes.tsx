@@ -3,7 +3,7 @@
 // A clipagem (ADR 0004, 14.3): o andamento enquanto o TakeOne procura, e depois os cortes, com a nota de 0 a 100,
 // as quatro notas com a frase do modelo, o título com as palavras de foco, o resumo, a categoria e os trechos do
 // original. Gostei e não gostei ficam guardados. "Abrir no editor" monta o corte num projeto (14.5) e abre.
-import { AlertCircle, AlertTriangle, ArrowLeft, Clapperboard, Loader2, RefreshCw, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeft, Clapperboard, Loader2, RefreshCw, ThumbsDown, ThumbsUp, Trash2, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { ErroApi } from "@/lib/api";
 import { projetoDoCorte } from "@/lib/clipar/abrirCorte";
+import { descreverPlano } from "@/lib/clipar/pedidoDeEdicao";
 import {
   avaliarCorte,
   CATEGORIAS,
@@ -128,6 +129,30 @@ function CartaoDoCorte({ corte, aoAvaliar, aoAbrir, abrindo, ocupado }: PropsDoC
   );
 }
 
+/** O "Como quer a edição" como o modelo entendeu, valendo para todos os cortes montados daqui. */
+function EdicaoPedida({ clipagem }: { clipagem: Clipagem }) {
+  const plano = clipagem.plano_da_edicao!;
+  const itens = descreverPlano(plano);
+  return (
+    <section className="flex flex-col gap-1.5 rounded-xl border border-destaque/40 bg-destaque/5 p-4 text-sm">
+      <p className="flex items-center gap-1.5 font-semibold">
+        <WandSparkles className="size-4 text-destaque" aria-hidden /> A edição de todos os cortes
+      </p>
+      <p className="text-xs text-suave">Você pediu: “{clipagem.opcoes.edicao}”</p>
+      {itens.length ? (
+        <ul className="list-inside list-disc text-xs">
+          {itens.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-suave">O modelo não achou nada para mudar na edição de sempre.</p>
+      )}
+      {plano.nao_deu.length ? <p className="text-xs text-aviso">Não dá para fazer aqui: {plano.nao_deu.join("; ")}.</p> : null}
+    </section>
+  );
+}
+
 export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
   const router = useRouter();
   const [clipagem, setClipagem] = useState<Clipagem | null>(null);
@@ -228,6 +253,8 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
           <Trash2 className="size-4" aria-hidden /> Excluir
         </button>
       </TituloDaPagina>
+
+      {clipagem.plano_da_edicao ? <EdicaoPedida clipagem={clipagem} /> : null}
 
       {clipagem.status === "processando" ? (
         <section className="flex flex-col gap-3 rounded-xl border border-borda bg-painel p-5" aria-live="polite">

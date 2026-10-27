@@ -13,6 +13,7 @@ import { transcreverMidias } from "@/lib/transcricao";
 
 import { ControleNumerico } from "./ControleNumerico";
 import { CriarAutomaticamente } from "./CriarAutomaticamente";
+import { PecaUmaEdicao } from "./PecaUmaEdicao";
 import { IDIOMAS } from "./LegendasDaFala";
 
 export type PropsTranscricao = {
@@ -22,6 +23,8 @@ export type PropsTranscricao = {
   aoBuscar: (tempo: Tick) => void;
   aoAvisar: (mensagem: string) => void;
   aoPedirAnimacao: (midia: Midia, inicio: Tick) => void;
+  /** A biblioteca: o "Peça uma edição" precisa do tamanho e do som das mídias. */
+  midias: Midia[];
 };
 
 /** Quantos trechos a lista mostra; o botão remove todos. */
@@ -31,8 +34,8 @@ function segundos(valor: number): string {
   return `${valor.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`;
 }
 
-/** Ferramenta Transcrição: a fala da faixa principal, para limpar pausas e vícios e editar pelo texto. */
-export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvisar, aoPedirAnimacao }: PropsTranscricao) {
+/** Ferramenta Transcrição: pedir uma edição em palavras, o "Criar automaticamente" e a fala da faixa principal, para limpar pausas e vícios e editar pelo texto. */
+export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvisar, aoPedirAnimacao, midias }: PropsTranscricao) {
   const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
   const clipes = useMemo(() => principal?.clipes ?? [], [principal]);
   const [palavras, setPalavras] = useState<Map<string, Palavra[]> | null>(null);
@@ -95,6 +98,7 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
   if (!palavras) {
     return (
       <div className="flex flex-col gap-3 text-xs">
+        <PecaUmaEdicao projeto={projeto} midias={midias} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
         <CriarAutomaticamente projeto={projeto} aoExecutar={aoExecutar} aoAvisar={aoAvisar} aoPedirAnimacao={aoPedirAnimacao} />
         <p className="text-suave">
           A fala da faixa principal é transcrita no worker de GPU. Depois dá para tirar as pausas longas, as hesitações (“ahn”, “hum”) e os retakes de uma vez, e
@@ -125,6 +129,7 @@ export function PainelTranscricao({ projeto, tempo, aoExecutar, aoBuscar, aoAvis
 
   return (
     <div className="flex flex-col gap-3 text-xs">
+      <PecaUmaEdicao projeto={projeto} midias={midias} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       <CriarAutomaticamente projeto={projeto} aoExecutar={aoExecutar} aoAvisar={aoAvisar} aoPedirAnimacao={aoPedirAnimacao} />
       <section className="flex flex-col gap-2 rounded-lg border border-borda p-2" aria-label="Limpeza de fala">
         <h3 className="font-semibold uppercase tracking-wide text-suave">Limpeza de fala</h3>

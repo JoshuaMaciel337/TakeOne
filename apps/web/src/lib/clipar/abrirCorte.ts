@@ -1,6 +1,7 @@
 // Abrir um corte no editor (ADR 0004, 14.5): o corte montado vira um projeto novo no formato da clipagem, ligado
-// ao corte, e abrir de novo vai ao mesmo projeto. A fala vem da clipagem (a transcrição ou o .srt da pessoa) e o
-// rosto da busca de sempre (worker de CPU); a montagem é pura (montarCorte.ts).
+// ao corte, e abrir de novo vai ao mesmo projeto. O "Como quer a edição" da clipagem muda as opções da montagem.
+// A fala vem da clipagem (a transcrição ou o .srt da pessoa) e o rosto da busca de sempre (worker de CPU); a
+// montagem é pura (montarCorte.ts).
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { type Clipagem, type Corte, falaDaClipagem } from "@/lib/clipagens";
@@ -10,6 +11,7 @@ import { buscarRosto } from "@/lib/rosto";
 import type { Midia } from "@/lib/tipos";
 
 import { montarCorte, OPCOES_DA_MONTAGEM, type OpcoesDaMontagem } from "./montarCorte";
+import { opcoesDoPlano } from "./pedidoDeEdicao";
 
 /** A fala lida um pouco além das pontas do corte, para a última palavra não ficar de fora. */
 const FOLGA_DA_FALA_S = 2;
@@ -44,10 +46,14 @@ export async function projetoDoCorte(
   const [midia, palavras] = await Promise.all([chamarApi<Midia>(`/midias/${clipagem.midia_id}`), falaDaClipagem(clipagem.id, de, ate)]);
   if (!midia.video) throw new Error("O vídeo do corte não tem imagem.");
   // O rosto só faz falta quando o formato do corte não é o do vídeo (um vídeo deitado num corte em pé)
-  const [largura, altura] = clipagem.opcoes.formato.split(":").map(Number);
+  // O formato que o "Como quer a edição" pedir vale mais que o da página de opções
+  const pedido = clipagem.plano_da_edicao?.formato;
+  const formato = pedido && pedido !== "manter" ? pedido : clipagem.opcoes.formato;
+  const [largura, altura] = formato.split(":").map(Number);
   const mesmoFormato = Math.abs(largura / altura - midia.video.largura / midia.video.altura) < 0.02;
   let rosto: Awaited<ReturnType<typeof buscarRosto>> = [];
-  if (!mesmoFormato) {
+  const enquadrar = clipagem.plano_da_edicao?.enquadrar ?? "manter";
+  if (!mesmoFormato && (enquadrar === "manter" || enquadrar === "rosto")) {
     try {
       rosto = await buscarRosto(midia.id, aoAndamento, ativo);
     } catch {
@@ -59,7 +65,7 @@ export async function projetoDoCorte(
   if (!ativo()) return null;
 
   aoAndamento("Montando o corte");
-  const vazio = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome: corte.titulo.slice(0, 120) || "Corte", proporcao: clipagem.opcoes.formato } });
+  const vazio = await chamarApi<Projeto>("/projetos", { metodo: "POST", corpo: { nome: corte.titulo.slice(0, 120) || "Corte", proporcao: formato } });
   const { projeto } = montarCorte({
     projeto: vazio,
     ctx: contextoDasMidias(new Map([[midia.id, midia]])),
@@ -68,7 +74,8 @@ export async function projetoDoCorte(
     palavras,
     rosto,
     enfase: corte.enfase,
-    opcoes: { ...opcoes, corDeDestaque: marca.cores[0] ?? opcoes.corDeDestaque },
+    // O "Como quer a edição" da clipagem muda as opções; a cor que ele pede vale mais que a do kit
+    opcoes: opcoesDoPlano(clipagem.plano_da_edicao, { ...opcoes, corDeDestaque: marca.cores[0] ?? opcoes.corDeDestaque }, marca.cores[0] ?? null),
   });
   await chamarApi<Projeto>(`/projetos/${vazio.id}`, {
     metodo: "PUT",

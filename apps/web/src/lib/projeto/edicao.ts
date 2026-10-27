@@ -1565,6 +1565,22 @@ export const ZOOM_DO_DESTAQUE = { escala: 1.12, entrada: 0.25, saida: 0.35 } as 
  * fica durante ele e volta depois, com keyframes de curva suave. Clipe que já tem keyframes de escala
  * fica como está, para não desmanchar o que a pessoa fez.
  */
+/** Tira os zooms dos clipes da principal (os keyframes de escala), deixando cada um no tamanho de antes deles. */
+export function tirarZooms(projeto: Projeto): Projeto {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");
+  if (!principal.clipes.some((clipe) => clipe.keyframes?.escala?.length)) return projeto;
+  exigirDestravada(principal);
+  const clipes = principal.clipes.map((clipe) => {
+    const pontos = clipe.keyframes?.escala;
+    if (!pontos?.length) return clipe;
+    const keyframes = { ...clipe.keyframes, escala: undefined };
+    const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
+    return { ...clipe, transformacao: { ...clipe.transformacao, escala: pontos[0].valor }, keyframes: vazios ? null : keyframes };
+  });
+  return finalizar(trocarFaixa(projeto, { ...principal, clipes }));
+}
+
 export function zoomNosTrechos(projeto: Projeto, trechos: Intervalo[], escala: number = ZOOM_DO_DESTAQUE.escala): Projeto {
   const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
   if (!principal) throw new ErroEdicao("O projeto está sem a faixa principal.");

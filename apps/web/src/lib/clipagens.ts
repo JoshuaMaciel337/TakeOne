@@ -1,5 +1,6 @@
 // O Clipar (ADR 0004): as opções da clipagem, os cortes achados e as contas da página (o tempo estimado).
 import { chamarApi } from "./api.ts";
+import type { PlanoDaEdicao } from "./clipar/pedidoDeEdicao.ts";
 import { lerLegendas, lerTextoDeLegenda } from "./projeto/legendas.ts";
 import { TICKS_POR_SEGUNDO } from "./tempo.ts";
 
@@ -15,6 +16,8 @@ export type OpcoesDaClipagem = {
   fim: number | null;
   idioma: "auto" | "pt" | "en" | "es";
   momentos: string;
+  /** Como a pessoa quer a edição dos cortes, nas palavras dela. */
+  edicao: string;
   formato: "9:16" | "1:1" | "4:5" | "16:9";
   maximo: number | null;
 };
@@ -28,6 +31,7 @@ export const OPCOES_PADRAO: OpcoesDaClipagem = {
   fim: null,
   idioma: "auto",
   momentos: "",
+  edicao: "",
   formato: "9:16",
   maximo: null,
 };
@@ -108,6 +112,8 @@ export type Clipagem = {
   status: "processando" | "pronta" | "erro";
   erro: string | null;
   andamento: { etapa: "transcricao" | "cortes"; progresso: number; mensagem: string } | null;
+  /** O "Como quer a edição" em plano, que a montagem de todos os cortes segue. */
+  plano_da_edicao: PlanoDaEdicao | null;
   cortes: Corte[];
   total_de_cortes: number;
   criado_em: string;

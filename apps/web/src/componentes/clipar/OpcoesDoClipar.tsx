@@ -1,8 +1,8 @@
 "use client";
 
 // A página de opções do Clipar (ADR 0004, 14.2): a estratégia (as prontas e as guardadas no espaço), a duração dos
-// cortes, o trecho a analisar sobre a forma de onda, o gênero, o idioma, os momentos pedidos, um .srt no lugar da
-// transcrição, o formato e quantos cortes, com o tempo estimado. As escolhas podem virar o padrão (no navegador).
+// cortes, como quer a edição (em palavras), o trecho a analisar sobre a forma de onda, o gênero, o idioma, os
+// momentos pedidos, um .srt no lugar da transcrição, o formato e quantos cortes, com o tempo estimado. As escolhas podem virar o padrão (no navegador).
 import { AlertCircle, ArrowLeft, FileText, Loader2, Save, Scissors, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,6 +33,7 @@ import type { Midia } from "@/lib/tipos";
 
 const CHAVE_PADRAO = "takeone-clipar-padrao";
 const FORMATOS: OpcoesDaClipagem["formato"][] = ["9:16", "1:1", "4:5", "16:9"];
+const SUGESTOES_DE_EDICAO = ["legendas maiores", "legendas amarelas", "legenda no meio", "estilo karaokê", "sem título", "sem zoom", "palavras fortes em verde"];
 
 function padraoGuardado(): OpcoesDaClipagem {
   try {
@@ -319,6 +320,33 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
             onChange={(e) => mudar({ momentos: e.target.value })}
           />
         </label>
+      </Secao>
+
+      <Secao
+        titulo="Como quer a edição"
+        descricao="Escreva do seu jeito: o modelo transforma em legendas, título, zooms e enquadramento de todos os cortes. Dentro do editor dá para pedir mais em cada corte."
+      >
+        <textarea
+          aria-label="Como quer a edição"
+          maxLength={500}
+          rows={2}
+          className="rounded-lg border border-borda bg-painel-2 p-2 text-sm"
+          placeholder="Ex.: legendas amarelas e maiores no meio da tela, sem título, zoom quando ele falar de dinheiro."
+          value={opcoes.edicao}
+          onChange={(e) => mudar({ edicao: e.target.value })}
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {SUGESTOES_DE_EDICAO.map((sugestao) => (
+            <button
+              key={sugestao}
+              type="button"
+              className="rounded-full border border-borda px-2.5 py-1 text-xs text-suave hover:text-texto"
+              onClick={() => mudar({ edicao: [opcoes.edicao.trim().replace(/[.,;]$/, ""), sugestao].filter(Boolean).join(", ").slice(0, 500) })}
+            >
+              + {sugestao}
+            </button>
+          ))}
+        </div>
       </Secao>
 
       <Secao titulo="Duração de cada corte">

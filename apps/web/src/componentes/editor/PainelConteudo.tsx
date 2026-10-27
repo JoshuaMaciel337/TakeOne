@@ -202,6 +202,7 @@ export function ConteudoDaFerramenta({
         aoBuscar={legendas.aoBuscar}
         aoAvisar={legendas.aoAvisar}
         aoPedirAnimacao={aoPedirAnimacao}
+        midias={biblioteca.midias ?? []}
       />
     ) : ferramenta.id === "transicoes" ? (
       <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
