@@ -2393,6 +2393,8 @@ class OpcoesDaClipagem(BaseModel):
     maximo: int | None = Field(default=None, ge=1, le=50)
     # O estilo da legenda animada dos cortes (core/modelos/legenda_animada.py); None: as legendas de sempre
     legenda_animada: str | None = Field(default=None, max_length=30)
+    # O modelo de edição dos cortes (apps/web/src/lib/clipar/modeloDePregacao.ts)
+    modelo_edicao: Literal["nenhum", "pregacao"] = "nenhum"
 
     @field_validator("instrucoes", "momentos", "genero", "edicao", mode="before")
     @classmethod

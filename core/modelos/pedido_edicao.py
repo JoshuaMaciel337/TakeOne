@@ -5,12 +5,16 @@
 # Qwen3 local traduz o pedido num plano de um conjunto fechado de ações: as legendas (estilo, tamanho, cor,
 # lugar, caixa alta, pôr ou tirar), a cor das palavras de ênfase, o título (pôr, tirar ou trocar o texto), os
 # zooms (onde a fala diz certas palavras ou em frases apontadas), tirar as pausas, cortar frases, o formato, o
-# enquadramento e o volume da música. O que ele não sabe fazer vai em "nao_deu", e a dúvida vira uma pergunta
+# enquadramento e o volume da música; e, com o modelo de pregação (14.12g), a edição completa de pregação, a cor do
+# vídeo, um efeito na voz de frases, as transições, os efeitos sonoros, os gráficos, as imagens de apoio, a cartela
+# final e a legenda animada. O que ele não sabe fazer vai em "nao_deu", e a dúvida vira uma pergunta
 # com opções (botões). O editor (ou a montagem dos cortes) é quem aplica: o plano só escolhe entre opções e
 # aponta números de frases. Funções puras: montam e conferem, sem acessar o banco nem o modelo.
 # -----------------------------------------------
 import re
 import unicodedata
+
+from core.modelos.legenda_animada import ESTILOS as ESTILOS_DA_LEGENDA_ANIMADA
 
 ESTILOS_DE_LEGENDA = ("contorno", "caixa", "amarela", "destaque", "karaoke", "palavra")
 CORES = {
@@ -62,7 +66,25 @@ ACOES_DO_PEDIDO = {
     "formato": "o formato do vídeo (valor: 9:16, 16:9, 1:1 ou 4:5)",
     "enquadrar": "o enquadramento (valor: rosto, centro ou inteiro)",
     "musica": "a música (valor: abaixar, aumentar ou tirar)",
+    "modelo_pregacao": "a edição completa de pregação: cor de cinema, voz de rádio na primeira frase, clarões e "
+                       "flashes nos cortes com sons, gráficos, imagens de apoio, cartela final e legenda editorial",
+    "cor_video": "a cor do vídeo (valor: cinema, frio, quente, preto_e_branco, vivido, drama, antigo ou natural)",
+    "voz_efeito": "um efeito na voz (valor: radio, telefone, sala, caverna, clara ou nenhum; frases: os números delas, "
+                  "ou vazia para a primeira frase)",
+    "transicoes": "transições nos cortes (valor: luz, flash, clarao, fusao ou nenhuma)",
+    "efeitos_sonoros": "efeitos sonoros nas transições, nos gráficos e na cartela (valor: sim)",
+    "graficos": "gráficos de pregação quando a fala toca no assunto (valor: vazio, ou o assunto: coração, mente, "
+                "bíblia, cruz, fogo, pomba, liberdade ou céu)",
+    "imagens_apoio": "imagens de apoio de um banco de vídeos (valor: o que buscar, ou vazio para escolher pela fala)",
+    "cartela": "a cartela final de impacto (valor: o texto, ou vazio para usar o título)",
+    "legenda_animada": "legendas animadas palavra a palavra (valor: editorial, uma_palavra, minusculas, pulando, "
+                       "caixa_falada, caixas, digitacao, contorno ou neon)",
 }
+CORES_DO_VIDEO = ("manter", "cinema", "frio", "quente", "pb", "vivido", "drama", "antigo", "natural")
+EFEITOS_DE_VOZ = ("manter", "radio", "telefone", "sala", "caverna", "clara", "nenhum")
+TRANSICOES = ("manter", "luz", "flash", "clarao", "fusao", "nenhuma")
+LEGENDAS_ANIMADAS = ("manter", *ESTILOS_DA_LEGENDA_ANIMADA)
+MAXIMO_DE_FRASES_DA_VOZ = 12
 
 ESQUEMA = {
     "type": "object",
@@ -117,6 +139,13 @@ Exemplos:
 - "legendas amarelas": acoes [legenda_cor amarelo].
 - "tira o título e as pausas": acoes [tirar_titulo, tirar_pausas].
 - "legenda bem grande no meio": acoes [legenda_tamanho bem_maior, legenda_lugar meio].
+- "edita como pregação" ou "deixa no estilo de corte de pregação": acoes [modelo_pregacao].
+- "voz de rádio no começo e flash nos cortes com som": acoes [voz_efeito radio (frases vazia), transicoes \
+flash, efeitos_sonoros sim].
+- "cor de cinema e um gráfico de coração quando falar de pecado": acoes [cor_video cinema, graficos coração].
+- "uma imagem de alguém orando e a cartela final dizendo A mentira sai": acoes [imagens_apoio pessoa orando, \
+cartela A mentira sai].
+- "legenda animada palavra por palavra": acoes [legenda_animada uma_palavra].
 - "põe um meme no final" ou "troca a voz por uma de robô": nada disso é uma ação, então acoes fica vazia e o \
 pedido vai para nao_deu. Nunca troque um pedido que não dá para fazer por outras ações.
 - "deixa mais bonito" (vago): acoes vazia e uma pergunta com opções, como "O que você quer mudar?" com \
@@ -222,6 +251,20 @@ _SINONIMOS = {
                   "centro": ("centro", "meio")},
     "musica": {"tirar": ("tira", "sem", "remov"), "abaixar": ("abaix", "baix", "diminu"),
                "aumentar": ("aument", "alta", "alto", "subi")},
+    "cor_video": {"natural": ("natural", "original", "tira", "sem cor"), "pb": ("preto", "pb", "cinza"),
+                  "cinema": ("cinema", "filme", "cinematogr"), "frio": ("fri", "azul"),
+                  "quente": ("quent", "dourad", "laranj"), "vivido": ("viv", "colorid", "satur"),
+                  "drama": ("drama",), "antigo": ("antig", "vintage", "retro")},
+    "voz": {"nenhum": ("nenhum", "tira", "sem", "normal"), "radio": ("radio",), "telefone": ("telefon", "celular"),
+            "caverna": ("caverna", "eco"), "sala": ("sala", "igreja", "reverb", "templo"),
+            "clara": ("clara", "limp", "nitid")},
+    "transicoes": {"nenhuma": ("nenhum", "tira", "sem"), "fusao": ("fusao", "dissolv", "suave", "cruzad"),
+                   "flash": ("flash", "branc", "camera"), "clarao": ("clarao", "luz", "brilho", "leak")},
+    "legenda_animada": {"uma_palavra": ("uma palavra", "uma por vez", "palavra por palavra"),
+                        "minusculas": ("minuscul",), "pulando": ("pul", "salt"), "caixa_falada": ("caixa na",),
+                        "caixas": ("caixas", "colorid"), "digitacao": ("digit", "maquina", "escrev"),
+                        "contorno": ("contorno", "grosso"), "neon": ("neon",),
+                        "editorial": ("editorial", "serif", "elegante", "pregacao", "animad")},
 }
 
 
@@ -279,6 +322,30 @@ def _bruto_das_acoes(bruto: dict) -> dict:
             saida["cortar_frases"] += frases or [int(numero) for numero in re.findall(r"\d+", valor)]
         elif tipo in ("formato", "enquadrar", "musica") and _sinonimo(tipo, valor):
             saida[tipo] = _sinonimo(tipo, valor)
+        elif tipo == "modelo_pregacao":
+            saida["modelo"] = "pregacao"
+        elif tipo == "cor_video" and _sinonimo("cor_video", valor):
+            saida["cor_video"] = _sinonimo("cor_video", valor)
+        elif tipo == "voz_efeito":
+            saida["voz"] = {"efeito": _sinonimo("voz", valor) or "radio", "frases": frases}
+        elif tipo == "transicoes":
+            texto = _sem_acento(valor)
+            # Flash e clarão juntos (ou "de luz") são os dois alternados
+            ambos = ("flash" in texto and ("clarao" in texto or "luz" in texto)) or "de luz" in texto
+            saida["transicoes"] = "luz" if ambos or not texto else (_sinonimo("transicoes", valor) or "luz")
+        elif tipo == "efeitos_sonoros":
+            saida["sons"] = "nao" if _sem_acento(valor) in ("nao", "tirar", "sem") else "sim"
+        elif tipo == "graficos":
+            saida["graficos"] = {"acao": "por", "assunto": valor}
+        elif tipo == "imagens_apoio":
+            saida["imagens"] = {"acao": "por", "busca": valor}
+        elif tipo == "cartela":
+            saida["cartela"] = {"acao": "por", "texto": valor}
+        elif tipo == "legenda_animada":
+            # O id do estilo ("uma_palavra") vale direto; senão, pelas pistas
+            id_do_estilo = _sem_acento(valor).replace(" ", "_")
+            saida["legenda_animada"] = (id_do_estilo if id_do_estilo in ESTILOS_DA_LEGENDA_ANIMADA
+                                        else _sinonimo("legenda_animada", valor) or "editorial")
     saida["zoom"] = zoom
     return saida
 
@@ -295,6 +362,8 @@ def conferir_plano(bruto: dict, frases: list[dict]) -> dict:
     titulo = bruto.get("titulo") if isinstance(bruto.get("titulo"), dict) else {}
     zoom = bruto.get("zoom") if isinstance(bruto.get("zoom"), dict) else {}
     pergunta = bruto.get("pergunta") if isinstance(bruto.get("pergunta"), dict) else {}
+    voz, graficos, imagens, cartela = (bruto.get(chave) if isinstance(bruto.get(chave), dict) else {}
+                                       for chave in ("voz", "graficos", "imagens", "cartela"))
     cores = set(_cores_da_lista)
     plano = {
         "resumo": _limpar(bruto.get("resumo"), 240),
@@ -316,6 +385,19 @@ def conferir_plano(bruto: dict, frases: list[dict]) -> dict:
         "formato": _escolha(bruto.get("formato"), FORMATOS),
         "enquadrar": _escolha(bruto.get("enquadrar"), ENQUADRAMENTOS),
         "musica": _escolha(bruto.get("musica"), MUSICA),
+        "modelo": _escolha(bruto.get("modelo"), ("manter", "pregacao")),
+        "cor_video": _escolha(bruto.get("cor_video"), CORES_DO_VIDEO),
+        "voz": {"efeito": _escolha(voz.get("efeito"), EFEITOS_DE_VOZ),
+                "frases": _numeros(voz.get("frases"), validos, MAXIMO_DE_FRASES_DA_VOZ)},
+        "transicoes": _escolha(bruto.get("transicoes"), TRANSICOES),
+        "sons": _escolha(bruto.get("sons"), SIM_NAO),
+        "graficos": {"acao": _escolha(graficos.get("acao"), ("manter", "por")),
+                     "assunto": _limpar(graficos.get("assunto"), 40)},
+        "imagens": {"acao": _escolha(imagens.get("acao"), ("manter", "por")),
+                    "busca": _limpar(imagens.get("busca"), 80)},
+        "cartela": {"acao": _escolha(cartela.get("acao"), ("manter", "por")),
+                    "texto": _limpar(cartela.get("texto"), 60)},
+        "legenda_animada": _escolha(bruto.get("legenda_animada"), LEGENDAS_ANIMADAS),
         "pergunta": {"texto": "", "opcoes": []},
         "nao_deu": [_limpar(item, 80) for item in (bruto.get("nao_deu") or [])[:6] if _limpar(item, 80)]
         if isinstance(bruto.get("nao_deu"), list) else [],

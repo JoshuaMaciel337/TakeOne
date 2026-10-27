@@ -103,3 +103,40 @@ def test_a_lista_de_acoes_vira_o_plano_so_com_o_pedido():
         "legenda": {**plano_vazio()["legenda"], "acao": "mudar", "cor": "amarelo"},
     }
     assert conferir_plano({"acoes": [{"tipo": "formato", "valor": "em pé", "frases": []}]}, FRASES)["formato"] == "9:16"
+
+
+def test_as_acoes_do_modelo_de_pregacao_viram_partes_do_plano():
+    bruto = {
+        "resumo": "Pregação",
+        "acoes": [
+            {"tipo": "cor_video", "valor": "Cinematográfica", "frases": []},
+            {"tipo": "voz_efeito", "valor": "de rádio", "frases": [1, 99]},
+            {"tipo": "transicoes", "valor": "flash e clarão", "frases": []},
+            {"tipo": "efeitos_sonoros", "valor": "", "frases": []},
+            {"tipo": "graficos", "valor": "coração", "frases": []},
+            {"tipo": "imagens_apoio", "valor": "pessoa orando", "frases": []},
+            {"tipo": "cartela", "valor": "A mentira sai", "frases": []},
+            {"tipo": "legenda_animada", "valor": "palavra por palavra", "frases": []},
+            {"tipo": "legenda_animada", "valor": "caixa_falada", "frases": []},
+        ],
+        "pergunta": {"texto": "", "opcoes": []},
+        "nao_deu": [],
+    }
+    plano = conferir_plano(bruto, FRASES)
+    assert plano["cor_video"] == "cinema" and plano["voz"] == {"efeito": "radio", "frases": [1]}
+    assert plano["transicoes"] == "luz" and plano["sons"] == "sim"
+    assert plano["graficos"] == {"acao": "por", "assunto": "coração"}
+    assert plano["imagens"] == {"acao": "por", "busca": "pessoa orando"}
+    assert plano["cartela"] == {"acao": "por", "texto": "A mentira sai"}
+    # O último pedido vale, e o id do estilo vale direto
+    assert plano["legenda_animada"] == "caixa_falada" and plano["modelo"] == "manter"
+    # Sem essas ações, tudo fica como estava; o modelo inteiro é uma ação só
+    vazio = conferir_plano({"acoes": []}, FRASES)
+    assert (vazio["cor_video"], vazio["voz"]["efeito"], vazio["transicoes"], vazio["sons"], vazio["modelo"]) == (
+        "manter", "manter", "manter", "manter", "manter")
+    assert conferir_plano({"acoes": [{"tipo": "modelo_pregacao", "valor": "", "frases": []}]}, FRASES)["modelo"] == \
+        "pregacao"
+    assert conferir_plano({"acoes": [{"tipo": "transicoes", "valor": "sem transição", "frases": []}]},
+                          FRASES)["transicoes"] == "nenhuma"
+    assert conferir_plano({"acoes": [{"tipo": "transicoes", "valor": "flash", "frases": []}]},
+                          FRASES)["transicoes"] == "flash"
