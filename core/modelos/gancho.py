@@ -14,7 +14,12 @@ PALAVRAS_MAXIMAS = 18
 # O texto do corte vai cortado: o começo basta para a ideia, e o pedido cabe folgado no contexto do modelo
 LETRAS_DO_TEXTO = 4000
 
-ESQUEMA = {"type": "object", "properties": {"frase": {"type": "string"}}, "required": ["frase"]}
+# O teto da frase vira gramática no Ollama: sem ele, o modelo chegou a copiar a fala inteira do corte (mais de 6 min
+# escrevendo uma frase que a conferência ia recusar)
+LETRAS_MAXIMAS = 180
+TOKENS_MAXIMOS = 120
+ESQUEMA = {"type": "object", "properties": {"frase": {"type": "string", "maxLength": LETRAS_MAXIMAS}},
+           "required": ["frase"]}
 
 INSTRUCOES = f"""Você escreve ganchos narrados para vídeos curtos de redes sociais, em português do Brasil. \
 Recebe o título e o que é dito no vídeo. Responda só com o JSON pedido.
@@ -47,6 +52,10 @@ def conferir_frase(bruto: dict) -> str | None:
     frase = re.sub(r"#\w+", "", frase)
     frase = "".join(c for c in frase if c.isalnum() or c.isspace() or c in ".,;:!?'-…%$")
     frase = " ".join(frase.split()).strip(" -")
+    if len(frase.split()) > PALAVRAS_MAXIMAS:
+        # Longa demais: o modelo às vezes emenda outra frase depois do gancho; a primeira, sozinha, pode servir
+        primeira = re.match(r"^.+?[.!?…](?=\s|$)", frase)
+        frase = primeira.group(0) if primeira else frase
     palavras = frase.split()
     if not PALAVRAS_MINIMAS <= len(palavras) <= PALAVRAS_MAXIMAS:
         return None

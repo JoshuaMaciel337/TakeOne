@@ -110,12 +110,17 @@ def esperar_a_placa(reportar: Callable[[int, str], None], minimo_mb: int = VRAM_
 CONTEXTO = 8192
 
 
+class RespostaInvalida(RuntimeError):
+    """O modelo devolveu algo que não é o JSON pedido (ou a resposta foi cortada no teto de tokens)."""
+
+
 def conversar(mensagens: list[dict], esquema: dict, reportar: Callable[[int, str], None], mensagem: str,
               temperatura: float = 0.2, primeiro: bool = True, ultimo: bool = True,
-              progresso: int = 45) -> dict:
+              progresso: int = 45, maximo_de_tokens: int | None = None) -> dict:
     """
     Pergunta ao modelo e devolve o JSON da resposta (preso ao esquema). Numa sequência de pedidos (lotes),
     só o primeiro espera a placa (depois, quem ocupa a placa é o próprio modelo) e só o último solta o modelo.
+    maximo_de_tokens: o teto da resposta, para os pedidos curtos (uma resposta cortada vira JSON inválido).
     """
     if primeiro:
         garantir_modelo(reportar)
@@ -124,6 +129,8 @@ def conversar(mensagens: list[dict], esquema: dict, reportar: Callable[[int, str
     inicio = time.monotonic()
     corpo = {"model": MODELO_LLM, "messages": mensagens, "format": esquema, "stream": False, "think": False,
              "keep_alive": 0 if ultimo else "2m", "options": {"temperature": temperatura, "num_ctx": CONTEXTO}}
+    if maximo_de_tokens:
+        corpo["options"]["num_predict"] = maximo_de_tokens
     try:
         with _pedir("/api/chat", corpo, tempo_limite=900) as resposta:
             conteudo = json.load(resposta)["message"]["content"]
@@ -132,6 +139,6 @@ def conversar(mensagens: list[dict], esquema: dict, reportar: Callable[[int, str
     try:
         bruto = json.loads(conteudo)
     except json.JSONDecodeError as e:
-        raise RuntimeError("O modelo não devolveu uma resposta válida.") from e
+        raise RespostaInvalida("O modelo não devolveu uma resposta válida.") from e
     logging.info(f"Resposta do LLM em {time.monotonic() - inicio:.0f} s.")
     return bruto if isinstance(bruto, dict) else {}

@@ -8,9 +8,9 @@ import logging
 from collections.abc import Callable
 
 from core.config import MODO_IA
-from core.modelos.gancho import ESQUEMA, FRASE_SIMULADA, conferir_frase, montar_mensagens
+from core.modelos.gancho import ESQUEMA, FRASE_SIMULADA, TOKENS_MAXIMOS, conferir_frase, montar_mensagens
 from core.modelos.job import ErroDefinitivo
-from worker.tarefas.llm import conversar
+from worker.tarefas.llm import RespostaInvalida, conversar
 
 TENTATIVAS = 2
 
@@ -20,9 +20,15 @@ def executar_gancho(db, job: dict, reportar: Callable[[int, str], None]) -> dict
     if MODO_IA != "real":
         return {"frase": FRASE_SIMULADA}
     for tentativa in range(TENTATIVAS):
-        bruto = conversar(montar_mensagens(entrada["titulo"], entrada["texto"]), ESQUEMA, reportar,
-                          "O modelo está escrevendo o gancho", temperatura=0.4 + 0.3 * tentativa,
-                          primeiro=tentativa == 0, ultimo=tentativa == TENTATIVAS - 1, progresso=50)
+        try:
+            bruto = conversar(montar_mensagens(entrada["titulo"], entrada["texto"]), ESQUEMA, reportar,
+                              "O modelo está escrevendo o gancho", temperatura=0.4 + 0.3 * tentativa,
+                              primeiro=tentativa == 0, ultimo=tentativa == TENTATIVAS - 1, progresso=50,
+                              maximo_de_tokens=TOKENS_MAXIMOS)
+        except RespostaInvalida as erro:
+            # A resposta cortada no teto não fecha o JSON: conta como uma frase recusada
+            logging.info(f"Gancho recusado: {erro}")
+            continue
         frase = conferir_frase(bruto)
         if frase:
             logging.info(f"Gancho escrito: {frase}")
