@@ -13,10 +13,13 @@ type Rosto = {
 
 const INTERVALO_MS = 1500;
 
-/** As amostras do rosto, ou null se `ativo()` virar falso no meio. Lança erro com a mensagem para a pessoa. */
-export async function buscarRosto(midiaId: string, aoAndamento: (texto: string) => void, ativo: () => boolean): Promise<AmostraDeRosto[] | null> {
-  aoAndamento("Procurando o rosto");
-  let rosto = await chamarApi<Rosto>(`/midias/${midiaId}/rosto`, { metodo: "POST" });
+/**
+ * As amostras do rosto, ou null se `ativo()` virar falso no meio. Lança erro com a mensagem para a pessoa. Com
+ * `todos`, as amostras trazem também os outros rostos de cada quadro (uma busca de antes deles é feita de novo).
+ */
+export async function buscarRosto(midiaId: string, aoAndamento: (texto: string) => void, ativo: () => boolean, todos = false): Promise<AmostraDeRosto[] | null> {
+  aoAndamento(todos ? "Procurando os rostos" : "Procurando o rosto");
+  let rosto = await chamarApi<Rosto>(`/midias/${midiaId}/rosto${todos ? "?todos=true" : ""}`, { metodo: "POST" });
   while (ativo() && rosto.status === "processando") {
     const andando = rosto.processamento;
     aoAndamento(andando?.status === "pendente" ? "Procurando o rosto · na fila" : `Procurando o rosto · ${andando?.progresso ?? 0}%`);

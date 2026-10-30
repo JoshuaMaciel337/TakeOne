@@ -10,7 +10,7 @@ import { GerarVideo } from "@/componentes/midia/GerarVideo";
 import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { MontarClipes } from "@/componentes/midia/MontarClipes";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
-import type { Comando } from "@/lib/projeto/comandos";
+import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import type { Tick } from "@/lib/tempo";
@@ -30,6 +30,8 @@ import { PainelMarca } from "./PainelMarca";
 import { PainelModelos } from "./PainelModelos";
 import { PainelTranscricao } from "./PainelTranscricao";
 import { PainelTexto } from "./PainelTexto";
+import { PainelDoCorte } from "./PainelDoCorte";
+import type { CorteDoProjeto } from "@/lib/clipar/corteDoProjeto";
 
 type Biblioteca = {
   midias: Midia[] | null;
@@ -57,12 +59,16 @@ type Props = {
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   aoPrever: (comando: Comando | null) => void;
+  /** Tira a prévia e executa o comando (o fim de um arrasto que mostrou a prévia). */
+  aoConfirmar?: (comando: Comando) => ResultadoDoComando;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
   aoFechar: () => void;
   /** O modelo de projeto que já vem escolhido (o "Usar" da página Modelos do hub). */
   modeloInicial?: string;
   /** A animação que já vem aberta na ferramenta Texto ou Elementos (o "Usar" de uma animação no hub). */
   animacaoInicial?: string;
+  /** O corte do Clipar de onde o projeto veio (a ferramenta Corte). */
+  corte?: CorteDoProjeto | null;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -174,12 +180,20 @@ export function ConteudoDaFerramenta({
   legendas,
   selecionado,
   aoPrever,
+  aoConfirmar,
   modeloInicial,
   animacaoInicial,
+  corte,
 }: Omit<Props, "aoFechar" | "className" | "style">) {
   return (
     <>
-    {ferramenta.id === "midia" ? (
+    {ferramenta.id === "corte" ? (
+      corte ? (
+        <PainelDoCorte {...legendas} corte={corte} midias={biblioteca.midias ?? []} aoPrever={aoPrever} aoConfirmar={aoConfirmar ?? legendas.aoExecutar} />
+      ) : (
+        <p className="text-xs text-suave">Este projeto não veio de um corte do Clipar.</p>
+      )
+    ) : ferramenta.id === "midia" ? (
       <PainelMidia
         biblioteca={biblioteca}
         midiaSelecionadaId={midiaSelecionadaId}

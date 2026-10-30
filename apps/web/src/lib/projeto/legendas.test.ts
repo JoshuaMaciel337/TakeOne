@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { segundosParaTicks } from "../tempo.ts";
-import { escreverSrt, escreverVtt, lerLegendas, lerTempo, lerTextoDeLegenda } from "./legendas.ts";
+import { segundosParaTicks, TICKS_POR_SEGUNDO } from "../tempo.ts";
+import { escreverSrt, escreverVtt, instanteParaDividir, lerLegendas, lerTempo, lerTextoDeLegenda, limitesDaFicha } from "./legendas.ts";
 
 const S = segundosParaTicks(1);
 
@@ -88,4 +88,27 @@ test("legendas sem a linha em branco entre elas, e as notas do WebVTT de fora", 
   assert.deepEqual(lerLegendas(srt).map((l) => l.conteudo), ["Um", "Dois"]);
   const vtt = "WEBVTT\n\n00:01.000 --> 00:02.000\nOi\n\nNOTE isto é uma nota\n\n00:03.000 --> 00:04.000\nTchau\n";
   assert.deepEqual(lerLegendas(vtt).map((l) => l.conteudo), ["Oi", "Tchau"]);
+});
+
+test("as fichas das legendas: os limites do tempo e onde dividir", () => {
+  const S = TICKS_POR_SEGUNDO;
+  const fichas = [
+    { id: "a", inicio: 0, duracao: 2 * S },
+    { id: "b", inicio: 3 * S, duracao: 2 * S },
+    { id: "c", inicio: 5 * S, duracao: S },
+  ];
+  assert.deepEqual(limitesDaFicha(fichas[1], fichas, 10 * S), {
+    inicio: { minimo: 2 * S, maximo: 5 * S - 0.2 * S },
+    fim: { minimo: 3 * S + 0.2 * S, maximo: 5 * S },
+  });
+  // A última vai até o fim do vídeo; a primeira começa no zero
+  assert.equal(limitesDaFicha(fichas[2], fichas, 10 * S).fim.maximo, 10 * S);
+  assert.equal(limitesDaFicha(fichas[0], fichas, 10 * S).inicio.minimo, 0);
+
+  const texto = (conteudo: string, tempos: number[] | null = null) => ({ conteudo, tempos }) as never;
+  const legenda = { inicio: 10 * S, duracao: 2 * S, texto: texto("um dois três quatro", [0, 0.4 * S, 0.9 * S, 1.5 * S]) };
+  assert.equal(instanteParaDividir(legenda, 11 * S), 11 * S, "o cursor dentro dela");
+  assert.equal(instanteParaDividir(legenda, 20 * S), 10.9 * S, "senão, a palavra do meio");
+  assert.equal(instanteParaDividir({ ...legenda, texto: texto("um dois três") }, 0), 11 * S, "sem tempos, o meio");
+  assert.equal(instanteParaDividir({ ...legenda, texto: texto("sozinha") }, 11 * S), null);
 });

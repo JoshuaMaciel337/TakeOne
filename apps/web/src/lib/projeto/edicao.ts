@@ -9,6 +9,7 @@
 // em TypeScript e com as regras do CapCut no lugar das do Premiere. A faixa principal é magnética (os
 // clipes ficam sempre encostados, a partir do zero); nas outras, um clipe que cairia por cima de outro
 // ganha uma faixa nova.
+import { DIVISAO_MINIMA, type LayoutDaCena, type RegiaoDoLayout, ZOOM_MAXIMO } from "./layoutDaCena.ts";
 import { type Contorno, DESFOQUE_MAXIMO_DA_SOMBRA, DISTANCIA_MAXIMA_DA_SOMBRA, LARGURA_MAXIMA_DO_CONTORNO, type Sombra } from "./silhueta.ts";
 import { ajustarAoQuadro, duracaoDoQuadro, quadroMaisProximo, TICK_MAXIMO, type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { type Animacao, type Animacoes, limitarAnimacoes, SEM_ANIMACAO } from "./animacao.ts";
@@ -2216,7 +2217,26 @@ export function esconderRostos(projeto: Projeto, clipeIds: string[], valor: { mo
     if (clipe.texto || clipe.ajuste) throw new ErroEdicao("Esconder os rostos vale só em vídeos.");
     if (!valor || valor.forca <= 0) return { ...clipe, esconder_rostos: null };
     if (valor.modo !== "pixelizar" && valor.modo !== "desfocar") throw new ErroEdicao("Este jeito de esconder não existe.");
-    return { ...clipe, esconder_rostos: { modo: valor.modo, forca: limitar(valor.forca, 0.05, 1) }, inverter: false, fluido: null, estabilizar: false };
+    return { ...clipe, esconder_rostos: { modo: valor.modo, forca: limitar(valor.forca, 0.05, 1) }, inverter: false, fluido: null, estabilizar: false, layout: null };
+  });
+}
+
+/**
+ * O layout da cena (layoutDaCena.ts) dos clipes de vídeo ou imagem; null volta ao preencher. As regiões ficam dentro
+ * da imagem e a divisão entre 20% e 80%. Desliga o que pede a máscara da pessoa ou dos rostos, que seguem o
+ * enquadramento do clipe.
+ */
+export function mudarLayout(projeto: Projeto, ctx: Contexto, clipeIds: string[], layout: LayoutDaCena | null): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    const info = clipe.midia_id ? ctx.midia(clipe.midia_id) : null;
+    if (layout && (clipe.texto || clipe.ajuste || !info?.video || info.transparente)) throw new ErroEdicao("O layout da cena vale em vídeos e fotos.");
+    if (!layout) return { ...clipe, layout: null };
+    const regiao = (r: RegiaoDoLayout): RegiaoDoLayout => ({ x: limitar(r.x, 0, 1), y: limitar(r.y, 0, 1), zoom: limitar(r.zoom, 1, ZOOM_MAXIMO) });
+    const valido: LayoutDaCena =
+      layout.tipo === "caber"
+        ? { tipo: "caber", desfoque: limitar(layout.desfoque, 0.05, 1) }
+        : { tipo: layout.tipo, divisao: limitar(layout.divisao, DIVISAO_MINIMA, 1 - DIVISAO_MINIMA), quadros: [regiao(layout.quadros[0]), regiao(layout.quadros[1])] };
+    return { ...clipe, layout: valido, fundo_desfocado: null, remover_fundo: false, esconder_rostos: null, esconder_objetos: null };
   });
 }
 
@@ -2225,7 +2245,7 @@ export function desfocarOFundo(projeto: Projeto, clipeIds: string[], intensidade
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto || clipe.ajuste) throw new ErroEdicao("O fundo desfocado vale só em vídeos.");
     if (intensidade === null || intensidade <= 0) return { ...clipe, fundo_desfocado: null };
-    return { ...clipe, fundo_desfocado: limitar(intensidade, 0.05, 1), remover_fundo: false, estabilizar: false, inverter: false, fluido: null };
+    return { ...clipe, fundo_desfocado: limitar(intensidade, 0.05, 1), remover_fundo: false, estabilizar: false, inverter: false, fluido: null, layout: null };
   });
 }
 
@@ -2233,7 +2253,7 @@ export function desfocarOFundo(projeto: Projeto, clipeIds: string[], intensidade
 export function removerFundo(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
   return mudarClipes(projeto, clipeIds, (clipe) => {
     if (clipe.texto) throw new ErroEdicao("O recorte do fundo vale só em vídeos.");
-    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false, fluido: null, fundo_desfocado: null } : {}) };
+    return { ...clipe, remover_fundo: ligar, ...(ligar ? { estabilizar: false, inverter: false, fluido: null, fundo_desfocado: null, layout: null } : {}) };
   });
 }
 

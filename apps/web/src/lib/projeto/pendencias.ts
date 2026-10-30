@@ -3,7 +3,7 @@
 // de sempre enquanto isso; a exportação no navegador, sem esta conferência, baixava um MP4 "pronto" sem o
 // recorte, o tom ou a estabilização pedidos, e sem aviso.
 import type { Midia } from "../tipos.ts";
-import { arquivoDaMascara, expandirParaDesenhar } from "./fundoDesfocado.ts";
+import { arquivoDaMascara, expandirParaDesenhar, tamanhosDasMidias } from "./fundoDesfocado.ts";
 import { lutGuardada } from "./lutImportada.ts";
 import { chaveDaEstabilizacao, type Projeto, zeroDoFluido } from "./modelo.ts";
 import { chaveDoTom } from "./som.ts";
@@ -17,7 +17,7 @@ export const FONTE_DE_SOM_MAXIMA_S = 15 * 60;
 /** Por que o projeto ainda não pode sair no navegador, ou null. */
 export function pendenciaParaONavegador(projetoDaEdicao: Projeto, midias: ReadonlyMap<string, Midia>): string | null {
   // A cópia recortada do fundo desfocado pede a máscara, como o recorte do fundo
-  const projeto = expandirParaDesenhar(projetoDaEdicao);
+  const projeto = expandirParaDesenhar(projetoDaEdicao, tamanhosDasMidias(midias));
   for (const faixa of projeto.faixas) {
     for (const clipe of faixa.clipes) {
       if (clipe.cor?.lut && clipe.cor.lut.intensidade > 0 && !lutGuardada(clipe.cor.lut.id)) return "A LUT de um clipe ainda está carregando (ou foi excluída). Espere um instante.";

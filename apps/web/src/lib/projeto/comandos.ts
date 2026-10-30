@@ -77,6 +77,7 @@ import {
   chromaClipes,
   chaveLumaClipes,
   desfocarOFundo,
+  mudarLayout,
   esconderObjetos,
   esconderRostos,
   removerFundo,
@@ -186,6 +187,7 @@ import { type Simbolo, type TintaDaInstancia, vetorDaInstancia } from "../vetor/
 import type { Grafico } from "../imagem/graficos.ts";
 import { type Afim, aplicarAfim, posicaoPelaAfim } from "../transformar/ferramentas.ts";
 import type { Cor } from "./cor.ts";
+import type { LayoutDaCena } from "./layoutDaCena.ts";
 import { posicaoTravada, problemaNaArvore } from "./arvore.ts";
 import { type PlanoDosPixels, substituirPorPixels } from "./rasterizar.ts";
 import type { MascaraDePixels } from "./mascaraDePixels.ts";
@@ -230,6 +232,8 @@ export type Comando =
   | { comando: "linha.tirarZooms"; parametros: Record<string, never> }
   /** O pedido de edição em palavras já aplicado (lib/clipar/pedidoDeEdicao.ts): um passo só do desfazer. */
   | { comando: "edicao.pedido"; parametros: { projeto: Projeto } }
+  /** Uma edição do painel Corte (lib/clipar/editorDoCorte.ts), feita sobre o projeto inteiro, com o nome do passo. */
+  | { comando: "corte.editar"; parametros: { projeto: Projeto; nome: string; selecao?: string[] } }
   | { comando: "clipe.duplicar"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.separarSom"; parametros: { clipeIds: string[] } }
   | { comando: "clipe.congelar"; parametros: { clipeId: string; tempo: Tick; midiaId: string; duracao: Tick } }
@@ -351,6 +355,7 @@ export type Comando =
   | { comando: "clipe.chaveLuma"; parametros: { clipeIds: string[]; chave: ChaveLuma | null } }
   | { comando: "clipe.removerFundo"; parametros: { clipeIds: string[]; ligar: boolean } }
   | { comando: "clipe.fundoDesfocado"; parametros: { clipeIds: string[]; intensidade: number | null } }
+  | { comando: "clipe.layout"; parametros: { clipeIds: string[]; layout: LayoutDaCena | null } }
   | { comando: "clipe.esconderRostos"; parametros: { clipeIds: string[]; valor: { modo: "pixelizar" | "desfocar"; forca: number } | null } }
   | { comando: "clipe.esconderObjetos"; parametros: { clipeId: string; objetos: { rastreio: string; modo: "pixelizar" | "desfocar"; forca: number }[] } }
   | { comando: "clipe.estabilizar"; parametros: { clipeIds: string[]; ligar: boolean } }
@@ -409,6 +414,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "linha.zoomNosTrechos": "dar zoom nos destaques",
   "linha.tirarZooms": "tirar os zooms",
   "edicao.pedido": "o pedido de edição",
+  "corte.editar": "editar o corte",
   "clipe.duplicar": "duplicar",
   "clipe.separarSom": "separar o som",
   "clipe.congelar": "congelar o quadro",
@@ -530,6 +536,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.chaveLuma": "mudar a chave de luminância",
   "clipe.removerFundo": "recortar o fundo",
   "clipe.fundoDesfocado": "desfocar o fundo",
+  "clipe.layout": "mudar o layout da cena",
   "clipe.esconderRostos": "esconder os rostos",
   "clipe.esconderObjetos": "esconder um objeto",
   "clipe.estabilizar": "estabilizar",
@@ -647,6 +654,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: tirarZooms(projeto) };
     case "edicao.pedido":
       return { projeto: parametros.projeto, selecao: [] };
+    case "corte.editar":
+      return { projeto: parametros.projeto, selecao: parametros.selecao };
     case "linha.removerIntervalos":
       return { projeto: removerIntervalos(projeto, ctx, parametros.intervalos), selecao: [] };
     case "linha.elevar":
@@ -705,6 +714,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: esconderRostos(projeto, parametros.clipeIds, parametros.valor) };
     case "clipe.fundoDesfocado":
       return { projeto: desfocarOFundo(projeto, parametros.clipeIds, parametros.intensidade) };
+    case "clipe.layout":
+      return { projeto: mudarLayout(projeto, ctx, parametros.clipeIds, parametros.layout) };
     case "clipe.estabilizar":
       return { projeto: estabilizarClipes(projeto, ctx, parametros.clipeIds, parametros.ligar) };
     case "clipe.chroma":

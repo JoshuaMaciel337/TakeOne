@@ -1,11 +1,11 @@
 "use client";
 
-import { Combine, Download, FileUp, Plus, Replace } from "lucide-react";
+import { Combine, Download, FileUp, Minus, Plus, Replace, Scissors } from "lucide-react";
 import { useRef, useState } from "react";
 
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
-import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, legendasDasFaixas, lerLegendas, lerTextoDeLegenda } from "@/lib/projeto/legendas";
-import type { Projeto } from "@/lib/projeto/modelo";
+import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, instanteParaDividir, legendasDasFaixas, lerLegendas, lerTextoDeLegenda, limitesDaFicha, PASSO_DA_FICHA } from "@/lib/projeto/legendas";
+import { type Clipe, duracaoDoProjeto, type Faixa, type Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
 
 import { LegendaAnimada } from "./LegendaAnimada";
@@ -47,6 +47,43 @@ function nomeDeArquivo(nome: string): string {
 }
 
 /** Painel da ferramenta Legendas: automáticas pela fala (Whisper no worker de GPU), manuais e SRT/VTT. */
+/** A ficha de uma legenda: o começo e o fim em passos de 0,1 s (sem passar das vizinhas) e dividir em duas. */
+function AjustesDaFicha({ clipe, faixa, projeto, tempo, aoExecutar }: { clipe: Clipe; faixa: Faixa; projeto: Projeto; tempo: Tick; aoExecutar: (comando: Comando) => ResultadoDoComando }) {
+  const limites = limitesDaFicha(clipe, faixa.clipes, duracaoDoProjeto(projeto));
+  const fim = clipe.inicio + clipe.duracao;
+  const dividirEm = instanteParaDividir(clipe, tempo);
+  const aparar = (borda: "inicio" | "fim", novo: Tick) => aoExecutar({ comando: "clipe.aparar", parametros: { clipeId: clipe.id, borda, tempo: novo } });
+  const botao = "botao-icone size-6 disabled:opacity-30";
+  return (
+    <div className="mt-1 flex items-center gap-1 text-[10px] text-suave">
+      <span>Começo</span>
+      <button type="button" className={botao} aria-label="Começar 0,1 s antes" disabled={clipe.inicio - PASSO_DA_FICHA < limites.inicio.minimo} onClick={() => aparar("inicio", clipe.inicio - PASSO_DA_FICHA)}>
+        <Minus className="size-3" aria-hidden />
+      </button>
+      <button type="button" className={botao} aria-label="Começar 0,1 s depois" disabled={clipe.inicio + PASSO_DA_FICHA > limites.inicio.maximo} onClick={() => aparar("inicio", clipe.inicio + PASSO_DA_FICHA)}>
+        <Plus className="size-3" aria-hidden />
+      </button>
+      <span className="ml-1.5">Fim</span>
+      <button type="button" className={botao} aria-label="Acabar 0,1 s antes" disabled={fim - PASSO_DA_FICHA < limites.fim.minimo} onClick={() => aparar("fim", fim - PASSO_DA_FICHA)}>
+        <Minus className="size-3" aria-hidden />
+      </button>
+      <button type="button" className={botao} aria-label="Acabar 0,1 s depois" disabled={fim + PASSO_DA_FICHA > limites.fim.maximo} onClick={() => aparar("fim", fim + PASSO_DA_FICHA)}>
+        <Plus className="size-3" aria-hidden />
+      </button>
+      <button
+        type="button"
+        className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-painel-3 hover:text-texto disabled:opacity-30"
+        disabled={dividirEm === null}
+        title="Divide no cursor, se ele está nesta legenda; senão, na palavra do meio"
+        onClick={() => dividirEm !== null && aoExecutar({ comando: "linha.dividir", parametros: { tempo: dividirEm, clipeIds: [clipe.id] } })}
+      >
+        <Scissors className="size-3" aria-hidden />
+        Dividir
+      </button>
+    </div>
+  );
+}
+
 export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar, aoExecutarQuandoProntas }: PropsLegendas) {
   const [estiloId, setEstiloId] = useState(ESTILOS_DE_LEGENDA[0].id);
   const arquivoRef = useRef<HTMLInputElement>(null);
@@ -206,6 +243,7 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
                 }}
                 className="mt-1 w-full resize-none rounded border border-transparent bg-transparent px-1 text-sm outline-none focus:border-destaque disabled:opacity-50"
               />
+              {faixa.travada ? null : <AjustesDaFicha clipe={clipe} faixa={faixa} projeto={projeto} tempo={tempo} aoExecutar={aoExecutar} />}
             </li>
           ))}
         </ol>

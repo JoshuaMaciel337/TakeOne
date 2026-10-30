@@ -88,12 +88,18 @@ export function PainelEfeitosDoVideo({ conteudo }: { conteudo: Conteudo }) {
   );
 }
 
-/** Texto: a transcrição (com o "Criar automaticamente"), as legendas e os gráficos de texto. */
-export function PainelTextoDoVideo({ conteudo, pedido }: { conteudo: Conteudo; pedido?: PedidoDeAba }) {
+/**
+ * Texto: a transcrição (com o "Criar automaticamente"), as legendas e os gráficos de texto. Num projeto que veio de um
+ * corte do Clipar, a aba Corte vem antes (estender, layout das cenas e a transcrição do original).
+ */
+export function PainelTextoDoVideo({ conteudo, pedido, comCorte = false }: { conteudo: Conteudo; pedido?: PedidoDeAba; comCorte?: boolean }) {
   return (
     <AbasDoPainel
+      // Outra lista de abas, outro painel (a aba ativa guardada é de uma das listas)
+      key={comCorte ? "com-corte" : "sem-corte"}
       pedido={pedido}
       abas={[
+        ...(comCorte ? [{ id: "corte", nome: "Corte", conteudo: () => conteudo("corte") }] : []),
         { id: "transcricao", nome: "Transcrição", conteudo: () => conteudo("transcricao") },
         { id: "legendas", nome: "Legendas", conteudo: () => conteudo("legendas") },
         { id: "graficos", nome: "Gráficos", conteudo: () => conteudo("texto") },

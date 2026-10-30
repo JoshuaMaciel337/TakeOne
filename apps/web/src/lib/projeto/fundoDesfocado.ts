@@ -4,6 +4,8 @@
 //  - esconder os rostos: uma faixa acima recebe uma cópia pixelizada ou desfocada, recortada pela máscara dos rostos.
 // O clipe guarda só a intenção (`fundo_desfocado`, `esconder_rostos`); duplicar o clipe de verdade deixaria as cópias
 // se desalinharem a cada corte.
+import type { Tamanho } from "./geometria.ts";
+import { comOsLayouts } from "./layoutDaCena.ts";
 import type { Clipe, Faixa, Projeto } from "./modelo.ts";
 import { comAsLuzesDasTransicoes } from "./transicaoDeLuz.ts";
 
@@ -41,10 +43,25 @@ export function arquivoDaMascara(clipe: Pick<Clipe, "mascara_do_recorte">): stri
   return "mascara.mp4";
 }
 
-/** O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele. */
-export function expandirParaDesenhar(projetoDaEdicao: Projeto): Projeto {
-  // As transições de luz viram camadas de ajuste por cima dos vídeos (transicaoDeLuz.ts)
-  const projeto = comAsLuzesDasTransicoes(projetoDaEdicao);
+/** O tamanho de uma mídia pelo id, para os layouts das cenas (layoutDaCena.ts). */
+export type TamanhoDaMidia = (midiaId: string) => Tamanho | null;
+
+/** O tamanho das mídias da biblioteca (o vídeo ou a imagem de cada uma). */
+export function tamanhosDasMidias(midias: ReadonlyMap<string, { video?: { largura: number; altura: number } | null }>): TamanhoDaMidia {
+  return (id) => {
+    const video = midias.get(id)?.video;
+    return video ? { largura: video.largura, altura: video.altura } : null;
+  };
+}
+
+/**
+ * O projeto como é desenhado, com as cópias de cada clipe nas faixas logo acima da dele. Sem `tamanho`, os layouts
+ * das cenas ficam de fora (a conta pede o tamanho da mídia).
+ */
+export function expandirParaDesenhar(projetoDaEdicao: Projeto, tamanho?: TamanhoDaMidia): Projeto {
+  // Os layouts das cenas viram as cópias de cima e de baixo (layoutDaCena.ts); as transições de luz, camadas de
+  // ajuste por cima dos vídeos (transicaoDeLuz.ts)
+  const projeto = comAsLuzesDasTransicoes(tamanho ? comOsLayouts(projetoDaEdicao, tamanho) : projetoDaEdicao);
   if (!projeto.faixas.some((faixa) => faixa.clipes.some((clipe) => temFundoDesfocado(clipe) || temRostosEscondidos(clipe) || objetosEscondidos(clipe).length))) return projeto;
   const faixas: Faixa[] = [];
   for (const faixa of projeto.faixas) {

@@ -55,6 +55,7 @@ import { type IdAba, PainelPropriedades } from "./PainelPropriedades";
 import { Previa } from "./Previa";
 import { useSeguirObjeto } from "./SeguirObjeto";
 import { useProjeto } from "./useProjeto";
+import { useCorteDoProjeto } from "@/lib/clipar/corteDoProjeto";
 
 const CONTEUDO = { padrao: 320, minimo: 240, maximo: 520 };
 const PROPRIEDADES = { padrao: 300, minimo: 240, maximo: 440 };
@@ -106,6 +107,7 @@ const AREAS: Record<string, EstadoDaArea> = {
 const IDS_DOS_PAINEIS = Object.keys(PAINEIS_DO_VIDEO);
 /** As ferramentas de antes (o endereço do hub ainda usa os ids delas) e o painel novo de cada uma. */
 const PAINEL_DA_FERRAMENTA: Record<IdFerramenta, { painel: IdPainelDoVideo; aba?: string }> = {
+  corte: { painel: "texto", aba: "corte" },
   midia: { painel: "projeto" },
   modelos: { painel: "graficos", aba: "modelos" },
   elementos: { painel: "graficos", aba: "elementos" },
@@ -322,6 +324,18 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   useEffect(() => {
     void Promise.resolve().then(abrirDoEndereco);
   }, []);
+  // O projeto veio de um corte do Clipar: o editor abre na ferramenta Corte (a não ser que o endereço peça outra)
+  const corteDoProjeto = useCorteDoProjeto(projetoId);
+  const abrirOCorte = useEffectEvent(() => {
+    if (ferramentaInicial) return;
+    setFerramenta("corte");
+    area.abrir("texto");
+    setPedidoTexto((atual) => ({ aba: "corte", vez: (atual?.vez ?? 0) + 1 }));
+  });
+  const idDoCorte = corteDoProjeto?.corte.id ?? null;
+  useEffect(() => {
+    if (idDoCorte) void Promise.resolve().then(abrirOCorte);
+  }, [idDoCorte]);
   /** Abre (ou põe à frente) um painel, na aba pedida. */
   function abrirPainel(painel: IdPainelDoVideo, aba?: string) {
     area.abrir(painel);
@@ -715,8 +729,14 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     aoExecutarQuandoProntas: executarQuandoProntas,
     modeloInicial,
     animacaoInicial,
+    corte: corteDoProjeto,
     selecionado,
     aoPrever: preverDoPainel,
+    // Tira a prévia e executa o comando final uma vez (sem a prévia virar um passo antes dele)
+    aoConfirmar: (comando: Comando) => {
+      setProvisorio(null);
+      return executar(comando);
+    },
     legendas: {
       projeto,
       nome: edicao.nome,
@@ -960,7 +980,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       metadados: { nome: PAINEIS_DO_VIDEO.metadados, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} somenteAbas={["info"]} className="h-full" /> },
       propriedades: { nome: PAINEIS_DO_VIDEO.propriedades, conteudo: <PainelPropriedades {...propsDasPropriedades} midia={midiaDasPropriedades} selecionado={selecionado} pedidoDeAba={pedidoDeAba} className="h-full" /> },
       graficos: { nome: PAINEIS_DO_VIDEO.graficos, conteudo: <PainelGraficosEssenciais conteudo={conteudo} pedido={pedidoGraficos} /> },
-      texto: { nome: PAINEIS_DO_VIDEO.texto, conteudo: <PainelTextoDoVideo conteudo={conteudo} pedido={pedidoTexto} /> },
+      texto: { nome: PAINEIS_DO_VIDEO.texto, conteudo: <PainelTextoDoVideo conteudo={conteudo} pedido={pedidoTexto} comCorte={Boolean(corteDoProjeto)} /> },
       projeto: { nome: PAINEIS_DO_VIDEO.projeto, conteudo: <PainelComRolagem>{conteudo("midia")}</PainelComRolagem> },
       efeitos: { nome: PAINEIS_DO_VIDEO.efeitos, conteudo: <PainelEfeitosDoVideo conteudo={conteudo} /> },
       marcadores: { nome: PAINEIS_DO_VIDEO.marcadores, conteudo: <PainelMarcadores projeto={projeto} tempo={tempo} aoBuscar={buscar} aoExecutar={executar} /> },
@@ -1134,6 +1154,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       <div className="flex min-h-0 flex-1 max-md:flex-col">
         <BarraFerramentas
           ativa={ferramenta}
+          comCorte={Boolean(corteDoProjeto)}
           aoEscolher={(id) => {
             setFerramenta(id);
             setPainelNoCelular(true);

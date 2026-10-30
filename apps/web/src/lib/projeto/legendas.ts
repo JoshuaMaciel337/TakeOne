@@ -3,8 +3,8 @@
 // Cada legenda vira um clipe de texto numa faixa "legenda" (lib/projeto/edicao.ts), então aparece
 // na prévia e sai no vídeo pelo mesmo caminho dos textos. Os tempos ficam em ticks.
 import { type Tick, TICKS_POR_SEGUNDO } from "../tempo.ts";
-import type { Faixa } from "./modelo.ts";
-import { type Texto, TEXTO_PADRAO } from "./texto.ts";
+import type { Clipe, Faixa } from "./modelo.ts";
+import { palavrasDoTexto, type Texto, TEXTO_PADRAO } from "./texto.ts";
 
 /**
  * tempos: quando cada palavra começa, na linha do tempo (só nas legendas da fala).
@@ -162,4 +162,36 @@ export function legendasDasFaixas(faixas: Faixa[]): Legenda[] {
     .filter((clipe) => clipe.texto)
     .map((clipe) => ({ inicio: clipe.inicio, fim: clipe.inicio + clipe.duracao, conteudo: clipe.texto!.conteudo }))
     .sort((a, b) => a.inicio - b.inicio);
+}
+
+/** O passo de cada clique nos botões de tempo das fichas das legendas. */
+export const PASSO_DA_FICHA = Math.round(0.1 * TICKS_POR_SEGUNDO);
+/** A ficha mais curta que os botões deixam. */
+const FICHA_MINIMA = Math.round(0.2 * TICKS_POR_SEGUNDO);
+
+/**
+ * Até onde a borda de uma ficha (uma legenda) pode ir, sem passar das vizinhas da mesma faixa nem deixar a ficha
+ * curta demais: o começo fica entre o fim da anterior e o fim menos o mínimo; o fim, entre o começo mais o mínimo e o
+ * começo da seguinte (sem seguinte, o fim do vídeo).
+ */
+export function limitesDaFicha(clipe: Pick<Clipe, "id" | "inicio" | "duracao">, daFaixa: Pick<Clipe, "id" | "inicio" | "duracao">[], fimDoVideo: Tick) {
+  const outras = daFaixa.filter((outra) => outra.id !== clipe.id);
+  const fim = clipe.inicio + clipe.duracao;
+  const anterior = Math.max(0, ...outras.filter((outra) => outra.inicio < clipe.inicio).map((outra) => outra.inicio + outra.duracao));
+  const seguintes = outras.filter((outra) => outra.inicio >= fim).map((outra) => outra.inicio);
+  const seguinte = seguintes.length ? Math.min(...seguintes) : Math.max(fimDoVideo, fim);
+  return { inicio: { minimo: anterior, maximo: fim - FICHA_MINIMA }, fim: { minimo: clipe.inicio + FICHA_MINIMA, maximo: seguinte } };
+}
+
+/**
+ * Onde dividir uma ficha: no cursor, se ele está dentro dela (longe das pontas), senão no começo da palavra do meio
+ * (pelos tempos da fala) ou no meio dela. null quando a legenda tem uma palavra só.
+ */
+export function instanteParaDividir(clipe: Pick<Clipe, "inicio" | "duracao" | "texto">, cursor: Tick): Tick | null {
+  const palavras = palavrasDoTexto(clipe.texto?.conteudo ?? "");
+  if (palavras.length < 2) return null;
+  if (cursor > clipe.inicio + FICHA_MINIMA && cursor < clipe.inicio + clipe.duracao - FICHA_MINIMA) return cursor;
+  const meio = Math.floor(palavras.length / 2);
+  const tempos = clipe.texto?.tempos;
+  return clipe.inicio + (tempos?.length === palavras.length ? tempos[meio] : Math.round(clipe.duracao / 2));
 }

@@ -132,11 +132,16 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   voz, transições e sons, gráficos, imagens, cartela, logo, chamada e música) com quatro prontos além do de pregação,
   escolhida na página de opções, aplicada aos cortes escolhidos na lista (os montados são montados de novo) e no
   editor, num passo do desfazer, e salva a partir do vídeo aberto. A barra de progresso e os emojis ficam com a 14.8.
-- [ ] **14.7 O editor do corte.** No editor de vídeo, quando o projeto vem de um corte: estender pelo original (+5 s
+- [x] **14.7 O editor do corte.** No editor de vídeo, quando o projeto vem de um corte: estender pelo original (+5 s
   em cada ponta e a transcrição inteira do original para escolher o trecho), a transcrição em segmentos (as linhas da
   legenda como fichas, para dividir, juntar e ajustar o tempo), o layout por cena para o formato em pé (preencher com o
   rosto, caber com o fundo desfocado da própria imagem, dividido em dois para duas pessoas, tela e rosto) e o
   rastreador manual por cena. Medir: um vídeo deitado com duas pessoas no layout dividido, prévia e exportação.
+  **Pronta (30/10/2026):** a ferramenta Corte (estender 5 s, a transcrição do original para pôr e tirar trechos, as
+  cenas com os quatro layouts e o retângulo arrastado sobre o quadro do original, as cenas separadas nas trocas de
+  câmera) e as fichas das legendas com o tempo e o dividir. Medido com um vídeo deitado de duas pessoas: prévia e
+  exportação a 3,5–3,8 níveis em 255 no dividido e 1,9–2,0 no caber. O rastreador manual é um enquadramento parado
+  por cena; seguir uma pessoa que anda dentro de uma parte do dividido fica para depois.
 - [ ] **14.8 Retenção e extras.** Barra de progresso; o quadro do original numa caixa (início, meio, fim ou sorteado);
   uma caixa com um vídeo de distração da biblioteca da pessoa; emoji automático nas legendas (o LLM escolhe, a fonte de
   emoji do servidor desenha); o gancho de locução (uma frase escrita pelo LLM e falada pelo Kokoro, com o volume do

@@ -15,7 +15,7 @@ import { duracaoDoQuadro, formatarTimecode, formatarTimecodeLongo, type Tick, TI
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
-import { arquivoDaMascara, ehCopiaDesenhada, expandirParaDesenhar } from "@/lib/projeto/fundoDesfocado";
+import { arquivoDaMascara, ehCopiaDesenhada, expandirParaDesenhar, tamanhosDasMidias } from "@/lib/projeto/fundoDesfocado";
 import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
 import { useTabelasDasLuts } from "@/lib/useLuts";
 import { DesenhoDaMascara } from "./DesenhoDaMascara";
@@ -120,7 +120,7 @@ function webgl2Disponivel(): boolean {
 
 export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andamento = 1, aoAlternar, selecao, aoSelecionar, aoPrever, aoTransformar, marcacao, desenhoDaMascara, programa, aoClicarParaTexto, className = "" }: Props) {
   // O projeto como é desenhado: o fundo desfocado vira duas cópias do clipe (lib/projeto/fundoDesfocado.ts)
-  const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao), [projetoDaEdicao]);
+  const projeto = useMemo(() => expandirParaDesenhar(projetoDaEdicao, tamanhosDasMidias(midias)), [projetoDaEdicao, midias]);
   const { areaRef, tamanho } = useQuadro(projeto.proporcao);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [suportado] = useState(webgl2Disponivel);
@@ -149,7 +149,9 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andam
   useTabelasDasLuts(lutsDoProjeto(projeto));
   const camadas = camadasNoTempo(projeto, visuais, tempo, tamanho, imagensDeTexto);
   const vazio = projeto.faixas.every((faixa) => faixa.clipes.length === 0);
-  const selecionada = selecao.length === 1 ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
+  // Um clipe com layout (layoutDaCena.ts) não se mexe pelas alças: o enquadramento é o do painel Layout
+  const comLayout = selecao.length === 1 && projetoDaEdicao.faixas.some((faixa) => faixa.clipes.some((clipe) => clipe.id === selecao[0] && clipe.layout));
+  const selecionada = selecao.length === 1 && !comLayout ? camadas.find((camada) => camada.clipe.id === selecao[0]) : undefined;
 
   useLayoutEffect(() => {
     desenho.current = { camadas, fundo: projeto.fundo.cor, quadro: tamanho, tocando, sujo: true };

@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Captions,
+  Clapperboard,
   Film,
   LayoutTemplate,
   type LucideIcon,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 export type IdFerramenta =
+  | "corte"
   | "midia"
   | "modelos"
   | "elementos"
@@ -34,10 +36,13 @@ export type Ferramenta = {
   icone: LucideIcon;
   /** O que o painel vai ter. Some quando a ferramenta fica pronta. */
   emBreve?: { fase: string; descricao: string };
+  /** Só aparece quando o projeto veio de um corte do Clipar. */
+  soNoCorte?: boolean;
 };
 
 // A ordem e os nomes seguem a seção 5 do docs/PLANO.md
 export const FERRAMENTAS: Ferramenta[] = [
+  { id: "corte", nome: "Corte", icone: Clapperboard, soNoCorte: true },
   { id: "midia", nome: "Mídia", icone: Film },
   {
     id: "modelos",

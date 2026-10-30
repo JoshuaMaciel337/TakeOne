@@ -10,6 +10,7 @@ import type { CamadaVetorial } from "../vetor/modelo.ts";
 import type { CaminhoDoDocumento } from "../vetor/caminhos.ts";
 import type { MascaraVetorial } from "../vetor/mascaraVetorial.ts";
 import type { TextoRico } from "../texto/modelo.ts";
+import type { LayoutDaCena } from "./layoutDaCena.ts";
 import type { InformacoesDoArquivo } from "../exportacao/metadados.ts";
 import type { ModoDeCor } from "../imagem/modos.ts";
 import type { VariaveisDoDocumento } from "./variaveis.ts";
@@ -328,6 +329,8 @@ export type Clipe = {
   imagem_limpa?: boolean;
   /** Recorta o fundo pela máscara da pessoa que o worker gera (só em vídeos). */
   remover_fundo?: boolean;
+  /** O layout da cena no formato em pé: caber sobre o fundo desfocado ou dividido em dois (lib/projeto/layoutDaCena.ts). */
+  layout?: LayoutDaCena | null;
   /** Fundo desfocado (0 a 1): a pessoa nítida sobre uma cópia desfocada do clipe (lib/projeto/fundoDesfocado.ts). */
   fundo_desfocado?: number | null;
   /** Esconder os rostos: uma cópia pixelizada ou desfocada por cima, só nos rostos (lib/projeto/fundoDesfocado.ts). */

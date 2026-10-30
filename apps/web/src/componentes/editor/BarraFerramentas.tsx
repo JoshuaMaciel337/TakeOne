@@ -5,17 +5,19 @@ import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
 type Props = {
   ativa: IdFerramenta;
   aoEscolher: (id: IdFerramenta) => void;
+  /** O projeto veio de um corte do Clipar: a ferramenta Corte aparece. */
+  comCorte?: boolean;
   className?: string;
 };
 
 /** No computador fica em pé à esquerda. No celular vira uma faixa embaixo que rola para o lado. */
-export function BarraFerramentas({ ativa, aoEscolher, className = "" }: Props) {
+export function BarraFerramentas({ ativa, aoEscolher, comCorte = false, className = "" }: Props) {
   return (
     <nav
       aria-label="Ferramentas"
       className={`flex shrink-0 gap-0.5 overflow-auto border-borda bg-painel p-1 max-md:h-16 max-md:border-t md:w-20 md:flex-col md:border-r ${className}`}
     >
-      {FERRAMENTAS.map(({ id, nome, icone: Icone }) => {
+      {FERRAMENTAS.filter((item) => comCorte || !item.soNoCorte).map(({ id, nome, icone: Icone }) => {
         const selecionada = id === ativa;
         return (
           <button

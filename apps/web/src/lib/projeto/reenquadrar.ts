@@ -11,8 +11,8 @@ import { KEYFRAMES_POR_PROPRIEDADE, type Keyframe } from "./keyframes.ts";
 import type { Clipe } from "./modelo.ts";
 import { segundosNoClipe } from "./velocidade.ts";
 
-/** Uma amostra do rosto: segundos da mídia; centro e área em frações da imagem. */
-export type AmostraDeRosto = { t: number; x: number; y: number; a: number };
+/** Uma amostra do rosto: segundos da mídia; centro e área em frações da imagem; os outros rostos do quadro (x, y, área). */
+export type AmostraDeRosto = { t: number; x: number; y: number; a: number; outros?: [number, number, number][] };
 
 export type Reenquadramento = {
   escala: number;
