@@ -96,11 +96,20 @@ export type Corte = {
   foco: string[];
   resumo: string;
   categoria: string;
-  notas: Record<"gancho" | "fluxo" | "valor" | "autonomia", number>;
-  motivos: Record<"gancho" | "fluxo" | "valor" | "autonomia", string>;
+  /** null na parte 2: o modelo não avaliou a continuação. */
+  notas: Record<"gancho" | "fluxo" | "valor" | "autonomia", number> | null;
+  motivos: Record<"gancho" | "fluxo" | "valor" | "autonomia", string> | null;
   medidas?: { ritmo?: number };
-  nota: number;
+  nota: number | null;
   propaganda: boolean;
+  /** O texto falado no corte (a busca da lista). */
+  texto?: string;
+  /** Os outros cortes que dividem um pedaço do tempo ou do texto com este. */
+  parecidos?: string[];
+  /** A parte 2: o corte que este continua. */
+  parte_de?: string | null;
+  /** A cópia: o corte de que ela saiu. */
+  copia_de?: string | null;
   avaliacao?: "gostei" | "nao_gostei" | null;
   /** O começo (segundos da mídia) das palavras de ênfase, que a montagem pinta nas legendas. */
   enfase?: number[];
@@ -171,6 +180,11 @@ export const verClipagem = (id: string) => chamarApi<Clipagem>(`/clipagens/${id}
 export const excluirClipagem = (id: string) => chamarApi<void>(`/clipagens/${id}`, { metodo: "DELETE" });
 export const avaliarCorte = (id: string, corteId: string, avaliacao: Corte["avaliacao"]) =>
   chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/avaliacao`, { metodo: "PUT", corpo: { avaliacao } });
+/** A cópia do corte, logo depois dele (para montar o mesmo trecho com outra edição). */
+export const duplicarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/copia`, { metodo: "POST" });
+/** A parte 2: as frases logo depois do corte, na faixa pedida. */
+export const continuarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/continuacao`, { metodo: "POST" });
+export const apagarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}`, { metodo: "DELETE" });
 
 /**
  * Quanto a clipagem deve levar, em segundos, pelas medidas do Nitro (TEDx de 10 min, 26/10/2026): a transcrição
@@ -205,5 +219,16 @@ export function ordenarCortes(cortes: Corte[], ordem: Ordem): Corte[] {
   if (ordem === "video") return copia.sort((a, b) => a.trechos[0].inicio - b.trechos[0].inicio);
   if (ordem === "longos") return copia.sort((a, b) => b.duracao - a.duracao);
   if (ordem === "curtos") return copia.sort((a, b) => a.duracao - b.duracao);
-  return copia.sort((a, b) => b.nota - a.nota);
+  // A parte 2 (sem nota) vem logo depois do corte que ela continua
+  const porId = new Map(cortes.map((corte) => [corte.id, corte]));
+  const chave = (corte: Corte, profundidade = 0): [number, number] => {
+    if (corte.nota !== null) return [corte.nota, profundidade];
+    const pai = corte.parte_de ? porId.get(corte.parte_de) : undefined;
+    return pai && profundidade < 50 ? chave(pai, profundidade + 1) : [-1, profundidade];
+  };
+  return copia.sort((a, b) => {
+    const [na, pa] = chave(a);
+    const [nb, pb] = chave(b);
+    return nb - na || pa - pb || a.trechos[0].inicio - b.trechos[0].inicio;
+  });
 }

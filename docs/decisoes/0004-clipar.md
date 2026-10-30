@@ -108,12 +108,15 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   link aos cortes), nenhum corte começando ou acabando no meio de uma frase, a comparação com os 12 cortes do Cut.Pro
   no mesmo vídeo (quantos dos nossos melhores coincidem com os dele de nota 8 a 10) e o vídeo repetido quatro vezes
   dando um corte só; e mais dois vídeos de tipos diferentes (entrevista com duas pessoas e aula).
-- [ ] **14.4 A lista de cortes.** Cartões em pé com a prévia já editada (uma prévia tocando de cada vez, ao passar o
+- [x] **14.4 A lista de cortes.** Cartões em pé com a prévia já editada (uma prévia tocando de cada vez, ao passar o
   mouse), a nota e as quatro partes com a explicação, a duração, o título com as palavras de foco, o resumo, a
   categoria, os trechos do original e os avisos (propaganda, parecido com outro); grade e lista; ordenar (nota, ordem
   do vídeo, mais longos, mais curtos), filtrar (gostei, não gostei, duração) e buscar nas falas; gostei e não gostei,
   guardados (14.10 usa); selecionar em massa; abrir no editor, exportar, baixar o .srt, duplicar, apagar, "parte 2" (o
   corte que continua a ideia); "Recriar com outras opções" sem transcrever de novo.
+  **Pronta (29/10/2026):** a prévia é a cópia leve com o título e as legendas desenhados por cima (sem montar o
+  projeto), no enquadramento do rosto quando a busca já existe; a parte 2 não tem nota (o modelo não a avalia) e vem
+  logo depois do corte que continua. Testada no Chrome com o TEDx.
 - [ ] **14.5 O corte montado.** Cada corte vira um projeto de vídeo no formato pedido: os trechos da mídia original
   (sem copiar o arquivo), a limpeza de pausas e hesitações (ligável), as legendas da fala no estilo escolhido (os 6 de
   hoje ou as animadas da 14.11, com a palavra falada destacada e as palavras de ênfase escolhidas pela IA), o título de abertura com as palavras de foco nos primeiros segundos,

@@ -110,3 +110,21 @@ export async function projetoDoCorte(
   await chamarApi(`/clipagens/${clipagem.id}/cortes/${corte.id}/projeto`, { metodo: "PUT", corpo: { projeto_id: vazio.id } });
   return vazio.id;
 }
+
+/**
+ * Exportar o corte (14.4): monta o projeto quando ainda não há (como o "Montar e abrir no editor") e põe o vídeo
+ * na fila do render em 1080p. O arquivo aparece em Exportados. Devolve o id do projeto, ou null se a pessoa saiu.
+ */
+export async function exportarCorte(
+  clipagem: Clipagem,
+  corte: Corte,
+  marca: Marca,
+  aoAndamento: (texto: string) => void,
+  ativo: () => boolean,
+): Promise<string | null> {
+  const projetoId = await projetoDoCorte(clipagem, corte, marca, aoAndamento, ativo);
+  if (!projetoId) return null;
+  aoAndamento("Pondo na fila do vídeo");
+  await chamarApi("/exportacoes", { metodo: "POST", corpo: { projeto_id: projetoId, resolucao: "1080p", formato: "mp4" } });
+  return projetoId;
+}
