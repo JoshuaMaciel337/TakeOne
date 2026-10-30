@@ -2,7 +2,7 @@
 
 // O Clipar (ADR 0004): do link, ou do arquivo, de um vídeo longo aos cortes prontos. A entrada, os vídeos chegando
 // (cada um pronto leva às opções) e as clipagens já pedidas.
-import { AlertCircle, ChevronRight, Link2, Loader2, Scissors } from "lucide-react";
+import { AlertCircle, ChevronRight, Link2, Loader2, Scissors, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -97,7 +97,11 @@ export default function PaginaClipar() {
       <TituloDaPagina
         titulo="Clipar"
         descricao="Cole o link de um vídeo longo, ou envie o arquivo. O TakeOne transcreve, acha os melhores momentos e monta os cortes, tudo na sua máquina."
-      />
+      >
+        <Link href="/app/clipar/automacoes" className="botao-secundario">
+          <Wand2 className="size-4" aria-hidden /> Automações
+        </Link>
+      </TituloDaPagina>
       <EntradaDoClipar aoImportar={() => void recarregar()} />
       <ListaEnvios />
       {clipagens.length ? (

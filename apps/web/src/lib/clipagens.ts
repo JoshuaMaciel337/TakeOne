@@ -29,6 +29,22 @@ export type OpcoesDaClipagem = {
   modelo_corte?: ModeloDeCorte | null;
 };
 
+const CHAVE_DO_PADRAO = "takeone-clipar-padrao";
+
+/** As opções que a pessoa guardou como padrão neste navegador (sem o trecho, que é de cada vídeo). */
+export function opcoesPadraoGuardadas(): OpcoesDaClipagem {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(CHAVE_DO_PADRAO) ?? "null") as Partial<OpcoesDaClipagem> | null;
+    return { ...OPCOES_PADRAO, ...(guardado ?? {}), inicio: 0, fim: null };
+  } catch {
+    return OPCOES_PADRAO;
+  }
+}
+
+export function guardarOpcoesPadrao(opcoes: OpcoesDaClipagem) {
+  localStorage.setItem(CHAVE_DO_PADRAO, JSON.stringify({ ...opcoes, inicio: 0, fim: null }));
+}
+
 export const OPCOES_PADRAO: OpcoesDaClipagem = {
   estrategia: "ganchos",
   instrucoes: "",
@@ -130,7 +146,37 @@ export type Corte = {
   projeto_id?: string | null;
   /** A capa (14.8): um quadro exportado em PNG ou uma imagem da biblioteca. */
   capa?: CapaDoCorte | null;
+  /** A saída pelo servidor (14.9): a montagem no worker e a exportação. */
+  saida?: SaidaDoCorte | null;
 };
+
+/** O vídeo exportado do corte, como a API o devolve junto da saída (null: a exportação foi apagada). */
+export type ExportacaoDoCorte = {
+  id: string;
+  status: "processando" | "pronta" | "erro";
+  arquivos: string[];
+  erro: string | null;
+  processamento: { progresso: number; mensagem: string } | null;
+};
+
+export type SaidaDoCorte = {
+  status: "na_fila" | "montando" | "montado" | "exportado" | "erro";
+  etapa: string | null;
+  erro: string | null;
+  exportar: boolean;
+  exportacao_id: string | null;
+  exportacao?: ExportacaoDoCorte | null;
+};
+
+/** Exportar vários cortes de uma vez: o worker monta os que faltam e põe os vídeos na fila (a página pode fechar). */
+export function pedirSaida(clipagemId: string, cortes: string[], resolucao: "720p" | "1080p" | "4k" = "1080p"): Promise<Clipagem> {
+  return chamarApi<Clipagem>(`/clipagens/${clipagemId}/saidas`, { metodo: "POST", corpo: { cortes, exportar: true, resolucao } });
+}
+
+/** O pacote dos cortes (o vídeo, as legendas em .srt e .vtt, o XML de intercâmbio e a capa de cada um), num ZIP. */
+export function enderecoDoPacote(clipagemId: string, cortes: string[]): string {
+  return `/api/clipagens/${clipagemId}/pacote?cortes=${cortes.map(encodeURIComponent).join(",")}`;
+}
 
 export type Clipagem = {
   id: string;

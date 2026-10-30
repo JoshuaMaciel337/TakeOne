@@ -21,6 +21,7 @@ import {
   List,
   ListPlus,
   Loader2,
+  Package,
   Palette,
   RefreshCw,
   Search,
@@ -37,7 +38,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EscolhaDoModelo } from "@/componentes/clipar/ModelosDeCorte";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { chamarApi, ErroApi } from "@/lib/api";
-import { exportarCorte, modeloDoCorte, projetoDoCorte } from "@/lib/clipar/abrirCorte";
+import { modeloDoCorte, projetoDoCorte } from "@/lib/clipar/abrirCorte";
 import {
   type AmostraDoRosto,
   DURACOES_DO_FILTRO,
@@ -49,7 +50,9 @@ import {
   legendasDoCorte,
   nomeDeArquivo,
   type PalavraDaMidia,
+  situacaoDaSaida,
   srtDoCorte,
+  vttDoCorte,
 } from "@/lib/clipar/listaDeCortes";
 import type { ModeloDeCorte } from "@/lib/clipar/modelosDeCorte";
 import { descreverPlano } from "@/lib/clipar/pedidoDeEdicao";
@@ -63,6 +66,7 @@ import {
   CRITERIOS,
   duplicarCorte,
   enderecoDaCapa,
+  enderecoDoPacote,
   excluirClipagem,
   FAIXAS,
   falaDaClipagem,
@@ -70,6 +74,7 @@ import {
   type Ordem,
   ordenarCortes,
   pedacosDoTitulo,
+  pedirSaida,
   verClipagem,
 } from "@/lib/clipagens";
 import { useEventosJobs } from "@/lib/eventos";
@@ -180,6 +185,7 @@ function BotaoIcone({ rotulo, aoClicar, desligado, ativo, children }: { rotulo: 
 function CartaoDoCorte(props: PropsDoCartao) {
   const { corte, modelo, vista, titulos, escolhido, andamento, ocupado, previa } = props;
   const grade = vista === "grade";
+  const saida = situacaoDaSaida(corte.saida);
   const parecidos = (corte.parecidos ?? []).filter((id) => titulos.has(id));
   return (
     <li className={`flex gap-3 rounded-xl border bg-painel p-3 ${escolhido ? "border-destaque" : "border-borda"} ${grade ? "flex-col" : "flex-row"}`}>
@@ -227,6 +233,19 @@ function CartaoDoCorte(props: PropsDoCartao) {
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden /> Parecido com {parecidos.map((id) => `“${titulos.get(id)}”`).join(", ")}.
           </p>
         ) : null}
+        {saida ? (
+          <p className={`flex items-center gap-1.5 text-xs ${saida.erro ? "text-erro" : saida.video ? "text-sucesso" : "text-suave"}`} role="status">
+            {saida.andando ? <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden /> : null}
+            <span className="min-w-0 flex-1 truncate" title={saida.texto}>
+              {saida.texto}
+            </span>
+            {saida.video ? (
+              <a href={saida.video} download className="font-medium text-destaque hover:underline">
+                Baixar o vídeo
+              </a>
+            ) : null}
+          </p>
+        ) : null}
         <div className="mt-auto flex flex-wrap items-center gap-1">
           <button type="button" className="botao-principal mr-1 px-3 py-1.5 text-sm" disabled={ocupado} onClick={props.aoAbrir}>
             {andamento ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Clapperboard className="size-4" aria-hidden />}
@@ -238,7 +257,7 @@ function CartaoDoCorte(props: PropsDoCartao) {
           <BotaoIcone rotulo="Não gostei" aoClicar={() => props.aoAvaliar(corte.avaliacao === "nao_gostei" ? null : "nao_gostei")} ativo={corte.avaliacao === "nao_gostei" ? "text-erro" : ""}>
             <ThumbsDown className="size-4" aria-hidden />
           </BotaoIcone>
-          <BotaoIcone rotulo="Exportar o vídeo (1080p)" aoClicar={props.aoExportar} desligado={ocupado}>
+          <BotaoIcone rotulo="Exportar o vídeo (1080p)" aoClicar={props.aoExportar} desligado={ocupado || Boolean(saida?.andando)}>
             <Download className="size-4" aria-hidden />
           </BotaoIcone>
           <BotaoIcone rotulo="Baixar as legendas (.srt)" aoClicar={props.aoBaixarSrt}>
@@ -373,6 +392,13 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
     const intervalo = setInterval(() => setVersao((n) => n + 1), 5000);
     return () => clearInterval(intervalo);
   }, [processando]);
+  // Enquanto algum corte monta ou gera o vídeo no servidor: olhar de novo a cada 3 s
+  const saindo = Boolean(clipagem?.cortes.some((corte) => situacaoDaSaida(corte.saida)?.andando));
+  useEffect(() => {
+    if (!saindo) return;
+    const intervalo = setInterval(() => setVersao((n) => n + 1), 3000);
+    return () => clearInterval(intervalo);
+  }, [saindo]);
   useEventosJobs((job) => {
     if (!clipagem) return;
     if (job.entrada.clipagem_id === clipagem.id || (job.tipo === "transcricao" && job.entrada.midia_id === clipagem.midia_id)) setVersao((n) => n + 1);
@@ -439,29 +465,38 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
     }
   }
 
-  /** Monta (se preciso) e põe na fila do vídeo, um depois do outro. */
+  /** O servidor monta os que faltam e põe os vídeos na fila (14.9): a página pode fechar. */
   async function exportar(lista: Corte[]) {
     if (!clipagem || andamento || !lista.length) return;
     setErro("");
     setAviso(null);
-    let feitos = 0;
+    const livres = lista.filter((corte) => !situacaoDaSaida(corte.saida)?.andando);
+    if (!livres.length) {
+      setAviso(lista.length === 1 ? "Este corte já está na fila." : "Esses cortes já estão na fila.");
+      return;
+    }
     try {
-      for (const corte of lista) {
-        setAndamento({ corte: corte.id, etapa: "Preparando" });
-        const id = await exportarCorte(clipagem, corte, marca, (etapa) => ativo.current && setAndamento({ corte: corte.id, etapa }), () => ativo.current);
-        if (!id || !ativo.current) return;
-        feitos++;
-      }
-      setAviso(feitos === 1 ? "O corte está na fila do vídeo." : `${feitos} cortes estão na fila do vídeo.`);
+      const doc = await pedirSaida(clipagem.id, livres.map((corte) => corte.id));
+      if (!ativo.current) return;
+      trocar(doc);
+      setAviso(
+        `${livres.length === 1 ? "O corte está na fila" : `${livres.length} cortes estão na fila`}: o servidor monta e gera o vídeo, e você pode fechar esta página. Os vídeos ficam aqui e em Exportados.`,
+      );
     } catch (e) {
       if (ativo.current) setErro(e instanceof Error ? e.message : "Não consegui exportar o corte.");
-    } finally {
-      if (ativo.current) {
-        setAndamento(null);
-        // Os cortes montados agora ficam ligados aos projetos deles
-        setVersao((n) => n + 1);
-      }
     }
+  }
+
+  /** O pacote dos escolhidos com o vídeo pronto: os vídeos, as legendas, o XML e as capas, num ZIP do servidor. */
+  function baixarPacote(lista: Corte[]) {
+    if (!clipagem) return;
+    const prontos = lista.filter((corte) => situacaoDaSaida(corte.saida)?.video);
+    if (!prontos.length) {
+      setAviso("Exporte os cortes antes: o pacote leva os vídeos prontos.");
+      return;
+    }
+    setAviso(prontos.length < lista.length ? `${prontos.length} de ${lista.length} cortes têm o vídeo pronto; o pacote leva esses.` : null);
+    window.location.href = enderecoDoPacote(clipagem.id, prontos.map((corte) => corte.id));
   }
 
   /** O modelo só nos cortes escolhidos; os já montados são montados de novo, dentro do mesmo projeto. */
@@ -494,23 +529,28 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
     }
   }
 
-  async function baixarSrt(lista: Corte[]) {
+  /** Um corte só: o .srt. Vários: o .srt e o .vtt de cada um, num ZIP. */
+  async function baixarLegendas(lista: Corte[]) {
     if (!clipagem || !lista.length) return;
     setErro("");
     try {
       const palavras = await carregarFala();
-      const arquivos = lista.map((corte) => ({ nome: nomeDeArquivo(corte.titulo, "srt"), texto: srtDoCorte(corte, clipagem.midia_id, palavras, formato) }));
-      if (arquivos.length === 1) {
-        baixarBlob(new Blob([arquivos[0].texto], { type: "application/x-subrip" }), arquivos[0].nome);
+      if (lista.length === 1) {
+        baixarBlob(new Blob([srtDoCorte(lista[0], clipagem.midia_id, palavras, formato)], { type: "application/x-subrip" }), nomeDeArquivo(lista[0].titulo, "srt"));
         return;
       }
       // Nomes repetidos (a cópia de um corte) ganham o número
       const usados = new Map<string, number>();
       const zip = zipSemCompressao(
-        arquivos.map(({ nome, texto }) => {
-          const vezes = (usados.get(nome) ?? 0) + 1;
-          usados.set(nome, vezes);
-          return { nome: vezes > 1 ? nome.replace(/\.srt$/, `-${vezes}.srt`) : nome, dados: new TextEncoder().encode(texto) };
+        lista.flatMap((corte) => {
+          const base = nomeDeArquivo(corte.titulo, "srt").replace(/\.srt$/, "");
+          const vezes = (usados.get(base) ?? 0) + 1;
+          usados.set(base, vezes);
+          const nome = vezes > 1 ? `${base}-${vezes}` : base;
+          return [
+            { nome: `${nome}.srt`, dados: new TextEncoder().encode(srtDoCorte(corte, clipagem.midia_id, palavras, formato)) },
+            { nome: `${nome}.vtt`, dados: new TextEncoder().encode(vttDoCorte(corte, clipagem.midia_id, palavras, formato)) },
+          ];
         }),
       );
       baixarBlob(new Blob([zip], { type: "application/zip" }), nomeDeArquivo(`${clipagem.nome} legendas`, "zip"));
@@ -683,14 +723,22 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" onClick={() => void avaliar(escolhidosVisiveis, "nao_gostei")}>
                     <ThumbsDown className="size-3.5" aria-hidden /> Não gostei
                   </button>
-                  <button type="button" className="botao-secundario px-2.5 py-1 text-xs" onClick={() => void baixarSrt(escolhidosVisiveis)}>
-                    <Captions className="size-3.5" aria-hidden /> Baixar os .srt
+                  <button type="button" className="botao-secundario px-2.5 py-1 text-xs" onClick={() => void baixarLegendas(escolhidosVisiveis)}>
+                    <Captions className="size-3.5" aria-hidden /> Baixar as legendas
                   </button>
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" disabled={andamento !== null} aria-expanded={escolhendoModelo} onClick={() => setEscolhendoModelo((sim) => !sim)}>
                     <Palette className="size-3.5" aria-hidden /> Aplicar um modelo
                   </button>
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" disabled={andamento !== null} onClick={() => void exportar(escolhidosVisiveis)}>
                     <Download className="size-3.5" aria-hidden /> Exportar
+                  </button>
+                  <button
+                    type="button"
+                    className="botao-secundario px-2.5 py-1 text-xs"
+                    title="Os vídeos prontos, as legendas em .srt e .vtt, o XML de intercâmbio e a capa de cada corte"
+                    onClick={() => baixarPacote(escolhidosVisiveis)}
+                  >
+                    <Package className="size-3.5" aria-hidden /> Baixar o pacote
                   </button>
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" disabled={andamento !== null} onClick={() => void apagar(escolhidosVisiveis)}>
                     <Trash2 className="size-3.5" aria-hidden /> Apagar
@@ -743,7 +791,7 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
                   aoAvaliar={(avaliacao) => void avaliar([corte], avaliacao)}
                   aoAbrir={() => void abrir(corte)}
                   aoExportar={() => void exportar([corte])}
-                  aoBaixarSrt={() => void baixarSrt([corte])}
+                  aoBaixarSrt={() => void baixarLegendas([corte])}
                   aoDuplicar={() => void mudarLista(() => duplicarCorte(clipagem.id, corte.id), "Não consegui duplicar o corte.")}
                   aoContinuar={() => void mudarLista(() => continuarCorte(clipagem.id, corte.id), "Não consegui fazer a parte 2.")}
                   aoApagar={() => void apagar([corte])}

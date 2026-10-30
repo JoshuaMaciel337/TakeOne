@@ -1,7 +1,7 @@
 // A lista de cortes (ADR 0004, 14.4): os filtros e a busca, as legendas de um corte antes de montar (a prévia do
 // cartão e o .srt) e o tempo da prévia, que anda pelos trechos do corte um depois do outro. Contas puras.
 import type { Corte } from "../clipagens.ts";
-import { ESTILOS_DE_LEGENDA, escreverSrt, type Legenda } from "../projeto/legendas.ts";
+import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, type Legenda } from "../projeto/legendas.ts";
 import { legendasDaFala, opcoesParaOQuadro } from "../projeto/legendasDaFala.ts";
 import type { Clipe } from "../projeto/modelo.ts";
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
@@ -68,6 +68,32 @@ export function legendasDoCorte(corte: Pick<Corte, "trechos">, midiaId: string, 
 
 export function srtDoCorte(corte: Pick<Corte, "trechos">, midiaId: string, palavras: PalavraDaMidia[], formato: string): string {
   return escreverSrt(legendasDoCorte(corte, midiaId, palavras, formato));
+}
+
+export function vttDoCorte(corte: Pick<Corte, "trechos">, midiaId: string, palavras: PalavraDaMidia[], formato: string): string {
+  return escreverVtt(legendasDoCorte(corte, midiaId, palavras, formato));
+}
+
+/**
+ * O que o cartão mostra da saída pelo servidor (14.9): o texto, se ainda anda (a lista olha de novo), se deu erro e,
+ * com o vídeo pronto, o endereço dele.
+ */
+export function situacaoDaSaida(saida: Corte["saida"]): { texto: string; andando: boolean; erro: boolean; video: string | null } | null {
+  if (!saida) return null;
+  const sem = { andando: false, erro: false, video: null };
+  if (saida.status === "na_fila") return { ...sem, texto: "Na fila da montagem", andando: true };
+  if (saida.status === "montando") return { ...sem, texto: saida.etapa || "Montando", andando: true };
+  if (saida.status === "montado") return { ...sem, texto: "Montado" };
+  if (saida.status === "erro") return { ...sem, texto: saida.erro || "A montagem falhou.", erro: true };
+  const exportacao = saida.exportacao;
+  if (!exportacao) return { ...sem, texto: "O vídeo foi apagado em Exportados." };
+  if (exportacao.status === "erro") return { ...sem, texto: exportacao.erro || "O vídeo não saiu.", erro: true };
+  if (exportacao.status === "pronta") {
+    const arquivo = exportacao.arquivos.find((nome) => nome.endsWith(".mp4"));
+    return { ...sem, texto: "Vídeo pronto", video: arquivo ? `/api/exportacoes/${exportacao.id}/arquivos/${arquivo}?baixar=true` : null };
+  }
+  const progresso = exportacao.processamento?.progresso ?? 0;
+  return { ...sem, texto: progresso > 0 ? `Gerando o vídeo: ${progresso}%` : "Na fila do vídeo", andando: true };
 }
 
 /** Um nome de arquivo a partir do título: sem acento, sem sinais, com hífens. */

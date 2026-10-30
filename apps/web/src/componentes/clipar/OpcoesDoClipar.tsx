@@ -18,10 +18,12 @@ import {
   FAIXAS,
   filaDaPlaca,
   GENEROS,
+  guardarOpcoesPadrao,
   type LegendaDaFala,
   legendasDoArquivo,
   listarEstrategias,
   OPCOES_PADRAO,
+  opcoesPadraoGuardadas,
   type OpcoesDaClipagem,
   pedirClipagem,
   picosDaOnda,
@@ -36,19 +38,8 @@ import { ESTILOS_ANIMADOS } from "@/lib/projeto/legendaAnimada";
 import { criarRecurso, excluirRecurso, useRecursos } from "@/lib/recursos";
 import type { Midia } from "@/lib/tipos";
 
-const CHAVE_PADRAO = "takeone-clipar-padrao";
 const FORMATOS: OpcoesDaClipagem["formato"][] = ["9:16", "1:1", "4:5", "16:9"];
 const SUGESTOES_DE_EDICAO = ["legendas maiores", "legendas amarelas", "legenda no meio", "estilo karaokê", "sem título", "sem zoom", "palavras fortes em verde"];
-
-function padraoGuardado(): OpcoesDaClipagem {
-  try {
-    const guardado = JSON.parse(localStorage.getItem(CHAVE_PADRAO) ?? "null") as Partial<OpcoesDaClipagem> | null;
-    // O trecho é de cada vídeo: nunca vem do padrão
-    return { ...OPCOES_PADRAO, ...(guardado ?? {}), inicio: 0, fim: null };
-  } catch {
-    return OPCOES_PADRAO;
-  }
-}
 
 function Escolha({ ativo, children, aoEscolher }: { ativo: boolean; children: React.ReactNode; aoEscolher: () => void }) {
   return (
@@ -118,7 +109,7 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
     chamarApi<Midia>(`/midias/${midiaId}`)
       .then((carregada) => {
         // O padrão guardado entra aqui, depois de montar: lido na renderização, o servidor e o navegador discordariam
-        setOpcoes(padraoGuardado());
+        setOpcoes(opcoesPadraoGuardadas());
         setMidia(carregada);
       })
       .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não encontrei o vídeo."));
@@ -183,7 +174,7 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
     try {
       if (salvarPadrao) {
         try {
-          localStorage.setItem(CHAVE_PADRAO, JSON.stringify({ ...opcoes, inicio: 0, fim: null }));
+          guardarOpcoesPadrao(opcoes);
         } catch {
           // Sem armazenamento (janela anônima), o padrão vale só agora
         }

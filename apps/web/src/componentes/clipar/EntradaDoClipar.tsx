@@ -1,10 +1,15 @@
 "use client";
 
-// A entrada do Clipar (ADR 0004, 14.1): colar o link e conferir o vídeo antes de importar, ou enviar o arquivo.
-import { AlertCircle, Link2, Loader2, Radio, UploadCloud } from "lucide-react";
+// A entrada do Clipar (ADR 0004, 14.1): colar o link e conferir o vídeo antes de importar, ou enviar o arquivo. Com
+// "Fazer tudo sozinho" (14.9), o vídeo entra numa esteira: o servidor procura os cortes e exporta os melhores sem a
+// página aberta, com as opções padrão deste navegador.
+import { AlertCircle, Link2, Loader2, Radio, UploadCloud, Wand2 } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
+import { criarEsteira } from "@/lib/automacoes";
+import { opcoesPadraoGuardadas } from "@/lib/clipagens";
 import { ACEITAR_ARQUIVOS, useEnvios } from "@/lib/envios";
 import { formatarTempo } from "@/lib/formatar";
 import { type DadosDoLink, importarLink, lerDadosDoLink } from "@/lib/importacao";
@@ -15,8 +20,55 @@ type Props = {
   aoImportar: (midia: Midia) => void;
 };
 
+/** O "Fazer tudo sozinho": quantos cortes exportar e, se pedido, o horário em que a busca começa. */
+function Sozinho({ ligado, quantos, horario, aoMudar }: { ligado: boolean; quantos: number; horario: string; aoMudar: (m: { ligado?: boolean; quantos?: number; horario?: string }) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-borda bg-painel-2 px-3 py-2 text-sm">
+      <label className="flex items-center gap-2 font-medium">
+        <input type="checkbox" className="accent-[var(--to-destaque)]" checked={ligado} onChange={(evento) => aoMudar({ ligado: evento.target.checked })} />
+        <Wand2 className="size-4 text-destaque" aria-hidden /> Fazer tudo sozinho
+      </label>
+      {ligado ? (
+        <>
+          <label className="flex items-center gap-1.5 text-suave">
+            exportar os
+            <select aria-label="Quantos cortes exportar" className="campo px-1.5 py-1" value={quantos} onChange={(evento) => aoMudar({ quantos: Number(evento.target.value) })}>
+              {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            melhores
+          </label>
+          <label className="flex items-center gap-1.5 text-suave" title="O download começa já; a busca dos cortes, que usa a placa de vídeo, espera o horário">
+            procurar os cortes
+            <input aria-label="Horário da busca" type="time" className="campo px-1.5 py-1" value={horario} onChange={(evento) => aoMudar({ horario: evento.target.value })} />
+            {horario ? (
+              <button type="button" className="text-xs underline" onClick={() => aoMudar({ horario: "" })}>
+                já
+              </button>
+            ) : (
+              <span className="text-xs">(vazio: já)</span>
+            )}
+          </label>
+          <span className="w-full text-xs text-suave">
+            Com as opções padrão do Clipar. O servidor procura os cortes, monta e exporta; você pode fechar a página e acompanhar em{" "}
+            <Link href="/app/clipar/automacoes" className="text-destaque hover:underline">
+              Automações
+            </Link>
+            .
+          </span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function EntradaDoClipar({ aoImportar }: Props) {
   const { iniciar } = useEnvios();
+  const [sozinho, setSozinho] = useState({ ligado: false, quantos: 3, horario: "" });
+  const [aviso, setAviso] = useState("");
   const arquivo = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState("");
   const [dados, setDados] = useState<DadosDoLink | null>(null);
@@ -38,13 +90,23 @@ export function EntradaDoClipar({ aoImportar }: Props) {
     }
   }
 
+  /** A esteira do vídeo (pelo link ou pelo vídeo enviado), com as opções padrão deste navegador. */
+  function pedirEsteira(video: { url: string; titulo: string } | { midia_id: string }) {
+    return criarEsteira({ ...video, opcoes: opcoesPadraoGuardadas(), quantos: sozinho.quantos, horario: sozinho.horario || null });
+  }
+
   async function importar() {
     if (!dados || importando) return;
     setImportando(true);
     setErro("");
+    setAviso("");
     try {
-      const midia = await importarLink(dados.url, dados.titulo);
-      aoImportar(midia);
+      if (sozinho.ligado) {
+        await pedirEsteira({ url: dados.url, titulo: dados.titulo });
+        setAviso(`“${dados.titulo}” está na esteira: o servidor baixa, procura os cortes e exporta os ${sozinho.quantos} melhores.`);
+      } else {
+        aoImportar(await importarLink(dados.url, dados.titulo));
+      }
       setDados(null);
       setUrl("");
     } catch (e) {
@@ -79,6 +141,20 @@ export function EntradaDoClipar({ aoImportar }: Props) {
         </button>
       </form>
 
+      <Sozinho {...sozinho} aoMudar={(mudanca) => setSozinho((atual) => ({ ...atual, ...mudanca }))} />
+
+      {aviso ? (
+        <p className="flex items-start gap-2 text-sm text-sucesso" role="status">
+          <Wand2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            {aviso}{" "}
+            <Link href="/app/clipar/automacoes" className="font-medium text-destaque hover:underline">
+              Acompanhar
+            </Link>
+          </span>
+        </p>
+      ) : null}
+
       {erro ? (
         <p className="flex items-start gap-2 text-sm text-erro" role="alert">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -106,7 +182,7 @@ export function EntradaDoClipar({ aoImportar }: Props) {
             <div className="mt-auto flex flex-wrap gap-2 pt-2">
               <button type="button" className="botao-principal" disabled={importando || Boolean(dados.problema)} onClick={() => void importar()}>
                 {importando ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                Importar
+                {sozinho.ligado ? "Importar e clipar" : "Importar"}
               </button>
               <button type="button" className="botao-secundario" onClick={() => setDados(null)}>
                 Cancelar
@@ -130,7 +206,21 @@ export function EntradaDoClipar({ aoImportar }: Props) {
           aria-hidden
           onChange={(evento) => {
             const lista = evento.target.files;
-            if (lista?.length) iniciar(Array.from(lista));
+            if (lista?.length) {
+              // Com "Fazer tudo sozinho", cada vídeo enviado entra numa esteira assim que a API cria a mídia
+              const comEsteira = sozinho.ligado;
+              iniciar(
+                Array.from(lista),
+                comEsteira
+                  ? (midiaId) => {
+                      setAviso("");
+                      pedirEsteira({ midia_id: midiaId })
+                        .then(() => setAviso("O vídeo enviado está na esteira: quando ele chegar, o servidor procura os cortes e exporta os melhores."))
+                        .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não consegui pôr o vídeo na esteira."));
+                    }
+                  : undefined,
+              );
+            }
             evento.target.value = "";
           }}
         />

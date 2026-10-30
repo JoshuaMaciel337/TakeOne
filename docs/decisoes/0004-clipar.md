@@ -153,10 +153,16 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   também na receita do modelo de corte. Medido: prévia e exportação a 2,35–3,5 níveis em 255 com tudo ligado; o
   vocabulário acertou os dois nomes que o Whisper errava. A capa fica no corte e sai em Exportados; ela não vai dentro
   do MP4, porque as redes pedem a capa à parte.
-- [ ] **14.9 Saída e automação.** Exportar vários cortes de uma vez pela fila (o render de sempre), baixar tudo num ZIP,
+- [x] **14.9 Saída e automação.** Exportar vários cortes de uma vez pela fila (o render de sempre), baixar tudo num ZIP,
   e as legendas em .srt e .vtt; o XML de intercâmbio por corte. A montagem no Node (decisão 1) e as automações: "quando
   eu colar um link", "vídeo novo no canal" (o monitor do feed do HolyCut, genérico) com o modelo de corte padrão, e "no
   horário". A publicação fica esperando o dono.
+  **Pronta (30/10/2026):** o "Exportar" da lista pede ao servidor (o worker da montagem roda o mesmo código TS pelo
+  Deno, que já vinha com o yt-dlp, no lugar do Node: o Deno prende a rede à API e não dá acesso ao disco), o pacote ZIP
+  (o vídeo, o .srt, o .vtt, o XML e a capa de cada corte), o "Fazer tudo sozinho" no link colado e no vídeo enviado, com
+  horário para a busca dos cortes, e os canais acompanhados. Medido: a montagem pelo worker deu o mesmo projeto que a do
+  navegador; dois cortes exportados com o navegador fechado; uma esteira do vídeo ao corte exportado em 247 s. A
+  publicação nas redes continua esperando o dono.
 - [ ] **14.10 Conversa no editor.** (Adiantada: o campo, o plano, as perguntas, o passo único e a medida dos 30
   pedidos estão prontos, e o mesmo pedido vale para todos os cortes na página de opções; falta o gosto do espaço.) Um campo "peça uma edição" no editor de vídeo: o Qwen3 traduz o pedido numa lista
   de ações de um conjunto fechado (legenda maior, menor, de outra cor ou outro estilo; título; zoom aqui; reenquadrar

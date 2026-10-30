@@ -3,7 +3,21 @@ import { test } from "node:test";
 
 import { type Corte, ordenarCortes } from "../clipagens.ts";
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
-import { centroDoRosto, enfaseNoCorte, enquadrarNaCaixa, FILTRO_PADRAO, filtrarCortes, instanteNaMidia, instanteNoCorte, legendasDoCorte, nomeDeArquivo, palavraFalada, srtDoCorte } from "./listaDeCortes.ts";
+import {
+  centroDoRosto,
+  enfaseNoCorte,
+  enquadrarNaCaixa,
+  FILTRO_PADRAO,
+  filtrarCortes,
+  instanteNaMidia,
+  instanteNoCorte,
+  legendasDoCorte,
+  nomeDeArquivo,
+  palavraFalada,
+  situacaoDaSaida,
+  srtDoCorte,
+  vttDoCorte,
+} from "./listaDeCortes.ts";
 
 const S = TICKS_POR_SEGUNDO;
 
@@ -102,4 +116,32 @@ test("a prévia cobre a caixa com o rosto no meio, sem sobrar borda", () => {
 test("a ênfase vai para o tempo do corte, pelo trecho em que cai", () => {
   const doCorte = { trechos: [{ inicio: 10, fim: 12 }, { inicio: 20, fim: 25 }], enfase: [10.5, 21, 15] };
   assert.deepEqual(enfaseNoCorte(doCorte), [0.5 * S, 3 * S]);
+});
+
+test("o .vtt do corte tem as mesmas legendas do .srt, com o ponto nos milissegundos", () => {
+  const corte = { trechos: [{ inicio: 10, fim: 14 }] };
+  const palavras = [
+    { texto: "Olá", inicio: 10.2, fim: 10.6 },
+    { texto: "mundo.", inicio: 10.7, fim: 11.3 },
+  ];
+  const vtt = vttDoCorte(corte, "m1", palavras, "9:16");
+  assert.ok(vtt.startsWith("WEBVTT"));
+  assert.match(vtt, /00:00:00\.200 --> /);
+  assert.equal((srtDoCorte(corte, "m1", palavras, "9:16").match(/-->/g) ?? []).length, (vtt.match(/-->/g) ?? []).length);
+});
+
+test("a saída pelo servidor vira o texto do cartão, e o vídeo pronto vira o endereço dele", () => {
+  const base = { etapa: null, erro: null, exportar: true, exportacao_id: null };
+  assert.equal(situacaoDaSaida(null), null);
+  assert.deepEqual(situacaoDaSaida({ ...base, status: "na_fila" }), { texto: "Na fila da montagem", andando: true, erro: false, video: null });
+  assert.equal(situacaoDaSaida({ ...base, status: "montando", etapa: "Procurando o rosto" })?.texto, "Procurando o rosto");
+  assert.equal(situacaoDaSaida({ ...base, status: "erro", erro: "O vídeo sumiu." })?.erro, true);
+  const exportacao = { id: "e1", status: "processando" as const, arquivos: [], erro: null, processamento: { progresso: 40, mensagem: "" } };
+  const exportado = { ...base, status: "exportado" as const, exportacao_id: "e1" };
+  assert.deepEqual(situacaoDaSaida({ ...exportado, exportacao }), { texto: "Gerando o vídeo: 40%", andando: true, erro: false, video: null });
+  const pronto = situacaoDaSaida({ ...exportado, exportacao: { ...exportacao, status: "pronta", arquivos: ["video.mp4"] } });
+  assert.equal(pronto?.video, "/api/exportacoes/e1/arquivos/video.mp4?baixar=true");
+  assert.equal(pronto?.andando, false);
+  // Apagada em Exportados: o corte volta a não ter vídeo
+  assert.equal(situacaoDaSaida({ ...exportado, exportacao: null })?.video, null);
 });
