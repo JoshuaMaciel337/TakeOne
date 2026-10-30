@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { EscolhaDoModelo } from "@/componentes/clipar/ModelosDeCorte";
 import { PreviaDaAnimacao } from "@/componentes/editor/PainelAnimacoes";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { arquivoDaMidia, chamarApi, ErroApi } from "@/lib/api";
@@ -27,6 +28,7 @@ import {
   tempoEstimado,
   tempoLegivel,
 } from "@/lib/clipagens";
+import { modeloDasOpcoes } from "@/lib/clipar/modelosDeCorte";
 import { formatarTempo } from "@/lib/formatar";
 import { enderecoDaPrevia } from "@/lib/legendasAnimadas";
 import { lerNiveis } from "@/lib/niveis";
@@ -353,17 +355,14 @@ export function OpcoesDoClipar({ midiaId }: { midiaId: string }) {
       </Secao>
 
       <Secao
-        titulo="Modelo de edição"
-        descricao="Pregação: a cor fria de cinema, a voz de rádio na primeira frase, clarões e flashes nos cortes com o som, gráficos quando a fala toca no assunto (coração, mente, Bíblia, cruz), imagens de apoio da Pixabay e a cartela final com o título."
+        titulo="Modelo de corte"
+        descricao="Como cada corte sai: a legenda, o título, os zooms, a cor, as transições, o logo, a chamada no fim e a música. Para fazer um modelo seu, monte um corte, edite no editor e use “Salvar como modelo de corte” no “Peça uma edição”."
       >
-        <div className="flex flex-wrap gap-2">
-          <Escolha ativo={opcoes.modelo_edicao !== "pregacao"} aoEscolher={() => mudar({ modelo_edicao: "nenhum" })}>
-            Sem modelo
-          </Escolha>
-          <Escolha ativo={opcoes.modelo_edicao === "pregacao"} aoEscolher={() => mudar({ modelo_edicao: "pregacao", legenda_animada: opcoes.legenda_animada ?? "editorial" })}>
-            Pregação
-          </Escolha>
-        </div>
+        <EscolhaDoModelo
+          escolhido={modeloDasOpcoes(opcoes).id}
+          podeExcluir
+          aoEscolher={(modelo) => mudar({ modelo_corte: modelo, modelo_edicao: "nenhum", legenda_animada: modelo.receita.legenda_animada })}
+        />
       </Secao>
 
       <Secao titulo="Legenda animada" descricao="As legendas de cada corte gravadas com a palavra entrando no ritmo da fala, e a palavra forte destacada.">

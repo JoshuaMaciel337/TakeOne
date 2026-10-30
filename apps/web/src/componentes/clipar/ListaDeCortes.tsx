@@ -6,6 +6,7 @@
 // do original e os avisos (propaganda, parecido com outro). Ordenar, filtrar (avaliação e duração) e buscar nas
 // falas; gostei e não gostei; escolher vários para avaliar, baixar o .srt, exportar ou apagar juntos. Em cada
 // corte: abrir no editor (montando na primeira vez, 14.5), exportar, baixar o .srt, duplicar, a parte 2 e apagar.
+// Um modelo de corte (14.6) pode ser aplicado aos escolhidos: os já montados são montados de novo com ele.
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,6 +19,7 @@ import {
   List,
   ListPlus,
   Loader2,
+  Palette,
   RefreshCw,
   Search,
   ThumbsDown,
@@ -30,9 +32,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { EscolhaDoModelo } from "@/componentes/clipar/ModelosDeCorte";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { chamarApi, ErroApi } from "@/lib/api";
-import { exportarCorte, projetoDoCorte } from "@/lib/clipar/abrirCorte";
+import { exportarCorte, modeloDoCorte, projetoDoCorte } from "@/lib/clipar/abrirCorte";
 import {
   type AmostraDoRosto,
   DURACOES_DO_FILTRO,
@@ -46,6 +49,7 @@ import {
   type PalavraDaMidia,
   srtDoCorte,
 } from "@/lib/clipar/listaDeCortes";
+import type { ModeloDeCorte } from "@/lib/clipar/modelosDeCorte";
 import { descreverPlano } from "@/lib/clipar/pedidoDeEdicao";
 import {
   apagarCorte,
@@ -59,6 +63,7 @@ import {
   excluirClipagem,
   FAIXAS,
   falaDaClipagem,
+  mudarModeloDoCorte,
   type Ordem,
   ordenarCortes,
   pedacosDoTitulo,
@@ -101,6 +106,8 @@ function corDaNota(nota: number | null): string {
 
 type PropsDoCartao = {
   corte: Corte;
+  /** O nome do modelo de corte que vale para ele. */
+  modelo: string;
   vista: Vista;
   /** Os títulos dos cortes, para o aviso "parecido com" e o "continua". */
   titulos: Map<string, string>;
@@ -168,7 +175,7 @@ function BotaoIcone({ rotulo, aoClicar, desligado, ativo, children }: { rotulo: 
 }
 
 function CartaoDoCorte(props: PropsDoCartao) {
-  const { corte, vista, titulos, escolhido, andamento, ocupado, previa } = props;
+  const { corte, modelo, vista, titulos, escolhido, andamento, ocupado, previa } = props;
   const grade = vista === "grade";
   const parecidos = (corte.parecidos ?? []).filter((id) => titulos.has(id));
   return (
@@ -198,6 +205,9 @@ function CartaoDoCorte(props: PropsDoCartao) {
             <TituloDoCorte corte={corte} />
             <p className="mt-0.5 text-xs text-suave">
               {CATEGORIAS[corte.categoria] ?? corte.categoria} · {corte.trechos.map((trecho) => `${formatarTempo(trecho.inicio)}–${formatarTempo(trecho.fim)}`).join(" + ")}
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-apagado" title="O modelo de corte que a montagem segue">
+              <Palette className="size-3" aria-hidden /> {modelo}
             </p>
           </div>
         </div>
@@ -295,6 +305,7 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
   const [versao, setVersao] = useState(0);
   const marca = useMarca();
   const [andamento, setAndamento] = useState<{ corte: string; etapa: string } | null>(null);
+  const [escolhendoModelo, setEscolhendoModelo] = useState(false);
   const [midia, setMidia] = useState<Midia | null>(null);
   const [rosto, setRosto] = useState<AmostraDoRosto[]>([]);
   const [fala, setFala] = useState<PalavraDaMidia[] | null>(null);
@@ -440,6 +451,36 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
       if (ativo.current) {
         setAndamento(null);
         // Os cortes montados agora ficam ligados aos projetos deles
+        setVersao((n) => n + 1);
+      }
+    }
+  }
+
+  /** O modelo só nos cortes escolhidos; os já montados são montados de novo, dentro do mesmo projeto. */
+  async function aplicarModelo(lista: Corte[], modelo: ModeloDeCorte) {
+    if (!clipagem || andamento || !lista.length) return;
+    const montados = lista.filter((corte) => corte.projeto_id);
+    if (montados.length && !window.confirm(`${montados.length === 1 ? "1 corte já montado vai ser montado" : `${montados.length} cortes já montados vão ser montados`} de novo com “${modelo.nome}”. O que foi mudado à mão neles sai. Continuar?`)) return;
+    setEscolhendoModelo(false);
+    setErro("");
+    setAviso(null);
+    try {
+      let doc = clipagem;
+      for (const corte of lista) {
+        setAndamento({ corte: corte.id, etapa: "Aplicando o modelo" });
+        doc = await mudarModeloDoCorte(clipagem.id, corte.id, modelo);
+        if (corte.projeto_id) {
+          const atualizado = doc.cortes.find((item) => item.id === corte.id) ?? { ...corte, modelo_corte: modelo };
+          const id = await projetoDoCorte(doc, atualizado, marca, (etapa) => ativo.current && setAndamento({ corte: corte.id, etapa }), () => ativo.current, true);
+          if (!id || !ativo.current) return;
+        }
+      }
+      if (ativo.current) trocar(doc);
+    } catch (e) {
+      if (ativo.current) setErro(e instanceof Error ? e.message : "Não consegui aplicar o modelo.");
+    } finally {
+      if (ativo.current) {
+        setAndamento(null);
         setVersao((n) => n + 1);
       }
     }
@@ -637,6 +678,9 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" onClick={() => void baixarSrt(escolhidosVisiveis)}>
                     <Captions className="size-3.5" aria-hidden /> Baixar os .srt
                   </button>
+                  <button type="button" className="botao-secundario px-2.5 py-1 text-xs" disabled={andamento !== null} aria-expanded={escolhendoModelo} onClick={() => setEscolhendoModelo((sim) => !sim)}>
+                    <Palette className="size-3.5" aria-hidden /> Aplicar um modelo
+                  </button>
                   <button type="button" className="botao-secundario px-2.5 py-1 text-xs" disabled={andamento !== null} onClick={() => void exportar(escolhidosVisiveis)}>
                     <Download className="size-3.5" aria-hidden /> Exportar
                   </button>
@@ -650,6 +694,14 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
               ) : null}
               <span className="ml-auto text-xs text-suave">{filtrando ? `${cortes.length} de ${clipagem.cortes.length} cortes` : `${clipagem.cortes.length} cortes`}</span>
             </div>
+            {escolhendoModelo && escolhidosVisiveis.length ? (
+              <div className="flex flex-col gap-2 border-t border-borda pt-3">
+                <p className="text-sm">
+                  O modelo de corte para {escolhidosVisiveis.length === 1 ? "o corte escolhido" : `os ${escolhidosVisiveis.length} cortes escolhidos`}:
+                </p>
+                <EscolhaDoModelo escolhido={null} aoEscolher={(modelo) => void aplicarModelo(escolhidosVisiveis, modelo)} />
+              </div>
+            ) : null}
           </div>
 
           {cortes.length ? (
@@ -658,6 +710,7 @@ export function ListaDeCortes({ clipagemId }: { clipagemId: string }) {
                 <CartaoDoCorte
                   key={corte.id}
                   corte={corte}
+                  modelo={modeloDoCorte(clipagem, corte).nome}
                   vista={vista}
                   titulos={titulos}
                   escolhido={escolhidos.has(corte.id)}

@@ -123,11 +123,15 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   o reenquadramento (o "Seguir o rosto" no formato em pé), zooms curtos nas frases fortes (o mesmo pedido do "Criar
   automaticamente", agora no trecho do corte), o kit de marca e o modelo de corte. Medir: prévia e exportação no
   Chrome nos níveis de sempre, dentro dos zooms e das legendas.
-- [ ] **14.6 Modelos de corte.** Um modelo de corte é uma receita, não uma linha do tempo fixa: o layout, o estilo da
+- [x] **14.6 Modelos de corte.** Um modelo de corte é uma receita, não uma linha do tempo fixa: o layout, o estilo da
   legenda (e onde ela fica), o título (estilo e duração), o logo e a chamada, a abertura e o encerramento, a música
   (com licença), a barra de progresso e os interruptores (limpar pausas, zooms, emojis, palavras-chave). Salvar o corte
   aberto como modelo de corte; escolher antes de gerar ou aplicar a todos os cortes de uma vez (num passo de cada
   projeto). Três prontos desenhados aqui.
+  **Pronta (29/10/2026):** a receita (enquadramento, pausas, legenda ou legenda animada, título, zooms, ênfase, cor,
+  voz, transições e sons, gráficos, imagens, cartela, logo, chamada e música) com quatro prontos além do de pregação,
+  escolhida na página de opções, aplicada aos cortes escolhidos na lista (os montados são montados de novo) e no
+  editor, num passo do desfazer, e salva a partir do vídeo aberto. A barra de progresso e os emojis ficam com a 14.8.
 - [ ] **14.7 O editor do corte.** No editor de vídeo, quando o projeto vem de um corte: estender pelo original (+5 s
   em cada ponta e a transcrição inteira do original para escolher o trecho), a transcrição em segmentos (as linhas da
   legenda como fichas, para dividir, juntar e ajustar o tempo), o layout por cena para o formato em pé (preencher com o

@@ -22,7 +22,7 @@ const ENTRE_TRANSICOES = 4;
 const MAXIMO_DE_TRANSICOES = 6;
 const DURACAO_DO_FLASH = 0.4;
 const DURACAO_DO_CLARAO = 0.6;
-const DURACAO_DA_CARTELA = 3.5;
+export const DURACAO_DA_CARTELA = 3.5;
 /** A queda da segunda parte da cartela (core/animacoes/cartela_impacto.html, QUEDA). */
 const QUEDA_DA_CARTELA = 1.0;
 const DURACAO_DA_IMAGEM = 2.4;

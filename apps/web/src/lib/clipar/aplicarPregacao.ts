@@ -20,7 +20,7 @@ const ESPERA_MAXIMA_MS = 6 * 60 * 1000;
 
 type ItemDaPixabay = { id: number; duracao: number | null; largura: number | null; altura: number | null };
 
-async function pedirAnimacao(modelo: string, campos: Record<string, string>, proporcao: string, duracao: number): Promise<Midia> {
+export async function pedirAnimacao(modelo: string, campos: Record<string, string>, proporcao: string, duracao: number): Promise<Midia> {
   return chamarApi<Midia>("/animacoes", { metodo: "POST", corpo: { modelo, campos, proporcao, duracao } });
 }
 
@@ -33,13 +33,13 @@ async function imagemDeApoio(busca: string): Promise<{ midia: Midia; largura: nu
 }
 
 /** Espera as mídias saírem do processamento; devolve as prontas pelo id (as que deram erro ficam de fora). */
-async function esperarProntas(ids: string[], aoAndamento: (texto: string) => void, ativo: () => boolean): Promise<Map<string, Midia> | null> {
+export async function esperarProntas(ids: string[], aoAndamento: (texto: string) => void, ativo: () => boolean, rotulo = "Preparando a edição de pregação"): Promise<Map<string, Midia> | null> {
   const prontas = new Map<string, Midia>();
   const faltam = new Set(ids);
   const limite = Date.now() + ESPERA_MAXIMA_MS;
   while (faltam.size && Date.now() < limite) {
     if (!ativo()) return null;
-    aoAndamento(`Preparando a edição de pregação · ${ids.length - faltam.size} de ${ids.length}`);
+    aoAndamento(`${rotulo} · ${ids.length - faltam.size} de ${ids.length}`);
     for (const id of [...faltam]) {
       const midia = await chamarApi<Midia>(`/midias/${id}`).catch(() => null);
       if (!midia || midia.status === "erro") faltam.delete(id);

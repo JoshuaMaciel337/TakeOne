@@ -1,5 +1,6 @@
 // O Clipar (ADR 0004): as opções da clipagem, os cortes achados e as contas da página (o tempo estimado).
 import { chamarApi } from "./api.ts";
+import type { ModeloDeCorte } from "./clipar/modelosDeCorte.ts";
 import type { PlanoDaEdicao } from "./clipar/pedidoDeEdicao.ts";
 import { lerLegendas, lerTextoDeLegenda } from "./projeto/legendas.ts";
 import { TICKS_POR_SEGUNDO } from "./tempo.ts";
@@ -22,8 +23,10 @@ export type OpcoesDaClipagem = {
   maximo: number | null;
   /** O estilo da legenda animada dos cortes (ESTILOS_ANIMADOS); null: as legendas de sempre. */
   legenda_animada: string | null;
-  /** O modelo de edição dos cortes: "pregacao" (lib/clipar/modeloDePregacao.ts) ou nenhum. */
+  /** O modelo de edição das clipagens de antes do modelo de corte: "pregacao" ou nenhum. */
   modelo_edicao: "nenhum" | "pregacao";
+  /** O modelo de corte de todos os cortes (14.6), copiado na hora do pedido; null: o padrão. */
+  modelo_corte?: ModeloDeCorte | null;
 };
 
 export const OPCOES_PADRAO: OpcoesDaClipagem = {
@@ -40,6 +43,7 @@ export const OPCOES_PADRAO: OpcoesDaClipagem = {
   maximo: null,
   legenda_animada: null,
   modelo_edicao: "nenhum",
+  modelo_corte: null,
 };
 
 export const FAIXAS: { id: Faixa; nome: string; segundos: [number, number] }[] = [
@@ -110,6 +114,8 @@ export type Corte = {
   parte_de?: string | null;
   /** A cópia: o corte de que ela saiu. */
   copia_de?: string | null;
+  /** O modelo de corte aplicado só a este corte (vale mais que o da clipagem). */
+  modelo_corte?: ModeloDeCorte | null;
   avaliacao?: "gostei" | "nao_gostei" | null;
   /** O começo (segundos da mídia) das palavras de ênfase, que a montagem pinta nas legendas. */
   enfase?: number[];
@@ -184,6 +190,9 @@ export const avaliarCorte = (id: string, corteId: string, avaliacao: Corte["aval
 export const duplicarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/copia`, { metodo: "POST" });
 /** A parte 2: as frases logo depois do corte, na faixa pedida. */
 export const continuarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/continuacao`, { metodo: "POST" });
+/** Aplica um modelo só a este corte (null: volta ao da clipagem). */
+export const mudarModeloDoCorte = (id: string, corteId: string, modelo: ModeloDeCorte | null) =>
+  chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}/modelo`, { metodo: "PUT", corpo: { modelo_corte: modelo } });
 export const apagarCorte = (id: string, corteId: string) => chamarApi<Clipagem>(`/clipagens/${id}/cortes/${corteId}`, { metodo: "DELETE" });
 
 /**

@@ -2,16 +2,20 @@
 
 // "Peça uma edição" (ADR 0004, 14.10): a pessoa escreve como quer o vídeo, o modelo local devolve um plano de um
 // conjunto fechado de ações (lib/clipar/pedidoDeEdicao.ts), o painel mostra o plano (e pergunta com botões
-// quando falta algo) e "Aplicar" faz tudo num passo só do desfazer, dizendo o que mudou e o que não deu.
-import { Check, LoaderCircle, MessageSquareText, Sparkles, X } from "lucide-react";
+// quando falta algo) e "Aplicar" faz tudo num passo só do desfazer, dizendo o que mudou e o que não deu. Embaixo, os
+// modelos de corte (14.6): aplicar um ao vídeo aberto (também num passo só) e salvar o vídeo aberto como modelo.
+import { Check, LoaderCircle, MessageSquareText, Palette, Save, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { avisarModelosMudaram, EscolhaDoModelo } from "@/componentes/clipar/ModelosDeCorte";
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { aplicarPlano, descreverPlano, estadoDoProjeto, type FraseDaLinha, frasesCortadas, frasesDaLinha, legendaAnimadaDoPlano, partesDoPlano, type PlanoDaEdicao } from "@/lib/clipar/pedidoDeEdicao";
 import { aplicarLegendaEPartes } from "@/lib/clipar/aplicarPregacao";
-import { PARTES_DA_PREGACAO } from "@/lib/clipar/modeloDePregacao";
+import { extrasDoModelo } from "@/lib/clipar/extrasDoModelo";
+import { type ModeloDeCorte, partesDoModelo, planoDoModelo, type ReceitaDoCorte, receitaDoProjeto, resumoDaReceita } from "@/lib/clipar/modelosDeCorte";
 import { pedirPlanoDaEdicao } from "@/lib/clipar/pedirEdicao";
 import { useMarca } from "@/lib/marca";
+import { criarRecurso } from "@/lib/recursos";
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import { falaDosClipes, type Palavra, palavrasDaLinha } from "@/lib/projeto/fala";
 import type { Projeto } from "@/lib/projeto/modelo";
@@ -37,6 +41,7 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
   const [pedido, setPedido] = useState("");
   const [andamento, setAndamento] = useState<string | null>(null);
   const [resposta, setResposta] = useState<{ plano: PlanoDaEdicao; frases: FraseDaLinha[]; palavras: Map<string, Palavra[]> } | null>(null);
+  const [modelo, setModelo] = useState<ModeloDeCorte | null>(null);
   const ativo = useRef(true);
   // O projeto mais novo, para aplicar sobre o que está na tela depois da espera pelo modelo
   const projetoAgora = useRef(projeto);
@@ -73,72 +78,97 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
     }
   }
 
-  async function aplicar() {
-    if (!resposta || andamento) return;
-    const { plano, palavras } = resposta;
+  /** Os rostos das mídias da principal, quando o plano enquadra no rosto (ou muda o formato). */
+  async function rostosDoPlano(plano: PlanoDaEdicao, atual: Projeto): Promise<Map<string, AmostraDeRosto[]> | null> {
+    const porId = new Map(midias.map((midia) => [midia.id, midia]));
+    const rostos = new Map<string, AmostraDeRosto[]>();
+    const mudaFormato = plano.formato !== "manter" && plano.formato !== atual.proporcao;
+    if (plano.enquadrar === "rosto" || (mudaFormato && plano.enquadrar === "manter")) {
+      for (const id of midiasDaPrincipal(atual)) {
+        if (!porId.get(id)?.video || porId.get(id)?.imagem) continue;
+        const amostras = await buscarRosto(id, setAndamento, () => ativo.current).catch(() => []);
+        if (!ativo.current || amostras === null) return null;
+        rostos.set(id, amostras);
+      }
+    }
+    return rostos;
+  }
+
+  /**
+   * O plano no projeto de agora, e depois o que espera mídias novas (a legenda animada, as partes de pregação e, num
+   * modelo de corte, o logo, a chamada e a música), num passo só do desfazer. Devolve o aviso, ou null se parou.
+   */
+  async function aplicarComMidias(plano: PlanoDaEdicao, palavras: Map<string, Palavra[]>, frases: FraseDaLinha[], receita: ReceitaDoCorte | null): Promise<string | null> {
     const atual = projetoAgora.current;
-    // As frases valem se a fala da linha de agora é a mesma que foi ao modelo; se a pessoa cortou algo durante a
-    // espera, cortar e dar zoom em frases ficam de fora (o resto do plano não depende delas)
-    const frasesDeAgora = frasesDaLinha(palavrasDaLinha(falaDosClipes(principalDe(atual), palavras)));
-    const frases = textoDasFrases(frasesDeAgora) === textoDasFrases(resposta.frases) ? frasesDeAgora : [];
     const porId = new Map(midias.map((midia) => [midia.id, midia]));
     const tamanhos = new Map(
       midias.flatMap((midia) => (midia.video ? [[midia.id, { largura: midia.video.largura, altura: midia.video.altura }] as const] : [])),
     );
-    try {
-      const rostos = new Map<string, AmostraDeRosto[]>();
-      const mudaFormato = plano.formato !== "manter" && plano.formato !== atual.proporcao;
-      if (plano.enquadrar === "rosto" || (mudaFormato && plano.enquadrar === "manter")) {
-        for (const id of midiasDaPrincipal(atual)) {
-          if (!porId.get(id)?.video || porId.get(id)?.imagem) continue;
-          const amostras = await buscarRosto(id, setAndamento, () => ativo.current).catch(() => []);
-          if (!ativo.current || amostras === null) return;
-          rostos.set(id, amostras);
-        }
-      }
-      setAndamento("Aplicando");
-      const titulo = atual.nome && !/^Projeto sem título/.test(atual.nome) ? { texto: atual.nome, foco: [] } : null;
-      const principalNoComeco = JSON.stringify(principalDe(projetoAgora.current));
-      const aplicado = aplicarPlano(projetoAgora.current, plano, {
-        ctx: contextoDasMidias(porId),
+    const rostos = await rostosDoPlano(plano, atual);
+    if (!rostos) return null;
+    setAndamento("Aplicando");
+    const titulo = atual.nome && !/^Projeto sem título/.test(atual.nome) ? { texto: atual.nome, foco: [] } : null;
+    const principalNoComeco = JSON.stringify(principalDe(projetoAgora.current));
+    const aplicado = aplicarPlano(projetoAgora.current, plano, {
+      ctx: contextoDasMidias(porId),
+      palavras,
+      frases,
+      tamanhos,
+      rostos,
+      corDaMarca: marca.cores[0] ?? null,
+      tituloPadrao: titulo,
+    });
+    let novo = aplicado.projeto;
+    const feitos = [...aplicado.feitos];
+    // Num modelo, o que já está como ele pede não é um "não deu"
+    const naoDeu = receita ? aplicado.naoDeu.filter((item) => !/^tirar as pausas|^tirar os zooms|^tirar o título|^tirar as legendas|^pôr o título: o vídeo já tem/.test(item)) : aplicado.naoDeu;
+    // O que espera mídias novas: a legenda animada e as partes de pregação (sons, gráficos, imagens...)
+    const doPlano = partesDoPlano(plano, frases);
+    const doModelo = receita ? partesDoModelo(receita) : null;
+    const partesPedidas = doModelo || doPlano ? { ...doModelo, ...doPlano } : null;
+    const animada = legendaAnimadaDoPlano(plano);
+    const mudou = () => JSON.stringify(principalDe(projetoAgora.current)) !== principalNoComeco;
+    if (partesPedidas || animada) {
+      const editado = await aplicarLegendaEPartes({
+        projeto: novo,
         palavras,
-        frases,
-        tamanhos,
-        rostos,
-        corDaMarca: marca.cores[0] ?? null,
-        tituloPadrao: titulo,
+        titulo: titulo?.texto ?? "",
+        midias: porId,
+        legendaAnimada: animada,
+        partes: partesPedidas,
+        aoAndamento: setAndamento,
+        ativo: () => ativo.current,
       });
-      let novo = aplicado.projeto;
-      const feitos = [...aplicado.feitos];
-      const { naoDeu } = aplicado;
-      // O que espera mídias novas: a legenda animada e as partes do modelo de pregação (sons, gráficos, imagens...)
-      const partesPedidas = partesDoPlano(plano, frases);
-      const animada = legendaAnimadaDoPlano(plano);
-      if (partesPedidas || animada) {
-        const editado = await aplicarLegendaEPartes({
-          projeto: novo,
-          palavras,
-          titulo: titulo?.texto ?? "",
-          midias: porId,
-          legendaAnimada: animada,
-          partes: partesPedidas,
-          aoAndamento: setAndamento,
-          ativo: () => ativo.current,
-        });
-        if (!editado) return;
-        if (JSON.stringify(principalDe(projetoAgora.current)) !== principalNoComeco) {
-          aoAvisar("O vídeo mudou enquanto a edição era preparada. Peça de novo.");
-          return;
-        }
-        novo = editado.projeto;
-        feitos.push(...editado.feitos);
-      }
-      if (feitos.length) aoExecutar({ comando: "edicao.pedido", parametros: { projeto: novo } });
-      const partes = [feitos.length ? `Pronto: ${feitos.join(", ")}. Ctrl+Z desfaz tudo de uma vez.` : "Nada mudou no vídeo."];
-      if (naoDeu.length) partes.push(`Não deu: ${naoDeu.join("; ")}.`);
-      aoAvisar(partes.join(" "));
+      if (!editado) return null;
+      novo = editado.projeto;
+      feitos.push(...editado.feitos);
+    }
+    if (receita && (receita.logo || receita.chamada || receita.musica)) {
+      const comExtras = await extrasDoModelo({ projeto: novo, receita, marca, midias: porId, palavras, aoAndamento: setAndamento, ativo: () => ativo.current });
+      if (!comExtras) return null;
+      novo = comExtras.projeto;
+      feitos.push(...comExtras.feitos);
+    }
+    if (mudou()) return "O vídeo mudou enquanto a edição era preparada. Peça de novo.";
+    if (feitos.length) aoExecutar({ comando: "edicao.pedido", parametros: { projeto: novo } });
+    const partes = [feitos.length ? `Pronto: ${feitos.join(", ")}. Ctrl+Z desfaz tudo de uma vez.` : "Nada mudou no vídeo."];
+    if (naoDeu.length) partes.push(`Não deu: ${naoDeu.join("; ")}.`);
+    return partes.join(" ");
+  }
+
+  async function aplicar() {
+    if (!resposta || andamento) return;
+    const { plano, palavras } = resposta;
+    // As frases valem se a fala da linha de agora é a mesma que foi ao modelo; se a pessoa cortou algo durante a
+    // espera, cortar e dar zoom em frases ficam de fora (o resto do plano não depende delas)
+    const frasesDeAgora = frasesDaLinha(palavrasDaLinha(falaDosClipes(principalDe(projetoAgora.current), palavras)));
+    const frases = textoDasFrases(frasesDeAgora) === textoDasFrases(resposta.frases) ? frasesDeAgora : [];
+    try {
+      const aviso = await aplicarComMidias(plano, palavras, frases, null);
+      if (aviso === null || !ativo.current) return;
+      aoAvisar(aviso);
       setResposta(null);
-      if (feitos.length) setPedido("");
+      if (aviso.startsWith("Pronto")) setPedido("");
     } catch (erro) {
       aoAvisar(erro instanceof Error ? erro.message : "Não deu para aplicar o pedido.");
     } finally {
@@ -146,37 +176,37 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
     }
   }
 
-  /** O modelo de pregação inteiro (lib/clipar/modeloDePregacao.ts), com a legenda editorial se o projeto tem legendas. */
-  async function modeloDePregacao() {
+  /** Um modelo de corte no vídeo aberto: a receita vira um plano, com as partes e os extras dela. */
+  async function aplicarModelo(escolhido: ModeloDeCorte) {
     if (andamento) return;
-    const principalNoComeco = JSON.stringify(principalDe(projetoAgora.current));
     try {
       const ids = midiasDaPrincipal(projetoAgora.current).filter((id) => midias.find((midia) => midia.id === id)?.audio);
       const palavras = ids.length ? await transcreverMidias(ids, "auto", setAndamento, () => ativo.current) : new Map<string, Palavra[]>();
       if (!palavras || !ativo.current) return;
-      const atual = projetoAgora.current;
-      const editado = await aplicarLegendaEPartes({
-        projeto: atual,
-        palavras,
-        titulo: atual.nome && !/^Projeto sem título/.test(atual.nome) ? atual.nome : "",
-        midias: new Map(midias.map((midia) => [midia.id, midia])),
-        legendaAnimada: "editorial",
-        partes: PARTES_DA_PREGACAO,
-        aoAndamento: setAndamento,
-        ativo: () => ativo.current,
-      });
-      if (!editado) return;
-      // A edição de agora pode ter mudado durante a espera: o modelo vale sobre o projeto de quando começou
-      if (JSON.stringify(principalDe(projetoAgora.current)) !== principalNoComeco) {
-        aoAvisar("O vídeo mudou enquanto o modelo era preparado. Peça de novo.");
-        return;
-      }
-      aoExecutar({ comando: "edicao.pedido", parametros: { projeto: editado.projeto } });
-      aoAvisar(`Modelo de pregação: ${editado.feitos.join(", ") || "nada mudou"}. Ctrl+Z desfaz tudo de uma vez.`);
+      const estado = estadoDoProjeto(projetoAgora.current);
+      const plano = planoDoModelo(escolhido.receita);
+      // O título que o vídeo já tem fica (o modelo pede um, e ele já está lá)
+      if (plano.titulo.acao === "por" && estado.titulo) plano.titulo.acao = "manter";
+      const aviso = await aplicarComMidias(plano, palavras, [], escolhido.receita);
+      if (aviso !== null && ativo.current) aoAvisar(`${escolhido.nome}: ${aviso}`);
     } catch (erro) {
-      if (ativo.current) aoAvisar(erro instanceof Error ? erro.message : "Não deu para aplicar o modelo de pregação.");
+      if (ativo.current) aoAvisar(erro instanceof Error ? erro.message : "Não deu para aplicar o modelo.");
     } finally {
       if (ativo.current) setAndamento(null);
+    }
+  }
+
+  /** O vídeo aberto como modelo de corte do espaço: o que ele tem vira o que o modelo põe. */
+  async function salvarComoModelo() {
+    const receita = receitaDoProjeto(projetoAgora.current, new Map(midias.map((midia) => [midia.id, midia])), marca.logo_midia_id);
+    const nome = window.prompt(`Nome do modelo de corte:\n(${resumoDaReceita(receita).join(", ")})`, "")?.trim();
+    if (!nome) return;
+    try {
+      await criarRecurso({ tipo: "modelo_corte", nome: nome.slice(0, 60), dados: { receita } });
+      avisarModelosMudaram();
+      aoAvisar(`Modelo “${nome}” salvo: ele aparece na página de opções do Clipar, na lista de cortes e aqui.`);
+    } catch (erro) {
+      aoAvisar(erro instanceof Error ? erro.message : "Não deu para salvar o modelo.");
     }
   }
 
@@ -270,15 +300,20 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
             {andamento ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <MessageSquareText className="size-4" aria-hidden />}
             {andamento ?? "Pedir"}
           </button>
-          <button
-            type="button"
-            className="botao-secundario px-3 py-1.5 text-xs"
-            disabled={andamento !== null}
-            title="A cor de cinema, a voz de rádio na primeira frase, clarões e flashes nos cortes com o som, gráficos pela fala, imagens de apoio, a cartela final e a legenda editorial"
-            onClick={() => void modeloDePregacao()}
-          >
-            <Sparkles className="size-4" aria-hidden /> Aplicar o modelo de pregação
-          </button>
+          <details className="rounded-md border border-borda bg-painel p-2">
+            <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-medium">
+              <Palette className="size-3.5 text-destaque" aria-hidden /> Modelos de corte
+            </summary>
+            <div className="mt-2 flex flex-col gap-2">
+              <EscolhaDoModelo escolhido={modelo?.id ?? null} aoEscolher={setModelo} compacto />
+              <button type="button" className="botao-principal px-3 py-1.5 text-xs" disabled={!modelo || andamento !== null} onClick={() => modelo && void aplicarModelo(modelo)}>
+                <Check className="size-4" aria-hidden /> {modelo ? `Aplicar “${modelo.nome}”` : "Escolha um modelo"}
+              </button>
+              <button type="button" className="botao-secundario px-3 py-1.5 text-xs" disabled={andamento !== null} onClick={() => void salvarComoModelo()}>
+                <Save className="size-4" aria-hidden /> Salvar como modelo de corte
+              </button>
+            </div>
+          </details>
         </>
       )}
     </section>
