@@ -19,6 +19,12 @@ CONFIANCA_MINIMA = 0.6
 # Outro rosto só "rouba" o enquadramento se estiver perto de quem já estava em quadro
 # (adaptado do HolyCut): a plateia ao fundo não tira o foco de quem fala
 DISTANCIA_MESMA_PESSOA = 0.18
+# Os outros rostos de cada amostra: no máximo tantos, e só os de pelo menos tanto da área do principal (a plateia
+# ao fundo não conta)
+OUTROS_NO_MAXIMO = 3
+AREA_DOS_OUTROS = 0.25
+# 2: as amostras têm os outros rostos do quadro (as de antes, sem eles, são buscadas de novo quando o layout pede)
+VERSAO_DA_BUSCA = 2
 
 
 def montar_rosto(organizacao_id, midia_id) -> dict:
@@ -45,3 +51,10 @@ def escolher_rosto(ultimo: tuple[float, float] | None,
         if perto:
             return max(perto, key=lambda r: r[2] / (0.05 + _distancia(r[:2], ultimo)))
     return max(rostos, key=lambda r: r[2])
+
+
+def outros_rostos(escolhido: tuple[float, float, float],
+                  rostos: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
+    """Os rostos do quadro além do escolhido, do maior para o menor, sem os pequenos demais perto dele."""
+    outros = [r for r in rostos if r is not escolhido and r[2] >= escolhido[2] * AREA_DOS_OUTROS]
+    return sorted(outros, key=lambda r: -r[2])[:OUTROS_NO_MAXIMO]

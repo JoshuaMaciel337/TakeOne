@@ -1,0 +1,453 @@
+{
+ "descricao": "Layouts das cenas: as duas cópias de cada clipe (lib/projeto/layoutDaCena.ts e core/utils/layout_da_cena.py).",
+ "casos": [
+  {
+   "nome": "caber num 9:16",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "layout": {
+     "tipo": "caber",
+     "desfoque": 0.6
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1920,
+    "altura": 1080
+   },
+   "proporcao": "9:16",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0,
+     "escala": 3.160493827160494,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": {
+     "tipo": "desfoque",
+     "intensidade": 0.6
+    },
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  },
+  {
+   "nome": "caber com recorte",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0.1,
+     "y": 0,
+     "largura": 0.8,
+     "altura": 1
+    },
+    "layout": {
+     "tipo": "caber",
+     "desfoque": 2
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1920,
+    "altura": 1080
+   },
+   "proporcao": "9:16",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0.1,
+     "y": 0,
+     "largura": 0.8,
+     "altura": 1
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0,
+     "escala": 2.528395061728395,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": {
+     "tipo": "desfoque",
+     "intensidade": 1
+    },
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0.1,
+     "y": 0,
+     "largura": 0.8,
+     "altura": 1
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  },
+  {
+   "nome": "duas pessoas no meio",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "layout": {
+     "tipo": "duas_pessoas",
+     "divisao": 0.5,
+     "quadros": [
+      {
+       "x": 0.3,
+       "y": 0.45,
+       "zoom": 1.4
+      },
+      {
+       "x": 0.72,
+       "y": 0.5,
+       "zoom": 1.4
+      }
+     ]
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1920,
+    "altura": 1080
+   },
+   "proporcao": "9:16",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0.07399553571428569,
+     "y": 0.09285714285714286,
+     "largura": 0.4520089285714286,
+     "altura": 0.7142857142857143
+    },
+    "transformacao": {
+     "x": 0,
+     "y": -0.25,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0.49399553571428567,
+     "y": 0.14285714285714285,
+     "largura": 0.4520089285714286,
+     "altura": 0.7142857142857143
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0.25,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  },
+  {
+   "nome": "duas pessoas na borda e zoom preso",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "layout": {
+     "tipo": "duas_pessoas",
+     "divisao": 0.9,
+     "quadros": [
+      {
+       "x": 0.02,
+       "y": 0.1,
+       "zoom": 9
+      },
+      {
+       "x": 0.99,
+       "y": 0.95,
+       "zoom": 0.5
+      }
+     ]
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1920,
+    "altura": 1080
+   },
+   "proporcao": "9:16",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 0.098876953125,
+     "altura": 0.25
+    },
+    "transformacao": {
+     "x": 0,
+     "y": -0.09999999999999998,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0.0,
+     "y": 0.36790123456790136,
+     "largura": 1.0,
+     "altura": 0.6320987654320986
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0.4,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  },
+  {
+   "nome": "tela e rosto virado",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "virar": {
+     "horizontal": true,
+     "vertical": false
+    },
+    "layout": {
+     "tipo": "tela_rosto",
+     "divisao": 0.316,
+     "quadros": [
+      {
+       "x": 0.5,
+       "y": 0.5,
+       "zoom": 1
+      },
+      {
+       "x": 0.8,
+       "y": 0.7,
+       "zoom": 2.5
+      }
+     ]
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1920,
+    "altura": 1080
+   },
+   "proporcao": "9:16",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0.0,
+     "y": 0.0006419753086419067,
+     "largura": 1.0,
+     "altura": 0.9987160493827162
+    },
+    "transformacao": {
+     "x": 0,
+     "y": -0.34199999999999997,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0.10748355263157885,
+     "y": 0.49999999999999994,
+     "largura": 0.18503289473684212,
+     "altura": 0.4
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0.158,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  },
+  {
+   "nome": "vídeo em pé num 1:1",
+   "clipe": {
+    "midia_id": "m",
+    "transformacao": {
+     "x": 0.1,
+     "y": -0.05,
+     "escala": 1.8,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "recorte": {
+     "x": 0,
+     "y": 0,
+     "largura": 1,
+     "altura": 1
+    },
+    "layout": {
+     "tipo": "duas_pessoas",
+     "divisao": 0.5,
+     "quadros": [
+      {
+       "x": 0.5,
+       "y": 0.3,
+       "zoom": 1
+      },
+      {
+       "x": 0.5,
+       "y": 0.7,
+       "zoom": 1.2
+      }
+     ]
+    },
+    "id": "c"
+   },
+   "midia": {
+    "largura": 1080,
+    "altura": 1920
+   },
+   "proporcao": "1:1",
+   "embaixo": {
+    "id": "c",
+    "recorte": {
+     "x": 0.0,
+     "y": 0.159375,
+     "largura": 1.0,
+     "altura": 0.28125
+    },
+    "transformacao": {
+     "x": 0,
+     "y": -0.25,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": null
+   },
+   "acima": {
+    "id": "c~layout",
+    "recorte": {
+     "x": 0.08333333333333331,
+     "y": 0.5828125,
+     "largura": 0.8333333333333334,
+     "altura": 0.234375
+    },
+    "transformacao": {
+     "x": 0,
+     "y": 0.25,
+     "escala": 1,
+     "rotacao": 0,
+     "opacidade": 0.9
+    },
+    "efeito": null,
+    "som_separado": true
+   }
+  }
+ ]
+}

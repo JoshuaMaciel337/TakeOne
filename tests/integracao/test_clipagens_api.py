@@ -108,6 +108,10 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
     caminho = f"/api/clipagens/{clipagem['id']}/cortes/{cortes[0]['id']}/projeto"
     ligado = cliente.put(caminho, json={"projeto_id": projeto["id"]}).json()
     assert ligado["cortes"][0]["projeto_id"] == projeto["id"]
+    # O editor acha o corte pelo projeto montado
+    pelo_projeto = cliente.get(f"/api/clipagens?projeto_id={projeto['id']}").json()
+    assert [c["id"] for c in pelo_projeto] == [clipagem["id"]] and pelo_projeto[0]["cortes"][0]["projeto_id"]
+    assert cliente.get(f"/api/clipagens?projeto_id={ObjectId()}").json() == []
     assert cliente.put(caminho, json={"projeto_id": str(ObjectId())}).status_code == 404
     assert cliente.put(caminho, json={"projeto_id": None}).json()["cortes"][0]["projeto_id"] is None
 

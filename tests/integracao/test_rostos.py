@@ -55,3 +55,21 @@ def test_video_sem_rosto_fica_pronto_sem_amostras(cliente, db_limpo):
     # Já procurado: pedir de novo não cria outro job
     cliente.post(f"/api/midias/{midia_id}/rosto")
     assert db_limpo.jobs.count_documents({"tipo": "rosto"}) == 1
+
+
+def test_busca_antiga_e_feita_de_novo_quando_o_layout_pede_todos(cliente, db_limpo):
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente)
+    cliente.post(f"/api/midias/{midia_id}/rosto")
+    # Uma busca pronta de antes dos outros rostos (sem versão)
+    db_limpo.rostos.update_one({"midia_id": ObjectId(midia_id)}, {"$set": {"status": "pronto", "amostras": []}})
+    db_limpo.jobs.delete_many({})
+    assert cliente.post(f"/api/midias/{midia_id}/rosto").json()["status"] == "pronto"
+    assert db_limpo.jobs.count_documents({}) == 0
+    pedido = cliente.post(f"/api/midias/{midia_id}/rosto?todos=true").json()
+    assert pedido["status"] == "processando" and db_limpo.jobs.count_documents({"tipo": "rosto"}) == 1
+    # Com a versão nova, pedir todos não busca de novo
+    db_limpo.rostos.update_one({"midia_id": ObjectId(midia_id)}, {"$set": {"status": "pronto", "versao": 2}})
+    db_limpo.jobs.delete_many({})
+    assert cliente.post(f"/api/midias/{midia_id}/rosto?todos=true").json()["versao"] == 2
+    assert db_limpo.jobs.count_documents({}) == 0

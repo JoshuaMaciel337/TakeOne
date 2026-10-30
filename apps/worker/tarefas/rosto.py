@@ -22,7 +22,9 @@ from core.modelos.rosto import (
     LARGURA_DE_ANALISE,
     STATUS_ERRO,
     STATUS_PRONTO,
+    VERSAO_DA_BUSCA,
     escolher_rosto,
+    outros_rostos,
 )
 from core.utils import storage
 from core.utils.mongo import agora
@@ -47,7 +49,7 @@ def _ler(saida, tamanho: int) -> bytes:
 
 def detectar(caminho, largura_video: int, altura_video: int, duracao: float,
              reportar: Callable[[int, str], None]) -> list[dict]:
-    """As amostras {t, x, y, a} do rosto principal, em frações da imagem."""
+    """As amostras {t, x, y, a} do rosto principal, em frações da imagem, com os outros rostos do quadro."""
     import cv2
     import numpy as np
 
@@ -72,8 +74,14 @@ def detectar(caminho, largura_video: int, altura_video: int, duracao: float,
             escolhido = escolher_rosto(ultimo, rostos)
             if escolhido is not None:
                 ultimo = escolhido[:2]
-                amostras.append({"t": round(n / AMOSTRAS_POR_SEGUNDO, 3), "x": round(float(escolhido[0]), 4),
-                                 "y": round(float(escolhido[1]), 4), "a": round(float(escolhido[2]), 5)})
+                amostra = {"t": round(n / AMOSTRAS_POR_SEGUNDO, 3), "x": round(float(escolhido[0]), 4),
+                           "y": round(float(escolhido[1]), 4), "a": round(float(escolhido[2]), 5)}
+                # Os outros rostos do quadro (o layout de duas pessoas acha as duas por eles)
+                outros = outros_rostos(escolhido, rostos)
+                if outros:
+                    amostra["outros"] = [[round(float(r[0]), 4), round(float(r[1]), 4), round(float(r[2]), 5)]
+                                         for r in outros]
+                amostras.append(amostra)
             n += 1
             if duracao and n % 20 == 0:
                 reportar(min(95, 5 + int(90 * n / (duracao * AMOSTRAS_POR_SEGUNDO))), "Procurando o rosto")
@@ -109,7 +117,8 @@ def executar_rosto(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     reportar(3, "Lendo o vídeo")
     amostras = detectar(proxy, int(video["largura"]), int(video["altura"]), float(midia.get("duracao") or 0), reportar)
     db.rostos.update_one({"midia_id": midia_id}, {"$set": {
-        "status": STATUS_PRONTO, "amostras": amostras, "erro": None, "atualizado_em": agora(),
+        "status": STATUS_PRONTO, "amostras": amostras, "versao": VERSAO_DA_BUSCA, "erro": None,
+        "atualizado_em": agora(),
     }})
     logging.info(f"[{organizacao_id}] [midia {midia_id}] Rosto em {len(amostras)} amostras.")
     reportar(100, "Rosto encontrado" if amostras else "Nenhum rosto encontrado")

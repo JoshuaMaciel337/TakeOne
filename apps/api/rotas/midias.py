@@ -81,6 +81,7 @@ from core.modelos.qualidade import montar_qualidade
 from core.modelos.rastreio import conferir_pedido, montar_rastreio
 from core.modelos.rosto import STATUS_PROCESSANDO as ROSTO_PROCESSANDO
 from core.modelos.rosto import STATUS_PRONTO as ROSTO_PRONTO
+from core.modelos.rosto import VERSAO_DA_BUSCA as VERSAO_DA_BUSCA_DO_ROSTO
 from core.modelos.rosto import montar_rosto
 from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSANDO
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
@@ -696,8 +697,10 @@ async def _job_da_analise(db, doc: dict) -> dict | None:
 
 
 @router.post("/{midia_id}/rosto", response_model=RostoSaida)
-async def pedir_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    """Põe a busca do rosto na fila do worker de CPU. Se já está pronta ou andando, só devolve."""
+async def pedir_rosto(midia_id: str, todos: bool = Query(default=False), usuario=Depends(usuario_atual),
+                     db=Depends(obter_db)):
+    """Põe a busca do rosto na fila do worker de CPU. Se já está pronta ou andando, só devolve. Com `todos`, uma
+    busca de antes, sem os outros rostos de cada quadro, é feita de novo (o layout de duas pessoas pede)."""
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA:
         raise HTTPException(status.HTTP_409_CONFLICT, "A mídia ainda está sendo preparada.")
@@ -707,7 +710,8 @@ async def pedir_rosto(midia_id: str, usuario=Depends(usuario_atual), db=Depends(
     if atual:
         job = await _job_da_analise(db, atual)
         andando = job is not None and job["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO)
-        if andando or atual["status"] == ROSTO_PRONTO:
+        completa = not todos or (atual.get("versao") or 1) >= VERSAO_DA_BUSCA_DO_ROSTO
+        if andando or (atual["status"] == ROSTO_PRONTO and completa):
             return rosto_para_saida(atual, job)
     documento = montar_rosto(usuario["organizacao_id"], midia["_id"])
     job = montar_job("rosto", usuario["organizacao_id"], {"midia_id": str(midia["_id"])}, criado_por=usuario["_id"])

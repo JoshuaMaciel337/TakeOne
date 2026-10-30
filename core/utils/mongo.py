@@ -62,6 +62,10 @@ INDICES = {
     "transcricoes": [
         ([("midia_id", 1)], {"unique": True}),
     ],
+    # O editor do corte acha o corte pelo projeto montado
+    "clipagens": [
+        ([("organizacao_id", 1), ("cortes.projeto_id", 1)], {}),
+    ],
     "rostos": [
         ([("midia_id", 1)], {"unique": True}),
     ],

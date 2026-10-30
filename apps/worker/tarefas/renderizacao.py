@@ -47,6 +47,7 @@ from core.utils.efeitos import LINHAS_POR_ALTURA, imagem_do_grao, tira_de_luz
 from core.utils.ffmpeg import ErroFFmpeg, executar_ffmpeg, resumir_sondagem, sondar
 from core.utils.fundo_desfocado import expandir_para_desenhar
 from core.utils.geometria import LADO_REFERENCIA_TEXTO
+from core.utils.layout_da_cena import com_os_layouts
 from core.utils.letras import tem_destaque, tem_letra_a_letra, texto_do_destaque
 from core.utils.lut import chave_da_lut, de_bytes
 from core.utils.mongo import agora
@@ -260,6 +261,8 @@ def executar_renderizacao(db, job: dict, reportar: Callable[[int, str], None]) -
 
     reportar(2, "Preparando as mídias e os textos")
     midias = preparar_midias(db, organizacao_id, projeto["faixas"])
+    # Os layouts das cenas (caber, dividido) viram as cópias de cima e de baixo, pelo tamanho de cada mídia
+    projeto = com_os_layouts(projeto, lambda midia_id: (m.largura, m.altura) if (m := midias.get(midia_id)) else None)
     luts = preparar_luts(db, organizacao_id, projeto["faixas"])
     largura, altura = exportacao["largura"], exportacao["altura"]
     pasta = caminho(ARQUIVO_FILTRO).parent

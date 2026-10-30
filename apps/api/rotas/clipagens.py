@@ -134,16 +134,21 @@ async def pedir_clipagem(dados: ClipagemEntrada, usuario=Depends(usuario_atual),
 
 
 @router.get("", response_model=list[ClipagemSaida])
-async def listar_clipagens(midia_id: str | None = Query(default=None), usuario=Depends(usuario_atual),
-                           db=Depends(obter_db)):
+async def listar_clipagens(midia_id: str | None = Query(default=None),
+                           projeto_id: str | None = Query(default=None, pattern=r"^[0-9a-f]{24}$"),
+                           usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """As clipagens do espaço; com projeto_id, só a que tem um corte montado nesse projeto (o editor do corte)."""
     filtro = {"organizacao_id": usuario["organizacao_id"]}
+    if projeto_id:
+        filtro["cortes.projeto_id"] = projeto_id
     if midia_id:
         try:
             filtro["midia_id"] = ObjectId(midia_id)
         except InvalidId:
             return []
     docs = await db.clipagens.find(filtro, {"palavras": 0}).sort("criado_em", -1).to_list(200)
-    return [clipagem_para_saida(doc, await _andamento(db, doc), resumida=True) for doc in docs]
+    # Pelo projeto, a clipagem vem inteira (o editor lê o corte)
+    return [clipagem_para_saida(doc, await _andamento(db, doc), resumida=not projeto_id) for doc in docs]
 
 
 @router.get("/{clipagem_id}", response_model=ClipagemSaida)

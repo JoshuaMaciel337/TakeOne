@@ -229,6 +229,25 @@ class EsconderObjetoEntrada(BaseModel):
     forca: float = Field(default=0.7, ge=0, le=1)
 
 
+class RegiaoDoLayoutEntrada(BaseModel):
+    """Um pedaço da imagem no layout dividido: o centro em frações da mídia e o zoom (1 é o maior que cabe)."""
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    zoom: float = Field(default=1, ge=1, le=4)
+
+
+class LayoutCaberEntrada(BaseModel):
+    tipo: Literal["caber"]
+    desfoque: float = Field(default=0.6, ge=0.05, le=1)
+
+
+class LayoutDivididoEntrada(BaseModel):
+    tipo: Literal["duas_pessoas", "tela_rosto"]
+    # A altura da parte de cima, em frações do quadro
+    divisao: float = Field(default=0.5, ge=0.2, le=0.8)
+    quadros: list[RegiaoDoLayoutEntrada] = Field(min_length=2, max_length=2)
+
+
 class ObjetoEscondidoEntrada(BaseModel):
     rastreio_id: str = Field(pattern=r"^[0-9a-f]{24}$")
 
@@ -1745,6 +1764,9 @@ class ClipeEntrada(BaseModel):
     chroma: ChromaEntrada | None = None
     # Some o preto ou o branco pela luma BT.709 (só em vídeos e imagens, como a tela verde)
     chave_luma: ChaveLumaEntrada | None = None
+    # O layout da cena no formato em pé: caber sobre o fundo desfocado ou dividido em dois
+    # (core/utils/layout_da_cena.py)
+    layout: Annotated[LayoutCaberEntrada | LayoutDivididoEntrada, Field(discriminator="tipo")] | None = None
     # Fundo desfocado (0 a 1): a pessoa nítida sobre uma cópia desfocada do clipe (core/utils/fundo_desfocado.py)
     fundo_desfocado: float | None = Field(default=None, ge=0, le=1)
     # Esconder os rostos: uma cópia pixelizada ou desfocada por cima, recortada pela máscara dos rostos
@@ -2584,12 +2606,15 @@ class AmostraDeRosto(BaseModel):
     x: float = Field(description="Centro do rosto, em frações da largura da imagem")
     y: float
     a: float = Field(description="Área do rosto, em frações da imagem")
+    outros: list[tuple[float, float, float]] | None = Field(default=None, description="Os outros rostos: x, y e área")
 
 
 class RostoSaida(BaseModel):
     midia_id: str
     status: str
     amostras: list[AmostraDeRosto] = []
+    # 2: as amostras trazem os outros rostos do quadro
+    versao: int = 1
     erro: str | None = None
     processamento: ProcessamentoSaida | None = None
 
