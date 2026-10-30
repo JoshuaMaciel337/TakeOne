@@ -89,7 +89,8 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
     assert [c["nota"] for c in cortes] == sorted((c["nota"] for c in cortes), reverse=True)
     for corte in cortes:
         assert 10 <= corte["trechos"][0]["inicio"] and corte["trechos"][-1]["fim"] <= 290
-        assert 24 <= corte["duracao"] <= 72 and "texto" not in corte and 0 <= corte["medidas"]["ritmo"] <= 1
+        assert 24 <= corte["duracao"] <= 72 and corte["texto"] and 0 <= corte["medidas"]["ritmo"] <= 1
+        assert corte["parecidos"] == []
         # A ênfase é o começo de palavras da fala, dentro do corte
         assert all(corte["trechos"][0]["inicio"] <= t <= corte["trechos"][-1]["fim"] for t in corte["enfase"])
     assert any(corte["enfase"] for corte in cortes)
@@ -109,6 +110,61 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
     assert ligado["cortes"][0]["projeto_id"] == projeto["id"]
     assert cliente.put(caminho, json={"projeto_id": str(ObjectId())}).status_code == 404
     assert cliente.put(caminho, json={"projeto_id": None}).json()["cortes"][0]["projeto_id"] is None
+
+
+
+def _pronta(cliente, db, **opcoes):
+    video = criar_video(db, duracao=300)
+    clipagem = cliente.post("/api/clipagens", json={"midia_id": str(video), "opcoes": opcoes}).json()
+    job = pegar_proximo_job(db, ["clipagem"], "w-teste")
+    assert processar_job(db, job, "w-teste") == "concluido"
+    return cliente.get(f"/api/clipagens/{clipagem['id']}").json()
+
+
+def test_copia_parte_dois_e_apagar(cliente, db_limpo):
+    cadastrar(cliente)
+    clipagem = _pronta(cliente, db_limpo, faixa="medio", maximo=3)
+    caminho = f"/api/clipagens/{clipagem['id']}/cortes"
+    # A ordem do vídeo: a parte 2 do primeiro corte cai antes do segundo
+    primeiro = min(clipagem["cortes"], key=lambda corte: corte["trechos"][0]["inicio"])
+    cliente.put(f"{caminho}/{primeiro['id']}/avaliacao", json={"avaliacao": "gostei"})
+
+    copia = cliente.post(f"{caminho}/{primeiro['id']}/copia")
+    assert copia.status_code == 201
+    cortes = copia.json()["cortes"]
+    posicao = [corte["id"] for corte in cortes].index(primeiro["id"])
+    nova = cortes[posicao + 1]
+    assert nova["copia_de"] == primeiro["id"] and nova["titulo"].endswith("(cópia)")
+    assert nova["trechos"] == primeiro["trechos"] and nova["avaliacao"] is None and nova["projeto_id"] is None
+    # A cópia não é "parecida" com o original: é o mesmo de propósito
+    assert nova["parecidos"] == [] and len({corte["id"] for corte in cortes}) == len(cortes)
+
+    parte = cliente.post(f"{caminho}/{primeiro['id']}/continuacao")
+    assert parte.status_code == 201
+    cortes = parte.json()["cortes"]
+    dois = cortes[[corte["id"] for corte in cortes].index(primeiro["id"]) + 1]
+    assert dois["parte_de"] == primeiro["id"] and dois["titulo"].endswith("(parte 2)") and dois["nota"] is None
+    assert dois["trechos"][0]["inicio"] >= primeiro["trechos"][-1]["fim"] - 0.05
+    assert 24 <= dois["duracao"] <= 72 and dois["texto"] and 0 <= dois["medidas"]["ritmo"] <= 1
+    tres = cliente.post(f"{caminho}/{dois['id']}/continuacao").json()["cortes"]
+    assert any(corte["titulo"].endswith("(parte 3)") for corte in tres)
+
+    # O último corte possível: a fala acaba logo depois
+    ultimo = {"id": "c90", "trechos": [{"inicio": 250.0, "fim": 299.5}], "duracao": 49.5, "titulo": "Fim",
+              "foco": [], "resumo": "", "categoria": "dica", "notas": None, "motivos": None, "nota": None,
+              "texto": "fim", "propaganda": False}
+    db_limpo.clipagens.update_one({"_id": ObjectId(clipagem["id"])}, {"$push": {"cortes": ultimo}})
+    assert cliente.post(f"{caminho}/c90/continuacao").status_code == 409
+    # Um corte que divide metade do tempo com outro ganha o aviso, nos dois
+    vizinho = {**ultimo, "id": "c91", "trechos": [{"inicio": 230.0, "fim": 280.0}], "duracao": 50.0}
+    db_limpo.clipagens.update_one({"_id": ObjectId(clipagem["id"])}, {"$push": {"cortes": vizinho}})
+    lista = {corte["id"]: corte for corte in cliente.get(f"/api/clipagens/{clipagem['id']}").json()["cortes"]}
+    assert "c91" in lista["c90"]["parecidos"] and "c90" in lista["c91"]["parecidos"]
+
+    apagado = cliente.delete(f"{caminho}/{nova['id']}")
+    assert apagado.status_code == 200 and nova["id"] not in {corte["id"] for corte in apagado.json()["cortes"]}
+    assert cliente.delete(f"{caminho}/{nova['id']}").status_code == 404
+    assert cliente.post(f"{caminho}/c99/copia").status_code == 404
 
 
 def test_sem_transcricao_pede_uma_e_espera(cliente, db_limpo):

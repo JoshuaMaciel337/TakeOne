@@ -24,10 +24,14 @@ from core.modelos.clipagem import (
     DURACAO_MINIMA,
     ESTRATEGIAS,
     STATUS_PROCESSANDO,
+    faixa_das_opcoes,
     montar_clipagem,
     palavras_das_legendas,
     palavras_do_trecho,
+    ritmo_do_corte,
 )
+from core.modelos.clipagem import STATUS_PRONTA as CLIPAGEM_PRONTA
+from core.modelos.cortes import MAXIMO_DE_CORTES_NA_LISTA, continuacao, copia_do_corte
 from core.modelos.job import RECURSO_GPU, STATUS_ERRO, STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import STATUS_PRONTA
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
@@ -154,13 +158,68 @@ async def fala_da_clipagem(clipagem_id: str, de: float = Query(default=0, ge=0),
     """As palavras da fala entre de e ate (segundos da mídia): do .srt da pessoa ou da transcrição. A montagem de
     cada corte (as legendas e a limpeza das pausas) parte delas."""
     doc = await _buscar(db, clipagem_id, usuario, com_palavras=True)
-    palavras = doc.get("palavras")
-    if not palavras:
-        transcricao = await db.transcricoes.find_one({"midia_id": doc["midia_id"]}, {"palavras": 1, "status": 1})
-        if transcricao is None or transcricao["status"] != TRANSCRICAO_PRONTA:
-            raise HTTPException(status.HTTP_409_CONFLICT, "A fala deste vídeo ainda não foi transcrita.")
-        palavras = transcricao.get("palavras") or []
-    return palavras_do_trecho(palavras, de, ate)
+    return palavras_do_trecho(await _palavras(db, doc), de, ate)
+
+
+async def _palavras(db, doc: dict) -> list[dict]:
+    """A fala da clipagem: o .srt da pessoa (guardado nela) ou a transcrição da mídia."""
+    if doc.get("palavras"):
+        return doc["palavras"]
+    transcricao = await db.transcricoes.find_one({"midia_id": doc["midia_id"]}, {"palavras": 1, "status": 1})
+    if transcricao is None or transcricao["status"] != TRANSCRICAO_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A fala deste vídeo ainda não foi transcrita.")
+    return transcricao.get("palavras") or []
+
+
+def _corte(doc: dict, corte_id: str) -> tuple[int, dict]:
+    for i, corte in enumerate(doc.get("cortes") or []):
+        if corte.get("id") == corte_id:
+            return i, corte
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Corte não encontrado.")
+
+
+async def _por_depois(db, doc: dict, posicao: int, novo: dict) -> None:
+    """Põe o corte novo logo depois de outro, com o limite da lista."""
+    if doc["status"] != CLIPAGEM_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Os cortes ainda estão sendo procurados.")
+    if len(doc.get("cortes") or []) >= MAXIMO_DE_CORTES_NA_LISTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"A lista já tem {MAXIMO_DE_CORTES_NA_LISTA} cortes.")
+    await db.clipagens.update_one({"_id": doc["_id"]},
+                                  {"$push": {"cortes": {"$each": [novo], "$position": posicao + 1}},
+                                   "$set": {"atualizado_em": agora()}})
+
+
+@router.post("/{clipagem_id}/cortes/{corte_id}/copia", response_model=ClipagemSaida, status_code=201)
+async def duplicar_corte(clipagem_id: str, corte_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A cópia do corte, logo depois dele, para montar o mesmo trecho com outra edição."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    posicao, corte = _corte(doc, corte_id)
+    await _por_depois(db, doc, posicao, copia_do_corte(corte, doc["cortes"]))
+    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+
+
+@router.post("/{clipagem_id}/cortes/{corte_id}/continuacao", response_model=ClipagemSaida, status_code=201)
+async def parte_seguinte(clipagem_id: str, corte_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A parte 2: o corte que continua a ideia, das frases logo depois do fim deste, na faixa pedida."""
+    doc = await _buscar(db, clipagem_id, usuario, com_palavras=True)
+    posicao, corte = _corte(doc, corte_id)
+    palavras = await _palavras(db, doc)
+    parte = continuacao(corte, palavras, faixa_das_opcoes(doc.get("opcoes") or {}), doc["cortes"])
+    if parte is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A fala do vídeo acaba logo depois deste corte.")
+    parte["medidas"] = {"ritmo": ritmo_do_corte(parte, palavras)}
+    await _por_depois(db, doc, posicao, parte)
+    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+
+
+@router.delete("/{clipagem_id}/cortes/{corte_id}", response_model=ClipagemSaida)
+async def apagar_corte(clipagem_id: str, corte_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Tira o corte da lista. O projeto em que ele foi montado continua nos projetos."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    _corte(doc, corte_id)
+    await db.clipagens.update_one({"_id": doc["_id"]},
+                                  {"$pull": {"cortes": {"id": corte_id}}, "$set": {"atualizado_em": agora()}})
+    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
 
 
 @router.put("/{clipagem_id}/cortes/{corte_id}/avaliacao", response_model=ClipagemSaida)

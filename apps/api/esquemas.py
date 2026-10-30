@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_serializ
 
 from core.modelos.animacao_html import DURACAO_MAXIMA as DURACAO_MAXIMA_ANIMACAO
 from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
+from core.modelos.cortes import parecidos
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
 from core.modelos.exportacao import STATUS_PROCESSANDO as STATUS_EXPORTACAO_PROCESSANDO
@@ -2459,8 +2460,12 @@ class ClipagemSaida(BaseModel):
 
 
 def clipagem_para_saida(doc: dict, andamento: dict | None, resumida: bool = False) -> ClipagemSaida:
-    """resumida: a lista das clipagens leva só a contagem (os cortes vêm ao abrir uma)."""
-    cortes = [{chave: valor for chave, valor in corte.items() if chave != "texto"} for corte in doc.get("cortes") or []]
+    """resumida: a lista das clipagens leva só a contagem (os cortes vêm ao abrir uma). Cada corte leva o texto
+    dele (a busca da lista) e os que se parecem com ele (o aviso)."""
+    cortes = doc.get("cortes") or []
+    if not resumida:
+        vizinhos = parecidos(cortes)
+        cortes = [{**corte, "parecidos": vizinhos.get(corte.get("id"), [])} for corte in cortes]
     return ClipagemSaida.model_validate({
         **doc,
         "id": str(doc["_id"]),

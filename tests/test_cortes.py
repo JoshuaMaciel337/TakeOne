@@ -1,6 +1,8 @@
 # Achar os cortes (Clipar, 14.3): as frases, as janelas, a conferência do que o modelo aponta e a junção
 from core.modelos.cortes import (
     FAIXAS,
+    TITULO_MAXIMO,
+    _titulo_da_parte,
     conferir_cortes,
     esquema_da_janela,
     frases_da_fala,
@@ -10,6 +12,7 @@ from core.modelos.cortes import (
     montar_mensagens,
     nota_final,
     parecenca,
+    proximo_id,
     tamanho_da_janela,
     texto_para_o_modelo,
 )
@@ -144,3 +147,15 @@ def test_nota_final_e_quantos_cortes():
     assert maximo_de_cortes(600) == 20 and maximo_de_cortes(60) == 3 and maximo_de_cortes(7200) == 30
     assert maximo_de_cortes(600, 5) == 5
     assert set(FAIXAS) >= {"auto", "curto", "medio", "longo"}
+
+
+def test_titulo_da_parte_conta_e_cabe():
+    assert _titulo_da_parte("O hábito") == "O hábito (parte 2)"
+    assert _titulo_da_parte("O hábito (parte 2)") == "O hábito (parte 3)"
+    longo = _titulo_da_parte("a" * TITULO_MAXIMO)
+    assert len(longo) == TITULO_MAXIMO and longo.endswith("(parte 2)")
+
+
+def test_proximo_id_passa_do_maior():
+    assert proximo_id([]) == "c01"
+    assert proximo_id([{"id": "c02"}, {"id": "c11"}, {"id": "x"}]) == "c12"

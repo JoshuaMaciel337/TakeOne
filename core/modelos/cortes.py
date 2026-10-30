@@ -403,3 +403,89 @@ def maximo_de_cortes(duracao: float, pedido: int | None = None) -> int:
     if pedido:
         return max(1, min(50, int(pedido)))
     return max(3, min(30, round(duracao / 60 * 2)))
+
+
+# -----------------------------------------------
+# A lista de cortes (14.4): os parecidos, a cópia e a parte 2
+# -----------------------------------------------
+PARECIDO_NO_TEMPO = 0.25        # abaixo da junção (0,5): dividem um pedaço do tempo, mas ficaram os dois
+PARECIDO_NO_TEXTO = 0.3         # abaixo da junção (0,55): dizem parte do mesmo
+PARTE_MINIMA_SEGUNDOS = 5.0     # menos fala que isso depois do corte não é uma parte 2
+MAXIMO_DE_CORTES_NA_LISTA = 100
+
+
+def parecidos(cortes: list[dict]) -> dict[str, list[str]]:
+    """Para cada corte, os outros que dividem um pedaço do tempo ou do texto com ele (o aviso da lista). A cópia
+    feita pela pessoa não conta: ela é o mesmo corte de propósito."""
+    resultado: dict[str, list[str]] = {}
+    for a in cortes:
+        resultado[a["id"]] = [
+            b["id"] for b in cortes
+            if b is not a and b.get("copia_de") != a["id"] and a.get("copia_de") != b["id"]
+            and (_sobreposicao(a, b) > PARECIDO_NO_TEMPO
+                 or parecenca(a.get("texto") or "", b.get("texto") or "") > PARECIDO_NO_TEXTO)
+        ]
+    return resultado
+
+
+def proximo_id(cortes: list[dict]) -> str:
+    """O id seguinte ("c13"), depois do maior que já existe."""
+    numeros = [int(corte["id"][1:]) for corte in cortes if re.fullmatch(r"c\d+", str(corte.get("id") or ""))]
+    return f"c{max(numeros, default=0) + 1:02d}"
+
+
+def copia_do_corte(corte: dict, cortes: list[dict]) -> dict:
+    """A cópia, para montar o mesmo corte com outra edição: sem o projeto e sem a avaliação."""
+    titulo = _limpar(f"{corte['titulo']} (cópia)", TITULO_MAXIMO)
+    return {**corte, "id": proximo_id(cortes), "titulo": titulo, "copia_de": corte["id"], "projeto_id": None,
+            "avaliacao": None}
+
+
+def _titulo_da_parte(titulo: str) -> str:
+    achado = re.search(r"\s*\(parte (\d+)\)$", titulo)
+    base, numero = (titulo[:achado.start()], int(achado.group(1)) + 1) if achado else (titulo, 2)
+    sufixo = f" (parte {numero})"
+    return base[:TITULO_MAXIMO - len(sufixo)].rstrip() + sufixo
+
+
+def continuacao(corte: dict, palavras: list[dict], faixa: str, cortes: list[dict]) -> dict | None:
+    """
+    A parte 2: as frases logo depois do fim do corte, até a duração dele (dentro da faixa pedida), fechando numa
+    frase. Sem o modelo, então sem notas: a lista mostra que ela continua o outro. None quando a fala acaba ali.
+    """
+    fim = corte["trechos"][-1]["fim"]
+    frases = [frase for frase in frases_da_fala(palavras) if frase["inicio"] >= fim - 0.05]
+    if not frases:
+        return None
+    minimo, maximo = FAIXAS.get(faixa, FAIXAS["auto"])
+    alvo = max(minimo, min(float(corte["duracao"]), maximo))
+    escolhidas: list[dict] = []
+    for frase in frases:
+        if escolhidas and frase["fim"] - escolhidas[0]["inicio"] > maximo * (1 + FOLGA_DA_FAIXA):
+            break
+        escolhidas.append(frase)
+        if frase["fim"] - escolhidas[0]["inicio"] >= alvo:
+            break
+    inicio, fim_da_parte = escolhidas[0]["inicio"], escolhidas[-1]["fim"]
+    if fim_da_parte - inicio < PARTE_MINIMA_SEGUNDOS:
+        return None
+    texto = " ".join(frase["texto"] for frase in escolhidas)
+    parte = {
+        "id": proximo_id(cortes),
+        "trechos": [{"inicio": round(inicio, 3), "fim": round(fim_da_parte, 3)}],
+        "duracao": round(fim_da_parte - inicio, 3),
+        "titulo": _titulo_da_parte(corte["titulo"]),
+        "foco": [],
+        "resumo": "",
+        "categoria": corte.get("categoria") or "explicacao",
+        "notas": None,
+        "motivos": None,
+        "nota": None,
+        "texto": texto,
+        "propaganda": bool(PROPAGANDA.search(texto)),
+        "enfase": [],
+        "parte_de": corte["id"],
+        "avaliacao": None,
+        "projeto_id": None,
+    }
+    return parte
