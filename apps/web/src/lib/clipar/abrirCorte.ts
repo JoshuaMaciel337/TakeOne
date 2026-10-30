@@ -2,11 +2,12 @@
 // ao corte, e abrir de novo vai ao mesmo projeto. O modelo de corte (o do corte, o da clipagem ou o padrão, 14.6)
 // dá as opções da montagem, e o "Como quer a edição" da clipagem muda o que pedir. A fala vem da clipagem (a
 // transcrição ou o .srt da pessoa) e o rosto da busca de sempre (worker de CPU); a montagem é pura
-// (montarCorte.ts). O que espera mídias novas (a legenda animada, as partes de pregação, a chamada, o logo e a
-// música) vem depois, antes de salvar o projeto.
+// (montarCorte.ts). O que espera mídias novas (a legenda animada, as partes de pregação, a chamada, o logo, a
+// música, os emojis, o gancho, a censura e a retenção) vem depois, antes de salvar o projeto.
 import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { type Clipagem, type Corte, falaDaClipagem } from "@/lib/clipagens";
+import { emojisNoProjeto } from "@/lib/emojis";
 import { falaDosClipes, palavrasDaLinha } from "@/lib/projeto/fala";
 import type { Marca } from "@/lib/projeto/marca";
 import type { Projeto } from "@/lib/projeto/modelo";
@@ -14,10 +15,13 @@ import { buscarRosto } from "@/lib/rosto";
 import type { Midia } from "@/lib/tipos";
 
 import { aplicarLegendaEPartes } from "./aplicarPregacao";
+import { censuraNoProjeto } from "./censuraDoCorte";
 import { extrasDoModelo } from "./extrasDoModelo";
+import { ganchoNoProjeto } from "./ganchoNarrado";
 import { modeloDasOpcoes, opcoesDoModelo, partesDoModelo, receitaValida } from "./modelosDeCorte";
 import { montarCorte, OPCOES_DA_MONTAGEM } from "./montarCorte";
 import { frasesDaLinha, legendaAnimadaDoPlano, opcoesDoPlano, partesDoPlano } from "./pedidoDeEdicao";
+import { retencaoNoProjeto, temRetencao } from "./retencaoDoCorte";
 
 /** A fala lida um pouco além das pontas do corte, para a última palavra não ficar de fora. */
 const FOLGA_DA_FALA_S = 2;
@@ -118,6 +122,35 @@ export async function projetoDoCorte(
     const comExtras = await extrasDoModelo({ projeto, receita, marca, midias, palavras: fala, aoAndamento, ativo });
     if (!comExtras) return null;
     projeto = comExtras.projeto;
+  }
+  if (receita.emojis) {
+    try {
+      const comEmojis = await emojisNoProjeto(projeto, midias, aoAndamento, ativo);
+      if (!comEmojis) return null;
+      projeto = comEmojis.projeto;
+    } catch {
+      // Sem emojis (o modelo não respondeu, o vídeo sem legendas): o corte sai sem eles
+    }
+  }
+  if (receita.gancho) {
+    try {
+      const comGancho = await ganchoNoProjeto({ projeto, midias, titulo: corte.titulo, voz: "pf_dora", aoAndamento, ativo });
+      if (!comGancho) return null;
+      projeto = comGancho.projeto;
+    } catch {
+      // Sem gancho (o modelo não escreveu uma frase que sirva): o corte sai sem ele
+    }
+  }
+  if (receita.censura && marca.censura.length) {
+    const comCensura = await censuraNoProjeto({ projeto, midias, palavras: fala, lista: marca.censura, modo: receita.censura, aoAndamento, ativo });
+    if (!comCensura) return null;
+    projeto = comCensura.projeto;
+  }
+  if (temRetencao(receita)) {
+    const pedido = { barra: receita.barra, quadro: receita.quadro_original, distracao: receita.distracao };
+    const comRetencao = await retencaoNoProjeto({ projeto, pedido, marca, midias, semente: `${clipagem.id}:${corte.id}`, aoAndamento, ativo });
+    if (!comRetencao) return null;
+    projeto = comRetencao.projeto;
   }
   await chamarApi<Projeto>(`/projetos/${vazio.id}`, {
     metodo: "PUT",

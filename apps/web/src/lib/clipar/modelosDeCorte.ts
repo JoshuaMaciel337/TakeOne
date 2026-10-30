@@ -1,7 +1,7 @@
 // Modelos de corte (ADR 0004, 14.6): uma receita, não uma linha do tempo fixa. Ela diz como cada corte sai: o
 // enquadramento, a limpeza das pausas, a legenda (estilo, lugar, tamanho, ou a animada), o título, os zooms, a
 // ênfase, a cor do vídeo, a voz na abertura, as transições e os sons, os gráficos, as imagens de apoio, a cartela, o
-// logo do kit, a chamada no fim e a música. A receita vira as opções da montagem (opcoesDoModelo), as partes da
+// logo do kit, a chamada no fim, a música e a retenção (a barra de progresso, o quadro do original e a distração). A receita vira as opções da montagem (opcoesDoModelo), as partes da
 // edição de pregação (partesDoModelo) e, no editor, um plano de edição (planoDoModelo), pelos caminhos que já
 // existem; o logo, a chamada e a música entram por comExtras (as mídias, extrasDoModelo.ts pede). Aplicado num vídeo
 // já editado, o modelo refaz as legendas, põe ou tira o título, os zooms e a ênfase e põe o que pede; o que ele deixa
@@ -9,6 +9,7 @@
 import { abaixamentoNaFala, type TrechoDeFala } from "../projeto/abaixar.ts";
 import { executarComando } from "../projeto/comandos.ts";
 import type { Contexto } from "../projeto/edicao.ts";
+import type { ModoDaCensura } from "../projeto/censura.ts";
 import type { Marca } from "../projeto/marca.ts";
 import type { Clipe, Projeto, Transformacao } from "../projeto/modelo.ts";
 import { ESTILOS_ANIMADOS } from "../projeto/legendaAnimada.ts";
@@ -19,6 +20,7 @@ import type { Midia } from "../tipos.ts";
 import { comMidiasDoPlano, DURACAO_DA_CARTELA, type PartesDaEdicao } from "./modeloDePregacao.ts";
 import { ALTURA_DA_POSICAO, type OpcoesDaMontagem } from "./montarCorte.ts";
 import type { PlanoDaEdicao } from "./pedidoDeEdicao.ts";
+import { barraDoProjeto, ehDistracao, ehFormaDaBarra, ehQuadroNaCaixa, type PosicaoDaBarra, QUANDO_DO_QUADRO, type QuandoDoQuadro } from "./retencao.ts";
 
 export type Transicoes = "nenhuma" | "fusao" | "flash" | "clarao" | "luz";
 export type ModeloDeChamada = "chamada_seguir" | "cta" | "chamada_comente";
@@ -48,6 +50,16 @@ export type ReceitaDoCorte = {
   chamada: { modelo: ModeloDeChamada; texto: string } | null;
   /** Uma música da biblioteca do espaço (com licença), baixa e abaixando na fala. */
   musica: { midia_id: string; volume: number; abaixar: boolean } | null;
+  /** A retenção (14.8): a barra de progresso, o quadro do original numa caixa e os vídeos de distração (um por corte). */
+  barra: PosicaoDaBarra | null;
+  quadro_original: QuandoDoQuadro | null;
+  distracao: string[];
+  /** O emoji automático: o LLM põe um emoji acima de algumas legendas (14.8). */
+  emojis: boolean;
+  /** O gancho narrado: uma frase do LLM falada no começo, com o som do vídeo abaixando (14.8). */
+  gancho: boolean;
+  /** A censura das palavras da lista do espaço: com um bipe ou o silêncio (14.8). */
+  censura: ModoDaCensura | null;
 };
 
 export type ModeloDeCorte = { id: string; nome: string; receita: ReceitaDoCorte };
@@ -72,6 +84,12 @@ export const RECEITA_PADRAO: ReceitaDoCorte = {
   logo: false,
   chamada: null,
   musica: null,
+  barra: null,
+  quadro_original: null,
+  distracao: [],
+  emojis: false,
+  gancho: false,
+  censura: null,
 };
 
 export const CHAMADAS: { id: ModeloDeChamada; nome: string; padrao: string }[] = [
@@ -116,7 +134,7 @@ export const MODELOS_PRONTOS: (ModeloDeCorte & { descricao: string })[] = [
   {
     id: "ritmo",
     nome: "Ritmo rápido",
-    descricao: "Para ganchos e dicas: legenda animada pulando, cor viva, flash com som nos cortes, zooms e o “comente” no fim.",
+    descricao: "Para ganchos e dicas: legenda animada pulando, cor viva, flash com som nos cortes, zooms, emojis, a barra de progresso e o “comente” no fim.",
     receita: {
       ...RECEITA_PADRAO,
       legenda_animada: "pulando",
@@ -125,6 +143,8 @@ export const MODELOS_PRONTOS: (ModeloDeCorte & { descricao: string })[] = [
       transicoes: "flash",
       sons: true,
       chamada: { modelo: "chamada_comente", texto: "QUERO" },
+      barra: "baixo",
+      emojis: true,
     },
   },
   {
@@ -187,6 +207,12 @@ export function receitaValida(dados: unknown): ReceitaDoCorte {
       musica && typeof musica === "object" && typeof musica.midia_id === "string"
         ? { midia_id: musica.midia_id, volume: Math.min(1, Math.max(0, Number(musica.volume) || 0.18)), abaixar: sim(musica.abaixar, true) }
         : null,
+    barra: ou(d.barra, ["baixo", "alto"], null) as PosicaoDaBarra | null,
+    quadro_original: ou(d.quadro_original, QUANDO_DO_QUADRO.map((q) => q.id), null) as QuandoDoQuadro | null,
+    emojis: sim(d.emojis, p.emojis),
+    gancho: sim(d.gancho, p.gancho),
+    censura: ou(d.censura, ["bipe", "silencio"], null) as ModoDaCensura | null,
+    distracao: Array.isArray(d.distracao) ? [...new Set(d.distracao.filter((id): id is string => typeof id === "string" && /^[0-9a-f]{24}$/.test(id)))].slice(0, 10) : [],
   };
 }
 
@@ -320,6 +346,21 @@ export function receitaDoProjeto(projeto: Projeto, midias: Map<string, Midia>, l
     logo: Boolean(logoDaMarca) && todas.some((clipe) => clipe.midia_id === logoDaMarca),
     chamada: chamadaAchada ? { modelo: chamadaAchada.modelo, texto: String(chamadaAchada.campos?.chamada ?? chamadaAchada.campos?.palavra ?? chamadaAchada.campos?.texto ?? "") } : null,
     musica: musica ? { midia_id: musica.midia_id, volume: Math.min(1, musica.volume), abaixar: Boolean(musica.abaixamento) } : null,
+    barra: barraDoProjeto(projeto, (id) => ehFormaDaBarra(midias.get(id)?.elemento))?.posicao ?? null,
+    quadro_original: todas.some((clipe) => ehQuadroNaCaixa(clipe, midiaDe(clipe))) ? "meio" : null,
+    emojis: todas.some((clipe) => midiaDe(clipe)?.elemento?.tipo === "emoji"),
+    gancho: todas.some((clipe) => midiaDe(clipe)?.fala?.gancho),
+    censura: todas.some((clipe) => midiaDe(clipe)?.efeito_sonoro?.id === "bipe") ? "bipe" : null,
+    // Os vídeos mudos na faixa de baixo (ou no canto) por cima da principal
+    distracao: [
+      ...new Set(
+        projeto.faixas
+          .filter((faixa) => faixa.tipo === "video")
+          .flatMap((faixa) => faixa.clipes)
+          .filter((clipe) => ehDistracao(clipe, midiaDe(clipe)))
+          .map((clipe) => clipe.midia_id!),
+      ),
+    ],
   });
 }
 
@@ -421,5 +462,11 @@ export function resumoDaReceita(receita: ReceitaDoCorte): string[] {
   if (receita.logo) itens.push("Logo do kit");
   if (receita.chamada) itens.push(`${CHAMADAS.find((item) => item.id === receita.chamada!.modelo)?.nome ?? "Chamada"} no fim`);
   if (receita.musica) itens.push("Música");
+  if (receita.barra) itens.push(`Barra de progresso ${receita.barra === "baixo" ? "embaixo" : "no alto"}`);
+  if (receita.quadro_original) itens.push("Quadro do original numa caixa");
+  if (receita.emojis) itens.push("Emojis nas legendas");
+  if (receita.gancho) itens.push("Gancho narrado");
+  if (receita.censura) itens.push(receita.censura === "bipe" ? "Palavras censuradas com bipe" : "Palavras censuradas no silêncio");
+  if (receita.distracao.length) itens.push(receita.distracao.length === 1 ? "Vídeo de distração" : `${receita.distracao.length} vídeos de distração`);
   return itens;
 }

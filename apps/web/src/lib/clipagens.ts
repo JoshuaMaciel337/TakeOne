@@ -92,6 +92,13 @@ export const CRITERIOS: { id: "gancho" | "fluxo" | "valor" | "autonomia"; nome: 
 
 export type Estrategia = { id: IdEstrategia; nome: string; faixa: Faixa; descricao: string };
 
+export type CapaDoCorte = { tipo: "quadro"; exportacao_id: string; segundos: number } | { tipo: "imagem"; midia_id: string };
+
+/** O endereço da capa para mostrar ou baixar (o PNG da exportação do quadro, ou a imagem da biblioteca). */
+export function enderecoDaCapa(capa: CapaDoCorte, baixar = false): string {
+  return capa.tipo === "quadro" ? `/api/exportacoes/${capa.exportacao_id}/arquivos/quadro.png${baixar ? "?baixar=true" : ""}` : `/api/midias/${capa.midia_id}/arquivos/imagem.png`;
+}
+
 export type Corte = {
   id: string;
   trechos: { inicio: number; fim: number }[];
@@ -121,6 +128,8 @@ export type Corte = {
   enfase?: number[];
   /** O projeto em que o corte foi montado (abrir de novo vai a ele). */
   projeto_id?: string | null;
+  /** A capa (14.8): um quadro exportado em PNG ou uma imagem da biblioteca. */
+  capa?: CapaDoCorte | null;
 };
 
 export type Clipagem = {

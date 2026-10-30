@@ -12,6 +12,10 @@ import { contextoDasMidias } from "@/componentes/editor/contexto";
 import { aplicarPlano, descreverPlano, estadoDoProjeto, type FraseDaLinha, frasesCortadas, frasesDaLinha, legendaAnimadaDoPlano, partesDoPlano, type PlanoDaEdicao } from "@/lib/clipar/pedidoDeEdicao";
 import { aplicarLegendaEPartes } from "@/lib/clipar/aplicarPregacao";
 import { extrasDoModelo } from "@/lib/clipar/extrasDoModelo";
+import { censuraNoProjeto } from "@/lib/clipar/censuraDoCorte";
+import { ganchoNoProjeto } from "@/lib/clipar/ganchoNarrado";
+import { retencaoNoProjeto, temRetencao } from "@/lib/clipar/retencaoDoCorte";
+import { emojisNoProjeto } from "@/lib/emojis";
 import { type ModeloDeCorte, partesDoModelo, planoDoModelo, type ReceitaDoCorte, receitaDoProjeto, resumoDaReceita } from "@/lib/clipar/modelosDeCorte";
 import { pedirPlanoDaEdicao } from "@/lib/clipar/pedirEdicao";
 import { useMarca } from "@/lib/marca";
@@ -148,6 +152,31 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
       if (!comExtras) return null;
       novo = comExtras.projeto;
       feitos.push(...comExtras.feitos);
+    }
+    if (receita?.emojis) {
+      const comEmojis = await emojisNoProjeto(novo, porId, setAndamento, () => ativo.current);
+      if (!comEmojis) return null;
+      novo = comEmojis.projeto;
+      if (comEmojis.quantos) feitos.push(`emojis em ${comEmojis.quantos} legendas`);
+    }
+    if (receita?.gancho) {
+      const comGancho = await ganchoNoProjeto({ projeto: novo, midias: porId, titulo: atual.nome, voz: "pf_dora", aoAndamento: setAndamento, ativo: () => ativo.current });
+      if (!comGancho) return null;
+      novo = comGancho.projeto;
+      feitos.push(`o gancho “${comGancho.frase}”`);
+    }
+    if (receita?.censura && marca.censura.length) {
+      const comCensura = await censuraNoProjeto({ projeto: novo, midias: porId, palavras, lista: marca.censura, modo: receita.censura, aoAndamento: setAndamento, ativo: () => ativo.current });
+      if (!comCensura) return null;
+      novo = comCensura.projeto;
+      if (comCensura.quantas) feitos.push(`${comCensura.quantas} ${comCensura.quantas === 1 ? "palavra censurada" : "palavras censuradas"}`);
+    }
+    if (receita && temRetencao(receita)) {
+      const pedido = { barra: receita.barra, quadro: receita.quadro_original, distracao: receita.distracao };
+      const comRetencao = await retencaoNoProjeto({ projeto: novo, pedido, marca, midias: porId, semente: atual.id, aoAndamento: setAndamento, ativo: () => ativo.current });
+      if (!comRetencao) return null;
+      novo = comRetencao.projeto;
+      feitos.push(...comRetencao.feitos);
     }
     if (mudou()) return "O vídeo mudou enquanto a edição era preparada. Peça de novo.";
     if (feitos.length) aoExecutar({ comando: "edicao.pedido", parametros: { projeto: novo } });

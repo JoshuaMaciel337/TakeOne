@@ -1,6 +1,6 @@
 // Formatos que a API devolve. Espelham apps/api/esquemas.py.
 import type { FormatoExportacao } from "./exportacao/formatos";
-import type { PedidoDeForma } from "./elementos";
+import type { ElementoEmoji, PedidoDeForma } from "./elementos";
 
 export type Usuario = {
   id: string;
@@ -90,7 +90,11 @@ export type Midia = {
   /** A voz em outro tom, por chave (tom_p3, tom_m2_limpa). */
   tons?: Record<string, { status: "processando" | "pronta" | "erro"; erro: string | null }>;
   /** Forma desenhada (lib/elementos.ts): o pedido que a gerou. Não aparece na biblioteca. */
-  elemento?: PedidoDeForma | null;
+  elemento?: PedidoDeForma | ElementoEmoji | null;
+  /** A foto de um quadro tirado de um vídeo (congelar, o quadro do original do Clipar): de onde e de que instante. */
+  quadro_de?: { midia_id: string; segundos: number } | null;
+  /** O texto em fala (o Kokoro): o texto, a voz, a velocidade e se é o gancho narrado de um corte. */
+  fala?: { texto: string; voz: string; velocidade: number; gancho?: boolean } | null;
   /** Camada de pixels do editor de imagem (lib/pixels.ts): o tamanho e a última versão enviada. Fora da biblioteca. */
   camada_pixels?: { largura: number; altura: number; ultima: number } | null;
   /** Importada pelo link (lib/importacao.ts): o site, o vídeo e o que se leu dele. */

@@ -730,6 +730,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     modeloInicial,
     animacaoInicial,
     corte: corteDoProjeto,
+    salvo: edicao.salvamento === "salvo",
     selecionado,
     aoPrever: preverDoPainel,
     // Tira a prévia e executa o comando final uma vez (sem a prévia virar um passo antes dele)

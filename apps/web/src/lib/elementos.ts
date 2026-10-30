@@ -1,4 +1,5 @@
-// Formas desenhadas no servidor (core/utils/forma.py): cada pedido vira uma imagem transparente da biblioteca.
+// Formas desenhadas no servidor (core/utils/forma.py): cada pedido vira uma imagem transparente da biblioteca. Os
+// emojis do emoji automático das legendas (core/utils/emoji.py) também, com `elemento.tipo` "emoji".
 import { chamarApi } from "./api";
 import type { Degrade } from "./projeto/gradiente";
 import type { Midia } from "./tipos";
@@ -15,6 +16,9 @@ export type PedidoDeForma = {
   /** O preenchimento em degradê no lugar da cor (lib/projeto/gradiente.ts); a forma vazada não tem. */
   degrade?: Degrade | null;
 };
+
+/** Um emoji do emoji automático das legendas (core/modelos/emojis.py), desenhado pela fonte de emoji do servidor. */
+export type ElementoEmoji = { tipo: "emoji"; nome: string };
 
 export const FORMAS: { tipo: TipoDeForma; nome: string; estica: boolean }[] = [
   { tipo: "retangulo", nome: "Retângulo", estica: true },

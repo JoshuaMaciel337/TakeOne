@@ -142,12 +142,17 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   câmera) e as fichas das legendas com o tempo e o dividir. Medido com um vídeo deitado de duas pessoas: prévia e
   exportação a 3,5–3,8 níveis em 255 no dividido e 1,9–2,0 no caber. O rastreador manual é um enquadramento parado
   por cena; seguir uma pessoa que anda dentro de uma parte do dividido fica para depois.
-- [ ] **14.8 Retenção e extras.** Barra de progresso; o quadro do original numa caixa (início, meio, fim ou sorteado);
+- [x] **14.8 Retenção e extras.** Barra de progresso; o quadro do original numa caixa (início, meio, fim ou sorteado);
   uma caixa com um vídeo de distração da biblioteca da pessoa; emoji automático nas legendas (o LLM escolhe, a fonte de
   emoji do servidor desenha); o gancho de locução (uma frase escrita pelo LLM e falada pelo Kokoro, com o volume do
   original abaixando); a capa do corte (o quadro atual ou uma imagem, baixada junto); censura de palavras (uma lista do
   espaço, com um bipe ou o silêncio) e o vocabulário da marca (nomes que a transcrição deve acertar, passados ao Whisper
   como dica).
+  **Pronta (30/10/2026):** no painel Corte, a retenção (barra, quadro do original e distração), o gancho narrado, a
+  censura e a capa; na ferramenta Legendas, os emojis; no kit de marca, as palavras censuradas e o vocabulário; tudo
+  também na receita do modelo de corte. Medido: prévia e exportação a 2,35–3,5 níveis em 255 com tudo ligado; o
+  vocabulário acertou os dois nomes que o Whisper errava. A capa fica no corte e sai em Exportados; ela não vai dentro
+  do MP4, porque as redes pedem a capa à parte.
 - [ ] **14.9 Saída e automação.** Exportar vários cortes de uma vez pela fila (o render de sempre), baixar tudo num ZIP,
   e as legendas em .srt e .vtt; o XML de intercâmbio por corte. A montagem no Node (decisão 1) e as automações: "quando
   eu colar um link", "vídeo novo no canal" (o monitor do feed do HolyCut, genérico) com o modelo de corte padrão, e "no

@@ -5,7 +5,8 @@
 // 100, as quatro notas com a frase do modelo, o título com as palavras de foco, o resumo, a categoria, os trechos
 // do original e os avisos (propaganda, parecido com outro). Ordenar, filtrar (avaliação e duração) e buscar nas
 // falas; gostei e não gostei; escolher vários para avaliar, baixar o .srt, exportar ou apagar juntos. Em cada
-// corte: abrir no editor (montando na primeira vez, 14.5), exportar, baixar o .srt, duplicar, a parte 2 e apagar.
+// corte: abrir no editor (montando na primeira vez, 14.5), exportar, baixar o .srt e a capa, duplicar, a parte 2 e
+// apagar.
 // Um modelo de corte (14.6) pode ser aplicado aos escolhidos: os já montados são montados de novo com ele.
 import {
   AlertCircle,
@@ -15,6 +16,7 @@ import {
   Clapperboard,
   Copy,
   Download,
+  ImageDown,
   LayoutGrid,
   List,
   ListPlus,
@@ -60,6 +62,7 @@ import {
   type Corte,
   CRITERIOS,
   duplicarCorte,
+  enderecoDaCapa,
   excluirClipagem,
   FAIXAS,
   falaDaClipagem,
@@ -241,6 +244,11 @@ function CartaoDoCorte(props: PropsDoCartao) {
           <BotaoIcone rotulo="Baixar as legendas (.srt)" aoClicar={props.aoBaixarSrt}>
             <Captions className="size-4" aria-hidden />
           </BotaoIcone>
+          {corte.capa ? (
+            <a href={enderecoDaCapa(corte.capa, true)} download className="botao-icone size-8" aria-label="Baixar a capa" title="Baixar a capa">
+              <ImageDown className="size-4" aria-hidden />
+            </a>
+          ) : null}
           <BotaoIcone rotulo="Duplicar" aoClicar={props.aoDuplicar} desligado={ocupado}>
             <Copy className="size-4" aria-hidden />
           </BotaoIcone>

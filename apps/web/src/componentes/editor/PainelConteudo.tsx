@@ -69,6 +69,8 @@ type Props = {
   animacaoInicial?: string;
   /** O corte do Clipar de onde o projeto veio (a ferramenta Corte). */
   corte?: CorteDoProjeto | null;
+  /** Se o projeto já está salvo no servidor (a capa do corte é exportada dele). */
+  salvo?: boolean;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -184,12 +186,13 @@ export function ConteudoDaFerramenta({
   modeloInicial,
   animacaoInicial,
   corte,
+  salvo = true,
 }: Omit<Props, "aoFechar" | "className" | "style">) {
   return (
     <>
     {ferramenta.id === "corte" ? (
       corte ? (
-        <PainelDoCorte {...legendas} corte={corte} midias={biblioteca.midias ?? []} aoPrever={aoPrever} aoConfirmar={aoConfirmar ?? legendas.aoExecutar} />
+        <PainelDoCorte {...legendas} corte={corte} midias={biblioteca.midias ?? []} aoPrever={aoPrever} aoConfirmar={aoConfirmar ?? legendas.aoExecutar} salvo={salvo} />
       ) : (
         <p className="text-xs text-suave">Este projeto não veio de um corte do Clipar.</p>
       )
@@ -212,7 +215,7 @@ export function ConteudoDaFerramenta({
     ) : ferramenta.id === "texto" ? (
       <PainelTexto aoAdicionar={aoAdicionarTexto} proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} animacaoInicial={animacaoInicial} />
     ) : ferramenta.id === "legendas" ? (
-      <PainelLegendas {...legendas} aoExecutarQuandoProntas={aoExecutarQuandoProntas} />
+      <PainelLegendas {...legendas} aoExecutarQuandoProntas={aoExecutarQuandoProntas} midias={biblioteca.midias ?? []} />
     ) : ferramenta.id === "transcricao" ? (
       <PainelTranscricao
         projeto={legendas.projeto}

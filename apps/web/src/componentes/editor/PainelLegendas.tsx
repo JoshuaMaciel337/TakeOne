@@ -7,7 +7,9 @@ import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
 import { ESTILOS_DE_LEGENDA, escreverSrt, escreverVtt, instanteParaDividir, legendasDasFaixas, lerLegendas, lerTextoDeLegenda, limitesDaFicha, PASSO_DA_FICHA } from "@/lib/projeto/legendas";
 import { type Clipe, duracaoDoProjeto, type Faixa, type Projeto } from "@/lib/projeto/modelo";
 import { formatarTimecode, type Tick } from "@/lib/tempo";
+import type { Midia } from "@/lib/tipos";
 
+import { EmojisDaIA } from "./EmojisDaIA";
 import { LegendaAnimada } from "./LegendaAnimada";
 import { LegendasDaFala } from "./LegendasDaFala";
 import { PalavrasChaveDaIA } from "./PalavrasChaveDaIA";
@@ -23,6 +25,8 @@ export type PropsLegendas = {
   aoAvisar: (mensagem: string) => void;
   /** Para a legenda animada: o comando roda quando a trilha gravada fica pronta. */
   aoExecutarQuandoProntas?: (midiaIds: string[], comando: Comando) => void;
+  /** As mídias do editor, para os emojis (achar os de antes). */
+  midias?: Midia[];
 };
 
 function baixar(nome: string, conteudo: string, tipo: string) {
@@ -84,7 +88,7 @@ function AjustesDaFicha({ clipe, faixa, projeto, tempo, aoExecutar }: { clipe: C
   );
 }
 
-export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar, aoExecutarQuandoProntas }: PropsLegendas) {
+export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBuscar, aoSelecionar, aoAvisar, aoExecutarQuandoProntas, midias }: PropsLegendas) {
   const [estiloId, setEstiloId] = useState(ESTILOS_DE_LEGENDA[0].id);
   const arquivoRef = useRef<HTMLInputElement>(null);
   const estilo = ESTILOS_DE_LEGENDA.find((item) => item.id === estiloId)!.texto;
@@ -146,6 +150,7 @@ export function PainelLegendas({ projeto, nome, tempo, selecao, aoExecutar, aoBu
 
       <LegendasDaFala projeto={projeto} estilo={estilo} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
       <PalavrasChaveDaIA projeto={projeto} aoExecutar={aoExecutar} aoAvisar={aoAvisar} />
+      {midias ? <EmojisDaIA projeto={projeto} midias={midias} aoExecutar={aoExecutar} aoAvisar={aoAvisar} /> : null}
       {aoExecutarQuandoProntas ? <LegendaAnimada projeto={projeto} aoExecutarQuandoProntas={aoExecutarQuandoProntas} aoAvisar={aoAvisar} /> : null}
 
       <div className="grid grid-cols-2 gap-2">

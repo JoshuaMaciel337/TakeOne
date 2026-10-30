@@ -26,6 +26,32 @@ type Props = {
 };
 
 /** Kit de marca do espaço: cores, fontes e logo, e os atalhos para usar no projeto aberto. */
+/** Uma lista do kit (o vocabulário, as palavras censuradas), uma por linha; vai para o kit ao sair do campo. */
+function ListaDoKit({ rotulo, dica, itens, aoMudar }: { rotulo: string; dica: string; itens: string[]; aoMudar: (itens: string[]) => void }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const id = `lista-${rotulo.replace(/\W+/g, "-").toLowerCase()}`;
+  return (
+    <section className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-xs font-semibold uppercase tracking-wide text-suave">
+        {rotulo}
+      </label>
+      <textarea
+        id={id}
+        rows={3}
+        value={texto ?? itens.join("\n")}
+        onChange={(evento) => setTexto(evento.target.value)}
+        onBlur={() => {
+          if (texto === null) return;
+          aoMudar(texto.split(/[\n,;]/).map((item) => item.trim()).filter(Boolean));
+          setTexto(null);
+        }}
+        className="campo resize-y px-2 py-1.5 text-xs"
+      />
+      <p className="text-[11px] text-suave">{dica}</p>
+    </section>
+  );
+}
+
 export function PainelMarca({ midias, projeto, aoAvisar }: Props) {
   const salva = useMarca();
   // O rascunho começa no kit salvo e só vai para o servidor no "Salvar"
@@ -150,6 +176,19 @@ export function PainelMarca({ midias, projeto, aoAvisar }: Props) {
           <p className="text-[11px] text-suave">Envie o logo como imagem (PNG com fundo transparente fica melhor) e escolha aqui.</p>
         )}
       </section>
+
+      <ListaDoKit
+        rotulo="Vocabulário da marca"
+        dica="Nomes que a transcrição deve acertar (a marca, produtos, pessoas), um por linha. Vale nas próximas transcrições."
+        itens={marca.vocabulario ?? []}
+        aoMudar={(vocabulario) => mudar({ vocabulario })}
+      />
+      <ListaDoKit
+        rotulo="Palavras censuradas"
+        dica="Uma por linha; um * no fim pega as variações (palavr*). A censura do Corte tapa com um bipe ou com o silêncio."
+        itens={marca.censura ?? []}
+        aoMudar={(censura) => mudar({ censura })}
+      />
 
       <button type="button" className="botao-principal px-3 py-1.5" disabled={!rascunho || salvando} onClick={salvar}>
         <Check className="size-4" aria-hidden />

@@ -3,9 +3,18 @@ import type { Tamanho } from "./geometria.ts";
 import type { Transformacao } from "./modelo.ts";
 import type { FonteTexto } from "./texto.ts";
 
-export type Marca = { cores: string[]; fonte_titulo: FonteTexto; fonte_texto: FonteTexto; logo_midia_id: string | null };
+export type Marca = {
+  cores: string[];
+  fonte_titulo: FonteTexto;
+  fonte_texto: FonteTexto;
+  logo_midia_id: string | null;
+  /** As palavras que a censura tapa nos cortes (14.8). */
+  censura: string[];
+  /** Os nomes que a transcrição deve acertar, passados ao Whisper como dica (14.8). */
+  vocabulario: string[];
+};
 
-export const MARCA_VAZIA: Marca = { cores: [], fonte_titulo: "display", fonte_texto: "texto", logo_midia_id: null };
+export const MARCA_VAZIA: Marca = { cores: [], fonte_titulo: "display", fonte_texto: "texto", logo_midia_id: null, censura: [], vocabulario: [] };
 export const CORES_DA_MARCA_MAXIMO = 6;
 
 export type Canto = "superior-esquerdo" | "superior-direito" | "inferior-esquerdo" | "inferior-direito";

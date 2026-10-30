@@ -700,7 +700,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {!clipe.ajuste ? <SilhuetaDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} /> : null}
         <MascaraDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
-        {midia?.elemento && !clipe.texto ? (
+        {midia?.elemento && midia.elemento.tipo !== "emoji" && !clipe.texto ? (
           <SecaoForma clipe={clipe} midia={{ ...midia, elemento: midia.elemento }} travada={travada} aoTrocarMidia={aoTrocarMidia} aoAvisar={aoAvisar} />
         ) : null}
         {comTempo && aoTrocarPorVideo && midia?.imagem && !midia.elemento && !midia.animacao && !midia.legenda_animada && !midia.video?.transparente && !clipe.texto ? (
