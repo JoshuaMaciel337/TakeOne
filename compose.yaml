@@ -65,6 +65,20 @@ services:
       mongo: {condition: service_healthy}
     restart: unless-stopped
 
+  # A montagem dos cortes do Clipar (o código TS do editor pelo Deno, ADR 0004): num worker só dela, porque ela
+  # espera jobs de CPU (o rosto, as animações). Fala só com a API, por uma chave temporária do dono do pedido.
+  worker-montagem:
+    build: {context: ., dockerfile: infra/docker/worker.Dockerfile}
+    image: takeone/worker:local
+    command: ["python", "-m", "worker.worker_principal", "--automatico", "--recursos", "montagem"]
+    environment:
+      <<: *ambiente-python
+      API_INTERNA: http://api:8000
+    depends_on:
+      mongo: {condition: service_healthy}
+      api: {condition: service_started}
+    restart: unless-stopped
+
   web:
     build:
       context: .

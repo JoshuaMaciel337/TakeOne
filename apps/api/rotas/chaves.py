@@ -25,7 +25,8 @@ def para_saida(doc: dict) -> ChaveSaida:
 
 @router.get("", response_model=list[ChaveSaida])
 async def listar_chaves(usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    cursor = db.chaves_de_acesso.find({"usuario_id": usuario["_id"]}).sort("criado_em", -1)
+    # As internas (as temporárias da montagem dos cortes) não são da pessoa
+    cursor = db.chaves_de_acesso.find({"usuario_id": usuario["_id"], "interna": {"$ne": True}}).sort("criado_em", -1)
     return [para_saida(doc) async for doc in cursor]
 
 
@@ -34,7 +35,8 @@ async def criar_chave(dados: ChaveEntrada, usuario=Depends(usuario_atual), db=De
     # Uma chave não cria outra: quem a tem não ganha acesso duradouro além do que já tem
     if usuario.get("_pela_chave"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Crie chaves pelo site, entrando com a senha.")
-    if await db.chaves_de_acesso.count_documents({"usuario_id": usuario["_id"]}) >= CHAVES_MAXIMAS:
+    da_pessoa = {"usuario_id": usuario["_id"], "interna": {"$ne": True}}
+    if await db.chaves_de_acesso.count_documents(da_pessoa) >= CHAVES_MAXIMAS:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Dá para ter até {CHAVES_MAXIMAS} chaves. Apague uma antes.")
     chave, doc = montar_chave(usuario["organizacao_id"], usuario["_id"], dados.nome.strip())
     doc["_id"] = (await db.chaves_de_acesso.insert_one(doc)).inserted_id
@@ -45,7 +47,7 @@ async def criar_chave(dados: ChaveEntrada, usuario=Depends(usuario_atual), db=De
 @router.delete("/{chave_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def apagar_chave(chave_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     try:
-        filtro = {"_id": ObjectId(chave_id), "usuario_id": usuario["_id"]}
+        filtro = {"_id": ObjectId(chave_id), "usuario_id": usuario["_id"], "interna": {"$ne": True}}
     except InvalidId as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Chave não encontrada.") from e
     if (await db.chaves_de_acesso.delete_one(filtro)).deleted_count == 0:

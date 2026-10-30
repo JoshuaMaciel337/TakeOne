@@ -435,10 +435,10 @@ def proximo_id(cortes: list[dict]) -> str:
 
 
 def copia_do_corte(corte: dict, cortes: list[dict]) -> dict:
-    """A cópia, para montar o mesmo corte com outra edição: sem o projeto e sem a avaliação."""
+    """A cópia, para montar o mesmo corte com outra edição: sem o projeto, a avaliação, a capa e a saída."""
     titulo = _limpar(f"{corte['titulo']} (cópia)", TITULO_MAXIMO)
     return {**corte, "id": proximo_id(cortes), "titulo": titulo, "copia_de": corte["id"], "projeto_id": None,
-            "avaliacao": None}
+            "avaliacao": None, "capa": None, "saida": None}
 
 
 def _titulo_da_parte(titulo: str) -> str:

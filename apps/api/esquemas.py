@@ -2585,6 +2585,101 @@ class AvaliacaoDoCorteEntrada(BaseModel):
     avaliacao: Literal["gostei", "nao_gostei"] | None = None
 
 
+class SaidaDosCortesEntrada(BaseModel):
+    """Exportar vários cortes de uma vez (14.9): o worker da montagem monta os que ainda não têm projeto e põe
+    cada vídeo na fila do render."""
+    cortes: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(min_length=1, max_length=50)
+    exportar: bool = True
+    resolucao: Literal["720p", "1080p", "4k"] = "1080p"
+
+
+HORARIO = r"^([01]\d|2[0-3]):[0-5]\d$"
+
+
+class EsteiraEntrada(BaseModel):
+    """Fazer tudo sozinho (14.9): do link colado (ou do vídeo enviado) aos melhores cortes exportados."""
+    url: str | None = Field(default=None, min_length=4, max_length=2000)
+    titulo: str | None = Field(default=None, max_length=120)
+    midia_id: str | None = Field(default=None, min_length=24, max_length=24)
+    opcoes: OpcoesDaClipagem = OpcoesDaClipagem()
+    quantos: int = Field(default=3, ge=1, le=10)
+    resolucao: Literal["720p", "1080p", "4k"] = "1080p"
+    # A busca dos cortes espera este horário (a placa de vídeo fica livre durante o dia); None: já
+    horario: str | None = Field(default=None, pattern=HORARIO)
+
+    @model_validator(mode="after")
+    def um_video(self):
+        if bool(self.url) == bool(self.midia_id):
+            raise ValueError("Mande o link ou o vídeo da biblioteca.")
+        return self
+
+
+class EsteiraSaida(BaseModel):
+    id: str
+    origem: str
+    titulo: str
+    status: str
+    midia_id: str | None = None
+    clipagem_id: str | None = None
+    automacao_id: str | None = None
+    quantos: int
+    horario: str | None = None
+    comecar_em: datetime | None = None
+    videos: int = 0
+    erro: str | None = None
+    criado_em: datetime
+    concluida_em: datetime | None = None
+
+
+def esteira_para_saida(doc: dict) -> EsteiraSaida:
+    return EsteiraSaida.model_validate({
+        **doc, "id": str(doc["_id"]),
+        **{campo: str(doc[campo]) if doc.get(campo) else None for campo in ("midia_id", "clipagem_id", "automacao_id")},
+    })
+
+
+class AutomacaoEntrada(BaseModel):
+    """Um canal do YouTube: cada vídeo novo dele vira uma esteira com estas opções."""
+    canal: str = Field(min_length=2, max_length=200)
+    opcoes: OpcoesDaClipagem = OpcoesDaClipagem()
+    quantos: int = Field(default=3, ge=1, le=10)
+    resolucao: Literal["720p", "1080p", "4k"] = "1080p"
+    horario: str | None = Field(default=None, pattern=HORARIO)
+    duracao_minima: int = Field(default=5, ge=1, le=240, description="Minutos")
+
+
+class AutomacaoMudanca(BaseModel):
+    ativa: bool | None = None
+    opcoes: OpcoesDaClipagem | None = None
+    quantos: int | None = Field(default=None, ge=1, le=10)
+    resolucao: Literal["720p", "1080p", "4k"] | None = None
+    # "" tira o horário
+    horario: str | None = Field(default=None, pattern=r"^(|([01]\d|2[0-3]):[0-5]\d)$")
+    duracao_minima: int | None = Field(default=None, ge=1, le=240)
+
+
+class AutomacaoSaida(BaseModel):
+    id: str
+    tipo: str
+    ativa: bool
+    canal: dict
+    opcoes: dict
+    quantos: int
+    resolucao: str
+    horario: str | None = None
+    duracao_minima: int
+    ultima_verificacao: datetime | None = None
+    ultimo_erro: str | None = None
+    criado_em: datetime
+
+
+def automacao_para_saida(doc: dict) -> AutomacaoSaida:
+    canal = doc.get("canal") or {}
+    return AutomacaoSaida.model_validate({**doc, "id": str(doc["_id"]),
+                                          "canal": {"id": canal.get("id"), "handle": canal.get("handle"),
+                                                    "nome": canal.get("nome")}})
+
+
 class ProjetoDoCorteEntrada(BaseModel):
     """O projeto em que o corte foi montado (14.5): abrir de novo vai a ele em vez de montar outro."""
     projeto_id: str | None = None

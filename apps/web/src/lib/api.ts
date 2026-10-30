@@ -1,5 +1,6 @@
 // Cliente da API. Tudo passa por /api no mesmo endereço do site,
-// então o cookie de sessão vai junto sem configuração extra.
+// então o cookie de sessão vai junto sem configuração extra. Fora do navegador (a montagem dos cortes no
+// worker, ADR 0004), configurarApi dá o endereço da API e a chave de acesso.
 
 export class ErroApi extends Error {
   status: number;
@@ -25,13 +26,22 @@ export function mensagemPadrao(status: number): string {
   return "Algo deu errado. Tente de novo.";
 }
 
+let enderecoDaApi = "";
+let cabecalhosFixos: Record<string, string> = {};
+
+/** Fora do navegador: o endereço da API (como "http://api:8000") e a chave de acesso que vai em cada pedido. */
+export function configurarApi(opcoes: { endereco: string; chave: string }) {
+  enderecoDaApi = opcoes.endereco.replace(/\/+$/, "");
+  cabecalhosFixos = { Authorization: `Bearer ${opcoes.chave}` };
+}
+
 export async function chamarApi<T>(caminho: string, opcoes: Opcoes = {}): Promise<T> {
   const temCorpo = opcoes.corpo !== undefined;
   let resposta: Response;
   try {
-    resposta = await fetch(`/api${caminho}`, {
+    resposta = await fetch(`${enderecoDaApi}/api${caminho}`, {
       method: opcoes.metodo ?? "GET",
-      headers: temCorpo ? { "Content-Type": "application/json" } : undefined,
+      headers: { ...cabecalhosFixos, ...(temCorpo ? { "Content-Type": "application/json" } : {}) },
       body: temCorpo ? JSON.stringify(opcoes.corpo) : undefined,
       credentials: "same-origin",
       cache: "no-store",

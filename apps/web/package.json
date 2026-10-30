@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "comparar-previa": "node scripts/comparar-previa.mjs"
+    "comparar-previa": "node scripts/comparar-previa.mjs",
+    "montador": "esbuild src/lib/clipar/montador/principal.ts --bundle --format=esm --platform=neutral --main-fields=module,main --alias:@=./src --log-level=warning --outfile=dist/montador.mjs"
   },
   "dependencies": {
     "ag-psd": "31.0.3",
@@ -30,6 +31,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "0.25.12",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "playwright-core": "^1.51.1",

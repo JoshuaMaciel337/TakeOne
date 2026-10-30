@@ -35,6 +35,7 @@ from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
 from worker.tarefas.legenda_animada import executar_legenda_animada
 from worker.tarefas.limpeza_imagem import executar_limpeza_imagem, marcar_imagem_com_erro
 from worker.tarefas.limpeza_voz import executar_limpeza_voz, marcar_voz_com_erro
+from worker.tarefas.montagem import executar_montagem, marcar_montagem_com_erro
 from worker.tarefas.objeto import executar_objeto, executar_selecao
 from worker.tarefas.palavras_chave import executar_palavras_chave
 from worker.tarefas.pedido_edicao import executar_pedido_edicao
@@ -64,6 +65,7 @@ REGISTRO = {
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
     "clipagem": Tarefa(executar_clipagem, ao_falhar=marcar_clipagem_com_erro),
+    "montagem": Tarefa(executar_montagem, ao_falhar=marcar_montagem_com_erro),
     "renderizacao": Tarefa(executar_renderizacao, ao_falhar=marcar_exportacao_com_erro),
     "transcricao": Tarefa(executar_transcricao, ao_falhar=marcar_transcricao_com_erro),
     "limpeza_voz": Tarefa(executar_limpeza_voz, ao_falhar=marcar_voz_com_erro),

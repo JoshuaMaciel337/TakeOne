@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // O montador dos cortes empacotado (npm run montador)
+    "dist/**",
   ]),
 ]);
 

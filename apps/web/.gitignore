@@ -5,6 +5,8 @@
 /.next/
 /out/
 /build
+# O montador dos cortes empacotado (npm run montador; a imagem do worker gera o dela)
+/dist/
 next-env.d.ts
 *.tsbuildinfo
 

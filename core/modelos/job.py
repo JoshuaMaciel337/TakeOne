@@ -14,6 +14,9 @@ STATUS_FINAIS = {STATUS_CONCLUIDO, STATUS_ERRO}
 
 RECURSO_CPU = "cpu"
 RECURSO_GPU = "gpu"
+# A montagem dos cortes (o código TS pelo Deno) espera jobs de CPU (o rosto, as animações): num worker só dela, ela
+# nunca ocupa o worker de que depende
+RECURSO_MONTAGEM = "montagem"
 
 # Tipo de job → recurso que o worker precisa ter para executá-lo
 TAREFAS = {
@@ -58,6 +61,7 @@ TAREFAS = {
     "profundidade": RECURSO_CPU,
     "restaurar": RECURSO_CPU,
     "importar_link": RECURSO_CPU,
+    "montagem": RECURSO_MONTAGEM,
 }
 
 

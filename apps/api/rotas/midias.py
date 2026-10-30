@@ -284,27 +284,34 @@ async def ler_dados_do_link(dados: LinkEntrada, usuario=Depends(usuario_atual)):
     return LinkSaida(**video, problema=problema_do_video(video))
 
 
-@router.post("/link", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
-async def importar_link(dados: LinkImportarEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    """Põe na fila o download do vídeo do link (worker de CPU). A mídia já entra na biblioteca, processando, e
-    passa pela ingestão como um envio comum quando o vídeo chega. O mesmo vídeo já importado no espaço volta como
-    está, sem baixar de novo."""
-    link = ler_link(dados.url)
+async def importar_do_link(db, usuario: dict, url: str, titulo: str | None = None) -> dict:
+    """A mídia do link: a que o espaço já importou (o mesmo vídeo, por outro formato do link) ou uma nova,
+    processando, com o download na fila."""
+    link = ler_link(url)
     if link is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, MENSAGEM_SITES)
     existente = await db.midias.find_one({"organizacao_id": usuario["organizacao_id"],
                                           "importacao.origem": link["origem"], "importacao.id": link["id"],
                                           "status": {"$ne": STATUS_ERRO}})
     if existente is not None:
-        return (await para_saida(db, [existente]))[0]
-    video = {"titulo": dados.titulo} if dados.titulo else None
+        return existente
+    video = {"titulo": titulo} if titulo else None
     midia, job = montar_importacao(usuario["organizacao_id"], usuario["_id"], link, video)
     midia["_id"] = (await db.midias.insert_one(midia)).inserted_id
     job["entrada"]["midia_id"] = str(midia["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     await db.midias.update_one({"_id": midia["_id"]}, {"$set": {"job_ingestao_id": job_id}})
     logging.info(f"[{usuario['organizacao_id']}] Importação pedida: {link['origem']} {link['id']}")
-    return (await para_saida(db, [{**midia, "job_ingestao_id": job_id}]))[0]
+    return {**midia, "job_ingestao_id": job_id}
+
+
+@router.post("/link", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)
+async def importar_link(dados: LinkImportarEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Põe na fila o download do vídeo do link (worker de CPU). A mídia já entra na biblioteca, processando, e
+    passa pela ingestão como um envio comum quando o vídeo chega. O mesmo vídeo já importado no espaço volta como
+    está, sem baixar de novo."""
+    midia = await importar_do_link(db, usuario, dados.url, dados.titulo)
+    return (await para_saida(db, [midia]))[0]
 
 
 @router.post("/fala", response_model=MidiaSaida, status_code=status.HTTP_201_CREATED)

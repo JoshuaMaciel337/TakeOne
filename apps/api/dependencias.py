@@ -21,11 +21,14 @@ async def _usuario_da_chave(db, chave: str) -> dict:
     doc = await db.chaves_de_acesso.find_one({"hash": hash_da_chave(chave)})
     if doc is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Chave de acesso inválida ou apagada.")
+    agora = datetime.now(TZ)
+    # A temporária vencida (o índice TTL do Mongo a apaga em até um minuto)
+    if doc.get("expira_em") and doc["expira_em"] <= agora:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Chave de acesso vencida.")
     usuario = await db.usuarios.find_one({"_id": doc["usuario_id"]})
     if not usuario or not usuario.get("ativo", True):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Chave de acesso inválida.")
     # O último uso, no máximo uma vez por minuto (cada pedido gravaria no banco)
-    agora = datetime.now(TZ)
     if not doc.get("usado_em") or agora - doc["usado_em"] > timedelta(minutes=1):
         await db.chaves_de_acesso.update_one({"_id": doc["_id"]}, {"$set": {"usado_em": agora}})
     return {**usuario, "_pela_chave": True}

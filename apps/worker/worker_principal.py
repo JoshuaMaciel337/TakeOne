@@ -22,6 +22,7 @@ import uuid
 
 from core.config import HEARTBEAT_SEGUNDOS, INTERVALO_BUSCA_SEGUNDOS, INTERVALO_LIMPEZA_SEGUNDOS, MODO_IA
 from core.modelos.job import STATUS_ERRO, ErroDefinitivo, tipos_por_recursos
+from core.utils.esteiras import laco_das_automacoes
 from core.utils.fila import (
     atualizar_progresso,
     concluir_job,
@@ -216,6 +217,10 @@ def main():
 
     criar_indices(db)
     threading.Thread(target=enviar_sinal_de_vida, args=(db, worker_id, recursos, tipos), daemon=True).start()
+    # As automações do Clipar (as esteiras e os canais) andam no worker da montagem, numa thread à parte: um corte
+    # montando não segura a volta das esteiras
+    if "montagem" in recursos and not args.agora:
+        threading.Thread(target=laco_das_automacoes, args=(db, _parar), daemon=True).start()
     executar_loop(db, tipos, worker_id, somente_disponiveis=args.agora)
     _parar.set()
     try:

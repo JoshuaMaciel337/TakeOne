@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from api.rotas import (
     animacoes,
     auth,
+    automacoes,
     celular,
     chaves,
     clipagens,
@@ -167,6 +168,7 @@ app.include_router(fontes.router)
 app.include_router(chaves.router)
 app.include_router(conversoes.router)
 app.include_router(clipagens.router)
+app.include_router(automacoes.router)
 app.include_router(legendas_animadas.router)
 app.include_router(efeitos_sonoros.router)
 app.include_router(pixabay.router)

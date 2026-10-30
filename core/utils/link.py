@@ -41,6 +41,22 @@ def ler_metadados(url: str, origem: str) -> dict:
         raise ErroImportacao(str(erro).removeprefix("ERROR: ")[:300]) from erro
 
 
+def resolver_canal(handle: str) -> tuple[str, str]:
+    """O id UC... e o nome do canal, a partir do @ (o feed RSS só aceita o id). Só o extrator das páginas de canal."""
+    yt_dlp = _yt_dlp()
+    opcoes = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": True, "playlistend": 1,
+              "allowed_extractors": ["youtube:tab"], "socket_timeout": 30}
+    try:
+        with yt_dlp.YoutubeDL(opcoes) as cliente:
+            info = cliente.extract_info(f"https://www.youtube.com/{handle}", download=False) or {}
+    except yt_dlp.utils.DownloadError as erro:
+        raise ErroImportacao(f"Não encontrei o canal {handle} no YouTube.") from erro
+    canal_id = str(info.get("channel_id") or "")
+    if not canal_id.startswith("UC"):
+        raise ErroImportacao(f"Não encontrei o canal {handle} no YouTube.")
+    return canal_id, " ".join(str(info.get("channel") or info.get("uploader") or handle).split())[:120]
+
+
 def mensagem_definitiva(erro: Exception) -> str | None:
     """A falha que não melhora tentando de novo (vídeo privado, removido, com idade), na língua da pessoa."""
     texto = str(erro).lower()

@@ -6,10 +6,14 @@
 # o .srt da pessoa, a fala vem dele (guardada na clipagem) e não há transcrição.
 # -----------------------------------------------
 import logging
+import zipfile
+from collections.abc import Iterator
+from pathlib import Path
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
@@ -20,8 +24,11 @@ from api.esquemas import (
     ModeloDoCorteEntrada,
     PalavraSaida,
     ProjetoDoCorteEntrada,
+    SaidaDosCortesEntrada,
     clipagem_para_saida,
 )
+from api.rotas.exportacoes import para_saida as exportacoes_para_saida
+from api.rotas.intercambio import BLOCO_DO_ZIP, _disposicao, _preparar, _Saida, nome_de_arquivo
 from core.modelos.clipagem import (
     DURACAO_MINIMA,
     ESTRATEGIAS,
@@ -34,9 +41,15 @@ from core.modelos.clipagem import (
 )
 from core.modelos.clipagem import STATUS_PRONTA as CLIPAGEM_PRONTA
 from core.modelos.cortes import MAXIMO_DE_CORTES_NA_LISTA, continuacao, copia_do_corte
+from core.modelos.exportacao import chave_exportacao
 from core.modelos.job import RECURSO_GPU, STATUS_ERRO, STATUS_EXECUTANDO, STATUS_PENDENTE, montar_job
 from core.modelos.midia import STATUS_PRONTA
+from core.modelos.midia import chave_arquivo as chave_da_midia
+from core.modelos.saida_dos_cortes import cortes_ocupados, montar_pedido
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
+from core.utils import storage
+from core.utils.intercambio import montar_xmeml
+from core.utils.legendas import escrever_srt, escrever_vtt, legendas_das_faixas
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/clipagens", tags=["clipagens"])
@@ -77,6 +90,30 @@ async def _andamento(db, doc: dict) -> dict | None:
         return {"etapa": "cortes", "progresso": 0, "mensagem": job.get("mensagem") or "Na fila"}
     return {"etapa": "cortes", "progresso": job.get("progresso", 0),
             "mensagem": job.get("mensagem") or "Procurando os cortes"}
+
+
+async def _com_as_exportacoes(db, doc: dict) -> dict:
+    """Cada corte exportado leva o estado da exportação dele (o andamento do render), numa consulta só."""
+    ids = [ObjectId(saida["exportacao_id"]) for corte in doc.get("cortes") or []
+           if (saida := corte.get("saida") or {}).get("exportacao_id") and ObjectId.is_valid(saida["exportacao_id"])]
+    if not ids:
+        return doc
+    cursor = db.exportacoes.find({"_id": {"$in": ids}, "organizacao_id": doc["organizacao_id"]}, {"projeto": 0})
+    exportacoes = {item.id: item.model_dump(include={"id", "status", "arquivos", "erro", "processamento"})
+                   for item in await exportacoes_para_saida(db, [e async for e in cursor])}
+    cortes = []
+    for corte in doc["cortes"]:
+        saida = corte.get("saida")
+        if saida and saida.get("exportacao_id"):
+            # A exportação apagada em Exportados: o corte volta a não ter vídeo
+            saida = {**saida, "exportacao": exportacoes.get(saida["exportacao_id"])}
+        cortes.append({**corte, "saida": saida} if saida else corte)
+    return {**doc, "cortes": cortes}
+
+
+async def _completa(db, doc: dict) -> ClipagemSaida:
+    """A clipagem inteira, com o andamento das exportações dos cortes (as rotas que mudam um corte)."""
+    return clipagem_para_saida(await _com_as_exportacoes(db, doc), None)
 
 
 @router.get("/estrategias")
@@ -155,7 +192,34 @@ async def listar_clipagens(midia_id: str | None = Query(default=None),
 @router.get("/{clipagem_id}", response_model=ClipagemSaida)
 async def ver_clipagem(clipagem_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     doc = await _buscar(db, clipagem_id, usuario)
-    return clipagem_para_saida(doc, await _andamento(db, doc))
+    return clipagem_para_saida(await _com_as_exportacoes(db, doc), await _andamento(db, doc))
+
+
+@router.post("/{clipagem_id}/saidas", response_model=ClipagemSaida, status_code=status.HTTP_202_ACCEPTED)
+async def pedir_saida(clipagem_id: str, dados: SaidaDosCortesEntrada, usuario=Depends(usuario_atual),
+                      db=Depends(obter_db)):
+    """Exportar vários cortes de uma vez (14.9): o worker da montagem monta os que ainda não têm projeto, sem a
+    página aberta, e põe cada vídeo na fila do render. Os mesmos cortes não entram duas vezes."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    if doc["status"] != CLIPAGEM_PRONTA:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Os cortes ainda estão sendo procurados.")
+    ids = list(dict.fromkeys(dados.cortes))
+    for corte_id in ids:
+        _corte(doc, corte_id)
+    if ocupados := cortes_ocupados(doc.get("cortes") or [], ids):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Já está na fila." if len(ocupados) == 1
+                            else f"{len(ocupados)} desses cortes já estão na fila.")
+    job, saida = montar_pedido(usuario["organizacao_id"], usuario["_id"], doc["_id"], ids, dados.exportar,
+                               dados.resolucao)
+    job["_id"] = (await db.jobs.insert_one(job)).inserted_id
+    await db.clipagens.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"cortes.$[c].saida": {**saida, "job_id": str(job["_id"])}, "atualizado_em": agora()}},
+        array_filters=[{"c.id": {"$in": ids}}],
+    )
+    logging.info(f"[{usuario['organizacao_id']}] Saída de {len(ids)} cortes pedida ({doc['nome']}, "
+                 f"{dados.resolucao})")
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.get("/{clipagem_id}/fala", response_model=list[PalavraSaida])
@@ -202,7 +266,7 @@ async def duplicar_corte(clipagem_id: str, corte_id: str, usuario=Depends(usuari
     doc = await _buscar(db, clipagem_id, usuario)
     posicao, corte = _corte(doc, corte_id)
     await _por_depois(db, doc, posicao, copia_do_corte(corte, doc["cortes"]))
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.post("/{clipagem_id}/cortes/{corte_id}/continuacao", response_model=ClipagemSaida, status_code=201)
@@ -216,7 +280,7 @@ async def parte_seguinte(clipagem_id: str, corte_id: str, usuario=Depends(usuari
         raise HTTPException(status.HTTP_409_CONFLICT, "A fala do vídeo acaba logo depois deste corte.")
     parte["medidas"] = {"ritmo": ritmo_do_corte(parte, palavras)}
     await _por_depois(db, doc, posicao, parte)
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.put("/{clipagem_id}/cortes/{corte_id}/modelo", response_model=ClipagemSaida)
@@ -229,7 +293,7 @@ async def mudar_modelo_do_corte(clipagem_id: str, corte_id: str, dados: ModeloDo
     modelo = dados.modelo_corte.model_dump() if dados.modelo_corte else None
     await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
                                   {"$set": {"cortes.$.modelo_corte": modelo, "atualizado_em": agora()}})
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.put("/{clipagem_id}/cortes/{corte_id}/capa", response_model=ClipagemSaida)
@@ -257,7 +321,96 @@ async def mudar_capa(clipagem_id: str, corte_id: str, dados: CapaDoCorteEntrada,
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Imagem não encontrada.")
     await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
                                   {"$set": {"cortes.$.capa": capa, "atualizado_em": agora()}})
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
+
+
+LEIA_ME_DO_PACOTE = """Os cortes do TakeOne
+
+Cada corte tem o vídeo (.mp4), as legendas em .srt (a maioria das redes e dos programas) e em .vtt (navegadores e
+alguns players), a capa, quando ela foi escolhida, e o XML de intercâmbio, para continuar a edição noutro programa.
+
+O XML aponta para o vídeo original numa pasta midias/ ao lado dele: para abrir, ponha o vídeo original lá (ou, no
+outro programa, ligue a mídia ao arquivo original).
+"""
+
+
+def _pacote_em_pedacos(arquivos: list[tuple[str, bytes | Path]]) -> Iterator[bytes]:
+    """O ZIP sem compressão (os vídeos já vêm comprimidos), mandado enquanto é montado, como o do intercâmbio."""
+    saida = _Saida()
+    with zipfile.ZipFile(saida, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as pacote:
+        for nome, conteudo in arquivos:
+            if isinstance(conteudo, bytes):
+                pacote.writestr(nome, conteudo)
+            else:
+                with open(conteudo, "rb") as origem, pacote.open(nome, "w", force_zip64=True) as destino:
+                    while bloco := origem.read(BLOCO_DO_ZIP):
+                        destino.write(bloco)
+                        yield from saida.tirar()
+            yield from saida.tirar()
+    yield from saida.tirar()
+
+
+async def _arquivos_do_corte(db, usuario: dict, numero: int, corte: dict) -> list[tuple[str, bytes | Path]] | None:
+    """O vídeo pronto, as legendas, o XML e a capa de um corte; None quando ele ainda não tem o vídeo."""
+    organizacao_id = usuario["organizacao_id"]
+    exportacao_id = (corte.get("saida") or {}).get("exportacao_id")
+    if not exportacao_id or not ObjectId.is_valid(exportacao_id):
+        return None
+    exportacao = await db.exportacoes.find_one({"_id": ObjectId(exportacao_id), "organizacao_id": organizacao_id},
+                                               {"status": 1, "arquivos": 1, "projeto_id": 1})
+    video = next((nome for nome in (exportacao or {}).get("arquivos") or [] if nome.endswith(".mp4")), None)
+    if not exportacao or exportacao.get("status") != "pronta" or not video:
+        return None
+    caminho = storage.caminho_local(chave_exportacao(organizacao_id, exportacao["_id"], video))
+    if not caminho.is_file():
+        return None
+    base = f"{numero:02d} {nome_de_arquivo(corte.get('titulo') or 'Corte')}"
+    arquivos: list[tuple[str, bytes | Path]] = [(f"{base}.mp4", caminho)]
+    # As legendas e o XML saem do projeto como está agora (as legendas que a pessoa ajustou no editor)
+    projeto_id = str(exportacao["projeto_id"])
+    try:
+        projeto, midias, _ = await _preparar(db, projeto_id, usuario)
+    except HTTPException:
+        projeto = None
+    if projeto:
+        legendas = legendas_das_faixas(projeto["faixas"])
+        if legendas:
+            arquivos += [(f"{base}.srt", escrever_srt(legendas).encode()),
+                         (f"{base}.vtt", escrever_vtt(legendas).encode())]
+        arquivos.append((f"{base}.xml", montar_xmeml(projeto, midias).encode()))
+    capa = corte.get("capa") or {}
+    if capa.get("tipo") == "quadro" and ObjectId.is_valid(capa.get("exportacao_id") or ""):
+        caminho_da_capa = storage.caminho_local(chave_exportacao(organizacao_id, ObjectId(capa["exportacao_id"]),
+                                                                 "quadro.png"))
+    elif capa.get("tipo") == "imagem" and ObjectId.is_valid(capa.get("midia_id") or ""):
+        caminho_da_capa = storage.caminho_local(chave_da_midia(organizacao_id, ObjectId(capa["midia_id"]),
+                                                               "imagem.png"))
+    else:
+        caminho_da_capa = None
+    if caminho_da_capa and caminho_da_capa.is_file():
+        arquivos.append((f"{base} - capa.png", caminho_da_capa))
+    return arquivos
+
+
+@router.get("/{clipagem_id}/pacote")
+async def baixar_pacote(clipagem_id: str, cortes: str = Query(min_length=1, max_length=2000),
+                        usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Os cortes escolhidos com o vídeo pronto num ZIP (14.9): o vídeo, as legendas em .srt e .vtt, o XML de
+    intercâmbio e a capa de cada um, numerados na ordem pedida."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    ids = list(dict.fromkeys(item for item in cortes.split(",") if item))[:MAXIMO_DE_CORTES_NA_LISTA]
+    arquivos: list[tuple[str, bytes | Path]] = [("LEIA-ME.txt", LEIA_ME_DO_PACOTE.encode())]
+    numero = 0
+    for corte_id in ids:
+        _, corte = _corte(doc, corte_id)
+        do_corte = await _arquivos_do_corte(db, usuario, numero + 1, corte)
+        if do_corte:
+            numero += 1
+            arquivos += do_corte
+    if not numero:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Nenhum desses cortes tem o vídeo pronto. Exporte antes.")
+    return StreamingResponse(_pacote_em_pedacos(arquivos), media_type="application/zip",
+                             headers={"Content-Disposition": _disposicao(f"{doc['nome']} cortes", ".zip")})
 
 
 @router.delete("/{clipagem_id}/cortes/{corte_id}", response_model=ClipagemSaida)
@@ -267,7 +420,7 @@ async def apagar_corte(clipagem_id: str, corte_id: str, usuario=Depends(usuario_
     _corte(doc, corte_id)
     await db.clipagens.update_one({"_id": doc["_id"]},
                                   {"$pull": {"cortes": {"id": corte_id}}, "$set": {"atualizado_em": agora()}})
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.put("/{clipagem_id}/cortes/{corte_id}/avaliacao", response_model=ClipagemSaida)
@@ -279,7 +432,7 @@ async def avaliar_corte(clipagem_id: str, corte_id: str, dados: AvaliacaoDoCorte
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Corte não encontrado.")
     await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
                                   {"$set": {"cortes.$.avaliacao": dados.avaliacao, "atualizado_em": agora()}})
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.put("/{clipagem_id}/cortes/{corte_id}/projeto", response_model=ClipagemSaida)
@@ -300,7 +453,7 @@ async def ligar_projeto(clipagem_id: str, corte_id: str, dados: ProjetoDoCorteEn
     await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
                                   {"$set": {"cortes.$.projeto_id": str(projeto_id) if projeto_id else None,
                                             "atualizado_em": agora()}})
-    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+    return await _completa(db, await _buscar(db, clipagem_id, usuario))
 
 
 @router.delete("/{clipagem_id}", status_code=status.HTTP_204_NO_CONTENT)

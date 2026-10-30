@@ -22,9 +22,20 @@ INDICES = {
     "organizacoes": [
         ([("slug", 1)], {"unique": True}),
     ],
+    # As automações do Clipar (14.9): o laço reserva pela próxima volta
+    "esteiras": [
+        ([("status", 1), ("proxima_volta", 1)], {}),
+        ([("organizacao_id", 1), ("criado_em", -1)], {}),
+    ],
+    "automacoes": [
+        ([("ativa", 1), ("tipo", 1), ("proxima_verificacao", 1)], {}),
+        ([("organizacao_id", 1)], {}),
+    ],
     "chaves_de_acesso": [
         ([("hash", 1)], {"unique": True}),
         ([("usuario_id", 1)], {}),
+        # As chaves temporárias da montagem no worker somem sozinhas quando vencem
+        ([("expira_em", 1)], {"expireAfterSeconds": 0}),
     ],
     "usuarios": [
         ([("email", 1)], {"unique": True}),

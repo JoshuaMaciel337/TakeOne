@@ -1,4 +1,14 @@
 # TakeOne worker — fila de jobs e backup. FFmpeg incluído.
+
+# O montador dos cortes do Clipar (apps/web/src/lib/clipar/montador): o código TS do editor num arquivo só, que o
+# worker da montagem roda pelo Deno (que vem com o yt-dlp)
+FROM node:22-alpine AS montador
+WORKDIR /web
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci --no-audit --no-fund --ignore-scripts
+COPY apps/web/src ./src
+RUN npm run montador
+
 FROM python:3.11-slim
 
 RUN apt-get update \
@@ -81,6 +91,7 @@ ENV FONTES_DA_BIBLIOTECA=/app/fontes-biblioteca
 COPY core /app/core
 COPY apps/worker /app/worker
 COPY infra/backup /app/backup
+COPY --from=montador /web/dist/montador.mjs /app/montador/montador.mjs
 
 RUN useradd --create-home --uid 1000 takeone && mkdir -p /dados/armazenamento /dados/backups && chown -R takeone /dados
 USER takeone
