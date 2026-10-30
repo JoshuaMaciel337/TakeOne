@@ -246,3 +246,35 @@ def test_clipagem_de_outro_espaco_nao_aparece(cliente, db_limpo):
     assert cliente.get(f"/api/clipagens/{clipagem['id']}").status_code == 404
     assert cliente.get("/api/clipagens").json() == []
     assert cliente.post("/api/clipagens", json={"midia_id": str(video)}).status_code == 404
+
+
+def test_modelo_de_corte_na_clipagem_no_corte_e_no_espaco(cliente, db_limpo):
+    cadastrar(cliente)
+    receita = {"legenda": "caixa", "posicao": "meio", "zooms": False, "logo": True,
+               "chamada": {"modelo": "chamada_comente", "texto": "QUERO"}}
+    modelo = {"id": "conversa", "nome": "Conversa", "receita": receita}
+    clipagem = _pronta(cliente, db_limpo, faixa="medio", maximo=2, modelo_corte=modelo)
+    guardado = clipagem["opcoes"]["modelo_corte"]
+    # A receita chega completa: o que faltou vem do padrão
+    assert guardado["receita"]["legenda"] == "caixa" and guardado["receita"]["titulo"] is True
+    assert guardado["receita"]["chamada"] == {"modelo": "chamada_comente", "texto": "QUERO"}
+    estragado = {"midia_id": str(criar_video(db_limpo)),
+                 "opcoes": {"modelo_corte": {"id": "x", "nome": "X", "receita": {"legenda": "gigante"}}}}
+    assert cliente.post("/api/clipagens", json=estragado).status_code == 422
+
+    corte = clipagem["cortes"][0]
+    caminho = f"/api/clipagens/{clipagem['id']}/cortes/{corte['id']}/modelo"
+    so_dele = {"id": "minimalista", "nome": "Minimalista", "receita": {"titulo": False, "legenda_animada": "pulando"}}
+    mudado = cliente.put(caminho, json={"modelo_corte": so_dele}).json()["cortes"][0]
+    assert mudado["modelo_corte"]["id"] == "minimalista" and mudado["modelo_corte"]["receita"]["titulo"] is False
+    assert cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": {"legenda_animada": "nao"}}}).status_code \
+        == 422
+    assert cliente.put(caminho, json={"modelo_corte": None}).json()["cortes"][0]["modelo_corte"] is None
+
+    # O modelo guardado no espaço
+    meu = {"tipo": "modelo_corte", "nome": "Meu jeito", "dados": {"receita": receita}}
+    salvo = cliente.post("/api/recursos", json=meu)
+    assert salvo.status_code == 201 and salvo.json()["dados"]["receita"]["posicao"] == "meio"
+    ruim = {"tipo": "modelo_corte", "nome": "Ruim", "dados": {"receita": {"musica": {"midia_id": "curto"}}}}
+    assert cliente.post("/api/recursos", json=ruim).status_code == 422
+    assert [r["nome"] for r in cliente.get("/api/recursos?tipo=modelo_corte").json()] == ["Meu jeito"]

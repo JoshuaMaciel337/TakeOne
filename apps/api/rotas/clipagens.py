@@ -16,6 +16,7 @@ from api.esquemas import (
     AvaliacaoDoCorteEntrada,
     ClipagemEntrada,
     ClipagemSaida,
+    ModeloDoCorteEntrada,
     PalavraSaida,
     ProjetoDoCorteEntrada,
     clipagem_para_saida,
@@ -209,6 +210,19 @@ async def parte_seguinte(clipagem_id: str, corte_id: str, usuario=Depends(usuari
         raise HTTPException(status.HTTP_409_CONFLICT, "A fala do vídeo acaba logo depois deste corte.")
     parte["medidas"] = {"ritmo": ritmo_do_corte(parte, palavras)}
     await _por_depois(db, doc, posicao, parte)
+    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+
+
+@router.put("/{clipagem_id}/cortes/{corte_id}/modelo", response_model=ClipagemSaida)
+async def mudar_modelo_do_corte(clipagem_id: str, corte_id: str, dados: ModeloDoCorteEntrada,
+                                usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """O modelo de corte só deste corte (vale mais que o da clipagem), ou None para voltar ao da clipagem. O projeto
+    já montado não muda aqui: a página monta de novo."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    _corte(doc, corte_id)
+    modelo = dados.modelo_corte.model_dump() if dados.modelo_corte else None
+    await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
+                                  {"$set": {"cortes.$.modelo_corte": modelo, "atualizado_em": agora()}})
     return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
 
 

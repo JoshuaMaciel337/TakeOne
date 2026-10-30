@@ -585,9 +585,10 @@ class RecursoEntrada(BaseModel):
     # camada (em dados.estilo, conferido como o da camada, e o preenchimento em dados.preenchimento), ou um conjunto
     # de ações (em dados.acoes: cada uma com id, nome e os passos gravados, que são do editor e a API só guarda), ou
     # uma predefinição de ferramenta (em dados.ferramenta e dados.opcoes, as opções dela, que a API só guarda), ou
-    # uma estratégia do Clipar (em dados.instrucoes, o que buscar e o estilo do título, e dados.faixa)
+    # uma estratégia do Clipar (em dados.instrucoes, o que buscar e o estilo do título, e dados.faixa), ou um modelo
+    # de corte do Clipar (em dados.receita, conferida como ReceitaDoCorte)
     tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo", "estilo_camada", "acoes",
-                  "ferramenta", "estrategia"]
+                  "ferramenta", "estrategia", "modelo_corte"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)
@@ -2376,6 +2377,60 @@ def job_para_saida(doc: dict) -> JobSaida:
     return JobSaida.model_validate({**doc, "id": str(doc["_id"])})
 
 
+class ChamadaDoModelo(BaseModel):
+    modelo: Literal["chamada_seguir", "cta", "chamada_comente"] = "chamada_seguir"
+    texto: str = Field(default="", max_length=60)
+
+
+class MusicaDoModelo(BaseModel):
+    midia_id: str = Field(min_length=24, max_length=24)
+    volume: float = Field(default=0.18, ge=0, le=1)
+    abaixar: bool = True
+
+
+class ReceitaDoCorte(BaseModel):
+    """Um modelo de corte (14.6): a receita que a montagem de cada corte segue
+    (apps/web/src/lib/clipar/modelosDeCorte.ts). A API só confere os valores; a montagem é do navegador."""
+    enquadrar: Literal["rosto", "centro", "inteiro"] = "rosto"
+    limpar: bool = True
+    legenda: Literal["contorno", "caixa", "amarela", "destaque", "karaoke", "palavra"] | None = "palavra"
+    legenda_animada: str | None = Field(default=None, max_length=30)
+    posicao: Literal["baixo", "meio", "alto"] = "baixo"
+    tamanho: Literal["normal", "menor", "maior", "bem_maior"] = "normal"
+    titulo: bool = True
+    zooms: bool = True
+    enfase: bool = True
+    cor: Literal["cinema", "frio", "quente", "vivido", "suave", "drama", "pb", "antigo"] | None = None
+    voz: Literal["radio", "telefone", "sala", "caverna", "clara"] | None = None
+    transicoes: Literal["nenhuma", "fusao", "flash", "clarao", "luz"] = "nenhuma"
+    sons: bool = False
+    graficos: bool = False
+    imagens: bool = False
+    cartela: bool = False
+    logo: bool = False
+    chamada: ChamadaDoModelo | None = None
+    musica: MusicaDoModelo | None = None
+
+    @field_validator("legenda_animada")
+    @classmethod
+    def conferir_legenda_animada(cls, valor):
+        if valor is not None and valor not in ESTILOS_DE_LEGENDA_ANIMADA:
+            raise ValueError("Estilo de legenda animada desconhecido.")
+        return valor
+
+
+class ModeloDeCorteEntrada(BaseModel):
+    """O modelo copiado na clipagem ou no corte: o id (um pronto ou um recurso do espaço), o nome e a receita."""
+    id: str = Field(min_length=1, max_length=40)
+    nome: str = Field(min_length=1, max_length=60)
+    receita: ReceitaDoCorte
+
+
+class ModeloDoCorteEntrada(BaseModel):
+    """O modelo aplicado só a um corte (None volta ao da clipagem)."""
+    modelo_corte: ModeloDeCorteEntrada | None = None
+
+
 class OpcoesDaClipagem(BaseModel):
     """As opções da página do Clipar (core/modelos/clipagem.py)."""
     estrategia: Literal["ganchos", "historias", "ideia", "dicas", "humor", "pregacao", "propria"] = "ganchos"
@@ -2394,8 +2449,10 @@ class OpcoesDaClipagem(BaseModel):
     maximo: int | None = Field(default=None, ge=1, le=50)
     # O estilo da legenda animada dos cortes (core/modelos/legenda_animada.py); None: as legendas de sempre
     legenda_animada: str | None = Field(default=None, max_length=30)
-    # O modelo de edição dos cortes (apps/web/src/lib/clipar/modeloDePregacao.ts)
+    # O modelo de edição das clipagens de antes do modelo de corte (o de pregação)
     modelo_edicao: Literal["nenhum", "pregacao"] = "nenhum"
+    # O modelo de corte de todos os cortes (14.6), copiado aqui: mudar o modelo depois não muda a clipagem
+    modelo_corte: ModeloDeCorteEntrada | None = None
 
     @field_validator("instrucoes", "momentos", "genero", "edicao", mode="before")
     @classmethod

@@ -30,6 +30,7 @@ from api.esquemas import (
     EstiloDeCamadaEntrada,
     EstiloDoCaractereEntrada,
     EstiloDoParagrafoEntrada,
+    ReceitaDoCorte,
     RecursoAtualizacao,
     RecursoEntrada,
     RecursoSaida,
@@ -176,6 +177,11 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A predefinição precisa da ferramenta e das opções.")
     if dados.tipo == "estrategia":
         dados.dados = _conferir_estrategia(dados.dados)
+    if dados.tipo == "modelo_corte":
+        try:
+            dados.dados = {"receita": ReceitaDoCorte.model_validate(dados.dados.get("receita") or {}).model_dump()}
+        except ValidationError as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O modelo de corte veio estragado.") from erro
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -203,7 +209,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
 
 
 TIPOS_DE_RECURSO = ("^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes|ferramenta|"
-                    "estrategia)$")
+                    "estrategia|modelo_corte)$")
 
 
 @router.get("", response_model=list[RecursoSaida])
