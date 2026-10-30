@@ -29,6 +29,10 @@ def test_pedido_valida_o_texto_e_a_voz(cliente, db_limpo):
     com_barra = cliente.post("/api/midias/fala", json={"texto": "Promoção 2/3 e/ou 50% off/"})
     assert com_barra.status_code == 201, com_barra.text
     assert com_barra.json()["nome"] == "Fala · Promoção 2/3 e/ou 50% off/"
+    # A fala do gancho narrado de um corte vem marcada; a de sempre, não
+    assert com_barra.json()["fala"] == {"texto": "Promoção 2/3 e/ou 50% off/", "voz": "pf_dora", "velocidade": 1.0}
+    gancho = cliente.post("/api/midias/fala", json={"texto": "Sabe o que quase ninguém percebe?", "gancho": True})
+    assert gancho.json()["fala"]["gancho"] is True
 
 
 @pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     AvaliacaoDoCorteEntrada,
+    CapaDoCorteEntrada,
     ClipagemEntrada,
     ClipagemSaida,
     ModeloDoCorteEntrada,
@@ -228,6 +229,34 @@ async def mudar_modelo_do_corte(clipagem_id: str, corte_id: str, dados: ModeloDo
     modelo = dados.modelo_corte.model_dump() if dados.modelo_corte else None
     await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
                                   {"$set": {"cortes.$.modelo_corte": modelo, "atualizado_em": agora()}})
+    return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
+
+
+@router.put("/{clipagem_id}/cortes/{corte_id}/capa", response_model=ClipagemSaida)
+async def mudar_capa(clipagem_id: str, corte_id: str, dados: CapaDoCorteEntrada,
+                     usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """A capa do corte (14.8): um quadro exportado em PNG ou uma imagem da biblioteca, do espaço; None tira."""
+    doc = await _buscar(db, clipagem_id, usuario)
+    _corte(doc, corte_id)
+    capa = dados.capa.model_dump() if dados.capa else None
+    if capa and capa["tipo"] == "quadro":
+        try:
+            filtro = {"_id": ObjectId(capa["exportacao_id"]), "organizacao_id": usuario["organizacao_id"],
+                      "formato": "png"}
+        except InvalidId:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Quadro não encontrado.") from None
+        if await db.exportacoes.count_documents(filtro) == 0:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Quadro não encontrado.")
+    elif capa:
+        try:
+            midia = await db.midias.find_one({"_id": ObjectId(capa["midia_id"]),
+                                              "organizacao_id": usuario["organizacao_id"]})
+        except InvalidId:
+            midia = None
+        if not midia or not midia.get("imagem"):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Imagem não encontrada.")
+    await db.clipagens.update_one({"_id": doc["_id"], "cortes.id": corte_id},
+                                  {"$set": {"cortes.$.capa": capa, "atualizado_em": agora()}})
     return clipagem_para_saida(await _buscar(db, clipagem_id, usuario), None)
 
 

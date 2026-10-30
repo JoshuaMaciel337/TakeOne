@@ -59,6 +59,7 @@ def test_quadro_congelado_e_o_que_o_render_mostra(cliente, db_limpo, segundos, q
     _processar(db_limpo, "ingestao")
     foto = cliente.get(f"/api/midias/{resposta.json()['id']}").json()
     assert foto["status"] == "pronta" and foto["imagem"]
+    assert foto["quadro_de"]["segundos"] == pytest.approx(segundos)
     # O cinza do quadro, convertido da faixa de TV para RGB: (16 + 20n − 16) × 255/219. A conversão do FFmpeg
     # (a mesma do render) fica uns 3 níveis abaixo da conta; os quadros vizinhos ficam 23 níveis longe
     esperado = 20 * quadro * 255 / 219

@@ -44,7 +44,10 @@ def test_pedir_processar_e_ler_a_transcricao(cliente, db_limpo):
 
     job = pegar_proximo_job(db_limpo, ["transcricao"], "w-teste")
     assert job["recurso"] == "gpu"
+    # O vocabulário da marca vai como dica ao Whisper, e a transcrição guarda o que valeu
+    assert cliente.put("/api/marca", json={"vocabulario": ["TakeOne", "Nitro"]}).status_code == 200
     assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    assert db_limpo.transcricoes.find_one({"midia_id": ObjectId(midia_id)})["vocabulario"] == ["TakeOne", "Nitro"]
 
     pronta = cliente.get(f"/api/midias/{midia_id}/transcricao").json()
     assert (pronta["status"], pronta["idioma"]) == ("pronta", "pt")

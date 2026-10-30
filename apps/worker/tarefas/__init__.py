@@ -6,6 +6,7 @@ from worker.tarefas.animacao_html import executar_animacao_html, marcar_animacao
 from worker.tarefas.batidas import executar_batidas, marcar_batidas_com_erro
 from worker.tarefas.clipagem import executar_clipagem, marcar_clipagem_com_erro
 from worker.tarefas.direcao import executar_direcao
+from worker.tarefas.emojis import executar_emojis
 from worker.tarefas.esconder_objeto import executar_esconder_objeto
 from worker.tarefas.esconder_objeto import marcar_com_erro as marcar_objeto_escondido_com_erro
 from worker.tarefas.esconder_rostos import executar_esconder_rostos
@@ -20,6 +21,7 @@ from worker.tarefas.foto_ia import (
     executar_profundidade,
     executar_restaurar,
 )
+from worker.tarefas.gancho import executar_gancho
 from worker.tarefas.geracao_video import (
     executar_foto_neural,
     executar_geracao_imagem,
@@ -92,6 +94,8 @@ REGISTRO = {
     "direcao": Tarefa(executar_direcao),
     "pedido_edicao": Tarefa(executar_pedido_edicao),
     "palavras_chave": Tarefa(executar_palavras_chave),
+    "emojis": Tarefa(executar_emojis),
+    "gancho": Tarefa(executar_gancho),
     "animacao_descrita": Tarefa(executar_animacao_descrita, ao_falhar=marcar_animacao_com_erro),
     "geracao_video": Tarefa(executar_geracao_video, ao_falhar=marcar_geracao_com_erro),
     "geracao_imagem": Tarefa(executar_geracao_imagem, ao_falhar=marcar_geracao_com_erro),

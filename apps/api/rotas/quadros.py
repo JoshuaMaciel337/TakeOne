@@ -52,6 +52,7 @@ async def congelar_quadro(midia_id: str, dados: QuadroEntrada, usuario=Depends(u
     nome = f"{origem['nome']} (quadro {int(minutos)}:{resto:05.2f})"
     midia["nome"] = midia["nome_original"] = nome[:200]
     midia["status"] = STATUS_PROCESSANDO
+    midia["quadro_de"] = {"midia_id": str(origem["_id"]), "segundos": segundos}
     midia_id_novo = (await db.midias.insert_one(midia)).inserted_id
     entrada = {"midia_id": str(midia_id_novo), "origem_id": str(origem["_id"]), "arquivo": arquivo,
                "segundos": segundos}

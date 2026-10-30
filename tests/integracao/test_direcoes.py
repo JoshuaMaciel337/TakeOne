@@ -38,6 +38,28 @@ def test_palavras_chave_pelo_job(cliente, db_limpo):
     assert pronto["status"] == "concluido" and pronto["saida"]["chaves"] == {"c1": [2]}
 
 
+def test_emojis_pelo_job(cliente, db_limpo):
+    cadastrar(cliente)
+    legendas = [{"id": f"c{i}", "texto": f"legenda {i}"} for i in range(7)]
+    job = cliente.post("/api/direcoes/emojis", json={"legendas": legendas}).json()
+    assert job["tipo"] == "emojis" and job["recurso"] == "gpu"
+    pego = pegar_proximo_job(db_limpo, ["emojis"], "w-teste")
+    assert processar_job(db_limpo, pego, "w-teste") == "concluido"
+    pronto = cliente.get(f"/api/jobs/{job['id']}").json()
+    # Um a cada três, e no máximo 40% das legendas
+    assert pronto["saida"]["emojis"] == {"c0": "fogo", "c3": "dinheiro"}
+
+
+def test_gancho_pelo_job(cliente, db_limpo):
+    cadastrar(cliente)
+    assert cliente.post("/api/direcoes/gancho", json={"titulo": " ", "texto": ""}).status_code == 422
+    job = cliente.post("/api/direcoes/gancho", json={"titulo": "Câncer aos 20", "texto": "Eu descobri..."}).json()
+    assert job["tipo"] == "gancho" and job["recurso"] == "gpu"
+    pego = pegar_proximo_job(db_limpo, ["gancho"], "w-teste")
+    assert processar_job(db_limpo, pego, "w-teste") == "concluido"
+    assert cliente.get(f"/api/jobs/{job['id']}").json()["saida"]["frase"].endswith("?")
+
+
 def test_pedido_de_edicao_pelo_job(cliente, db_limpo):
     cadastrar(cliente)
     assert cliente.post("/api/direcoes/pedido", json={"pedido": ""}).status_code == 422

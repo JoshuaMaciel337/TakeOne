@@ -128,6 +128,10 @@ class MidiaSaida(BaseModel):
     gerada: dict | None = None
     # Forma desenhada (POST /api/elementos/formas): o pedido que a gerou
     elemento: dict | None = None
+    # A foto de um quadro tirado de um vídeo (POST /api/midias/{id}/quadro): de onde e de que instante
+    quadro_de: dict | None = None
+    # O texto em fala (POST /api/midias/fala): o texto, a voz, a velocidade e se é o gancho narrado de um corte
+    fala: dict | None = None
     # Animação em HTML: {modelo, campos, proporcao, duracao}
     animacao: dict | None = None
     # Legenda animada do Clipar: {estilo, proporcao, duracao, palavras}
@@ -418,11 +422,28 @@ FonteTexto = Literal["display", "texto", "manuscrita"]
 
 
 class MarcaEntrada(BaseModel):
-    """O kit de marca do espaço: até 6 cores, a fonte dos títulos e a dos textos e o logo."""
+    """O kit de marca do espaço: até 6 cores, a fonte dos títulos e a dos textos, o logo, as palavras censuradas
+    (o bipe ou o silêncio nos cortes) e o vocabulário (os nomes que a transcrição deve acertar)."""
     cores: list[Annotated[str, Field(pattern=COR)]] = Field(default=[], max_length=6)
     fonte_titulo: FonteTexto = "display"
     fonte_texto: FonteTexto = "texto"
     logo_midia_id: str | None = None
+    censura: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(default=[], max_length=200)
+    vocabulario: list[Annotated[str, Field(min_length=1, max_length=60)]] = Field(default=[], max_length=100)
+
+    @field_validator("censura", "vocabulario", mode="before")
+    @classmethod
+    def limpar_listas(cls, valor):
+        if not isinstance(valor, list):
+            return valor
+        vistos, limpos = set(), []
+        for item in valor:
+            texto = " ".join(str(item).split()) if isinstance(item, str) else item
+            if isinstance(texto, str) and (not texto or texto.lower() in vistos):
+                continue
+            vistos.add(texto.lower() if isinstance(texto, str) else texto)
+            limpos.append(texto)
+        return limpos
 
     @field_validator("cores")
     @classmethod
@@ -435,6 +456,8 @@ class MarcaSaida(BaseModel):
     fonte_titulo: str = "display"
     fonte_texto: str = "texto"
     logo_midia_id: str | None = None
+    censura: list[str] = []
+    vocabulario: list[str] = []
 
 
 class DegradeEntrada(BaseModel):
@@ -443,6 +466,19 @@ class DegradeEntrada(BaseModel):
     cores: list[Annotated[str, Field(pattern=COR)]] = Field(min_length=2, max_length=5)
     angulo: float = Field(default=0, ge=-360, le=360)
     meio: float = Field(default=0.5, ge=0.05, le=0.95)
+
+
+class EmojiEntrada(BaseModel):
+    """Um emoji da lista do emoji automático (core/modelos/emojis.py), pelo nome."""
+    nome: str = Field(min_length=1, max_length=30)
+
+    @field_validator("nome")
+    @classmethod
+    def conferir_nome(cls, valor):
+        from core.modelos.emojis import EMOJIS
+        if valor not in EMOJIS:
+            raise ValueError("Emoji desconhecido.")
+        return valor
 
 
 class FormaEntrada(BaseModel):
@@ -1894,6 +1930,12 @@ class LegendaParaDestacar(BaseModel):
     texto: str = Field(max_length=500)
 
 
+class GanchoEntrada(BaseModel):
+    """O gancho narrado do corte (14.8): o título e o texto das legendas, para o LLM escrever a frase."""
+    titulo: str = Field(default="", max_length=300)
+    texto: str = Field(default="", max_length=20000)
+
+
 class PalavrasChaveEntrada(BaseModel):
     legendas: list[LegendaParaDestacar] = Field(min_length=1, max_length=2000)
 
@@ -2029,6 +2071,8 @@ class FalaEntrada(BaseModel):
     texto: str = Field(min_length=2, max_length=3000)
     voz: Literal["pf_dora", "pm_alex", "pm_santa"] = "pf_dora"
     velocidade: float = Field(default=1.0, ge=0.7, le=1.4)
+    # A fala do gancho narrado de um corte (14.8): o editor acha o gancho de antes por ela
+    gancho: bool = False
 
     @field_validator("texto", mode="before")
     @classmethod
@@ -2432,6 +2476,16 @@ class ReceitaDoCorte(BaseModel):
     logo: bool = False
     chamada: ChamadaDoModelo | None = None
     musica: MusicaDoModelo | None = None
+    # A retenção (14.8): a barra de progresso, o quadro do original numa caixa e os vídeos de distração da biblioteca
+    barra: Literal["baixo", "alto"] | None = None
+    quadro_original: Literal["inicio", "meio", "fim", "sorteado"] | None = None
+    distracao: list[Annotated[str, Field(pattern=r"^[0-9a-f]{24}$")]] = Field(default_factory=list, max_length=10)
+    # O emoji automático: o LLM põe um emoji acima de algumas legendas
+    emojis: bool = False
+    # O gancho narrado: uma frase do LLM falada no começo
+    gancho: bool = False
+    # A censura das palavras da lista do espaço (o kit de marca)
+    censura: Literal["bipe", "silencio"] | None = None
 
     @field_validator("legenda_animada")
     @classmethod
@@ -2446,6 +2500,24 @@ class ModeloDeCorteEntrada(BaseModel):
     id: str = Field(min_length=1, max_length=40)
     nome: str = Field(min_length=1, max_length=60)
     receita: ReceitaDoCorte
+
+
+class CapaDoQuadro(BaseModel):
+    """A capa do corte tirada de um quadro do vídeo: a exportação em PNG daquele instante."""
+    tipo: Literal["quadro"]
+    exportacao_id: str = Field(min_length=24, max_length=24)
+    segundos: float = Field(ge=0)
+
+
+class CapaDaImagem(BaseModel):
+    """A capa do corte numa imagem da biblioteca."""
+    tipo: Literal["imagem"]
+    midia_id: str = Field(min_length=24, max_length=24)
+
+
+class CapaDoCorteEntrada(BaseModel):
+    """A capa do corte (14.8), ou None para tirar."""
+    capa: Annotated[CapaDoQuadro | CapaDaImagem, Field(discriminator="tipo")] | None = None
 
 
 class ModeloDoCorteEntrada(BaseModel):
@@ -2720,6 +2792,8 @@ def midia_para_saida(doc: dict, job: dict | None = None) -> MidiaSaida:
                          if (limpa := doc.get("imagem_limpa")) else None),
         "elemento": ({k: v for k, v in elemento.items() if k != "chave"}
                      if (elemento := doc.get("elemento")) else None),
+        "quadro_de": doc.get("quadro_de"),
+        "fala": doc.get("fala"),
         # O preenchimento generativo não tem formato nem duração; a marca dele só aparece nele
         "gerada": ({"descricao": gerada["descricao"], "formato": gerada.get("formato"),
                     "duracao": gerada.get("duracao"), "imagem_id": gerada.get("imagem_id"),

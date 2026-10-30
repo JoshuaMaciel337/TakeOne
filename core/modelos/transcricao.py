@@ -203,3 +203,20 @@ def palavras_simuladas(duracao: float) -> list[dict]:
         t += 0.35 + (0.8 if palavra.endswith(".") else 0)
         i += 1
     return palavras
+
+
+# A dica do vocabulário da marca para o Whisper: os nomes que ele deve acertar. Ela entra no começo do contexto
+# do decodificador, então fica curta (o contexto tem 448 tokens e a dica não pode empurrar o texto ouvido para fora)
+LETRAS_DA_DICA = 400
+
+
+def dica_do_vocabulario(vocabulario: list[str]) -> str | None:
+    """Os nomes do vocabulário separados por vírgula, até LETRAS_DA_DICA letras, ou None sem nenhum."""
+    nomes, total = [], 0
+    for nome in vocabulario or []:
+        nome = " ".join(str(nome).split())
+        if not nome or total + len(nome) + 2 > LETRAS_DA_DICA:
+            continue
+        nomes.append(nome)
+        total += len(nome) + 2
+    return ", ".join(nomes) or None

@@ -27,6 +27,7 @@ from core.modelos.transcricao import (
     STATUS_ERRO,
     STATUS_PRONTA,
     aparar_no_silencio,
+    dica_do_vocabulario,
     encaixar_recuperadas,
     fatias_de,
     limpar_palavras,
@@ -40,7 +41,7 @@ from core.utils.mongo import agora
 
 
 def _ouvir(modelo, caminho: Path, idioma: str | None, deslocamento: float, duracao: float,
-           reportar: Callable[[int, str], None]) -> tuple[list[dict], str | None]:
+           reportar: Callable[[int, str], None], dica: str | None = None) -> tuple[list[dict], str | None]:
     segmentos, info = modelo.transcribe(
         str(caminho),
         language=idioma,
@@ -48,6 +49,7 @@ def _ouvir(modelo, caminho: Path, idioma: str | None, deslocamento: float, durac
         word_timestamps=True,
         condition_on_previous_text=False,
         beam_size=5,
+        hotwords=dica,
     )
     palavras = []
     for segmento in segmentos:
@@ -67,7 +69,7 @@ VRAM_DO_WHISPER_MB = 3500       # o large-v3-turbo em int8 usa uns 3 GB
 
 
 def recuperar_omitidas(modelo, caminho: Path, palavras: list[dict], niveis, idioma: str | None,
-                       duracao: float) -> list[dict]:
+                       duracao: float, dica: str | None = None) -> list[dict]:
     """
     Ouve de novo, sozinhos, os trechos onde o Whisper pode ter omitido fala (core/modelos/transcricao.py)
     e encaixa o que voltar, se repetir palavras vizinhas. É o que deixa os retakes aparecerem no texto.
@@ -84,7 +86,7 @@ def recuperar_omitidas(modelo, caminho: Path, palavras: list[dict], niveis, idio
         a, b = max(0.0, inicio - FOLGA_DO_TRECHO_S), min(duracao, fim + FOLGA_DO_TRECHO_S)
         segmentos, _ = modelo.transcribe(audio[int(a * TAXA_DO_WHISPER):int(b * TAXA_DO_WHISPER)], language=idioma,
                                          vad_filter=True, word_timestamps=True, condition_on_previous_text=False,
-                                         beam_size=5)
+                                         beam_size=5, hotwords=dica)
         novas = [{"texto": w.word, "inicio": a + w.start, "fim": a + w.end} for s in segmentos for w in s.words or []]
         novas = aparar_no_silencio(limpar_palavras(novas), niveis, NIVEIS_POR_SEGUNDO)
         if len(novas) > 1 and repete_vizinhas(novas, palavras, inicio, fim):
@@ -95,7 +97,7 @@ def recuperar_omitidas(modelo, caminho: Path, palavras: list[dict], niveis, idio
 
 
 def transcrever(caminho: Path, idioma: str | None, duracao: float,
-                reportar: Callable[[int, str], None], niveis=None) -> tuple[list[dict], str]:
+                reportar: Callable[[int, str], None], niveis=None, dica: str | None = None) -> tuple[list[dict], str]:
     import ctranslate2
     from faster_whisper import WhisperModel
 
@@ -116,21 +118,22 @@ def transcrever(caminho: Path, idioma: str | None, duracao: float,
                 except ErroFFmpeg as erro:
                     raise ErroDefinitivo("Não foi possível separar um trecho do áudio para transcrever.") from erro
             # O idioma da primeira fatia vale para as outras
-            da_fatia, detectado = _ouvir(modelo, arquivo, detectado, inicio, duracao, reportar)
+            da_fatia, detectado = _ouvir(modelo, arquivo, detectado, inicio, duracao, reportar, dica)
             palavras += da_fatia
     if niveis:
         reportar(96, "Procurando fala repetida")
-        palavras = recuperar_omitidas(modelo, caminho, palavras, niveis, detectado, duracao)
+        palavras = recuperar_omitidas(modelo, caminho, palavras, niveis, detectado, duracao, dica)
     return palavras, detectado or "pt"
 
 
-def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, caminho_niveis: str | None, fila) -> None:
+def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, caminho_niveis: str | None, fila,
+                         dica: str | None = None) -> None:
     """Roda no processo filho: manda o progresso e o resultado (ou o erro) pela fila."""
     try:
         # Os níveis são int8 com sinal (dB), um por janela de 10 ms
         niveis = array("b", Path(caminho_niveis).read_bytes()) if caminho_niveis else None
         palavras, detectado = transcrever(Path(caminho), idioma, duracao, lambda p, m: fila.put(("progresso", p, m)),
-                                          niveis)
+                                          niveis, dica)
         fila.put(("fim", palavras, detectado))
     except ErroDefinitivo as erro:
         fila.put(("definitivo", str(erro)))
@@ -140,12 +143,13 @@ def _transcrever_no_filho(caminho: str, idioma: str | None, duracao: float, cami
 
 def transcrever_em_outro_processo(caminho: Path, idioma: str | None, duracao: float,
                                   reportar: Callable[[int, str], None],
-                                  caminho_niveis: Path | None = None) -> tuple[list[dict], str]:
+                                  caminho_niveis: Path | None = None,
+                                  dica: str | None = None) -> tuple[list[dict], str]:
     """A transcrição num processo novo (spawn), que leva o modelo embora quando termina."""
     contexto = multiprocessing.get_context("spawn")
     fila = contexto.Queue()
     niveis = str(caminho_niveis) if caminho_niveis else None
-    filho = contexto.Process(target=_transcrever_no_filho, args=(str(caminho), idioma, duracao, niveis, fila),
+    filho = contexto.Process(target=_transcrever_no_filho, args=(str(caminho), idioma, duracao, niveis, fila, dica),
                              daemon=True)
     filho.start()
     try:
@@ -196,12 +200,16 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
     rotulo = f"[{organizacao_id}] [midia {midia_id}]"
 
     niveis = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_NIVEIS))
+    # O vocabulário da marca (os nomes que o Whisper deve acertar) vai como dica
+    organizacao = db.organizacoes.find_one({"_id": organizacao_id}, {"marca.vocabulario": 1}) or {}
+    vocabulario = ((organizacao.get("marca") or {}).get("vocabulario") or [])
+    dica = dica_do_vocabulario(vocabulario)
     if MODO_IA == "real":
         from worker.tarefas.llm import esperar_a_placa
 
         esperar_a_placa(reportar, VRAM_DO_WHISPER_MB, "a transcrição", progresso=2)
         brutas, idioma = transcrever_em_outro_processo(caminho, None if pedido == "auto" else pedido, duracao, reportar,
-                                                       niveis if niveis.is_file() else None)
+                                                       niveis if niveis.is_file() else None, dica)
     else:
         brutas, idioma = palavras_simuladas(duracao), "pt" if pedido == "auto" else pedido
     palavras = limpar_palavras(brutas)
@@ -211,7 +219,7 @@ def executar_transcricao(db, job: dict, reportar: Callable[[int, str], None]) ->
 
     db.transcricoes.update_one({"midia_id": midia_id}, {"$set": {
         "status": STATUS_PRONTA, "idioma": idioma, "modelo": MODELO if MODO_IA == "real" else "simulado",
-        "palavras": palavras, "erro": None, "atualizado_em": agora(),
+        "palavras": palavras, "erro": None, "vocabulario": vocabulario, "atualizado_em": agora(),
     }})
     logging.info(f"{rotulo} Transcrição pronta: {len(palavras)} palavras, idioma {idioma}.")
     reportar(100, "Transcrição pronta")

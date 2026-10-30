@@ -7,6 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TZ=America/Sao_Paulo
 
 WORKDIR /app
+# A fonte de emoji (Noto Color Emoji, OFL): o emoji automático das legendas é desenhado aqui (core/utils/emoji.py)
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/*
 COPY apps/api/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 

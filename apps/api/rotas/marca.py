@@ -3,7 +3,9 @@
 #
 # As cores, as fontes de título e de texto e o logo (uma imagem da biblioteca) de cada espaço, guardados
 # no documento da organização (campo `marca`). O editor usa o kit para pôr o logo no vídeo, aplicar a
-# fonte e a cor aos textos e oferecer as cores nos seletores e nas animações.
+# fonte e a cor aos textos e oferecer as cores nos seletores e nas animações. As palavras censuradas e o vocabulário
+# da marca (ADR 0004, 14.8) também ficam aqui: a censura tapa as palavras nos cortes, e o vocabulário vai como dica ao
+# Whisper nas transcrições do espaço.
 # -----------------------------------------------
 import logging
 
@@ -18,7 +20,8 @@ from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/marca", tags=["marca"])
 
-MARCA_PADRAO = {"cores": [], "fonte_titulo": "display", "fonte_texto": "texto", "logo_midia_id": None}
+MARCA_PADRAO = {"cores": [], "fonte_titulo": "display", "fonte_texto": "texto", "logo_midia_id": None, "censura": [],
+                "vocabulario": []}
 
 
 def marca_para_saida(organizacao: dict | None) -> MarcaSaida:

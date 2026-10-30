@@ -319,9 +319,11 @@ async def gerar_fala(dados: FalaEntrada, usuario=Depends(usuario_atual), db=Depe
     midia["nome"] = midia["nome_original"] = nome
     midia["status"] = STATUS_PROCESSANDO
     midia["fala"] = {"texto": dados.texto, "voz": dados.voz, "velocidade": dados.velocidade}
+    if dados.gancho:
+        midia["fala"]["gancho"] = True
     midia_id = (await db.midias.insert_one(midia)).inserted_id
-    job = montar_job("fala", usuario["organizacao_id"], {"midia_id": str(midia_id), **midia["fala"]},
-                     criado_por=usuario["_id"])
+    entrada = {"midia_id": str(midia_id), "texto": dados.texto, "voz": dados.voz, "velocidade": dados.velocidade}
+    job = montar_job("fala", usuario["organizacao_id"], entrada, criado_por=usuario["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     # O progresso da fala aparece como o da ingestão; ao terminar, o worker troca pelo job da ingestão
     await db.midias.update_one({"_id": midia_id}, {"$set": {"job_ingestao_id": job_id}})

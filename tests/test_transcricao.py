@@ -101,3 +101,12 @@ def test_recuperadas_so_entram_se_repetirem_a_fala_vizinha():
     com_reticencias = [*retake[:-1], {"texto": "vídeos...", "inicio": 2.25, "fim": 2.5}]
     cortada = encaixar_recuperadas(palavras, com_reticencias, 1.2, 2.6)
     assert cortada[-1]["texto"] == "vídeos", "sem as reticências da palavra cortada na borda"
+
+
+def test_dica_do_vocabulario_curta_e_sem_vazios():
+    from core.modelos.transcricao import LETRAS_DA_DICA, dica_do_vocabulario
+
+    assert dica_do_vocabulario([]) is None and dica_do_vocabulario(["  "]) is None
+    assert dica_do_vocabulario(["TakeOne", " Holy  Cut "]) == "TakeOne, Holy Cut"
+    longa = dica_do_vocabulario([f"Nome comprido número {i}" for i in range(100)])
+    assert len(longa) <= LETRAS_DA_DICA

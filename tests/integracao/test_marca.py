@@ -24,9 +24,10 @@ def _imagem(db, cliente) -> str:
 def test_kit_comeca_vazio_e_guarda_cores_fontes_e_logo(cliente, db_limpo):
     cadastrar(cliente)
     assert cliente.get("/api/marca").json() == {"cores": [], "fonte_titulo": "display", "fonte_texto": "texto",
-                                                "logo_midia_id": None}
+                                                "logo_midia_id": None, "censura": [], "vocabulario": []}
     logo = _imagem(db_limpo, cliente)
-    kit = {"cores": ["#FF624A", "#101828"], "fonte_titulo": "manuscrita", "fonte_texto": "texto", "logo_midia_id": logo}
+    kit = {"cores": ["#FF624A", "#101828"], "fonte_titulo": "manuscrita", "fonte_texto": "texto", "logo_midia_id": logo,
+           "censura": ["palavrão"], "vocabulario": ["TakeOne"]}
     salvo = cliente.put("/api/marca", json=kit)
     assert salvo.status_code == 200, salvo.text
     assert salvo.json()["cores"] == ["#ff624a", "#101828"]
@@ -44,6 +45,16 @@ def test_kit_recusa_o_que_nao_serve(cliente, db_limpo):
     assert cliente.put("/api/marca", json={"fonte_titulo": "comic"}).status_code == 422
     assert cliente.put("/api/marca", json={"logo_midia_id": video}).status_code == 409, "o logo é uma imagem"
     assert cliente.put("/api/marca", json={"logo_midia_id": "0" * 24}).status_code == 404
+    assert cliente.put("/api/marca", json={"censura": ["x" * 41]}).status_code == 422
+    assert cliente.put("/api/marca", json={"vocabulario": [f"nome {i}" for i in range(101)]}).status_code == 422
+
+
+def test_listas_do_kit_sem_repetir_nem_espaco_a_mais(cliente, db_limpo):
+    cadastrar(cliente)
+    kit = {"censura": ["  porra ", "Porra", "", "caral*"], "vocabulario": ["Take  One", "HolyCut", "take one"]}
+    salvo = cliente.put("/api/marca", json=kit).json()
+    assert salvo["censura"] == ["porra", "caral*"]
+    assert salvo["vocabulario"] == ["Take One", "HolyCut"]
 
 
 def test_cada_espaco_tem_o_seu_kit(cliente, db_limpo):

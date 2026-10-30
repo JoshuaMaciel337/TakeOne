@@ -26,6 +26,7 @@ EFEITOS = {
     "estalo": ("Estalo", "Um pop curto, para o que aparece na tela."),
     "subida": ("Subida", "O som que cresce até o corte, para a tensão."),
     "brilho": ("Brilho", "Sininhos que cintilam, para uma revelação."),
+    "bipe": ("Bipe", "O tom de 1 kHz da censura, para tapar uma palavra."),
 }
 
 
@@ -155,6 +156,12 @@ def _brilho(sorteio) -> np.ndarray:
     return som + cintilar
 
 
+def _bipe() -> np.ndarray:
+    # 2 s de tom puro: a censura corta no tamanho da palavra
+    t = _amostras(2.0)
+    return np.sin(2 * np.pi * 1000 * t)
+
+
 def sintetizar(efeito: str) -> np.ndarray:
     """O efeito em estéreo (2 × amostras), em ponto flutuante, com o pico em -1 dBFS."""
     if efeito not in EFEITOS:
@@ -174,6 +181,7 @@ def sintetizar(efeito: str) -> np.ndarray:
             "estalo": _estalo,
             "subida": lambda: _subida(sorteio),
             "brilho": lambda: _brilho(sorteio),
+            "bipe": _bipe,
         }[efeito]()
         esquerda = direita = mono
     estereo = np.vstack([esquerda, direita])

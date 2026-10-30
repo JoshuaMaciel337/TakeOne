@@ -125,6 +125,32 @@ def _pronta(cliente, db, **opcoes):
     return cliente.get(f"/api/clipagens/{clipagem['id']}").json()
 
 
+def test_capa_do_corte_num_quadro_ou_numa_imagem(cliente, db_limpo):
+    cadastrar(cliente)
+    clipagem = _pronta(cliente, db_limpo, faixa="medio", maximo=1)
+    caminho = f"/api/clipagens/{clipagem['id']}/cortes/{clipagem['cortes'][0]['id']}/capa"
+    projeto = cliente.post("/api/projetos", json={"nome": "Corte", "proporcao": "9:16"}).json()
+    organizacao = db_limpo.projetos.find_one({"_id": ObjectId(projeto["id"])})["organizacao_id"]
+    # O quadro é uma exportação em PNG do espaço; um vídeo exportado não serve
+    quadro = {"_id": ObjectId(), "organizacao_id": organizacao, "formato": "png"}
+    video = {"_id": ObjectId(), "organizacao_id": organizacao, "formato": "mp4"}
+    db_limpo.exportacoes.insert_many([quadro, video])
+    capa = {"tipo": "quadro", "exportacao_id": str(quadro["_id"]), "segundos": 4.5}
+    assert cliente.put(caminho, json={"capa": capa}).json()["cortes"][0]["capa"] == capa
+    assert cliente.put(caminho, json={"capa": {**capa, "exportacao_id": str(video["_id"])}}).status_code == 404
+    # A imagem é uma imagem da biblioteca do espaço
+    imagem = montar_midia(organizacao, ObjectId(), "foto.png", 10, "image/png")
+    imagem["imagem"] = True
+    imagem_id = db_limpo.midias.insert_one(imagem).inserted_id
+    com_imagem = cliente.put(caminho, json={"capa": {"tipo": "imagem", "midia_id": str(imagem_id)}}).json()
+    assert com_imagem["cortes"][0]["capa"] == {"tipo": "imagem", "midia_id": str(imagem_id)}
+    outra = montar_midia(ObjectId(), ObjectId(), "foto.png", 10, "image/png")
+    outra["imagem"] = True
+    outra_id = db_limpo.midias.insert_one(outra).inserted_id
+    assert cliente.put(caminho, json={"capa": {"tipo": "imagem", "midia_id": str(outra_id)}}).status_code == 404
+    assert cliente.put(caminho, json={"capa": None}).json()["cortes"][0]["capa"] is None
+
+
 def test_copia_parte_dois_e_apagar(cliente, db_limpo):
     cadastrar(cliente)
     clipagem = _pronta(cliente, db_limpo, faixa="medio", maximo=3)
@@ -274,6 +300,13 @@ def test_modelo_de_corte_na_clipagem_no_corte_e_no_espaco(cliente, db_limpo):
     assert cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": {"legenda_animada": "nao"}}}).status_code \
         == 422
     assert cliente.put(caminho, json={"modelo_corte": None}).json()["cortes"][0]["modelo_corte"] is None
+    # A retenção (14.8): a barra, o quadro do original e os vídeos de distração (ids da biblioteca)
+    retencao = {"barra": "baixo", "quadro_original": "sorteado", "distracao": ["a" * 24]}
+    com_retencao = cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": retencao}}).json()["cortes"][0]
+    assert {chave: com_retencao["modelo_corte"]["receita"][chave] for chave in retencao} == retencao
+    estragadas = ({"barra": "meio"}, {"quadro_original": "agora"}, {"distracao": ["x"]}, {"distracao": ["a" * 24] * 11})
+    for estragada in estragadas:
+        assert cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": estragada}}).status_code == 422
 
     # O modelo guardado no espaço
     meu = {"tipo": "modelo_corte", "nome": "Meu jeito", "dados": {"receita": receita}}

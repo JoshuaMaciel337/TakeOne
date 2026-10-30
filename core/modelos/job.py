@@ -25,6 +25,8 @@ TAREFAS = {
     "direcao": RECURSO_GPU,
     "pedido_edicao": RECURSO_GPU,
     "palavras_chave": RECURSO_GPU,
+    "emojis": RECURSO_GPU,
+    "gancho": RECURSO_GPU,
     "animacao_descrita": RECURSO_GPU,
     "geracao_imagem": RECURSO_GPU,
     "preenchimento": RECURSO_GPU,
