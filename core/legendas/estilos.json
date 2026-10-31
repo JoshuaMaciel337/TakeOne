@@ -1,0 +1,391 @@
+{
+ "_comentario": "As legendas animadas (ADR 0004, 14.11): a receita de cada estilo, lida pelo Python (core/modelos/legenda_animada.py: o agrupamento das palavras e as fontes) e pelo motor (core/legendas/motor.js: o desenho). Cores: texto, enfase, caixa e neon vêm do pedido (o kit de marca); o resto é um hexadecimal. Tamanhos em centésimos do lado menor do quadro.",
+ "categorias": {
+  "editorial": "Editorial",
+  "palavra": "Uma palavra por vez",
+  "fala": "Destaque da fala",
+  "caixas": "Caixas e fundos",
+  "efeitos": "Efeitos"
+ },
+ "estilos": {
+  "editorial": {
+   "nome": "Editorial", "categoria": "editorial",
+   "descricao": "Serifada condensada em caixa alta, a palavra forte em itálico dourado.",
+   "agrupar": "bloco", "letras": 12, "linhas": 3, "enfase_sozinha": true, "fontes": ["dm_serif", "playfair_italico"],
+   "base": {"familia": "DM Serif Display", "peso": 400, "tam": 7.4, "caixa": "alta", "largura": 0.84, "altura": 7.0},
+   "enfase": {"familia": "Playfair Display", "italico": true, "peso": 500, "tam": 8.6, "caixa": "baixa", "largura": 1, "altura": 9.4},
+   "entrada": {"dur": 0.2, "alfa": "suave", "sobe": 0.25, "escala": 0.94, "desfoque_enfase": 0.8}
+  },
+  "assinatura": {
+   "nome": "Assinatura", "categoria": "editorial",
+   "descricao": "Caixa alta limpa e a palavra forte escrita à mão, grande, na cor de destaque.",
+   "agrupar": "bloco", "letras": 16, "linhas": 3, "enfase_sozinha": true, "fontes": ["montserrat", "great_vibes"],
+   "base": {"peso": 700, "tam": 4.6, "altura": 6.0},
+   "enfase": {"familia": "Great Vibes", "peso": 400, "tam": 14, "caixa": "normal", "altura": 12},
+   "entrada": {"dur": 0.3, "alfa": "suave", "sobe": 0.2, "desfoque_enfase": 1.2}
+  },
+  "revista": {
+   "nome": "Revista", "categoria": "editorial",
+   "descricao": "Letras altas e estreitas; os conectivos pequenos em serifada itálica; os números contam.",
+   "agrupar": "bloco", "letras": 14, "linhas": 3, "fontes": ["bebas", "cormorant_italico"],
+   "base": {"familia": "Bebas Neue", "peso": 400, "tam": 9, "altura": 8.2},
+   "enfase": {"tam": 11, "altura": 9.6},
+   "conectivo": {"familia": "Cormorant Garamond", "italico": true, "peso": 600, "tam": 5.4, "caixa": "baixa"},
+   "numero": {"conta": true, "tam": 12, "altura": 10.4, "cor": "enfase"},
+   "entrada": {"dur": 0.24, "alfa": "suave", "sobe": 0.35}
+  },
+  "manchete": {
+   "nome": "Manchete", "categoria": "editorial",
+   "descricao": "Linhas desencontradas, a palavra forte numa serifada pesada e enorme.",
+   "agrupar": "bloco", "letras": 12, "linhas": 3, "enfase_sozinha": true, "fontes": ["oswald", "abril"],
+   "base": {"familia": "Oswald", "peso": 600, "tam": 6.6, "altura": 7.4},
+   "enfase": {"familia": "Abril Fatface", "peso": 400, "tam": 10.5, "caixa": "normal", "altura": 11},
+   "conectivo": {"peso": 400, "tam": 4.6},
+   "numero": {"conta": true, "familia": "Abril Fatface", "peso": 400, "tam": 12, "altura": 12, "cor": "enfase"},
+   "alinhamento": "desencontrado",
+   "entrada": {"dur": 0.22, "alfa": "suave", "lado": 6}
+  },
+  "enfase_gigante": {
+   "nome": "Ênfase gigante", "categoria": "editorial",
+   "descricao": "A frase pequena e a palavra forte enorme, sozinha na linha, entrando com mola.",
+   "agrupar": "bloco", "letras": 16, "linhas": 3, "enfase_sozinha": true, "fontes": ["montserrat", "anton"],
+   "base": {"peso": 700, "tam": 4.4, "altura": 5.8},
+   "enfase": {"familia": "Anton", "peso": 400, "tam": 13, "altura": 13.6},
+   "numero": {"conta": true, "familia": "Anton", "peso": 400, "tam": 14, "altura": 14.4, "cor": "enfase"},
+   "entrada": {"dur": 0.3, "alfa": 3, "curva": "mola", "escala": 0.5}
+  },
+  "serifa_apoio": {
+   "nome": "Serifada de apoio", "categoria": "editorial",
+   "descricao": "Palavras pesadas em caixa alta, com os conectivos em serifada itálica pequena entre elas.",
+   "agrupar": "bloco", "letras": 14, "linhas": 3, "fontes": ["archivo_black", "playfair_italico"],
+   "base": {"familia": "Archivo Black", "peso": 400, "tam": 6.2, "altura": 7.6},
+   "conectivo": {"familia": "Playfair Display", "italico": true, "peso": 500, "tam": 5.2, "caixa": "baixa", "cor": "#f2f2f2"},
+   "entrada": {"dur": 0.2, "alfa": "suave", "sobe": 0.3}
+  },
+  "empilhado": {
+   "nome": "Empilhado", "categoria": "editorial",
+   "descricao": "Uma palavra por linha, apertadas umas nas outras, a forte maior e colorida.",
+   "agrupar": "bloco", "letras": 1, "linhas": 4, "fontes": ["anton"],
+   "base": {"familia": "Anton", "peso": 400, "tam": 8.4, "altura": 8.0},
+   "enfase": {"tam": 11, "altura": 10.4},
+   "conectivo": {"tam": 5.4, "altura": 5.6},
+   "entrada": {"dur": 0.18, "alfa": "suave", "lado": 8}
+  },
+  "desencontrado": {
+   "nome": "Desencontrado", "categoria": "editorial",
+   "descricao": "Linhas puxadas para um lado e para o outro, em letras altas, subindo uma a uma.",
+   "agrupar": "bloco", "letras": 11, "linhas": 3, "fontes": ["bebas"],
+   "base": {"familia": "Bebas Neue", "peso": 400, "tam": 9.6, "altura": 8.6},
+   "alinhamento": "desencontrado",
+   "entrada": {"dur": 0.2, "alfa": "suave", "sobe": 0.4}
+  },
+  "classico": {
+   "nome": "Clássico", "categoria": "editorial",
+   "descricao": "Serifada de livro, em letras normais, entrando devagar.",
+   "agrupar": "bloco", "letras": 22, "linhas": 2, "fontes": ["merriweather"],
+   "base": {"familia": "Merriweather", "peso": 700, "tam": 5.4, "caixa": "normal", "altura": 7.2},
+   "entrada": {"dur": 0.35, "alfa": "suave", "sobe": 0.12}
+  },
+  "suave": {
+   "nome": "Suave", "categoria": "editorial",
+   "descricao": "Serifada itálica em minúsculas, discreta, para falas calmas.",
+   "agrupar": "bloco", "letras": 22, "linhas": 2, "fontes": ["lora_italico"],
+   "base": {"familia": "Lora", "italico": true, "peso": 600, "tam": 6, "caixa": "baixa", "altura": 7.4},
+   "entrada": {"dur": 0.4, "alfa": "suave", "desfoque": 0.6}
+  },
+
+  "uma_palavra": {
+   "nome": "Uma palavra por vez", "categoria": "palavra",
+   "descricao": "Só a palavra falada, em negrito, entrando com um pulo curto.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["montserrat"],
+   "base": {"tam": 5.6, "altura": 6.4},
+   "enfase": {"tam": 6.6},
+   "entrada": {"dur": 0.16, "alfa": 3, "curva": "mola", "escala": 0.6}
+  },
+  "minusculas": {
+   "nome": "Minúsculas", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, em minúsculas, discreta.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["montserrat"],
+   "base": {"peso": 700, "tam": 5.2, "caixa": "baixa", "altura": 6},
+   "enfase": {"tam": 6},
+   "entrada": {"dur": 0.16, "alfa": "suave", "sobe": 0.3}
+  },
+  "palavra_gigante": {
+   "nome": "Palavra gigante", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, enorme, chegando de perto, com contorno fino.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["anton"],
+   "base": {"familia": "Anton", "peso": 400, "tam": 14, "altura": 15},
+   "numero": {"conta": true, "cor": "enfase"},
+   "contorno": {"largura": 0.45, "cor": "#000000"},
+   "sombra": false,
+   "entrada": {"dur": 0.18, "alfa": 2.5, "escala": 1.5}
+  },
+  "palavra_desfoque": {
+   "nome": "Desfoque", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, saindo do desfoque.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["montserrat"],
+   "base": {"peso": 800, "tam": 6.4, "altura": 7.2},
+   "enfase": {"tam": 7.4},
+   "entrada": {"dur": 0.22, "alfa": "suave", "escala": 0.9, "desfoque": 2.2}
+  },
+  "palavra_lado": {
+   "nome": "Deslizando", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, deslizando da esquerda.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["oswald"],
+   "base": {"familia": "Oswald", "peso": 700, "tam": 7.4, "altura": 8.2},
+   "enfase": {"tam": 8.6},
+   "entrada": {"dur": 0.18, "alfa": "suave", "lado": 10}
+  },
+  "palavra_girando": {
+   "nome": "Girando", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, entrando girada e parando com mola.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["montserrat"],
+   "base": {"peso": 900, "tam": 6.4, "altura": 7.6},
+   "enfase": {"tam": 7.6},
+   "entrada": {"dur": 0.26, "alfa": 3, "curva": "mola", "escala": 0.4, "giro": -28}
+  },
+  "palavra_caindo": {
+   "nome": "Caindo", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, caindo de cima e quicando.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["luckiest"],
+   "base": {"familia": "Luckiest Guy", "peso": 400, "tam": 7.4, "altura": 8.4},
+   "enfase": {"tam": 8.6},
+   "contorno": {"largura": 0.7, "cor": "#111111"},
+   "sombra": {"dura": [0, 0.5], "cor": "#111111"},
+   "entrada": {"dur": 0.3, "alfa": 4, "curva": "mola", "desce": 1.2}
+  },
+  "palavra_caixa": {
+   "nome": "Palavra na caixa", "categoria": "palavra",
+   "descricao": "Uma palavra por vez, numa caixa de cor que muda a cada palavra.",
+   "agrupar": "palavra", "letras": 20, "linhas": 1, "fontes": ["archivo_black"],
+   "base": {"familia": "Archivo Black", "peso": 400, "tam": 6.2, "altura": 9.2, "cor": "#ffffff"},
+   "fundo": {"tipo": "palavras", "cores": ["caixa", "enfase", "#2f80ff", "#111111"], "raio": 1.2, "ciclo": "bloco"},
+   "largura_extra": 3.4, "texto_dy": 0.04, "sombra": false,
+   "entrada": {"dur": 0.22, "alfa": 2.5, "curva": "mola", "escala": 0.5, "giro_alterna": 3}
+  },
+
+  "pulando": {
+   "nome": "Palavra pulando", "categoria": "fala",
+   "descricao": "A frase inteira, com a palavra falada pulando e na cor de destaque.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"tam": 5.2},
+   "falada": {"cor": "enfase", "pulo": 0.32},
+   "entrada": {"dur": 0.25}
+  },
+  "caixa_falada": {
+   "nome": "Caixa na palavra falada", "categoria": "fala",
+   "descricao": "A palavra falada ganha uma caixa colorida atrás.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"tam": 5.2},
+   "falada": {"caixa": "caixa"},
+   "entrada": {"dur": 0.12}
+  },
+  "karaoke": {
+   "nome": "Karaokê", "categoria": "fala",
+   "descricao": "A frase inteira, e a cor vai preenchendo cada palavra no ritmo da fala.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"peso": 900, "tam": 5.4, "altura": 6.8},
+   "enfase": {"cor": "texto"},
+   "falada": {"karaoke": "enfase"},
+   "contorno": {"largura": 0.5, "cor": "#000000"}
+  },
+  "karaoke_caixa": {
+   "nome": "Karaokê em caixa", "categoria": "fala",
+   "descricao": "A frase numa caixa escura, com as palavras acendendo na cor de destaque conforme são ditas.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["poppins_bold"], "todas": true,
+   "base": {"familia": "Poppins", "peso": 700, "tam": 4.8, "caixa": "normal", "altura": 6.6},
+   "enfase": {"cor": "texto"},
+   "falada": {"karaoke": "enfase"},
+   "fundo": {"tipo": "bloco", "cor": "#000000", "alfa": 0.7, "folga": [2.4, 1.4], "raio": 1.8},
+   "sombra": false
+  },
+  "marca_texto": {
+   "nome": "Marca-texto", "categoria": "fala",
+   "descricao": "A palavra falada é riscada por um marca-texto que cresce enquanto ela é dita.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"peso": 800, "tam": 5.2, "caixa": "normal", "altura": 7},
+   "enfase": {"cor": "texto"},
+   "falada": {"marca": "enfase", "cor_na_marca": "#111111"},
+   "entrada": {"dur": 0.2}
+  },
+  "falada_maior": {
+   "nome": "Palavra falada maior", "categoria": "fala",
+   "descricao": "A frase inteira; a palavra falada cresce e muda de cor.",
+   "agrupar": "bloco", "letras": 16, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"peso": 900, "tam": 5.2, "altura": 7.2},
+   "enfase": {"cor": "texto"},
+   "falada": {"cor": "enfase", "escala": 1.12},
+   "espaco": 2.2,
+   "entrada": {"dur": 0.14}
+  },
+  "acendendo": {
+   "nome": "Acendendo", "categoria": "fala",
+   "descricao": "A frase aparece apagada e cada palavra acende quando é dita.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"peso": 800, "tam": 5.4, "altura": 6.8},
+   "falada": {"apagadas": 0.35, "cor": "enfase"},
+   "entrada": {"dur": 0.14}
+  },
+  "sublinhado": {
+   "nome": "Sublinhado", "categoria": "fala",
+   "descricao": "Um traço grosso corre embaixo da palavra falada.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"], "todas": true,
+   "base": {"peso": 800, "tam": 5.2, "caixa": "normal", "altura": 7.4},
+   "falada": {"sublinhado": "enfase"},
+   "entrada": {"dur": 0.18}
+  },
+
+  "caixas": {
+   "nome": "Caixas coloridas", "categoria": "caixas",
+   "descricao": "Cada palavra numa caixa, que entra girando um pouco.",
+   "agrupar": "bloco", "letras": 14, "linhas": 3, "fontes": ["archivo_black"],
+   "base": {"familia": "Archivo Black", "peso": 400, "tam": 5.4, "altura": 8.2, "cor": "#ffffff"},
+   "enfase": {"cor": "#ffffff"},
+   "fundo": {"tipo": "palavras", "cores": ["caixa", "enfase", "#2f80ff", "#111111"], "raio": 1},
+   "espaco": 1.6, "largura_extra": 3, "texto_dy": 0.04, "sombra": false,
+   "entrada": {"dur": 0.22, "alfa": 2.5, "curva": "mola", "escala": 0.5, "giro_alterna": 3, "giro": -10}
+  },
+  "etiqueta": {
+   "nome": "Etiqueta", "categoria": "caixas",
+   "descricao": "Cada linha numa faixa branca, com as letras pretas; a palavra forte na cor de destaque.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["montserrat"],
+   "base": {"peso": 800, "tam": 5, "caixa": "normal", "altura": 7.6, "cor": "#111111"},
+   "enfase": {"cor": "caixa"},
+   "fundo": {"tipo": "linhas", "cor": "#ffffff", "alfa": 1, "folga": [1.6, 0.4], "raio": 0.8, "visiveis": true},
+   "sombra": false,
+   "entrada": {"dur": 0.2, "alfa": "suave", "sobe": 0.3}
+  },
+  "faixa": {
+   "nome": "Faixa", "categoria": "caixas",
+   "descricao": "Uma faixa de cor de lado a lado atrás da frase, com as letras brancas deslizando.",
+   "agrupar": "bloco", "letras": 18, "linhas": 2, "fontes": ["oswald"],
+   "base": {"familia": "Oswald", "peso": 700, "tam": 6.4, "altura": 7.8},
+   "enfase": {"cor": "#111111"},
+   "fundo": {"tipo": "faixa", "cor": "caixa", "alfa": 0.92, "folga": [0, 1.6]},
+   "sombra": false,
+   "entrada": {"dur": 0.2, "alfa": "suave", "lado": 6}
+  },
+  "cinema": {
+   "nome": "Cinema", "categoria": "caixas",
+   "descricao": "Legenda de filme: letras normais numa caixa escura e translúcida.",
+   "agrupar": "bloco", "letras": 26, "linhas": 2, "fontes": ["poppins_medio"],
+   "base": {"familia": "Poppins", "peso": 500, "tam": 4.6, "caixa": "normal", "altura": 6.4},
+   "enfase": {"cor": "texto"},
+   "fundo": {"tipo": "bloco", "cor": "#000000", "alfa": 0.55, "folga": [2, 1.2], "raio": 1, "visiveis": true},
+   "sombra": false,
+   "entrada": {"dur": 0.15, "alfa": "suave"}
+  },
+  "pilulas": {
+   "nome": "Pílulas", "categoria": "caixas",
+   "descricao": "Cada palavra numa pílula da cor da marca, que entra crescendo; a forte em outra cor.",
+   "agrupar": "bloco", "letras": 16, "linhas": 3, "fontes": ["montserrat"],
+   "base": {"peso": 800, "tam": 4.8, "altura": 8.4, "cor": "#ffffff"},
+   "fundo": {"tipo": "palavras", "cores": ["caixa"], "cor_enfase": "enfase", "raio": 4.2},
+   "espaco": 1.2, "largura_extra": 4, "texto_dy": 0.04, "sombra": false,
+   "entrada": {"dur": 0.22, "alfa": 3, "curva": "mola", "escala": 0.3}
+  },
+  "digitacao": {
+   "nome": "Digitação", "categoria": "caixas",
+   "descricao": "As letras aparecem no ritmo da fala, com o cursor piscando.",
+   "agrupar": "bloco", "letras": 20, "linhas": 2, "fontes": ["space_mono"],
+   "base": {"familia": "Space Mono", "peso": 700, "tam": 4.6, "caixa": "normal", "altura": 6.2},
+   "fundo": {"tipo": "bloco", "cor": "#000000", "alfa": 0.62, "folga": [2.5, 1.5], "raio": 1.6},
+   "digitar": true,
+   "entrada": {"dur": 0}
+  },
+  "terminal": {
+   "nome": "Terminal", "categoria": "caixas",
+   "descricao": "Letras verdes de computador numa tela preta, digitadas com o cursor.",
+   "agrupar": "bloco", "letras": 22, "linhas": 2, "fontes": ["space_mono"],
+   "base": {"familia": "Space Mono", "peso": 700, "tam": 4.2, "caixa": "baixa", "altura": 6, "cor": "#3dff8a"},
+   "enfase": {"cor": "#ffffff"},
+   "fundo": {"tipo": "bloco", "cor": "#050805", "alfa": 0.88, "folga": [2.5, 1.5], "raio": 0.6},
+   "digitar": true, "sombra": false,
+   "brilho": {"cor": "#3dff8a", "raios": [1.2]},
+   "entrada": {"dur": 0}
+  },
+
+  "contorno": {
+   "nome": "Contorno grosso", "categoria": "efeitos",
+   "descricao": "Letras grossas com contorno preto; a palavra falada em amarelo.",
+   "agrupar": "bloco", "letras": 14, "linhas": 2, "fontes": ["anton"],
+   "base": {"familia": "Anton", "peso": 400, "tam": 7.2, "altura": 8},
+   "falada": {"cor": "enfase"},
+   "contorno": {"largura": 1.1, "cor": "#000000"},
+   "sombra": false,
+   "entrada": {"dur": 0.12, "alfa": 3, "curva": "mola", "escala": 0.6}
+  },
+  "neon": {
+   "nome": "Néon", "categoria": "efeitos",
+   "descricao": "Letras com brilho de néon, acendendo uma a uma.",
+   "agrupar": "bloco", "letras": 16, "linhas": 2, "fontes": ["montserrat"],
+   "base": {"tam": 5.4, "altura": 6.8, "cor": "#ffffff"},
+   "enfase": {"cor": "#ffffff"},
+   "brilho": {"cor": "neon", "cor_enfase": "caixa", "raios": [3, 1.2]},
+   "sombra": false,
+   "entrada": {"dur": 0.3, "tremula": true}
+  },
+  "vazado": {
+   "nome": "Vazado", "categoria": "efeitos",
+   "descricao": "Só o contorno das letras; a palavra falada se enche de cor.",
+   "agrupar": "bloco", "letras": 14, "linhas": 2, "fontes": ["anton"],
+   "base": {"familia": "Anton", "peso": 400, "tam": 7.8, "altura": 8.4},
+   "enfase": {"cor": "texto"},
+   "contorno": {"largura": 0.42, "cor": "texto", "so": true},
+   "falada": {"cor": "enfase"},
+   "sombra": false,
+   "entrada": {"dur": 0.2, "alfa": "suave", "escala": 0.85}
+  },
+  "sombra_dura": {
+   "nome": "Sombra dura", "categoria": "efeitos",
+   "descricao": "Letras redondas e grossas com uma sombra sólida deslocada, como um adesivo.",
+   "agrupar": "bloco", "letras": 14, "linhas": 2, "fontes": ["bungee"],
+   "base": {"familia": "Bungee", "peso": 400, "tam": 5.6, "altura": 7.8},
+   "sombra": {"dura": [0.55, 0.55], "cor": "caixa"},
+   "entrada": {"dur": 0.24, "alfa": 3, "curva": "mola", "escala": 0.6}
+  },
+  "quadrinhos": {
+   "nome": "Quadrinhos", "categoria": "efeitos",
+   "descricao": "Letras de gibi com contorno e sombra, cada palavra entrando torta.",
+   "agrupar": "bloco", "letras": 14, "linhas": 2, "fontes": ["luckiest"],
+   "base": {"familia": "Luckiest Guy", "peso": 400, "tam": 6.8, "altura": 8.2, "cor": "#ffe14d"},
+   "enfase": {"cor": "#ffffff"},
+   "contorno": {"largura": 0.9, "cor": "#111111"},
+   "sombra": {"dura": [0.35, 0.6], "cor": "#111111"},
+   "entrada": {"dur": 0.26, "alfa": 3, "curva": "mola", "escala": 0.4, "giro_alterna": 4, "giro": -14}
+  },
+  "degrade": {
+   "nome": "Degradê", "categoria": "efeitos",
+   "descricao": "Letras pesadas pintadas num degradê das cores da marca.",
+   "agrupar": "bloco", "letras": 16, "linhas": 2, "fontes": ["montserrat"],
+   "base": {"peso": 900, "tam": 5.8, "altura": 7.2},
+   "gradiente": ["enfase", "caixa"],
+   "entrada": {"dur": 0.24, "alfa": 3, "curva": "mola", "escala": 0.6}
+  },
+  "glitch": {
+   "nome": "Falha digital", "categoria": "efeitos",
+   "descricao": "Cada palavra chega tremendo em vermelho e azul, como uma tela com defeito.",
+   "agrupar": "bloco", "letras": 16, "linhas": 2, "fontes": ["bungee"],
+   "base": {"familia": "Bungee", "peso": 400, "tam": 5.4, "altura": 7.4},
+   "glitch": true,
+   "entrada": {"dur": 0.3}
+  },
+  "marcador": {
+   "nome": "Escrito à mão", "categoria": "efeitos",
+   "descricao": "Letras de pincel atômico, um pouco tortas, aparecendo letra a letra.",
+   "agrupar": "bloco", "letras": 16, "linhas": 2, "fontes": ["permanent_marker"],
+   "base": {"familia": "Permanent Marker", "peso": 400, "tam": 6.6, "caixa": "normal", "altura": 8.4},
+   "letra_a_letra": true,
+   "entrada": {"dur": 0.3, "giro_alterna": 2}
+  },
+  "letreiro": {
+   "nome": "Letreiro", "categoria": "efeitos",
+   "descricao": "Letras grandes que sobem letra a letra, com os números contando.",
+   "agrupar": "bloco", "letras": 12, "linhas": 2, "fontes": ["anton"],
+   "base": {"familia": "Anton", "peso": 400, "tam": 9, "altura": 9.6},
+   "numero": {"conta": true, "cor": "enfase", "tam": 11, "altura": 11},
+   "letra_a_letra": true,
+   "entrada": {"dur": 0.3, "sobe": 0.3}
+  }
+ }
+}

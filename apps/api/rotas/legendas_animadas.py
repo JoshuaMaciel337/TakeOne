@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/legendas-animadas", tags=["legendas-animadas"])
 
 _COR = re.compile(r"#[0-9a-fA-F]{6}")
 _ARQUIVOS_DAS_FONTES = {(pasta, arquivo) for pasta, arquivo, *_ in FONTES.values()}
-EXEMPLO = "Quanto menos contato com a palavra, mais longe você fica"
+EXEMPLO = "Em 30 dias, quanto menos contato com a palavra, mais longe você fica"
 ENFASE_DO_EXEMPLO = {"palavra", "longe"}
 
 # A prévia toca em laço, com o mesmo relógio do worker (renderAt), depois das fontes
@@ -84,18 +84,19 @@ def _conferir(estilo: str, proporcao: str):
 
 
 def palavras_do_exemplo() -> list[dict]:
-    """A frase da prévia, com 0,32 s por palavra e uma pausa curta no meio."""
+    """A frase da prévia, com 0,32 s por palavra e uma pausa curta depois de cada vírgula."""
     palavras, t = [], 0.3
-    for i, texto in enumerate(EXEMPLO.split()):
+    for texto in EXEMPLO.split():
         palavras.append({"texto": texto, "inicio": round(t, 2), "fim": round(t + 0.28, 2),
                          "enfase": texto.strip(",.") in ENFASE_DO_EXEMPLO})
-        t += 0.32 + (0.5 if i == 4 else 0)
+        t += 0.32 + (0.5 if texto.endswith(",") else 0)
     return palavras
 
 
 @router.get("/estilos")
 async def estilos(_usuario=Depends(usuario_atual)):
-    return [{"id": chave, "nome": e["nome"], "descricao": e["descricao"]} for chave, e in ESTILOS.items()]
+    return [{"id": chave, "nome": e["nome"], "descricao": e["descricao"], "categoria": e["categoria"]}
+            for chave, e in ESTILOS.items()]
 
 
 @router.get("/previa", response_class=HTMLResponse)

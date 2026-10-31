@@ -19,38 +19,19 @@ DURACAO_MAXIMA = 300.0           # um corte de até 5 min
 PALAVRAS_NO_MAXIMO = 3000
 LETRAS_DA_PALAVRA = 40
 
-# Os estilos: o jeito de agrupar ("bloco": várias palavras juntas, que entram uma a uma; "palavra": uma por vez),
-# quantas letras cabem numa linha e quantas linhas um bloco tem, e as fontes da biblioteca que o motor carrega.
-# O desenho de cada um fica em core/legendas/motor.js.
-ESTILOS = {
-    "editorial": {"nome": "Editorial", "agrupar": "bloco", "letras": 12, "linhas": 3,
-                  "descricao": "Serifada condensada em caixa alta, a palavra forte em itálico dourado.",
-                  "fontes": ["dm_serif", "playfair_italico"]},
-    "uma_palavra": {"nome": "Uma palavra por vez", "agrupar": "palavra", "letras": 20, "linhas": 1,
-                    "descricao": "Só a palavra falada, em negrito, entrando com um pulo curto.",
-                    "fontes": ["montserrat"]},
-    "minusculas": {"nome": "Minúsculas", "agrupar": "palavra", "letras": 20, "linhas": 1,
-                   "descricao": "Uma palavra por vez, em minúsculas, discreta.",
-                   "fontes": ["montserrat"]},
-    "pulando": {"nome": "Palavra pulando", "agrupar": "bloco", "letras": 18, "linhas": 2,
-                "descricao": "A frase inteira, com a palavra falada pulando e na cor de destaque.",
-                "fontes": ["montserrat"]},
-    "caixa_falada": {"nome": "Caixa na palavra falada", "agrupar": "bloco", "letras": 18, "linhas": 2,
-                     "descricao": "A palavra falada ganha uma caixa colorida atrás.",
-                     "fontes": ["montserrat"]},
-    "caixas": {"nome": "Caixas coloridas", "agrupar": "bloco", "letras": 14, "linhas": 3,
-               "descricao": "Cada palavra numa caixa, que entra girando um pouco.",
-               "fontes": ["archivo_black"]},
-    "digitacao": {"nome": "Digitação", "agrupar": "bloco", "letras": 20, "linhas": 2,
-                  "descricao": "As letras aparecem no ritmo da fala, com o cursor piscando.",
-                  "fontes": ["space_mono"]},
-    "contorno": {"nome": "Contorno grosso", "agrupar": "bloco", "letras": 14, "linhas": 2,
-                 "descricao": "Letras grossas com contorno preto; a palavra falada em amarelo.",
-                 "fontes": ["anton"]},
-    "neon": {"nome": "Néon", "agrupar": "bloco", "letras": 16, "linhas": 2,
-             "descricao": "Letras com brilho de néon, acendendo uma a uma.",
-             "fontes": ["montserrat"]},
-}
+# Os estilos (core/legendas/estilos.json, 14.11): o jeito de agrupar ("bloco": várias palavras juntas, que entram uma
+# a uma; "palavra": uma por vez), quantas letras cabem numa linha e quantas linhas um bloco tem, a categoria, as fontes
+# da biblioteca que o motor carrega e a receita do desenho, que vai inteira para o motor (core/legendas/motor.js)
+_ARQUIVO_DOS_ESTILOS = json.loads((PASTA_DO_MOTOR / "estilos.json").read_text(encoding="utf-8"))
+CATEGORIAS: dict[str, str] = _ARQUIVO_DOS_ESTILOS["categorias"]
+ESTILOS: dict[str, dict] = _ARQUIVO_DOS_ESTILOS["estilos"]
+_CAMPOS_DO_PYTHON = {"nome", "categoria", "descricao", "agrupar", "letras", "linhas", "enfase_sozinha", "fontes"}
+
+
+def receita_do_estilo(estilo: str) -> dict:
+    """O que o motor desenha: a receita sem os campos que só o Python usa."""
+    return {chave: valor for chave, valor in ESTILOS[estilo].items() if chave not in _CAMPOS_DO_PYTHON}
+
 
 # As fontes do motor: o arquivo, a família, o estilo e o peso. Montserrat vem de core/fontes; as outras, da biblioteca
 # de fontes livres (core/fontes/biblioteca.json, OFL), que as imagens da API e do worker já baixam
@@ -61,7 +42,39 @@ FONTES = {
     "archivo_black": ("biblioteca", "ArchivoBlack-Regular.ttf", "Archivo Black", "normal", "400"),
     "space_mono": ("biblioteca", "SpaceMono-Bold.ttf", "Space Mono", "normal", "700"),
     "anton": ("biblioteca", "Anton-Regular.ttf", "Anton", "normal", "400"),
+    "great_vibes": ("biblioteca", "GreatVibes-Regular.ttf", "Great Vibes", "normal", "400"),
+    "bebas": ("biblioteca", "BebasNeue-Regular.ttf", "Bebas Neue", "normal", "400"),
+    "cormorant_italico": ("biblioteca", "CormorantGaramond-Italic[wght].ttf", "Cormorant Garamond", "italic",
+                          "300 700"),
+    "oswald": ("biblioteca", "Oswald[wght].ttf", "Oswald", "normal", "200 700"),
+    "abril": ("biblioteca", "AbrilFatface-Regular.ttf", "Abril Fatface", "normal", "400"),
+    "merriweather": ("biblioteca", "Merriweather[opsz,wdth,wght].ttf", "Merriweather", "normal", "300 900"),
+    "lora_italico": ("biblioteca", "Lora-Italic[wght].ttf", "Lora", "italic", "400 700"),
+    "luckiest": ("biblioteca", "LuckiestGuy-Regular.ttf", "Luckiest Guy", "normal", "400"),
+    "poppins_bold": ("biblioteca", "Poppins-Bold.ttf", "Poppins", "normal", "700"),
+    "poppins_medio": ("biblioteca", "Poppins-Medium.ttf", "Poppins", "normal", "500"),
+    "bungee": ("biblioteca", "Bungee-Regular.ttf", "Bungee", "normal", "400"),
+    "permanent_marker": ("biblioteca", "PermanentMarker-Regular.ttf", "Permanent Marker", "normal", "400"),
 }
+
+# O papel de cada palavra (14.11): a ênfase vem do LLM (as palavras-chave); números e conectivos, destas regras. Os
+# estilos que têm um desenho para o papel o usam (o conectivo menor, o número que conta)
+CONECTIVOS = {"a", "o", "as", "os", "e", "é", "de", "da", "do", "das", "dos", "em", "na", "no", "nas", "nos", "um",
+              "uma", "uns", "umas", "que", "se", "por", "pra", "para", "pro", "com", "sem", "ao", "aos", "à", "às",
+              "mas", "ou", "nem", "como", "então", "quando", "porque", "pelo", "pela", "pelos", "pelas", "num",
+              "numa", "lhe", "me", "te", "eu", "você", "ele", "ela", "isso", "esse", "essa", "este", "esta", "já",
+              "só", "também", "the", "of", "and", "to", "in", "is", "it", "y", "el", "la", "en", "los", "las"}
+_NUMERO = re.compile(r"\d")
+
+
+def papel_da_palavra(texto: str, enfase: bool) -> str:
+    """"numero", "enfase", "conectivo" ou "normal"."""
+    if _NUMERO.search(texto):
+        return "numero"
+    if enfase:
+        return "enfase"
+    limpo = re.sub(r"[^\w]", "", texto.lower())
+    return "conectivo" if limpo in CONECTIVOS else "normal"
 
 # Um bloco fecha no fim da frase, numa pausa assim ou quando passa disto
 PAUSA_DO_BLOCO = 0.45
@@ -89,21 +102,24 @@ def conferir_palavras(palavras: list[dict], duracao: float) -> list[dict]:
         inicio = max(0.0, float(palavra["inicio"]))
         fim = min(duracao, max(inicio + 0.05, float(palavra.get("fim") or inicio)))
         if texto and inicio < duracao:
-            saida.append({"texto": texto, "inicio": round(inicio, 3), "fim": round(fim, 3),
-                          "enfase": bool(palavra.get("enfase"))})
+            enfase = bool(palavra.get("enfase"))
+            saida.append({"texto": texto, "inicio": round(inicio, 3), "fim": round(fim, 3), "enfase": enfase,
+                          "papel": papel_da_palavra(texto, enfase)})
     if not saida:
         raise ErroLegenda("Não há palavras dentro da duração da legenda.")
     return saida
 
 
 def _linhas(textos: list[tuple[str, bool]], letras: int, estilo: str) -> list[list[int]]:
-    """Os índices das palavras em linhas de até `letras` letras. No editorial, a palavra de ênfase fica sozinha na
-    linha dela (é maior e de outra fonte), como no corte de referência ("QUANTO / MENOS / contato")."""
+    """Os índices das palavras em linhas de até `letras` letras. Nos estilos com "enfase_sozinha" (o editorial), a
+    palavra de ênfase fica sozinha na linha dela (é maior e de outra fonte), como no corte de referência ("QUANTO /
+    MENOS / contato")."""
+    so_ela = bool(ESTILOS[estilo].get("enfase_sozinha"))
     linhas: list[list[int]] = []
     atual: list[int] = []
     tamanho = 0
     for i, (texto, enfase) in enumerate(textos):
-        sozinha = estilo == "editorial" and enfase
+        sozinha = so_ela and enfase
         if atual and (sozinha or tamanho + 1 + len(texto) > letras):
             linhas.append(atual)
             atual, tamanho = [], 0
@@ -165,7 +181,8 @@ def montar_pagina(blocos: list[dict], estilo: str, proporcao: str, duracao: floa
         pasta, arquivo, familia, forma, peso = FONTES[nome]
         url = f"{base_das_fontes}/{pasta}/{arquivo.replace('[', '%5B').replace(']', '%5D')}"
         fontes.append({"url": url, "familia": familia, "estilo": forma, "peso": peso})
-    dados = {"blocos": blocos, "estilo": estilo, "duracao": duracao, "posicao": posicao,
+    dados = {"blocos": blocos, "estilo": estilo, "receita": receita_do_estilo(estilo), "duracao": duracao,
+             "posicao": posicao,
              "cores": cores, "largura": largura, "altura": altura, "fontes": fontes}
     return f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
