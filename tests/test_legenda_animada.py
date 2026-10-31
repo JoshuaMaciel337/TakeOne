@@ -170,12 +170,18 @@ def test_cada_estilo_desenha_sem_erro_dentro_da_faixa_e_igual_no_mesmo_instante(
     fala = conferir_palavras(_palavras(texto, passo=0.34, comeco=0.2, enfase={"rotina", "hábito"}), 6.5)
     largura, altura = QUADROS["9:16"]
     instantes = (1.2, 2.05, 4.4)
+    # Só os estilos com as fontes instaladas: o CI não baixa a biblioteca de fontes livres (as imagens baixam)
+    arquivos = arquivos_da_pagina()
+    instaladas = {chave for chave, (pasta, arquivo, *_) in FONTES.items()
+                  if arquivos[f"/fontes/{pasta}/{arquivo}"].is_file()}
+    estilos = [estilo for estilo, dados in ESTILOS.items() if set(dados["fontes"]) <= instaladas]
+    assert estilos
     playwright, navegador = abrir_navegador()
     try:
-        for estilo in ESTILOS:
+        for estilo in estilos:
             pagina = montar_pagina(blocos_da_fala(fala, estilo, 6.5), estilo, "9:16", 6.5, {}, 0.7, "/fontes",
                                    "/legendas")
-            with Estudio(pagina, largura, altura, navegador, extras=arquivos_da_pagina()) as estudio:
+            with Estudio(pagina, largura, altura, navegador, extras=arquivos) as estudio:
                 y0, y1 = (int(v) for v in estudio.avaliar("() => window.faixaDaLegenda()"))
                 algo = 0
                 for t in instantes:
