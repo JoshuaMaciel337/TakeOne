@@ -35,31 +35,47 @@ from core.modelos.cortes import (
     montar_mensagens,
     tamanho_da_janela,
 )
-from core.modelos.job import ErroDefinitivo, montar_job
+from core.modelos.gosto import ajuste_do_gosto, avaliados, gosto_do_espaco, texto_do_gosto
+from core.modelos.job import STATUS_EXECUTANDO, STATUS_PENDENTE, ErroDefinitivo, montar_job
+from core.modelos.medidas_do_corte import MedidasDoVideo
+from core.modelos.midia import ARQUIVO_NIVEIS, chave_arquivo
 from core.modelos.palavras_chave import ESQUEMA as ESQUEMA_DAS_CHAVES
 from core.modelos.palavras_chave import MAXIMO_DE_LEGENDAS, conferir_escolhas, escolhas_simuladas
 from core.modelos.palavras_chave import montar_mensagens as mensagens_das_chaves
 from core.modelos.pedido_edicao import ESQUEMA as ESQUEMA_DO_PEDIDO
 from core.modelos.pedido_edicao import conferir_plano, plano_simulado
 from core.modelos.pedido_edicao import montar_mensagens as montar_mensagens_do_pedido
+from core.modelos.qualidade import STATUS_PRONTO as QUALIDADE_PRONTA
+from core.modelos.qualidade import montar_qualidade
+from core.modelos.rosto import STATUS_PRONTO as ROSTO_PRONTO
+from core.modelos.rosto import montar_rosto
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
+from core.utils import storage
 from core.utils.mongo import agora
 
 ESPERA_PELA_TRANSCRICAO_S = 15
 MAXIMO_DE_ESPERAS = 240           # uma hora esperando a transcrição
+# As medidas da imagem (o rosto e a nota de cada instante) rodam no worker de CPU junto da transcrição, na frente dos
+# downloads e das ingestões; se ainda faltarem quando a fala estiver pronta, a clipagem espera até tanto e segue sem
+# elas (com o worker de CPU ocupado por um vídeo longo, esperar mais atrasaria os cortes demais)
+ESPERAS_PELAS_MEDIDAS = 20        # 5 min
 
 
-def _esperar_a_transcricao(db, job: dict, clipagem: dict) -> dict:
-    """A transcrição ainda não acabou: um job novo olha de novo daqui a pouco, sem gastar as tentativas."""
+def _esperar_a_transcricao(db, job: dict, clipagem: dict, mensagem: str = "Esperando a transcrição",
+                           medidas: bool = False) -> dict:
+    """A transcrição (ou as medidas) ainda não acabou: um job novo olha de novo daqui a pouco, sem gastar as
+    tentativas."""
     esperas = int(job["entrada"].get("esperas") or 0)
     if esperas >= MAXIMO_DE_ESPERAS:
         raise ErroDefinitivo("A transcrição do vídeo passou de uma hora. Tente de novo mais tarde.")
     momento = agora()
-    novo = montar_job("clipagem", job["organizacao_id"], {**job["entrada"], "esperas": esperas + 1},
-                      criado_por=job.get("criado_por"), momento=momento)
+    entrada = {**job["entrada"], "esperas": esperas + 1}
+    if medidas:
+        entrada["esperas_das_medidas"] = int(job["entrada"].get("esperas_das_medidas") or 0) + 1
+    novo = montar_job("clipagem", job["organizacao_id"], entrada, criado_por=job.get("criado_por"), momento=momento)
     novo["disponivel_em"] = momento + timedelta(seconds=ESPERA_PELA_TRANSCRICAO_S)
-    novo["mensagem"] = "Esperando a transcrição"
+    novo["mensagem"] = mensagem
     novo_id = db.jobs.insert_one(novo).inserted_id
     db.clipagens.update_one({"_id": clipagem["_id"]}, {"$set": {"job_id": novo_id, "atualizado_em": momento}})
     return {"clipagem_id": str(clipagem["_id"]), "aguardando": True}
@@ -73,6 +89,43 @@ def _pedir_transcricao(db, job: dict, midia: dict, idioma: str):
     db.transcricoes.replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
 
 
+def _pedir_medidas(db, job: dict, midia: dict) -> list[str]:
+    """Pede o rosto e a nota da imagem que ainda não existem (o worker de CPU); devolve os que estão andando."""
+    andando = []
+    for colecao, tarefa, montar in (("rostos", "rosto", montar_rosto), ("qualidades", "qualidade", montar_qualidade)):
+        atual = db[colecao].find_one({"midia_id": midia["_id"]})
+        if atual is None:
+            documento = montar(midia["organizacao_id"], midia["_id"])
+            novo = montar_job(tarefa, midia["organizacao_id"], {"midia_id": str(midia["_id"])}, prioridade=1,
+                              criado_por=job.get("criado_por"))
+            documento["job_id"] = db.jobs.insert_one(novo).inserted_id
+            db[colecao].replace_one({"midia_id": midia["_id"]}, documento, upsert=True)
+            andando.append(tarefa)
+            continue
+        dele = db.jobs.find_one({"_id": atual.get("job_id")}, {"status": 1}) if atual.get("job_id") else None
+        if dele is not None and dele["status"] in (STATUS_PENDENTE, STATUS_EXECUTANDO):
+            andando.append(tarefa)
+    return andando
+
+
+def _medidas_do_video(db, midia: dict) -> MedidasDoVideo:
+    """O que já foi medido do vídeo: os níveis do som, os rostos e a nota da imagem (os que estão prontos)."""
+    arquivo = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], ARQUIVO_NIVEIS))
+    niveis = arquivo.read_bytes() if arquivo.is_file() else None
+    rostos = db.rostos.find_one({"midia_id": midia["_id"], "status": ROSTO_PRONTO}, {"amostras.t": 1})
+    qualidade = db.qualidades.find_one({"midia_id": midia["_id"], "status": QUALIDADE_PRONTA}, {"t": 1, "nota": 1})
+    return MedidasDoVideo(niveis, rostos["amostras"] if rostos else None, qualidade)
+
+
+def _gosto(db, clipagem: dict) -> dict | None:
+    """O gosto do espaço: os cortes avaliados nas clipagens de antes (as 50 mais novas)."""
+    campos = {f"cortes.{campo}": 1 for campo in ("avaliacao", "titulo", "categoria", "duracao", "texto")}
+    anteriores = db.clipagens.find({"organizacao_id": clipagem["organizacao_id"],
+                                    "cortes.avaliacao": {"$in": ["gostei", "nao_gostei"]}},
+                                   campos).sort("atualizado_em", -1).limit(50)
+    return gosto_do_espaco(avaliados(list(anteriores), clipagem["_id"]))
+
+
 def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> dict:
     clipagem_id = ObjectId(job["entrada"]["clipagem_id"])
     clipagem = db.clipagens.find_one({"_id": clipagem_id})
@@ -83,6 +136,9 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
         raise ErroDefinitivo("O vídeo da clipagem foi excluído.")
     opcoes = clipagem["opcoes"]
     idioma = opcoes.get("idioma") or "auto"
+
+    # O rosto e a nota da imagem andam no worker de CPU enquanto a fala é transcrita
+    medindo = _pedir_medidas(db, job, midia) if midia.get("video") else []
 
     if clipagem.get("palavras"):
         # O .srt da pessoa: a API já cortou no trecho
@@ -100,9 +156,12 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
         palavras = palavras_do_trecho(transcricao.get("palavras") or [], opcoes.get("inicio"), opcoes.get("fim"))
     if len(palavras) < 20:
         raise ErroDefinitivo("O vídeo quase não tem fala no trecho escolhido: não há o que cortar pela fala.")
+    if medindo and int(job["entrada"].get("esperas_das_medidas") or 0) < ESPERAS_PELAS_MEDIDAS:
+        return _esperar_a_transcricao(db, job, clipagem, "Medindo a imagem", medidas=True)
     faixa = faixa_das_opcoes(opcoes)
     duracao = (palavras[-1]["fim"] - palavras[0]["inicio"])
     frases = frases_da_fala(palavras)
+    gosto = _gosto(db, clipagem)
     if MODO_IA != "real":
         candidatos = cortes_simulados(palavras, faixa)
     else:
@@ -113,7 +172,7 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
         candidatos = []
         for indice, janela in enumerate(janelas):
             mensagens = montar_mensagens(janela, faixa, estrategia, opcoes.get("momentos") or "",
-                                         opcoes.get("genero") or "")
+                                         opcoes.get("genero") or "", texto_do_gosto(gosto))
             progresso = 10 + int(80 * indice / max(1, len(janelas)))
             try:
                 esquema = esquema_da_janela(janela[0]["n"], janela[-1]["n"])
@@ -128,7 +187,14 @@ def executar_clipagem(db, job: dict, reportar: Callable[[int, str], None]) -> di
                          f"propostos, {len(aceitos)} aceitos.")
             candidatos.extend(aceitos)
     reportar(92, "Escolhendo os melhores")
-    pontuados = [pontuar(corte, palavras) for corte in candidatos]
+    video = _medidas_do_video(db, midia)
+    pontuados = []
+    for corte in candidatos:
+        pontuado = pontuar(corte, palavras, video)
+        pontos, motivo = ajuste_do_gosto(pontuado, gosto)
+        if pontos:
+            pontuado.update(nota=max(0, min(100, pontuado["nota"] + pontos)), gosto=motivo)
+        pontuados.append(pontuado)
     cortes = juntar_cortes(pontuados, maximo_das_opcoes(opcoes, duracao))
     if not cortes:
         raise ErroDefinitivo("Nenhum corte se sustentou nesse vídeo. Tente outra estratégia ou outra duração.")

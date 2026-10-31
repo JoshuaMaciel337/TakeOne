@@ -126,6 +126,20 @@ def test_comeco_que_aponta_para_tras_perde_autonomia_e_propaganda_e_marcada():
     assert cortes[1]["propaganda"] and not cortes[0]["propaganda"]
 
 
+def test_comeco_que_responde_ou_continua_perde_autonomia():
+    frases = _frases_numeradas(12)
+    frases[2]["texto"] = "Não, não tenho. Mas tem muita coisa para fazer"
+    frases[6]["texto"] = "Já a meiose dá origem a quatro células"
+    frases[9]["texto"] = "Não existe fórmula mágica para o sucesso"
+    bruto = {"cortes": [_bruto([{"de": 2, "ate": 4}]), _bruto([{"de": 6, "ate": 8}], titulo="Outro corte bom"),
+                        _bruto([{"de": 9, "ate": 11}], titulo="Um terceiro corte")]}
+    resposta, continuacao, normal = conferir_cortes(bruto, frases, "medio")
+    assert resposta["notas"]["autonomia"] == 5.0 and "respondendo" in resposta["motivos"]["autonomia"]
+    assert continuacao["notas"]["fluxo"] == 5.0 and "Já" in continuacao["motivos"]["autonomia"]
+    # "Não" abrindo uma frase que não é resposta não conta
+    assert normal["notas"]["autonomia"] > 5.0
+
+
 def test_junção_tira_os_que_se_sobrepoem_e_os_repetidos():
     texto = "o plugin faz a edição automática no premiere em um clique com legendas e trilha"
     def corte(inicio, fim, nota, frase=texto):

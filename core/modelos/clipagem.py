@@ -125,9 +125,10 @@ def ritmo_do_corte(corte: dict, palavras: list[dict]) -> float:
     return round(0.5 * densidade + 0.5 * velocidade, 3)
 
 
-def pontuar(corte: dict, palavras: list[dict]) -> dict:
-    """A nota de 0 a 100 do corte, com as medidas do vídeo. Propaganda perde pontos."""
-    medidas = {"ritmo": ritmo_do_corte(corte, palavras)}
+def pontuar(corte: dict, palavras: list[dict], video=None) -> dict:
+    """A nota de 0 a 100 do corte, com as medidas do vídeo (o ritmo da fala e, com `video`, uma MedidasDoVideo de
+    core/modelos/medidas_do_corte.py, a voz, o rosto e a imagem). Propaganda perde pontos."""
+    medidas = {"ritmo": ritmo_do_corte(corte, palavras), **(video.do_corte(corte) if video is not None else {})}
     nota = nota_final(corte["notas"], medidas) - (15 if corte.get("propaganda") else 0)
     return {**corte, "medidas": medidas, "nota": max(0, nota)}
 

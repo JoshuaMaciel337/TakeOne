@@ -54,7 +54,10 @@ CATEGORIAS = {
 CRITERIOS = ("gancho", "fluxo", "valor", "autonomia")
 # Palavras que, abrindo o corte, apontam para algo dito antes dele: o corte não se entende sozinho
 REFERENCIAS_SOLTAS = {"isso", "isto", "esse", "essa", "este", "esta", "aquilo", "ele", "ela", "eles", "elas",
-                      "também", "tambem", "aí", "ai", "daí", "dai", "então", "entao"}
+                      "também", "tambem", "aí", "ai", "daí", "dai", "então", "entao", "já", "ja", "porém", "porem",
+                      "entretanto", "inclusive", "aliás", "alias"}
+# Uma resposta solta ("Não, não tenho.", "Exato."): o corte começa respondendo a uma pergunta que ficou de fora
+RESPOSTAS_SOLTAS = {"não", "nao", "sim", "exato", "exatamente", "verdade", "claro", "certo", "isso"}
 PROPAGANDA = re.compile(r"\b(link na (descrição|bio)|cupom|desconto de \d+|patrocin|use o código|"
                         r"comenta (a palavra|aqui)|inscreva-se|ative o sininho|deixa (o|seu) like)\b", re.IGNORECASE)
 
@@ -201,8 +204,9 @@ o que não se sustenta sozinho (agradecimentos, transições). Não repita um mo
 
 
 def montar_mensagens(janela: list[dict], faixa: str, estrategia: str = "", momentos: str = "",
-                     genero: str = "") -> list[dict]:
-    """O pedido de uma janela. A estratégia, o gênero e os momentos pedidos vêm da página de opções."""
+                     genero: str = "", gosto: str = "") -> list[dict]:
+    """O pedido de uma janela. A estratégia, o gênero e os momentos pedidos vêm da página de opções; o gosto, dos
+    cortes avaliados no espaço (core/modelos/gosto.py)."""
     minimo, maximo = FAIXAS.get(faixa, FAIXAS["auto"])
     extras = [f"Duração de cada corte: de {minimo:.0f} a {maximo:.0f} segundos (some os trechos)."]
     if genero:
@@ -211,6 +215,8 @@ def montar_mensagens(janela: list[dict], faixa: str, estrategia: str = "", momen
         extras.append(f"O que buscar e o estilo do título, nas palavras de quem pediu: {estrategia[:500]}")
     if momentos:
         extras.append(f"Prefira estes momentos, se aparecerem: {momentos[:300]}")
+    if gosto:
+        extras.append(gosto)
     return [
         {"role": "system", "content": INSTRUCOES + "\n\n" + "\n".join(extras)},
         {"role": "user", "content": texto_para_o_modelo(janela)},
@@ -322,7 +328,12 @@ def conferir_cortes(bruto: dict, frases: list[dict], faixa: str) -> list[dict]:
         primeira = _token(texto.split()[0]) if texto.split() else ""
         motivos = {criterio: _limpar((item.get("motivos") or {}).get(criterio), MOTIVO_MAXIMO)
                    for criterio in CRITERIOS}
-        if primeira in {_token(palavra) for palavra in REFERENCIAS_SOLTAS}:
+        resposta = bool(re.match(r"^\S+?[,.!]", texto)) and primeira in {_token(p) for p in RESPOSTAS_SOLTAS}
+        if resposta:
+            notas["fluxo"] = min(notas["fluxo"], 5.0)
+            notas["autonomia"] = min(notas["autonomia"], 5.0)
+            motivos["autonomia"] = f"Começa respondendo (\"{texto.split()[0]}\") a algo que ficou fora do corte."
+        elif primeira in {_token(palavra) for palavra in REFERENCIAS_SOLTAS}:
             # Começa apontando para trás: o fluxo e a autonomia caem, e o motivo diz por quê
             notas["fluxo"] = min(notas["fluxo"], 5.0)
             notas["autonomia"] = min(notas["autonomia"], 5.0)
