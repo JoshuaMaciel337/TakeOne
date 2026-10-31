@@ -1,0 +1,103 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Ícones em volta",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "descricao": "O título no meio e ícones (estrelas, corações, raios e brilhos) girando em volta dele numa órbita.",
+ "campos": [
+  {"id": "linhas", "rotulo": "Título", "tipo": "linhas", "padrao": "3 HÁBITOS\nQUE MUDAM\nTUDO", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Cor dos ícones 1", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Cor dos ícones 2", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Ícones em volta: oito ícones desenhados aqui (estrela, coração, raio e brilho, duas vezes) numa elipse em volta do
+     título; a órbita entra abrindo do meio e gira 40° por segundo, e cada ícone pulsa no seu ritmo. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const linhas = String(C.linhas || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 4);
+  function estrela(r) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  function coracao(r) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.8);
+    ctx.bezierCurveTo(-r * 1.4, -r * 0.1, -r * 0.6, -r * 1.1, 0, -r * 0.4);
+    ctx.bezierCurveTo(r * 0.6, -r * 1.1, r * 1.4, -r * 0.1, 0, r * 0.8);
+    ctx.fill();
+  }
+  function raio(r) {
+    ctx.beginPath();
+    ctx.moveTo(r * 0.2, -r);
+    ctx.lineTo(-r * 0.55, r * 0.15);
+    ctx.lineTo(-r * 0.05, r * 0.15);
+    ctx.lineTo(-r * 0.25, r);
+    ctx.lineTo(r * 0.55, -r * 0.2);
+    ctx.lineTo(r * 0.05, -r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  function brilhoIcone(r) {
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.quadraticCurveTo(0, 0, 0, r);
+    ctx.quadraticCurveTo(0, 0, -r, 0);
+    ctx.quadraticCurveTo(0, 0, 0, -r);
+    ctx.fill();
+  }
+  const icones = [estrela, coracao, raio, brilhoIcone];
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.2, 0.35, dur);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tam = Math.min(...linhas.map((l) => TO.caber(ctx, l, 900, 10, W * 0.62, "Montserrat")));
+    const entrelinha = tam * u * 1.08;
+    const altura = entrelinha * linhas.length;
+    const abre = TO.ease.outBack(TO.prog(t, 0.1, 0.7));
+    const rx = Math.min(W * 0.42, (W * 0.62) / 2 + 12 * u) * abre;
+    const ry = Math.min(H * 0.4, altura / 2 + 12 * u) * abre;
+    ctx.globalAlpha = geral;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + t * ((40 * Math.PI) / 180);
+      const pulso = 1 + 0.15 * Math.sin(t * 5 + i * 1.7);
+      ctx.save();
+      ctx.translate(W / 2 + Math.cos(a) * rx, H / 2 + Math.sin(a) * ry);
+      ctx.rotate(Math.sin(t * 2 + i) * 0.4);
+      ctx.fillStyle = i % 2 ? C.cor_2 : C.cor_1;
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 1 * u;
+      icones[i % 4](3.4 * u * pulso * Math.min(1, abre));
+      ctx.restore();
+    }
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 1.5 * u;
+    linhas.forEach((linha, i) => {
+      const p = TO.ease.outBack(TO.prog(t, 0.3 + i * 0.12, 0.7 + i * 0.12));
+      if (p <= 0) return;
+      ctx.save();
+      ctx.translate(W / 2, H / 2 - altura / 2 + entrelinha * (i + 0.5));
+      ctx.scale(p, p);
+      ctx.fillText(linha, 0, 0);
+      ctx.restore();
+    });
+  };
+})();
+</script>

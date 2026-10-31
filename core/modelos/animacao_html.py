@@ -44,6 +44,7 @@ BRANCO = "#ffffff"
 
 CATEGORIAS = {
     "titulos": "Títulos",
+    "ganchos": "Ganchos de abertura",
     "tarjas": "Tarjas e nomes",
     "chamadas": "Chamadas",
     "numeros": "Números e gráficos",

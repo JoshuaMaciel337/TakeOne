@@ -1,0 +1,79 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Contagem 3, 2, 1",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.2,
+ "descricao": "Um 3, 2, 1 rápido dentro de um círculo que se fecha, e a frase estoura no lugar.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "PRESTA ATENÇÃO NISSO", "maximo": 40},
+  {"id": "cor_1", "rotulo": "Cor do círculo", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Contagem 3, 2, 1: cada número fica 0,4 s, com o arco do círculo se fechando no tempo dele; depois do 1, a frase
+     entra com escala de mola, e um anel se expande e some. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.1, 0.3, dur);
+    ctx.globalAlpha = geral;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const raio = 14 * u;
+    const passo = 0.4;
+    const n = Math.floor(t / passo);
+    if (n < 3) {
+      const parcial = (t - n * passo) / passo;
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, raio, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = C.cor_1;
+      ctx.lineWidth = 1.6 * u;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, raio, -Math.PI / 2, -Math.PI / 2 + parcial * Math.PI * 2);
+      ctx.stroke();
+      const k = 1.25 - 0.25 * TO.ease.outCubic(Math.min(1, parcial * 3));
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.scale(k, k);
+      ctx.font = TO.fonte(900, 16, "Montserrat");
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(String(3 - n), 0, 0);
+      ctx.restore();
+      return;
+    }
+    const q = TO.clamp(t - 3 * passo, 0, 9);
+    const anel = TO.prog(q, 0, 0.5);
+    if (anel < 1) {
+      ctx.globalAlpha = geral * (1 - anel);
+      ctx.strokeStyle = C.cor_1;
+      ctx.lineWidth = 1.6 * u * (1 - anel) + 0.2 * u;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, raio * (1 + anel * 1.5), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    const mola = TO.spring(q, 0.45, 2.6);
+    ctx.globalAlpha = geral * Math.min(1, q * 6);
+    const tam = TO.caber(ctx, C.texto || "", 900, 9, W * 0.86, "Montserrat");
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(0.5 + 0.5 * mola, 0.5 + 0.5 * mola);
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 1.6 * u;
+    ctx.fillText(C.texto || "", 0, 0);
+    ctx.restore();
+  };
+})();
+</script>

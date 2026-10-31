@@ -1,0 +1,65 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Não é isso, é aquilo",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "descricao": "A ideia comum aparece, é riscada por um traço e dá lugar à ideia certa, maior e na cor de destaque.",
+ "campos": [
+  {"id": "antes", "rotulo": "A ideia errada", "tipo": "texto", "padrao": "FALTA DE TEMPO", "maximo": 30},
+  {"id": "depois", "rotulo": "A ideia certa", "tipo": "texto", "padrao": "FALTA DE PRIORIDADE", "maximo": 30},
+  {"id": "cor_1", "rotulo": "Cor do risco", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_2", "rotulo": "Cor da ideia certa", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor da ideia errada", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Não é isso, é aquilo: a ideia errada entra (0 a 0,35 s), o risco a atravessa da esquerda para a direita (0,8 a
+     1,15 s) e ela desce e apaga, enquanto a certa cai de cima com mola e fica no lugar dela. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.35, dur);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tamA = TO.caber(ctx, C.antes || "", 900, 8, W * 0.8, "Montserrat");
+    const tamD = TO.caber(ctx, C.depois || "", 900, 10, W * 0.86, "Montserrat");
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.35));
+    const risco = TO.ease.inOutCubic(TO.prog(t, 0.8, 1.15));
+    const sai = TO.ease.inCubic(TO.prog(t, 1.3, 1.7));
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 1.6 * u;
+    if (sai < 1) {
+      const y = H / 2 - 7 * u + sai * 6 * u;
+      ctx.globalAlpha = geral * entra * (1 - sai * 0.7);
+      ctx.font = TO.fonte(900, tamA, "Montserrat");
+      ctx.fillStyle = C.cor_texto;
+      ctx.fillText(C.antes || "", W / 2, y);
+      const largura = ctx.measureText(C.antes || "").width + 3 * u;
+      if (risco > 0) {
+        ctx.strokeStyle = C.cor_1;
+        ctx.lineWidth = 1.4 * u;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - largura / 2, y + 1.2 * u);
+        ctx.lineTo(W / 2 - largura / 2 + largura * risco, y + 1.2 * u - 2.4 * u * risco);
+        ctx.stroke();
+      }
+    }
+    const q = TO.clamp(t - 1.35, 0, 9);
+    if (q > 0) {
+      const mola = TO.spring(q, 0.45, 2.4);
+      ctx.globalAlpha = geral * Math.min(1, q * 5);
+      ctx.font = TO.fonte(900, tamD, "Montserrat");
+      ctx.fillStyle = C.cor_2;
+      ctx.fillText(C.depois || "", W / 2, H / 2 + 4 * u - (1 - mola) * 10 * u);
+    }
+  };
+})();
+</script>

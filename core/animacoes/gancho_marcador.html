@@ -1,0 +1,70 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Frase marcada",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.2,
+ "descricao": "A frase aparece em letras grandes e um marca-texto passa por baixo da parte mais forte.",
+ "campos": [
+  {"id": "linhas", "rotulo": "Frase", "tipo": "linhas", "padrao": "Ninguém te conta\nque o segredo\né a constância", "maximo": 70},
+  {"id": "cor_1", "rotulo": "Cor do marca-texto", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Frase marcada: as linhas sobem uma a uma; na última, o marca-texto corre da esquerda para a direita (1,1 a 1,6 s),
+     levemente torto, e as letras dela passam a escuro onde ele já passou. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const linhas = String(C.linhas || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 4);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.35, dur);
+    if (!linhas.length) return;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tam = Math.min(...linhas.map((l) => TO.caber(ctx, l, 900, 9, W * 0.8, "Montserrat")));
+    const entrelinha = tam * u * 1.18;
+    const topo = H / 2 - ((linhas.length - 1) * entrelinha) / 2;
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    const ultima = linhas.length - 1;
+    const marca = TO.ease.inOutCubic(TO.prog(t, 1.1, 1.6));
+    linhas.forEach((linha, i) => {
+      const p = TO.ease.outCubic(TO.prog(t, 0.1 + i * 0.2, 0.45 + i * 0.2));
+      if (p <= 0) return;
+      const y = topo + i * entrelinha + (1 - p) * 3 * u;
+      const largura = ctx.measureText(linha).width;
+      ctx.globalAlpha = geral * p;
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 1.5 * u;
+      ctx.fillStyle = C.cor_texto;
+      if (i === ultima && marca > 0) {
+        ctx.save();
+        ctx.shadowColor = "transparent";
+        ctx.translate(W / 2, y);
+        ctx.rotate(-0.015);
+        ctx.fillStyle = C.cor_1;
+        TO.retangulo(ctx, -largura / 2 - 1.5 * u, -tam * u * 0.42, (largura + 3 * u) * marca, tam * u * 0.84, 0.8 * u);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillText(linha, W / 2, y);
+      if (i === ultima && marca > 0) {
+        ctx.save();
+        ctx.shadowColor = "transparent";
+        ctx.beginPath();
+        ctx.rect(W / 2 - largura / 2 - 1.5 * u, y - tam * u, (largura + 3 * u) * marca, tam * u * 2);
+        ctx.clip();
+        ctx.fillStyle = "#111111";
+        ctx.fillText(linha, W / 2, y);
+        ctx.restore();
+      }
+    });
+  };
+})();
+</script>

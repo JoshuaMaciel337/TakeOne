@@ -1,0 +1,73 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Pergunta com interrogação",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "Uma interrogação enorme e meio transparente balança atrás da pergunta, que entra palavra a palavra.",
+ "campos": [
+  {"id": "texto", "rotulo": "Pergunta", "tipo": "texto", "padrao": "Você sabe para onde vai o seu dinheiro?", "maximo": 60},
+  {"id": "cor_1", "rotulo": "Cor da interrogação", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Pergunta com interrogação: o "?" gigante entra girando e fica balançando atrás (a 35%); as palavras da pergunta
+     sobem uma a uma em linhas que cabem em 80% da largura. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const palavras = String(C.texto || "").split(/\s+/).filter(Boolean).slice(0, 14);
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.3, dur);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const p = TO.ease.outBack(TO.prog(t, 0.05, 0.5));
+    ctx.save();
+    ctx.globalAlpha = geral * 0.35 * Math.min(1, p);
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate((1 - p) * -0.8 + Math.sin(t * 2.2) * 0.08);
+    ctx.scale(p, p);
+    ctx.font = TO.fonte(900, Math.min(60, (H / u) * 0.6), "Montserrat");
+    ctx.fillStyle = C.cor_1;
+    ctx.fillText("?", 0, 0);
+    ctx.restore();
+    ctx.font = TO.fonte(900, 7.5, "Montserrat");
+    const larguraMax = W * 0.8;
+    const linhas = [];
+    let atual = [];
+    palavras.forEach((palavra, i) => {
+      const tentativa = [...atual.map((j) => palavras[j]), palavra].join(" ");
+      if (atual.length && ctx.measureText(tentativa).width > larguraMax) {
+        linhas.push(atual);
+        atual = [];
+      }
+      atual.push(i);
+    });
+    if (atual.length) linhas.push(atual);
+    const entrelinha = 9 * u;
+    const topo = H / 2 - ((linhas.length - 1) * entrelinha) / 2;
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 1.6 * u;
+    linhas.forEach((linha, j) => {
+      const texto = linha.map((i) => palavras[i]).join(" ");
+      let x = W / 2 - ctx.measureText(texto).width / 2;
+      for (const i of linha) {
+        const largura = ctx.measureText(palavras[i]).width;
+        const q = TO.ease.outCubic(TO.prog(t, 0.3 + i * 0.1, 0.55 + i * 0.1));
+        if (q > 0) {
+          ctx.globalAlpha = geral * q;
+          ctx.fillText(palavras[i], x + largura / 2, topo + j * entrelinha + (1 - q) * 3 * u);
+        }
+        x += largura + ctx.measureText(" ").width;
+      }
+    });
+  };
+})();
+</script>

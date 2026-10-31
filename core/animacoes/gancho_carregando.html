@@ -1,0 +1,85 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Carregando",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "Uma barra de carregamento enche com a porcentagem e, em 100%, revela o título com um estouro.",
+ "campos": [
+  {"id": "selo", "rotulo": "Texto da barra", "tipo": "texto", "padrao": "carregando segredo...", "maximo": 30},
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "O MÉTODO QUE NINGUÉM TE CONTA", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Cor da barra", "tipo": "cor", "padrao": "#22d3ee"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Carregando: a barra enche de 0,1 s a 1,4 s numa curva com um tropeço no meio (fica em 87% por 0,15 s, como os
+     carregamentos de verdade), com a porcentagem; em 100% ela some e o título entra com mola, com um anel que se abre. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  function enchido(t) {
+    if (t < 0.9) return 0.87 * TO.ease.outCubic(TO.prog(t, 0.1, 0.9));
+    if (t < 1.05) return 0.87;
+    return 0.87 + 0.13 * TO.ease.inOutCubic(TO.prog(t, 1.05, 1.4));
+  }
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.1, 0.3, dur);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const largura = Math.min(W * 0.78, 80 * u);
+    const altura = 4 * u;
+    const someBarra = TO.prog(t, 1.45, 1.65);
+    if (someBarra < 1) {
+      ctx.globalAlpha = geral * (1 - someBarra);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      TO.retangulo(ctx, W / 2 - largura / 2 - 2 * u, H / 2 - 9 * u, largura + 4 * u, 17 * u, 2 * u);
+      ctx.fill();
+      ctx.font = TO.fonte(600, 3.6, "Inter");
+      ctx.fillStyle = C.cor_texto;
+      ctx.textAlign = "left";
+      ctx.fillText(C.selo || "", W / 2 - largura / 2, H / 2 - 4.5 * u);
+      ctx.textAlign = "right";
+      const k = enchido(t);
+      ctx.fillText(`${Math.round(k * 100)}%`, W / 2 + largura / 2, H / 2 - 4.5 * u);
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      TO.retangulo(ctx, W / 2 - largura / 2, H / 2 + 0.5 * u, largura, altura, altura / 2);
+      ctx.fill();
+      ctx.fillStyle = C.cor_1;
+      TO.retangulo(ctx, W / 2 - largura / 2, H / 2 + 0.5 * u, Math.max(altura, largura * k), altura, altura / 2);
+      ctx.fill();
+    }
+    const q = TO.clamp(t - 1.45, 0, 9);
+    if (q <= 0) return;
+    ctx.textAlign = "center";
+    const anel = TO.prog(q, 0, 0.5);
+    if (anel < 1) {
+      ctx.globalAlpha = geral * (1 - anel);
+      ctx.strokeStyle = C.cor_1;
+      ctx.lineWidth = 1.2 * u;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, 8 * u + anel * Math.min(W, H) * 0.35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.font = TO.fonte(900, 7.5, "Montserrat");
+    const linhas = TO.quebrar(ctx, C.texto || "", W * 0.84).slice(0, 3);
+    const tam = Math.min(...linhas.map((l) => TO.caber(ctx, l, 900, 7.5, W * 0.84, "Montserrat")));
+    const mola = TO.spring(q, 0.45, 2.6);
+    ctx.save();
+    ctx.globalAlpha = geral * Math.min(1, q * 6);
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(0.6 + 0.4 * mola, 0.6 + 0.4 * mola);
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 1.6 * u;
+    linhas.forEach((l, i) => ctx.fillText(l, 0, (i - (linhas.length - 1) / 2) * tam * u * 1.1));
+    ctx.restore();
+  };
+})();
+</script>

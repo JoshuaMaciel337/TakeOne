@@ -1,0 +1,63 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Antes e depois",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.2,
+ "tela_cheia": true,
+ "descricao": "A tela dividida em duas cores, com o antes de um lado e o depois do outro, e a linha do meio correndo.",
+ "campos": [
+  {"id": "antes", "rotulo": "Antes", "tipo": "texto", "padrao": "EU, 2024", "maximo": 20},
+  {"id": "depois", "rotulo": "Depois", "tipo": "texto", "padrao": "EU, HOJE", "maximo": 20},
+  {"id": "cor_1", "rotulo": "Cor do antes", "tipo": "cor", "padrao": "#2b2d42"},
+  {"id": "cor_2", "rotulo": "Cor do depois", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Antes e depois: as duas metades (de cima e de baixo no vídeo em pé, de lado no deitado) cobrem a tela a 70%, com
+     o vídeo aparecendo por baixo; a divisa corre do começo até o meio e balança; cada palavra entra na sua metade. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.35, dur);
+    const emPe = H > W;
+    const lado = emPe ? H : W;
+    const divisa = lado * (0.5 * TO.ease.outCubic(TO.prog(t, 0, 0.6)) + 0.015 * Math.sin(t * 3));
+    ctx.globalAlpha = geral * 0.7;
+    ctx.fillStyle = C.cor_1;
+    if (emPe) ctx.fillRect(0, 0, W, divisa);
+    else ctx.fillRect(0, 0, divisa, H);
+    ctx.fillStyle = C.cor_2;
+    if (emPe) ctx.fillRect(0, divisa, W, H - divisa);
+    else ctx.fillRect(divisa, 0, W - divisa, H);
+    ctx.globalAlpha = geral;
+    ctx.fillStyle = "#ffffff";
+    if (emPe) ctx.fillRect(0, divisa - 0.4 * u, W, 0.8 * u);
+    else ctx.fillRect(divisa - 0.4 * u, 0, 0.8 * u, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 1.6 * u;
+    const espaco = emPe ? W * 0.84 : W * 0.42;
+    [[C.antes, 0.35, 0.25], [C.depois, 0.6, 0.75]].forEach(([texto, comeco, onde]) => {
+      const p = TO.spring(TO.clamp(t - comeco, 0, 9), 0.5, 2.4);
+      if (p <= 0 || !texto) return;
+      const tam = TO.caber(ctx, texto, 900, 10, espaco, "Montserrat");
+      ctx.save();
+      ctx.translate(emPe ? W / 2 : W * onde, emPe ? H * onde : H / 2);
+      ctx.scale(p, p);
+      ctx.font = TO.fonte(900, tam, "Montserrat");
+      ctx.fillText(texto, 0, 0);
+      ctx.restore();
+    });
+  };
+})();
+</script>

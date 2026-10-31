@@ -1,0 +1,62 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Vídeo num cartão",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "tela_cheia": true,
+ "descricao": "O vídeo aparece numa janela de cantos redondos sobre um fundo de cor, com o título em cima, como um cartão.",
+ "campos": [
+  {"id": "texto", "rotulo": "Título", "tipo": "texto", "padrao": "O ERRO QUE ME CUSTOU TUDO", "maximo": 50},
+  {"id": "cor_1", "rotulo": "Cor do fundo", "tipo": "cor", "padrao": "#16131f"},
+  {"id": "cor_2", "rotulo": "Cor da borda", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor do título", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Vídeo num cartão: a camada cobre o quadro com a cor e recorta uma janela de cantos redondos (o vídeo aparece por
+     ela), que cresce do meio com mola; a borda é desenhada por cima e o título entra acima da janela. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.2, 0.35, dur);
+    const mola = TO.spring(TO.clamp(t - 0.1, 0, 9), 0.6, 2);
+    const k = 0.6 + 0.4 * mola;
+    const emPe = H > W;
+    const janelaW = Math.min(W * (emPe ? 0.84 : 0.58), H * (emPe ? 0.62 : 0.95)) * k;
+    const janelaH = Math.min(H * (emPe ? 0.5 : 0.56), janelaW * (emPe ? 1.2 : 0.6) / k) * k;
+    const cy = H / 2 + 6 * u;
+    const raio = 4 * u;
+    ctx.globalAlpha = geral;
+    ctx.fillStyle = C.cor_1;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = "destination-out";
+    TO.retangulo(ctx, W / 2 - janelaW / 2, cy - janelaH / 2, janelaW, janelaH, raio);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = C.cor_2;
+    ctx.lineWidth = 1.2 * u;
+    TO.retangulo(ctx, W / 2 - janelaW / 2, cy - janelaH / 2, janelaW, janelaH, raio);
+    ctx.stroke();
+    const p = TO.ease.outCubic(TO.prog(t, 0.45, 0.9));
+    if (p > 0 && C.texto) {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = TO.fonte(900, 7, "Montserrat");
+      const linhas = TO.quebrar(ctx, C.texto, W * 0.84).slice(0, 3);
+      const tam = Math.min(...linhas.map((l) => TO.caber(ctx, l, 900, 7, W * 0.84, "Montserrat")));
+      ctx.font = TO.fonte(900, tam, "Montserrat");
+      ctx.globalAlpha = geral * p;
+      ctx.fillStyle = C.cor_texto;
+      const base = cy - janelaH / 2 - 3 * u - tam * u * 0.6;
+      linhas.forEach((l, i) => ctx.fillText(l, W / 2, base - (linhas.length - 1 - i) * tam * u * 1.1 + (1 - p) * 3 * u));
+    }
+  };
+})();
+</script>

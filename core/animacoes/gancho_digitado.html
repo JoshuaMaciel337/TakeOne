@@ -1,0 +1,74 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Título digitado",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "A frase aparece letra a letra numa barra de pesquisa, com o cursor piscando, como se alguém digitasse a dúvida.",
+ "campos": [
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "como sair das dívidas em 1 ano", "maximo": 60},
+  {"id": "cor_1", "rotulo": "Cor do botão", "tipo": "cor", "padrao": "#ff3478"},
+  {"id": "cor_texto", "rotulo": "Cor do texto", "tipo": "cor", "padrao": "#111111"}
+ ]
+}
+</script>
+<!-- Título digitado: a barra branca de cantos redondos sobe com mola; as letras entram entre 0,35 s e 2,15 s; o cursor
+     pisca duas vezes por segundo (e fica aceso enquanto digita); o botão da lupa cresce no fim. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const texto = String(C.texto || "").trim();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.3, dur);
+    const larg = Math.min(W * 0.86, 95 * u);
+    const alt = 11 * u;
+    const botao = alt * 0.8;
+    const tam = TO.caber(ctx, texto || "M", 600, 5, larg - botao - 8 * u, "Inter");
+    const mola = TO.spring(TO.clamp(t - 0.05, 0, 9), 0.55, 2.4);
+    ctx.save();
+    ctx.globalAlpha = geral;
+    ctx.translate(W / 2, H / 2 + (1 - mola) * 6 * u);
+    ctx.scale(0.9 + 0.1 * mola, 0.9 + 0.1 * mola);
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 3 * u;
+    ctx.shadowOffsetY = 0.8 * u;
+    ctx.fillStyle = "#ffffff";
+    TO.retangulo(ctx, -larg / 2, -alt / 2, larg, alt, alt / 2);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    // O botão da lupa, à direita
+    const bx = larg / 2 - alt / 2;
+    const p = TO.ease.outBack(TO.prog(t, 2.1, 2.45));
+    ctx.fillStyle = C.cor_1;
+    ctx.beginPath();
+    ctx.arc(bx, 0, (botao / 2) * Math.max(0.6, p), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 0.6 * u;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(bx - 0.5 * u, -0.5 * u, 1.6 * u, 0, Math.PI * 2);
+    ctx.moveTo(bx + 0.7 * u, 0.7 * u);
+    ctx.lineTo(bx + 2 * u, 2 * u);
+    ctx.stroke();
+    // As letras e o cursor
+    const n = Math.floor(TO.prog(t, 0.35, 2.15) * texto.length);
+    ctx.font = TO.fonte(600, tam, "Inter");
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    const x0 = -larg / 2 + alt * 0.55;
+    const visivel = texto.slice(0, n);
+    ctx.fillText(visivel, x0, 0);
+    if (Math.floor(t * 4) % 2 === 0 || (n > 0 && n < texto.length)) {
+      ctx.fillRect(x0 + ctx.measureText(visivel).width + 0.4 * u, -tam * u * 0.55, 0.45 * u, tam * u * 1.1);
+    }
+    ctx.restore();
+  };
+})();
+</script>

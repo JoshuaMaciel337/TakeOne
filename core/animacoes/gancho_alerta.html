@@ -1,0 +1,78 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Alerta",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "tela_cheia": true,
+ "descricao": "Uma faixa listrada de atenção atravessa a tela inclinada, com a palavra de alerta, e a frase entra embaixo.",
+ "campos": [
+  {"id": "selo", "rotulo": "Palavra da faixa", "tipo": "texto", "padrao": "ATENÇÃO", "maximo": 14},
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "Não assine nada antes de ver isto", "maximo": 60},
+  {"id": "cor_1", "rotulo": "Cor da faixa", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor da frase", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Alerta: a faixa (inclinada -8°) entra da esquerda e as listras correm por ela; a palavra fica no meio da faixa,
+     num retângulo preto; a frase entra embaixo, em até duas linhas. A faixa é mais larga que a tela, então o modelo
+     é de tela cheia. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.1, 0.3, dur);
+    const entra = TO.ease.outCubic(TO.prog(t, 0, 0.45));
+    const faixaH = 11 * u;
+    const diag = Math.hypot(W, H);
+    ctx.save();
+    ctx.globalAlpha = geral;
+    ctx.translate(W / 2 - (1 - entra) * diag, H / 2 - 6 * u);
+    ctx.rotate((-8 * Math.PI) / 180);
+    ctx.fillStyle = C.cor_1;
+    ctx.fillRect(-diag / 2, -faixaH / 2, diag, faixaH);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-diag / 2, -faixaH / 2, diag, faixaH);
+    ctx.clip();
+    ctx.fillStyle = "#111111";
+    const listra = 4 * u;
+    const deslize = (t * 8 * u) % (listra * 2);
+    for (let x = -diag / 2 - faixaH - listra * 2 + deslize; x < diag / 2 + faixaH; x += listra * 2) {
+      ctx.beginPath();
+      ctx.moveTo(x, faixaH / 2);
+      ctx.lineTo(x + listra, faixaH / 2);
+      ctx.lineTo(x + listra + faixaH, -faixaH / 2);
+      ctx.lineTo(x + faixaH, -faixaH / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.font = TO.fonte(900, 6, "Montserrat");
+    const largura = ctx.measureText(C.selo || "").width + 6 * u;
+    ctx.fillStyle = "#111111";
+    ctx.fillRect(-largura / 2, -faixaH / 2 - 0.5 * u, largura, faixaH + u);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_1;
+    ctx.fillText(C.selo || "", 0, 0.3 * u);
+    ctx.restore();
+    const p = TO.ease.outCubic(TO.prog(t, 0.5, 0.95));
+    if (p <= 0 || !C.texto) return;
+    ctx.font = TO.fonte(800, 6, "Montserrat");
+    const linhas = TO.quebrar(ctx, C.texto, W * 0.82).slice(0, 2);
+    ctx.globalAlpha = geral * p;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = C.cor_texto;
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 1.6 * u;
+    linhas.forEach((l, i) => ctx.fillText(l, W / 2, H / 2 + 12 * u + i * 7.5 * u + (1 - p) * 3 * u));
+  };
+})();
+</script>

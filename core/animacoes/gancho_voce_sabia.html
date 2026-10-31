@@ -1,0 +1,78 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Você sabia?",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3.5,
+ "descricao": "Um selo girando com a pergunta curta e, embaixo, o fato numa faixa que se desenrola.",
+ "campos": [
+  {"id": "selo", "rotulo": "Selo", "tipo": "texto", "padrao": "VOCÊ SABIA?", "maximo": 18},
+  {"id": "texto", "rotulo": "Fato", "tipo": "texto", "padrao": "O cérebro decide antes de você perceber", "maximo": 70},
+  {"id": "cor_1", "rotulo": "Cor do selo", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_2", "rotulo": "Cor da faixa", "tipo": "cor", "padrao": "#ffffff"},
+  {"id": "cor_texto", "rotulo": "Cor do fato", "tipo": "cor", "padrao": "#111111"}
+ ]
+}
+</script>
+<!-- Você sabia?: o selo (um círculo serrilhado de 16 pontas) entra girando com mola, inclinado; a faixa branca abre da
+     esquerda para a direita embaixo dele e o fato aparece dentro dela, em até três linhas. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.35, dur);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = TO.fonte(700, 5.6, "Montserrat");
+    const linhas = TO.quebrar(ctx, C.texto || "", W * 0.74).slice(0, 3);
+    const faixaH = linhas.length * 7 * u + 4 * u;
+    const raio = 13 * u;
+    const centroSelo = H / 2 - faixaH / 2 - raio * 0.55;
+    const mola = TO.spring(TO.clamp(t - 0.05, 0, 9), 0.5, 2.2);
+    ctx.save();
+    ctx.globalAlpha = geral;
+    ctx.translate(W / 2, centroSelo);
+    ctx.rotate(-0.18 + (1 - mola) * -1.2 + Math.sin(t * 1.5) * 0.03);
+    ctx.scale(mola, mola);
+    ctx.fillStyle = C.cor_1;
+    ctx.beginPath();
+    for (let i = 0; i < 32; i++) {
+      const a = (i / 32) * Math.PI * 2;
+      const r = i % 2 ? raio * 0.9 : raio;
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // O selo em até duas linhas, cada uma cabendo na largura do círculo
+    const partes = String(C.selo || "").split(" ");
+    const meio = Math.ceil(partes.length / 2);
+    const duas = partes.length > 1 ? [partes.slice(0, meio).join(" "), partes.slice(meio).join(" ")] : partes;
+    const tam = Math.min(...duas.map((l) => TO.caber(ctx, l, 900, 6, raio * 1.45, "Montserrat")));
+    ctx.font = TO.fonte(900, tam, "Montserrat");
+    ctx.fillStyle = "#111111";
+    duas.forEach((l, i) => ctx.fillText(l, 0, (i - (duas.length - 1) / 2) * tam * u * 1.1));
+    ctx.restore();
+    const abre = TO.ease.inOutCubic(TO.prog(t, 0.55, 1.05));
+    if (abre <= 0) return;
+    const faixaW = W * 0.82;
+    const topo = H / 2 - faixaH / 2 + raio * 0.35;
+    ctx.globalAlpha = geral;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(W / 2 - faixaW / 2, topo - u, faixaW * abre, faixaH + 2 * u);
+    ctx.clip();
+    ctx.fillStyle = C.cor_2;
+    TO.retangulo(ctx, W / 2 - faixaW / 2, topo, faixaW, faixaH, 2 * u);
+    ctx.fill();
+    ctx.font = TO.fonte(700, 5.6, "Montserrat");
+    ctx.fillStyle = C.cor_texto;
+    linhas.forEach((l, i) => ctx.fillText(l, W / 2, topo + 2 * u + 3.5 * u + i * 7 * u));
+    ctx.restore();
+  };
+})();
+</script>

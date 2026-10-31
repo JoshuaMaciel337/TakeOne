@@ -1,0 +1,68 @@
+<script type="application/json" id="modelo">
+{
+ "nome": "Número gigante",
+ "categoria": "ganchos",
+ "motor": "canvas",
+ "duracao": 3,
+ "descricao": "Um número enorme conta até o valor, com a frase embaixo: bom para resultados e dados que surpreendem.",
+ "campos": [
+  {"id": "numero", "rotulo": "Número", "tipo": "numero", "padrao": "90", "maximo": 9},
+  {"id": "antes", "rotulo": "Antes do número", "tipo": "texto", "padrao": "", "maximo": 4},
+  {"id": "depois", "rotulo": "Depois do número", "tipo": "texto", "padrao": "%", "maximo": 6},
+  {"id": "texto", "rotulo": "Frase", "tipo": "texto", "padrao": "das pessoas desistem no primeiro mês", "maximo": 60},
+  {"id": "cor_1", "rotulo": "Cor do número", "tipo": "cor", "padrao": "#ffd166"},
+  {"id": "cor_texto", "rotulo": "Cor da frase", "tipo": "cor", "padrao": "#ffffff"}
+ ]
+}
+</script>
+<!-- Número gigante: o número conta de zero até o valor em 1,1 s (saída cúbica, para desacelerar no fim) e dá um
+     tranco de escala ao chegar; a frase sobe por baixo dele. Um escuro em volta do meio garante a leitura. -->
+<script>
+(() => {
+  const { largura: W, altura: H, u } = window.QUADRO;
+  const C = window.CAMPOS;
+  const ctx = TO.canvas2d();
+  const bruto = String(C.numero || "0");
+  const valor = Number(bruto.replace(",", ".")) || 0;
+  const casas = /[.,]/.test(bruto) ? 1 : 0;
+  const escrito = (v) => `${C.antes || ""}${v.toFixed(casas).replace(".", ",")}${C.depois || ""}`;
+  window.renderAt = (t) => {
+    const dur = window.DURACAO;
+    // Cada quadro começa do zero (a sombra e a transparência do anterior não passam para este)
+    ctx.reset();
+    const geral = TO.envelope(t, 0.15, 0.3, dur);
+    const conta = TO.ease.outCubic(TO.prog(t, 0.1, 1.2));
+    const tamNumero = TO.caber(ctx, escrito(valor), 900, 30, W * 0.8, "Montserrat");
+    const tranco = 1 + 0.08 * Math.sin(Math.PI * TO.prog(t, 1.2, 1.45));
+    const raio = Math.min(W, H) * 0.48;
+    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, raio);
+    g.addColorStop(0, "rgba(0,0,0,0.5)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalAlpha = geral;
+    ctx.fillStyle = g;
+    ctx.fillRect(W / 2 - raio, H / 2 - raio, raio * 2, raio * 2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.save();
+    ctx.translate(W / 2, H / 2 - 4 * u);
+    ctx.scale(tranco, tranco);
+    ctx.font = TO.fonte(900, tamNumero, "Montserrat");
+    ctx.fillStyle = C.cor_1;
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 2 * u;
+    ctx.fillText(escrito(valor * conta), 0, 0);
+    ctx.restore();
+    const p = TO.ease.outCubic(TO.prog(t, 0.9, 1.4));
+    if (p > 0 && C.texto) {
+      ctx.font = TO.fonte(700, 5.6, "Montserrat");
+      const linhas = TO.quebrar(ctx, C.texto, W * 0.8).slice(0, 3);
+      ctx.globalAlpha = geral * p;
+      ctx.fillStyle = C.cor_texto;
+      ctx.shadowColor = "rgba(0,0,0,0.4)";
+      ctx.shadowBlur = 1.2 * u;
+      const topo = H / 2 - 4 * u + tamNumero * u * 0.62 + 4 * u;
+      linhas.forEach((linha, i) => ctx.fillText(linha, W / 2, topo + (1 - p) * 2 * u + i * 7 * u));
+    }
+  };
+})();
+</script>
