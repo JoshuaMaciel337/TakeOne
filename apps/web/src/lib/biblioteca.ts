@@ -67,7 +67,7 @@ export const ORDENS: { id: Ordem; nome: string }[] = [
 ];
 
 /** As categorias de animação que ficam na ferramenta Texto do editor (o resto fica em Elementos). */
-export const CATEGORIAS_DE_TEXTO = new Set(["titulos", "tarjas", "citacoes"]);
+export const CATEGORIAS_DE_TEXTO = new Set(["titulos", "ganchos", "tarjas", "citacoes"]);
 
 export function chaveDaAnimacao(id: string): string {
   return `animacao-${id}`;

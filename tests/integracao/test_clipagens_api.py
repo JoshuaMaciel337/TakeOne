@@ -1,5 +1,5 @@
 # O Clipar (14.2 e 14.3): pedir os cortes, esperar a transcrição, achar os cortes (modo simulado) e avaliar
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from bson import ObjectId
@@ -25,13 +25,21 @@ def _organizacao(db):
     return db.usuarios.find_one({})["organizacao_id"]
 
 
-def criar_video(db, duracao=300.0, transcrito=True, **extra) -> ObjectId:
-    """Uma mídia pronta (sem arquivos: o modo simulado só lê a transcrição) e, se pedido, a fala dela."""
+def criar_video(db, duracao=300.0, transcrito=True, medido=True, **extra) -> ObjectId:
+    """Uma mídia pronta (sem arquivos: o modo simulado só lê a transcrição) e, se pedido, a fala dela e as
+    medidas da imagem (um rosto só na primeira metade e a imagem boa em tudo)."""
     organizacao = _organizacao(db)
     midia = montar_midia(organizacao, None, "palestra.mp4", 1000)
     midia.update({"status": "pronta", "nome": "Palestra", "duracao": duracao, "audio": {"codec": "aac"},
                   "video": {"largura": 1280, "altura": 720}, **extra})
     midia_id = db.midias.insert_one(midia).inserted_id
+    if medido:
+        amostras = [{"t": n / 2, "x": 0.5, "y": 0.4, "a": 0.02} for n in range(int(duracao))]
+        db.rostos.insert_one({"organizacao_id": organizacao, "midia_id": midia_id, "status": "pronto",
+                              "amostras": amostras})
+        tempos = [n / 4 for n in range(int(duracao * 4))]
+        db.qualidades.insert_one({"organizacao_id": organizacao, "midia_id": midia_id, "status": "pronto",
+                                  "t": tempos, "nota": [0.8] * len(tempos), "corte": [False] * len(tempos)})
     if transcrito:
         palavras, t = [], 0.0
         while t < duracao - 1:
@@ -91,6 +99,10 @@ def test_acha_os_cortes_e_guarda_a_avaliacao(cliente, db_limpo):
         assert 10 <= corte["trechos"][0]["inicio"] and corte["trechos"][-1]["fim"] <= 290
         assert 24 <= corte["duracao"] <= 72 and corte["texto"] and 0 <= corte["medidas"]["ritmo"] <= 1
         assert corte["parecidos"] == []
+        # O rosto só está na primeira metade do vídeo (150 s), e a imagem é 0,8 em tudo
+        assert corte["medidas"]["imagem"] == 0.8
+        assert corte["medidas"]["rosto"] == (1.0 if corte["trechos"][-1]["fim"] <= 150 else
+                                             0.0 if corte["trechos"][0]["inicio"] >= 150 else corte["medidas"]["rosto"])
         # A ênfase é o começo de palavras da fala, dentro do corte
         assert all(corte["trechos"][0]["inicio"] <= t <= corte["trechos"][-1]["fim"] for t in corte["enfase"])
     assert any(corte["enfase"] for corte in cortes)
@@ -211,6 +223,46 @@ def test_sem_transcricao_pede_uma_e_espera(cliente, db_limpo):
     assert andamento["etapa"] == "transcricao" and andamento["mensagem"] == "Transcrição na fila"
 
 
+def test_sem_as_medidas_da_imagem_pede_e_espera(cliente, db_limpo):
+    cadastrar(cliente)
+    video = criar_video(db_limpo, medido=False)
+    clipagem = cliente.post("/api/clipagens", json={"midia_id": str(video)}).json()
+    job = pegar_proximo_job(db_limpo, ["clipagem"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    assert {j["tipo"] for j in db_limpo.jobs.find({"tipo": {"$in": ["rosto", "qualidade"]}})} == {"rosto", "qualidade"}
+    espera = db_limpo.jobs.find_one({"tipo": "clipagem", "_id": {"$ne": job["_id"]}})
+    assert espera["entrada"]["esperas_das_medidas"] == 1 and espera["mensagem"] == "Medindo a imagem"
+    # As medidas acabam (a busca do rosto falhou, a imagem ficou pronta): a clipagem segue com o que há
+    db_limpo.jobs.update_many({"tipo": {"$in": ["rosto", "qualidade"]}}, {"$set": {"status": "concluido"}})
+    db_limpo.rostos.update_one({"midia_id": video}, {"$set": {"status": "erro"}})
+    db_limpo.qualidades.update_one({"midia_id": video}, {"$set": {"status": "pronto", "t": list(range(300)),
+                                                                   "nota": [0.5] * 300}})
+    db_limpo.jobs.update_one({"_id": espera["_id"]}, {"$set": {"disponivel_em": datetime.now(UTC)}})
+    job = pegar_proximo_job(db_limpo, ["clipagem"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    pronta = cliente.get(f"/api/clipagens/{clipagem['id']}").json()
+    assert pronta["status"] == "pronta"
+    medidas = [corte["medidas"] for corte in pronta["cortes"]]
+    assert all("rosto" not in m and "ritmo" in m for m in medidas)
+    assert any(m.get("imagem") == 0.5 for m in medidas)
+
+
+def test_o_gosto_do_espaco_ajusta_a_nota_da_clipagem_seguinte(cliente, db_limpo):
+    cadastrar(cliente)
+    primeira = _pronta(cliente, db_limpo, faixa="medio", maximo=3)
+    assert all("gosto" not in corte for corte in primeira["cortes"])
+    # Uma clipagem de antes com dois cortes de explicação marcados com "gostei" (os simulados são todos dessa
+    # categoria): o gosto soma pela categoria e pela duração
+    avaliados = [{"id": f"c0{i}", "titulo": "Um corte bom", "categoria": "explicacao", "duracao": 46.0,
+                  "texto": "Hoje eu vou contar", "avaliacao": "gostei"} for i in (1, 2)]
+    db_limpo.clipagens.insert_one({"organizacao_id": _organizacao(db_limpo), "cortes": avaliados,
+                                   "atualizado_em": datetime.now(UTC)})
+    segunda = _pronta(cliente, db_limpo, faixa="medio", maximo=3)
+    assert segunda["cortes"] and all(corte["gosto"].startswith("+6") and "explicação" in corte["gosto"]
+                                     for corte in segunda["cortes"])
+    assert segunda["cortes"][0]["nota"] == min(100, primeira["cortes"][0]["nota"] + 6)
+
+
 def test_o_srt_da_pessoa_entra_no_lugar_da_transcricao(cliente, db_limpo):
     cadastrar(cliente)
     video = criar_video(db_limpo, transcrito=False)
@@ -304,7 +356,11 @@ def test_modelo_de_corte_na_clipagem_no_corte_e_no_espaco(cliente, db_limpo):
     retencao = {"barra": "baixo", "quadro_original": "sorteado", "distracao": ["a" * 24]}
     com_retencao = cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": retencao}}).json()["cortes"][0]
     assert {chave: com_retencao["modelo_corte"]["receita"][chave] for chave in retencao} == retencao
-    estragadas = ({"barra": "meio"}, {"quadro_original": "agora"}, {"distracao": ["x"]}, {"distracao": ["a" * 24] * 11})
+    # A abertura (14.11): só os ganchos da biblioteca
+    com_abertura = cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": {"abertura": "gancho_digitado"}}})
+    assert com_abertura.json()["cortes"][0]["modelo_corte"]["receita"]["abertura"] == "gancho_digitado"
+    estragadas = ({"barra": "meio"}, {"quadro_original": "agora"}, {"distracao": ["x"]}, {"distracao": ["a" * 24] * 11},
+                  {"abertura": "titulo_neon"}, {"abertura": "nao_existe"})
     for estragada in estragadas:
         assert cliente.put(caminho, json={"modelo_corte": {**so_dele, "receita": estragada}}).status_code == 422
 

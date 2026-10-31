@@ -114,12 +114,12 @@ export async function projetoDoCorte(
     : (clipagem.opcoes.legenda_animada ?? legendaAnimadaDoPlano(plano) ?? receita.legenda_animada);
   const midias = new Map([[midia.id, midia]]);
   if (legendaAnimada || partes) {
-    const editado = await aplicarLegendaEPartes({ projeto, palavras: fala, titulo: corte.titulo, midias, legendaAnimada, partes, aoAndamento, ativo });
+    const editado = await aplicarLegendaEPartes({ projeto, palavras: fala, titulo: corte.titulo, midias, legendaAnimada, partes, aoAndamento, ativo, coresDaMarca: marca.cores });
     if (!editado) return null;
     projeto = editado.projeto;
   }
-  if (receita.logo || receita.chamada || receita.musica) {
-    const comExtras = await extrasDoModelo({ projeto, receita, marca, midias, palavras: fala, aoAndamento, ativo });
+  if (receita.logo || receita.chamada || receita.musica || receita.abertura) {
+    const comExtras = await extrasDoModelo({ projeto, receita, marca, midias, palavras: fala, titulo: corte.titulo, aoAndamento, ativo });
     if (!comExtras) return null;
     projeto = comExtras.projeto;
   }

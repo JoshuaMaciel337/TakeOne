@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -7,6 +8,8 @@ import type { Clipe, Projeto } from "../projeto/modelo.ts";
 import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import type { Midia } from "../tipos.ts";
 import {
+  ABERTURAS,
+  camposDaAbertura,
   camposDaChamada,
   comExtras,
   DURACAO_DA_CHAMADA,
@@ -196,4 +199,33 @@ test("o resumo da receita para o cartão", () => {
   assert.deepEqual(resumoDaReceita(pronto("conversa")), ["Legenda caixa escura no meio", "Rosto no quadro", "Sem pausas", "Título", "Cor suave", "Logo do kit", "Botão seguir no fim"]);
   assert.deepEqual(resumoDaReceita({ ...RECEITA_PADRAO, legenda: null, limpar: false, titulo: false, zooms: false, enquadrar: "inteiro" }), ["Sem legendas", "A imagem inteira"]);
   assert.ok(resumoDaReceita(pronto("ritmo")).includes("Flash com som"));
+});
+
+
+test("cada abertura é um gancho da biblioteca com o campo que recebe o título", () => {
+  for (const abertura of ABERTURAS) {
+    const html = readFileSync(new URL(`../../../../../core/animacoes/${abertura.id}.html`, import.meta.url), "utf8");
+    const dados = JSON.parse(html.split('<script type="application/json" id="modelo">')[1].split("</script>")[0]);
+    assert.equal(dados.categoria, "ganchos", abertura.id);
+    const campo = dados.campos.find((item: { id: string; tipo: string }) => item.id === abertura.campo);
+    assert.ok(campo, `${abertura.id}: sem o campo ${abertura.campo}`);
+    assert.equal(campo.tipo, abertura.campo === "linhas" ? "linhas" : "texto", abertura.id);
+  }
+});
+
+test("a abertura leva o título nas linhas e nas cores da marca, e tira o título de texto", () => {
+  const marca = { ...MARCA_VAZIA, cores: ["#112233", "#445566"] };
+  assert.deepEqual(camposDaAbertura("gancho_tela_tingida", "o hábito que mudou a minha vida", marca), {
+    linhas: "O HÁBITO QUE\nMUDOU A MINHA\nVIDA",
+    cor_1: "#112233",
+    cor_2: "#445566",
+  });
+  assert.deepEqual(camposDaAbertura("gancho_pergunta", "  Por que   você desiste? ", MARCA_VAZIA), { texto: "Por que você desiste?" });
+  assert.deepEqual(camposDaAbertura("nenhum", "x", marca), {});
+  const receita = receitaValida({ ...RECEITA_PADRAO, abertura: "gancho_digitado" });
+  assert.equal(receita.abertura, "gancho_digitado");
+  assert.equal(receitaValida({ ...RECEITA_PADRAO, abertura: "nao_existe" }).abertura, null);
+  assert.equal(opcoesDoModelo(receita, "#ffffff").titulo, false);
+  assert.equal(opcoesDoModelo(RECEITA_PADRAO, "#ffffff").titulo, true);
+  assert.ok(resumoDaReceita(receita).includes("Abertura: título digitado"));
 });

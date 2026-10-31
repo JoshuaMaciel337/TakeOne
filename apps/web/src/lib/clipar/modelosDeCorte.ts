@@ -60,6 +60,9 @@ export type ReceitaDoCorte = {
   gancho: boolean;
   /** A censura das palavras da lista do espaço: com um bipe ou o silêncio (14.8). */
   censura: ModoDaCensura | null;
+  /** A abertura (14.11): um gancho da biblioteca de animações (ABERTURAS) com o título do corte, nos primeiros
+   * segundos, no lugar do título de texto; null: o título de sempre. */
+  abertura: string | null;
 };
 
 export type ModeloDeCorte = { id: string; nome: string; receita: ReceitaDoCorte };
@@ -90,7 +93,26 @@ export const RECEITA_PADRAO: ReceitaDoCorte = {
   emojis: false,
   gancho: false,
   censura: null,
+  abertura: null,
 };
+
+/** Os ganchos de abertura que levam o título do corte: o modelo da biblioteca, o nome e o campo do título ("linhas"
+ * quebra o título em até três linhas). Os ganchos que pedem outra coisa (um número, duas ideias) ficam de fora. */
+export const ABERTURAS: { id: string; nome: string; campo: "texto" | "linhas"; caixaAlta: boolean }[] = [
+  { id: "gancho_caixas", nome: "Palavras em caixas", campo: "texto", caixaAlta: true },
+  { id: "gancho_tela_tingida", nome: "Tela tingida", campo: "linhas", caixaAlta: true },
+  { id: "gancho_digitado", nome: "Título digitado", campo: "texto", caixaAlta: false },
+  { id: "gancho_cartao", nome: "Vídeo num cartão", campo: "texto", caixaAlta: true },
+  { id: "gancho_icones", nome: "Ícones em volta", campo: "linhas", caixaAlta: true },
+  { id: "gancho_pergunta", nome: "Pergunta com interrogação", campo: "texto", caixaAlta: false },
+  { id: "gancho_contagem", nome: "Contagem 3, 2, 1", campo: "texto", caixaAlta: true },
+  { id: "gancho_voce_sabia", nome: "Você sabia?", campo: "texto", caixaAlta: false },
+  { id: "gancho_aspas", nome: "Frase entre aspas", campo: "texto", caixaAlta: false },
+  { id: "gancho_alerta", nome: "Alerta", campo: "texto", caixaAlta: false },
+  { id: "gancho_carregando", nome: "Carregando", campo: "texto", caixaAlta: true },
+  { id: "gancho_marcador", nome: "Frase marcada", campo: "linhas", caixaAlta: false },
+];
+export const DURACAO_DA_ABERTURA = 3;
 
 export const CHAMADAS: { id: ModeloDeChamada; nome: string; padrao: string }[] = [
   { id: "chamada_seguir", nome: "Botão seguir", padrao: "Gostou? Segue para mais" },
@@ -145,6 +167,7 @@ export const MODELOS_PRONTOS: (ModeloDeCorte & { descricao: string })[] = [
       chamada: { modelo: "chamada_comente", texto: "QUERO" },
       barra: "baixo",
       emojis: true,
+      abertura: "gancho_caixas",
     },
   },
   {
@@ -212,6 +235,7 @@ export function receitaValida(dados: unknown): ReceitaDoCorte {
     emojis: sim(d.emojis, p.emojis),
     gancho: sim(d.gancho, p.gancho),
     censura: ou(d.censura, ["bipe", "silencio"], null) as ModoDaCensura | null,
+    abertura: ou(d.abertura, ABERTURAS.map((a) => a.id), null),
     distracao: Array.isArray(d.distracao) ? [...new Set(d.distracao.filter((id): id is string => typeof id === "string" && /^[0-9a-f]{24}$/.test(id)))].slice(0, 10) : [],
   };
 }
@@ -228,7 +252,8 @@ export function opcoesDoModelo(receita: ReceitaDoCorte, corDeDestaque: string): 
   return {
     limpar: receita.limpar,
     legenda: receita.legenda ?? (receita.legenda_animada ? "palavra" : null),
-    titulo: receita.titulo,
+    // A abertura já traz o título
+    titulo: receita.titulo && !receita.abertura,
     zooms: receita.zooms,
     corDeDestaque,
     enquadrar: receita.enquadrar,
@@ -351,6 +376,11 @@ export function receitaDoProjeto(projeto: Projeto, midias: Map<string, Midia>, l
     emojis: todas.some((clipe) => midiaDe(clipe)?.elemento?.tipo === "emoji"),
     gancho: todas.some((clipe) => midiaDe(clipe)?.fala?.gancho),
     censura: todas.some((clipe) => midiaDe(clipe)?.efeito_sonoro?.id === "bipe") ? "bipe" : null,
+    abertura:
+      todas
+        .filter((clipe) => clipe.inicio < TICKS_POR_SEGUNDO)
+        .map((clipe) => midiaDe(clipe)?.animacao?.modelo)
+        .find((modelo) => ABERTURAS.some((abertura) => abertura.id === modelo)) ?? null,
     // Os vídeos mudos na faixa de baixo (ou no canto) por cima da principal
     distracao: [
       ...new Set(
@@ -372,6 +402,7 @@ export const DURACAO_DA_CHAMADA = 4;
 const FADE_DA_MUSICA = 1.5 * S;
 
 export type Extras = {
+  abertura?: { midiaId: string } | null;
   logo?: { midiaId: string; transformacao: Transformacao } | null;
   chamada?: { midiaId: string; inicio: Tick } | null;
   musica?: { midiaId: string; volume: number; falas: TrechoDeFala[] | null } | null;
@@ -392,6 +423,28 @@ export function camposDaChamada(receita: ReceitaDoCorte, marca: Marca): Record<s
   const campo = chamada.modelo === "chamada_comente" ? "palavra" : chamada.modelo === "chamada_seguir" ? "chamada" : "texto";
   return {
     ...(chamada.texto.trim() ? { [campo]: chamada.texto.trim() } : {}),
+    ...(marca.cores[0] ? { cor_1: marca.cores[0] } : {}),
+    ...(marca.cores[1] ? { cor_2: marca.cores[1] } : {}),
+  };
+}
+
+/** Os campos da abertura: o título do corte no campo dela (em linhas equilibradas, quando o campo é de linhas, e em
+ * caixa alta nos ganchos desenhados assim) e as duas cores da marca. */
+export function camposDaAbertura(id: string, titulo: string, marca: Marca): Record<string, string> {
+  const abertura = ABERTURAS.find((item) => item.id === id);
+  if (!abertura) return {};
+  let texto = titulo.trim().replace(/\s+/g, " ");
+  if (abertura.caixaAlta) texto = texto.toLocaleUpperCase("pt-BR");
+  if (abertura.campo === "linhas") {
+    const palavras = texto.split(" ");
+    const quantas = palavras.length > 6 ? 3 : palavras.length > 2 ? 2 : 1;
+    const porLinha = Math.ceil(palavras.length / quantas);
+    const linhas: string[] = [];
+    for (let i = 0; i < palavras.length; i += porLinha) linhas.push(palavras.slice(i, i + porLinha).join(" "));
+    texto = linhas.join("\n");
+  }
+  return {
+    ...(texto ? { [abertura.campo]: texto.slice(0, 60) } : {}),
     ...(marca.cores[0] ? { cor_1: marca.cores[0] } : {}),
     ...(marca.cores[1] ? { cor_2: marca.cores[1] } : {}),
   };
@@ -429,6 +482,11 @@ export function comExtras(projetoInicial: Projeto, ctx: Contexto, extras: Extras
       // Sem logo
     }
   }
+  if (extras.abertura) {
+    const antes = projeto;
+    projeto = comMidiasDoPlano(projeto, ctx, [{ tipo: "cartela", midiaId: extras.abertura.midiaId, inicio: 0 }]);
+    if (projeto !== antes) feitos.push("a abertura");
+  }
   if (extras.chamada) {
     const antes = projeto;
     projeto = comMidiasDoPlano(projeto, ctx, [{ tipo: "cartela", midiaId: extras.chamada.midiaId, inicio: extras.chamada.inicio }]);
@@ -449,7 +507,9 @@ export function resumoDaReceita(receita: ReceitaDoCorte): string[] {
   else itens.push("Sem legendas");
   itens.push(receita.enquadrar === "rosto" ? "Rosto no quadro" : receita.enquadrar === "centro" ? "Enquadrado pelo meio" : "A imagem inteira");
   if (receita.limpar) itens.push("Sem pausas");
-  if (receita.titulo) itens.push("Título");
+  const abertura = ABERTURAS.find((item) => item.id === receita.abertura);
+  if (abertura) itens.push(`Abertura: ${abertura.nome.toLowerCase()}`);
+  else if (receita.titulo) itens.push("Título");
   if (receita.zooms) itens.push("Zooms");
   const cor = CORES_DO_VIDEO.find((item) => item.id === receita.cor)?.nome;
   if (cor) itens.push(`Cor ${cor.toLowerCase()}`);

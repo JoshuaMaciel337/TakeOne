@@ -150,26 +150,57 @@ function TituloDoCorte({ corte }: { corte: Corte }) {
   );
 }
 
+const MEDIDAS = [
+  { id: "ritmo", nome: "fala", dica: "Quanto do corte tem fala, e quão animada" },
+  { id: "voz", nome: "voz", dica: "O volume da fala comparado com o resto do vídeo" },
+  { id: "rosto", nome: "rosto", dica: "Quanto do corte tem um rosto à vista" },
+  { id: "imagem", nome: "imagem", dica: "Nitidez, luz e câmera firme" },
+] as const;
+
+function MedidasDoCorte({ corte }: { corte: Corte }) {
+  const medidas = MEDIDAS.filter((medida) => corte.medidas?.[medida.id] != null);
+  if (!medidas.length && !corte.gosto) return null;
+  return (
+    <div className="space-y-0.5 text-[11px] text-apagado">
+      {medidas.length ? (
+        <p>
+          Medido no vídeo:{" "}
+          {medidas.map((medida, i) => (
+            <span key={medida.id} title={medida.dica}>
+              {i ? " · " : ""}
+              {medida.nome} {Math.round((corte.medidas?.[medida.id] ?? 0) * 100)}%
+            </span>
+          ))}
+        </p>
+      ) : null}
+      {corte.gosto ? <p title="Pelos cortes que você marcou com gostei e não gostei">{corte.gosto}</p> : null}
+    </div>
+  );
+}
+
 function NotasDoCorte({ corte, compactas }: { corte: Corte; compactas: boolean }) {
   const notas = corte.notas;
   if (!notas) return null;
   return (
-    <div className={`grid gap-x-3 gap-y-2 ${compactas ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
-      {CRITERIOS.map((criterio) => {
-        const motivo = corte.motivos?.[criterio.id] ?? "";
-        return (
-          <div key={criterio.id} className="text-xs" title={`${criterio.dica} ${motivo}`.trim()}>
-            <div className="flex justify-between">
-              <span className="text-suave">{criterio.nome}</span>
-              <span className="tabular-nums">{notas[criterio.id]}</span>
+    <div className="space-y-2">
+      <div className={`grid gap-x-3 gap-y-2 ${compactas ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
+        {CRITERIOS.map((criterio) => {
+          const motivo = corte.motivos?.[criterio.id] ?? "";
+          return (
+            <div key={criterio.id} className="text-xs" title={`${criterio.dica} ${motivo}`.trim()}>
+              <div className="flex justify-between">
+                <span className="text-suave">{criterio.nome}</span>
+                <span className="tabular-nums">{notas[criterio.id]}</span>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-painel-3">
+                <div className="h-full rounded-full bg-destaque" style={{ width: `${notas[criterio.id] * 10}%` }} />
+              </div>
+              {motivo && !compactas ? <p className="mt-1 line-clamp-2 text-[11px] text-apagado">{motivo}</p> : null}
             </div>
-            <div className="mt-1 h-1.5 rounded-full bg-painel-3">
-              <div className="h-full rounded-full bg-destaque" style={{ width: `${notas[criterio.id] * 10}%` }} />
-            </div>
-            {motivo && !compactas ? <p className="mt-1 line-clamp-2 text-[11px] text-apagado">{motivo}</p> : null}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {compactas ? null : <MedidasDoCorte corte={corte} />}
     </div>
   );
 }

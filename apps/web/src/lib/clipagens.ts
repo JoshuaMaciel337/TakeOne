@@ -126,7 +126,10 @@ export type Corte = {
   /** null na parte 2: o modelo não avaliou a continuação. */
   notas: Record<"gancho" | "fluxo" | "valor" | "autonomia", number> | null;
   motivos: Record<"gancho" | "fluxo" | "valor" | "autonomia", string> | null;
-  medidas?: { ritmo?: number };
+  /** O que o vídeo diz do corte, de 0 a 1 (core/modelos/medidas_do_corte.py): as que faltam não vêm. */
+  medidas?: { ritmo?: number; voz?: number; rosto?: number; imagem?: number };
+  /** Quanto o gosto do espaço (os cortes avaliados antes) mudou a nota, e por quê (core/modelos/gosto.py). */
+  gosto?: string;
   nota: number | null;
   propaganda: boolean;
   /** O texto falado no corte (a busca da lista). */

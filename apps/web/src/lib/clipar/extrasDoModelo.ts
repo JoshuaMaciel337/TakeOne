@@ -9,7 +9,7 @@ import type { Projeto } from "@/lib/projeto/modelo";
 import type { Midia } from "@/lib/tipos";
 
 import { esperarProntas, pedirAnimacao } from "./aplicarPregacao";
-import { camposDaChamada, comExtras, DURACAO_DA_CHAMADA, type Extras, inicioDaChamada, type ReceitaDoCorte } from "./modelosDeCorte";
+import { camposDaAbertura, camposDaChamada, comExtras, DURACAO_DA_ABERTURA, DURACAO_DA_CHAMADA, type Extras, inicioDaChamada, type ReceitaDoCorte } from "./modelosDeCorte";
 
 /**
  * Pede o que os extras precisam (a chamada é gravada pelo worker; o logo e a música vêm da biblioteca), espera e põe
@@ -21,6 +21,8 @@ export async function extrasDoModelo(opcoes: {
   marca: Marca;
   midias: Map<string, Midia>;
   palavras: Map<string, Palavra[]>;
+  /** O título do corte, que vai na abertura. */
+  titulo: string;
   aoAndamento: (texto: string) => void;
   ativo: () => boolean;
 }): Promise<{ projeto: Projeto; feitos: string[] } | null> {
@@ -34,6 +36,11 @@ export async function extrasDoModelo(opcoes: {
   if (receita.chamada && inicio !== null) {
     aoAndamento("Gravando a chamada do fim");
     pedida = await pedirAnimacao(receita.chamada.modelo, camposDaChamada(receita, marca), projeto.proporcao, DURACAO_DA_CHAMADA).catch(() => null);
+  }
+  let abertura: Midia | null = null;
+  if (receita.abertura && opcoes.titulo.trim()) {
+    aoAndamento("Gravando a abertura");
+    abertura = await pedirAnimacao(receita.abertura, camposDaAbertura(receita.abertura, opcoes.titulo, marca), projeto.proporcao, DURACAO_DA_ABERTURA).catch(() => null);
   }
   if (receita.logo && marca.logo_midia_id) {
     const logo = await buscar(marca.logo_midia_id);
@@ -52,14 +59,13 @@ export async function extrasDoModelo(opcoes: {
       extras.musica = { midiaId: musica.id, volume: receita.musica.volume, falas };
     }
   }
-  if (pedida && inicio !== null) {
-    const prontas = await esperarProntas([pedida.id], aoAndamento, ativo, "Gravando a chamada do fim");
+  const esperar = [abertura, pedida && inicio !== null ? pedida : null].filter((midia): midia is Midia => Boolean(midia));
+  if (esperar.length) {
+    const prontas = await esperarProntas(esperar.map((midia) => midia.id), aoAndamento, ativo, abertura ? "Gravando a abertura" : "Gravando a chamada do fim");
     if (!prontas) return null;
-    const pronta = prontas.get(pedida.id);
-    if (pronta) {
-      midias.set(pronta.id, pronta);
-      extras.chamada = { midiaId: pronta.id, inicio };
-    }
+    for (const pronta of prontas.values()) midias.set(pronta.id, pronta);
+    if (abertura && prontas.get(abertura.id)) extras.abertura = { midiaId: abertura.id };
+    if (pedida && inicio !== null && prontas.get(pedida.id)) extras.chamada = { midiaId: pedida.id, inicio };
   }
   if (!ativo()) return null;
   return comExtras(projeto, contextoDasMidias(midias), extras);

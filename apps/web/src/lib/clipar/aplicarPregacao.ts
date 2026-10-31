@@ -123,13 +123,15 @@ export async function aplicarLegendaEPartes(opcoes: {
   partes: PartesDaEdicao | null;
   aoAndamento: (texto: string) => void;
   ativo: () => boolean;
+  /** As cores do kit de marca: as caixas e o néon da legenda animada. */
+  coresDaMarca?: string[];
 }): Promise<{ projeto: Projeto; feitos: string[] } | null> {
   const { palavras, titulo, legendaAnimada, partes, aoAndamento, ativo } = opcoes;
   const midias = new Map(opcoes.midias);
   let projeto = opcoes.projeto;
   const feitos: string[] = [];
   if (legendaAnimada && faixaDasLegendas(projeto)) {
-    const pedido = pedidoDasLegendas(projeto);
+    const pedido = pedidoDasLegendas(projeto, opcoes.coresDaMarca);
     aoAndamento("Gravando a legenda animada");
     const trilha = await esperarLegenda(await pedirLegendaAnimada(pedido, legendaAnimada, projeto.proporcao), aoAndamento, ativo);
     if (!trilha) return null;

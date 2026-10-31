@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_serializ
 
 from core.modelos.animacao_html import DURACAO_MAXIMA as DURACAO_MAXIMA_ANIMACAO
 from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
+from core.modelos.animacao_html import MODELOS as MODELOS_DE_ANIMACAO
 from core.modelos.cortes import parecidos
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
@@ -2486,12 +2487,21 @@ class ReceitaDoCorte(BaseModel):
     gancho: bool = False
     # A censura das palavras da lista do espaço (o kit de marca)
     censura: Literal["bipe", "silencio"] | None = None
+    # A abertura (14.11): um gancho da biblioteca de animações, com o título do corte, no lugar do título de texto
+    abertura: str | None = Field(default=None, max_length=60)
 
     @field_validator("legenda_animada")
     @classmethod
     def conferir_legenda_animada(cls, valor):
         if valor is not None and valor not in ESTILOS_DE_LEGENDA_ANIMADA:
             raise ValueError("Estilo de legenda animada desconhecido.")
+        return valor
+
+    @field_validator("abertura")
+    @classmethod
+    def conferir_abertura(cls, valor):
+        if valor is not None and (MODELOS_DE_ANIMACAO.get(valor) or {}).get("categoria") != "ganchos":
+            raise ValueError("Abertura desconhecida: escolha um dos ganchos de abertura.")
         return valor
 
 

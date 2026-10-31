@@ -142,13 +142,14 @@ export function PecaUmaEdicao({ projeto, midias, aoExecutar, aoAvisar }: Props) 
         partes: partesPedidas,
         aoAndamento: setAndamento,
         ativo: () => ativo.current,
+        coresDaMarca: marca.cores,
       });
       if (!editado) return null;
       novo = editado.projeto;
       feitos.push(...editado.feitos);
     }
-    if (receita && (receita.logo || receita.chamada || receita.musica)) {
-      const comExtras = await extrasDoModelo({ projeto: novo, receita, marca, midias: porId, palavras, aoAndamento: setAndamento, ativo: () => ativo.current });
+    if (receita && (receita.logo || receita.chamada || receita.musica || receita.abertura)) {
+      const comExtras = await extrasDoModelo({ projeto: novo, receita, marca, midias: porId, palavras, titulo: titulo?.texto ?? "", aoAndamento: setAndamento, ativo: () => ativo.current });
       if (!comExtras) return null;
       novo = comExtras.projeto;
       feitos.push(...comExtras.feitos);

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -5,7 +6,7 @@ import { TICKS_POR_SEGUNDO } from "../tempo.ts";
 import { executarComando } from "./comandos.ts";
 import type { Contexto } from "./edicao.ts";
 import { ErroEdicao } from "./edicao.ts";
-import { animarLegendas, faixaDasLegendas, pedidoDasLegendas } from "./legendaAnimada.ts";
+import { animarLegendas, CATEGORIAS_ANIMADAS, ESTILOS_ANIMADOS, faixaDasLegendas, pedidoDasLegendas } from "./legendaAnimada.ts";
 import { ESTILO_LEGENDA, POSICAO_LEGENDA } from "./legendas.ts";
 import type { Projeto } from "./modelo.ts";
 
@@ -82,4 +83,24 @@ test("a trilha entra por cima e esconde as legendas, num passo só", () => {
   // Escondida, a faixa não vira trilha de novo
   assert.equal(faixaDasLegendas(novo), null);
   assert.throws(() => pedidoDasLegendas(novo), ErroEdicao);
+});
+
+test("a lista de estilos é a mesma do arquivo que o motor e o Python leem", () => {
+  const arquivo = JSON.parse(readFileSync(new URL("../../../../../core/legendas/estilos.json", import.meta.url), "utf8"));
+  assert.deepEqual(
+    ESTILOS_ANIMADOS.map((e) => [e.id, e.nome, e.categoria, e.descricao]),
+    Object.entries(arquivo.estilos).map(([id, e]) => {
+      const estilo = e as { nome: string; categoria: string; descricao: string };
+      return [id, estilo.nome, estilo.categoria, estilo.descricao];
+    }),
+  );
+  assert.deepEqual(Object.fromEntries(CATEGORIAS_ANIMADAS.map((c) => [c.id, c.nome])), arquivo.categorias);
+});
+
+test("as caixas e o néon vêm das cores do kit de marca", () => {
+  assert.deepEqual(pedidoDasLegendas(comLegendas(), ["#112233"]).cores.caixa, "#112233");
+  const cores = pedidoDasLegendas(comLegendas(), ["#112233", "#445566", "#778899"]).cores;
+  assert.equal(cores.caixa, "#445566");
+  assert.equal(cores.neon, "#778899");
+  assert.equal(pedidoDasLegendas(comLegendas()).cores.caixa, undefined);
 });

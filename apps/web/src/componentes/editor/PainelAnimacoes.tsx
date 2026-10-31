@@ -38,7 +38,7 @@ type Props = {
 };
 
 /** As categorias que são texto (títulos, tarjas com nome, citações) ficam na ferramenta Texto; o resto, em Elementos. */
-const CATEGORIAS_DE_TEXTO = new Set(["titulos", "tarjas", "citacoes"]);
+const CATEGORIAS_DE_TEXTO = new Set(["titulos", "ganchos", "tarjas", "citacoes"]);
 export type GrupoDeAnimacoes = "texto" | "elementos";
 
 const DO_GRUPO: Record<GrupoDeAnimacoes, (categoria: string) => boolean> = {

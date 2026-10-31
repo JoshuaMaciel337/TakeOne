@@ -101,13 +101,17 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   (duas pontas sobre a forma de onda); o idioma; "incluir momentos" em texto livre; um .srt próprio no lugar da
   transcrição; o formato (9:16, 1:1, 4:5, 16:9); o modelo de corte (14.6); quantos cortes, no máximo; e o tempo
   estimado. "Salvar como padrão".
-- [ ] **14.3 Achar os cortes.** A tarefa no worker de GPU: a transcrição (a que já existe, ou a do .srt), as frases e
+- [x] **14.3 Achar os cortes.** A tarefa no worker de GPU: a transcrição (a que já existe, ou a do .srt), as frases e
   as pausas, as janelas, o Qwen3 por janela com o esquema, a conferência, as medidas, a junção e o corte do que se
   repete, a nota e a ordem, o aviso de propaganda ("link na descrição", "cupom", "comenta..."), e a coleção `clipagens`
   (a submissão, as opções, o estado e os cortes). Medir: no TEDx de teste, o tempo no Nitro (meta: menos de 5 min do
   link aos cortes), nenhum corte começando ou acabando no meio de uma frase, a comparação com os 12 cortes do Cut.Pro
   no mesmo vídeo (quantos dos nossos melhores coincidem com os dele de nota 8 a 10) e o vídeo repetido quatro vezes
   dando um corte só; e mais dois vídeos de tipos diferentes (entrevista com duas pessoas e aula).
+  **Pronta (31/10/2026):** a nota leva as medidas do vídeo (o ritmo, a voz, o rosto e a imagem), e os cortes que
+  começam respondendo ou continuando perdem fluxo e autonomia. Medido: o TEDx em 324 s com a subida do modelo; o
+  vídeo repetido quatro vezes, 5 cortes sem nenhum repetido; uma aula de 14 min, 25 cortes; 15 min de uma entrevista
+  de 64 min, 14 cortes no trecho pedido. A comparação com o Cut.Pro ficou a de 26/10 (9 dos 12 dele cobertos).
 - [x] **14.4 A lista de cortes.** Cartões em pé com a prévia já editada (uma prévia tocando de cada vez, ao passar o
   mouse), a nota e as quatro partes com a explicação, a duração, o título com as palavras de foco, o resumo, a
   categoria, os trechos do original e os avisos (propaganda, parecido com outro); grade e lista; ordenar (nota, ordem
@@ -117,12 +121,14 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   **Pronta (29/10/2026):** a prévia é a cópia leve com o título e as legendas desenhados por cima (sem montar o
   projeto), no enquadramento do rosto quando a busca já existe; a parte 2 não tem nota (o modelo não a avalia) e vem
   logo depois do corte que continua. Testada no Chrome com o TEDx.
-- [ ] **14.5 O corte montado.** Cada corte vira um projeto de vídeo no formato pedido: os trechos da mídia original
+- [x] **14.5 O corte montado.** Cada corte vira um projeto de vídeo no formato pedido: os trechos da mídia original
   (sem copiar o arquivo), a limpeza de pausas e hesitações (ligável), as legendas da fala no estilo escolhido (os 6 de
   hoje ou as animadas da 14.11, com a palavra falada destacada e as palavras de ênfase escolhidas pela IA), o título de abertura com as palavras de foco nos primeiros segundos,
   o reenquadramento (o "Seguir o rosto" no formato em pé), zooms curtos nas frases fortes (o mesmo pedido do "Criar
   automaticamente", agora no trecho do corte), o kit de marca e o modelo de corte. Medir: prévia e exportação no
   Chrome nos níveis de sempre, dentro dos zooms e das legendas.
+  **Pronta (31/10/2026):** a escolha das opções e o logo vieram com o modelo de corte (14.6), e a medida foi feita nele
+  e na retenção (14.8).
 - [x] **14.6 Modelos de corte.** Um modelo de corte é uma receita, não uma linha do tempo fixa: o layout, o estilo da
   legenda (e onde ela fica), o título (estilo e duração), o logo e a chamada, a abertura e o encerramento, a música
   (com licença), a barra de progresso e os interruptores (limpar pausas, zooms, emojis, palavras-chave). Salvar o corte
@@ -163,15 +169,16 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   horário para a busca dos cortes, e os canais acompanhados. Medido: a montagem pelo worker deu o mesmo projeto que a do
   navegador; dois cortes exportados com o navegador fechado; uma esteira do vídeo ao corte exportado em 247 s. A
   publicação nas redes continua esperando o dono.
-- [ ] **14.10 Conversa no editor.** (Adiantada: o campo, o plano, as perguntas, o passo único e a medida dos 30
-  pedidos estão prontos, e o mesmo pedido vale para todos os cortes na página de opções; falta o gosto do espaço.) Um campo "peça uma edição" no editor de vídeo: o Qwen3 traduz o pedido numa lista
+- [x] **14.10 Conversa no editor.** Um campo "peça uma edição" no editor de vídeo: o Qwen3 traduz o pedido numa lista
   de ações de um conjunto fechado (legenda maior, menor, de outra cor ou outro estilo; título; zoom aqui; reenquadrar
   em quem fala; tirar as pausas; cortar o trecho em que se fala de X; trocar o formato; abaixar a música), mostra o
   plano e pergunta com botões quando falta algo, aplica num passo só do desfazer e diz o que mudou e o que não deu. Os
   gostei e não gostei da lista entram aqui e na 14.3 como exemplos do gosto do espaço. Medir: uma lista de 30 pedidos
   comuns, com quantos saem certos.
+  **Pronta (31/10/2026):** 29 de 30 pedidos certos; o gosto do espaço entra na busca dos cortes, como exemplos e num
+  ajuste pequeno da nota. No pedido de edição, que não escolhe cortes, os gostei e não gostei não têm o que mudar.
 
-- [ ] **14.11 Biblioteca de legendas animadas e ganchos.** O motor da decisão 8 e uma biblioteca desenhada aqui, no
+- [x] **14.11 Biblioteca de legendas animadas e ganchos.** O motor da decisão 8 e uma biblioteca desenhada aqui, no
   estilo dos pacotes de legenda para redes (só a ideia, sem copiar nenhum): umas 40 legendas animadas (editorial com
   tamanhos e fontes misturados, ênfase gigante, serifada itálica de apoio, palavra por palavra com pulo, karaokê em
   caixa, caixas de cor atrás das palavras, digitação com cursor, número contando, linhas desencontradas, empilhada,
@@ -181,6 +188,9 @@ Cada parte termina testada no navegador (e no Nitro, onde há modelo), com o que
   As cores vêm do kit de marca. Cada estilo tem a miniatura tocando no painel, como as animações. Medir: prévia e
   exportação no Chrome a menos de 4 níveis em 255 no meio das animações das palavras, e o tempo de gravar a trilha de um
   corte de 60 s no Nitro.
+  **Pronta (31/10/2026):** 42 legendas animadas (receitas em `core/legendas/estilos.json`) e 16 ganchos de abertura,
+  12 deles usáveis como abertura do modelo de corte. Os emojis ficaram com a 14.8 (valem com qualquer estilo). Medido:
+  a trilha Karaokê de 56 s em 170 s; prévia e exportação a 1,8–2,4 níveis em 255 na faixa da legenda.
 
 - [x] **14.12 O modelo de edição de pregação.** O dono mandou um "antes e depois" de 18,5 s de um corte de pregação
   editado à mão (analisado quadro a quadro em 27/10/2026): o pregador mais perto e com a cor fria de cinema, a legenda
