@@ -1,0 +1,12 @@
+// Porta de entrada pública do TakeOne (veja docs/publicar.md). Publicar: npx wrangler deploy, nesta pasta.
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "takeone",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  // O serviço VPC "takeone-site": o contêiner web:3000, pelo túnel "takeone" que roda no Nitro
+  "vpc_services": [{ "binding": "SITE", "service_id": "01a19364-1d9b-7670-8bc1-5c428b28190a", "remote": true }]
+}
