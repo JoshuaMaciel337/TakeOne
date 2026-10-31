@@ -75,6 +75,8 @@ JWT_ALGORITMO = "HS256"
 SESSAO_DIAS = int(os.environ.get("SESSAO_DIAS", "7"))
 COOKIE_NOME = "takeone_sessao"
 COOKIE_SEGURO = os.environ.get("COOKIE_SEGURO", "false").lower() == "true"
+# Com o site aberto na internet, só cria conta quem tem um convite (apps/worker/convites.py)
+CADASTRO_SO_COM_CONVITE = os.environ.get("CADASTRO_SO_COM_CONVITE", "false").lower() == "true"
 
 # Limite de tentativas de login por IP + e-mail
 MAX_TENTATIVAS_LOGIN = 5

@@ -16,6 +16,8 @@ x-ambiente-python: &ambiente-python
   DATABASE_NAME: ${DATABASE_NAME:-takeone}
   PASTA_ARMAZENAMENTO: /dados/armazenamento
   TZ: America/Sao_Paulo
+  # O endereço público (docs/publicar.md), para os links dos convites
+  SITE_PUBLICO: ${SITE_PUBLICO:-}
 
 services:
   mongo:
@@ -42,6 +44,7 @@ services:
       JWT_SEGREDO: ${JWT_SEGREDO:?Defina JWT_SEGREDO no arquivo .env}
       SESSAO_DIAS: ${SESSAO_DIAS:-7}
       COOKIE_SEGURO: ${COOKIE_SEGURO:-false}
+      CADASTRO_SO_COM_CONVITE: ${CADASTRO_SO_COM_CONVITE:-false}
       MODO_IA: ${MODO_IA:-simulado}
       UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-20}
       ESPACO_MINIMO_LIVRE_GB: ${ESPACO_MINIMO_LIVRE_GB:-2}

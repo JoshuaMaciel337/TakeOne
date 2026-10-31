@@ -32,6 +32,8 @@ class CadastroEntrada(BaseModel):
     senha: str = Field(min_length=8, max_length=128)
     nome_organizacao: str | None = Field(default=None, max_length=80,
                                          description="Nome do espaço. Vazio: 'Espaço de <primeiro nome>'")
+    convite: str | None = Field(default=None, max_length=40,
+                                description="O código do convite, quando o cadastro é só com convite")
 
     @field_validator("nome", "nome_organizacao", mode="before")
     @classmethod

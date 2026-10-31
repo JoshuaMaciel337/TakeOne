@@ -31,6 +31,9 @@ INDICES = {
         ([("ativa", 1), ("tipo", 1), ("proxima_verificacao", 1)], {}),
         ([("organizacao_id", 1)], {}),
     ],
+    "convites": [
+        ([("hash", 1)], {"unique": True}),
+    ],
     "chaves_de_acesso": [
         ([("hash", 1)], {"unique": True}),
         ([("usuario_id", 1)], {}),

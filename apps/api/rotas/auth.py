@@ -26,7 +26,9 @@ from api.seguranca import (
     precisa_novo_hash,
     verificar_senha,
 )
+from core import config
 from core.config import COOKIE_NOME, COOKIE_SEGURO, SESSAO_DIAS
+from core.utils import convites
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -89,13 +91,47 @@ async def criar_organizacao(db, nome: str):
 # -----------------------------------------------
 # ROTAS
 # -----------------------------------------------
+@router.get("/cadastro")
+async def como_cadastrar():
+    """A tela de cadastro pergunta se precisa do campo do convite."""
+    return {"so_com_convite": config.CADASTRO_SO_COM_CONVITE}
+
+
+async def gastar_convite(db, codigo: str | None, request: Request):
+    """Gasta um uso do convite, ou recusa. Devolve o _id do convite (None quando o cadastro é aberto)."""
+    if not config.CADASTRO_SO_COM_CONVITE:
+        return None
+    chave = f"{ip_do_cliente(request)}|convite"
+    if limitador.bloqueado(chave):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            "Muitas tentativas. Aguarde alguns minutos e tente de novo.")
+    if not codigo or not codigo.strip():
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "O cadastro é só com convite. Peça um código a quem te chamou.")
+    convite = await db.convites.find_one_and_update(convites.filtro_valido(codigo), {"$inc": {"usos": 1}})
+    if convite is None:
+        limitador.registrar_falha(chave)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Convite inválido, vencido ou já usado.")
+    return convite["_id"]
+
+
+async def devolver_convite(db, convite_id):
+    """O cadastro não foi até o fim: o uso volta para o convite."""
+    if convite_id is not None:
+        await db.convites.update_one({"_id": convite_id}, {"$inc": {"usos": -1}})
+
+
 @router.post("/cadastro", response_model=SessaoSaida, status_code=status.HTTP_201_CREATED)
-async def cadastrar(dados: CadastroEntrada, resposta: Response, db=Depends(obter_db)):
+async def cadastrar(dados: CadastroEntrada, request: Request, resposta: Response, db=Depends(obter_db)):
     email = dados.email.lower().strip()
     if await db.usuarios.find_one({"email": email}, {"_id": 1}):
         raise HTTPException(status.HTTP_409_CONFLICT, "Este e-mail já tem cadastro. Entre com sua senha.")
 
-    organizacao_id, slug = await criar_organizacao(db, nome_do_espaco(dados))
+    convite_id = await gastar_convite(db, dados.convite, request)
+    try:
+        organizacao_id, slug = await criar_organizacao(db, nome_do_espaco(dados))
+    except HTTPException:
+        await devolver_convite(db, convite_id)
+        raise
     momento = agora()
     usuario = {
         "nome": dados.nome,
@@ -111,9 +147,13 @@ async def cadastrar(dados: CadastroEntrada, resposta: Response, db=Depends(obter
         usuario["_id"] = (await db.usuarios.insert_one(usuario)).inserted_id
     except DuplicateKeyError as e:
         await db.organizacoes.delete_one({"_id": organizacao_id})
+        await devolver_convite(db, convite_id)
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "Este e-mail já tem cadastro. Entre com sua senha.") from e
 
+    if convite_id is not None:
+        await db.convites.update_one({"_id": convite_id}, {"$push": {"contas": usuario["_id"]}})
+        await db.usuarios.update_one({"_id": usuario["_id"]}, {"$set": {"convite_id": convite_id}})
     definir_cookie(resposta, criar_token(str(usuario["_id"]), str(organizacao_id)))
     logging.info(f"[{slug}] Novo espaço cadastrado.")
     return await montar_sessao(db, usuario)

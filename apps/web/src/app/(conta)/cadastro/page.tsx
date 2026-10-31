@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { CampoTexto } from "@/componentes/CampoTexto";
@@ -13,6 +13,14 @@ export default function PaginaCadastro() {
   const router = useRouter();
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Com o site aberto na internet, o cadastro pede um convite (o link traz o código: /cadastro?convite=...)
+  const [convite, setConvite] = useState<{ pedido: boolean; codigo: string }>({ pedido: false, codigo: "" });
+
+  useEffect(() => {
+    chamarApi<{ so_com_convite: boolean }>("/auth/cadastro")
+      .then((r) => setConvite({ pedido: r.so_com_convite, codigo: new URLSearchParams(window.location.search).get("convite") ?? "" }))
+      .catch(() => undefined);
+  }, []);
 
   async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -27,6 +35,7 @@ export default function PaginaCadastro() {
           email: dados.get("email"),
           senha: dados.get("senha"),
           nome_organizacao: dados.get("nome_organizacao") || null,
+          convite: dados.get("convite") || null,
         },
       });
       router.replace("/app");
@@ -58,6 +67,17 @@ export default function PaginaCadastro() {
           autoComplete="organization"
           dica="Seu canal, produtora ou empresa."
         />
+        {convite.pedido ? (
+          <CampoTexto
+            key={convite.codigo}
+            rotulo="Código do convite"
+            name="convite"
+            autoComplete="off"
+            defaultValue={convite.codigo}
+            dica="Por enquanto o TakeOne está aberto só para convidados."
+            required
+          />
+        ) : null}
         {erro ? <AvisoErro>{erro}</AvisoErro> : null}
         <button type="submit" className="botao-principal mt-2 w-full" disabled={enviando}>
           {enviando ? "Criando conta..." : "Criar conta"}
