@@ -21,6 +21,8 @@ INDICES = {
     ],
     "organizacoes": [
         ([("slug", 1)], {"unique": True}),
+        # O link de convite da equipe procura o espaço pelo hash do token
+        ([("convite_membros.token_hash", 1)], {"sparse": True}),
     ],
     # As automações do Clipar (14.9): o laço reserva pela próxima volta
     "esteiras": [
@@ -85,6 +87,11 @@ INDICES = {
     ],
     "batidas": [
         ([("midia_id", 1)], {"unique": True}),
+    ],
+    # Membros de um espaço que não é o próprio (colaboração)
+    "membros": [
+        ([("organizacao_id", 1), ("usuario_id", 1)], {"unique": True}),
+        ([("usuario_id", 1), ("criado_em", 1)], {}),
     ],
     "exportacoes": [
         ([("organizacao_id", 1), ("projeto_id", 1), ("criado_em", -1)], {}),

@@ -475,7 +475,7 @@ Cada fase termina com algo que dá para usar e testar.
 - Servidor MCP, para agentes editarem pelos comandos.
 - Publicar direto no YouTube, TikTok e Instagram.
 - [x] Links de aprovação (do HolyCut), com as anotações nos instantes do vídeo virando marcadores.
-- Colaboração: mais de uma pessoa no mesmo espaço.
+- [x] Colaboração: o dono chama pelo link, a conta trabalha em vários espaços e troca pelo menu (Equipe).
 
 ### Ordem combinada em 22/10/2026 (ondas)
 Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por seções, página inicial com as ferramentas e os projetos, página de todas as ferramentas e biblioteca de modelos com prévia) e dos editores de foto da storytold (PhotoCraft, LightCraft, figcraft), as demandas novas entram junto com os lotes que faltam das 42 funções:

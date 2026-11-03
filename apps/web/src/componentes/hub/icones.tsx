@@ -17,11 +17,11 @@ import {
   House,
   Image as ImageIcon,
   ImagePlus,
-  KeyRound,
   Images,
+  ImageUp,
+  KeyRound,
   LayoutGrid,
   LayoutTemplate,
-  type LucideIcon,
   Mic,
   Palette,
   Pipette,
@@ -34,9 +34,10 @@ import {
   Sparkles,
   Stamp,
   Type,
+  type LucideIcon,
+  Users,
   Volume1,
   WandSparkles,
-  ImageUp,
 } from "lucide-react";
 import { createElement } from "react";
 
@@ -76,6 +77,7 @@ const ICONES: Record<string, LucideIcon> = {
   midias: Images,
   exportados: Download,
   assistentes: KeyRound,
+  equipe: Users,
   agenda: CalendarDays,
   desempenho: ChartColumn,
   redes: AtSign,

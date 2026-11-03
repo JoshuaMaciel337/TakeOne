@@ -25,6 +25,7 @@ from api.rotas import (
     direcoes,
     efeitos_sonoros,
     elementos,
+    espacos,
     eventos,
     exportacoes,
     fontes,
@@ -143,6 +144,7 @@ async def tratar_erro_validacao(_request: Request, exc: RequestValidationError):
 # -----------------------------------------------
 app.include_router(sistema.router)
 app.include_router(auth.router)
+app.include_router(espacos.router)
 app.include_router(jobs.router)
 app.include_router(eventos.router)
 app.include_router(uploads.router)

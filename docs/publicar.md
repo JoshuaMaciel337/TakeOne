@@ -47,6 +47,11 @@ docker compose exec worker-cpu python worker/convites.py --agora --revogar ABC
 
 Revogar recebe as três primeiras letras do código (as que a lista mostra). Quem já criou a conta continua entrando.
 
+## Equipe de um testador
+
+Quem já tem conta chama outras pessoas para o próprio espaço em Conectar › Equipe (um link de 7 dias). Esse link não
+cria contas: quem ainda não tem conta precisa antes de um convite seu.
+
 ## Atualizar o Worker
 
 Dentro de `infra/cloudflare/`, com o wrangler logado na conta (`npx wrangler login`):

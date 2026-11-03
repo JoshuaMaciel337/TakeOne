@@ -20,6 +20,11 @@ export type Sessao = {
   organizacao: Organizacao;
 };
 
+/** Um espaço em que a pessoa trabalha: o próprio (dono) ou um de que é membro. */
+export type Espaco = { id: string; nome: string; papel: "dono" | "membro"; atual: boolean };
+
+export type MembroDoEspaco = { id: string; nome: string; email: string; papel: "dono" | "membro"; desde: string };
+
 export type StatusJob = "pendente" | "executando" | "concluido" | "erro";
 
 export type Job = {

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { BotaoTema } from "@/componentes/BotaoTema";
+import { TrocaDeEspaco } from "@/componentes/hub/TrocaDeEspaco";
 import { Logo } from "@/componentes/Logo";
 import { itemAtivo, type ItemDoMenu, SECOES_DO_MENU } from "@/lib/hub";
 import { useSessao } from "@/lib/sessao";
@@ -63,7 +64,7 @@ function Hub({ children }: { children: React.ReactNode }) {
 }
 
 function MenuLateral({ caminho, aoFechar }: { caminho: string; aoFechar: () => void }) {
-  const { sessao, sair } = useSessao();
+  const { sair } = useSessao();
   const abrirNoEditor = useAbrirNoEditor();
   const ativo = itemAtivo(caminho);
 
@@ -133,10 +134,7 @@ function MenuLateral({ caminho, aoFechar }: { caminho: string; aoFechar: () => v
         ))}
       </nav>
       <div className="flex shrink-0 items-center gap-2 border-t border-borda p-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{sessao.usuario.nome}</p>
-          <p className="truncate text-xs text-suave">{sessao.organizacao.nome}</p>
-        </div>
+        <TrocaDeEspaco aoNavegar={aoFechar} />
         <BotaoTema />
         <button type="button" onClick={() => void sair()} className="botao-icone" aria-label="Sair" title="Sair">
           <LogOut className="size-4" aria-hidden />

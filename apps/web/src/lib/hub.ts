@@ -294,7 +294,13 @@ export const SECOES_DO_MENU: { titulo: string | null; itens: ItemDoMenu[] }[] = 
       { nome: "Exportados", href: "/app/exportados", icone: "exportados" },
     ],
   },
-  { titulo: "Conectar", itens: [{ nome: "Assistentes", href: "/app/assistentes", icone: "assistentes" }] },
+  {
+    titulo: "Conectar",
+    itens: [
+      { nome: "Equipe", href: "/app/equipe", icone: "equipe" },
+      { nome: "Assistentes", href: "/app/assistentes", icone: "assistentes" },
+    ],
+  },
   {
     titulo: "Publicar",
     itens: [

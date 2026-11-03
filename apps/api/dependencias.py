@@ -10,10 +10,29 @@ from fastapi import Depends, HTTPException, Request, status
 from api.seguranca import ler_token
 from core.config import COOKIE_NOME, TZ
 from core.modelos.chave import PREFIXO, hash_da_chave
+from core.modelos.espaco import PAPEL_MEMBRO
 
 
 def obter_db(request: Request):
     return request.app.state.db
+
+
+async def no_espaco(db, usuario: dict, organizacao_id) -> dict | None:
+    """O usuário trabalhando no espaço pedido: o próprio (como dono) ou um de que é membro. None se não é mais."""
+    if organizacao_id is None or organizacao_id == usuario["organizacao_id"]:
+        return usuario
+    membro = await db.membros.find_one({"organizacao_id": organizacao_id, "usuario_id": usuario["_id"]})
+    if membro is None:
+        return None
+    return {**usuario, "organizacao_id": organizacao_id, "papel": membro.get("papel", PAPEL_MEMBRO),
+            "espaco_proprio": usuario["organizacao_id"]}
+
+
+def _objectid(valor) -> ObjectId | None:
+    try:
+        return ObjectId(valor) if valor else None
+    except (InvalidId, TypeError):
+        return None
 
 
 async def _usuario_da_chave(db, chave: str) -> dict:
@@ -31,7 +50,11 @@ async def _usuario_da_chave(db, chave: str) -> dict:
     # O último uso, no máximo uma vez por minuto (cada pedido gravaria no banco)
     if not doc.get("usado_em") or agora - doc["usado_em"] > timedelta(minutes=1):
         await db.chaves_de_acesso.update_one({"_id": doc["_id"]}, {"$set": {"usado_em": agora}})
-    return {**usuario, "_pela_chave": True}
+    # A chave vale no espaço em que foi criada; num espaço de que a pessoa saiu, não vale mais
+    no_da_chave = await no_espaco(db, usuario, doc.get("organizacao_id"))
+    if no_da_chave is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "A chave é de um espaço de que você não faz mais parte.")
+    return {**no_da_chave, "_pela_chave": True}
 
 
 async def usuario_atual(request: Request, db=Depends(obter_db)) -> dict:
@@ -53,4 +76,5 @@ async def usuario_atual(request: Request, db=Depends(obter_db)) -> dict:
     usuario = await db.usuarios.find_one({"_id": usuario_id})
     if not usuario or not usuario.get("ativo", True):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sessão inválida. Entre de novo.")
-    return usuario
+    # O espaço da sessão vai no token; quem saiu (ou foi tirado) de um espaço volta ao próprio
+    return await no_espaco(db, usuario, _objectid(dados.get("org"))) or usuario
