@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { useEventosJobs } from "@/lib/eventos";
 import type { FormatoExportacao } from "@/lib/exportacao/formatos";
-import type { Exportacao } from "@/lib/tipos";
+import type { Aprovacao, Exportacao } from "@/lib/tipos";
+
+// Enquanto alguém ainda vai responder um pedido de aprovação, a lista confere de tempos em tempos
+const INTERVALO_DA_APROVACAO_MS = 15000;
 
 export type PedidoDeExportacao = {
   resolucao: "720p" | "1080p" | "4k";
@@ -42,6 +45,13 @@ export function useExportacoes(projetoId: string, ativo: boolean) {
     if (ativo) void recarregar();
   }, [ativo, recarregar]);
 
+  const esperandoResposta = exportacoes?.some((e) => e.aprovacao?.status === "pendente" && !e.aprovacao.expirada) ?? false;
+  useEffect(() => {
+    if (!ativo || !esperandoResposta) return;
+    const intervalo = setInterval(() => void recarregar(), INTERVALO_DA_APROVACAO_MS);
+    return () => clearInterval(intervalo);
+  }, [ativo, esperandoResposta, recarregar]);
+
   useEventosJobs((job) => {
     if (job.tipo !== "renderizacao") return;
     const exportacaoId = String(job.entrada.exportacao_id ?? "");
@@ -72,5 +82,9 @@ export function useExportacoes(projetoId: string, ativo: boolean) {
     setExportacoes((lista) => lista?.filter((exportacao) => exportacao.id !== exportacaoId) ?? lista);
   }, []);
 
-  return { exportacoes, erro, exportar, excluir };
+  const mudarAprovacao = useCallback((exportacaoId: string, aprovacao: Aprovacao | null) => {
+    setExportacoes((lista) => lista?.map((exportacao) => (exportacao.id === exportacaoId ? { ...exportacao, aprovacao } : exportacao)) ?? lista);
+  }, []);
+
+  return { exportacoes, erro, exportar, excluir, mudarAprovacao };
 }

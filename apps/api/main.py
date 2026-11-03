@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.rotas import (
     animacoes,
+    aprovar,
     auth,
     automacoes,
     celular,
@@ -150,6 +151,7 @@ app.include_router(projetos.router)
 app.include_router(modelos.router)
 app.include_router(exportacoes.router)
 app.include_router(celular.router)
+app.include_router(aprovar.router)
 app.include_router(textos.router)
 app.include_router(som.router)
 app.include_router(animacoes.router)

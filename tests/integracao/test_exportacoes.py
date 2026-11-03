@@ -126,6 +126,59 @@ def test_baixar_e_link_do_celular(cliente, db_limpo):
     assert not arquivo.exists()
 
 
+def test_link_de_aprovacao_com_anotacoes(cliente, db_limpo):
+    cadastrar(cliente)
+    projeto = projeto_com(cliente, criar_midia(db_limpo, cliente))
+    exportacao = cliente.post("/api/exportacoes", json={"projeto_id": projeto["id"]}).json()
+    assert cliente.post(f"/api/exportacoes/{exportacao['id']}/aprovacao", json={}).status_code == 409
+
+    doc = db_limpo.exportacoes.find_one({"_id": ObjectId(exportacao["id"])})
+    arquivo = storage.caminho_local(chave_exportacao(doc["organizacao_id"], doc["_id"], ARQUIVO_VIDEO))
+    arquivo.parent.mkdir(parents=True, exist_ok=True)
+    arquivo.write_bytes(b"0123456789" * 10)
+    db_limpo.exportacoes.update_one({"_id": doc["_id"]},
+                                    {"$set": {"status": "pronta", "arquivos": [ARQUIVO_VIDEO], "duracao": 2.0}})
+
+    pedido = cliente.post(f"/api/exportacoes/{exportacao['id']}/aprovacao", json={"para": "Ana"})
+    assert pedido.status_code == 201
+    token = pedido.json()["token"]
+    assert db_limpo.exportacoes.find_one({"_id": doc["_id"]})["aprovacao"]["token_hash"] != token
+
+    # Quem aprova não tem conta
+    sessao = dict(cliente.cookies)
+    cliente.cookies.clear()
+    publico = cliente.get(f"/api/aprovar/{token}").json()
+    assert (publico["nome"], publico["aprovacao"]["para"], publico["duracao"]) == ("Lançamento", "Ana", 2.0)
+    assert "token_hash" not in str(publico) and "projeto" not in publico
+    parte = cliente.get(f"/api/aprovar/{token}/arquivo", headers={"Range": "bytes=10-19"})
+    assert parte.status_code == 206 and parte.content == b"0123456789"
+    assert cliente.get("/api/aprovar/token-inventado").status_code == 404
+
+    base = f"/api/aprovar/{token}"
+    assert cliente.post(f"{base}/anotacoes", json={"tempo": 5, "texto": "fora", "nome": "Ana"}).status_code == 422
+    cliente.post(f"{base}/anotacoes", json={"tempo": 1.5, "texto": "Trocar o título", "nome": "Ana"})
+    anotado = cliente.post(f"{base}/anotacoes", json={"tempo": 0.5, "texto": "Som baixo", "nome": "Ana"}).json()
+    anotacoes = anotado["aprovacao"]["anotacoes"]
+    assert [a["texto"] for a in anotacoes] == ["Som baixo", "Trocar o título"], "em ordem de tempo"
+    tirado = cliente.delete(f"{base}/anotacoes/{anotacoes[0]['id']}").json()
+    assert [a["texto"] for a in tirado["aprovacao"]["anotacoes"]] == ["Trocar o título"]
+
+    respondido = cliente.post(base, json={"decisao": "ajustes", "nome": "Ana", "comentario": ""})
+    assert respondido.status_code == 200 and respondido.json()["aprovacao"]["status"] == "ajustes"
+    assert cliente.post(base, json={"decisao": "aprovado", "nome": "Ana"}).status_code == 409
+    assert cliente.post(f"{base}/anotacoes", json={"tempo": 1, "texto": "x", "nome": "Ana"}).status_code == 409
+
+    # Quem editou vê a resposta e as anotações; pedir de novo troca o link e começa do zero
+    cliente.cookies.update(sessao)
+    visto = cliente.get(f"/api/exportacoes/{exportacao['id']}").json()["aprovacao"]
+    assert (visto["status"], visto["respondido_por"], len(visto["anotacoes"])) == ("ajustes", "Ana", 1)
+    novo = cliente.post(f"/api/exportacoes/{exportacao['id']}/aprovacao", json={}).json()
+    assert novo["aprovacao"]["status"] == "pendente" and novo["aprovacao"]["anotacoes"] == []
+    assert cliente.get(base).status_code == 404
+    assert cliente.delete(f"/api/exportacoes/{exportacao['id']}/aprovacao").status_code == 204
+    assert cliente.get(f"/api/aprovar/{novo['token']}").status_code == 404
+
+
 def test_exportacao_de_outro_espaco_nao_aparece(cliente, db_limpo):
     cadastrar(cliente)
     projeto = projeto_com(cliente, criar_midia(db_limpo, cliente))

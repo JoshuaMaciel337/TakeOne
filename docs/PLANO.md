@@ -474,7 +474,8 @@ Cada fase termina com algo que dá para usar e testar.
 - [x] Expressões nos keyframes: repetir em ciclo ou vaivém (`loopOut`) e tremer (`wiggle`), escritas aqui, na prévia e no render.
 - Servidor MCP, para agentes editarem pelos comandos.
 - Publicar direto no YouTube, TikTok e Instagram.
-- Colaboração e links de aprovação (do HolyCut).
+- [x] Links de aprovação (do HolyCut), com as anotações nos instantes do vídeo virando marcadores.
+- Colaboração: mais de uma pessoa no mesmo espaço.
 
 ### Ordem combinada em 22/10/2026 (ondas)
 Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por seções, página inicial com as ferramentas e os projetos, página de todas as ferramentas e biblioteca de modelos com prévia) e dos editores de foto da storytold (PhotoCraft, LightCraft, figcraft), as demandas novas entram junto com os lotes que faltam das 42 funções:
@@ -543,7 +544,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [ ] Onda 12, os editores com o layout dos programas profissionais ([ADR 0002](decisoes/0002-layout-dos-editores.md)): quem vem do editor de imagem e do editor de vídeo mais usados acha cada coisa onde está acostumado, com os mesmos nomes; as funções só do TakeOne entram no lugar mais parecido.
   - [x] 12.1 Fundação: barra de menus, grupos de painéis com abas, áreas de trabalho guardadas e barra de status.
   - [x] 12.2 Editor de imagem: layout "Essenciais", ferramentas, barra de opções, Camadas, Propriedades e Ajustes, Histórico, Cor e Amostras.
-  - [ ] Depois da 12.2, no editor de imagem: escrever direto na tela com a ferramenta Texto (hoje o texto nasce com "Texto" e muda na aba Texto), as formigas andando em volta da seleção (hoje uma área cinza) e Selecionar > Tudo e Inverter.
+  - [x] Depois da 12.2, no editor de imagem: escrever direto na tela com a ferramenta Texto (hoje o texto nasce com "Texto" e muda na aba Texto), as formigas andando em volta da seleção (hoje uma área cinza) e Selecionar > Tudo e Inverter.
   - [x] 12.3 Editor de vídeo: layout "Edição", Projeto, Efeitos, Texto, Gráficos essenciais, monitor Programa, cabeçalhos da linha do tempo e medidores.
   - [x] 12.4 Controles de efeito com os keyframes, Cor nas seções do painel de cor e Som essencial.
   - [x] 12.5 Ferramentas da linha do tempo, entrada e saída com elevar e extrair, e os atalhos.

@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_serializ
 from core.modelos.animacao_html import DURACAO_MAXIMA as DURACAO_MAXIMA_ANIMACAO
 from core.modelos.animacao_html import DURACAO_MINIMA as DURACAO_MINIMA_ANIMACAO
 from core.modelos.animacao_html import MODELOS as MODELOS_DE_ANIMACAO
+from core.modelos.aprovacao import LETRAS_DO_NOME, LETRAS_DO_TEXTO, expirada
 from core.modelos.cortes import parecidos
 from core.modelos.exportacao import ARQUIVOS_PUBLICOS as ARQUIVOS_EXPORTACAO
 from core.modelos.exportacao import STATUS_ERRO as STATUS_EXPORTACAO_ERRO
@@ -2403,6 +2404,64 @@ class ExportacaoCriarEntrada(BaseModel):
         return self
 
 
+class AnotacaoSaida(BaseModel):
+    id: str
+    tempo: float = Field(description="Segundos do vídeo exportado")
+    texto: str
+    nome: str
+    criado_em: datetime
+
+
+class AprovacaoSaida(BaseModel):
+    status: Literal["pendente", "aprovado", "ajustes"]
+    para: str = ""
+    pedido_em: datetime
+    expira_em: datetime
+    expirada: bool = False
+    anotacoes: list[AnotacaoSaida] = []
+    respondido_por: str | None = None
+    comentario: str | None = None
+    respondido_em: datetime | None = None
+
+
+class AprovacaoCriarEntrada(BaseModel):
+    para: str = Field(default="", max_length=LETRAS_DO_NOME, description="Quem vai aprovar, ex.: Ana, da loja")
+
+
+class AprovacaoCriadaSaida(BaseModel):
+    token: str = Field(description="Vai no link /aprovar/{token}. Só aparece nesta resposta.")
+    aprovacao: AprovacaoSaida
+
+
+class AprovacaoPublicaSaida(BaseModel):
+    """O que quem aprova vê pelo link, sem conta."""
+    espaco: str
+    nome: str
+    formato: str = "mp4"
+    largura: int
+    altura: int
+    duracao: float | None = None
+    aprovacao: AprovacaoSaida
+
+
+class AprovacaoRespostaEntrada(BaseModel):
+    decisao: Literal["aprovado", "ajustes"]
+    nome: str = Field(min_length=1, max_length=LETRAS_DO_NOME)
+    comentario: str = Field(default="", max_length=LETRAS_DO_TEXTO)
+
+
+class AnotacaoEntrada(BaseModel):
+    tempo: float = Field(ge=0, le=6 * 3600)
+    texto: str = Field(min_length=1, max_length=LETRAS_DO_TEXTO)
+    nome: str = Field(min_length=1, max_length=LETRAS_DO_NOME)
+
+
+def aprovacao_para_saida(aprovacao: dict | None) -> AprovacaoSaida | None:
+    if not aprovacao:
+        return None
+    return AprovacaoSaida.model_validate({**aprovacao, "expirada": expirada(aprovacao)})
+
+
 class ExportacaoSaida(BaseModel):
     id: str
     projeto_id: str
@@ -2419,6 +2478,7 @@ class ExportacaoSaida(BaseModel):
     duracao: float | None = None
     erro: str | None = None
     processamento: ProcessamentoSaida | None = None
+    aprovacao: AprovacaoSaida | None = None
     criado_em: datetime
     concluido_em: datetime | None = None
 
@@ -2951,4 +3011,5 @@ def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida
         "erro": erro,
         "arquivos": [nome for nome in doc.get("arquivos", []) if nome in ARQUIVOS_EXPORTACAO],
         "processamento": processamento,
+        "aprovacao": aprovacao_para_saida(doc.get("aprovacao")),
     })

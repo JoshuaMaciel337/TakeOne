@@ -14,7 +14,16 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
-from api.esquemas import ExportacaoCriarEntrada, ExportacaoSaida, LinkCelularSaida, exportacao_para_saida
+from api.esquemas import (
+    AprovacaoCriadaSaida,
+    AprovacaoCriarEntrada,
+    ExportacaoCriarEntrada,
+    ExportacaoSaida,
+    LinkCelularSaida,
+    aprovacao_para_saida,
+    exportacao_para_saida,
+)
+from core.modelos.aprovacao import montar_aprovacao
 from core.modelos.exportacao import (
     ARQUIVOS_PUBLICOS,
     GIF_MAXIMO_S,
@@ -169,3 +178,25 @@ async def criar_link_celular(exportacao_id: str, usuario=Depends(usuario_atual),
     token, link = montar_link_celular()
     await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"link_celular": link}})
     return LinkCelularSaida(caminho=f"/api/baixar/{token}", expira_em=link["expira_em"])
+
+
+@router.post("/{exportacao_id}/aprovacao", response_model=AprovacaoCriadaSaida, status_code=status.HTTP_201_CREATED)
+async def pedir_aprovacao(exportacao_id: str, dados: AprovacaoCriarEntrada | None = None,
+                          usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Um link de 7 dias para o cliente assistir e aprovar sem conta. Pedir de novo troca o link: o anterior deixa
+    de valer, e a resposta e as anotações do pedido anterior saem junto."""
+    exportacao = await buscar_exportacao(db, exportacao_id, usuario)
+    if exportacao["status"] != STATUS_PRONTA or arquivo_do_formato(exportacao.get("formato")) not in exportacao.get(
+            "arquivos", []):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Espere o arquivo ficar pronto para pedir a aprovação.")
+    token, aprovacao = montar_aprovacao(usuario["_id"], (dados or AprovacaoCriarEntrada()).para)
+    await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$set": {"aprovacao": aprovacao}})
+    logging.info(f"[{usuario['organizacao_id']}] Aprovação pedida: {exportacao['nome']}")
+    return AprovacaoCriadaSaida(token=token, aprovacao=aprovacao_para_saida(aprovacao))
+
+
+@router.delete("/{exportacao_id}/aprovacao", status_code=status.HTTP_204_NO_CONTENT)
+async def cancelar_aprovacao(exportacao_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Tira o pedido (e a resposta, se houver): o link deixa de valer."""
+    exportacao = await buscar_exportacao(db, exportacao_id, usuario)
+    await db.exportacoes.update_one({"_id": exportacao["_id"]}, {"$unset": {"aprovacao": ""}})

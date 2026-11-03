@@ -10,6 +10,8 @@ import {
   adicionarMarcador,
   ajustarAudio,
   apagarMarcador,
+  COR_DAS_ANOTACOES,
+  marcarAnotacoes,
   mudarMarcador,
   ajustarMusicaAoVideo,
   animarClipes,
@@ -1280,6 +1282,23 @@ test("marcadores: pôr no quadro do cursor, mudar, apagar e virar capítulos", (
   projeto = apagarMarcador(projeto, um.id);
   assert.equal(projeto.marcadores?.length, 1);
   assert.throws(() => mudarMarcador(projeto, um.id, { nome: "x" }), ErroEdicao);
+});
+
+test("as anotações de uma aprovação viram marcadores amarelos, num quadro que já tinha marcador também", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  projeto = adicionarMarcador(projeto, ctx, 2 * S).projeto;
+  const { projeto: marcado, fora } = marcarAnotacoes(projeto, ctx, [
+    { tempo: 2 * S + 5, texto: "Trocar   o título", nome: "Ana" },
+    { tempo: 5 * S, texto: "Som baixo" },
+  ]);
+  assert.equal(fora, 0);
+  assert.deepEqual(marcado.marcadores?.map((m) => [m.t, m.nome, m.cor]), [
+    [2 * S, "Ana: Trocar o título", COR_DAS_ANOTACOES],
+    [5 * S, "Som baixo", COR_DAS_ANOTACOES],
+  ]);
+  const cheio = { ...projeto, marcadores: Array.from({ length: 200 }, (_, i) => ({ id: `m${i}`, t: i * S, nome: "x", cor: "#ff624a" })) };
+  assert.throws(() => marcarAnotacoes(cheio, ctx, [{ tempo: 300 * S, texto: "a" }]), ErroEdicao);
 });
 
 test("ondulação, esticar a velocidade e elevar, como as ferramentas dos editores profissionais", () => {

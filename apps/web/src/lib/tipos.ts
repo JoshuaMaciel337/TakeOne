@@ -159,11 +159,39 @@ export type Exportacao = {
   duracao: number | null;
   erro: string | null;
   processamento: { status: StatusJob; progresso: number; mensagem: string } | null;
+  /** O pedido de aprovação pelo link, quando há um. */
+  aprovacao?: Aprovacao | null;
   criado_em: string;
   concluido_em: string | null;
 };
 
 export type LinkCelular = { caminho: string; expira_em: string };
+
+/** Uma anotação de quem aprova, no instante `tempo` (segundos do arquivo exportado). */
+export type Anotacao = { id: string; tempo: number; texto: string; nome: string; criado_em: string };
+
+export type Aprovacao = {
+  status: "pendente" | "aprovado" | "ajustes";
+  para: string;
+  pedido_em: string;
+  expira_em: string;
+  expirada: boolean;
+  anotacoes: Anotacao[];
+  respondido_por: string | null;
+  comentario: string | null;
+  respondido_em: string | null;
+};
+
+/** O que quem aprova vê pelo link, sem conta. */
+export type AprovacaoPublica = {
+  espaco: string;
+  nome: string;
+  formato: FormatoExportacao;
+  largura: number;
+  altura: number;
+  duracao: number | null;
+  aprovacao: Aprovacao;
+};
 
 export type IdiomaTranscricao = "auto" | "pt" | "en" | "es";
 

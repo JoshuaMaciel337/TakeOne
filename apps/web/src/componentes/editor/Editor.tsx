@@ -844,6 +844,10 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           salvamento={edicao.salvamento}
           tempo={tempo}
           inicial={exportandoQuadro ? "quadro" : "video"}
+          aoMarcarAnotacoes={(anotacoes) => {
+            const comando = { comando: "marcador.anotacoes", parametros: { anotacoes: anotacoes.map((a) => ({ tempo: Math.round(a.tempo * TICKS_POR_SEGUNDO), texto: a.texto, nome: a.nome })) } } as const;
+            if (executar(comando)) mostrarAviso(`${anotacoes.length} anotaç${anotacoes.length === 1 ? "ão virou marcador" : "ões viraram marcadores"} na régua. Ctrl+Z desfaz.`);
+          }}
           aoFechar={() => {
             setExportando(false);
             setExportandoQuadro(false);

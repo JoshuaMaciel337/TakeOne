@@ -88,6 +88,7 @@ import {
   adicionarMarcador,
   ajustarMusicaAoVideo,
   apagarMarcador,
+  marcarAnotacoes,
   mudarMarcador,
   congelarQuadro,
   inverterClipes,
@@ -242,6 +243,7 @@ export type Comando =
   | { comando: "marcador.adicionar"; parametros: { tempo: Tick } }
   | { comando: "marcador.mudar"; parametros: { id: string; nome?: string; cor?: string; t?: Tick } }
   | { comando: "marcador.apagar"; parametros: { id: string } }
+  | { comando: "marcador.anotacoes"; parametros: { anotacoes: { tempo: Tick; texto: string; nome?: string }[] } }
   | { comando: "clipe.devolverSom"; parametros: { clipeIds: string[] } }
   | { comando: "faixa.alternar"; parametros: { faixaId: string; propriedade: "oculta" | "muda" | "travada" } }
   | { comando: "projeto.proporcao"; parametros: { proporcao: Proporcao } }
@@ -423,6 +425,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "marcador.adicionar": "pôr um marcador",
   "marcador.mudar": "mudar o marcador",
   "marcador.apagar": "apagar o marcador",
+  "marcador.anotacoes": "pôr as anotações na linha do tempo",
   "clipe.devolverSom": "devolver o som",
   "faixa.alternar": "mudar a faixa",
   "projeto.proporcao": "mudar a proporção",
@@ -686,6 +689,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
     }
     case "marcador.apagar":
       return { projeto: apagarMarcador(projeto, parametros.id) };
+    case "marcador.anotacoes":
+      return { projeto: marcarAnotacoes(projeto, ctx, parametros.anotacoes).projeto };
     case "clipe.fluido":
       return { projeto: fluidoNoClipe(projeto, ctx, parametros.clipeId, parametros.fluido) };
     case "clipe.inverter":

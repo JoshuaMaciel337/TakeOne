@@ -16,9 +16,10 @@ import {
 import { formatarBytes, formatarQuando, formatarTempo } from "@/lib/formatar";
 import { duracaoDoProjeto, type Projeto, type Proporcao, textoDosCapitulos } from "@/lib/projeto/modelo";
 import { ajustarAoQuadro, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
-import type { Exportacao, Midia } from "@/lib/tipos";
+import type { Anotacao, Aprovacao, Exportacao, Midia } from "@/lib/tipos";
 import { type PedidoDeExportacao, useExportacoes } from "@/lib/useExportacoes";
 
+import { AprovacaoDoVideo } from "./AprovacaoDoVideo";
 import { ExportarNoNavegador } from "./ExportarNoNavegador";
 import { PainelQrCelular, useLinkCelular } from "./QrDoCelular";
 import type { EstadoSalvamento } from "./useProjeto";
@@ -58,11 +59,13 @@ type Props = {
   aoFechar: () => void;
   /** A escolha que já vem marcada (o "Exportar quadro" do monitor abre em Quadro). */
   inicial?: Escolha;
+  /** As anotações de quem aprovou viram marcadores na linha do tempo. */
+  aoMarcarAnotacoes: (anotacoes: Anotacao[]) => void;
 };
 
 /** Escolher a resolução, acompanhar o render e baixar o vídeo (no computador ou no celular), ou levar a edição para outro editor. */
-export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, tempo, aoFechar, inicial = "video" }: Props) {
-  const { exportacoes, erro, exportar, excluir } = useExportacoes(projetoId, true);
+export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamento, tempo, aoFechar, inicial = "video", aoMarcarAnotacoes }: Props) {
+  const { exportacoes, erro, exportar, excluir, mudarAprovacao } = useExportacoes(projetoId, true);
   const [escolha, setEscolha] = useState<Escolha>(inicial);
   const [resolucao, setResolucao] = useState<Resolucao>("1080p");
   const [taxa, setTaxa] = useState<number | null>(null);
@@ -269,7 +272,13 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
             ) : (
               <ul className="space-y-2">
                 {exportacoes.map((exportacao) => (
-                  <ItemExportacao key={exportacao.id} exportacao={exportacao} aoExcluir={() => void excluir(exportacao.id)} />
+                  <ItemExportacao
+                    key={exportacao.id}
+                    exportacao={exportacao}
+                    aoExcluir={() => void excluir(exportacao.id)}
+                    aoMudarAprovacao={(aprovacao) => mudarAprovacao(exportacao.id, aprovacao)}
+                    aoMarcarAnotacoes={aoMarcarAnotacoes}
+                  />
                 ))}
               </ul>
             )}
@@ -280,7 +289,14 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
   );
 }
 
-function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoExcluir: () => void }) {
+type PropsDoItem = {
+  exportacao: Exportacao;
+  aoExcluir: () => void;
+  aoMudarAprovacao: (aprovacao: Aprovacao | null) => void;
+  aoMarcarAnotacoes: (anotacoes: Anotacao[]) => void;
+};
+
+function ItemExportacao({ exportacao, aoExcluir, aoMudarAprovacao, aoMarcarAnotacoes }: PropsDoItem) {
   const progresso = exportacao.processamento?.progresso ?? 0;
   const celular = useLinkCelular(exportacao.id);
   const arquivo = arquivoDaExportacao(exportacao);
@@ -325,6 +341,7 @@ function ItemExportacao({ exportacao, aoExcluir }: { exportacao: Exportacao; aoE
       ) : null}
       {celular.erro ? <p className="col-span-full text-xs text-erro">{celular.erro}</p> : null}
       {celular.link ? <PainelQrCelular link={celular.link} aoFechar={celular.fechar} /> : null}
+      {exportacao.status === "pronta" ? <AprovacaoDoVideo exportacao={exportacao} aoMudar={(aprovacao) => aoMudarAprovacao(aprovacao)} aoMarcar={aoMarcarAnotacoes} /> : null}
       {exportacao.status === "erro" && exportacao.erro ? (
         <p className="col-span-full flex items-start gap-1 text-xs text-erro">
           <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />

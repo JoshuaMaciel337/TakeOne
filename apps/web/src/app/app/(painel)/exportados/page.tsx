@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
+import { AprovacaoDoVideo } from "@/componentes/editor/AprovacaoDoVideo";
 import { TituloDaPagina } from "@/componentes/hub/TituloDaPagina";
 import { chamarApi, ErroApi } from "@/lib/api";
 import { arquivoDaExportacao, resumoDaExportacao } from "@/lib/exportacao/formatos";
@@ -38,7 +39,7 @@ export default function PaginaExportados() {
       {exportacoes && exportacoes.length ? (
         <ul className="flex flex-col divide-y divide-borda overflow-hidden rounded-xl border border-borda bg-painel-2">
           {exportacoes.map((exportacao) => (
-            <li key={exportacao.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <li key={exportacao.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{exportacao.nome}</p>
                 <p className="text-xs text-suave">
@@ -69,6 +70,14 @@ export default function PaginaExportados() {
                   Abrir o projeto
                 </Link>
               </div>
+              {exportacao.status === "pronta" ? (
+                <div className="sm:basis-full">
+                  <AprovacaoDoVideo
+                    exportacao={exportacao}
+                    aoMudar={(aprovacao) => setExportacoes((lista) => lista?.map((e) => (e.id === exportacao.id ? { ...e, aprovacao } : e)) ?? lista)}
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

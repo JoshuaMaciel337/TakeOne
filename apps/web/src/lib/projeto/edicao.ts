@@ -1196,6 +1196,32 @@ export function mudarMarcador(projeto: Projeto, id: string, mudanca: Partial<Omi
   };
 }
 
+/** A cor dos marcadores que vêm das anotações de uma aprovação (o amarelo, de "atenção"). */
+export const COR_DAS_ANOTACOES = "#ffd400";
+
+/**
+ * As anotações de quem aprovou viram marcadores nos instantes delas, com o texto como nome (um passo só). Num quadro
+ * que já tem marcador, o texto vai para ele. O que passaria do limite de marcadores fica de fora, e o número volta.
+ */
+export function marcarAnotacoes(projeto: Projeto, ctx: Contexto, anotacoes: readonly { tempo: Tick; texto: string; nome?: string }[]): { projeto: Projeto; fora: number } {
+  let atual = projeto;
+  let fora = 0;
+  for (const anotacao of anotacoes) {
+    let resultado: { projeto: Projeto; id: string };
+    try {
+      resultado = adicionarMarcador(atual, ctx, anotacao.tempo);
+    } catch (e) {
+      if (!(e instanceof ErroEdicao)) throw e;
+      fora++;
+      continue;
+    }
+    const texto = anotacao.nome ? `${anotacao.nome}: ${anotacao.texto}` : anotacao.texto;
+    atual = mudarMarcador(resultado.projeto, resultado.id, { nome: texto.replace(/\s+/g, " "), cor: COR_DAS_ANOTACOES });
+  }
+  if (fora === anotacoes.length && fora) throw new ErroEdicao(`O projeto já tem ${MARCADORES_MAXIMOS} marcadores.`);
+  return { projeto: atual, fora };
+}
+
 export function apagarMarcador(projeto: Projeto, id: string): Projeto {
   return { ...projeto, marcadores: (projeto.marcadores ?? []).filter((m) => m.id !== id) };
 }
