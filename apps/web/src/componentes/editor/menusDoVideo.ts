@@ -1,6 +1,7 @@
 // Os menus do editor de vídeo (ADR 0002), na ordem, com os nomes e com os atalhos dos editores de vídeo profissionais.
 // Os atalhos de uma tecla são atendidos pelo teclado do editor; aqui eles aparecem para quem procura.
 import type { ItemDeMenu, Menu } from "@/componentes/area/BarraDeMenus";
+import { itensDaAparencia } from "@/lib/aparencia";
 
 /** Os painéis do editor de vídeo, com o nome do menu Janela (em ordem alfabética, como lá). */
 export const PAINEIS_DO_VIDEO = {
@@ -187,6 +188,9 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
       itens: [
         { nome: "Aumentar o zoom da linha do tempo", atalho: "=", aoEscolher: () => a.zoomDaLinha(1.5) },
         { nome: "Diminuir o zoom da linha do tempo", atalho: "-", aoEscolher: () => a.zoomDaLinha(1 / 1.5) },
+        "-",
+        // O menu só existe no Takepro
+        { nome: "Aparência", itens: itensDaAparencia("takepro") },
       ],
     },
     {

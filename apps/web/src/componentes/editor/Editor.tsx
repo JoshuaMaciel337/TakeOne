@@ -8,6 +8,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useS
 import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
 import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
 import { PainelHistorico } from "@/componentes/area/PainelHistorico";
+import { BotaoAparencia, JanelaDaAparencia, useAparencia } from "@/componentes/Aparencia";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 
@@ -299,6 +300,9 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   // O layout dos programas profissionais (tela larga)
   const router = useRouter();
   const telaLarga = useTelaLarga();
+  // O Takepro precisa da tela larga; abaixo dela, e no Takecut, a tela simples
+  const { aparencia } = useAparencia();
+  const profissional = telaLarga && aparencia === "takepro";
   const area = useAreaDeTrabalho("video", AREAS, "edicao", IDS_DOS_PAINEIS);
   const [larguraEsquerdaCima, setLarguraEsquerdaCima] = useTamanhoSalvo("video-esquerda-cima", ESQUERDA_CIMA.padrao, ESQUERDA_CIMA.minimo, ESQUERDA_CIMA.maximo);
   const [larguraDireitaCima, setLarguraDireitaCima] = useTamanhoSalvo("video-direita-cima", DIREITA_CIMA.padrao, DIREITA_CIMA.minimo, DIREITA_CIMA.maximo);
@@ -339,6 +343,13 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   /** Abre (ou põe à frente) um painel, na aba pedida. */
   function abrirPainel(painel: IdPainelDoVideo, aba?: string) {
     area.abrir(painel);
+    // Na tela simples, o painel é a ferramenta que mostra o mesmo conteúdo
+    if (!profissional) {
+      const ferramentaDoPainel = (Object.entries(PAINEL_DA_FERRAMENTA) as [IdFerramenta, { painel: IdPainelDoVideo; aba?: string }][]).find(
+        ([, destino]) => destino.painel === painel && (!aba || !destino.aba || destino.aba === aba),
+      );
+      if (ferramentaDoPainel) setFerramenta(ferramentaDoPainel[0]);
+    }
     if (!aba) return;
     if (painel === "texto") setPedidoTexto((atual) => ({ aba, vez: (atual?.vez ?? 0) + 1 }));
     else if (painel === "graficos") setPedidoGraficos((atual) => ({ aba, vez: (atual?.vez ?? 0) + 1 }));
@@ -614,7 +625,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         if (reproducao.tocando) reproducao.parar();
         buscar(quadroMaisProximo(projeto.taxa, tempo) + (tecla === "l" ? 1 : -1) * quadro);
       } else reproducao.acelerar(tecla === "l" ? 1 : -1);
-    } else if (telaLarga && !ctrl && !evento.altKey && FERRAMENTAS_DA_LINHA.some((item) => item.tecla.toLowerCase() === (evento.shiftKey ? `shift+${tecla}` : tecla))) {
+    } else if (profissional && !ctrl && !evento.altKey && FERRAMENTAS_DA_LINHA.some((item) => item.tecla.toLowerCase() === (evento.shiftKey ? `shift+${tecla}` : tecla))) {
       setFerramentaDaLinha(FERRAMENTAS_DA_LINHA.find((item) => item.tecla.toLowerCase() === (evento.shiftKey ? `shift+${tecla}` : tecla))!.id);
     }
     else if ((tecla === "delete" || tecla === "backspace") && !evento.shiftKey && selecaoValida.length) executar({ comando: "clipe.apagar", parametros: { clipeIds: selecaoValida } });
@@ -651,7 +662,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     else if (tecla === "end") buscar(projeto.duracao);
     else if (tecla === "escape") setSelecao([]);
     // Na tela simplificada o N continua ligando o ímã (na larga, é a Edição contínua)
-    else if (tecla === "n" && !ctrl && !telaLarga) setIma((atual) => !atual);
+    else if (tecla === "n" && !ctrl && !profissional) setIma((atual) => !atual);
     else return;
     evento.preventDefault();
   });
@@ -708,7 +719,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       setSelecao([]);
     },
     aoAdicionarMidia: adicionarNoCursor,
-    aoAbrirMidia: telaLarga
+    aoAbrirMidia: profissional
       ? (id: string) => {
           setFonte({ midiaId: id, entrada: null, saida: null });
           abrirPainel("fonte");
@@ -812,6 +823,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   };
   const janelas = (
     <>
+      {telaLarga ? <JanelaDaAparencia /> : null}
       {vendoAtalhos ? <JanelaAtalhos aoFechar={() => setVendoAtalhos(false)} /> : null}
       {configurando ? <JanelaSequencia projeto={projetoNaTela ?? projeto} aoPrever={preverDoPainel} aoExecutar={executar} aoFechar={() => setConfigurando(false)} /> : null}
       {salvandoModelo ? (
@@ -862,7 +874,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     </>
   );
 
-  if (telaLarga) {
+  if (profissional) {
     const conteudo = (id: IdFerramenta) => <ConteudoDaFerramenta ferramenta={FERRAMENTAS.find((item) => item.id === id)!} {...propsDoConteudo} />;
     const acoes: AcoesDoVideo = {
       temSelecao: selecaoValida.length > 0,
@@ -1050,6 +1062,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                 </option>
               ))}
             </select>
+            <BotaoAparencia className="ml-1" />
             <BotaoTema />
             <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando(true)} title="Exportar mídia (Ctrl+M)">
               <Download className="size-3.5" aria-hidden />

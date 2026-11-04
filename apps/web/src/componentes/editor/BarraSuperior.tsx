@@ -3,6 +3,7 @@
 import { BookmarkPlus, Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
 
+import { BotaoAparencia } from "@/componentes/Aparencia";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 
@@ -106,6 +107,8 @@ export function BarraSuperior({
         >
           <Redo2 className="size-4" aria-hidden />
         </button>
+        {/* O Takepro precisa da tela larga: abaixo dela, o editor fica na tela simples */}
+        <BotaoAparencia className="mx-1 max-lg:hidden" />
         {/* No celular o nome do projeto precisa do espaço: o tema também se troca no painel */}
         <span className="max-sm:hidden">
           <BotaoTema />

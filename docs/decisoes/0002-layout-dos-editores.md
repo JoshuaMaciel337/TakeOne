@@ -78,7 +78,11 @@ Outras áreas de trabalho: Montagem, Cor, Efeitos, Áudio e Legendas e gráficos
 6. **Monitor de origem** (Fonte), com Inserir e Sobrescrever.
 7. **As outras áreas de trabalho** e os ajustes finais (celular, testes, documentação).
 
-## O que fica para o dono confirmar
+## O que o dono decidiu (04/11/2026)
 
-- Se o tema padrão fica o escuro de hoje (com a cor de destaque do TakeOne) ou passa ao cinza médio dos programas.
-- Se a área de trabalho padrão do vídeo fica a "Edição" ou a "Montagem" (mais simples, com o Projeto grande).
+O tema e o layout viraram uma escolha de quem usa, com duas aparências:
+
+- **Takecut:** a tela simples dos apps de vídeo para criadores (as ferramentas com nome numa coluna à esquerda, o painel delas ao lado, a prévia no meio e os ajustes do que está escolhido à direita), no tema escuro com o destaque do TakeOne. No editor de vídeo é a tela simplificada que já existia (antes só abaixo de 1024 px); no de imagem, a coluna abre os painéis de sempre (Modelos, Imagens, Texto, Formas, Ajustes, Filtros, Efeitos, Foto com IA, Cores, Histórico), as Propriedades e as Camadas ficam à direita, as ferramentas de mexer na imagem numa faixa em cima da prévia e os menus num botão "Menu".
+- **Takepro:** o layout deste ADR, no cinza médio dos programas, com a área Edição no vídeo.
+
+Na primeira vez num editor, uma janela pergunta qual; depois, troca no topo dos dois editores e em Exibir › Aparência. As funções são as mesmas nos dois: só muda o caminho até elas.
