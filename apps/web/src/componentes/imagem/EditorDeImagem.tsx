@@ -1,14 +1,13 @@
 "use client";
 
-import { Check, ChevronLeft, Download, LoaderCircle, Redo2, Undo2, X } from "lucide-react";
+import { Check, ChevronLeft, Download, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
-import { type AreaDeTrabalho, ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
+import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
 import { PainelHistorico } from "@/componentes/area/PainelHistorico";
-import { BotaoAparencia, JanelaDaAparencia, useAparencia } from "@/componentes/Aparencia";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 import { contextoDasMidias } from "@/componentes/editor/contexto";
@@ -18,7 +17,6 @@ import { MiniaturaDoEstilo } from "@/componentes/editor/PainelTexto";
 import { useProjeto } from "@/componentes/editor/useProjeto";
 import { Redirecionar } from "@/componentes/projeto/Redirecionar";
 import { criarForma } from "@/lib/elementos";
-import { ColunaDoTakecut, ENTRADAS_DO_TAKECUT, FaixaDeFerramentas } from "./TakecutDaImagem";
 import { caminhosDaFormaPersonalizada, type FormaDoEspaco, PainelFormasPersonalizadas, SeletorDeFormaPersonalizada } from "./FormasPersonalizadas";
 import { caminhosNaCaixa, normalizarParaFormaPersonalizada } from "@/lib/vetor/arrasto";
 import type { EstadoDaArea } from "@/lib/areaDeTrabalho";
@@ -414,26 +412,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const ctx = useMemo(() => contextoDasMidias(midias), [midias]);
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
-  const areaDoTakepro = useAreaDeTrabalho("imagem", AREAS, "essenciais", IDS_DOS_PAINEIS);
-  // No Takecut, a coluna da esquerda mostra um painel por vez e as Propriedades e as Camadas ficam sempre à direita;
-  // o que os menus e as ferramentas pedem à área (abrir o painel Cor, o Caractere...) vai para essa coluna
-  const { aparencia } = useAparencia();
-  const takecut = aparencia === "takecut";
-  const [painelDoTakecut, setPainelDoTakecut] = useState<IdPainelDaImagem | null>("biblioteca");
-  const fixosDoTakecut = (painel: string) => painel === "propriedades" || painel === "camadas";
-  const area: AreaDeTrabalho = takecut
-    ? {
-        ...areaDoTakepro,
-        aberto: (painel) => fixosDoTakecut(painel) || painel === painelDoTakecut,
-        abrir: (painel) => {
-          if (!fixosDoTakecut(painel)) setPainelDoTakecut(painel as IdPainelDaImagem);
-        },
-        alternar: (painel) => {
-          if (!fixosDoTakecut(painel)) setPainelDoTakecut((atual) => (atual === painel ? null : (painel as IdPainelDaImagem)));
-        },
-        fechar: (painel) => setPainelDoTakecut((atual) => (atual === painel ? null : atual)),
-      }
-    : areaDoTakepro;
+  const area = useAreaDeTrabalho("imagem", AREAS, "essenciais", IDS_DOS_PAINEIS);
 
   const [ferramenta, setFerramenta] = useState<IdFerramentaDaImagem>("mover");
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
@@ -5590,7 +5569,6 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       if (como === "alternar") mudarGrade(atual ? { ...atual, visivel: !atual.visivel } : gradePadrao(2, documento.largura, documento.altura), false, atual?.visivel ? "ocultar a grade de perspectiva" : "mostrar a grade de perspectiva");
       else mudarGrade({ ...gradePadrao(como, documento.largura, documento.altura), ...(atual ? { celula: atual.celula, extensao: atual.extensao } : {}) }, false);
     },
-    aparencia,
     clarearInterface: (passo) => {
       const indice = TEMAS.findIndex((item) => item.id === temaAtual());
       const proximo = TEMAS[Math.min(TEMAS.length - 1, Math.max(0, indice + passo))];
@@ -6889,38 +6867,16 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto">
-      <header className={`shrink-0 items-center gap-1 border-b border-borda bg-painel ${takecut ? "h-11 px-2" : "h-8 px-1.5"} ${modoDeTela === "cheia" ? "hidden" : "flex"}`}>
+      <header className={`h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5 ${modoDeTela === "cheia" ? "hidden" : "flex"}`}>
         <Link href="/app" className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-suave transition hover:text-texto" title="Voltar ao início">
-          <ChevronLeft className={takecut ? "size-4" : "size-3.5"} aria-hidden />
-          <Simbolo tamanho={takecut ? 24 : 18} />
+          <ChevronLeft className="size-3.5" aria-hidden />
+          <Simbolo tamanho={18} />
         </Link>
-        <MenusDaImagem acoes={acoes} ativo={!janelaAberta} personalizacao={personalizacao} mostrarTudo={mostrarTudoNosMenus} aoMostrarTudo={() => setMostrarTudoNosMenus(true)} compacto={takecut} />
-        {takecut ? (
-          <input
-            id="nome-projeto"
-            value={edicao.nome}
-            onChange={(evento) => edicao.renomear(evento.currentTarget.value)}
-            aria-label="Nome da imagem"
-            maxLength={120}
-            className="ml-1 w-full min-w-0 max-w-64 truncate rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium outline-none transition hover:border-borda focus:border-destaque"
-          />
-        ) : null}
+        <MenusDaImagem acoes={acoes} ativo={!janelaAberta} personalizacao={personalizacao} mostrarTudo={mostrarTudoNosMenus} aoMostrarTudo={() => setMostrarTudoNosMenus(true)} />
         <span className="ml-auto hidden items-center gap-1 text-[11px] text-suave sm:flex" role="status">
           {edicao.salvamento === "salvo" ? <Check className="size-3" aria-hidden /> : <LoaderCircle className="size-3 animate-spin" aria-hidden />}
           {salvamento}
         </span>
-        {takecut ? (
-          <>
-            <button type="button" className="botao-icone ml-1" disabled={!edicao.nomeDesfazer} onClick={acoes.desfazer} title={edicao.nomeDesfazer ? `Desfazer ${edicao.nomeDesfazer} (Ctrl+Z)` : "Nada para desfazer"} aria-label="Desfazer">
-              <Undo2 className="size-4" aria-hidden />
-            </button>
-            <button type="button" className="botao-icone" disabled={!edicao.nomeRefazer} onClick={acoes.refazer} title={edicao.nomeRefazer ? `Refazer ${edicao.nomeRefazer} (Ctrl+Shift+Z)` : "Nada para refazer"} aria-label="Refazer">
-              <Redo2 className="size-4" aria-hidden />
-            </button>
-          </>
-        ) : null}
-        <BotaoAparencia className="ml-1 max-sm:hidden" />
-        {takecut ? null : (
         <select
           aria-label="Área de trabalho"
           title="Área de trabalho"
@@ -6934,15 +6890,14 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             </option>
           ))}
         </select>
-        )}
         <BotaoTema />
-        <button type="button" className={`botao-principal shrink-0 text-xs ${takecut ? "px-3 py-1.5" : "px-2.5 py-0.5"}`} onClick={() => setExportando("exportar")} title="Exportar como PNG, JPG, WebP, GIF, AVIF, TIFF, PDF… (Ctrl+Alt+Shift+W)">
+        <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando("exportar")} title="Exportar como PNG, JPG, WebP, GIF, AVIF, TIFF, PDF… (Ctrl+Alt+Shift+W)">
           <Download className="size-3.5" aria-hidden />
           <span className="hidden sm:inline">Exportar</span>
         </button>
       </header>
 
-      <div className={paineisOcultos === "todos" || (takecut && ferramenta === "mover") ? "hidden" : "contents"}>
+      <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
       <BarraDeOpcoes
         predefinicoes={conteudoDasPredefinicoes}
         amostra={{ lado: ladoDaAmostra, aoMudar: setLadoDaAmostra, amostradores: amostradores.length, aoLimpar: () => setAmostradores([]) }}
@@ -7257,33 +7212,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       </div>
 
       <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
-        {takecut ? (
-          <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
-            <ColunaDoTakecut aberto={painelDoTakecut} aoAbrir={(painel) => setPainelDoTakecut((atual) => (atual === painel ? null : painel))} />
-            {painelDoTakecut ? (
-              <aside aria-label={PAINEIS_DA_IMAGEM[painelDoTakecut]} className="flex shrink-0 flex-col border-r border-borda bg-painel max-md:max-h-[60vh] max-md:w-full max-md:border-b max-md:border-r-0 md:w-72">
-                <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-borda px-3">
-                  <h2 className="truncate text-sm font-semibold">{ENTRADAS_DO_TAKECUT.find((item) => item.painel === painelDoTakecut)?.nome ?? PAINEIS_DA_IMAGEM[painelDoTakecut]}</h2>
-                  <button type="button" className="botao-icone size-6" onClick={() => setPainelDoTakecut(null)} aria-label="Fechar o painel" title="Fechar">
-                    <X className="size-3.5" aria-hidden />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  {painelDoTakecut === "estilos" ? (
-                    <div className="px-3 pt-3">
-                      <button type="button" className="botao-principal w-full px-3 py-1.5 text-xs" onClick={() => porTexto()}>
-                        Adicionar texto
-                      </button>
-                      <p className="mt-2 text-[11px] text-suave">Ou escolha um estilo pronto; a ferramenta Texto escreve onde você clicar.</p>
-                    </div>
-                  ) : null}
-                  {paineis[painelDoTakecut].conteudo}
-                </div>
-              </aside>
-            ) : null}
-          </div>
-        ) : null}
-        <div className={paineisOcultos === "todos" || takecut ? "hidden" : "contents"}>
+        <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
         <CaixaDeFerramentas
           ocultas={new Set(personalizacao.ferramentasOcultas)}
           colunas={personalizacao.colunas}
@@ -7305,17 +7234,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
         </div>
 
-        <main className={`flex min-h-0 min-w-0 flex-1 flex-col max-md:h-[62vh] ${takecut ? "max-md:order-first max-md:basis-full" : ""}`}>
-          {takecut && modoDeTela === "padrao" && paineisOcultos !== "todos" ? (
-            <FaixaDeFerramentas
-              ativa={ferramenta}
-              aoEscolher={escolherFerramenta}
-              primeiroPlano={cores.primeiroPlano}
-              fundo={cores.fundo}
-              aoEditarCor={() => setPainelDoTakecut("cor")}
-            />
-          ) : null}
-          <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b border-borda bg-painel-2 ${modoDeTela === "padrao" && !takecut ? "flex" : "hidden"}`}>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col max-md:h-[62vh]">
+          <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b border-borda bg-painel-2 ${modoDeTela === "padrao" ? "flex" : "hidden"}`}>
             {abas.map((documento) =>
               documento.id === projetoId ? (
             <div key={documento.id} role="tab" aria-selected className="flex h-full max-w-full shrink-0 items-center gap-1 border-r border-borda bg-fundo px-2 text-[11px]">
@@ -7698,24 +7618,11 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
           </footer>
         </main>
 
-        {takecut ? (
-          <div className={paineisOcultos === "nenhum" ? "flex shrink-0 flex-col border-l border-borda bg-painel max-md:h-[80vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" : "hidden"}>
-            <section aria-label="Propriedades" className="flex min-h-0 flex-1 flex-col">
-              <h2 className="flex h-10 shrink-0 items-center border-b border-borda px-3 text-sm font-semibold">Propriedades</h2>
-              <div className="min-h-0 flex-1 overflow-y-auto">{paineis.propriedades.conteudo}</div>
-            </section>
-            <section aria-label="Camadas" className="flex h-[42%] min-h-48 shrink-0 flex-col border-t border-borda">
-              <h2 className="flex h-9 shrink-0 items-center px-3 text-sm font-semibold">Camadas</h2>
-              <div className="min-h-0 flex-1 overflow-y-auto">{paineis.camadas.conteudo}</div>
-            </section>
-          </div>
-        ) : null}
-        <div className={paineisOcultos === "nenhum" && !takecut ? "contents" : "hidden"}>
+        <div className={paineisOcultos === "nenhum" ? "contents" : "hidden"}>
           <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
         </div>
       </div>
 
-      <JanelaDaAparencia />
       {paradaDaAcao ? <JanelaParadaAoTocar mensagem={paradaDaAcao.mensagem} continuar={paradaDaAcao.continuar} aoResponder={paradaDaAcao.responder} /> : null}
       {janelaDoHistorico === "instantaneo" ? (
         <JanelaNovoInstantaneo
@@ -8570,7 +8477,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 }
 
 /** A barra de menus e os atalhos dela (os menus são montados aqui, com o estado da vez). */
-function MenusDaImagem({ acoes, ativo, personalizacao, mostrarTudo, aoMostrarTudo, compacto = false }: { acoes: AcoesDosMenus; ativo: boolean; personalizacao: Personalizacao; mostrarTudo: boolean; aoMostrarTudo: () => void; compacto?: boolean }) {
+function MenusDaImagem({ acoes, ativo, personalizacao, mostrarTudo, aoMostrarTudo }: { acoes: AcoesDosMenus; ativo: boolean; personalizacao: Personalizacao; mostrarTudo: boolean; aoMostrarTudo: () => void }) {
   // Os menus com os atalhos, as cores e os itens escondidos da personalização; os menus com algum escondido ganham
   // no fim o item que mostra todos (até recarregar)
   const menus = personalizarMenus(menusDaImagem(acoes), personalizacao, mostrarTudo).map((menu) =>
@@ -8579,9 +8486,9 @@ function MenusDaImagem({ acoes, ativo, personalizacao, mostrarTudo, aoMostrarTud
   useAtalhosDosMenus(menus, ativo);
   return (
     <>
-      {compacto ? null : <BarraDeMenus menus={menus} className="min-w-0 max-md:hidden" />}
-      {/* No celular (e no Takecut), os menus num só, como submenus */}
-      <BarraDeMenus menus={[{ nome: "Menu", itens: menus.map((menu) => ({ nome: menu.nome, itens: menu.itens })) }]} className={compacto ? "" : "md:hidden"} />
+      <BarraDeMenus menus={menus} className="min-w-0 max-md:hidden" />
+      {/* No celular, os menus num só, como submenus */}
+      <BarraDeMenus menus={[{ nome: "Menu", itens: menus.map((menu) => ({ nome: menu.nome, itens: menu.itens })) }]} className="md:hidden" />
     </>
   );
 }

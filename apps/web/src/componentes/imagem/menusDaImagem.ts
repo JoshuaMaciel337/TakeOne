@@ -16,7 +16,6 @@ import type { Suavizacao, TextoRico } from "@/lib/texto/modelo";
 
 import { AJUSTES, type Ajuste } from "./ajustesDaImagem";
 import type { IdFerramentaDaImagem } from "./ferramentasDaImagem";
-import { type Aparencia, itensDaAparencia } from "@/lib/aparencia";
 
 /** Os painéis do editor de imagem, com o nome do menu Janela (em ordem alfabética, como lá). */
 export const PAINEIS_DA_IMAGEM = {
@@ -201,8 +200,6 @@ export type AcoesDosMenus = {
   mudarGradeDePerspectiva: (como: "alternar" | 1 | 2 | 3) => void;
   /** Exibir › Interface mais escura e mais clara (os quatro temas, em ordem). */
   clarearInterface: (passo: -1 | 1) => void;
-  /** Exibir › Aparência: o Takecut ou o Takepro. */
-  aparencia: Aparencia;
   /** Editar › Preferências (Ctrl+K). */
   preferencias: () => void;
   /** Editar › Pesquisar (Ctrl+F): a caixa que procura nos comandos e nas ferramentas. */
@@ -976,7 +973,6 @@ export function menusDaImagem(a: AcoesDosMenus): Menu[] {
           ],
         },
         { nome: "Mostrar ou ocultar os painéis", atalho: "Tab", aoEscolher: () => a.ocultarPaineis("todos") },
-        { nome: "Aparência", itens: itensDaAparencia(a.aparencia) },
         { nome: "Interface mais escura", atalho: "Shift+F1", aoEscolher: () => a.clarearInterface(-1) },
         { nome: "Interface mais clara", atalho: "Shift+F2", aoEscolher: () => a.clarearInterface(1) },
         { nome: "Mostrar ou ocultar os painéis encaixados", atalho: "Shift+Tab", aoEscolher: () => a.ocultarPaineis("encaixados"), titulo: "Só os painéis da direita; a caixa de ferramentas e a barra de opções ficam" },

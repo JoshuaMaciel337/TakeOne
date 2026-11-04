@@ -1,6 +1,7 @@
-// A aparência dos editores: o Takecut (a tela simples dos apps de vídeo para criadores: ferramentas com nome à esquerda,
-// a prévia no meio, os ajustes à direita) ou o Takepro (o layout dos programas profissionais, ADR 0002). A escolha fica no
-// navegador, como o tema; no celular os dois editores de vídeo usam a tela simples, que é a que cabe.
+// O layout do editor de vídeo: o Takecut (a tela simples dos apps de vídeo para criadores: ferramentas com nome à
+// esquerda, a prévia no meio, os ajustes à direita) ou o Takepro (o layout dos programas profissionais de vídeo, ADR 0002).
+// O editor de imagem é um editor de fotos e tem o layout dele, sem essa escolha. A escolha fica no navegador, como o
+// tema; no celular o editor de vídeo usa a tela simples, que é a que cabe.
 import { trocarTema, type Tema } from "./tema";
 
 export type Aparencia = "takecut" | "takepro";
@@ -70,7 +71,7 @@ export function lerAparencia(): Aparencia | "nenhuma" {
   return aparenciaEscolhida() ?? semArmazenamento ?? "nenhuma";
 }
 
-/** Exibir › Aparência, nos menus dos dois editores: os dois nomes, com a marca no da vez. */
+/** Exibir › Layout, no menu do Takepro: os dois nomes, com a marca no da vez. */
 export function itensDaAparencia(atual: Aparencia): { nome: string; marcado: boolean; titulo: string; aoEscolher: () => void }[] {
   return APARENCIAS.map((item) => ({ nome: item.nome, marcado: item.id === atual, titulo: item.descricao, aoEscolher: () => item.id !== atual && escolherAparencia(item.id) }));
 }

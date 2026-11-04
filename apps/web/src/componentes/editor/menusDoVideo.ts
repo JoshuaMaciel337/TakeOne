@@ -190,7 +190,7 @@ export function menusDoVideo(a: AcoesDoVideo): Menu[] {
         { nome: "Diminuir o zoom da linha do tempo", atalho: "-", aoEscolher: () => a.zoomDaLinha(1 / 1.5) },
         "-",
         // O menu só existe no Takepro
-        { nome: "Aparência", itens: itensDaAparencia("takepro") },
+        { nome: "Layout", itens: itensDaAparencia("takepro") },
       ],
     },
     {

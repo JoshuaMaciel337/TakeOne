@@ -80,9 +80,11 @@ Outras áreas de trabalho: Montagem, Cor, Efeitos, Áudio e Legendas e gráficos
 
 ## O que o dono decidiu (04/11/2026)
 
-O tema e o layout viraram uma escolha de quem usa, com duas aparências:
+O layout do editor de vídeo virou uma escolha de quem usa:
 
-- **Takecut:** a tela simples dos apps de vídeo para criadores (as ferramentas com nome numa coluna à esquerda, o painel delas ao lado, a prévia no meio e os ajustes do que está escolhido à direita), no tema escuro com o destaque do TakeOne. No editor de vídeo é a tela simplificada que já existia (antes só abaixo de 1024 px); no de imagem, a coluna abre os painéis de sempre (Modelos, Imagens, Texto, Formas, Ajustes, Filtros, Efeitos, Foto com IA, Cores, Histórico), as Propriedades e as Camadas ficam à direita, as ferramentas de mexer na imagem numa faixa em cima da prévia e os menus num botão "Menu".
-- **Takepro:** o layout deste ADR, no cinza médio dos programas, com a área Edição no vídeo.
+- **Takecut:** a tela simples dos apps de vídeo para criadores (as ferramentas com nome numa coluna à esquerda, o painel delas ao lado, a prévia no meio e os ajustes do que está escolhido à direita), no tema escuro com o destaque do TakeOne. É a tela simplificada que já existia, antes só abaixo de 1024 px.
+- **Takepro:** o layout deste ADR, no cinza médio dos programas, com a área Edição.
 
-Na primeira vez num editor, uma janela pergunta qual; depois, troca no topo dos dois editores e em Exibir › Aparência. As funções são as mesmas nos dois: só muda o caminho até elas.
+Na primeira vez no editor de vídeo, uma janela pergunta qual; depois, troca em "Layout" no topo e em Exibir › Layout, quantas vezes a pessoa quiser. As funções são as mesmas nos dois: só muda o caminho até elas.
+
+O editor de imagem é um editor de fotos: fica com o layout deste ADR, sem essa escolha.

@@ -5,17 +5,20 @@ import { useSyncExternalStore } from "react";
 
 import { type Aparencia, APARENCIAS, assinarAparencia, escolherAparencia, lerAparencia } from "@/lib/aparencia";
 
-/** A aparência dos editores (o Takecut quando a pessoa ainda não escolheu) e se ela já escolheu. */
+/** O layout do editor de vídeo (o Takecut quando a pessoa ainda não escolheu) e se ela já escolheu. */
 export function useAparencia(): { aparencia: Aparencia; escolhida: boolean } {
   const lida = useSyncExternalStore(assinarAparencia, lerAparencia, () => "takepro" as const);
   return { aparencia: lida === "nenhuma" ? "takecut" : lida, escolhida: lida !== "nenhuma" };
 }
 
-/** Os dois nomes lado a lado, no topo dos editores: um clique troca o layout. */
+/** Os dois nomes lado a lado, no topo do editor de vídeo: um clique troca o layout, quantas vezes a pessoa quiser. */
 export function BotaoAparencia({ className = "" }: { className?: string }) {
   const { aparencia } = useAparencia();
   return (
-    <div role="radiogroup" aria-label="Aparência do editor" className={`flex shrink-0 rounded-md border border-borda bg-painel-2 p-0.5 text-[11px] ${className}`}>
+    <div role="radiogroup" aria-label="Layout do editor de vídeo" className={`flex shrink-0 items-center rounded-md border border-borda bg-painel-2 p-0.5 text-[11px] ${className}`}>
+      <span className="px-1.5 text-suave" aria-hidden>
+        Layout
+      </span>
       {APARENCIAS.map((item) => (
         <button
           key={item.id}
@@ -89,7 +92,7 @@ function Esboco({ aparencia }: { aparencia: Aparencia }) {
   );
 }
 
-/** Na primeira vez num editor: a pessoa escolhe entre o Takecut e o Takepro (dá para trocar depois, no topo). */
+/** Na primeira vez no editor de vídeo: a pessoa escolhe entre o Takecut e o Takepro (dá para trocar depois, no topo). */
 export function JanelaDaAparencia() {
   const { escolhida } = useAparencia();
   if (escolhida) return null;
@@ -98,9 +101,9 @@ export function JanelaDaAparencia() {
       <div className="flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-xl border border-borda bg-painel p-5 shadow-2xl shadow-black/50">
         <div>
           <h2 id="titulo-aparencia" className="font-display text-lg font-bold">
-            Como você prefere editar?
+            Como você prefere editar os vídeos?
           </h2>
-          <p className="mt-1 text-sm text-suave">As funções são as mesmas nos dois; muda o jeito de chegar a elas. Dá para trocar a qualquer hora, no topo do editor.</p>
+          <p className="mt-1 text-sm text-suave">As funções são as mesmas nos dois; muda o jeito de chegar a elas. Dá para trocar a qualquer hora, em Layout, no topo do editor de vídeo.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {APARENCIAS.map((item) => (

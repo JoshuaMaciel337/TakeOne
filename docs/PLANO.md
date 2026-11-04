@@ -567,7 +567,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] 13.14 Visualização e medição (réguas e guias, grade, navegador, informações).
   - [x] 13.15 Organização e fluxo (histórico, ações, comps, atalhos, preferências, linha do tempo, fatias).
   - [x] 13.16 Ferramentas vetoriais da suíte (as do editor vetorial).
-  - [x] O tema e o layout padrão (decidido pelo dono em 04/11/2026): duas aparências à escolha, o Takecut (a tela simples dos apps de vídeo para criadores, no tema escuro) e o Takepro (o layout dos programas profissionais, no cinza médio, com a área Edição). Na primeira vez num editor, a pessoa escolhe; troca no topo dos editores e em Exibir › Aparência.
+  - [x] O tema e o layout padrão (decidido pelo dono em 04/11/2026): dois layouts à escolha no editor de vídeo, o Takecut (a tela simples dos apps de vídeo para criadores, no tema escuro) e o Takepro (o layout dos programas profissionais, no cinza médio, com a área Edição). Na primeira vez no editor de vídeo, a pessoa escolhe; troca em "Layout" no topo e em Exibir › Layout, quantas vezes quiser. O editor de imagem fica com o layout dele.
   - [x] Remover e desfocar o fundo das fotos também no editor de vídeo (pedido do dono em 04/11/2026), com a mesma máscara do editor de imagem.
   - [x] Depois da onda 12, no editor de vídeo: tocar para trás e mais rápido com J e L (até 8×, com o K segurado andando um quadro), o painel de escopos de cor (forma de onda, desfile RGB, vetorscópio e histograma) e a seleção de faixa para trás (Shift+A).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
