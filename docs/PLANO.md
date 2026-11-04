@@ -572,6 +572,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
   - [x] Depois da onda 12, no editor de vídeo: tocar para trás e mais rápido com J e L (até 8×, com o K segurado andando um quadro), o painel de escopos de cor (forma de onda, desfile RGB, vetorscópio e histograma) e a seleção de faixa para trás (Shift+A).
 - Retoque de pele e rosto fica de fora (perto do que o dono vetou, e os modelos bons têm licença arriscada). Publicar, agendar e desempenho aparecem no menu com "Em breve" até existirem.
 - [ ] Onda 14, o Clipar ([ADR 0004](decisoes/0004-clipar.md)): colar o link (ou enviar o arquivo) de um vídeo longo e sair com os cortes prontos, cortados, legendados e editados conforme o conteúdo, em 12 partes (entrada, opções, achar os cortes, lista, corte montado, modelos de corte, editor do corte, retenção e extras, saída e automação, conversa no editor, a biblioteca de legendas animadas e ganchos, e o modelo de edição de pregação, a partir de um antes e depois que o dono mandou). Visto antes no Cut.Pro e no OpusClip, com as contas do dono, em 26/10/2026.
+- [ ] Onda 15, personagens ([ADR 0005](decisoes/0005-personagens.md)): criar uma pessoa uma vez e usá-la nas imagens e nos vídeos gerados, com o produto como referência e falando com as vozes prontas (liberado pelo dono em 04/11/2026). Em 6 partes: medir, personagens, imagem com personagem, vídeo com personagem, a personagem falando e repetir até o dono aprovar.
 
 **Estimativa:**
 - Versão utilizável ao final da fase 3: cerca de 7 a 9 semanas.

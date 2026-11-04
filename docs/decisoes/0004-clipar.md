@@ -33,7 +33,8 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 
 ## Fora do escopo, com o motivo
 
-- Dublagem, troca de personagem, personas, avatar e correção de contato visual: vetados pelo dono.
+- Dublagem, troca de personagem, personas, avatar e correção de contato visual: vetados pelo dono (os personagens
+  foram liberados depois, em 04/11/2026, no [ADR 0005](0005-personagens.md)).
 - Geração de vídeo paga (o Cut.Pro usa um modelo pago), campeonatos de cortes, métricas das redes: sem custo por uso e
   fora do produto.
 - Música e efeitos sonoros comerciais: só com licença (o banco da Pixabay depende da chave do dono).
