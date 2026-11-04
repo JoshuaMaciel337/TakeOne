@@ -445,6 +445,27 @@ def test_remover_fundo_le_a_mascara_como_o_clipe_e_usa_alphamerge():
                         720, 1280)
 
 
+def test_remover_fundo_de_uma_foto_le_a_mascara_em_png_e_multiplica_o_alfa():
+    foto = MidiaDoRender("/m/foto.png", 800, 400, video=True, audio=False, imagem=True, mascara="/m/mascara.png")
+    sobre = clipe("f1", "foto", 0, 4, remover_fundo=True)
+    plano = planejar_render(projeto([faixa("video", [sobre]), faixa("principal", [clipe("c1", "deitado", 0, 4)])]),
+                            {**MIDIAS, "foto": foto}, 720, 1280)
+    mascara = next(e for e in plano.entradas if e.caminho == "/m/mascara.png")
+    imagem = next(e for e in plano.entradas if e.caminho == "/m/foto.png")
+    # A máscara é uma imagem repetida pelo mesmo tempo da foto
+    assert mascara.imagem and (mascara.duracao, mascara.taxa) == (imagem.duracao, imagem.taxa)
+    # Já na faixa cheia (sem a conversão do vídeo) e sem o alfa pré-multiplicado
+    cadeia = next(parte for parte in plano.filtro.split(";") if "[mf2]" in parte and "format=gray" in parte)
+    assert "in_range=tv" not in cadeia and "premultiply" not in cadeia and ",crop=" in cadeia
+    # A transparência que a foto já tem multiplica a máscara
+    assert "alphaextract[rfb2]" in plano.filtro and "[rfb2][mf2]blend=all_mode=multiply[rfc2]" in plano.filtro
+    assert "[vf2][rfc2]alphamerge" in plano.filtro
+    with pytest.raises(ErroRender, match="recorte do fundo"):
+        sem = MidiaDoRender("/m/foto.png", 800, 400, video=True, audio=False, imagem=True)
+        planejar_render(projeto([faixa("principal", [clipe("f1", "foto", 0, 4, remover_fundo=True)])]),
+                        {**MIDIAS, "foto": sem}, 720, 1280)
+
+
 def test_imagem_sem_ruido_le_o_video_limpo_e_o_som_do_original():
     limpa = MidiaDoRender("/m/deitado.mp4", 1280, 720, video=True, audio=True, matriz=None, imagem_limpa="/m/limpo.mp4")
     plano = planejar_render(projeto([faixa("principal", [clipe("c1", "deitado", 0, 4, imagem_limpa=True)])]),

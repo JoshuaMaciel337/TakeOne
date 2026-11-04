@@ -43,6 +43,11 @@ export function arquivoDaMascara(clipe: Pick<Clipe, "mascara_do_recorte">): stri
   return "mascara.mp4";
 }
 
+/** A máscara que recorta o clipe nesta mídia: numa foto, a imagem cinza da pessoa (mascara.png); num vídeo, o vídeo dela. */
+export function arquivoDaMascaraDoClipe(clipe: Pick<Clipe, "mascara_do_recorte">, midia: { imagem?: boolean }): string {
+  return midia.imagem ? "mascara.png" : arquivoDaMascara(clipe);
+}
+
 /** O tamanho de uma mídia pelo id, para os layouts das cenas (layoutDaCena.ts). */
 export type TamanhoDaMidia = (midiaId: string) => Tamanho | null;
 

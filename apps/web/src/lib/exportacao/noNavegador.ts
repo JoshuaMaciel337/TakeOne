@@ -5,7 +5,7 @@
 // pelo mp4-muxer (MIT). Lê as mesmas cópias leves da prévia, por isso só 720p.
 //
 // O som com velocidade mudada fica para o servidor: o navegador não muda a velocidade sem mudar o tom.
-import { arquivoDaMascara, expandirParaDesenhar, tamanhosDasMidias } from "../projeto/fundoDesfocado.ts";
+import { arquivoDaMascaraDoClipe, expandirParaDesenhar, tamanhosDasMidias } from "../projeto/fundoDesfocado.ts";
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 import { arquivoDaMidia } from "@/lib/api";
@@ -151,7 +151,7 @@ async function misturarSom(projeto: Projeto, midias: ReadonlyMap<string, Midia>,
 }
 
 /** O que uma camada de mídia pede para o quadro: a imagem parada, ou o vídeo (e a máscara do fundo). */
-type PedidoDeFonte = { camada: CamadaNaTela; imagem: string } | { camada: CamadaNaTela; video: string; mascara: string | null };
+type PedidoDeFonte = { camada: CamadaNaTela; imagem: string; mascara: string | null } | { camada: CamadaNaTela; video: string; mascara: string | null };
 
 /** Um decodificador por arquivo e chave do clipe, com a espera pelo quadro exato. */
 class Fontes {
@@ -299,9 +299,10 @@ export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: Read
       const pedidos = camadas.flatMap((camada): PedidoDeFonte[] => {
         if (camada.imagem) return [];
         const item = visuais.find((v) => v.chave === camada.chave)!;
-        if (item.midia.imagem) return [{ camada, imagem: arquivoDaMidia(item.midia.id, "proxy.webp") }];
+        const arquivoDaMascara = arquivoDaMascaraDoClipe(camada.clipe, item.midia);
+        const mascara = camada.clipe.remover_fundo && item.midia.arquivos.includes(arquivoDaMascara) ? arquivoDaMidia(item.midia.id, arquivoDaMascara) : null;
+        if (item.midia.imagem) return [{ camada, imagem: arquivoDaMidia(item.midia.id, "proxy.webp"), mascara }];
         const video = arquivoDaMidia(item.midia.id, arquivoDaImagemDoClipe(item.clipe, item.midia));
-        const mascara = camada.clipe.remover_fundo && item.midia.arquivos.includes(arquivoDaMascara(camada.clipe)) ? arquivoDaMidia(item.midia.id, arquivoDaMascara(camada.clipe)) : null;
         return [{ camada, video, mascara }];
       });
       let prontas: Camada[] | null = null;
@@ -309,7 +310,10 @@ export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: Read
         if (tentativa > 20) throw new Error("Os vídeos não entregaram os quadros juntos. Exporte pelo servidor.");
         const imagens = new Map<string, ImageBitmap>();
         for (const pedido of pedidos) {
-          if ("imagem" in pedido) imagens.set(pedido.imagem, await fontes.imagem(pedido.imagem));
+          if ("imagem" in pedido) {
+            imagens.set(pedido.imagem, await fontes.imagem(pedido.imagem));
+            if (pedido.mascara) imagens.set(pedido.mascara, await fontes.imagem(pedido.mascara));
+          }
           else {
             await fontes.esperar(pedido.camada.chave, pedido.video, pedido.camada.segundos, k, sinal);
             if (pedido.mascara) await fontes.esperar(pedido.camada.chave, pedido.mascara, pedido.camada.segundos, k, sinal);
@@ -328,7 +332,7 @@ export async function exportarNoNavegador(projetoDaEdicao: Projeto, midias: Read
             continue;
           }
           if ("imagem" in pedido) {
-            coletadas.push(camadaDoCompositor(camada, imagens.get(pedido.imagem)!, null));
+            coletadas.push(camadaDoCompositor(camada, imagens.get(pedido.imagem)!, pedido.mascara ? imagens.get(pedido.mascara)! : null));
             continue;
           }
           const fonte = fontes.coletar(camada.chave, pedido.video, camada.segundos);

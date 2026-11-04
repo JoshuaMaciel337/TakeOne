@@ -119,8 +119,8 @@ function FonteDeVideo(props: PropsFonte) {
  * Com o alfa já pré-multiplicado no bitmap: o WebGL ignora o UNPACK_PREMULTIPLY_ALPHA num ImageBitmap, e o
  * compositor espera a cor multiplicada pelo alfa (sem isso, a borda de uma forma clara saía em escada).
  */
-function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
-  const url = arquivoDaMidia(item.midia.id, "proxy.webp");
+function FonteImagem({ item, aoRegistrar, aoTerQuadro, arquivo = "proxy.webp" }: PropsFonte & { arquivo?: string }) {
+  const url = arquivoDaMidia(item.midia.id, arquivo);
   const avisos = useRef({ aoRegistrar, aoTerQuadro });
   useEffect(() => {
     avisos.current = { aoRegistrar, aoTerQuadro };
@@ -130,7 +130,7 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
     let vivo = true;
     avisos.current.aoRegistrar({ quadro: () => bitmap });
     fetch(url)
-      .then((resposta) => (resposta.ok ? resposta.blob() : Promise.reject(new Error(`proxy.webp: ${resposta.status}`))))
+      .then((resposta) => (resposta.ok ? resposta.blob() : Promise.reject(new Error(`${arquivo}: ${resposta.status}`))))
       .then((blob) => createImageBitmap(blob, { premultiplyAlpha: "premultiply" }))
       .then((pronto) => {
         if (!vivo) {
@@ -146,7 +146,7 @@ function FonteImagem({ item, aoRegistrar, aoTerQuadro }: PropsFonte) {
       avisos.current.aoRegistrar(null);
       bitmap?.close();
     };
-  }, [url]);
+  }, [url, arquivo]);
   return null;
 }
 
@@ -160,6 +160,8 @@ function arquivoDaImagem(item: ItemDaPrevia): string {
  */
 export function FonteDaMascara({ arquivo = "mascara.mp4", ...props }: PropsFonte & { arquivo?: string }) {
   const [falhou, setFalhou] = useState(() => !webCodecsDisponivel());
+  // Numa foto, a máscara é uma imagem cinza: o mesmo bitmap em todo instante
+  if (props.item.midia.imagem) return <FonteImagem {...props} arquivo={arquivo} />;
   if (falhou) return null;
   return <FonteWebCodecs {...props} arquivo={arquivo} aoFalhar={() => setFalhou(true)} />;
 }

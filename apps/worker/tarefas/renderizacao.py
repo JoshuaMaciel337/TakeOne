@@ -29,6 +29,7 @@ from core.modelos.midia import (
     ARQUIVO_IMAGEM_LIMPA,
     ARQUIVO_INVERTIDO,
     ARQUIVO_MASCARA,
+    ARQUIVO_MASCARA_IMAGEM,
     ARQUIVO_MASCARA_ROSTOS,
     ARQUIVO_PROXY_AUDIO,
     ARQUIVO_PROXY_IMAGEM,
@@ -127,8 +128,10 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
                                        arquivo_da_mascara_do_objeto(chave)))).is_file()),
             mascara_rostos=str(rostos) if (rostos := storage.caminho_local(chave_arquivo(
                 midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA_ROSTOS))).is_file() else None,
+            # A máscara da pessoa: um vídeo, ou uma imagem cinza numa foto
             mascara=str(mascara) if (mascara := storage.caminho_local(chave_arquivo(
-                midia["organizacao_id"], midia["_id"], ARQUIVO_MASCARA))).is_file() else None,
+                midia["organizacao_id"], midia["_id"],
+                ARQUIVO_MASCARA_IMAGEM if e_imagem(midia) else ARQUIVO_MASCARA))).is_file() else None,
             tons=tuple((chave, str(caminho)) for chave, tom in (midia.get("tons") or {}).items()
                        if tom.get("status") == "pronta"
                        and (caminho := storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"],

@@ -15,7 +15,7 @@ import { duracaoDoQuadro, formatarTimecode, formatarTimecodeLongo, type Tick, TI
 import type { Midia } from "@/lib/tipos";
 
 import { arquivoDoTom, FonteDaMascara, type FonteDeQuadros, FonteDoClipe, SomDoClipe, usaVozLimpa } from "./FontesDaPrevia";
-import { arquivoDaMascara, ehCopiaDesenhada, expandirParaDesenhar, tamanhosDasMidias } from "@/lib/projeto/fundoDesfocado";
+import { arquivoDaMascaraDoClipe, ehCopiaDesenhada, expandirParaDesenhar, tamanhosDasMidias } from "@/lib/projeto/fundoDesfocado";
 import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
 import { useTabelasDasLuts } from "@/lib/useLuts";
 import { DesenhoDaMascara } from "./DesenhoDaMascara";
@@ -272,12 +272,12 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andam
                 />
               ))}
               {visuais
-                .filter((item) => item.clipe.remover_fundo && item.midia.arquivos.includes(arquivoDaMascara(item.clipe)))
+                .filter((item) => item.clipe.remover_fundo && item.midia.arquivos.includes(arquivoDaMascaraDoClipe(item.clipe, item.midia)))
                 .map((item) => (
                   <FonteDaMascara
                     key={`mascara:${item.chave}`}
                     item={item}
-                    arquivo={arquivoDaMascara(item.clipe)}
+                    arquivo={arquivoDaMascaraDoClipe(item.clipe, item.midia)}
                     tempo={tempo}
                     tocando={tocando}
                     aoRegistrar={(fonte) => {

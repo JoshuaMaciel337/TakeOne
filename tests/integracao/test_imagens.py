@@ -167,6 +167,32 @@ def test_logo_transparente_deixa_ver_o_que_esta_embaixo(cliente, db_limpo):
         assert max(abs(int(a) - b) for a, b in zip(obtido, FUNDO, strict=True)) < 40, (ponto, obtido)
 
 
+@pytest.mark.skipif(not TEM_FFMPEG, reason="FFmpeg não instalado")
+def test_foto_com_o_fundo_removido_no_video(cliente, db_limpo):
+    cadastrar(cliente)
+    organizacao = organizacao_de(cliente)
+
+    def logo(caminho):
+        imagem = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+        imagem.paste((0, 255, 0, 255), (100, 100, 300, 300))
+        imagem.save(caminho, "PNG")
+
+    midia_id = enviar_imagem(db_limpo, organizacao, "logo.png", logo)
+    # A máscara que o recorte do fundo grava numa foto: aqui, a metade da esquerda fica e a da direita sai
+    mascara = Image.new("L", (400, 400), 0)
+    mascara.paste(255, (0, 0, 200, 400))
+    mascara.save(storage.caminho_local(chave_arquivo(organizacao, midia_id, "mascara.png")), "PNG")
+    clipe = {"id": "l1", "midia_id": str(midia_id), "inicio": 0, "duracao": 2 * SEGUNDO, "entrada": 0,
+             "velocidade": 1, "volume": 1, "remover_fundo": True}
+    video = _exportar(cliente, db_limpo, lambda p: [{**p["faixas"][0], "clipes": [clipe]}], 2.0, proporcao="1:1")
+    quadro = quadro_do_video(video, 1.0, 720, 720)
+    # A imagem cabe no quadro (1,8 vez): o verde da metade da esquerda fica; o da direita e o transparente, não
+    assert max(abs(int(a) - b) for a, b in zip(quadro[360, 270], (0, 255, 0), strict=True)) < 40
+    for ponto in ((450, 360), (60, 60), (100, 360)):
+        obtido = quadro[ponto[1], ponto[0]]
+        assert max(abs(int(a) - b) for a, b in zip(obtido, FUNDO, strict=True)) < 40, (ponto, obtido)
+
+
 def test_bmp_gif_animado_e_tiff_de_16_bits_entram_como_fotos(cliente, db_limpo):
     import numpy as np
 

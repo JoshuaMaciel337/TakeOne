@@ -3,7 +3,7 @@
 // de sempre enquanto isso; a exportação no navegador, sem esta conferência, baixava um MP4 "pronto" sem o
 // recorte, o tom ou a estabilização pedidos, e sem aviso.
 import type { Midia } from "../tipos.ts";
-import { arquivoDaMascara, expandirParaDesenhar, tamanhosDasMidias } from "./fundoDesfocado.ts";
+import { arquivoDaMascaraDoClipe, expandirParaDesenhar, tamanhosDasMidias } from "./fundoDesfocado.ts";
 import { lutGuardada } from "./lutImportada.ts";
 import { chaveDaEstabilizacao, type Projeto, zeroDoFluido } from "./modelo.ts";
 import { chaveDoTom } from "./som.ts";
@@ -25,7 +25,7 @@ export function pendenciaParaONavegador(projetoDaEdicao: Projeto, midias: Readon
       const midia = midias.get(clipe.midia_id);
       if (!midia || midia.status !== "pronta") return "Uma mídia do projeto ainda está sendo preparada (ou foi excluída). Espere terminar.";
       const tem = (arquivo: string) => midia.arquivos.includes(arquivo);
-      if (clipe.remover_fundo && !midia.imagem && !tem(arquivoDaMascara(clipe)))
+      if (clipe.remover_fundo && !tem(arquivoDaMascaraDoClipe(clipe, midia)))
         return clipe.mascara_do_recorte === "rostos"
           ? "Os rostos de um clipe ainda estão sendo procurados. Espere terminar."
           : clipe.mascara_do_recorte?.startsWith("objeto:")

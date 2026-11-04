@@ -118,7 +118,7 @@ class MidiaDoRender:
     hdr: str | None = None      # "pq" ou "hlg": o HDR do celular, convertido para SDR na leitura
     voz_limpa: str | None = None   # a voz sem ruído, no mesmo tempo do original, quando já foi gerada
     tons: tuple = ()               # (chave do tom, arquivo) das vozes em outro tom já geradas
-    mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve
+    mascara: str | None = None     # a máscara da pessoa (recorte do fundo), no tempo da cópia leve; numa foto, o PNG
     mascara_rostos: str | None = None  # a dos rostos (esconder os rostos), no mesmo tempo
     mascaras_objetos: tuple = ()       # as dos objetos escondidos: (id do rastreio, caminho)
     imagem_limpa: str | None = None  # a imagem sem ruído, em resolução cheia e já em BT.709
@@ -325,11 +325,23 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
         # Recorte do fundo: o alfa vem do vídeo da máscara, lido, cortado e redimensionado como o clipe
         # (depois do desfoque e das cores separadas, antes da lente: como o shader da prévia)
         inicio_da_mascara = len(entrada_de_cor or [])
-        da_mascara = ["scale=in_range=tv:out_range=pc", "format=gray",
-                      *[f for f in filtros[inicio_da_mascara:filtros.index("format=rgba")]]]
-        cabeca = (f"{_continuar(cabeca, filtros)}[vf{numero}];\n"
-                  f"[{mascara_do_fundo}:v]{','.join(da_mascara)}[mf{numero}];\n"
-                  f"[vf{numero}][mf{numero}]alphamerge")
+        mesmos = filtros[inicio_da_mascara:filtros.index("format=rgba")]
+        if alfa_na_fonte:
+            # Numa foto, a máscara é um PNG cinza (já na faixa cheia), e o redimensionar vai sem o alfa
+            # pré-multiplicado, que ela não tem
+            sem_alfa = {"format=gbrap", "premultiply=inplace=1", "unpremultiply=inplace=1"}
+            da_mascara = ["format=gray", *[f for f in mesmos if f not in sem_alfa], "format=gray"]
+            # A foto pode já ter transparência (um PNG): a máscara multiplica o alfa dela, como o shader
+            cabeca = (f"{_continuar(cabeca, [*filtros, 'split'])}[vf{numero}][rfa{numero}];\n"
+                      f"[{mascara_do_fundo}:v]{','.join(da_mascara)}[mf{numero}];\n"
+                      f"[rfa{numero}]alphaextract[rfb{numero}];\n"
+                      f"[rfb{numero}][mf{numero}]blend=all_mode=multiply[rfc{numero}];\n"
+                      f"[vf{numero}][rfc{numero}]alphamerge")
+        else:
+            da_mascara = ["scale=in_range=tv:out_range=pc", "format=gray", *mesmos]
+            cabeca = (f"{_continuar(cabeca, filtros)}[vf{numero}];\n"
+                      f"[{mascara_do_fundo}:v]{','.join(da_mascara)}[mf{numero}];\n"
+                      f"[vf{numero}][mf{numero}]alphamerge")
         filtros = []
     distorcao = distorcao_do_efeito(clipe)
     com_alfa = alfa_na_fonte or mascara_do_fundo is not None
@@ -1230,7 +1242,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             grao = (len(entradas), roteiro_grao, colunas)
             entradas.append(Entrada(imagem_grao, 0, fim_janela - inicio_janela, imagem=True, taxa=taxa))
         mascara_do_fundo = None
-        if clipe.get("remover_fundo") and not clipe.get("texto") and not e_imagem_parada:
+        if clipe.get("remover_fundo") and not clipe.get("texto"):
             midia = midias[clipe["midia_id"]]
             qual = clipe.get("mascara_do_recorte") or ""
             arquivo_da_mascara = (midia.mascara_rostos if qual == "rostos"
@@ -1241,7 +1253,8 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
                                  "ou desligue \"Remover o fundo\" para exportar.")
             lida = entradas[indice_da_entrada[clipe["id"]]]
             mascara_do_fundo = len(entradas)
-            entradas.append(Entrada(arquivo_da_mascara, lida.inicio, lida.duracao))
+            # Numa foto, a máscara é uma imagem repetida pelo tempo da foto
+            entradas.append(Entrada(arquivo_da_mascara, lida.inicio, lida.duracao, imagem=lida.imagem, taxa=lida.taxa))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao,
                                           mascara_do_fundo, alfa_na_fonte, cantos)

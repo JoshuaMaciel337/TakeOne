@@ -708,12 +708,13 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         ) : null}
         {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
         {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
-        {!clipe.texto && midia?.video && (!midia.imagem || !comTempo) && !midia.elemento && !midia.camada_pixels ? (
+        {!clipe.texto && midia?.video && !midia.elemento && !midia.camada_pixels ? (
           <RemoverFundo
             clipe={clipe}
             midia={midia}
             travada={travada}
             aoExecutar={aoExecutar}
+            noVideo={comTempo}
             // Numa foto do editor de imagem: a pessoa nítida sobre uma cópia desfocada (duas camadas)
             desfocar={!comTempo && midia.imagem && !midia.video.transparente ? () => aoExecutar({ comando: "imagem.desfocarFundo", parametros: { faixaId: faixa.id } }) : undefined}
           />
@@ -976,9 +977,9 @@ function DesenhoDaCurva({ pontos }: { pontos: PontoDeVelocidade[] }) {
 
 /**
  * Remover o fundo sem tela verde: o worker acha a pessoa em cada quadro (MODNet) e a prévia e o
- * render usam a mesma máscara. Numa foto (só no editor de imagem), a máscara é uma imagem.
+ * render usam a mesma máscara. Numa foto, a máscara é uma imagem (mascara.png).
  */
-function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void; desfocar?: () => void }) {
+function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar, noVideo }: { clipe: Clipe; midia: Midia; travada: boolean; aoExecutar: (comando: Comando) => void; desfocar?: () => void; noVideo: boolean }) {
   const [erroDoPedido, setErroDoPedido] = useState("");
   const recorte = midia.recorte_fundo;
   // A animação já nasce com a transparência: a mesma opção, com outro nome
@@ -1001,7 +1002,8 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: 
         <input type="checkbox" checked={Boolean(clipe.remover_fundo)} disabled={travada} onChange={(evento) => mudar(evento.currentTarget.checked)} />
         <span className="flex-1">{animacao ? "Fundo transparente (só a animação aparece)" : "Remover o fundo (fica a pessoa)"}</span>
       </label>
-      {!desfocar && !foto && !animacao ? (
+      {/* No vídeo, o fundo desfocado é a expansão (fundoDesfocado.ts); no editor de imagem, duas camadas (o botão abaixo) */}
+      {noVideo && !animacao ? (
         <>
           <label className="mt-1 flex items-center gap-2 text-xs">
             <input
@@ -1030,10 +1032,10 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: 
               />
               <p className="mt-1 text-[11px] text-suave" role="status">
                 {recorte?.status === "pronta"
-                  ? "Pronto. A pessoa fica nítida sobre o próprio vídeo desfocado."
+                  ? `Pronto. A pessoa fica nítida sobre ${foto ? "a própria foto desfocada" : "o próprio vídeo desfocado"}.`
                   : recorte?.status === "erro" || erroDoPedido
                     ? `O recorte falhou: ${erroDoPedido || recorte?.erro}`
-                    : `Achando a pessoa em cada quadro${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}.`}
+                    : `Achando a pessoa ${foto ? "na foto" : "em cada quadro"}${recorte?.progresso ? ` · ${recorte.progresso}%` : ""}.`}
               </p>
             </>
           ) : null}
@@ -1058,7 +1060,7 @@ function RemoverFundo({ clipe, midia, travada, aoExecutar, desfocar }: { clipe: 
           {recorte?.status === "pronta"
             ? animacao
               ? "A animação aparece por cima do vídeo, sem fundo."
-              : foto
+              : foto && !noVideo
                 ? "Pronto. A prévia e a imagem exportada mostram só a pessoa."
                 : "Pronto. A prévia e o vídeo exportado mostram só a pessoa."
             : recorte?.status === "erro" || erroDoPedido
