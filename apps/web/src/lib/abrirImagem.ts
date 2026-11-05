@@ -1,15 +1,18 @@
 // Arquivo › Abrir e Colocar incorporado do editor de imagem (ADR 0003, onda 13.13): a imagem do computador sobe pelo
 // envio de sempre (tus), espera a ingestão e vira um documento (do tamanho dela) ou uma camada.
 import { chamarApi } from "./api";
+import type { OpcoesDoEnvio } from "./envios";
 import type { Midia } from "./tipos";
 
 /** Sobe o arquivo e espera a mídia ficar pronta (ou dar erro): a mídia pronta. */
-export async function enviarEEsperar(iniciar: (arquivos: File[], aoCriar?: (midiaId: string) => void) => void, arquivo: File, limiteMs = 10 * 60_000): Promise<Midia> {
+export async function enviarEEsperar(iniciar: (arquivos: File[], opcoes?: OpcoesDoEnvio) => void, arquivo: File, limiteMs = 10 * 60_000): Promise<Midia> {
   const midiaId = await new Promise<string>((pronto, falhou) => {
     const espera = window.setTimeout(() => falhou(new Error("O envio não começou. Tente de novo.")), 60_000);
-    iniciar([arquivo], (id) => {
-      window.clearTimeout(espera);
-      pronto(id);
+    iniciar([arquivo], {
+      aoCriar: (id) => {
+        window.clearTimeout(espera);
+        pronto(id);
+      },
     });
   });
   const inicio = Date.now();

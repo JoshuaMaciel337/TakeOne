@@ -24,7 +24,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
 from api.dependencias import obter_db, usuario_atual
-from core.config import ESPACO_MINIMO_LIVRE_BYTES, UPLOAD_MAX_BYTES
+from core.config import ESPACO_MINIMO_LIVRE_BYTES, EXTENSOES_IMAGEM, UPLOAD_MAX_BYTES
+from core.modelos.album import FOTOS_POR_ALBUM, montar_foto, pasta_do_caminho
 from core.modelos.job import montar_job
 from core.modelos.midia import (
     PRIORIDADE_INGESTAO,
@@ -95,7 +96,11 @@ async def concluir_envio(db, midia: dict, usuario: dict):
     Último pedaço chegou: a mídia vai para a fila de ingestão. Pode ser chamado duas vezes (o PATCH e o HEAD
     de um cliente que tentou de novo): só o primeiro troca o status, e o job do segundo é apagado.
     """
-    job = montar_job("ingestao", midia["organizacao_id"], {"midia_id": str(midia["_id"])},
+    entrada = {"midia_id": str(midia["_id"])}
+    if midia.get("album_id"):
+        # A biblioteca não recarrega a cada foto de um álbum que termina de chegar; a página do álbum, sim
+        entrada["album_id"] = str(midia["album_id"])
+    job = montar_job("ingestao", midia["organizacao_id"], entrada,
                      prioridade=PRIORIDADE_INGESTAO, criado_por=usuario["_id"])
     job_id = (await db.jobs.insert_one(job)).inserted_id
     momento = agora()
@@ -166,8 +171,31 @@ async def criar_envio(request: Request, usuario=Depends(usuario_atual), db=Depen
                             mensagem="O servidor está sem espaço para esse arquivo. "
                                      "Avise quem cuida do servidor do TakeOne.")
 
+    album = None
+    if metadados.get("album"):
+        try:
+            album = await db.albuns.find_one({"_id": ObjectId(metadados["album"]),
+                                              "organizacao_id": usuario["organizacao_id"]}, {"_id": 1})
+        except InvalidId:
+            album = None
+        if album is None:
+            return resposta_tus(status.HTTP_404_NOT_FOUND, mensagem="O álbum não existe mais.")
+        if extensao_aceita(nome) not in EXTENSOES_IMAGEM:
+            return resposta_tus(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                                mensagem="O álbum aceita só fotos (JPG, PNG, WebP, HEIC...).")
+        if await db.album_fotos.count_documents({"album_id": album["_id"]}) >= FOTOS_POR_ALBUM:
+            return resposta_tus(status.HTTP_409_CONFLICT,
+                                mensagem=f"O álbum chegou ao limite de {FOTOS_POR_ALBUM:,} fotos.".replace(",", "."))
+
     midia = montar_midia(usuario["organizacao_id"], usuario["_id"], nome, total, metadados.get("filetype", ""))
+    if album is not None:
+        midia["album_id"] = album["_id"]
     midia["_id"] = (await db.midias.insert_one(midia)).inserted_id
+    if album is not None:
+        foto = montar_foto(usuario["organizacao_id"], album["_id"], midia["_id"],
+                           pasta_do_caminho(metadados.get("caminho", "")))
+        await db.album_fotos.insert_one(foto)
+        await db.albuns.update_one({"_id": album["_id"]}, {"$set": {"atualizado_em": agora()}})
     if not await run_in_threadpool(storage.salvar_bytes, chave_original(midia), b""):
         await db.midias.delete_one({"_id": midia["_id"]})
         return resposta_tus(status.HTTP_500_INTERNAL_SERVER_ERROR, mensagem="Não foi possível começar o envio.")
@@ -271,4 +299,5 @@ async def cancelar_envio(upload_id: str, request: Request, usuario=Depends(usuar
         return resposta_tus(status.HTTP_409_CONFLICT, mensagem="O envio já terminou. Exclua pela mídia.")
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     await db.midias.delete_one({"_id": midia["_id"]})
+    await db.album_fotos.delete_many({"midia_id": midia["_id"]})
     return resposta_tus(status.HTTP_204_NO_CONTENT)

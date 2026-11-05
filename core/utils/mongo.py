@@ -55,6 +55,15 @@ INDICES = {
     ],
     "midias": [
         ([("organizacao_id", 1), ("criado_em", -1)], {}),
+        # As fotos enviadas para um álbum (onda 16) ficam fora da lista da biblioteca
+        ([("album_id", 1)], {"sparse": True}),
+    ],
+    "albuns": [
+        ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
+    ],
+    "album_fotos": [
+        ([("album_id", 1), ("midia_id", 1)], {"unique": True}),
+        ([("midia_id", 1)], {}),
     ],
     "pinceis": [
         ([("organizacao_id", 1), ("criado_em", 1)], {}),

@@ -733,7 +733,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       tocando: reproducao.tocando,
       aoAlternar: alternar,
       aoGravar: (arquivo: File, inicio: Tick) => {
-        iniciarEnvio([arquivo], (id) => pedirAnimacao({ id }, inicio));
+        iniciarEnvio([arquivo], { aoCriar: (id) => pedirAnimacao({ id }, inicio) });
         mostrarAviso("Narração gravada: ela entra na faixa de áudio quando terminar de subir.");
       },
     },

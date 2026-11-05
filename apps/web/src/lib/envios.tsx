@@ -13,12 +13,25 @@ export type Envio = {
   estado: EstadoEnvio;
   erro?: string;
   midiaId?: string;
+  /** O álbum de fotos para onde vai (a página do álbum mostra o andamento; as outras listas, não). */
+  album?: string;
+};
+
+export type OpcoesDoEnvio = {
+  /** Chamado com o id da mídia assim que a API cria o envio (a gravação de narração entra no instante dela). */
+  aoCriar?: (midiaId: string) => void;
+  /** O álbum de fotos de destino (a API só aceita fotos). */
+  album?: string;
+  /** O caminho de cada arquivo dentro da pasta enviada ("Cerimônia/IMG_01.jpg"), que o álbum guarda. */
+  caminhos?: Map<File, string>;
 };
 
 // Pedaços abaixo de 10 MB: é o limite de corpo do Next e fica longe dos 100 MB da Cloudflare
 const TAMANHO_PEDACO = 8 * 1024 * 1024;
 // Se a internet cair, tenta de novo com espera crescente e continua de onde parou
 const ESPERAS_MS = [0, 1_000, 3_000, 5_000, 10_000, 20_000, 30_000, 60_000];
+// Envios ao mesmo tempo: os outros esperam na fila (uma pasta de ensaio tem milhares de fotos)
+const ENVIOS_SIMULTANEOS = 4;
 
 // Mesma lista de core/config.py
 const EXTENSOES_ACEITAS = [
@@ -60,8 +73,7 @@ type ContextoEnvios = {
   envios: Envio[];
   /** Muda sempre que uma mídia é criada ou termina de chegar, para as listas recarregarem. */
   versao: number;
-  /** `aoCriar`: chamado com o id da mídia assim que a API cria o envio (a gravação de narração entra no instante dela). */
-  iniciar: (arquivos: File[], aoCriar?: (midiaId: string) => void) => void;
+  iniciar: (arquivos: File[], opcoes?: OpcoesDoEnvio) => void;
   pausar: (chave: string) => void;
   retomar: (chave: string) => void;
   cancelar: (chave: string) => void;
@@ -74,76 +86,123 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
   const [envios, setEnvios] = useState<Envio[]>([]);
   const [versao, setVersao] = useState(0);
   const uploads = useRef(new Map<string, Upload>());
+  // Os que já começaram e ainda não terminaram (contam no limite) e os que esperam a vez, na ordem
+  const ativos = useRef(new Set<string>());
+  const fila = useRef<string[]>([]);
 
   const atualizar = useCallback((chave: string, campos: Partial<Envio>) => {
     setEnvios((lista) => lista.map((envio) => (envio.chave === chave ? { ...envio, ...campos } : envio)));
   }, []);
 
-  const remover = useCallback((chave: string) => {
-    uploads.current.delete(chave);
-    setEnvios((lista) => lista.filter((envio) => envio.chave !== chave));
+  const comecarProximos = useCallback(() => {
+    while (ativos.current.size < ENVIOS_SIMULTANEOS && fila.current.length) {
+      const chave = fila.current.shift()!;
+      const upload = uploads.current.get(chave);
+      if (!upload) continue;
+      ativos.current.add(chave);
+      void upload.findPreviousUploads().then((anteriores) => {
+        if (!uploads.current.has(chave)) return; // cancelado enquanto procurava
+        if (anteriores.length > 0) upload.resumeFromPreviousUpload(anteriores[0]);
+        upload.start();
+      });
+    }
   }, []);
 
+  /** O envio parou (terminou, deu erro, foi pausado ou cancelado): libera a vez para o próximo da fila. */
+  const liberar = useCallback(
+    (chave: string) => {
+      ativos.current.delete(chave);
+      comecarProximos();
+    },
+    [comecarProximos],
+  );
+
+  const remover = useCallback(
+    (chave: string) => {
+      uploads.current.delete(chave);
+      fila.current = fila.current.filter((item) => item !== chave);
+      setEnvios((lista) => lista.filter((envio) => envio.chave !== chave));
+      liberar(chave);
+    },
+    [liberar],
+  );
+
   const iniciar = useCallback(
-    async (arquivos: File[], aoCriar?: (midiaId: string) => void) => {
+    async (arquivos: File[], opcoes: OpcoesDoEnvio = {}) => {
       const { Upload: ClasseUpload } = await import("tus-js-client");
+      const { aoCriar, album, caminhos } = opcoes;
+      const novos: Envio[] = [];
       for (const arquivo of arquivos) {
-        const chave = `${arquivo.name}-${arquivo.size}-${arquivo.lastModified}`;
+        const caminho = caminhos?.get(arquivo) ?? (arquivo.webkitRelativePath || arquivo.name);
+        const chave = `${album ?? ""}:${caminho}-${arquivo.size}-${arquivo.lastModified}`;
         if (uploads.current.has(chave)) continue; // este arquivo já está sendo enviado
-        const envio: Envio = { chave, nome: arquivo.name, tamanho: arquivo.size, enviado: 0, estado: "preparando" };
+        const envio: Envio = { chave, nome: arquivo.name, tamanho: arquivo.size, enviado: 0, estado: "preparando", album };
         if (!extensaoAceita(arquivo.name)) {
           envio.estado = "erro";
           envio.erro = "Formato não aceito. Envie um vídeo (MP4, MOV, MKV...), um áudio (MP3, WAV, M4A...) ou uma imagem (JPG, PNG, WebP).";
         }
-        setEnvios((lista) => [envio, ...lista.filter((item) => item.chave !== chave)]);
+        novos.push(envio);
         if (envio.estado === "erro") continue;
+        const metadata: Record<string, string> = { filename: arquivo.name, filetype: arquivo.type };
+        if (album) {
+          metadata.album = album;
+          metadata.caminho = caminho;
+        }
 
         const upload: Upload = new ClasseUpload(arquivo, {
           endpoint: "/api/uploads",
           chunkSize: TAMANHO_PEDACO,
           retryDelays: ESPERAS_MS,
-          metadata: { filename: arquivo.name, filetype: arquivo.type },
+          metadata,
           storeFingerprintForResuming: true,
           removeFingerprintOnSuccess: true,
           onShouldRetry: deveTentarDeNovo,
           onUploadUrlAvailable: () => {
             const midiaId = upload.url?.split("/").pop();
             atualizar(chave, { estado: "enviando", midiaId });
-            setVersao((valor) => valor + 1);
+            // As fotos de um álbum não estão na biblioteca: não fazem as listas recarregarem
+            if (!album) setVersao((valor) => valor + 1);
             if (midiaId) aoCriar?.(midiaId);
           },
           onProgress: (enviado, total) => atualizar(chave, { enviado, tamanho: total, estado: "enviando" }),
           onSuccess: () => {
             remover(chave);
-            setVersao((valor) => valor + 1);
+            if (!album) setVersao((valor) => valor + 1);
           },
-          onError: (erro) => atualizar(chave, { estado: "erro", erro: mensagemDoErro(erro) }),
+          onError: (erro) => {
+            atualizar(chave, { estado: "erro", erro: mensagemDoErro(erro) });
+            liberar(chave);
+          },
         });
         uploads.current.set(chave, upload);
-        const anteriores = await upload.findPreviousUploads();
-        if (anteriores.length > 0) upload.resumeFromPreviousUpload(anteriores[0]);
-        upload.start();
+        fila.current.push(chave);
       }
+      // Um estado só para a leva toda (milhares de fotos de uma pasta não viram milhares de renderizações)
+      const chaves = new Set(novos.map((envio) => envio.chave));
+      setEnvios((lista) => [...novos, ...lista.filter((item) => !chaves.has(item.chave))]);
+      comecarProximos();
     },
-    [atualizar, remover],
+    [atualizar, remover, liberar, comecarProximos],
   );
 
   const pausar = useCallback(
     (chave: string) => {
       uploads.current.get(chave)?.abort();
+      fila.current = fila.current.filter((item) => item !== chave);
       atualizar(chave, { estado: "pausado" });
+      liberar(chave);
     },
-    [atualizar],
+    [atualizar, liberar],
   );
 
   const retomar = useCallback(
     (chave: string) => {
-      const upload = uploads.current.get(chave);
-      if (!upload) return;
-      atualizar(chave, { estado: "enviando", erro: undefined });
-      upload.start();
+      if (!uploads.current.has(chave)) return;
+      atualizar(chave, { estado: "preparando", erro: undefined });
+      fila.current.push(chave);
+      comecarProximos();
     },
-    [atualizar],
+    [atualizar, comecarProximos],
   );
 
   const cancelar = useCallback(
@@ -172,7 +231,7 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
       value={{
         envios,
         versao,
-        iniciar: (arquivos, aoCriar) => void iniciar(arquivos, aoCriar),
+        iniciar: (arquivos, opcoes) => void iniciar(arquivos, opcoes),
         pausar,
         retomar,
         cancelar,

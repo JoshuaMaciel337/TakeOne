@@ -212,11 +212,13 @@ export function EntradaDoClipar({ aoImportar }: Props) {
               iniciar(
                 Array.from(lista),
                 comEsteira
-                  ? (midiaId) => {
-                      setAviso("");
-                      pedirEsteira({ midia_id: midiaId })
-                        .then(() => setAviso("O vídeo enviado está na esteira: quando ele chegar, o servidor procura os cortes e exporta os melhores."))
-                        .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não consegui pôr o vídeo na esteira."));
+                  ? {
+                      aoCriar: (midiaId) => {
+                        setAviso("");
+                        pedirEsteira({ midia_id: midiaId })
+                          .then(() => setAviso("O vídeo enviado está na esteira: quando ele chegar, o servidor procura os cortes e exporta os melhores."))
+                          .catch((e: unknown) => setErro(e instanceof ErroApi ? e.message : "Não consegui pôr o vídeo na esteira."));
+                      },
                     }
                   : undefined,
               );

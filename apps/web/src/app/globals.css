@@ -21,6 +21,12 @@
   /* O código de tempo do editor de vídeo, no azul que os editores profissionais usam */
   --to-codigo: #4aa3ff;
   --to-gradiente: linear-gradient(120deg, var(--to-destaque) 0%, var(--to-destaque-2) 100%);
+  /* Os rótulos de cor das fotos do álbum (onda 16): as mesmas nos quatro temas, porque aparecem sobre a foto */
+  --to-rotulo-vermelho: #e5484d;
+  --to-rotulo-amarelo: #f5c400;
+  --to-rotulo-verde: #30a46c;
+  --to-rotulo-azul: #3e7bfa;
+  --to-rotulo-roxo: #9b5de5;
   color-scheme: dark;
 }
 
@@ -88,6 +94,11 @@
   --color-aviso: var(--to-aviso);
   --color-erro: var(--to-erro);
   --color-codigo: var(--to-codigo);
+  --color-rotulo-vermelho: var(--to-rotulo-vermelho);
+  --color-rotulo-amarelo: var(--to-rotulo-amarelo);
+  --color-rotulo-verde: var(--to-rotulo-verde);
+  --color-rotulo-azul: var(--to-rotulo-azul);
+  --color-rotulo-roxo: var(--to-rotulo-roxo);
 
   --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-inter), system-ui, sans-serif;

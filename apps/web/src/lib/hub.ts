@@ -58,6 +58,14 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
     selo: "novo",
   },
   {
+    id: "album-de-fotos",
+    nome: "Álbum de fotos",
+    descricao: "Envie a pasta de um ensaio, dê notas e cores e separe as melhores fotos pelo teclado.",
+    categorias: ["imagem"],
+    destino: { tipo: "pagina", href: "/app/albuns" },
+    selo: "novo",
+  },
+  {
     id: "criar-automaticamente",
     nome: "Criar automaticamente",
     descricao: "Tira pausas e retakes e põe legendas, título, tarja, zooms e a chamada do fim.",
@@ -278,6 +286,7 @@ export const SECOES_DO_MENU: { titulo: string | null; itens: ItemDoMenu[] }[] = 
       { nome: "Editor de vídeo", acao: "editor-video", icone: "editor-video" },
       { nome: "Clipar", href: "/app/clipar", icone: "clipar" },
       { nome: "Editor de imagem", href: "/app/ferramentas/editor-de-imagem", icone: "editor-imagem" },
+      { nome: "Álbum de fotos", href: "/app/albuns", icone: "album-de-fotos" },
       { nome: "Gerar vídeo com IA", href: "/app/ferramentas/gerar-video", icone: "gerar-video" },
       { nome: "Gerar imagem com IA", href: "/app/ferramentas/gerar-imagem", icone: "gerar-imagem" },
       { nome: "Texto em fala", href: "/app/ferramentas/texto-em-fala", icone: "texto-em-fala" },

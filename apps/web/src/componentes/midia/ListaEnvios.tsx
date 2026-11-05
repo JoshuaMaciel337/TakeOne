@@ -7,7 +7,9 @@ import { formatarBytes, porcentagem } from "@/lib/formatar";
 
 /** Envios em andamento nesta aba, com pausar, retomar e cancelar. */
 export function ListaEnvios() {
-  const { envios, pausar, retomar, cancelar, dispensar } = useEnvios();
+  const { envios: todos, pausar, retomar, cancelar, dispensar } = useEnvios();
+  // As fotos de um álbum têm o andamento na página dele (uma pasta de ensaio tem milhares)
+  const envios = todos.filter((envio) => !envio.album);
   if (envios.length === 0) return null;
 
   return (

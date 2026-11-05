@@ -142,7 +142,8 @@ async def listar_midias(limite: int = Query(default=30, ge=1, le=200),
                         usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """As mídias do espaço, das mais novas para as mais antigas, em páginas: a seguinte começa depois de `antes`
     (o id da última da página). O editor busca todas, porque um projeto pode usar uma mídia antiga."""
-    filtro: dict = {"organizacao_id": usuario["organizacao_id"]}
+    # As fotos enviadas para um álbum têm a lista do álbum (milhares de fotos de um ensaio encheriam o painel Mídia)
+    filtro: dict = {"organizacao_id": usuario["organizacao_id"], "album_id": None}
     if antes:
         try:
             filtro["_id"] = {"$lt": ObjectId(antes)}
@@ -354,29 +355,39 @@ async def atualizar_midia(midia_id: str, dados: MidiaAtualizarEntrada,
     return (await para_saida(db, [{**midia, "nome": dados.nome}]))[0]
 
 
-@router.delete("/{midia_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    midia = await buscar_midia(db, midia_id, usuario)
+async def motivo_para_manter(db, midia: dict) -> str | None:
+    """Por que a mídia não pode sair da biblioteca agora (um projeto, um modelo ou uma exportação a usa), ou None."""
+    organizacao_id = midia["organizacao_id"]
     em_projetos = await db.projetos.count_documents(
-        {"organizacao_id": usuario["organizacao_id"], "midias_usadas": str(midia["_id"])})
+        {"organizacao_id": organizacao_id, "midias_usadas": str(midia["_id"])})
     if em_projetos:
         quantos = "1 projeto" if em_projetos == 1 else f"{em_projetos} projetos"
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            f"Esta mídia está em {quantos}. Tire os clipes dela da linha do tempo antes de excluir.")
+        return f"Esta mídia está em {quantos}. Tire os clipes dela da linha do tempo antes de excluir."
     em_modelos = await db.modelos.count_documents(
-        {"organizacao_id": usuario["organizacao_id"], "midias_usadas": str(midia["_id"])})
+        {"organizacao_id": organizacao_id, "midias_usadas": str(midia["_id"])})
     if em_modelos:
         quantos = "1 modelo" if em_modelos == 1 else f"{em_modelos} modelos"
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            f"Esta mídia está em {quantos} do espaço. Exclua o modelo antes de excluir a mídia.")
+        return f"Esta mídia está em {quantos} do espaço. Exclua o modelo antes de excluir a mídia."
     # A exportação guarda uma cópia do projeto: tirada da linha do tempo, a mídia ainda é usada pelo vídeo
     # que está sendo gerado, e excluí-la derrubava a exportação
     exportando = await db.exportacoes.count_documents({
-        "organizacao_id": usuario["organizacao_id"], "status": STATUS_EXPORTACAO_PROCESSANDO,
+        "organizacao_id": organizacao_id, "status": STATUS_EXPORTACAO_PROCESSANDO,
         "projeto.faixas.clipes.midia_id": str(midia["_id"])}, limit=1)
     if exportando:
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            "Um vídeo que usa esta mídia ainda está sendo exportado. Espere terminar para excluir.")
+        return "Um vídeo que usa esta mídia ainda está sendo exportado. Espere terminar para excluir."
+    return None
+
+
+@router.delete("/{midia_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    midia = await buscar_midia(db, midia_id, usuario)
+    if motivo := await motivo_para_manter(db, midia):
+        raise HTTPException(status.HTTP_409_CONFLICT, motivo)
+    await apagar_midia(db, midia)
+
+
+async def apagar_midia(db, midia: dict):
+    """Tira a mídia do banco e do disco, com tudo o que foi medido dela (confira antes o motivo_para_manter)."""
     momento = agora()
     # Jobs que ainda iam mexer nesta mídia param aqui
     await db.jobs.update_many(
@@ -394,6 +405,7 @@ async def excluir_midia(midia_id: str, usuario=Depends(usuario_atual), db=Depend
     await db.organizacoes.update_one({"_id": midia["organizacao_id"], "marca.logo_midia_id": midia["_id"]},
                                      {"$set": {"marca.logo_midia_id": None}})
     await db.batidas.delete_one({"midia_id": midia["_id"]})
+    await db.album_fotos.delete_many({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
 

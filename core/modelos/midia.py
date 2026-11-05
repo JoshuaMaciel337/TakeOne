@@ -149,7 +149,7 @@ def campos_da_imagem(info: dict, arquivos_antigos: list[str]) -> dict:
              "matriz": None, "transparente": info["transparente"]}
     miniaturas = {"total": 1, "colunas": 1, "linhas": 1, "intervalo": 1.0, **info["miniatura"]}
     return {"status": STATUS_PRONTA, "imagem": True, "duracao": None, "video": video, "audio": None,
-            "arquivos": arquivos, "miniaturas": miniaturas, "erro": None}
+            "arquivos": arquivos, "miniaturas": miniaturas, "erro": None, "exif": info.get("exif") or None}
 
 
 def nome_para_exibir(nome_arquivo: str) -> str:

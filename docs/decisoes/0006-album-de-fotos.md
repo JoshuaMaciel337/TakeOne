@@ -42,10 +42,16 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 
 ## Decisões técnicas
 
-1. **O álbum é um tipo de projeto, a foto continua uma mídia.** O álbum (`tipo: "album"`) guarda as mídias, o gênero,
-   as preferências e, por foto, a nota, a cor, a marcação, a categoria da IA e o grupo de parecidas. As fotos são as
-   mídias da biblioteca de sempre (com a cópia leve e a capa da ingestão), então "Abrir no editor de imagem", "Usar
-   nos vídeos" e "Montar com vários clipes" valem sem código novo.
+1. **O álbum tem coleções próprias, a foto continua uma mídia.** O álbum (`albuns`: nome e tipo do ensaio) e o que é
+   dele em cada foto (`album_fotos`: a nota, a cor, a marcação, a pasta de origem e, depois, a categoria da IA e o grupo
+   de parecidas) ficam fora do projeto, porque um ensaio tem milhares de fotos e cada tecla muda uma ou várias delas;
+   o projeto inteiro com a versão seria salvo a cada nota. As fotos são as mídias da biblioteca de sempre (a ingestão,
+   a cópia leve e a capa), então abrir uma foto no editor de imagem vale sem código novo. A foto enviada para o álbum
+   leva `album_id` na mídia e fica fora da lista da biblioteca (o editor busca a biblioteca inteira e recarrega a cada
+   ingestão: milhares de fotos de um ensaio pesariam em toda aba aberta); a ingestão dela leva o álbum no job, e a
+   biblioteca não recarrega por ela. Tirar uma foto do álbum apaga a enviada para ele, a menos que um projeto, um modelo
+   ou uma exportação a use (aí ela vai para a biblioteca); a que veio da biblioteca só sai do álbum. Os envios sobem 4
+   de cada vez (antes, todos ao mesmo tempo).
 2. **A análise é por mídia e fica guardada; a escolha é uma conta.** O worker mede cada foto uma vez (rostos e pontos
    do rosto, olhos, sorriso, pose, olhar, foco no rosto e geral, exposição e o vetor da imagem) e guarda numa coleção
    própria. Agrupar e escolher é uma conta sobre essas medidas (`lib/` puro, com testes, como a montagem), então mudar
@@ -75,9 +81,10 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 
 ## Para o dono decidir
 
-- **RAW:** sem revelar, dá para usar o JPEG que toda câmera grava dentro do RAW (serve para a grade e a seleção; o
-  leitor dos contêineres é nosso). Revelar de verdade pede o LibRaw (LGPL ou CDDL), o rawspeed (LGPL) ou o DNG SDK
-  (licença da Adobe). O LibRaw pode rodar como programa à parte, como o espeak-ng; a decisão é do dono.
+- **RAW (decidido em 04/11/2026):** por agora, o JPEG que toda câmera grava dentro do RAW (serve para a grade, a
+  seleção e a edição; o leitor dos contêineres é nosso). A revelação do RAW de verdade fica como melhoria futura, que o
+  dono quer fazer: pede o LibRaw (LGPL ou CDDL, rodando como programa à parte, como o espeak-ng), o rawspeed (LGPL) ou o
+  DNG SDK (licença da Adobe), e uma cópia leve de 16 bits que o compositor leia em ponto flutuante.
 - **Ordem:** o dono decidiu em 04/11/2026 terminar antes a onda 15 (personagens); esta é a onda 16.
 - **Retoque de pele e rosto:** o plano o deixava de fora, por estar perto do que o dono tinha vetado; ao pedir as
   funções do AfterShoot (que incluem o retoque) em 04/11/2026, o dono o trouxe para dentro. Os modelos de rosto com
@@ -85,9 +92,10 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 
 ## Partes
 
-- [ ] 16.1 Álbum de fotos: o tipo de projeto, a página no hub (cartões e lista), as duas entradas (enviar uma pasta
-  inteira pelo navegador, mantendo as subpastas; e "no lugar", de uma pasta do Nitro montada só para leitura, sem
-  copiar), a grade virtual com a cópia leve, estrelas, cores, marcação, filtros, ordem e os atalhos.
+- [x] 16.1 Álbum de fotos: as coleções, a página no hub, enviar fotos ou a pasta inteira pelo navegador (com as
+  subpastas, também arrastando), o EXIF na ingestão (a hora da foto, a câmera, a lente e a exposição), a grade virtual
+  com a capa, estrelas, cores, marcação, filtros, ordem, a lupa e os atalhos.
+- [ ] 16.1b Fotos "no lugar", de uma pasta do Nitro montada só para leitura (sem copiar), e o RAW pelo JPEG embutido.
 - [ ] 16.2 Medir cada foto: o job do worker de CPU com rostos, pontos do rosto, olhos, sorriso, pose, olhar, foco,
   exposição e o vetor da imagem, guardados por mídia, com o progresso por etapas.
 - [ ] 16.3 Escolher as melhores: grupos por tempo e semelhança, a nota por gênero, a melhor de cada grupo, destaques e

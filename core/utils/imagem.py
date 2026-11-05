@@ -97,8 +97,66 @@ def abrir_imagem(caminho: Path) -> Image.Image:
     return imagem.convert("RGBA" if tem_alfa else "RGB")
 
 
+# As etiquetas do EXIF que o álbum de fotos usa (a hora da foto ordena e separa as cenas; o resto filtra)
+_IFD_EXIF = 0x8769
+_MARCA, _MODELO = 271, 272
+_DATA_ORIGINAL, _DATA_DIGITALIZADA = 36867, 36868
+_LENTE, _ISO, _ABERTURA, _EXPOSICAO, _FOCAL = 42036, 34855, 33437, 33434, 37386
+
+
+def _numero(valor) -> float | None:
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    return numero if numero == numero and numero > 0 else None
+
+
+def _texto(valor) -> str | None:
+    if isinstance(valor, bytes):
+        valor = valor.decode("utf-8", "ignore")
+    if not isinstance(valor, str):
+        return None
+    valor = valor.replace("\x00", "").strip()
+    return valor[:80] or None
+
+
+def ler_exif(caminho: Path) -> dict:
+    """
+    A data e a hora da foto (sem fuso, como a câmera grava: "2026-05-10T15:32:10"), a câmera, a lente, o ISO, a
+    abertura, a exposição (em segundos) e a distância focal, só os que existem. Um EXIF quebrado não impede a
+    ingestão: sai o que deu para ler.
+    """
+    exif: dict = {}
+    try:
+        with Image.open(caminho) as arquivo:
+            dados = arquivo.getexif()
+            interno = dados.get_ifd(_IFD_EXIF)
+    except Exception:
+        return exif
+    data = _texto(interno.get(_DATA_ORIGINAL) or interno.get(_DATA_DIGITALIZADA) or dados.get(306))
+    if data and len(data) >= 19 and data[4] == ":" and data[7] == ":":
+        exif["data"] = f"{data[:4]}-{data[5:7]}-{data[8:10]}T{data[11:19]}"
+    marca, modelo = _texto(dados.get(_MARCA)), _texto(dados.get(_MODELO))
+    if modelo:
+        # Muitas câmeras repetem a marca no modelo ("Canon" + "Canon EOS R6")
+        repete = not marca or modelo.lower().startswith(marca.split()[0].lower())
+        exif["camera"] = modelo if repete else f"{marca} {modelo}"
+    if lente := _texto(interno.get(_LENTE)):
+        exif["lente"] = lente
+    iso = interno.get(_ISO)
+    if isinstance(iso, tuple):
+        iso = iso[0] if iso else None
+    if (iso := _numero(iso)) is not None:
+        exif["iso"] = int(iso)
+    for chave, etiqueta in (("abertura", _ABERTURA), ("exposicao", _EXPOSICAO), ("focal", _FOCAL)):
+        if (valor := _numero(interno.get(etiqueta))) is not None:
+            exif[chave] = round(valor, 6)
+    return exif
+
+
 def preparar_imagem(original: Path, pasta: Path) -> dict:
-    """Grava os quatro arquivos da imagem em `pasta` e devolve {largura, altura, transparente} da imagem.png."""
+    """Grava os quatro arquivos da imagem em `pasta` e devolve {largura, altura, transparente, miniatura, exif}."""
     imagem = abrir_imagem(original)
     transparente = _tem_transparencia(imagem)
     if not transparente and imagem.mode == "RGBA":
@@ -116,7 +174,8 @@ def preparar_imagem(original: Path, pasta: Path) -> dict:
                             Image.Resampling.LANCZOS)
     miniatura.save(pasta / "miniaturas.jpg", quality=85)
     return {"largura": render.width, "altura": render.height, "transparente": transparente,
-            "miniatura": {"largura": miniatura.width, "altura": miniatura.height}}
+            "miniatura": {"largura": miniatura.width, "altura": miniatura.height},
+            "exif": ler_exif(original) if original.suffix.lower() != ".svg" else {}}
 
 
 def quadro_inicial(caminho: Path, tamanho: tuple[int, int], destino: Path):

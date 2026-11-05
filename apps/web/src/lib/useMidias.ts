@@ -84,6 +84,8 @@ export function useMidias() {
     // "objeto" e "quadro" também: a foto editada e o quadro congelado nascem processando, como a fala; e as fotos
     // com IA (ampliar, expandir, foto em 3D) e a imagem gerada
     if (!JOBS_QUE_CRIAM_MIDIA.includes(job.tipo)) return;
+    // As fotos de um álbum ficam fora da biblioteca: milhares chegando não recarregam a lista a cada uma
+    if (job.entrada.album_id) return;
     if (job.status === "concluido" || job.status === "erro") {
       void recarregar();
       return;

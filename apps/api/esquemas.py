@@ -3013,3 +3013,92 @@ def exportacao_para_saida(doc: dict, job: dict | None = None) -> ExportacaoSaida
         "processamento": processamento,
         "aprovacao": aprovacao_para_saida(doc.get("aprovacao")),
     })
+
+
+# -----------------------------------------------
+# Álbum de fotos (onda 16, core/modelos/album.py)
+# -----------------------------------------------
+GeneroDoAlbum = Literal["casamento", "ensaio", "familia", "evento", "esporte", "escola", "recem_nascido", "produto",
+                        "outro"]
+CorDaFoto = Literal["vermelho", "amarelo", "verde", "azul", "roxo"]
+MarcacaoDaFoto = Literal["escolhida", "rejeitada"]
+IdDeMidia = Annotated[str, Field(min_length=24, max_length=24)]
+
+
+class AlbumEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=120)
+    genero: GeneroDoAlbum = "ensaio"
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class AlbumAtualizarEntrada(BaseModel):
+    nome: str | None = Field(default=None, min_length=1, max_length=120)
+    genero: GeneroDoAlbum | None = None
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
+
+
+class AlbumSaida(BaseModel):
+    id: str
+    nome: str
+    genero: str
+    fotos: int = 0
+    prontas: int = 0
+    escolhidas: int = 0
+    # A foto da capa do cartão: a primeira pronta
+    capa_midia_id: str | None = None
+    criado_em: datetime
+    atualizado_em: datetime
+
+
+class FotoDoAlbumSaida(BaseModel):
+    """Uma foto na grade do álbum: o que a mídia tem (o tamanho, a câmera) e o que o álbum guarda dela."""
+    midia_id: str
+    nome: str
+    status: str
+    erro: str | None = None
+    progresso: int | None = None
+    largura: int | None = None
+    altura: int | None = None
+    exif: dict | None = None
+    pasta: str = ""
+    nota: int = 0
+    cor: CorDaFoto | None = None
+    marcacao: MarcacaoDaFoto | None = None
+    enviado_em: datetime | None = None
+    # A foto foi enviada para o álbum (sai com ele); senão veio da biblioteca e só sai do álbum
+    do_album: bool = True
+
+
+class FotosMudarEntrada(BaseModel):
+    """A mesma mudança em várias fotos: a nota, a cor e a marcação (só o que vier; tirar é pedir de propósito)."""
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=20_000)
+    nota: int | None = Field(default=None, ge=0, le=5)
+    cor: CorDaFoto | None = None
+    marcacao: MarcacaoDaFoto | None = None
+    tirar_cor: bool = False
+    tirar_marcacao: bool = False
+
+    @model_validator(mode="after")
+    def alguma_mudanca(self):
+        nada = self.nota is None and self.cor is None and self.marcacao is None
+        if nada and not (self.tirar_cor or self.tirar_marcacao):
+            raise ValueError("Diga o que mudar: a nota, a cor ou a marcação.")
+        return self
+
+
+class FotosIdsEntrada(BaseModel):
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=20_000)
+
+
+class FotosRemovidasSaida(BaseModel):
+    """Quantas fotos saíram do disco e quantas voltaram para a biblioteca porque um projeto ou modelo as usa."""
+    apagadas: int
+    na_biblioteca: int
