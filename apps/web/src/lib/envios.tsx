@@ -3,6 +3,10 @@
 import type { DetailedError, Upload } from "tus-js-client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { nomeParaEnviar } from "./extensoesAceitas";
+
+export { ACEITAR_ARQUIVOS, ACEITAR_IMAGENS } from "./extensoesAceitas";
+
 export type EstadoEnvio = "preparando" | "enviando" | "pausado" | "erro";
 
 export type Envio = {
@@ -32,23 +36,6 @@ const TAMANHO_PEDACO = 8 * 1024 * 1024;
 const ESPERAS_MS = [0, 1_000, 3_000, 5_000, 10_000, 20_000, 30_000, 60_000];
 // Envios ao mesmo tempo: os outros esperam na fila (uma pasta de ensaio tem milhares de fotos)
 const ENVIOS_SIMULTANEOS = 4;
-
-// Mesma lista de core/config.py
-const EXTENSOES_ACEITAS = [
-  ".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts",
-  ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac",
-  ".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif",
-  // O RAW das câmeras (pelo JPEG que a câmera grava dentro dele)
-  ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".raf", ".dng", ".orf", ".rw2", ".pef", ".srw",
-];
-export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", "image/*", ...EXTENSOES_ACEITAS].join(",");
-/** Só as imagens (Arquivo › Abrir do editor de imagem). */
-export const ACEITAR_IMAGENS = ["image/*", ...EXTENSOES_ACEITAS.slice(EXTENSOES_ACEITAS.indexOf(".jpg"))].join(",");
-
-function extensaoAceita(nome: string): boolean {
-  const indice = nome.lastIndexOf(".");
-  return indice >= 0 && EXTENSOES_ACEITAS.includes(nome.slice(indice).toLowerCase());
-}
 
 function statusDoErro(erro: Error): number | undefined {
   return (erro as DetailedError).originalResponse?.getStatus() || undefined;
@@ -138,14 +125,15 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
         const caminho = caminhos?.get(arquivo) ?? (arquivo.webkitRelativePath || arquivo.name);
         const chave = `${album ?? ""}:${caminho}-${arquivo.size}-${arquivo.lastModified}`;
         if (uploads.current.has(chave)) continue; // este arquivo já está sendo enviado
-        const envio: Envio = { chave, nome: arquivo.name, tamanho: arquivo.size, enviado: 0, estado: "preparando", album };
-        if (!extensaoAceita(arquivo.name)) {
+        const nome = nomeParaEnviar(arquivo.name, arquivo.type);
+        const envio: Envio = { chave, nome: nome ?? arquivo.name, tamanho: arquivo.size, enviado: 0, estado: "preparando", album };
+        if (!nome) {
           envio.estado = "erro";
           envio.erro = "Formato não aceito. Envie um vídeo (MP4, MOV, MKV...), um áudio (MP3, WAV, M4A...) ou uma imagem (JPG, PNG, WebP).";
         }
         novos.push(envio);
         if (envio.estado === "erro") continue;
-        const metadata: Record<string, string> = { filename: arquivo.name, filetype: arquivo.type };
+        const metadata: Record<string, string> = { filename: envio.nome, filetype: arquivo.type };
         if (album) {
           metadata.album = album;
           metadata.caminho = caminho;

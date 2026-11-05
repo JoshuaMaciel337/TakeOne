@@ -3,7 +3,7 @@
 // A edição de uma foto (Edição automatizada › Edição de uma foto): a mesma edição do álbum, sem a escolha das
 // melhores. Por dentro é um álbum de uma foto só (unica), fora da lista da edição em massa, então o worker, as
 // medidas, o estilo pessoal, o retoque e a exportação são os de sempre.
-import { ArrowLeft, Download, Eye, LoaderCircle, WandSparkles } from "lucide-react";
+import { ArrowLeft, Download, Eye, ImageUp, LoaderCircle, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -19,6 +19,7 @@ import { aplicarEstiloPessoal, analisarAlbum, editarFotos, type EstiloPessoal, e
 import { arquivoDaFoto, comCor, type EdicaoDaFoto, edicaoParaEnviar, editandoAgora } from "@/lib/album/edicao";
 import { comPredefinicao } from "@/lib/album/retoque";
 import { arquivoDaMidia, ErroApi } from "@/lib/api";
+import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 
 export function EdicaoDeUmaFoto({ albumId }: { albumId: string }) {
@@ -35,6 +36,10 @@ export function EdicaoDeUmaFoto({ albumId }: { albumId: string }) {
   // O pincel do retoque, na lupa (o mesmo do álbum)
   const [pincel, setPincel] = useState(false);
   const analisada = useRef(false);
+  // O envio da foto (ele começa na página de antes): o andamento, ou o erro e outra foto
+  const { envios, iniciar } = useEnvios();
+  const envio = envios.find((item) => item.album === albumId);
+  const outraFoto = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     estilosPessoais()
@@ -120,10 +125,37 @@ export function EdicaoDeUmaFoto({ albumId }: { albumId: string }) {
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <main className="relative flex min-h-[45dvh] flex-1 items-center justify-center bg-black/40 p-3 lg:min-h-0">
           {!foto || !pronta ? (
-            <p className="flex items-center gap-2 text-sm text-suave">
-              <LoaderCircle className="size-4 animate-spin" aria-hidden />
-              {foto?.status === "erro" ? (foto.erro ?? "A foto não pôde ser preparada.") : "Preparando a foto…"}
-            </p>
+            envio?.estado === "erro" || foto?.status === "erro" || (fotos?.length === 0 && !envio) ? (
+              // A foto não chegou (o envio falhou, ou a página foi aberta depois): o porquê e outra foto
+              <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+                <p className="text-sm text-erro">
+                  {envio?.estado === "erro" ? envio.erro : foto?.status === "erro" ? (foto.erro ?? "A foto não pôde ser preparada.") : "A foto não chegou ao TakeOne."}
+                </p>
+                <button type="button" className="botao-principal px-4 py-2 text-sm" onClick={() => outraFoto.current?.click()}>
+                  <ImageUp className="size-4" aria-hidden />
+                  Escolher a foto
+                </button>
+                <input
+                  ref={outraFoto}
+                  type="file"
+                  accept={ACEITAR_IMAGENS}
+                  className="hidden"
+                  onChange={(evento) => {
+                    const arquivo = evento.target.files?.[0];
+                    if (arquivo) iniciar([arquivo], { album: albumId });
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="flex items-center gap-2 text-sm text-suave">
+                <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                {envio && envio.estado !== "preparando" && envio.tamanho
+                  ? `Enviando a foto… ${Math.round((100 * envio.enviado) / envio.tamanho)}%`
+                  : foto
+                    ? "Preparando a foto…"
+                    : "Enviando a foto…"}
+              </p>
+            )
           ) : (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element -- a cópia leve servida pela API */}

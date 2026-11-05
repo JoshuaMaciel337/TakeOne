@@ -87,7 +87,12 @@ export default function PaginaEdicaoDeUmaFoto() {
                     {edicao.capa_midia_id ? (
                       // eslint-disable-next-line @next/next/no-img-element -- a capa servida pela API
                       <img src={arquivoDaMidia(edicao.capa_midia_id, "capa.jpg")} alt="" className="size-full object-cover" loading="lazy" />
-                    ) : null}
+                    ) : (
+                      <span className="flex size-full flex-col items-center justify-center gap-1 text-xs text-suave">
+                        <ImageUp className="size-6" aria-hidden />
+                        {edicao.fotos ? "Preparando" : "Sem foto"}
+                      </span>
+                    )}
                   </div>
                   <p className="truncate px-2 py-1.5 text-xs">{edicao.nome}</p>
                 </Link>
