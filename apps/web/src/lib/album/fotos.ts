@@ -34,11 +34,35 @@ export type Album = {
   prontas: number;
   escolhidas: number;
   capa_midia_id: string | null;
+  escolha_opcoes?: Record<string, unknown> | null;
   criado_em: string;
   atualizado_em: string;
 };
 
 export type Exif = { data?: string; camera?: string; lente?: string; iso?: number; abertura?: number; exposicao?: number; focal?: number };
+
+export type RostoMedido = {
+  /** x, y, largura e altura em frações da foto. */
+  caixa: [number, number, number, number];
+  confianca: number;
+  foco: number;
+  guinada?: number;
+  arfagem?: number;
+  /** De 0 (fechado) a 1 (aberto). */
+  olho_esq?: number;
+  olho_dir?: number;
+  sorriso?: number;
+  /** De 0 (olhando para o lado) a 1 (para a câmera). */
+  olhando?: number;
+};
+
+export type Medidas = {
+  versao: number;
+  foco: { geral: number; melhor_bloco: number };
+  exposicao: { mediana: number; estourado: number; afogado: number };
+  rostos: RostoMedido[];
+  com_vetor_do_modelo: boolean;
+};
 
 export type FotoDoAlbum = {
   midia_id: string;
@@ -55,7 +79,25 @@ export type FotoDoAlbum = {
   marcacao: Marcacao | null;
   enviado_em: string | null;
   do_album: boolean;
+  medidas?: Medidas | null;
+  categoria?: Categoria | null;
+  grupo?: number | null;
+  cena?: number | null;
+  nota_ia?: number | null;
+  motivo?: string | null;
 };
+
+/** As categorias da escolha das melhores (core/modelos/escolha.py), com a cor de cada uma na grade. */
+export type Categoria = "destaque" | "escolhida" | "talvez" | "parecida" | "desfocada" | "olhos_fechados";
+
+export const CATEGORIAS: { id: Categoria; nome: string; plural: string }[] = [
+  { id: "destaque", nome: "Destaque", plural: "Destaques" },
+  { id: "escolhida", nome: "Escolhida", plural: "Escolhidas pela IA" },
+  { id: "talvez", nome: "Talvez", plural: "Talvez" },
+  { id: "parecida", nome: "Parecida", plural: "Parecidas" },
+  { id: "desfocada", nome: "Desfocada", plural: "Desfocadas" },
+  { id: "olhos_fechados", nome: "Olhos fechados", plural: "Olhos fechados" },
+];
 
 export type Mudanca = { nota?: number; cor?: CorDaFoto; marcacao?: Marcacao; tirar_cor?: boolean; tirar_marcacao?: boolean };
 
@@ -80,12 +122,14 @@ export type Filtro = {
   /** "sem": as que não têm marcação. */
   marcacao: "todas" | Marcacao | "sem";
   pasta: string | null;
+  /** As categorias da escolha (vazio: todas). */
+  categorias: Categoria[];
 };
 
-export const FILTRO_VAZIO: Filtro = { busca: "", nota: 0, comparacao: "ao_menos", cores: [], marcacao: "todas", pasta: null };
+export const FILTRO_VAZIO: Filtro = { busca: "", nota: 0, comparacao: "ao_menos", cores: [], marcacao: "todas", pasta: null, categorias: [] };
 
 export function filtroAtivo(filtro: Filtro): boolean {
-  return Boolean(filtro.busca.trim()) || filtro.nota > 0 || filtro.cores.length > 0 || filtro.marcacao !== "todas" || filtro.pasta !== null;
+  return Boolean(filtro.busca.trim()) || filtro.nota > 0 || filtro.cores.length > 0 || filtro.marcacao !== "todas" || filtro.pasta !== null || filtro.categorias.length > 0;
 }
 
 const semAcento = (texto: string) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -103,17 +147,19 @@ export function filtrarFotos(fotos: FotoDoAlbum[], filtro: Filtro): FotoDoAlbum[
     if (filtro.marcacao === "sem" && foto.marcacao) return false;
     if (filtro.marcacao !== "todas" && filtro.marcacao !== "sem" && foto.marcacao !== filtro.marcacao) return false;
     if (filtro.pasta !== null && foto.pasta !== filtro.pasta) return false;
+    if (filtro.categorias.length && (!foto.categoria || !filtro.categorias.includes(foto.categoria))) return false;
     return true;
   });
 }
 
-export type Ordem = "captura" | "nome" | "envio" | "nota";
+export type Ordem = "captura" | "nome" | "envio" | "nota" | "nota_ia";
 
 export const ORDENS: { id: Ordem; nome: string }[] = [
   { id: "captura", nome: "Hora da foto" },
   { id: "nome", nome: "Nome do arquivo" },
   { id: "envio", nome: "Ordem de envio" },
   { id: "nota", nome: "Nota" },
+  { id: "nota_ia", nome: "Nota da IA" },
 ];
 
 const nomes = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
@@ -135,6 +181,7 @@ export function ordenarFotos(fotos: FotoDoAlbum[], ordem: Ordem): FotoDoAlbum[] 
     nome: porNome,
     envio: porEnvio,
     nota: (a, b) => b.nota - a.nota || comparar.captura(a, b),
+    nota_ia: (a, b) => (b.nota_ia ?? -1) - (a.nota_ia ?? -1) || comparar.captura(a, b),
   };
   return [...fotos].sort(comparar[ordem]);
 }
@@ -197,4 +244,44 @@ export function resumoDaCamera(exif: Exif | null): string {
   if (exif.exposicao) partes.push(exif.exposicao >= 1 ? `${Number(exif.exposicao.toFixed(1))} s` : `1/${Math.round(1 / exif.exposicao)} s`);
   if (exif.focal) partes.push(`${Math.round(exif.focal)} mm`);
   return partes.join(" · ");
+}
+
+// -----------------------------------------------
+// As medidas em palavras (a gaveta e, depois, a escolha das melhores)
+// -----------------------------------------------
+/** Olho fechado abaixo disso; sorrindo acima disso (medido nos quadros de teste: aberto 0,74, piscando 0,24). */
+export const LIMIAR_OLHO_ABERTO = 0.5;
+export const LIMIAR_SORRISO = 0.5;
+
+/** Que fração das fotos medidas do álbum tem o foco abaixo do desta (0 a 1): o foco é relativo ao ensaio. */
+export function posicaoDoFoco(foto: FotoDoAlbum, fotos: FotoDoAlbum[]): number | null {
+  const valor = foto.medidas?.foco.melhor_bloco;
+  if (valor === undefined) return null;
+  const todos = fotos.map((f) => f.medidas?.foco.melhor_bloco).filter((v): v is number => v !== undefined);
+  if (todos.length < 2) return null;
+  return todos.filter((v) => v < valor).length / (todos.length - 1);
+}
+
+export function exposicaoEmPalavras(medidas: Medidas): string {
+  const { mediana, estourado, afogado } = medidas.exposicao;
+  if (estourado > 0.08) return "estourada";
+  if (afogado > 0.25 || mediana < 0.15) return "escura";
+  if (mediana > 0.85) return "clara demais";
+  return "boa";
+}
+
+/** O rosto principal (o maior) e como ele está: olhos, sorriso, olhar. */
+export function rostoPrincipal(medidas: Medidas): { rosto: RostoMedido; olhosFechados: boolean; sorrindo: boolean; olhando: boolean } | null {
+  const rosto = medidas.rostos[0];
+  if (!rosto) return null;
+  // A média dos dois olhos, como a escolha (core/modelos/escolha.py): um olho só costuma ser a cabeça inclinada
+  const olho = ((rosto.olho_esq ?? 1) + (rosto.olho_dir ?? 1)) / 2;
+  return { rosto, olhosFechados: olho < LIMIAR_OLHO_ABERTO, sorrindo: (rosto.sorriso ?? 0) >= LIMIAR_SORRISO, olhando: (rosto.olhando ?? 1) >= 0.5 };
+}
+
+/** Quantas fotos há em cada categoria da escolha (vazio antes de escolher). */
+export function contarCategorias(fotos: FotoDoAlbum[]): Partial<Record<Categoria, number>> {
+  const conta: Partial<Record<Categoria, number>> = {};
+  for (const foto of fotos) if (foto.categoria) conta[foto.categoria] = (conta[foto.categoria] ?? 0) + 1;
+  return conta;
 }

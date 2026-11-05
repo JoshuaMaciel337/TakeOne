@@ -97,3 +97,41 @@ test("o resumo da câmera", () => {
   assert.equal(resumoDaCamera({ exposicao: 2 }), "2 s");
   assert.equal(resumoDaCamera(null), "");
 });
+
+test("as medidas em palavras", async () => {
+  const { posicaoDoFoco, exposicaoEmPalavras, rostoPrincipal } = await import("./fotos.ts");
+  const medidas = (melhor: number, extra: Partial<import("./fotos.ts").Medidas> = {}) => ({
+    versao: 1,
+    foco: { geral: melhor / 2, melhor_bloco: melhor },
+    exposicao: { mediana: 0.45, estourado: 0, afogado: 0.01 },
+    rostos: [],
+    com_vetor_do_modelo: true,
+    ...extra,
+  });
+  const fotos = [10, 50, 90, 200].map((v, i) => foto({ midia_id: `f${i}`, medidas: medidas(v) }));
+  assert.equal(posicaoDoFoco(fotos[0], fotos), 0);
+  assert.equal(posicaoDoFoco(fotos[3], fotos), 1);
+  assert.equal(posicaoDoFoco(foto({ midia_id: "x" }), fotos), null);
+  assert.equal(exposicaoEmPalavras(medidas(1)), "boa");
+  assert.equal(exposicaoEmPalavras(medidas(1, { exposicao: { mediana: 0.9, estourado: 0.2, afogado: 0 } })), "estourada");
+  assert.equal(exposicaoEmPalavras(medidas(1, { exposicao: { mediana: 0.1, estourado: 0, afogado: 0.4 } })), "escura");
+  const rosto = { caixa: [0, 0, 0.2, 0.2] as [number, number, number, number], confianca: 0.9, foco: 100 };
+  assert.equal(rostoPrincipal(medidas(1)), null);
+  const piscando = rostoPrincipal(medidas(1, { rostos: [{ ...rosto, olho_esq: 0.24, olho_dir: 0.32, sorriso: 0.83, olhando: 0.2 }] }))!;
+  assert.deepEqual([piscando.olhosFechados, piscando.sorrindo, piscando.olhando], [true, true, false]);
+  const aberto = rostoPrincipal(medidas(1, { rostos: [{ ...rosto, olho_esq: 0.74, olho_dir: 0.76, sorriso: 0.1, olhando: 0.7 }] }))!;
+  assert.deepEqual([aberto.olhosFechados, aberto.sorrindo, aberto.olhando], [false, false, true]);
+});
+
+test("as categorias da escolha: filtro, ordem e contagem", async () => {
+  const { contarCategorias } = await import("./fotos.ts");
+  const comCategoria = [
+    foto({ midia_id: "a", categoria: "destaque", nota_ia: 90 }),
+    foto({ midia_id: "b", categoria: "parecida", nota_ia: 70 }),
+    foto({ midia_id: "c", categoria: "desfocada", nota_ia: 20 }),
+    foto({ midia_id: "d" }),
+  ];
+  assert.deepEqual(filtrarFotos(comCategoria, { ...FILTRO_VAZIO, categorias: ["destaque", "parecida"] }).map((f) => f.midia_id), ["a", "b"]);
+  assert.deepEqual(ordenarFotos(comCategoria, "nota_ia").map((f) => f.midia_id), ["a", "b", "c", "d"]);
+  assert.deepEqual(contarCategorias(comCategoria), { destaque: 1, parecida: 1, desfocada: 1 });
+});

@@ -407,6 +407,7 @@ async def apagar_midia(db, midia: dict):
                                      {"$set": {"marca.logo_midia_id": None}})
     await db.batidas.delete_one({"midia_id": midia["_id"]})
     await db.album_fotos.delete_many({"midia_id": midia["_id"]})
+    await db.fotos_medidas.delete_one({"midia_id": midia["_id"]})
     await run_in_threadpool(storage.remover_pasta, pasta_da_midia(midia["organizacao_id"], midia["_id"]))
     logging.info(f"[{midia['organizacao_id']}] Mídia excluída: {midia['nome']}")
 

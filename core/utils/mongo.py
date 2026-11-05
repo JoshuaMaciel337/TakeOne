@@ -61,6 +61,9 @@ INDICES = {
     "albuns": [
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
     ],
+    "fotos_medidas": [
+        ([("midia_id", 1)], {"unique": True}),
+    ],
     "album_fotos": [
         ([("album_id", 1), ("midia_id", 1)], {"unique": True}),
         ([("midia_id", 1)], {}),

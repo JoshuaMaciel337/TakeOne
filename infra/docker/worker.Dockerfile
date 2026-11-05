@@ -88,6 +88,26 @@ COPY core/fontes/biblioteca.json core/fontes/baixar_biblioteca.py /tmp/fontes/
 RUN python /tmp/fontes/baixar_biblioteca.py --manifesto /tmp/fontes/biblioteca.json --destino /app/fontes-biblioteca     && chmod -R a+rX /app/fontes-biblioteca
 ENV FONTES_DA_BIBLIOTECA=/app/fontes-biblioteca
 
+# Os modelos do álbum de fotos (onda 16), no fim, para as camadas pesadas de cima continuarem no cache
+# MediaPipe Face Landmarker (Apache-2.0): os 478 pontos e as expressões do rosto, em TFLite, que o próprio OpenCV
+# lê (sem o pacote do MediaPipe); para os olhos fechados, o sorriso e o olhar das fotos do álbum
+ADD --checksum=sha256:64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff \
+    https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task \
+    /app/modelos/rosto/face_landmarker.task
+RUN python3 -c "import zipfile; zipfile.ZipFile('/app/modelos/rosto/face_landmarker.task').extractall('/app/modelos/rosto')" \
+    && chmod 644 /app/modelos/rosto/*
+# DINOv2 small em ONNX (Apache-2.0; onnx-community/dinov2-small-ONNX numa revisão fixa): o vetor de cada foto do
+# álbum, para achar as parecidas
+ADD --checksum=sha256:6266c3cd72db6953cecdcbfeab9422a9f783d96f1a4e296ba70ffbac43b54a18 \
+    https://huggingface.co/onnx-community/dinov2-small-ONNX/resolve/08c606e3123472a388efa59181b677d428f69bbd/onnx/model.onnx \
+    /app/modelos/dinov2_small.onnx
+RUN chmod 644 /app/modelos/dinov2_small.onnx
+# SFace (OpenCV Zoo, Apache-2.0): o vetor de cada rosto, para juntar as fotos da mesma pessoa
+ADD --checksum=sha256:0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79 \
+    https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx \
+    /app/modelos/sface.onnx
+RUN chmod 644 /app/modelos/sface.onnx
+
 COPY core /app/core
 COPY apps/worker /app/worker
 COPY infra/backup /app/backup

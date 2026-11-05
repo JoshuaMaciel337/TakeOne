@@ -27,6 +27,13 @@
   --to-rotulo-verde: #30a46c;
   --to-rotulo-azul: #3e7bfa;
   --to-rotulo-roxo: #9b5de5;
+  /* As categorias da escolha das melhores fotos: as mesmas nos quatro temas, sobre a foto */
+  --to-grupo-destaque: #3e8bff;
+  --to-grupo-escolhida: #22a35a;
+  --to-grupo-talvez: #8a8f9a;
+  --to-grupo-parecida: #e0a106;
+  --to-grupo-desfocada: #ef4444;
+  --to-grupo-olhos-fechados: #a26bf0;
   color-scheme: dark;
 }
 
@@ -99,6 +106,12 @@
   --color-rotulo-verde: var(--to-rotulo-verde);
   --color-rotulo-azul: var(--to-rotulo-azul);
   --color-rotulo-roxo: var(--to-rotulo-roxo);
+  --color-grupo-destaque: var(--to-grupo-destaque);
+  --color-grupo-escolhida: var(--to-grupo-escolhida);
+  --color-grupo-talvez: var(--to-grupo-talvez);
+  --color-grupo-parecida: var(--to-grupo-parecida);
+  --color-grupo-desfocada: var(--to-grupo-desfocada);
+  --color-grupo-olhos-fechados: var(--to-grupo-olhos-fechados);
 
   --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-inter), system-ui, sans-serif;

@@ -3,10 +3,11 @@
 import base64
 import io
 
+import numpy as np
 import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from api.main import app
 from core.utils.fila import pegar_proximo_job
@@ -184,6 +185,76 @@ def test_importar_pasta_do_computador_sem_copiar(cliente, db_limpo, tmp_path, mo
     ingerir_tudo(db_limpo)
     assert cliente.delete(f"/api/albuns/{album['id']}").json()["apagadas"] == 3
     assert (fotos / "Casamento" / "IMG_1.jpg").is_file() and (fotos / "Casamento" / "Festa" / "IMG_2.jpg").is_file()
+
+
+def test_analisar_mede_as_fotos_que_faltam(cliente, db_limpo):
+    album = cliente.post("/api/albuns", json={"nome": "Medidas"}).json()
+    ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", _jpeg((60 * i, 90, 30))) for i in range(3)]
+    ingerir_tudo(db_limpo)
+    assert all(f["medidas"] is None for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json())
+    primeiro = cliente.post(f"/api/albuns/{album['id']}/analisar")
+    assert primeiro.status_code == 202
+    # Pedir de novo com a análise na fila devolve a mesma
+    assert cliente.post(f"/api/albuns/{album['id']}/analisar").json() == primeiro.json()
+    job = pegar_proximo_job(db_limpo, ["medir_album"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    assert db_limpo.jobs.find_one({"_id": job["_id"]})["saida"]["medidas"] == 3
+    fotos = cliente.get(f"/api/albuns/{album['id']}/fotos").json()
+    for foto in fotos:
+        assert set(foto["medidas"]) >= {"foco", "exposicao", "rostos"} and "vetor" not in foto["medidas"]
+    assert len(db_limpo.fotos_medidas.find_one({"midia_id": ObjectId(ids[0])})["vetor"]) == 384 * 2
+    # Uma foto nova depois: a próxima análise mede só ela
+    enviar_foto(cliente, album["id"], "IMG_nova.jpg", _jpeg((5, 5, 200)))
+    ingerir_tudo(db_limpo)
+    cliente.post(f"/api/albuns/{album['id']}/analisar")
+    job = pegar_proximo_job(db_limpo, ["medir_album"], "w-teste")
+    processar_job(db_limpo, job, "w-teste")
+    assert db_limpo.jobs.find_one({"_id": job["_id"]})["saida"] == {"album_id": album["id"], "medidas": 1, "falhas": 0,
+                                                                     "ja_estavam": 3}
+    # Tirar a foto do álbum leva as medidas junto
+    cliente.post(f"/api/albuns/{album['id']}/fotos/remover", json={"midia_ids": [ids[0]]})
+    assert db_limpo.fotos_medidas.count_documents({"midia_id": ObjectId(ids[0])}) == 0
+
+
+def test_escolher_as_melhores_sem_passar_por_cima_do_que_foi_feito_a_mao(cliente, db_limpo):
+    album = cliente.post("/api/albuns", json={"nome": "Escolha", "genero": "produto"}).json()
+    assert cliente.post(f"/api/albuns/{album['id']}/escolher", json={}).status_code == 409
+
+    def foto_com_bordas(semente: int, borrar: float = 0) -> bytes:
+        sorteio = np.random.default_rng(semente)
+        imagem = Image.fromarray(sorteio.integers(0, 255, (96, 128, 3), dtype=np.uint8)).resize((512, 384))
+        if borrar:
+            imagem = imagem.filter(ImageFilter.GaussianBlur(borrar))
+        saida = io.BytesIO()
+        imagem.save(saida, "JPEG", quality=92)
+        return saida.getvalue()
+
+    ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", foto_com_bordas(i)) for i in range(5)]
+    borrada = enviar_foto(cliente, album["id"], "IMG_borrada.jpg", foto_com_bordas(9, borrar=6))
+    ingerir_tudo(db_limpo)
+    cliente.post(f"/api/albuns/{album['id']}/analisar")
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["medir_album"], "w-teste"), "w-teste")
+    # A pessoa já rejeitou uma foto à mão: a escolha não muda a marcação dela
+    cliente.patch(f"/api/albuns/{album['id']}/fotos", json={"midia_ids": [ids[0]], "marcacao": "rejeitada"})
+
+    resposta = cliente.post(f"/api/albuns/{album['id']}/escolher", json={"quantas": "muitas"})
+    assert resposta.status_code == 200, resposta.text
+    saida = resposta.json()
+    assert saida["sem_analise"] == 0 and sum(saida["categorias"].values()) == 6
+    fotos = {f["midia_id"]: f for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}
+    assert fotos[borrada]["categoria"] == "desfocada" and fotos[borrada]["nota"] == 1
+    assert fotos[ids[0]]["marcacao"] == "rejeitada" and fotos[ids[0]]["categoria"]
+    escolhidas = [f for f in fotos.values() if f["categoria"] in ("escolhida", "destaque")]
+    assert escolhidas
+    assert all(f["marcacao"] == "escolhida" and f["nota"] >= 4 for f in escolhidas if f["midia_id"] != ids[0])
+    assert all(f["motivo"] and 0 <= f["nota_ia"] <= 100 for f in fotos.values())
+    assert cliente.get(f"/api/albuns/{album['id']}").json()["escolha_opcoes"]["quantas"] == "muitas"
+
+    # Assistido: só as categorias, sem mexer nas estrelas
+    cliente.patch(f"/api/albuns/{album['id']}/fotos", json={"midia_ids": [ids[1]], "nota": 0})
+    db_limpo.album_fotos.update_one({"midia_id": ObjectId(ids[1])}, {"$set": {"origem": "ia"}})
+    cliente.post(f"/api/albuns/{album['id']}/escolher", json={"aplicar": False})
+    assert {f["midia_id"]: f for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}[ids[1]]["nota"] == 0
 
 
 def test_album_de_outro_espaco(cliente, db_limpo):

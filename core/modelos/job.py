@@ -24,6 +24,8 @@ TAREFAS = {
     "ingestao": RECURSO_CPU,
     # As fotos de uma pasta do computador entram no álbum sem cópia (onda 16)
     "importar_pasta": RECURSO_CPU,
+    # As medidas de cada foto do álbum: foco, exposição, rostos, olhos, sorriso e o vetor (onda 16.2)
+    "medir_album": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,

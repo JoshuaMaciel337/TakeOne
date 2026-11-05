@@ -1,29 +1,40 @@
 "use client";
 
 import {
+  Aperture,
   ArrowLeft,
   Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  CircleHelp,
+  EyeOff,
   FolderUp,
   HardDrive,
   ImageUp,
+  Layers,
   LoaderCircle,
+  ScanSearch,
   Search,
   Star,
   Trash2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
-import { fotosDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
+import { analisarAlbum, escolherMelhores, fotosDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
+import type { OpcoesDaEscolha } from "@/lib/album/api";
 import {
   type Album as TipoAlbum,
   aplicarMudanca,
+  type Categoria,
+  CATEGORIAS,
+  contarCategorias,
   colunasDaGrade,
   contar,
   CORES,
@@ -42,7 +53,10 @@ import {
   ORDENS,
   ordenarFotos,
   pastas as pastasDasFotos,
+  exposicaoEmPalavras,
+  posicaoDoFoco,
   resumoDaCamera,
+  rostoPrincipal,
 } from "@/lib/album/fotos";
 import { arquivoDaMidia, ErroApi } from "@/lib/api";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
@@ -62,6 +76,25 @@ const CLASSE_DA_COR: Record<CorDaFoto, string> = {
   azul: "bg-rotulo-azul",
   roxo: "bg-rotulo-roxo",
 };
+
+const CLASSE_DA_CATEGORIA: Record<Categoria, string> = {
+  destaque: "bg-grupo-destaque",
+  escolhida: "bg-grupo-escolhida",
+  talvez: "bg-grupo-talvez",
+  parecida: "bg-grupo-parecida",
+  desfocada: "bg-grupo-desfocada",
+  olhos_fechados: "bg-grupo-olhos-fechados",
+};
+
+function IconeDaCategoria({ categoria }: { categoria: Categoria }) {
+  const classe = "size-3";
+  if (categoria === "destaque") return <Star className={classe} fill="currentColor" aria-hidden />;
+  if (categoria === "escolhida") return <Check className={classe} aria-hidden />;
+  if (categoria === "parecida") return <Layers className={classe} aria-hidden />;
+  if (categoria === "desfocada") return <Aperture className={classe} aria-hidden />;
+  if (categoria === "olhos_fechados") return <EyeOff className={classe} aria-hidden />;
+  return <CircleHelp className={classe} aria-hidden />;
+}
 
 type Vista = { tamanho: number; ordem: Ordem };
 
@@ -133,7 +166,11 @@ function useAlbum(albumId: string) {
   const [album, setAlbum] = useState<TipoAlbum | null>(null);
   const [fotos, setFotos] = useState<FotoDoAlbum[] | null>(null);
   const [erro, setErro] = useState("");
+  const [analise, setAnalise] = useState<{ progresso: number; mensagem: string } | null>(null);
   const espera = useRef<number | null>(null);
+  const esperaDaAnalise = useRef<((deuCerto: boolean) => void) | null>(null);
+  /** Uma promessa que se resolve quando a análise em andamento termina (true se deu certo). */
+  const esperarAnalise = useCallback(() => new Promise<boolean>((pronto) => (esperaDaAnalise.current = pronto)), []);
   const pedido = useRef(0);
 
   const recarregar = useCallback(() => {
@@ -168,6 +205,20 @@ function useAlbum(albumId: string) {
 
   useEventosJobs((job) => {
     if (job.entrada.album_id !== albumId) return;
+    // A análise das fotos: o andamento na barra de cima; no fim, as medidas chegam com a lista
+    if (job.tipo === "medir_album") {
+      if (job.status === "concluido" || job.status === "erro") {
+        setAnalise(null);
+        if (job.status === "erro") setErro(job.erro ?? "A análise das fotos falhou.");
+        void recarregar();
+        // Quem esperava a análise (a escolha das melhores) segue
+        esperaDaAnalise.current?.(job.status === "concluido");
+        esperaDaAnalise.current = null;
+      } else {
+        setAnalise({ progresso: job.progresso, mensagem: job.mensagem });
+      }
+      return;
+    }
     // A pasta importada do computador: as fotos já estão no álbum quando o job termina
     if (job.tipo === "importar_pasta") {
       if (job.status === "concluido" || job.status === "erro") pedirRecarga();
@@ -190,14 +241,17 @@ function useAlbum(albumId: string) {
     if (criados) pedirRecarga();
   }, [criados, pedirRecarga]);
 
-  return { album, setAlbum, fotos, setFotos, erro, setErro, recarregar };
+  return { album, setAlbum, fotos, setFotos, erro, setErro, recarregar, analise, setAnalise, esperarAnalise };
 }
 
 // -----------------------------------------------
 // A tela
 // -----------------------------------------------
 export function Album({ albumId }: { albumId: string }) {
-  const { album, setAlbum, fotos, setFotos, erro, setErro, recarregar } = useAlbum(albumId);
+  const { album, setAlbum, fotos, setFotos, erro, setErro, recarregar, analise, setAnalise, esperarAnalise } = useAlbum(albumId);
+  const [escolhendo, setEscolhendo] = useState(false);
+  const [ocupado, setOcupado] = useState("");
+
   const { iniciar, envios } = useEnvios();
   const [filtro, setFiltro] = useState<Filtro>(FILTRO_VAZIO);
   const [vista, setVista] = useState<Vista>({ tamanho: TAMANHOS.padrao, ordem: "captura" });
@@ -237,8 +291,10 @@ export function Album({ albumId }: { albumId: string }) {
   const visiveis = useMemo(() => ordenarFotos(filtrarFotos(fotos ?? [], filtro), vista.ordem), [fotos, filtro, vista.ordem]);
   const contagens = useMemo(() => contar(fotos ?? []), [fotos]);
   const listaDePastas = useMemo(() => pastasDasFotos(fotos ?? []), [fotos]);
+  const porCategoria = useMemo(() => contarCategorias(fotos ?? []), [fotos]);
   const indiceDoCursor = cursor ? visiveis.findIndex((foto) => foto.midia_id === cursor) : -1;
   const fotoDoCursor = indiceDoCursor >= 0 ? visiveis[indiceDoCursor] : null;
+  const semMedida = (fotos ?? []).filter((foto) => foto.status === "pronta" && !foto.medidas).length;
 
   const envioDoAlbum = envios.filter((envio) => envio.album === albumId);
   const faltam = envioDoAlbum.filter((envio) => envio.estado !== "erro");
@@ -250,6 +306,35 @@ export function Album({ albumId }: { albumId: string }) {
     const fora = arquivos.length - fotosDaLeva.length;
     setAviso(fora ? `${fora.toLocaleString("pt-BR")} arquivo(s) que não são fotos ficaram de fora.` : "");
     if (fotosDaLeva.length) iniciar(fotosDaLeva, { album: albumId, caminhos });
+  }
+
+  /** Analisa o que falta (se faltar) e escolhe as melhores com as opções; no fim, o resumo no aviso. */
+  async function escolherAsMelhores(opcoes: OpcoesDaEscolha) {
+    setErro("");
+    try {
+      if (semMedida > 0) {
+        setOcupado("Analisando as fotos…");
+        const terminou = esperarAnalise();
+        setAnalise({ progresso: 0, mensagem: "Na fila" });
+        await analisarAlbum(albumId);
+        if (!(await terminou)) throw new Error("A análise das fotos falhou.");
+      }
+      setOcupado("Escolhendo…");
+      const resultado = await escolherMelhores(albumId, opcoes);
+      await recarregar();
+      const partes = CATEGORIAS.filter((c) => resultado.categorias[c.id]).map((c) => {
+        const n = resultado.categorias[c.id];
+        const nome = n === 1 ? c.nome : c.plural;
+        return `${n} ${nome.charAt(0).toLowerCase()}${nome.slice(1)}`;
+      });
+      setAviso(`Pronto: ${partes.join(", ")}.`);
+      setFiltro({ ...FILTRO_VAZIO, categorias: ["destaque", "escolhida"] });
+      setEscolhendo(false);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível escolher as melhores.");
+    } finally {
+      setOcupado("");
+    }
   }
 
   /** As fotos que recebem a ação: as escolhidas, ou a do cursor. */
@@ -460,6 +545,31 @@ export function Album({ albumId }: { albumId: string }) {
               </span>
             </span>
           ) : null}
+          {analise ? (
+            <span className="hidden items-center gap-2 text-xs text-suave md:flex" title={analise.mensagem}>
+              <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+              {analise.mensagem || "Analisando"}
+              <span className="h-1.5 w-20 overflow-hidden rounded-full bg-painel-3">
+                <span className="block h-full rounded-full" style={{ width: `${analise.progresso}%`, background: "var(--to-gradiente)" }} />
+              </span>
+            </span>
+          ) : semMedida > 0 ? (
+            <button
+              type="button"
+              className="botao-secundario px-3 py-1.5 text-xs"
+              title="Mede o foco, a exposição, os rostos, os olhos e o sorriso de cada foto"
+              onClick={() => {
+                setAnalise({ progresso: 0, mensagem: "Na fila" });
+                analisarAlbum(albumId).catch((e) => {
+                  setAnalise(null);
+                  setErro(e instanceof ErroApi ? e.message : "Não foi possível analisar as fotos.");
+                });
+              }}
+            >
+              <ScanSearch className="size-4" aria-hidden />
+              <span className="hidden lg:inline">Analisar {semMedida.toLocaleString("pt-BR")}</span>
+            </button>
+          ) : null}
           {noComputador ? (
             <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => setImportando(true)} title="Importar uma pasta do computador do servidor, sem copiar">
               <HardDrive className="size-4" aria-hidden />
@@ -470,7 +580,13 @@ export function Album({ albumId }: { albumId: string }) {
             <ImageUp className="size-4" aria-hidden />
             <span className="hidden sm:inline">Enviar fotos</span>
           </button>
-          <button type="button" className="botao-principal px-3 py-1.5 text-xs" onClick={() => entradaPasta.current?.click()} title="Enviar pasta">
+          {fotos.length ? (
+            <button type="button" className="botao-principal px-3 py-1.5 text-xs" onClick={() => setEscolhendo(true)} title="A IA agrupa as parecidas, tira as desfocadas e as de olhos fechados e escolhe as melhores">
+              <WandSparkles className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Escolher as melhores</span>
+            </button>
+          ) : null}
+          <button type="button" className={`${fotos.length ? "botao-secundario" : "botao-principal"} px-3 py-1.5 text-xs`} onClick={() => entradaPasta.current?.click()} title="Enviar pasta">
             <FolderUp className="size-4" aria-hidden />
             <span className="hidden sm:inline">Enviar pasta</span>
           </button>
@@ -502,7 +618,7 @@ export function Album({ albumId }: { albumId: string }) {
         </div>
       </header>
 
-      <BarraDeFiltros filtro={filtro} aoMudar={setFiltro} ordem={vista.ordem} aoOrdenar={(ordem) => mudarVista({ ordem })} pastas={listaDePastas} />
+      <BarraDeFiltros filtro={filtro} aoMudar={setFiltro} ordem={vista.ordem} aoOrdenar={(ordem) => mudarVista({ ordem })} pastas={listaDePastas} porCategoria={porCategoria} />
 
       {erro || aviso || comErro.length ? (
         <div className="flex flex-col gap-1 border-b border-borda bg-painel px-3 py-2 text-xs">
@@ -562,6 +678,7 @@ export function Album({ albumId }: { albumId: string }) {
           quantos={quantosSelecionados}
           aoAplicar={(mudanca) => aplicar(mudanca)}
           aoRemover={remover}
+          todas={fotos}
         />
       </div>
 
@@ -591,6 +708,16 @@ export function Album({ albumId }: { albumId: string }) {
       </footer>
 
       {importando ? <JanelaImportarPasta albumId={albumId} aoFechar={() => setImportando(false)} aoImportar={setAviso} /> : null}
+      {escolhendo ? (
+        <JanelaEscolher
+          iniciais={(album.escolha_opcoes as Partial<OpcoesDaEscolha> | null) ?? null}
+          faltamAnalisar={semMedida}
+          total={contagens.prontas}
+          ocupado={ocupado}
+          aoEscolher={(opcoes) => void escolherAsMelhores(opcoes)}
+          aoFechar={() => setEscolhendo(false)}
+        />
+      ) : null}
 
       {lupa && fotoDoCursor ? (
         <Lupa
@@ -660,12 +787,15 @@ function BarraDeFiltros({
   ordem,
   aoOrdenar,
   pastas,
+  porCategoria,
 }: {
   filtro: Filtro;
   aoMudar: (filtro: Filtro) => void;
   ordem: Ordem;
   aoOrdenar: (ordem: Ordem) => void;
   pastas: { pasta: string; fotos: number }[];
+  /** Quantas fotos em cada categoria da escolha (vazio: o álbum ainda não passou pela escolha). */
+  porCategoria: Partial<Record<Categoria, number>>;
 }) {
   const muda = (campos: Partial<Filtro>) => aoMudar({ ...filtro, ...campos });
   const separador = <span className="h-4 w-px bg-borda" aria-hidden />;
@@ -722,6 +852,27 @@ function BarraDeFiltros({
           );
         })}
       </div>
+      {Object.keys(porCategoria).length ? (
+        <>
+          {separador}
+          <select
+            value={filtro.categorias.join(",")}
+            onChange={(evento) => muda({ categorias: evento.target.value ? (evento.target.value.split(",") as Categoria[]) : [] })}
+            className="max-w-52 rounded border border-borda bg-painel-2 px-1.5 py-0.5"
+            aria-label="Escolha da IA"
+          >
+            <option value="">Todas as categorias</option>
+            <option value="destaque,escolhida">
+              As melhores · {(porCategoria.destaque ?? 0) + (porCategoria.escolhida ?? 0)}
+            </option>
+            {CATEGORIAS.filter((c) => porCategoria[c.id]).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.plural} · {porCategoria[c.id]}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
       {pastas.length > 1 ? (
         <>
           {separador}
@@ -905,6 +1056,18 @@ function Cartao({
         <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-aviso">{foto.nota}★</span>
       ) : null}
       {foto.cor ? <span className={`absolute inset-x-0 bottom-0 h-1 ${CLASSE_DA_COR[foto.cor]}`} aria-label={`Cor ${foto.cor}`} /> : null}
+      {foto.categoria ? (
+        <>
+          <span className={`absolute inset-x-0 top-0 h-1 ${CLASSE_DA_CATEGORIA[foto.categoria]}`} />
+          <span
+            className={`absolute right-1 top-1.5 flex h-5 items-center gap-0.5 rounded-full px-1.5 text-[10px] font-semibold text-white ${CLASSE_DA_CATEGORIA[foto.categoria]}`}
+            title={`${CATEGORIAS.find((c) => c.id === foto.categoria)?.nome}${foto.motivo ? `: ${foto.motivo}` : ""}`}
+          >
+            <IconeDaCategoria categoria={foto.categoria} />
+            {lado >= 150 && foto.nota_ia !== null && foto.nota_ia !== undefined ? foto.nota_ia : null}
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -917,6 +1080,7 @@ function Gaveta({
   quantos,
   aoAplicar,
   aoRemover,
+  todas,
 }: {
   contagens: ReturnType<typeof contar>;
   filtro: Filtro;
@@ -925,6 +1089,7 @@ function Gaveta({
   quantos: number;
   aoAplicar: (mudanca: Mudanca) => void;
   aoRemover: () => void;
+  todas: FotoDoAlbum[];
 }) {
   const linha = (rotulo: string, numero: number, ativo: boolean, aoClicar?: () => void, classe = "") => (
     <button
@@ -938,6 +1103,7 @@ function Gaveta({
     </button>
   );
   const alvo = quantos > 1 ? `as ${quantos.toLocaleString("pt-BR")} selecionadas` : "a foto";
+  const porCategoria = contarCategorias(todas);
   return (
     <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-borda bg-painel p-3 lg:flex" aria-label="Resultado e detalhes">
       <section>
@@ -950,6 +1116,24 @@ function Gaveta({
         {contagens.processando ? linha("Preparando", contagens.processando, false) : null}
         {contagens.erros ? linha("Com erro", contagens.erros, false, undefined, "text-erro") : null}
       </section>
+
+      {Object.keys(porCategoria).length ? (
+        <section>
+          <h2 className="mb-1 text-[11px] font-semibold tracking-wide text-apagado uppercase">Escolha da IA</h2>
+          {CATEGORIAS.filter((c) => porCategoria[c.id]).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => aoFiltrar({ ...FILTRO_VAZIO, categorias: filtro.categorias.length === 1 && filtro.categorias[0] === c.id ? [] : [c.id] })}
+              className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs ${filtro.categorias.length === 1 && filtro.categorias[0] === c.id ? "bg-painel-3 text-texto" : "text-suave hover:bg-painel-2 hover:text-texto"}`}
+            >
+              <span className={`size-2.5 rounded-full ${CLASSE_DA_CATEGORIA[c.id]}`} aria-hidden />
+              <span className="flex-1">{c.plural}</span>
+              <span className="tabular-nums">{porCategoria[c.id]!.toLocaleString("pt-BR")}</span>
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       {foto ? (
         <section className="flex flex-col gap-2">
@@ -996,6 +1180,17 @@ function Gaveta({
                 ) : null}
               </dl>
               {resumoDaCamera(foto.exif) ? <p className="text-xs text-suave">{resumoDaCamera(foto.exif)}</p> : null}
+              {foto.categoria ? (
+                <p className="flex items-start gap-1.5 text-xs">
+                  <span className={`mt-1 size-2.5 shrink-0 rounded-full ${CLASSE_DA_CATEGORIA[foto.categoria]}`} aria-hidden />
+                  <span>
+                    <strong>{CATEGORIAS.find((c) => c.id === foto.categoria)?.nome}</strong>
+                    {foto.nota_ia !== null && foto.nota_ia !== undefined ? ` · nota ${foto.nota_ia}` : ""}
+                    {foto.motivo ? <span className="block text-suave">{foto.motivo}</span> : null}
+                  </span>
+                </p>
+              ) : null}
+              <MedidasDaFoto foto={foto} fotos={todas} />
             </>
           ) : null}
           <div className="flex items-center justify-between">
@@ -1122,5 +1317,31 @@ function Lupa({
         </span>
       </div>
     </div>
+  );
+}
+
+/** As medidas da análise em palavras: o foco comparado ao resto do ensaio, a exposição e o rosto principal. */
+function MedidasDaFoto({ foto, fotos }: { foto: FotoDoAlbum; fotos: FotoDoAlbum[] }) {
+  if (!foto.medidas) return foto.status === "pronta" ? <p className="text-[11px] text-apagado">Ainda não analisada.</p> : null;
+  const posicao = posicaoDoFoco(foto, fotos);
+  const principal = rostoPrincipal(foto.medidas);
+  const linha = (rotulo: string, valor: string, classe = "") => (
+    <>
+      <dt className="text-apagado">{rotulo}</dt>
+      <dd className={classe}>{valor}</dd>
+    </>
+  );
+  const exposicao = exposicaoEmPalavras(foto.medidas);
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded-md bg-painel-2 p-2 text-xs">
+      {posicao !== null
+        ? linha("Foco", posicao >= 0.66 ? "dos mais nítidos do ensaio" : posicao >= 0.25 ? "na média do ensaio" : "dos menos nítidos", posicao < 0.25 ? "text-aviso" : "")
+        : null}
+      {linha("Exposição", exposicao, exposicao === "boa" ? "" : "text-aviso")}
+      {linha("Rostos", foto.medidas.rostos.length ? String(foto.medidas.rostos.length) : "nenhum")}
+      {principal ? linha("Olhos", principal.olhosFechados ? "fechados" : "abertos", principal.olhosFechados ? "text-erro" : "") : null}
+      {principal?.rosto.sorriso !== undefined ? linha("Sorriso", principal.sorrindo ? "sim" : "não") : null}
+      {principal?.rosto.olhando !== undefined ? linha("Olhar", principal.olhando ? "para a câmera" : "para o lado") : null}
+    </dl>
   );
 }

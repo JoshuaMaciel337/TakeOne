@@ -54,8 +54,10 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
    de cada vez (antes, todos ao mesmo tempo).
 2. **A análise é por mídia e fica guardada; a escolha é uma conta.** O worker mede cada foto uma vez (rostos e pontos
    do rosto, olhos, sorriso, pose, olhar, foco no rosto e geral, exposição e o vetor da imagem) e guarda numa coleção
-   própria. Agrupar e escolher é uma conta sobre essas medidas (`lib/` puro, com testes, como a montagem), então mudar
-   o modo, a quantidade ou o rigor do desfoque refaz a escolha na hora, sem rodar modelo nenhum.
+   própria (`fotos_medidas`). Agrupar e escolher é uma conta sobre essas medidas (`core/modelos/escolha.py`, pura e
+   com testes), então mudar o modo, a quantidade ou o rigor do desfoque refaz a escolha em segundos, sem rodar modelo
+   nenhum. Ela roda na API, não no navegador: os vetores de milhares de fotos (384 números cada) não precisam ir para a
+   aba, e o resultado vai direto para `album_fotos`.
 3. **Os modelos são abertos e pequenos, na CPU.** YuNet (MIT, já usado) para os rostos; MediaPipe Face Landmarker
    (Apache-2.0: 478 pontos e as expressões, que dão olhos fechados, sorriso, pose e olhar); variância do laplaciano no
    recorte do rosto e na máscara do assunto para o foco, com o limiar calibrado pelo próprio álbum; histograma para a
@@ -96,11 +98,12 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
   subpastas, também arrastando), o EXIF na ingestão (a hora da foto, a câmera, a lente e a exposição), a grade virtual
   com a capa, estrelas, cores, marcação, filtros, ordem, a lupa e os atalhos.
 - [x] 16.1b Fotos "no lugar", de uma pasta do Nitro montada só para leitura (sem copiar), e o RAW pelo JPEG embutido.
-- [ ] 16.2 Medir cada foto: o job do worker de CPU com rostos, pontos do rosto, olhos, sorriso, pose, olhar, foco,
+- [x] 16.2 Medir cada foto: o job do worker de CPU com rostos, pontos do rosto, olhos, sorriso, pose, olhar, foco,
   exposição e o vetor da imagem, guardados por mídia, com o progresso por etapas.
-- [ ] 16.3 Escolher as melhores: grupos por tempo e semelhança, a nota por gênero, a melhor de cada grupo, destaques e
+- [x] 16.3 Escolher as melhores: grupos por tempo e semelhança, a nota por gênero, a melhor de cada grupo, destaques e
   "talvez"; os modos automático, assistido e manual; quantas ficam ou um número exato; o rigor do desfoque e dos olhos;
-  estrelas e cores por categoria. Medido contra as escolhas feitas à mão pelo dono num ensaio de verdade.
+  estrelas e cores por categoria. Medido contra as escolhas feitas à mão pelo dono num ensaio de verdade (falta:
+  o ensaio e as escolhas do dono; testado com rajadas montadas de fotos reais).
 - [ ] 16.4 As vistas: lupa com a tira do grupo e os rostos da foto, comparação de até 12 com zoom e arrasto juntos,
   tela cheia, pincel de notas, gaveta do resultado, pessoas (SFace) e o filtro "alguma" ou "todas".
 - [ ] 16.5 Editar em lote: o "Melhorar", as LUTs, os filtros e o igualar a cor aplicados às escolhidas; sincronizar os

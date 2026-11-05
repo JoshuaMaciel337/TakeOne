@@ -56,6 +56,15 @@ DEEP_FILTER = os.environ.get("DEEP_FILTER", "deep-filter")
 # YuNet (detector de rostos do OpenCV, MIT): o modelo vem na imagem do worker
 MODELO_ROSTO = Path(os.environ.get("MODELO_ROSTO", "/app/modelos/yunet.onnx"))
 # VitTrack (rastreador do OpenCV Zoo, Apache-2.0): segue o objeto marcado no vídeo
+# Os 478 pontos e as expressões do rosto (MediaPipe Face Landmarker, Apache-2.0: os TFLite de dentro do .task), para
+# os olhos fechados, o sorriso e o olhar das fotos do álbum
+MODELO_PONTOS_DO_ROSTO = Path(os.environ.get("MODELO_PONTOS_DO_ROSTO",
+                                             "/app/modelos/rosto/face_landmarks_detector.tflite"))
+MODELO_EXPRESSOES = Path(os.environ.get("MODELO_EXPRESSOES", "/app/modelos/rosto/face_blendshapes.tflite"))
+# O vetor de cada foto (DINOv2 small, Apache-2.0, em ONNX), para achar as fotos parecidas do álbum
+MODELO_VETOR_DA_FOTO = Path(os.environ.get("MODELO_VETOR_DA_FOTO", "/app/modelos/dinov2_small.onnx"))
+# SFace (OpenCV Zoo, Apache-2.0): o vetor de cada rosto, para juntar as fotos da mesma pessoa
+MODELO_PESSOA = Path(os.environ.get("MODELO_PESSOA", "/app/modelos/sface.onnx"))
 MODELO_RASTREIO = Path(os.environ.get("MODELO_RASTREIO", "/app/modelos/vittrack.onnx"))
 # MODNet (recorte de retrato) para recortar o fundo do vídeo
 MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx"))

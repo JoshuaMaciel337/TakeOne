@@ -22,3 +22,20 @@ export type PastaDoComputador = { disponivel: boolean; caminho: string; pastas: 
 export const pastaDoComputador = (caminho: string) => chamarApi<PastaDoComputador>(`/albuns/pasta-do-computador?caminho=${encodeURIComponent(caminho)}`);
 export const importarPasta = (id: string, caminho: string, subpastas: boolean) =>
   chamarApi<{ job_id: string }>(`/albuns/${id}/importar`, { metodo: "POST", corpo: { caminho, subpastas } });
+
+export const analisarAlbum = (id: string) => chamarApi<{ job_id: string }>(`/albuns/${id}/analisar`, { metodo: "POST" });
+
+export type OpcoesDaEscolha = {
+  quantas: "minima" | "poucas" | "padrao" | "muitas";
+  alvo: number;
+  rigor: "tolerante" | "moderado" | "rigido";
+  olhos_fechados: boolean;
+  grupos: "pequeno" | "padrao" | "grande" | "muito_grande";
+  aplicar: boolean;
+  manter_feitas_a_mao: boolean;
+};
+
+export const OPCOES_DA_ESCOLHA: OpcoesDaEscolha = { quantas: "padrao", alvo: 0, rigor: "moderado", olhos_fechados: true, grupos: "padrao", aplicar: true, manter_feitas_a_mao: true };
+
+export const escolherMelhores = (id: string, opcoes: OpcoesDaEscolha) =>
+  chamarApi<{ categorias: Record<string, number>; sem_analise: number }>(`/albuns/${id}/escolher`, { metodo: "POST", corpo: opcoes });

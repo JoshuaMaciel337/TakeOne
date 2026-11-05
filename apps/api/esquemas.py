@@ -3049,6 +3049,8 @@ class AlbumSaida(BaseModel):
     id: str
     nome: str
     genero: str
+    # As últimas opções de "Escolher as melhores", para a janela abrir com elas
+    escolha_opcoes: dict | None = None
     fotos: int = 0
     prontas: int = 0
     escolhidas: int = 0
@@ -3075,6 +3077,15 @@ class FotoDoAlbumSaida(BaseModel):
     enviado_em: datetime | None = None
     # A foto foi enviada para o álbum (sai com ele); senão veio da biblioteca e só sai do álbum
     do_album: bool = True
+    # As medidas da análise (core/utils/medir_foto.py: foco, exposição e rostos), sem o vetor; None antes dela
+    medidas: dict | None = None
+    # A escolha das melhores (core/modelos/escolha.py): a categoria, o grupo de parecidas, a cena, a nota de 0 a 100
+    # e o porquê; None antes de escolher
+    categoria: str | None = None
+    grupo: int | None = None
+    cena: int | None = None
+    nota_ia: int | None = None
+    motivo: str | None = None
 
 
 class FotosMudarEntrada(BaseModel):
@@ -3123,5 +3134,25 @@ class ImportarPastaEntrada(BaseModel):
     subpastas: bool = True
 
 
-class ImportarPastaSaida(BaseModel):
+class JobDoAlbumSaida(BaseModel):
     job_id: str
+
+
+class EscolherEntrada(BaseModel):
+    """As opções de "Escolher as melhores" (core/modelos/escolha.py)."""
+    quantas: Literal["minima", "poucas", "padrao", "muitas"] = "padrao"
+    # Um número exato de fotos no lugar da fração (0: pela fração)
+    alvo: int = Field(default=0, ge=0, le=20_000)
+    rigor: Literal["tolerante", "moderado", "rigido"] = "moderado"
+    olhos_fechados: bool = True
+    grupos: Literal["pequeno", "padrao", "grande", "muito_grande"] = "padrao"
+    # Automático: dá as estrelas e a marcação; assistido: só as categorias e os grupos
+    aplicar: bool = True
+    # As notas e marcações feitas à mão ficam como estão
+    manter_feitas_a_mao: bool = True
+
+
+class EscolhaSaida(BaseModel):
+    """Quantas fotos ficaram em cada categoria, e quantas não entraram por falta de análise."""
+    categorias: dict[str, int]
+    sem_analise: int
