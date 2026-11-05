@@ -44,6 +44,22 @@ imagem primeiro (com o personagem e o produto), depois o movimento, depois a fal
 Ficam de fora: o Wav2Lip (só pesquisa), o InstantID e o IP-Adapter FaceID (usam o insightface, que não é comercial), o
 FLUX.1 Kontext dev e o FLUX.2 [klein] 9B (licença não comercial).
 
+## Medido até aqui (04/11/2026)
+
+- **Imagem:** o FLUX.2 [klein] 4B pôs a Rose com a almofada de referência na mesma cena.
+- **Fala, primeiro caminho:** o Wan 5B anima e o MuseTalk refaz a boca. A boca saiu borrada, como um remendo colado.
+- **Fala, segundo caminho:** o EchoMimicV3 1.3B (Flash, Apache-2.0), a partir da foto e da fala, foi bem melhor. A boca
+  é de gente, ela pisca, mexe a cabeça e gesticula, sem tremido. O rosto ficou entre 0,68 e 0,79 do SFace com a foto.
+  - Em 480 × 848 e 25 quadros por segundo, cabe na placa de uma vez só até 3,2 s (81 quadros).
+  - Passando disso, a memória transborda e o driver cai.
+- **Decisão do dono (05/11/2026):** o vídeo da personagem falando é gerado em trechos emendados. Para os 9,8 s da fala
+  de teste, foram 4 trechos de 81 quadros, cada um começando nos 8 últimos quadros do anterior e misturado na emenda.
+  - Sem o TeaCache, para não travar a boca, e com a força da voz em 4,5.
+  - Mediu 21 min no total (3,5 min carregando os modelos) e pico de 5,5 GB na placa.
+  - O rosto cai de 0,77 no começo a 0,55 no fim: continua sendo ela, mas cada emenda perde um pouco.
+  - A almofada troca de desenho a partir do segundo trecho.
+  - O próximo passo da 15.4/15.5 é guardar o rosto e o produto em todos os trechos.
+
 ## Partes
 
 - [ ] 15.1 Medir: os modelos acima no Nitro, com a Rose e fotos de produto. O rosto pela distância do SFace, o produto
