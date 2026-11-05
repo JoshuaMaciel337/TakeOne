@@ -19,6 +19,7 @@ import {
   adicionarClipe,
   adicionarLegenda,
   definirTransicao,
+  transicaoEmTodos,
   animarClipes,
   adicionarTexto,
   ajustarAudio,
@@ -391,7 +392,8 @@ export type Comando =
   | { comando: "linha.pulsarNoRitmo"; parametros: { batidas: Tick[] } }
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
-  | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } };
+  | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } }
+  | { comando: "linha.transicaoEmTodos"; parametros: { transicao: Transicao | null } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -574,6 +576,7 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.animar": "mudar a animação",
   "clipe.cor": "mudar a cor",
   "clipe.transicao": "mudar a transição",
+  "linha.transicaoEmTodos": "pôr a transição em todos os cortes",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -1301,6 +1304,8 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: pulsarNoRitmo(projeto, parametros.batidas) };
     case "clipe.transicao":
       return { projeto: definirTransicao(projeto, parametros.clipeId, parametros.transicao) };
+    case "linha.transicaoEmTodos":
+      return { projeto: transicaoEmTodos(projeto, parametros.transicao) };
     case "clipe.cor":
       return { projeto: mudarCor(projeto, parametros.clipeIds, parametros.cor) };
     case "clipe.animar":

@@ -1,7 +1,5 @@
 "use client";
 
-import { Check } from "lucide-react";
-
 import type { Comando } from "@/lib/projeto/comandos";
 import { DURACAO_TRANSICAO_S } from "@/lib/projeto/edicao";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
@@ -9,28 +7,65 @@ import { duracaoMaximaDaTransicao, TIPOS_TRANSICAO, type TipoTransicao } from "@
 import { TICKS_POR_SEGUNDO } from "@/lib/tempo";
 
 import { ControleNumerico } from "./ControleNumerico";
+import { GradeDeMateriais } from "./GradeDeMateriais";
+
+const CATEGORIA_DA_TRANSICAO: Record<TipoTransicao, string> = {
+  fusao: "Básicas",
+  escurecer: "Básicas",
+  desfoque: "Básicas",
+  deslizar: "Movimento",
+  empurrar: "Movimento",
+  zoom: "Movimento",
+  zoom_desfoque: "Movimento",
+  cortina_direita: "Cortinas",
+  cortina_esquerda: "Cortinas",
+  cortina_baixo: "Cortinas",
+  cortina_cima: "Cortinas",
+  relogio: "Formas",
+  iris: "Formas",
+  losango: "Formas",
+  persianas: "Formas",
+  diagonal: "Formas",
+  blocos: "Formas",
+  flash: "Luz",
+  clarao: "Luz",
+};
 
 type Props = {
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   aoPrever: (comando: Comando | null) => void;
   aoExecutar: (comando: Comando) => void;
+  /** A prévia da transição sob o mouse (null só tira a prévia). */
+  aoMostrar?: (comando: Comando | null) => void;
 };
 
 const DURACAO_MAXIMA_S = 2;
 const PERTO = 1e-6;
 
 /** Ferramenta Transições: a passagem do clipe selecionado (na principal) para o seguinte. */
-export function PainelTransicoes({ selecionado, aoPrever, aoExecutar }: Props) {
+export function PainelTransicoes({ selecionado, aoPrever, aoExecutar, aoMostrar }: Props) {
   const faixa = selecionado?.faixa;
   const clipe = selecionado?.clipe;
   const indice = faixa && clipe ? faixa.clipes.findIndex((item) => item.id === clipe.id) : -1;
   const proximo = faixa?.tipo === "principal" && indice >= 0 ? faixa.clipes[indice + 1] : undefined;
 
+  // "Aplicar a todos os cortes" usa a escolhida do clipe ou a fusão, na duração dela
+  const emTodos = (tipo: TipoTransicao | null) =>
+    aoExecutar({
+      comando: "linha.transicaoEmTodos",
+      parametros: { transicao: tipo ? { tipo, duracao: clipe?.transicao?.duracao ?? Math.round(DURACAO_TRANSICAO_S * TICKS_POR_SEGUNDO), misturar_som: Boolean(clipe?.transicao?.misturar_som) } : null },
+    });
+
   if (!clipe || !faixa || !proximo) {
     return (
-      <p className="text-xs text-suave">
-        Selecione um clipe da faixa principal que tenha outro logo depois. A transição fica no corte entre os dois.
-      </p>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-suave">
+          Selecione um clipe da faixa principal que tenha outro logo depois (a transição fica no corte entre os dois), ou arraste uma transição até perto de um corte da linha do tempo.
+        </p>
+        <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => emTodos("fusao")}>
+          Pôr fusão em todos os cortes
+        </button>
+      </div>
     );
   }
 
@@ -46,38 +81,30 @@ export function PainelTransicoes({ selecionado, aoPrever, aoExecutar }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-suave">Passagem do clipe selecionado para o próximo. Metade da transição fica antes do corte e metade depois.</p>
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={faixa.travada}
-          aria-pressed={atual === null}
-          onClick={() => aoExecutar(definir(null))}
-          className={`rounded-lg border p-2 text-left text-xs transition disabled:opacity-50 ${atual === null ? "border-destaque" : "border-borda hover:border-suave"}`}
-        >
-          <span className="flex items-center gap-1 font-medium">
-            {atual === null ? <Check className="size-3" aria-hidden /> : null}
-            Corte seco
-          </span>
-          <span className="text-[11px] text-suave">Sem transição</span>
+      <p className="text-xs text-suave">Passagem do clipe selecionado para o próximo (ou arraste uma até perto de um corte). Metade da transição fica antes do corte e metade depois.</p>
+      <GradeDeMateriais
+        tipo="transicao"
+        itens={TIPOS_TRANSICAO.map((tipo) => ({ id: tipo.id, nome: tipo.nome, descricao: tipo.descricao, categoria: CATEGORIA_DA_TRANSICAO[tipo.id] }))}
+        atual={atual?.tipo ?? null}
+        nenhum={{ nome: "Corte seco", descricao: "Sem transição" }}
+        desativado={() => faixa.travada}
+        aoEscolher={(id) => aoExecutar(definir(id as TipoTransicao | null))}
+        aoPassar={faixa.travada || !aoMostrar ? undefined : (id) => aoMostrar(id === null ? null : definir(id as TipoTransicao))}
+      />
+      <button
+        type="button"
+        className="botao-secundario px-3 py-1.5 text-xs"
+        disabled={faixa.travada}
+        onClick={() => emTodos(atual?.tipo ?? "fusao")}
+        title="A transição deste corte, na mesma duração, em todos os cortes da principal"
+      >
+        {atual ? `Aplicar ${TIPOS_TRANSICAO.find((tipo) => tipo.id === atual.tipo)?.nome ?? ""} a todos os cortes` : "Pôr fusão em todos os cortes"}
+      </button>
+      {faixa.clipes.some((item) => item.transicao) ? (
+        <button type="button" className="text-left text-[11px] text-suave hover:text-texto" disabled={faixa.travada} onClick={() => emTodos(null)}>
+          Tirar a transição de todos os cortes
         </button>
-        {TIPOS_TRANSICAO.map((tipo) => (
-          <button
-            key={tipo.id}
-            type="button"
-            disabled={faixa.travada}
-            aria-pressed={atual?.tipo === tipo.id}
-            onClick={() => aoExecutar(definir(tipo.id))}
-            className={`rounded-lg border p-2 text-left text-xs transition disabled:opacity-50 ${atual?.tipo === tipo.id ? "border-destaque" : "border-borda hover:border-suave"}`}
-          >
-            <span className="flex items-center gap-1 font-medium">
-              {atual?.tipo === tipo.id ? <Check className="size-3" aria-hidden /> : null}
-              {tipo.nome}
-            </span>
-            <span className="text-[11px] text-suave">{tipo.descricao}</span>
-          </button>
-        ))}
-      </div>
+      ) : null}
       {atual ? (
         <ControleNumerico
           rotulo="Duração"

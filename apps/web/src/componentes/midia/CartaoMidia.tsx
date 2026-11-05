@@ -16,6 +16,10 @@ type Props = {
   aoAdicionar?: (midia: Midia) => void;
   /** Duplo clique: abre a mídia no monitor de origem (a Fonte). */
   aoAbrir?: (midia: Midia) => void;
+  /** A mídia já está na linha do tempo do projeto aberto. */
+  noProjeto?: boolean;
+  /** Uma linha da lista, em vez do cartão da grade. */
+  emLista?: boolean;
 };
 
 function situacao(midia: Midia): string {
@@ -29,7 +33,7 @@ function situacao(midia: Midia): string {
 }
 
 /** Miniatura com nome e duração. A capa aparece quando a ingestão termina. */
-export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir, aoAdicionar, aoAbrir }: Props) {
+export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExcluir, aoAdicionar, aoAbrir, noProjeto = false, emLista = false }: Props) {
   const temCapa = midia.arquivos.includes("capa.jpg");
   const pronta = midia.status === "pronta";
   const adicionavel = Boolean(aoAdicionar) && pronta;
@@ -53,7 +57,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
         title={midia.nome}
         aria-pressed={selecionada}
       >
-        <span className="relative flex aspect-video items-center justify-center bg-painel-3">
+        <span className={`relative flex items-center justify-center bg-painel-3 ${emLista ? "float-left mr-2 aspect-video w-20" : "aspect-video"}`}>
           {temCapa ? (
             // eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie
             <img src={arquivoDaMidia(midia.id, "capa.jpg")} alt="" className="size-full object-cover" loading="lazy" draggable={false} />
@@ -64,6 +68,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
           ) : (
             <Loader2 className="size-6 animate-spin text-suave" aria-hidden />
           )}
+          {noProjeto ? <span className="absolute left-1 bottom-1 rounded bg-sucesso/90 px-1 py-0.5 text-[10px] font-semibold text-white">No projeto</span> : null}
           {pronta && midia.imagem ? (
             <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">Imagem</span>
           ) : pronta && midia.duracao ? (
@@ -72,7 +77,7 @@ export function CartaoMidia({ midia, selecionada = false, aoSelecionar, aoExclui
             </span>
           ) : null}
         </span>
-        <span className="block px-2 py-1.5">
+        <span className={`block px-2 ${emLista ? "py-2" : "py-1.5"}`}>
           <span className="block truncate text-xs font-medium">{midia.nome}</span>
           {midia.status === "erro" ? (
             <span className="block truncate text-[11px] text-erro" title={midia.erro ?? undefined}>

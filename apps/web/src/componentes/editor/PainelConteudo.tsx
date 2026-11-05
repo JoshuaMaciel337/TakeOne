@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, X } from "lucide-react";
+import { Clock, LayoutGrid, List, Search, X } from "lucide-react";
 import { useState } from "react";
 
 import { AvisoErro } from "@/componentes/AvisoErro";
@@ -11,7 +11,8 @@ import { ListaEnvios } from "@/componentes/midia/ListaEnvios";
 import { MontarClipes } from "@/componentes/midia/MontarClipes";
 import { ZonaDeEnvio } from "@/componentes/midia/ZonaDeEnvio";
 import type { Comando, ResultadoDoComando } from "@/lib/projeto/comandos";
-import type { Clipe, Faixa } from "@/lib/projeto/modelo";
+import { paraBusca } from "@/lib/materiais";
+import type { Clipe, Faixa, Projeto } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
 import type { Tick } from "@/lib/tempo";
 import type { Midia } from "@/lib/tipos";
@@ -59,6 +60,8 @@ type Props = {
   /** O clipe escolhido, para a ferramenta Filtros. */
   selecionado: { clipe: Clipe; faixa: Faixa } | null;
   aoPrever: (comando: Comando | null) => void;
+  /** Mostra um comando só na tela (o material sob o mouse); null tira, sem confirmar nada. */
+  aoMostrar?: (comando: Comando | null) => void;
   /** Tira a prévia e executa o comando (o fim de um arrasto que mostrou a prévia). */
   aoConfirmar?: (comando: Comando) => ResultadoDoComando;
   /** No celular o painel é uma folha por cima da tela, com botão de fechar. */
@@ -85,14 +88,28 @@ function PainelMidia({
   aoExecutar,
   aoAvisar,
   aoPedir,
+  projeto,
 }: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia" | "aoAbrirMidia"> & {
   proporcao: string;
+  projeto: Projeto;
   aoPedir: (midia: Midia) => void;
   aoExecutar: (comando: Comando) => void;
   aoAvisar: (mensagem: string) => void;
 }) {
   // As formas desenhadas (Elementos) não entram na biblioteca: elas são editadas no próprio clipe
   const biblioteca = (midias ?? []).filter((midia) => !midia.elemento && !midia.camada_pixels);
+  const [busca, setBusca] = useState("");
+  const [tipo, setTipo] = useState<"tudo" | "video" | "imagem" | "audio">("tudo");
+  const [ordem, setOrdem] = useState<"recentes" | "nome" | "duracao">("recentes");
+  const [emLista, setEmLista] = useState(false);
+  const usadas = new Set(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.midia_id).filter(Boolean)));
+  const termo = paraBusca(busca.trim());
+  const visiveis = biblioteca
+    .filter((midia) => (tipo === "tudo" ? true : tipo === "imagem" ? midia.imagem : tipo === "audio" ? !midia.video : midia.video && !midia.imagem))
+    .filter((midia) => !termo || paraBusca(midia.nome).includes(termo))
+    .sort((a, b) =>
+      ordem === "nome" ? a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }) : ordem === "duracao" ? (b.duracao ?? 0) - (a.duracao ?? 0) : 0,
+    );
   return (
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
@@ -109,11 +126,34 @@ function PainelMidia({
       {biblioteca.length > 0 ? (
         <>
           <p className="text-xs font-medium text-suave">Biblioteca do espaço · arraste para a linha do tempo</p>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
-            {biblioteca.map((midia) => (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-borda bg-painel-2 px-2 py-1">
+              <Search className="size-3.5 text-suave" aria-hidden />
+              <input value={busca} onChange={(evento) => setBusca(evento.target.value)} placeholder="Buscar na biblioteca" aria-label="Buscar na biblioteca" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+            </label>
+            <select value={tipo} onChange={(evento) => setTipo(evento.target.value as typeof tipo)} aria-label="Tipo de mídia" className="rounded-md border border-borda bg-painel-2 px-1.5 py-1 text-xs">
+              <option value="tudo">Tudo</option>
+              <option value="video">Vídeos</option>
+              <option value="imagem">Fotos</option>
+              <option value="audio">Áudios</option>
+            </select>
+            <select value={ordem} onChange={(evento) => setOrdem(evento.target.value as typeof ordem)} aria-label="Ordem" className="rounded-md border border-borda bg-painel-2 px-1.5 py-1 text-xs">
+              <option value="recentes">Recentes</option>
+              <option value="nome">Nome</option>
+              <option value="duracao">Duração</option>
+            </select>
+            <button type="button" className="botao-icone" onClick={() => setEmLista(!emLista)} aria-pressed={emLista} aria-label={emLista ? "Ver em grade" : "Ver em lista"} title={emLista ? "Ver em grade" : "Ver em lista"}>
+              {emLista ? <LayoutGrid className="size-4" aria-hidden /> : <List className="size-4" aria-hidden />}
+            </button>
+          </div>
+          {!visiveis.length ? <p className="py-2 text-center text-xs text-suave">Nenhuma mídia com esse filtro.</p> : null}
+          <div className={emLista ? "flex flex-col gap-1.5" : "grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2"}>
+            {visiveis.map((midia) => (
               <CartaoMidia
                 key={midia.id}
                 midia={midia}
+                noProjeto={usadas.has(midia.id)}
+                emLista={emLista}
                 selecionada={midia.id === midiaSelecionadaId}
                 aoSelecionar={(alvo) => aoSelecionarMidia(alvo.id === midiaSelecionadaId ? null : alvo.id)}
                 aoAdicionar={(alvo) => aoAdicionarMidia(alvo.id)}
@@ -182,6 +222,7 @@ export function ConteudoDaFerramenta({
   legendas,
   selecionado,
   aoPrever,
+  aoMostrar,
   aoConfirmar,
   modeloInicial,
   animacaoInicial,
@@ -204,12 +245,20 @@ export function ConteudoDaFerramenta({
         aoAdicionarMidia={aoAdicionarMidia}
         aoAbrirMidia={aoAbrirMidia}
         proporcao={legendas.projeto.proporcao}
+        projeto={legendas.projeto}
         aoExecutar={legendas.aoExecutar}
         aoAvisar={legendas.aoAvisar}
         aoPedir={aoPedirAnimacao}
       />
     ) : ferramenta.id === "audio" ? (
-      <PainelAudio aoPedir={aoPedirAnimacao} gravacao={gravacao} />
+      <PainelAudio
+        aoPedir={aoPedirAnimacao}
+        gravacao={gravacao}
+        doEspaco={{
+          midias: (biblioteca.midias ?? []).filter((midia) => midia.status === "pronta" && midia.audio && !midia.elemento && !midia.camada_pixels && !midia.imagem),
+          aoPor: (midiaId, somenteSom) => legendas.aoExecutar({ comando: "clipe.adicionar", parametros: { midiaId, inicio: gravacao?.tempo ?? 0, somenteSom } }),
+        }}
+      />
     ) : ferramenta.id === "elementos" ? (
       <PainelElementos proporcao={legendas.projeto.proporcao} aoPedir={aoPedirAnimacao} aoAvisar={legendas.aoAvisar} animacaoInicial={animacaoInicial} />
     ) : ferramenta.id === "texto" ? (
@@ -227,11 +276,11 @@ export function ConteudoDaFerramenta({
         midias={biblioteca.midias ?? []}
       />
     ) : ferramenta.id === "transicoes" ? (
-      <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
+      <PainelTransicoes selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} aoMostrar={aoMostrar} />
     ) : ferramenta.id === "efeitos" ? (
-      <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} />
+      <PainelEfeitos selecionado={selecionado} aoPrever={aoPrever} aoExecutar={legendas.aoExecutar} aoMostrar={aoMostrar} />
     ) : ferramenta.id === "filtros" ? (
-      <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} tempo={legendas.tempo} />
+      <PainelFiltros selecionado={selecionado} aoExecutar={legendas.aoExecutar} aoMostrar={aoMostrar} tempo={legendas.tempo} />
     ) : ferramenta.id === "modelos" ? (
       <PainelModelos
         projeto={legendas.projeto}

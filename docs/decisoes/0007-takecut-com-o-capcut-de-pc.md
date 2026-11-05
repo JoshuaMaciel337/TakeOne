@@ -73,7 +73,7 @@ a voz, ajustar a música, o Clipar e a IA toda local.
   direito, a seleção em caixa, as alças de fade e a linha de volume no clipe, os selos (velocidade, efeito, keyframes),
   a prévia seguindo o mouse, o cabeçalho das faixas dobrável e com altura ajustável, o estado vazio clicável e o cursor
   que avisa o encaixe.
-- [ ] 17.3 Materiais: a navegação em dois níveis, os cartões com miniatura (o filtro no quadro do clipe escolhido) e a
+- [x] 17.3 Materiais: a navegação em dois níveis, os cartões com miniatura (o filtro no quadro do clipe escolhido) e a
   prévia ao passar o mouse, arrastar efeitos, filtros, transições e textos para a linha, busca, filtro, ordem e grade ou
   lista na mídia, o selo "No projeto", favoritos e recentes, "Aplicar a todos os cortes" nas transições, os áudios do
   espaço no painel Áudio e extrair o áudio de um vídeo.

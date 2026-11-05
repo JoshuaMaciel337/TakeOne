@@ -753,6 +753,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     salvo: edicao.salvamento === "salvo",
     selecionado,
     aoPrever: preverDoPainel,
+    aoMostrar: setProvisorio,
     // Tira a prévia e executa o comando final uma vez (sem a prévia virar um passo antes dele)
     aoConfirmar: (comando: Comando) => {
       setProvisorio(null);

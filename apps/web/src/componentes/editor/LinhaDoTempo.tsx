@@ -34,7 +34,10 @@ import {
 } from "lucide-react";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
-import { midiaNoArrasto } from "@/lib/arrasto";
+import { materialNoArrasto, midiaNoArrasto } from "@/lib/arrasto";
+import { DURACAO_TRANSICAO_S } from "@/lib/projeto/edicao";
+import { INTENSIDADE_PADRAO, SO_EM_MIDIA, type TipoEfeito } from "@/lib/projeto/efeitos";
+import type { TipoTransicao } from "@/lib/projeto/transicao";
 import { formatarTempo } from "@/lib/formatar";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
@@ -154,7 +157,7 @@ type Arrasto =
   // Alt + arrastar: o conteúdo do clipe (slip) ou o corte entre dois clipes encostados (roll), com o da esquerda
   | { tipo: "deslizar"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "corte"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
-  | { tipo: "soltar"; comando: Comando; guia: Tick | null }
+  | { tipo: "soltar"; comando: Comando; guia: Tick | null; alvo?: string }
   // As alças de fade e a linha de volume do clipe escolhido
   | { tipo: "fade"; clipe: Clipe; lado: "entrada" | "saida"; x0: number; ativo: boolean; comando: Comando | null; guia: null }
   | { tipo: "volume"; clipe: Clipe; y0: number; alturaInterna: number; ativo: boolean; comando: Comando | null; guia: null }
@@ -554,7 +557,46 @@ export function LinhaDoTempo({
   // -----------------------------------------------
   // Soltar mídias da biblioteca
   // -----------------------------------------------
+  /** O filtro, o efeito ou a transição arrastados do painel: o clipe sob o ponteiro (ou o corte mais perto) e o comando. */
+  function comandoDoMaterial(evento: React.DragEvent): { comando: Comando; alvo: string } | null {
+    const material = materialNoArrasto(evento.dataTransfer);
+    if (!material) return null;
+    const t = tempoNoPonteiro(evento);
+    if (material.tipo === "transicao") {
+      // O corte da principal mais perto do ponteiro, até 40 pixels
+      const principal = exibido.faixas.find((faixa) => faixa.tipo === "principal");
+      if (!principal || principal.travada) return null;
+      let melhor: Clipe | null = null;
+      for (const clipe of principal.clipes.slice(0, -1)) {
+        if (Math.abs(px(fimDoClipe(clipe)) - px(t)) <= 40 && (!melhor || Math.abs(fimDoClipe(clipe) - t) < Math.abs(fimDoClipe(melhor) - t))) melhor = clipe;
+      }
+      if (!melhor) return null;
+      const duracao = melhor.transicao?.duracao ?? Math.round(DURACAO_TRANSICAO_S * TICKS_POR_SEGUNDO);
+      return { alvo: melhor.id, comando: { comando: "clipe.transicao", parametros: { clipeId: melhor.id, transicao: { tipo: material.id as TipoTransicao, duracao, misturar_som: Boolean(melhor.transicao?.misturar_som) } } } };
+    }
+    const linha = layoutOriginal.linhas.find((item) => { const y = pontoNaArea(evento).y; return y >= item.topo && y < item.topo + item.altura; });
+    if (!linha || linha.faixa.travada || linha.faixa.tipo === "audio") return null;
+    const clipe = linha.faixa.clipes.find((item) => item.inicio <= t && t < fimDoClipe(item));
+    if (!clipe) return null;
+    if (material.tipo === "filtro") return { alvo: clipe.id, comando: { comando: "clipe.cor", parametros: { clipeIds: [clipe.id], cor: { filtro: material.id } } } };
+    if (clipe.texto && SO_EM_MIDIA.includes(material.id as TipoEfeito)) return null;
+    return { alvo: clipe.id, comando: { comando: "clipe.efeito", parametros: { clipeIds: [clipe.id], efeito: { tipo: material.id as TipoEfeito, intensidade: clipe.efeito?.intensidade ?? INTENSIDADE_PADRAO } } } };
+  }
+
   function aoPassarArrastando(evento: React.DragEvent) {
+    if (materialNoArrasto(evento.dataTransfer)) {
+      evento.preventDefault();
+      const achado = comandoDoMaterial(evento);
+      evento.dataTransfer.dropEffect = achado ? "copy" : "none";
+      const atual = arrastoAtual.current;
+      if (!achado) {
+        if (atual?.tipo === "soltar") trocarArrasto(null);
+        return;
+      }
+      if (atual?.tipo === "soltar" && atual.alvo === achado.alvo && JSON.stringify(atual.comando) === JSON.stringify(achado.comando)) return;
+      trocarArrasto({ tipo: "soltar", comando: achado.comando, guia: null, alvo: achado.alvo });
+      return;
+    }
     const midiaId = midiaNoArrasto(evento.dataTransfer);
     if (!midiaId) return;
     evento.preventDefault();
@@ -577,7 +619,7 @@ export function LinhaDoTempo({
 
   function aoSoltar(evento: React.DragEvent) {
     const atual = arrastoAtual.current;
-    if (!midiaNoArrasto(evento.dataTransfer)) return;
+    if (!midiaNoArrasto(evento.dataTransfer) && !materialNoArrasto(evento.dataTransfer)) return;
     evento.preventDefault();
     trocarArrasto(null);
     if (atual?.tipo === "soltar") aoExecutar(atual.comando);
@@ -982,7 +1024,7 @@ export function LinhaDoTempo({
                       esquerda={px(clipe.inicio)}
                       largura={Math.max(2, px(clipe.duracao))}
                       altura={altura}
-                      selecionado={selecao.includes(clipe.id)}
+                      selecionado={selecao.includes(clipe.id) || (arrasto?.tipo === "soltar" && arrasto.alvo === clipe.id)}
                       cursor={CURSOR_DA_FERRAMENTA[ferramentaEfetiva]}
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                       aoMenu={(evento) => abrirContexto(evento, clipe)}

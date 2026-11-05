@@ -292,6 +292,8 @@ export type DestinoClipe = {
   faixaId?: string;
   /** Cria uma faixa nova em vez de usar uma que já existe. */
   novaFaixa?: boolean;
+  /** Só o som de um vídeo, numa faixa de áudio (extrair o áudio, ADR 0007, 17.3). */
+  somenteSom?: boolean;
 };
 
 /** Quanto uma imagem parada dura ao entrar na linha do tempo. */
@@ -321,6 +323,14 @@ export function adicionarClipe(projeto: Projeto, ctx: Contexto, midiaId: string,
     ...(info.transparente && !info.imagem ? { remover_fundo: true } : {}),
   };
   const faixa = destino.faixaId ? projeto.faixas.find((item) => item.id === destino.faixaId) : undefined;
+  if (destino.somenteSom) {
+    // O som do vídeo vai para uma faixa de áudio, como o "Separar o som" faz com um vídeo que já está na linha
+    if (!info.video || !info.audio || info.imagem) throw new ErroEdicao("Só dá para extrair o som de um vídeo com som.");
+    if (faixa && faixa.tipo !== "audio") throw new ErroEdicao("O som extraído vai para uma faixa de áudio.");
+    clipe.inicio = Math.max(0, quadroMaisProximo(projeto.taxa, destino.inicio ?? 0));
+    delete clipe.remover_fundo;
+    return { projeto: finalizar(colocarLivre(projeto, ctx, "audio", clipe, faixa?.id, destino.novaFaixa)), clipeId: clipe.id };
+  }
   if (faixa && !combina(faixa.tipo, info)) throw new ErroEdicao(faixaDeTexto(faixa.tipo) ? "A faixa de texto só recebe textos." : mensagemDeTipo(info));
 
   let resultado: Projeto;
@@ -2142,6 +2152,26 @@ export function definirTransicao(projeto: Projeto, clipeId: string, transicao: T
   if (transicao && (clipe.curva_velocidade || proximo?.curva_velocidade)) throw new ErroEdicao("Clipe com curva de velocidade não tem transição. Tire a curva antes.");
   const nova = transicao && proximo ? { ...transicao, duracao: Math.max(1, Math.min(Math.round(transicao.duracao), duracaoMaximaDaTransicao(clipe, proximo))) } : null;
   return trocarFaixa(projeto, { ...faixa, clipes: faixa.clipes.map((item) => (item.id === clipeId ? { ...item, transicao: nova } : item)) });
+}
+
+/**
+ * A mesma transição em todos os cortes da principal (ADR 0007, 17.3), cada uma presa à duração que cabe ali; os cortes
+ * com curva de velocidade ficam de fora. Null tira todas.
+ */
+export function transicaoEmTodos(projeto: Projeto, transicao: Transicao | null): Projeto {
+  const principal = projeto.faixas.find((faixa) => faixa.tipo === "principal");
+  if (!principal || principal.clipes.length < 2) throw new ErroEdicao("A transição fica entre dois clipes da principal: ponha pelo menos dois.");
+  exigirDestravada(principal);
+  let resultado = projeto;
+  let feitas = 0;
+  for (let i = 0; i < principal.clipes.length - 1; i++) {
+    const clipe = principal.clipes[i];
+    if (transicao && (clipe.curva_velocidade || principal.clipes[i + 1].curva_velocidade)) continue;
+    resultado = definirTransicao(resultado, clipe.id, transicao);
+    feitas++;
+  }
+  if (!feitas) throw new ErroEdicao("Nenhum corte da principal aceita a transição (os clipes têm curva de velocidade).");
+  return resultado;
 }
 
 /** Intensidade máxima de um filtro pronto (200%). */

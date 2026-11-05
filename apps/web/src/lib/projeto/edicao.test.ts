@@ -67,6 +67,7 @@ import {
   removerIntervalos,
   restaurarClipes,
   separarSom,
+  transicaoEmTodos,
   devolverSom,
   transformarClipes,
   VOLUME_MAXIMO,
@@ -1366,4 +1367,31 @@ test("fonte: inserir abre espaço em todas as faixas; sobrescrever troca só o t
   assert.deepEqual(somDe(projeto), [[0, 2, 0], [2, 1, 10], [3, 2, 3], [7, 25, 5]]);
   conferir(projeto);
   assert.throws(() => inserirTrecho(projeto, ctx, "video4", 2 * S, 2 * S, 0, "inserir"), ErroEdicao);
+});
+
+test("a mesma transição em todos os cortes da principal, presa ao que cabe em cada um", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  projeto = adicionarClipe(projeto, ctx, "video4").projeto;
+  projeto = adicionarClipe(projeto, ctx, "video10").projeto;
+  const todas = transicaoEmTodos(projeto, { tipo: "fusao", duracao: 9 * S });
+  const [a, b, c] = principal(todas);
+  assert.equal(a.transicao?.tipo, "fusao");
+  assert.equal(b.transicao?.tipo, "fusao");
+  assert.equal(c.transicao ?? null, null, "o último não tem com quem passar");
+  assert.ok(a.transicao!.duracao <= 4 * S, "presa à duração que cabe no corte");
+  assert.ok(principal(transicaoEmTodos(todas, null)).every((clipe) => !clipe.transicao));
+  assert.throws(() => transicaoEmTodos(adicionarClipe(vazio(), ctx, "video4").projeto, { tipo: "fusao", duracao: S }), ErroEdicao);
+});
+
+test("extrair o som de um vídeo: entra só o som, numa faixa de áudio", () => {
+  const ctx = contexto();
+  const { projeto, clipeId } = adicionarClipe(vazio(), ctx, "video10", { inicio: 2 * S, somenteSom: true });
+  conferir(projeto);
+  const audio = projeto.faixas.find((f) => f.tipo === "audio")!;
+  assert.equal(audio.clipes[0].id, clipeId);
+  assert.equal(audio.clipes[0].inicio, 2 * S);
+  assert.equal(principal(projeto).length, 0, "a imagem não entra");
+  assert.throws(() => adicionarClipe(vazio(), ctx, "musica", { somenteSom: true }), ErroEdicao);
+  assert.throws(() => adicionarClipe(vazio(), ctx, "foto", { somenteSom: true }), ErroEdicao);
 });
