@@ -1,6 +1,8 @@
 "use client";
 
-import type { DetailedError, Upload } from "tus-js-client";
+// O tus vem com a página (não buscado na hora do envio): com o site atualizado no meio, o pedaço de código buscado
+// depois já não existia, e o envio nem começava
+import { type DetailedError, Upload } from "tus-js-client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { nomeParaEnviar } from "./extensoesAceitas";
@@ -118,7 +120,6 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
 
   const iniciar = useCallback(
     async (arquivos: File[], opcoes: OpcoesDoEnvio = {}) => {
-      const { Upload: ClasseUpload } = await import("tus-js-client");
       const { aoCriar, album, caminhos } = opcoes;
       const novos: Envio[] = [];
       for (const arquivo of arquivos) {
@@ -139,7 +140,7 @@ export function ProvedorEnvios({ children }: { children: React.ReactNode }) {
           metadata.caminho = caminho;
         }
 
-        const upload: Upload = new ClasseUpload(arquivo, {
+        const upload: Upload = new Upload(arquivo, {
           endpoint: "/api/uploads",
           chunkSize: TAMANHO_PEDACO,
           retryDelays: ESPERAS_MS,
