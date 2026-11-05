@@ -189,9 +189,9 @@ export const FERRAMENTAS_DO_HUB: FerramentaDoHub[] = [
   {
     id: "fundo-da-foto",
     nome: "Tirar o fundo da foto",
-    descricao: "Recorta a pessoa da foto e deixa o fundo transparente.",
+    descricao: "Recorta a pessoa da foto e deixa o fundo transparente, no editor de imagem.",
     categorias: ["imagem", "ia"],
-    destino: { tipo: "em-breve", quando: "Com o editor de imagem" },
+    destino: { tipo: "pagina", href: "/app/ferramentas/editor-de-imagem" },
   },
   {
     id: "limpar-voz",
