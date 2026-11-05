@@ -130,6 +130,8 @@ export type ProjetoResumo = {
   duracao: number;
   capa_midia_id: string | null;
   atualizado_em: string;
+  /** Na lixeira desde (sai de vez 30 dias depois). */
+  lixeira_em?: string | null;
 };
 
 export type Worker = {

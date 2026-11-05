@@ -4,6 +4,8 @@ import { Download, FileCode, FolderArchive, LoaderCircle, QrCode, Trash2, Triang
 import { useEffect, useState } from "react";
 
 import { ErroApi } from "@/lib/api";
+import { avisarQuandoTerminar } from "@/lib/avisoDeExportacao";
+import { escreverSrt, legendasDasFaixas } from "@/lib/projeto/legendas";
 import {
   arquivoDaExportacao,
   type FormatoExportacao,
@@ -78,6 +80,13 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
   const quadroForaDoVideo = escolha === "quadro" && instante >= duracao;
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState("");
+  // Junto com o vídeo (ADR 0007, 17.7): as legendas em .srt e o aviso do navegador quando terminar
+  const legendas = legendasDasFaixas(projeto.faixas);
+  const [comLegendas, setComLegendas] = useState(true);
+  const [avisarNoFim, setAvisarNoFim] = useState(false);
+  // Uma estimativa do tamanho do MP4: a taxa média do H.264 na qualidade do render, por resolução, e o som AAC
+  const megabitsPorSegundo = { "720p": 4, "1080p": 8, "4k": 28 }[resolucao];
+  const megabytes = ((duracao / TICKS_POR_SEGUNDO) * (megabitsPorSegundo + 0.19)) / 8;
   const salvo = salvamento === "salvo";
 
   useEffect(() => {
@@ -99,7 +108,19 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
           : escolha === "som"
             ? { resolucao, formato: formatoDoSom }
             : { resolucao, formato: "mp4", ...(taxa ? { taxa } : {}) };
+    if (escolha === "video" && comLegendas && legendas.length) {
+      // As legendas saem do projeto como ele está, no navegador
+      const url = URL.createObjectURL(new Blob([escreverSrt(legendas)], { type: "application/x-subrip" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${(projeto.nome || "legendas").replace(/[\\/:*?"<>|]+/g, "_")}.srt`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
     exportar(pedido)
+      .then((nova) => {
+        if (avisarNoFim) void avisarQuandoTerminar(nova.id, projeto.nome);
+      })
       .catch((e) => setAviso(e instanceof ErroApi ? e.message : "Não foi possível pedir a exportação."))
       .finally(() => setEnviando(false));
   }
@@ -160,6 +181,17 @@ export function JanelaExportar({ projetoId, projeto, midias, proporcao, salvamen
             ) : null}
             {escolha === "video" ? (
               <>
+                <p className="text-[11px] text-suave">O arquivo deve ficar com uns {megabytes < 1 ? "menos de 1" : Math.round(megabytes).toLocaleString("pt-BR")} MB.</p>
+                {legendas.length ? (
+                  <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={comLegendas} onChange={(evento) => setComLegendas(evento.target.checked)} />
+                    Baixar também as legendas ({legendas.length}) em .srt
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={avisarNoFim} onChange={(evento) => setAvisarNoFim(evento.target.checked)} />
+                  Avisar quando terminar (uma notificação do navegador)
+                </label>
                 <label className="flex items-center justify-between gap-2 text-xs text-suave">
                   Quadros por segundo
                   <select

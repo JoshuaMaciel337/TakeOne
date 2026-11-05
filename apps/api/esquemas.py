@@ -2388,6 +2388,17 @@ class ProjetoResumoSaida(BaseModel):
     duracao: int
     capa_midia_id: str | None = None
     atualizado_em: datetime
+    # Na lixeira desde (ADR 0007, 17.7): sai de vez 30 dias depois
+    lixeira_em: datetime | None = None
+
+
+class ProjetoRenomearEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=120)
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def limpar_espacos(cls, valor):
+        return _limpar_espacos(valor)
 
 
 class ExportacaoCriarEntrada(BaseModel):

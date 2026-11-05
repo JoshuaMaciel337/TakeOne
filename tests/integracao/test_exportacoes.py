@@ -120,8 +120,10 @@ def test_baixar_e_link_do_celular(cliente, db_limpo):
     assert cliente.get(link["caminho"]).status_code == 404
     assert cliente.get(novo["caminho"]).status_code == 200
 
-    # Excluir o projeto leva as exportações e os arquivos junto
+    # Excluir leva o projeto para a lixeira (as exportações ficam); apagar de vez leva as exportações e os arquivos
     assert cliente.delete(f"/api/projetos/{projeto['id']}").status_code == 204
+    assert db_limpo.exportacoes.count_documents({}) == 1
+    assert cliente.delete(f"/api/projetos/{projeto['id']}/definitivo").status_code == 204
     assert db_limpo.exportacoes.count_documents({}) == 0
     assert not arquivo.exists()
 

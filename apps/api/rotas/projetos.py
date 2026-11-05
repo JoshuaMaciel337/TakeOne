@@ -14,6 +14,7 @@ from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
     ProjetoCriarEntrada,
     ProjetoDaImagemEntrada,
+    ProjetoRenomearEntrada,
     ProjetoResumoSaida,
     ProjetoSaida,
     ProjetoSalvarEntrada,
@@ -47,9 +48,12 @@ MENSAGEM_CONFLITO = ("Este projeto foi salvo em outra aba ou outro computador. "
                      "Recarregue a página para continuar da versão mais nova.")
 
 
-async def buscar_projeto(db, projeto_id: str, usuario: dict, projecao: dict | None = None) -> dict:
+async def buscar_projeto(db, projeto_id: str, usuario: dict, projecao: dict | None = None,
+                         na_lixeira: bool = False) -> dict:
+    """O projeto do espaço; os da lixeira só aparecem para restaurar ou apagar de vez (`na_lixeira`)."""
     try:
-        filtro = {"_id": ObjectId(projeto_id), "organizacao_id": usuario["organizacao_id"]}
+        filtro = {"_id": ObjectId(projeto_id), "organizacao_id": usuario["organizacao_id"],
+                  "lixeira_em": {"$ne": None} if na_lixeira else None}
     except InvalidId as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Projeto não encontrado.") from e
     projeto = await db.projetos.find_one(filtro, projecao)
@@ -76,7 +80,7 @@ async def listar_projetos(limite: int = Query(default=60, ge=1, le=200),
                           usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Os projetos do espaço, dos mexidos há menos tempo para os mais antigos, em páginas: a seguinte começa depois
     de `antes` (o id do último da página), pela data dele e, no empate, pelo id."""
-    filtro: dict = {"organizacao_id": usuario["organizacao_id"]}
+    filtro: dict = {"organizacao_id": usuario["organizacao_id"], "lixeira_em": None}
     if antes:
         try:
             ultimo = await db.projetos.find_one({"_id": ObjectId(antes), "organizacao_id": usuario["organizacao_id"]},
@@ -218,9 +222,55 @@ async def salvar_projeto(projeto_id: str, dados: ProjetoSalvarEntrada,
     return projeto_para_saida(await buscar_projeto(db, projeto_id, usuario))
 
 
+@router.get("/lixeira/lista", response_model=list[ProjetoResumoSaida])
+async def listar_lixeira(usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Os projetos na lixeira (ADR 0007, 17.7), dos jogados há menos tempo para os mais antigos."""
+    cursor = db.projetos.find({"organizacao_id": usuario["organizacao_id"], "lixeira_em": {"$ne": None}},
+                              {"faixas": 0}).sort([("lixeira_em", -1)]).limit(500)
+    return [projeto_para_resumo(p) async for p in cursor]
+
+
 @router.delete("/{projeto_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def excluir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+async def jogar_na_lixeira(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Excluir leva o projeto para a lixeira: ele some da lista e sai de vez em 30 dias (a manutenção do dia)."""
     projeto = await buscar_projeto(db, projeto_id, usuario, {"nome": 1})
+    await db.projetos.update_one({"_id": projeto["_id"]}, {"$set": {"lixeira_em": agora()}})
+    logging.info(f"[{usuario['organizacao_id']}] Projeto na lixeira: {projeto['nome']}")
+
+
+@router.post("/{projeto_id}/restaurar", response_model=ProjetoResumoSaida)
+async def restaurar_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    projeto = await buscar_projeto(db, projeto_id, usuario, {"_id": 1}, na_lixeira=True)
+    await db.projetos.update_one({"_id": projeto["_id"]}, {"$set": {"lixeira_em": None, "atualizado_em": agora()}})
+    return projeto_para_resumo(await db.projetos.find_one({"_id": projeto["_id"]}, {"faixas": 0}))
+
+
+@router.post("/{projeto_id}/duplicar", response_model=ProjetoResumoSaida, status_code=status.HTTP_201_CREATED)
+async def duplicar_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Uma cópia do projeto (a linha do tempo inteira), com "(cópia)" no nome, na versão 1."""
+    original = await buscar_projeto(db, projeto_id, usuario)
+    momento = agora()
+    copia = {k: v for k, v in original.items() if k not in ("_id", "modelo_origem")}
+    copia.update({"nome": f"{original['nome'][:110]} (cópia)", "versao": 1, "criado_em": momento,
+                  "atualizado_em": momento, "criado_por": usuario["_id"], "lixeira_em": None})
+    copia["_id"] = (await db.projetos.insert_one(copia)).inserted_id
+    return projeto_para_resumo(copia)
+
+
+@router.patch("/{projeto_id}", response_model=ProjetoResumoSaida)
+async def renomear_projeto(projeto_id: str, dados: ProjetoRenomearEntrada, usuario=Depends(usuario_atual),
+                           db=Depends(obter_db)):
+    """Só o nome (a lista de projetos): a versão sobe, para um editor aberto saber que o projeto mudou."""
+    projeto = await buscar_projeto(db, projeto_id, usuario, {"_id": 1})
+    await db.projetos.update_one({"_id": projeto["_id"]},
+                                 {"$set": {"nome": dados.nome, "atualizado_em": agora()}, "$inc": {"versao": 1}})
+    return projeto_para_resumo(await db.projetos.find_one({"_id": projeto["_id"]}, {"faixas": 0}))
+
+
+@router.delete("/{projeto_id}/definitivo", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_projeto(projeto_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Apaga de vez um projeto da lixeira, com as exportações dele."""
+    projeto = await buscar_projeto(db, projeto_id, usuario, {"nome": 1}, na_lixeira=True)
     await apagar_exportacoes(db, {"projeto_id": projeto["_id"], "organizacao_id": usuario["organizacao_id"]})
     await db.projetos.delete_one({"_id": projeto["_id"]})
     logging.info(f"[{usuario['organizacao_id']}] Projeto excluído: {projeto['nome']}")

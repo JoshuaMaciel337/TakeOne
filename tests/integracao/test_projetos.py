@@ -190,7 +190,10 @@ def test_midia_em_projeto_nao_pode_ser_excluida(cliente, db_limpo):
     assert recusada.status_code == 409
     assert "1 projeto" in recusada.json()["detail"]
 
+    # Na lixeira o projeto ainda prende a mídia; apagado de vez, solta
     assert cliente.delete(f"/api/projetos/{projeto['id']}").status_code == 204
+    assert cliente.delete(f"/api/midias/{midia_id}").status_code == 409
+    assert cliente.delete(f"/api/projetos/{projeto['id']}/definitivo").status_code == 204
     assert cliente.delete(f"/api/midias/{midia_id}").status_code == 204
 
 
@@ -326,3 +329,38 @@ def test_arvore_de_camadas_so_na_imagem(cliente, db_limpo):
     luz = {**clipe(midia_id, 0, 5), "mesclagem": "luz_suave"}
     sobre = {"id": "s1", "tipo": "video", "oculta": False, "muda": False, "travada": False, "clipes": [luz]}
     assert salvar(cliente, video, principal + [sobre]).status_code == 422
+
+
+def test_lixeira_duplicar_e_renomear(cliente, db_limpo):
+    from datetime import timedelta
+
+    from core.utils.lixeira import esvaziar_lixeira
+    from core.utils.mongo import agora
+
+    cadastrar(cliente)
+    midia_id = criar_midia(db_limpo, cliente)
+    projeto = cliente.post("/api/projetos", json={"nome": "Viagem"}).json()
+    assert salvar(cliente, projeto, principal_com(projeto, [clipe(midia_id, 0, 2)])).status_code == 200
+    # Renomear muda só o nome e sobe a versão (o editor aberto fica sabendo)
+    renomeado = cliente.patch(f"/api/projetos/{projeto['id']}", json={"nome": "  Viagem à praia "})
+    assert renomeado.status_code == 200 and renomeado.json()["nome"] == "Viagem à praia"
+    assert cliente.get(f"/api/projetos/{projeto['id']}").json()["versao"] == 3
+    # Duplicar copia a linha do tempo
+    copia = cliente.post(f"/api/projetos/{projeto['id']}/duplicar").json()
+    assert copia["nome"] == "Viagem à praia (cópia)"
+    aberto = cliente.get(f"/api/projetos/{copia['id']}").json()
+    assert aberto["versao"] == 1 and aberto["faixas"][-1]["clipes"][0]["midia_id"] == midia_id
+    # Excluir leva para a lixeira: some da lista e de abrir, aparece na lixeira e volta
+    assert cliente.delete(f"/api/projetos/{projeto['id']}").status_code == 204
+    assert [p["id"] for p in cliente.get("/api/projetos").json()] == [copia["id"]]
+    assert cliente.get(f"/api/projetos/{projeto['id']}").status_code == 404
+    lixeira = cliente.get("/api/projetos/lixeira/lista").json()
+    assert [p["id"] for p in lixeira] == [projeto["id"]] and lixeira[0]["lixeira_em"]
+    assert cliente.post(f"/api/projetos/{projeto['id']}/restaurar").status_code == 200
+    assert {p["id"] for p in cliente.get("/api/projetos").json()} == {projeto["id"], copia["id"]}
+    # Só o da lixeira se apaga de vez; a manutenção do dia apaga os de mais de 30 dias
+    assert cliente.delete(f"/api/projetos/{copia['id']}/definitivo").status_code == 404
+    cliente.delete(f"/api/projetos/{copia['id']}")
+    db_limpo.projetos.update_one({"_id": ObjectId(copia["id"])}, {"$set": {"lixeira_em": agora() - timedelta(days=31)}})
+    assert esvaziar_lixeira(db_limpo) == 1
+    assert db_limpo.projetos.count_documents({"_id": ObjectId(copia["id"])}) == 0

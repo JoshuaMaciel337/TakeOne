@@ -18,6 +18,8 @@ import { chamarApi, ErroApi } from "@/lib/api";
 import { ACEITAR_ARQUIVOS, useEnvios } from "@/lib/envios";
 import type { EstadoDaArea } from "@/lib/areaDeTrabalho";
 import { enderecoDoProjeto } from "@/lib/hub";
+import { pegarArquivos } from "@/lib/arquivosDoNovoProjeto";
+import { useAvisoDasExportacoes } from "@/lib/avisoDeExportacao";
 import { clipeParaAparar, corteVizinho, marcadorVizinho } from "@/lib/projeto/atalhos";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Texto } from "@/lib/projeto/texto";
@@ -326,6 +328,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const importarRef = useRef<HTMLInputElement>(null);
   const [tempoDoMouse, setTempoDoMouse] = useState<Tick | null>(null);
+  // A notificação do navegador quando uma exportação pedida com "Avisar quando terminar" acaba
+  useAvisoDasExportacoes();
   // "Melhorar o projeto" e o assistente flutuante do Takecut (ADR 0007, 17.6)
   const [melhorando, setMelhorando] = useState(false);
   const [assistenteAberto, setAssistenteAberto] = useState(false);
@@ -432,7 +436,19 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
 
   // Mídias pedidas nos painéis (animações, formas): quando ficam prontas, entram no cursor do momento do
   // pedido ou trocam a imagem dos clipes escolhidos. Só saem da lista quando aparecem prontas ou com erro.
-  const pendentes = useRef(new Map<string, { inicio: Tick } | { clipeIds: string[] } | { preencher: string }>());
+  const pendentes = useRef(new Map<string, { inicio: Tick } | { clipeIds: string[] } | { preencher: string } | { noFim: true }>());
+  // Os arquivos soltos na página de projetos (ADR 0007, 17.7): sobem agora e entram no fim, conforme ficam prontos
+  useEffect(() => {
+    const arquivos = pegarArquivos(projetoId);
+    if (!arquivos.length) return;
+    iniciarEnvio(arquivos, {
+      aoCriar: (id) => {
+        pendentes.current.set(id, { noFim: true });
+        void biblioteca.recarregar();
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez por projeto aberto
+  }, [projetoId]);
   function pedirAnimacao(midia: { id: string }, inicio: Tick = tempo) {
     pendentes.current.set(midia.id, { inicio });
     void biblioteca.recarregar();
@@ -469,6 +485,12 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       pendentes.current.delete(id);
       if (midia.status === "erro") mostrarAviso(`"${midia.nome}" não ficou pronta: ${midia.erro ?? "erro desconhecido"}`);
       else if ("inicio" in acao) executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio: acao.inicio } });
+      else if ("noFim" in acao) {
+        // Fotos e vídeos no fim da principal; áudio no começo de uma faixa de áudio
+        const principal = projeto?.faixas.find((faixa) => faixa.tipo === "principal")?.clipes ?? [];
+        const fim = principal.reduce((maior, clipe) => Math.max(maior, fimDoClipe(clipe)), 0);
+        executar({ comando: "clipe.adicionar", parametros: { midiaId: id, inicio: midia.video ? fim : 0 } });
+      }
       // A foto em 3D: o vídeo entra no lugar da foto (o clipe encurta se ele for mais curto)
       else if ("preencher" in acao) executar({ comando: "clipe.preencher", parametros: { clipeId: acao.preencher, midiaId: id } });
       else executar({ comando: "clipe.trocarMidia", parametros: { clipeIds: acao.clipeIds, midiaId: id } });

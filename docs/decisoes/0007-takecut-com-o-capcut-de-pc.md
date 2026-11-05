@@ -84,7 +84,7 @@ a voz, ajustar a música, o Clipar e a IA toda local.
 - [x] 17.6 IA no Takecut: "Melhorar o projeto" (uma análise de loudness, ruído, tremor, cor e legenda com "aplicar em
   todos"), o assistente flutuante com o roteador e o plano em etapas, a transcrição como editor completo, a IA no
   botão direito do clipe, casar um roteiro colado com a fala, dividir por cena, separar voz e música e buscar por cena. (Feitos o "Melhorar o projeto", a IA no botão direito, dividir por cena e o assistente flutuante com o pedido em palavras; o roteador, o roteiro colado, o Demucs e a busca por cena ficaram para depois.)
-- [ ] 17.7 Início e exportação: criar projeto arrastando arquivos (com a proporção da primeira mídia), a lista de
+- [x] 17.7 Início e exportação: criar projeto arrastando arquivos (com a proporção da primeira mídia), a lista de
   projetos com busca, ordem, renomear, duplicar e Lixeira de 30 dias, e a exportação com vídeo, áudio, GIF e legendas
   ligáveis juntos, o nome do arquivo, a qualidade com a estimativa de tamanho, a capa, a transparência e o aviso do
   navegador ao terminar.

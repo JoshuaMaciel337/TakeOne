@@ -73,6 +73,7 @@ export function useExportacoes(projetoId: string, ativo: boolean) {
     async (pedido: PedidoDeExportacao) => {
       const nova = await chamarApi<Exportacao>("/exportacoes", { metodo: "POST", corpo: { projeto_id: projetoId, ...pedido } });
       setExportacoes((lista) => [nova, ...(lista ?? [])]);
+      return nova;
     },
     [projetoId],
   );

@@ -26,6 +26,7 @@ from bson.raw_bson import RawBSONDocument
 
 from core.config import DATABASE_NAME, PASTA_RAIZ, TZ
 from core.utils.limpeza_pixels import limpar_versoes
+from core.utils.lixeira import esvaziar_lixeira
 from core.utils.mongo import conectar
 
 # -----------------------------------------------
@@ -98,6 +99,11 @@ def executar_backup(pasta: Path = PASTA_BACKUP, retencao_dias: int = RETENCAO_DI
             limpar_versoes(db)
         except Exception as e:
             logging.error(f"Erro na limpeza das camadas de pixels: {e}")
+        # E os projetos na lixeira há mais de 30 dias
+        try:
+            esvaziar_lixeira(db)
+        except Exception as e:
+            logging.error(f"Erro ao esvaziar a lixeira: {e}")
         db.client.close()
         remover_backups_antigos(pasta, retencao_dias, momento)
         logging.info(f"Backup concluído em {destino}")
