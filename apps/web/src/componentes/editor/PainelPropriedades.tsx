@@ -19,7 +19,7 @@ import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade
 import { type Alinhamento, escalaParaCobrir, posicaoAlinhada } from "@/lib/projeto/encaixe";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, chaveDoFluido, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, zeroDoFluido } from "@/lib/projeto/modelo";
-import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar, volumeNoTempo } from "@/lib/projeto/keyframes";
+import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, misturaDaCor, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar, volumeNoTempo } from "@/lib/projeto/keyframes";
 import {
   chaveDoTom,
   CURVAS_DO_FADE,
@@ -349,7 +349,9 @@ export function PainelPropriedades({ midia, midias, selecionado, taxa, tempo, ao
         ) : aba === "velocidade" && selecionado && !selecionado.clipe.texto ? (
           <AbaVelocidade clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "cor" && selecionado && selecionado.faixa.tipo !== "audio" ? (
-          <AbaCor clipe={selecionado.clipe} faixa={selecionado.faixa} midia={midia} faixas={faixas} midias={midias} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+          <CorAnimada clipe={selecionado.clipe} faixa={selecionado.faixa} tempo={tempo} taxa={taxa} aoPrever={aoPrever} aoExecutar={aoExecutar}>
+            {(clipeDaCor, prever, executar) => <AbaCor clipe={clipeDaCor} faixa={selecionado.faixa} midia={midia} faixas={faixas} midias={midias} aoPrever={prever} aoExecutar={executar} />}
+          </CorAnimada>
         ) : aba === "animacao" && selecionado && selecionado.faixa.tipo !== "audio" ? (
           <AbaAnimacao clipe={selecionado.clipe} faixa={selecionado.faixa} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         ) : aba === "audio" && selecionado ? (
@@ -451,6 +453,96 @@ type PropsBasico = PropsAba & {
 };
 
 /** O losango do keyframe: cheio com ponto no instante, vazado com pontos em outros instantes. */
+/**
+ * A cor animada (ADR 0007, 17.5): com ela ligada, o clipe vai da cor dele até a cor de chegada pelos pontos da
+ * mistura. A aba Cor edita uma das duas (a de chegada recebe os mesmos comandos, trocados por "clipe.corB").
+ */
+function CorAnimada({
+  clipe,
+  faixa,
+  tempo,
+  taxa,
+  aoPrever,
+  aoExecutar,
+  children,
+}: {
+  clipe: Clipe;
+  faixa: Faixa;
+  tempo: Tick;
+  taxa: Taxa;
+  aoPrever: (comando: Comando | null) => void;
+  aoExecutar: (comando: Comando) => void;
+  children: (clipeDaCor: Clipe, prever: (comando: Comando | null) => void, executar: (comando: Comando) => void) => React.ReactNode;
+}) {
+  const [qual, setQual] = useState<"inicio" | "chegada">("inicio");
+  const animada = Boolean(clipe.cor_b);
+  const editandoChegada = animada && qual === "chegada";
+  const trocar = (comando: Comando): Comando => (editandoChegada && comando.comando === "clipe.cor" ? { comando: "clipe.corB", parametros: comando.parametros } : comando);
+  const mistura = misturaDaCor(clipe, tempo);
+  const pontos = clipe.keyframes?.cor ?? [];
+  const noInstante = Boolean(keyframeEm(pontos, tempo - clipe.inicio, duracaoDoQuadro(taxa) / 2));
+  const dentro = tempo >= clipe.inicio && tempo <= clipe.inicio + clipe.duracao;
+  const travada = faixa.travada;
+  const clipeDaCor = editandoChegada ? { ...clipe, cor: clipe.cor_b } : clipe;
+  return (
+    <div>
+      {clipe.ajuste ? null : (
+        <Secao titulo="Animar a cor">
+          <label className="flex items-center gap-2 py-1 text-xs">
+            <input type="checkbox" checked={animada} disabled={travada} onChange={(evento) => aoExecutar({ comando: "clipe.animarCor", parametros: { clipeIds: [clipe.id], ligar: evento.currentTarget.checked } })} />
+            A cor muda ao longo do clipe
+          </label>
+          {animada ? (
+            <>
+              <div className="my-1 grid grid-cols-2 gap-1 rounded-md bg-painel-2 p-0.5 text-xs" role="group" aria-label="Qual cor editar">
+                {(
+                  [
+                    ["inicio", "Cor do começo"],
+                    ["chegada", "Cor de chegada"],
+                  ] as const
+                ).map(([id, nome]) => (
+                  <button key={id} type="button" aria-pressed={qual === id} onClick={() => setQual(id)} className={`rounded px-2 py-1 ${qual === id ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`}>
+                    {nome}
+                  </button>
+                ))}
+              </div>
+              <ControleNumerico
+                rotulo="Mistura no cursor"
+                valor={mistura * 100}
+                minimo={0}
+                maximo={100}
+                sufixo="%"
+                desativado={travada || !dentro}
+                aoPrever={(valor) => aoPrever({ comando: "clipe.misturaDaCor", parametros: { clipeId: clipe.id, tempo, valor: valor / 100 } })}
+                aoConfirmar={(valor) => {
+                  if (Math.abs(valor / 100 - mistura) < PERTO) aoPrever(null);
+                  else aoExecutar({ comando: "clipe.misturaDaCor", parametros: { clipeId: clipe.id, tempo, valor: valor / 100 } });
+                }}
+                acao={
+                  <BotaoKeyframe
+                    pontos={pontos}
+                    noInstante={noInstante}
+                    desativado={travada || !dentro}
+                    aoClicar={() => aoExecutar({ comando: "clipe.keyframe", parametros: { clipeId: clipe.id, propriedade: "cor", tempo, acao: "alternar" } })}
+                  />
+                }
+              />
+              <p className="text-[11px] text-suave">
+                Começa com 0% (a cor do começo) e chega a 100% (a de chegada) no fim do clipe. Mude a mistura no cursor ou ponha mais pontos para a cor ir e voltar. A vinheta fica a da cor do começo.
+              </p>
+            </>
+          ) : null}
+        </Secao>
+      )}
+      {children(
+        clipeDaCor,
+        (comando) => aoPrever(comando ? trocar(comando) : null),
+        (comando) => aoExecutar(trocar(comando)),
+      )}
+    </div>
+  );
+}
+
 function BotaoKeyframe({ pontos, noInstante, desativado, aoClicar }: { pontos: Keyframe[] | undefined; noInstante: boolean; desativado: boolean; aoClicar: () => void }) {
   const tem = Boolean(pontos?.length);
   const titulo = noInstante ? "Tirar o keyframe deste instante" : "Pôr um keyframe neste instante";

@@ -67,12 +67,14 @@ import {
   removerIntervalos,
   restaurarClipes,
   separarSom,
+  animarCor,
+  mudarCorB,
   transicaoEmTodos,
   devolverSom,
   transformarClipes,
   VOLUME_MAXIMO,
 } from "./edicao.ts";
-import { transformacaoNoTempo, volumeNoTempo } from "./keyframes.ts";
+import { misturaDaCor, transformacaoNoTempo, volumeNoTempo } from "./keyframes.ts";
 import { CURVAS_PRONTAS } from "./velocidade.ts";
 import { ESTILO_LEGENDA } from "./legendas.ts";
 import { ajustarTexto, alternarPalavraChave, ESTILOS_DE_TEXTO, palavrasDoTexto, TEXTO_PADRAO } from "./texto.ts";
@@ -1394,4 +1396,31 @@ test("extrair o som de um vídeo: entra só o som, numa faixa de áudio", () => 
   assert.equal(principal(projeto).length, 0, "a imagem não entra");
   assert.throws(() => adicionarClipe(vazio(), ctx, "musica", { somenteSom: true }), ErroEdicao);
   assert.throws(() => adicionarClipe(vazio(), ctx, "foto", { somenteSom: true }), ErroEdicao);
+});
+
+test("cor animada: a cor de chegada, a mistura de 0 a 1 e os pontos que andam ao dividir", () => {
+  const ctx = contexto();
+  let projeto = adicionarClipe(vazio(), ctx, "video10").projeto;
+  const [clipe] = principal(projeto);
+  projeto = animarCor(projeto, [clipe.id], true);
+  let animado = principal(projeto)[0];
+  assert.ok(animado.cor_b, "nasce a cor de chegada");
+  assert.equal(misturaDaCor(animado, 0), 0);
+  assert.equal(misturaDaCor(animado, 5 * S), 0.5);
+  assert.equal(misturaDaCor(animado, 10 * S), 1);
+  projeto = mudarCorB(projeto, [clipe.id], { filtro: "frio", exposicao: 0.5 });
+  animado = principal(projeto)[0];
+  assert.equal(animado.cor_b?.filtro, "frio");
+  assert.equal(animado.cor?.filtro ?? null, null, "a cor do clipe não muda");
+  // Dividir no meio: a segunda metade continua a mistura de onde parou
+  const dividido = dividirClipes(projeto, ctx, 5 * S, [clipe.id]).projeto;
+  const segunda = principal(dividido)[1];
+  assert.ok(Math.abs(misturaDaCor(segunda, 5 * S) - 0.5) < 1e-9);
+  assert.ok(Math.abs(misturaDaCor(segunda, 10 * S) - 1) < 1e-9);
+  // Desligar tira a cor de chegada e os pontos
+  const desligado = principal(animarCor(projeto, [clipe.id], false))[0];
+  assert.equal(desligado.cor_b, null);
+  assert.equal(desligado.keyframes?.cor, undefined);
+  assert.equal(misturaDaCor(desligado, 5 * S), 0);
+  assert.throws(() => mudarCorB(animarCor(projeto, [clipe.id], false), [clipe.id], { exposicao: 1 }), ErroEdicao);
 });

@@ -20,7 +20,9 @@ export function pendenciaParaONavegador(projetoDaEdicao: Projeto, midias: Readon
   const projeto = expandirParaDesenhar(projetoDaEdicao, tamanhosDasMidias(midias));
   for (const faixa of projeto.faixas) {
     for (const clipe of faixa.clipes) {
-      if (clipe.cor?.lut && clipe.cor.lut.intensidade > 0 && !lutGuardada(clipe.cor.lut.id)) return "A LUT de um clipe ainda está carregando (ou foi excluída). Espere um instante.";
+      for (const cor of [clipe.cor, clipe.cor_b]) {
+        if (cor?.lut && cor.lut.intensidade > 0 && !lutGuardada(cor.lut.id)) return "A LUT de um clipe ainda está carregando (ou foi excluída). Espere um instante.";
+      }
       if (!clipe.midia_id) continue;
       const midia = midias.get(clipe.midia_id);
       if (!midia || midia.status !== "pronta") return "Uma mídia do projeto ainda está sendo preparada (ou foi excluída). Espere terminar.";

@@ -20,6 +20,9 @@ import {
   adicionarLegenda,
   definirTransicao,
   transicaoEmTodos,
+  animarCor,
+  mudarCorB,
+  mudarMisturaDaCor,
   animarClipes,
   adicionarTexto,
   ajustarAudio,
@@ -393,7 +396,10 @@ export type Comando =
   | { comando: "clipe.animar"; parametros: { clipeIds: string[]; animacao: Partial<Animacoes> } }
   | { comando: "clipe.cor"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
   | { comando: "clipe.transicao"; parametros: { clipeId: string; transicao: Transicao | null } }
-  | { comando: "linha.transicaoEmTodos"; parametros: { transicao: Transicao | null } };
+  | { comando: "linha.transicaoEmTodos"; parametros: { transicao: Transicao | null } }
+  | { comando: "clipe.animarCor"; parametros: { clipeIds: string[]; ligar: boolean } }
+  | { comando: "clipe.corB"; parametros: { clipeIds: string[]; cor: Partial<Cor> } }
+  | { comando: "clipe.misturaDaCor"; parametros: { clipeId: string; tempo: Tick; valor: number } };
 
 export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.adicionar": "adicionar clipe",
@@ -577,6 +583,9 @@ export const NOMES_DOS_COMANDOS: Record<Comando["comando"], string> = {
   "clipe.cor": "mudar a cor",
   "clipe.transicao": "mudar a transição",
   "linha.transicaoEmTodos": "pôr a transição em todos os cortes",
+  "clipe.animarCor": "animar a cor",
+  "clipe.corB": "mudar a cor de chegada",
+  "clipe.misturaDaCor": "mudar a mistura da cor",
 };
 
 /** Aplica o comando. `selecao` vem quando o comando cria clipes que devem ficar selecionados. */
@@ -1306,6 +1315,12 @@ function executarSemConferir(projeto: Projeto, { comando, parametros }: Comando,
       return { projeto: definirTransicao(projeto, parametros.clipeId, parametros.transicao) };
     case "linha.transicaoEmTodos":
       return { projeto: transicaoEmTodos(projeto, parametros.transicao) };
+    case "clipe.animarCor":
+      return { projeto: animarCor(projeto, parametros.clipeIds, parametros.ligar) };
+    case "clipe.corB":
+      return { projeto: mudarCorB(projeto, parametros.clipeIds, parametros.cor) };
+    case "clipe.misturaDaCor":
+      return { projeto: mudarMisturaDaCor(projeto, parametros.clipeId, parametros.tempo, parametros.valor) };
     case "clipe.cor":
       return { projeto: mudarCor(projeto, parametros.clipeIds, parametros.cor) };
     case "clipe.animar":

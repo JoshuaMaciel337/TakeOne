@@ -39,6 +39,7 @@ import {
   type Keyframes,
   KEYFRAMES_POR_PROPRIEDADE,
   keyframeEm,
+  misturaDaCor,
   type PropriedadeAnimavel,
   PROPRIEDADES_ANIMAVEIS,
   transformacaoNoTempo,
@@ -1324,7 +1325,7 @@ export const GRUPOS_DE_AJUSTES = [
 export type GrupoDeAjustes = (typeof GRUPOS_DE_AJUSTES)[number]["id"];
 
 const CAMPOS_DOS_GRUPOS: Record<GrupoDeAjustes, (keyof Clipe)[]> = {
-  cor: ["cor"],
+  cor: ["cor", "cor_b"],
   efeito: ["efeito", "chroma", "chave_luma"],
   animacao: ["animacao"],
   imagem: ["transformacao", "recorte", "virar", "cantos", "keyframes", "expressoes", "mesclagem", "contorno", "sombra"],
@@ -1556,9 +1557,10 @@ export function mudarKeyframe(projeto: Projeto, clipeId: string, propriedade: Ch
       delete keyframes[propriedade];
       const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
       if (propriedade === "volume") return { ...clipe, keyframes: vazios ? null : keyframes, volume: existente.valor };
+      if (propriedade === "cor") return { ...clipe, keyframes: vazios ? null : keyframes };
       return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: existente.valor } };
     }
-    const valor = propriedade === "volume" ? volumeNoTempo(clipe, tempo) : transformacaoParaEditar(clipe, tempo)[propriedade];
+    const valor = propriedade === "volume" ? volumeNoTempo(clipe, tempo) : propriedade === "cor" ? misturaDaCor(clipe, tempo) : transformacaoParaEditar(clipe, tempo)[propriedade];
     return { ...clipe, keyframes: { ...clipe.keyframes, [propriedade]: comPonto(pontos, { t, valor, curva: curvaEm(pontos, t) }, projeto) } };
     // O volume também vale nos clipes das faixas de áudio
   }, { comAudio: propriedade === "volume" });
@@ -1576,6 +1578,7 @@ export function limparKeyframes(projeto: Projeto, clipeId: string, propriedade: 
     delete keyframes[propriedade];
     const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
     if (propriedade === "volume") return { ...clipe, keyframes: vazios ? null : keyframes, volume: volumeNoTempo(clipe, instante) };
+    if (propriedade === "cor") return { ...clipe, keyframes: vazios ? null : keyframes };
     return { ...clipe, keyframes: vazios ? null : keyframes, transformacao: { ...clipe.transformacao, [propriedade]: transformacaoParaEditar(clipe, instante)[propriedade] } };
   }, { comAudio: propriedade === "volume" });
 }
@@ -2172,6 +2175,53 @@ export function transicaoEmTodos(projeto: Projeto, transicao: Transicao | null):
   }
   if (!feitas) throw new ErroEdicao("Nenhum corte da principal aceita a transição (os clipes têm curva de velocidade).");
   return resultado;
+}
+
+/**
+ * A cor animada (ADR 0007, 17.5): ligar cria a cor de chegada (uma cópia da cor do clipe, para a pessoa mudar) e os
+ * pontos da mistura no começo (0) e no fim (1) do clipe; desligar tira a cor de chegada e os pontos. Camadas de
+ * ajuste, áudio e pastas ficam de fora.
+ */
+export function animarCor(projeto: Projeto, clipeIds: string[], ligar: boolean): Projeto {
+  return mudarClipes(projeto, clipeIds, (clipe) => {
+    if (clipe.ajuste || clipe.pasta) throw new ErroEdicao("A cor animada vale para vídeos, imagens e textos.");
+    const keyframes: Keyframes = { ...clipe.keyframes };
+    if (!ligar) {
+      delete keyframes.cor;
+      const vazios = CHAVES_DE_KEYFRAME.every((p) => !keyframes[p]?.length);
+      return { ...clipe, cor_b: null, keyframes: vazios ? null : keyframes };
+    }
+    keyframes.cor = [
+      { t: 0, valor: 0, curva: "linear" },
+      { t: clipe.duracao, valor: 1, curva: "linear" },
+    ];
+    return { ...clipe, cor_b: structuredClone(clipe.cor ?? COR_PADRAO), keyframes };
+  });
+}
+
+/** A mistura da cor no instante do cursor (0 a 1): o ponto dali muda, ou nasce, com a curva que valia ali. */
+export function mudarMisturaDaCor(projeto: Projeto, clipeId: string, tempo: Tick, valor: number): Projeto {
+  return mudarClipes(projeto, [clipeId], (clipe) => {
+    if (!clipe.cor_b) throw new ErroEdicao("Ligue \"Animar a cor\" antes de mudar a mistura.");
+    const t = Math.min(Math.max(0, tempo - clipe.inicio), clipe.duracao);
+    const pontos = clipe.keyframes?.cor ?? [];
+    return { ...clipe, keyframes: { ...clipe.keyframes, cor: comPonto(pontos, { t, valor: limitar(valor, 0, 1), curva: curvaEm(pontos, t) }, projeto) } };
+  });
+}
+
+/** Os ajustes da cor de chegada (as mesmas regras e limites da cor do clipe). */
+export function mudarCorB(projeto: Projeto, clipeIds: string[], mudanca: Partial<Cor>): Projeto {
+  const ids = new Set(clipeIds);
+  // A conta é a do mudarCor, com a cor de chegada no lugar da cor
+  const trocado = (p: Projeto): Projeto => ({
+    ...p,
+    faixas: p.faixas.map((faixa) => ({ ...faixa, clipes: faixa.clipes.map((clipe) => (ids.has(clipe.id) ? { ...clipe, cor: clipe.cor_b ?? null, cor_b: clipe.cor ?? null } : clipe)) })),
+  });
+  for (const id of clipeIds) {
+    const achado = acharClipe(projeto, id);
+    if (!achado?.clipe.cor_b) throw new ErroEdicao("Ligue \"Animar a cor\" antes de mudar a cor de chegada.");
+  }
+  return trocado(mudarCor(trocado(projeto), clipeIds, mudanca));
 }
 
 /** Intensidade máxima de um filtro pronto (200%). */

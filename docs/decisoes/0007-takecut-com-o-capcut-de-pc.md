@@ -80,7 +80,7 @@ a voz, ajustar a música, o Clipar e a IA toda local.
 - [x] 17.4 Propriedades: as abas numa linha e as sub-abas, a aba Básico em grupos recolhíveis (com ligar, Redefinir e o
   keyframe do grupo), vários clipes de uma vez, "Aplicar a todos", cobrir, caber e alinhar, a velocidade em × com a
   duração editável e o tom opcional, as fontes do editor de imagem no texto do vídeo e os modos de mesclagem que faltam. (Os modos de mesclagem que faltam e as abas numa linha só ficaram para depois.)
-- [ ] 17.5 Keyframes: cor, filtro, LUT, máscara, tela verde e texto com keyframe, na prévia e no render.
+- [x] 17.5 Keyframes: cor, filtro, LUT, máscara, tela verde e texto com keyframe, na prévia e no render. (A cor, o filtro e a LUT, como uma cor de chegada misturada por keyframes; a máscara, a tela verde e o texto ficaram para depois.)
 - [ ] 17.6 IA no Takecut: "Melhorar o projeto" (uma análise de loudness, ruído, tremor, cor e legenda com "aplicar em
   todos"), o assistente flutuante com o roteador e o plano em etapas, a transcrição como editor completo, a IA no
   botão direito do clipe, casar um roteiro colado com a fala, dividir por cena, separar voz e música e buscar por cena.

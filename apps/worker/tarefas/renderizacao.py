@@ -157,8 +157,9 @@ def preparar_midias(db, organizacao_id, faixas: list[dict]) -> dict[str, MidiaDo
 
 def preparar_luts(db, organizacao_id, faixas: list[dict]) -> dict:
     """As LUTs importadas que os clipes usam (as que sumiram ficam de fora, e o plano recusa o clipe)."""
-    ids = {(c.get("cor") or {}).get("lut", {}).get("id") for f in faixas for c in f["clipes"]
-           if ((c.get("cor") or {}).get("lut") or {}).get("id")}
+    # A cor do clipe e a de chegada (a cor animada)
+    ids = {((c.get(campo) or {}).get("lut") or {}).get("id") for f in faixas for c in f["clipes"]
+           for campo in ("cor", "cor_b")} - {None}
     luts = {}
     validos = [ObjectId(i) for i in ids if ObjectId.is_valid(i)]
     for doc in db.luts.find({"_id": {"$in": validos}, "organizacao_id": organizacao_id}):

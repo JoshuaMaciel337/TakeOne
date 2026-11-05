@@ -92,6 +92,7 @@ async def excluir_lut(lut_id: str, usuario=Depends(usuario_atual), db=Depends(ob
     # Na cor de um clipe ou na Pesquisa de cores de uma camada de ajuste do editor de imagem
     usado = await db.projetos.find_one({"organizacao_id": usuario["organizacao_id"],
                                         "$or": [{"faixas.clipes.cor.lut.id": str(lut["_id"])},
+                                                {"faixas.clipes.cor_b.lut.id": str(lut["_id"])},
                                                 {"faixas.clipes.ajuste_imagem.lut.id": str(lut["_id"])}]},
                                        {"nome": 1})
     if usado:

@@ -354,6 +354,8 @@ export type Clipe = {
   animacao?: Animacoes | null;
   /** Ajustes de cor e filtro pronto; sem ela, a imagem como veio. */
   cor?: Cor | null;
+  /** A cor de chegada: com os keyframes de `cor`, a cor do clipe vai até ela (ADR 0007, 17.5). */
+  cor_b?: Cor | null;
   /** Só na faixa principal: a transição para o clipe seguinte. */
   transicao?: Transicao | null;
 };

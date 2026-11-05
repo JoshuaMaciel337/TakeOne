@@ -4,7 +4,7 @@
 import { arvoreDaImagem, camadaVisivel, faixasEmOrdem, mesclagemDaPasta, type NoDaCamada } from "@/lib/projeto/arvore";
 import type { EfeitoDeTransicao } from "@/lib/projeto/transicao";
 import { transformacaoAnimada } from "@/lib/projeto/animacao";
-import { type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, hslNeutro, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
+import { AJUSTES_NEUTROS, type AjustesCor, ajustesEfetivos, corNeutra, curvasNeutras, hslNeutro, type LutDaCor, lutDaCor, somarAjustes } from "@/lib/projeto/cor";
 import {
   ajustesDoEfeito,
   brilhoDoEfeito,
@@ -29,7 +29,7 @@ import { matrizEmUso } from "@/lib/projeto/mascaraDePixels";
 import { lutGuardada } from "@/lib/projeto/lutImportada";
 import { type AjusteDaImagem, compilarAjuste, lutDaFuncao, type TabelaDoAjuste } from "@/lib/imagem/ajustes";
 import { filtrosQueValem } from "@/lib/imagem/filtros/pilha";
-import { transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
+import { misturaDaCor, transformacaoNoTempo, transformacaoParaEditar } from "@/lib/projeto/keyframes";
 import { type Cortes, cortesDoTrecho, temLetraALetra, textoDoDestaque, trechoVisivel } from "@/lib/projeto/letras";
 import { type Clipe, type Faixa, faixaDeTexto, fimDoClipe, type Projeto, type Recorte, tempoNaMidia } from "@/lib/projeto/modelo";
 import type { Texto } from "@/lib/projeto/texto";
@@ -162,7 +162,36 @@ const luts = new Map<string, LutDaCor>();
  * A cor do clipe para o compositor: a LUT dos ajustes e das curvas, como o render (o efeito VHS soma aos ajustes),
  * e a vinheta à parte.
  */
-function corDoClipe(clipe: Clipe): Pick<CamadaNaTela, "lut" | "vinheta"> {
+function corDoClipe(clipe: Clipe, tempo: Tick | null = null): Pick<CamadaNaTela, "lut" | "vinheta"> {
+  const a = lutDaCorDoClipe(clipe, clipe.cor);
+  const mistura = tempo === null ? 0 : misturaDaCor(clipe, tempo);
+  if (mistura <= 0 || !clipe.cor_b) return a;
+  // A cor animada (ADR 0007, 17.5): a grade das duas cores misturada; a vinheta fica a da cor do clipe, como no render
+  const b = lutDaCorDoClipe(clipe, clipe.cor_b);
+  const gradeA = a.lut?.dados ?? identidade();
+  const gradeB = b.lut?.dados ?? identidade();
+  const passo = Math.round(mistura * 1000) / 1000;
+  const chave = `${a.lut?.chave ?? "-"}|${b.lut?.chave ?? "-"}|${passo}`;
+  let lut = luts.get(chave);
+  if (!lut) {
+    const dados = new Float32Array(gradeA.length);
+    for (let i = 0; i < dados.length; i++) dados[i] = gradeA[i] + (gradeB[i] - gradeA[i]) * passo;
+    lut = { chave, dados };
+    if (luts.size > 40) luts.clear();
+    luts.set(chave, lut);
+  }
+  return { lut, vinheta: a.vinheta };
+}
+
+let gradeIdentidade: Float32Array | null = null;
+/** A grade que não muda nada (para misturar com uma cor original). */
+function identidade(): Float32Array {
+  gradeIdentidade ??= lutDaCor({ ...AJUSTES_NEUTROS }, null, null, null);
+  return gradeIdentidade;
+}
+
+function lutDaCorDoClipe(clipe: Clipe, corDoEstado: Clipe["cor"]): Pick<CamadaNaTela, "lut" | "vinheta"> {
+  clipe = { ...clipe, cor: corDoEstado };
   const ajustes: AjustesCor = somarAjustes(ajustesEfetivos(clipe.cor), ajustesDoEfeito(clipe.efeito));
   const vinheta = ajustes.vinheta;
   const semVinheta = { ...ajustes, vinheta: 0 };
@@ -277,7 +306,7 @@ export function camadasNoTempo(
       caixa: caixaDoClipe(transformacaoNaTransicao(transformacaoAnimada(clipe, tempo), item.efeitos ?? [], tempo), clipe.recorte, tamanhoMidia, quadro),
       // As alças mexem no valor do instante (com keyframes, gravam um ponto ali), sem as animações
       caixaBase: caixaDoClipe(transformacaoParaEditar(clipe, tempo), clipe.recorte, tamanhoMidia, quadro),
-      ...corDoClipe(clipe),
+      ...corDoClipe(clipe, tempo),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       ...luzEGrao(clipe, caixaDoClipe(transformacaoNoTempo(clipe, tempo), clipe.recorte, tamanhoMidia, quadro), tempo, projeto.taxa),
       revelado: item.efeitos?.length ? reveladoNaTransicao(item.efeitos, tempo) : undefined,
@@ -311,7 +340,7 @@ export function camadasNoTempo(
       recorte: clipe.recorte,
       caixa,
       caixaBase,
-      ...corDoClipe(clipe),
+      ...corDoClipe(clipe, tempo),
       desvio: desvioDeCor(clipe.efeito, quadroDoClipe(clipe, tempo, projeto.taxa)),
       segundos: 0,
     };

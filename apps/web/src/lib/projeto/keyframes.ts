@@ -26,8 +26,11 @@ export const CURVAS_DE_KEYFRAME: { id: Curva; nome: string }[] = [
 /** `t`: tempo desde o começo do clipe, na linha do tempo. `curva`: como o valor vai até o ponto seguinte. */
 export type Keyframe = { t: Tick; valor: number; curva: Curva };
 export type PropriedadeAnimavel = "x" | "y" | "escala" | "rotacao" | "opacidade";
-/** O que pode ter pontos: as propriedades da imagem e o volume (o fator de 0 a 4, como `clipe.volume`). */
-export type ChaveDeKeyframe = PropriedadeAnimavel | "volume";
+/**
+ * O que pode ter pontos: as propriedades da imagem, o volume (o fator de 0 a 4, como `clipe.volume`) e a cor (a
+ * mistura de 0 a 1 entre a cor do clipe e a cor de chegada, `clipe.cor_b`; ADR 0007, 17.5).
+ */
+export type ChaveDeKeyframe = PropriedadeAnimavel | "volume" | "cor";
 export type Keyframes = Partial<Record<ChaveDeKeyframe, Keyframe[]>>;
 
 export type Repeticao = "ciclo" | "vaivem";
@@ -41,7 +44,7 @@ export type Expressao = { repetir?: Repeticao | null; tremer?: Tremor | null };
 export type Expressoes = Partial<Record<PropriedadeAnimavel, Expressao>>;
 
 export const PROPRIEDADES_ANIMAVEIS: PropriedadeAnimavel[] = ["x", "y", "escala", "rotacao", "opacidade"];
-export const CHAVES_DE_KEYFRAME: ChaveDeKeyframe[] = [...PROPRIEDADES_ANIMAVEIS, "volume"];
+export const CHAVES_DE_KEYFRAME: ChaveDeKeyframe[] = [...PROPRIEDADES_ANIMAVEIS, "volume", "cor"];
 /** Fase do tremido de cada propriedade, para x e y não tremerem juntos. */
 export const FASE_DO_TREMOR: Record<PropriedadeAnimavel, number> = { x: 0, y: 7.3, escala: 13.1, rotacao: 19.7, opacidade: 29.3 };
 /** A menor escala que a expressão deixa sair (o tremido não vira o clipe do avesso). */
@@ -180,4 +183,14 @@ export function deslocarKeyframes(keyframes: Keyframes | null | undefined, delta
     if (pontos) resultado[propriedade] = pontos.map((ponto) => ({ ...ponto, t: ponto.t - delta }));
   }
   return resultado;
+}
+
+/**
+ * A mistura da cor no instante `tempo` da linha do tempo (0: a cor do clipe; 1: a cor de chegada), pelos pontos da
+ * cor. Sem a cor de chegada ou sem pontos, 0. A mesma conta em core/utils/keyframes.py (mistura_da_cor).
+ */
+export function misturaDaCor(clipe: { inicio: Tick; cor_b?: unknown; keyframes?: Keyframes | null }, tempo: Tick): number {
+  const pontos = clipe.keyframes?.cor;
+  if (!clipe.cor_b || !pontos?.length) return 0;
+  return Math.min(1, Math.max(0, valorNoTempo(pontos, tempo - clipe.inicio)));
 }

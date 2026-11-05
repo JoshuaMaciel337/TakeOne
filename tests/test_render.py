@@ -792,3 +792,23 @@ def test_camera_lenta_suave_le_os_quadros_novos_a_partir_do_zero():
     longe = clipe("c1", "deitado", 0, 4, entrada=5, velocidade=0.5, fluido={"de": 1.0, "ate": 4.0})
     with pytest.raises(ErroRender, match="passou do trecho"):
         planejar_render(projeto([faixa("principal", [longe])], duracao=4), midias, 720, 1280)
+
+
+def test_cor_animada_mistura_a_lut_da_cor_de_chegada_por_roteiro():
+    pontos = [{"t": 0, "valor": 0, "curva": "linear"}, {"t": 4 * S, "valor": 1, "curva": "linear"}]
+    animado = clipe("c1", "deitado", 0, 4, cor={"filtro": None, "intensidade": 1},
+                    cor_b={"exposicao": 0.8, "filtro": None, "intensidade": 1}, keyframes={"cor": pontos})
+    plano = planejar_render(projeto([faixa("principal", [animado])]), MIDIAS, 1080, 1920, pasta="/trabalho")
+    luts = [a for a in plano.auxiliares if a.tipo == "lut"]
+    assert len(luts) == 1, "a cor do clipe é a original: só a de chegada vira LUT"
+    assert "[ka1]null[kc1]" in plano.filtro and f"[kb1]lut3d=file='{luts[0].caminho}'" in plano.filtro
+    assert "blend@cor1=all_mode=normal:c0_opacity=0" in plano.filtro
+    roteiro = next(a for a in plano.auxiliares if a.caminho.startswith("/trabalho/mistura_da_cor_c1"))
+    linhas = roteiro.conteudo.strip().splitlines()
+    assert linhas[0].startswith("0 blend@cor1 c0_opacity 0,")
+    valores = [float(linha.split()[3].rstrip(",")) for linha in linhas]
+    assert valores == sorted(valores) and valores[-1] == 1 and 0.49 < valores[len(valores) // 2] < 0.51
+    # Sem a cor de chegada, os pontos de cor não fazem nada
+    so_pontos = clipe("c2", "deitado", 0, 4, keyframes={"cor": pontos})
+    plano = planejar_render(projeto([faixa("principal", [so_pontos])]), MIDIAS, 1080, 1920, pasta="/trabalho")
+    assert "blend@cor" not in plano.filtro

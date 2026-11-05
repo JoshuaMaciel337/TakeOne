@@ -296,7 +296,7 @@ class KeyframeEntrada(BaseModel):
 # Os mesmos limites da TransformacaoEntrada; no máximo 100 pontos por propriedade (o render monta
 # uma expressão com todos)
 LIMITES_ANIMAVEIS = {"x": (-10, 10), "y": (-10, 10), "escala": (0.01, 20), "rotacao": (-180, 180), "opacidade": (0, 1),
-                     "volume": (0, 4)}
+                     "volume": (0, 4), "cor": (0, 1)}
 
 
 class KeyframesEntrada(BaseModel):
@@ -307,6 +307,8 @@ class KeyframesEntrada(BaseModel):
     opacidade: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
     # O volume do som (fator de 0 a 4, como o `volume` do clipe)
     volume: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
+    # A mistura da cor (0: a cor do clipe; 1: a cor de chegada, `cor_b`)
+    cor: list[KeyframeEntrada] | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def em_ordem_e_nos_limites(self):
@@ -1853,6 +1855,8 @@ class ClipeEntrada(BaseModel):
             raise ValueError("O texto em arco não tem animação letra a letra nem palavra a palavra.")
         return self
     cor: CorEntrada | None = None
+    # A cor de chegada: com os keyframes de `cor`, a cor do clipe vai até ela (ADR 0007, 17.5)
+    cor_b: CorEntrada | None = None
     transicao: TransicaoEntrada | None = None
 
 

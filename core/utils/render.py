@@ -52,6 +52,7 @@ from core.utils.ffmpeg import FILTRO_MARCAS_BT709, MARCAS_BT709, ler_como_bt709
 from core.utils.geometria import Caixa, caixa_do_clipe, caixa_do_texto, caixa_visivel, recorte_na_fonte
 from core.utils.keyframes import (
     animadas,
+    comandos_da_cor,
     comandos_de_opacidade,
     expressao_da_propriedade,
     maior_escala,
@@ -253,7 +254,8 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                     mascara: tuple[str, str] | None = None, desfoque: list[str] | None = None,
                     luz: tuple[int, float] | None = None, grao: tuple[int, str, int] | None = None,
                     mascara_do_fundo: int | None = None, alfa_na_fonte: bool = False,
-                    cantos: tuple[int, int | None] | None = None) -> tuple[str, str]:
+                    cantos: tuple[int, int | None] | None = None,
+                    cor_b: tuple[str | None, str] | None = None) -> tuple[str, str]:
     """
     (cadeia que prepara a imagem do clipe, expressão do overlay que a coloca no quadro).
     lut: caminho da LUT da cor; vinheta: entrada do FFmpeg com a imagem da vinheta.
@@ -267,6 +269,7 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
     mascara_do_fundo: entrada com o vídeo da máscara da pessoa (recorte do fundo), lida como o clipe.
     alfa_na_fonte: a imagem já chega com transparência (texto, logo, forma).
     cantos: (entrada com a máscara dos cantos, entrada com o anel da borda ou None), quando o clipe os tem.
+    cor_b: (LUT da cor de chegada ou None, roteiro do sendcmd da mistura), quando a cor do clipe é animada.
     A caixa vem da transformação de base (core/utils/keyframes.py); o que tem keyframes muda por quadro aqui.
     """
     com_keyframes = animadas(clipe)
@@ -453,7 +456,20 @@ def _video_do_clipe(entrada: int, clipe: dict, caixa: Caixa, taxa: str, quadro: 
                   f"[nb{numero}]{','.join(desfocar)},format=gbrap[nc{numero}];\n"
                   f"[na{numero}][nc{numero}]lut2=c0='{conta}':c1='{conta}':c2='{conta}':c3=x,unpremultiply=inplace=1")
         filtros = []
-    if lut:
+    if cor_b:
+        # A cor animada (ADR 0007, 17.5): a cor do clipe e a de chegada, cada uma pela LUT dela, e a de chegada por
+        # cima na mistura do quadro (o roteiro muda a opacidade do blend). A leitura tetraédrica é linear na grade,
+        # então é a mesma conta da prévia, que mistura as duas grades
+        lut_b, roteiro_cor = cor_b
+        ramo_a = f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral" if lut else "null"
+        ramo_b = f"lut3d=file='{_escapar_caminho(lut_b)}':interp=tetrahedral" if lut_b else "null"
+        cabeca = (f"{_continuar(cabeca, [*filtros, 'format=gbrap', 'split'])}[ka{numero}][kb{numero}];\n"
+                  f"[ka{numero}]{ramo_a}[kc{numero}];\n"
+                  f"[kb{numero}]{ramo_b},sendcmd=f='{_escapar_caminho(roteiro_cor)}'[kd{numero}];\n"
+                  f"[kd{numero}][kc{numero}]blend@cor{numero}=all_mode=normal:c0_opacity=0:c1_opacity=0"
+                  f":c2_opacity=0:c3_opacity=0")
+        filtros = []
+    elif lut:
         filtros.append(f"lut3d=file='{_escapar_caminho(lut)}':interp=tetrahedral")
     if mascara:
         # Quatro caixas transparentes escondem as letras que ainda não apareceram (ou já saíram). Depois dos efeitos,
@@ -1117,6 +1133,23 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
         if com_curvas:
             lut = f"{pasta}/{nome_da_lut(com_curvas)}"
             auxiliares.setdefault(lut, ArquivoAuxiliar(lut, "lut", com_curvas))
+        cor_b = None
+        if clipe.get("cor_b") and (clipe.get("keyframes") or {}).get("cor"):
+            # A cor de chegada, pela LUT dela (com o efeito, como a do clipe), e a mistura por quadro
+            ajustes_b = somar_ajustes(ajustes_efetivos(clipe["cor_b"]), ajustes_do_efeito(clipe))
+            com_curvas_b = _ajustes_da_lut({**clipe, "cor": clipe["cor_b"]}, ajustes_b, luts)
+            lut_b = None
+            if com_curvas_b:
+                lut_b = f"{pasta}/{nome_da_lut(com_curvas_b)}"
+                auxiliares.setdefault(lut_b, ArquivoAuxiliar(lut_b, "lut", com_curvas_b))
+            leitura = leituras.get(clipe["id"])
+            janela_cor = (leitura.inicio, leitura.fim) if leitura else (segundos(clipe["inicio"]),
+                                                                        segundos(clipe["inicio"] + clipe["duracao"]))
+            roteiro_cor = f"{pasta}/mistura_da_cor_{clipe['id']}_{numero}.txt"
+            conteudo = comandos_da_cor(clipe, segundos(clipe["inicio"]), janela_cor, float(taxa_em_fracao(taxa)),
+                                       f"blend@cor{numero}")
+            auxiliares[roteiro_cor] = ArquivoAuxiliar(roteiro_cor, "comandos", {}, conteudo=conteudo)
+            cor_b = (lut_b, roteiro_cor)
         if ajustes["vinheta"] > 0 or linhas_vhs > 0:
             # As linhas do VHS entram na mesma imagem multiplicada da vinheta
             imagem_vinheta = f"{pasta}/vinheta_{clipe['id']}.png"
@@ -1257,7 +1290,7 @@ def planejar_render(projeto: dict, midias: dict[str, MidiaDoRender], largura: in
             entradas.append(Entrada(arquivo_da_mascara, lida.inicio, lida.duracao, imagem=lida.imagem, taxa=lida.taxa))
         cadeia, overlay = _video_do_clipe(entrada, clipe, caixa, taxa, quadro, numero, lut, vinheta,
                                           leitura, entrada_de_cor, roteiro, mascara, desfoque, luz, grao,
-                                          mascara_do_fundo, alfa_na_fonte, cantos)
+                                          mascara_do_fundo, alfa_na_fonte, cantos, cor_b)
         linhas.append(f"{cadeia}[c{numero}]")
         mesclagem = clipe.get("mesclagem") or "normal"
         if mesclagem == "normal":

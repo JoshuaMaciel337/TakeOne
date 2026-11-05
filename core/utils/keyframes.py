@@ -234,3 +234,30 @@ def comandos_de_opacidade(clipe: dict, inicio_do_clipe: float, janela: tuple[flo
             linhas.append(f"{_n(local)} {alvo} aa {_n(valor)};")
             anterior = valor
     return "\n".join(linhas) + "\n"
+
+
+def mistura_da_cor(clipe: dict, no_clipe: float) -> float:
+    """A mistura da cor `no_clipe` ticks depois do começo do clipe (0: a cor dele; 1: a cor de chegada), a mesma conta
+    de misturaDaCor (lib/projeto/keyframes.ts). Sem a cor de chegada ou sem pontos, 0."""
+    pontos = (clipe.get("keyframes") or {}).get("cor")
+    if not clipe.get("cor_b") or not pontos:
+        return 0.0
+    return min(1.0, max(0.0, valor_no_tempo(pontos, no_clipe)))
+
+
+def comandos_da_cor(clipe: dict, inicio_do_clipe: float, janela: tuple[float, float], fps: float, alvo: str) -> str:
+    """
+    O roteiro do sendcmd que muda, a cada quadro, quanto da cor de chegada aparece: a opacidade dos três canais do
+    blend que põe a cor de chegada por cima da cor do clipe (o all_opacity do blend só vale abaixo de 1, por isso
+    canal a canal). Os tempos contam do começo da janela, como o da opacidade.
+    """
+    linhas, anterior = [], None
+    quadros = round((janela[1] - janela[0]) * fps) + 1
+    for n in range(quadros):
+        local = n / fps
+        valor = mistura_da_cor(clipe, (janela[0] + local - inicio_do_clipe) * TICKS_POR_SEGUNDO)
+        if anterior is None or abs(valor - anterior) > 1e-4:
+            v = _n(valor)
+            linhas.append(f"{_n(local)} {alvo} c0_opacity {v}, {alvo} c1_opacity {v}, {alvo} c2_opacity {v};")
+            anterior = valor
+    return "\n".join(linhas) + "\n"
