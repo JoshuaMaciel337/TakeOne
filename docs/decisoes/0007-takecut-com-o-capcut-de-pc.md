@@ -77,9 +77,9 @@ a voz, ajustar a música, o Clipar e a IA toda local.
   prévia ao passar o mouse, arrastar efeitos, filtros, transições e textos para a linha, busca, filtro, ordem e grade ou
   lista na mídia, o selo "No projeto", favoritos e recentes, "Aplicar a todos os cortes" nas transições, os áudios do
   espaço no painel Áudio e extrair o áudio de um vídeo.
-- [ ] 17.4 Propriedades: as abas numa linha e as sub-abas, a aba Básico em grupos recolhíveis (com ligar, Redefinir e o
+- [x] 17.4 Propriedades: as abas numa linha e as sub-abas, a aba Básico em grupos recolhíveis (com ligar, Redefinir e o
   keyframe do grupo), vários clipes de uma vez, "Aplicar a todos", cobrir, caber e alinhar, a velocidade em × com a
-  duração editável e o tom opcional, as fontes do editor de imagem no texto do vídeo e os modos de mesclagem que faltam.
+  duração editável e o tom opcional, as fontes do editor de imagem no texto do vídeo e os modos de mesclagem que faltam. (Os modos de mesclagem que faltam e as abas numa linha só ficaram para depois.)
 - [ ] 17.5 Keyframes: cor, filtro, LUT, máscara, tela verde e texto com keyframe, na prévia e no render.
 - [ ] 17.6 IA no Takecut: "Melhorar o projeto" (uma análise de loudness, ruído, tremor, cor e legenda com "aplicar em
   todos"), o assistente flutuante com o roteador e o plano em etapas, a transcrição como editor completo, a IA no

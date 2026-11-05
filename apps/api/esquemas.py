@@ -422,7 +422,8 @@ class DestaqueEntrada(BaseModel):
 
 
 # Os limites são os mesmos de apps/web/src/lib/projeto/texto.ts
-FonteTexto = Literal["display", "texto", "manuscrita"]
+# As três do servidor ou uma da biblioteca de fontes livres ("lib:roboto", ADR 0007, 17.4)
+FonteTexto = Annotated[str, Field(pattern=r"^(display|texto|manuscrita|lib:[a-z0-9-]{1,48})$")]
 
 
 class MarcaEntrada(BaseModel):

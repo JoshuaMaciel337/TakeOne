@@ -35,6 +35,7 @@ import { AbasDeFerramentas } from "./AbasDeFerramentas";
 import { BarraDoTakecut, LAYOUTS_DO_TAKECUT, layoutAtual, type TamanhosDoTakecut } from "./BarraDoTakecut";
 import { BarraFerramentas } from "./BarraFerramentas";
 import { DetalhesDoProjeto } from "./DetalhesDoProjeto";
+import { VariosClipes } from "./VariosClipes";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
@@ -1293,7 +1294,21 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
                   {...propsDasPropriedades}
                   midia={midiaDasPropriedades}
                   selecionado={selecionado}
-                  semSelecao={midiaDasPropriedades ? undefined : <DetalhesDoProjeto projeto={projetoNaTela ?? projeto} aoPrever={preverDoPainel} aoExecutar={executar} aoConfigurar={() => setConfigurando(true)} />}
+                  semSelecao={
+                    selecaoValida.length > 1 ? (
+                      <VariosClipes
+                        clipes={selecaoValida.map((id) => acharClipe(projetoNaTela ?? projeto, id)).filter((achado) => achado !== null)}
+                        midias={midias}
+                        aoPrever={preverDoPainel}
+                        aoExecutar={(comando) => {
+                          setProvisorio(null);
+                          executar(comando);
+                        }}
+                      />
+                    ) : midiaDasPropriedades ? undefined : (
+                      <DetalhesDoProjeto projeto={projetoNaTela ?? projeto} aoPrever={preverDoPainel} aoExecutar={executar} aoConfigurar={() => setConfigurando(true)} />
+                    )
+                  }
                   className="h-full w-full"
                 />
               </div>

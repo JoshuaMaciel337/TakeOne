@@ -16,6 +16,8 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
+from core.config import FONTES_DA_BIBLIOTECA
+from core.modelos.fontes import arquivo_para_o_texto
 from core.utils.gradiente import imagem_do_degrade
 from core.utils.letras import palavras_das_letras
 
@@ -94,6 +96,25 @@ TEXTO_PADRAO = {
 
 @lru_cache(maxsize=64)
 def carregar_fonte(familia: str, negrito: bool, tamanho: int) -> ImageFont.FreeTypeFont:
+    # As fontes da biblioteca do editor de imagem ("lib:roboto", ADR 0007, 17.4); sem ela na pasta, a de títulos
+    da_biblioteca = arquivo_para_o_texto(familia, negrito, FONTES_DA_BIBLIOTECA) if familia.startswith("lib:") else None
+    if da_biblioteca:
+        caminho, peso = da_biblioteca
+        fonte = ImageFont.truetype(str(caminho), tamanho, layout_engine=ImageFont.Layout.BASIC)
+        try:
+            eixos = fonte.get_variation_axes()
+        except OSError:
+            eixos = []
+        if eixos:
+            valores = []
+            for eixo in eixos:
+                nome = eixo.get("name", b"")
+                nome = nome.decode(errors="ignore") if isinstance(nome, bytes) else str(nome)
+                padrao = eixo.get("default", eixo["minimum"])
+                no_peso = min(eixo["maximum"], max(eixo["minimum"], peso))
+                valores.append(no_peso if nome.lower().startswith("weight") else padrao)
+            fonte.set_variation_by_axes(valores)
+        return fonte
     arquivo, pesos = FONTES.get(familia, FONTES["display"])
     # Motor de layout fixo: com a libraqm numa máquina e sem ela em outra, o mesmo texto media
     # larguras diferentes (aprendido no HolyCut). O BASIC existe em todo lugar e atende o português.

@@ -3,7 +3,8 @@
 
 import { CORES_DO_DEGRADE, type Degrade, MEIO_DO_DEGRADE } from "./gradiente.ts";
 
-export type FonteTexto = "display" | "texto" | "manuscrita";
+/** As três do servidor ou uma da biblioteca de fontes livres ("lib:roboto", ADR 0007, 17.4). */
+export type FonteTexto = "display" | "texto" | "manuscrita" | `lib:${string}`;
 export type Alinhamento = "esquerda" | "centro" | "direita";
 
 /**

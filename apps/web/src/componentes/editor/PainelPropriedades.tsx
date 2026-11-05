@@ -9,13 +9,14 @@ import {
   type Sombra,
   SOMBRA_PADRAO,
 } from "@/lib/projeto/silhueta";
-import { ChevronLeft, ChevronRight, Diamond, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ChevronDown, ChevronLeft, ChevronRight, CopyCheck, Diamond, Maximize, Minimize, Image as ImageIcon, LoaderCircle, MousePointerClick, RotateCcw, Trash2, TrianglesCenterlineDashedHorizontal, TrianglesCenterlineDashedVertical, X } from "lucide-react";
 import { useContext, useState } from "react";
 
 import { arquivoDaMidia, chamarApi } from "@/lib/api";
 import { formatarBytes, formatarTempo } from "@/lib/formatar";
 import type { Comando } from "@/lib/projeto/comandos";
 import { CURVAS_PRONTAS, type PontoDeVelocidade } from "@/lib/projeto/velocidade";
+import { type Alinhamento, escalaParaCobrir, posicaoAlinhada } from "@/lib/projeto/encaixe";
 import { LIMITES_TRANSFORMACAO, LIMITES_VELOCIDADE, type MudancaDeAudio, RECORTE_MINIMO, VOLUME_MAXIMO } from "@/lib/projeto/edicao";
 import { BORDA_MAXIMA, type Cantos, CANTOS_PADRAO, CHAVE_LUMA_PADRAO, type ChaveLuma, type Chroma, CHROMA_PADRAO, chaveDoFluido, type Clipe, type Faixa, LIMITES_DA_MASCARA, MASCARA_PADRAO, type MascaraDeForma, MESCLAGENS, type Mesclagem, type Recorte, RECORTE_PADRAO, type Transformacao, TRANSFORMACAO_PADRAO, zeroDoFluido } from "@/lib/projeto/modelo";
 import { type Curva, CURVAS_DE_KEYFRAME, type Keyframe, keyframeEm, type PropriedadeAnimavel, PROPRIEDADES_ANIMAVEIS, transformacaoParaEditar, volumeNoTempo } from "@/lib/projeto/keyframes";
@@ -51,6 +52,7 @@ import { SecaoExpressoes } from "./SecaoExpressoes";
 import { SecaoForma } from "./SecaoForma";
 import { type ContextoDasFormas, SecaoDaFormaVetorial } from "../imagem/SecaoDaFormaVetorial";
 import { SeguirRosto } from "./SeguirRosto";
+import { razao } from "./proporcoes";
 
 // As abas da seção 5 do plano. As que ainda não têm conteúdo dizem em que fase chegam.
 const ABAS = [
@@ -381,14 +383,39 @@ type PropsAba = {
   aoExecutar: (comando: Comando) => void;
 };
 
+const CHAVE_DAS_SECOES = "takeone-secoes-fechadas";
+
+function secoesFechadas(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_DAS_SECOES) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+/** Um grupo das propriedades (ADR 0007, 17.4): o título recolhe e abre, e fica lembrado neste navegador. */
 function Secao({ titulo, children, acao }: { titulo: string; children: React.ReactNode; acao?: React.ReactNode }) {
+  const [fechada, setFechada] = useState(() => (typeof window === "undefined" ? false : secoesFechadas().includes(titulo)));
+  const alternar = () => {
+    const nova = !fechada;
+    setFechada(nova);
+    try {
+      const outras = secoesFechadas().filter((t) => t !== titulo);
+      localStorage.setItem(CHAVE_DAS_SECOES, JSON.stringify(nova ? [...outras, titulo] : outras));
+    } catch {
+      // Sem armazenamento: vale até fechar a página
+    }
+  };
   return (
     <section className="border-b border-borda/60 pb-2 pt-3 first:pt-0 last:border-0">
       <div className="flex min-h-6 items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-suave">{titulo}</h3>
-        {acao}
+        <button type="button" onClick={alternar} aria-expanded={!fechada} className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-suave hover:text-texto">
+          <ChevronDown className={`size-3.5 transition ${fechada ? "-rotate-90" : ""}`} aria-hidden />
+          {titulo}
+        </button>
+        {fechada ? null : acao}
       </div>
-      {children}
+      {fechada ? null : children}
     </section>
   );
 }
@@ -542,6 +569,13 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
     (Object.keys(TRANSFORMACAO_PADRAO) as (keyof Transformacao)[]).some((chave) => Math.abs(t[chave] - TRANSFORMACAO_PADRAO[chave]) > PERTO) ||
     (Object.keys(RECORTE_PADRAO) as (keyof Recorte)[]).some((chave) => Math.abs(clipe.recorte[chave] - RECORTE_PADRAO[chave]) > PERTO);
   const { x, y, escala, opacidade } = LIMITES_TRANSFORMACAO;
+  // O tamanho do quadro e o da mídia, para caber, cobrir e alinhar (só nos clipes de mídia com tamanho conhecido)
+  const r = razao(proporcao as Parameters<typeof razao>[0]);
+  const quadro = r < 1 ? { largura: 1080, altura: 1080 / r } : { largura: 1080 * r, altura: 1080 };
+  const tamanhoDaMidia = !clipe.texto && midia?.video?.largura && midia.video.altura ? { largura: midia.video.largura, altura: midia.video.altura } : null;
+  const alinhar = (alinhamento: Alinhamento) => tamanhoDaMidia && aoExecutar(transformar(posicaoAlinhada(alinhamento, t, tamanhoDaMidia, clipe.recorte, quadro)));
+  const outrosDaFaixa = faixa.clipes.filter((item) => item.id !== clipe.id);
+  const mostrarMovimento = pontosDoClipe.length > 0 || Boolean(!clipe.texto && midia?.video && !midia.imagem) || (comTempo && (faixa.tipo === "texto" || faixa.tipo === "video"));
 
   return (
     <div>
@@ -620,16 +654,35 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
       <Secao
         titulo="Posição e tamanho"
         acao={
-          <button
-            type="button"
-            className="botao-icone size-6"
-            disabled={travada || !mudado}
-            onClick={() => aoExecutar({ comando: "clipe.restaurar", parametros: { clipeIds: ids } })}
-            aria-label="Restaurar posição, tamanho e recorte"
-            title="Restaurar posição, tamanho e recorte"
-          >
-            <RotateCcw className="size-3.5" aria-hidden />
-          </button>
+          <span className="flex items-center">
+            {comTempo && outrosDaFaixa.length ? (
+              <button
+                type="button"
+                className="botao-icone size-6"
+                disabled={travada}
+                onClick={() =>
+                  aoExecutar({
+                    comando: "clipe.transformar",
+                    parametros: { clipeIds: outrosDaFaixa.map((item) => item.id), transformacao: { x: t.x, y: t.y, escala: t.escala, rotacao: t.rotacao, opacidade: t.opacidade } },
+                  })
+                }
+                aria-label="Aplicar a todos os clipes da faixa"
+                title="A mesma posição, escala, giro e opacidade em todos os clipes desta faixa"
+              >
+                <CopyCheck className="size-3.5" aria-hidden />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="botao-icone size-6"
+              disabled={travada || !mudado}
+              onClick={() => aoExecutar({ comando: "clipe.restaurar", parametros: { clipeIds: ids } })}
+              aria-label="Restaurar posição, tamanho e recorte"
+              title="Restaurar posição, tamanho e recorte"
+            >
+              <RotateCcw className="size-3.5" aria-hidden />
+            </button>
+          </span>
         }
       >
         <ControleNumerico
@@ -661,6 +714,40 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           sufixo="%"
           {...controleDeTransformacao("escala", 100)}
         />
+        {tamanhoDaMidia ? (
+          <div className="mb-1 flex flex-wrap items-center gap-1" role="group" aria-label="Caber, cobrir e alinhar">
+            <button type="button" className="botao-secundario px-2 py-0.5 text-[11px]" disabled={travada} onClick={() => aoExecutar(transformar({ escala: 1, x: 0, y: 0 }))} title="A mídia inteira no quadro">
+              <Minimize className="size-3.5" aria-hidden />
+              Caber
+            </button>
+            <button
+              type="button"
+              className="botao-secundario px-2 py-0.5 text-[11px]"
+              disabled={travada}
+              onClick={() => aoExecutar(transformar({ escala: escalaParaCobrir(tamanhoDaMidia, clipe.recorte, quadro), x: 0, y: 0 }))}
+              title="Encher o quadro, sem faixas"
+            >
+              <Maximize className="size-3.5" aria-hidden />
+              Cobrir
+            </button>
+            <span className="ml-auto flex">
+              {(
+                [
+                  ["esquerda", AlignStartVertical, "Encostar na esquerda"],
+                  ["centro", AlignCenterVertical, "Centralizar na horizontal"],
+                  ["direita", AlignEndVertical, "Encostar na direita"],
+                  ["topo", AlignStartHorizontal, "Encostar no alto"],
+                  ["meio", AlignCenterHorizontal, "Centralizar na vertical"],
+                  ["base", AlignEndHorizontal, "Encostar embaixo"],
+                ] as const
+              ).map(([id, Icone, nome]) => (
+                <button key={id} type="button" className="botao-icone size-6" disabled={travada} onClick={() => alinhar(id)} aria-label={nome} title={nome}>
+                  <Icone className="size-3.5" aria-hidden />
+                </button>
+              ))}
+            </span>
+          </div>
+        ) : null}
         <ControleNumerico rotulo="Giro" minimo={-180} maximo={180} passo={0.5} sufixo="°" {...controleDeTransformacao("rotacao", 1)} />
         <div className="flex items-center gap-2 text-xs">
           <span className="flex-1 text-suave">Virar</span>
@@ -696,6 +783,8 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
             ))}
           </select>
         </label>
+      </Secao>
+      <Secao titulo="Cantos, contorno e máscara">
         {clipe.vetor && formas ? <SecaoDaFormaVetorial clipe={clipe} travada={travada} contexto={formas} aoExecutar={aoExecutar} /> : null}
         <CantosDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {!clipe.ajuste ? <SilhuetaDoClipe clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} /> : null}
@@ -706,8 +795,11 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         {comTempo && aoTrocarPorVideo && midia?.imagem && !midia.elemento && !midia.animacao && !midia.legenda_animada && !midia.video?.transparente && !clipe.texto ? (
           <FotoEm3D clipe={clipe} midia={midia} travada={travada} aoPedir={aoTrocarPorVideo} aoAvisar={aoAvisar} />
         ) : null}
-        {clipe.texto ? null : <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
-        {clipe.texto ? null : <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />}
+      </Secao>
+      {clipe.texto ? null : (
+      <Secao titulo="Fundo e imagem">
+        <TelaVerde clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
+        <ChaveDeLuma clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
         {!clipe.texto && midia?.video && !midia.elemento && !midia.camada_pixels ? (
           <RemoverFundo
             clipe={clipe}
@@ -728,6 +820,10 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
         {!clipe.texto && midia?.video && !midia.imagem && !midia.animacao && !midia.legenda_animada ? (
           <Estabilizar clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} />
         ) : null}
+      </Secao>
+      )}
+      {mostrarMovimento ? (
+      <Secao titulo="Movimento">
         {pontosDoClipe.length ? (
           <div className="mt-1 flex items-center gap-1 text-[11px] text-suave" aria-label="Keyframes do clipe">
             <button
@@ -790,6 +886,7 @@ function AbaBasico({ clipe, faixa, tempo, taxa, aoBuscar, midia, proporcao, aoAv
           />
         ) : null}
       </Secao>
+      ) : null}
       {comTempo ? (
         <Secao titulo="Expressões">
           <SecaoExpressoes clipe={clipe} travada={travada} aoPrever={aoPrever} aoExecutar={aoExecutar} />
@@ -888,23 +985,42 @@ function AbaVelocidade({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba &
   const travada = faixa.travada;
   const comando = (velocidade: number): Comando => ({ comando: "clipe.velocidade", parametros: { clipeId: clipe.id, velocidade } });
   const duracaoS = clipe.duracao / TICKS_POR_SEGUNDO;
+  // O trecho da mídia que o clipe toca: mudar a duração muda a velocidade para ele caber (ADR 0007, 17.4)
+  const trechoS = duracaoS * clipe.velocidade;
+  const velocidadeDaDuracao = (segundos: number) => Math.min(LIMITES_VELOCIDADE.maximo, Math.max(LIMITES_VELOCIDADE.minimo, trechoS / Math.max(0.01, segundos)));
+  const comSom = Boolean(midia?.audio && !clipe.som_separado);
+  const tomDaVelocidade = Math.max(-12, Math.min(12, Math.round(12 * Math.log2(clipe.velocidade))));
   return (
     <div>
       {travada ? <p className="mb-2 rounded-md bg-painel-2 px-2 py-1.5 text-xs text-suave">A faixa está travada. Destrave o cadeado para editar.</p> : null}
       <Secao titulo="Velocidade">
         <ControleNumerico
           rotulo="Velocidade"
-          valor={clipe.velocidade * 100}
-          minimo={LIMITES_VELOCIDADE.minimo * 100}
-          maximo={400}
-          maximoDigitado={LIMITES_VELOCIDADE.maximo * 100}
-          passo={5}
-          sufixo="%"
-          desativado={travada}
-          aoPrever={(valor) => aoPrever(comando(valor / 100))}
+          valor={clipe.velocidade}
+          minimo={LIMITES_VELOCIDADE.minimo}
+          maximo={4}
+          maximoDigitado={LIMITES_VELOCIDADE.maximo}
+          passo={0.05}
+          sufixo="×"
+          desativado={travada || Boolean(clipe.curva_velocidade?.length)}
+          aoPrever={(valor) => aoPrever(comando(valor))}
           aoConfirmar={(valor) => {
-            if (Math.abs(valor / 100 - clipe.velocidade) < PERTO) aoPrever(null);
-            else aoExecutar(comando(valor / 100));
+            if (Math.abs(valor - clipe.velocidade) < PERTO) aoPrever(null);
+            else aoExecutar(comando(valor));
+          }}
+        />
+        <ControleNumerico
+          rotulo="Duração"
+          valor={duracaoS}
+          minimo={Math.max(0.1, trechoS / LIMITES_VELOCIDADE.maximo)}
+          maximo={Math.min(trechoS / LIMITES_VELOCIDADE.minimo, Math.max(duracaoS * 4, trechoS * 2))}
+          passo={0.1}
+          sufixo="s"
+          desativado={travada || Boolean(clipe.curva_velocidade?.length)}
+          aoPrever={(valor) => aoPrever(comando(velocidadeDaDuracao(valor)))}
+          aoConfirmar={(valor) => {
+            if (Math.abs(valor - duracaoS) < 0.005) aoPrever(null);
+            else aoExecutar(comando(velocidadeDaDuracao(valor)));
           }}
         />
         <div className="mt-2 grid grid-cols-5 gap-1">
@@ -924,8 +1040,27 @@ function AbaVelocidade({ clipe, faixa, midia, aoPrever, aoExecutar }: PropsAba &
           ))}
         </div>
         <p className="mt-2 text-[11px] text-suave">
-          Duração: {duracaoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
+          Trecho da mídia: {trechoS.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} s. O som acompanha a velocidade sem mudar o tom da voz.
         </p>
+        {comSom && Math.abs(clipe.velocidade - 1) > PERTO ? (
+          <button
+            type="button"
+            className="botao-secundario mt-2 w-full px-3 py-1 text-xs"
+            disabled={travada || (clipe.tom ?? 0) === tomDaVelocidade}
+            onClick={() => {
+              aoExecutar({ comando: "clipe.audio", parametros: { clipeIds: [clipe.id], tom: tomDaVelocidade } });
+              // O worker grava a voz no tom (sobre a voz limpa, se ela está ligada e pronta), como na aba Áudio
+              const limpa = Boolean(clipe.voz_limpa) && midia?.voz_limpa?.status === "pronta";
+              const estado = midia?.tons?.[chaveDoTom(tomDaVelocidade, limpa)]?.status;
+              if (midia && tomDaVelocidade && estado !== "pronta" && estado !== "processando") {
+                chamarApi(`/midias/${midia.id}/tom`, { metodo: "POST", corpo: { semitons: tomDaVelocidade, limpa } }).catch(() => undefined);
+              }
+            }}
+            title="Muda o tom da voz na mesma medida da velocidade (mais rápido, mais agudo), em semitons inteiros. Volta pela aba Áudio."
+          >
+            {(clipe.tom ?? 0) === tomDaVelocidade ? `O tom acompanha a velocidade (${tomDaVelocidade > 0 ? "+" : ""}${tomDaVelocidade} semitons)` : "Mudar o tom junto com a velocidade"}
+          </button>
+        ) : null}
         {midia?.video && !midia.imagem ? <AoContrario clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
         {midia?.video?.fps && !midia.imagem && (clipe.velocidade < 1 || clipe.fluido) ? <CameraLentaSuave clipe={clipe} midia={midia} travada={travada} aoExecutar={aoExecutar} /> : null}
       </Secao>

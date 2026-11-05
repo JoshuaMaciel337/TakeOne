@@ -3,6 +3,7 @@
 import { AlignCenter, AlignLeft, AlignRight, Bold, CaseUpper, Plus, Strikethrough, Underline, X } from "lucide-react";
 
 import type { Comando } from "@/lib/projeto/comandos";
+import { useCatalogoDeFontes } from "@/lib/texto/fontes";
 import type { Clipe, Faixa } from "@/lib/projeto/modelo";
 import {
   type Alinhamento,
@@ -74,6 +75,8 @@ const PERTO = 1e-6;
 /** Conteúdo, fonte, cor, contorno, sombra e fundo de um clipe de texto. */
 /** `semTempo`: no editor de imagem, sem o destaque da fala (que anda com o tempo). */
 export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false }: Props & { semTempo?: boolean }) {
+  // As famílias da biblioteca (sem as três do servidor nem as enviadas pelo espaço, que o servidor não desenha no vídeo)
+  const fontesDaBiblioteca = useCatalogoDeFontes().filter((familia) => !["inter", "montserrat", "caveat"].includes(familia.id) && !familia.estilos.some((estilo) => estilo.id));
   const texto = clipe.texto!;
   const travada = faixa.travada;
   const mudar = (mudanca: Partial<Texto>): Comando => ({ comando: "texto.mudar", parametros: { clipeIds: [clipe.id], texto: mudanca } });
@@ -141,11 +144,25 @@ export function AbaTexto({ clipe, faixa, aoPrever, aoExecutar, semTempo = false 
             onChange={(evento) => aoExecutar(mudar({ fonte: evento.currentTarget.value as FonteTexto }))}
             className="min-w-0 flex-1 rounded-md border border-borda bg-painel-2 px-2 py-1.5 text-xs outline-none focus:border-destaque"
           >
-            {FONTES_TEXTO.map((fonte) => (
-              <option key={fonte.id} value={fonte.id}>
-                {fonte.nome}
-              </option>
-            ))}
+            <optgroup label="Do TakeOne">
+              {FONTES_TEXTO.map((fonte) => (
+                <option key={fonte.id} value={fonte.id}>
+                  {fonte.nome}
+                </option>
+              ))}
+            </optgroup>
+            {/* As fontes livres da biblioteca (as do editor de imagem), desenhadas pelo servidor como as outras */}
+            {fontesDaBiblioteca.length ? (
+              <optgroup label="Biblioteca de fontes">
+                {fontesDaBiblioteca.map((familia) => (
+                  <option key={familia.id} value={`lib:${familia.id}`}>
+                    {familia.nome}
+                  </option>
+                ))}
+              </optgroup>
+            ) : texto.fonte.startsWith("lib:") ? (
+              <option value={texto.fonte}>{texto.fonte.slice(4)}</option>
+            ) : null}
           </select>
           <BotaoAlternar ativo={texto.negrito} rotulo="Negrito" desativado={travada} aoClicar={() => aoExecutar(mudar({ negrito: !texto.negrito }))}>
             <Bold className="size-4" aria-hidden />
