@@ -14,6 +14,8 @@
 #   POST   /api/albuns/{id}/importar         importa uma pasta dela sem copiar (job "importar_pasta")
 #   POST   /api/albuns/{id}/analisar         mede as fotos que faltam (job "medir_album")
 #   POST   /api/albuns/{id}/escolher         escolhe as melhores pelas medidas (core/modelos/escolha.py)
+#   GET    /api/albuns/{id}/pessoas          as pessoas achadas nos rostos (core/modelos/pessoas.py)
+#   PATCH  /api/albuns/{id}/pessoas/{n}      dá um nome a uma pessoa
 #
 # As fotos chegam pelo envio de sempre (tus), com o álbum nos metadados (api/rotas/uploads.py).
 # -----------------------------------------------
@@ -41,6 +43,8 @@ from api.esquemas import (
     ImportarPastaEntrada,
     JobDoAlbumSaida,
     PastaDoComputadorSaida,
+    PessoaAtualizarEntrada,
+    PessoaDoAlbumSaida,
 )
 from api.rotas.midias import apagar_midia, jobs_de_ingestao, motivo_para_manter
 from core.modelos.album import FOTOS_POR_ALBUM, montar_album, montar_foto, mudanca_das_fotos
@@ -253,6 +257,7 @@ async def excluir_album(album_id: str, usuario=Depends(usuario_atual), db=Depend
     ids += [m["_id"] async for m in db.midias.find({"album_id": album["_id"], "_id": {"$nin": ids}}, {"_id": 1})]
     resultado = await tirar_fotos(db, album, ids)
     await db.albuns.delete_one({"_id": album["_id"]})
+    await db.album_pessoas.delete_many({"album_id": album["_id"]})
     logging.info(f"[{usuario['organizacao_id']}] Álbum excluído: {album['nome']} ({resultado.apagadas} fotos "
                  f"apagadas, {resultado.na_biblioteca} na biblioteca)")
     return resultado
@@ -281,8 +286,30 @@ async def listar_fotos(album_id: str, usuario=Depends(usuario_atual), db=Depends
             cor=foto.get("cor"), marcacao=foto.get("marcacao"), enviado_em=midia.get("enviado_em"),
             do_album=midia.get("album_id") == album["_id"], medidas=medidas.get(midia["_id"]),
             categoria=foto.get("categoria"), grupo=foto.get("grupo"), cena=foto.get("cena"),
-            nota_ia=foto.get("nota_ia"), motivo=foto.get("motivo")))
+            nota_ia=foto.get("nota_ia"), motivo=foto.get("motivo"), pessoas=foto.get("pessoas") or []))
     return saida
+
+
+@router.get("/{album_id}/pessoas", response_model=list[PessoaDoAlbumSaida])
+async def listar_pessoas(album_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    return [PessoaDoAlbumSaida(numero=p["numero"], nome=p.get("nome", ""), fotos=p.get("fotos", 0),
+                               capa_midia_id=str(p["capa"]["midia_id"]), caixa=p["capa"]["caixa"])
+            async for p in db.album_pessoas.find({"album_id": album["_id"]}, {"centro": 0}).sort(
+                [("fotos", -1), ("numero", 1)])]
+
+
+@router.patch("/{album_id}/pessoas/{numero}", response_model=PessoaDoAlbumSaida)
+async def nomear_pessoa(album_id: str, numero: int, dados: PessoaAtualizarEntrada, usuario=Depends(usuario_atual),
+                        db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    pessoa = await db.album_pessoas.find_one_and_update(
+        {"album_id": album["_id"], "numero": numero}, {"$set": {"nome": dados.nome.strip()}},
+        projection={"centro": 0}, return_document=True)
+    if pessoa is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pessoa não encontrada.")
+    return PessoaDoAlbumSaida(numero=pessoa["numero"], nome=pessoa["nome"], fotos=pessoa.get("fotos", 0),
+                              capa_midia_id=str(pessoa["capa"]["midia_id"]), caixa=pessoa["capa"]["caixa"])
 
 
 @router.post("/{album_id}/fotos", response_model=list[FotoDoAlbumSaida], status_code=status.HTTP_201_CREATED)

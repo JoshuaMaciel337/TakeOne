@@ -1,7 +1,7 @@
 // As chamadas da API do álbum de fotos (apps/api/rotas/albuns.py).
 import { chamarApi } from "@/lib/api";
 
-import type { Album, FotoDoAlbum, Genero, Mudanca } from "./fotos";
+import type { Album, FotoDoAlbum, Genero, Mudanca, PessoaDoAlbum } from "./fotos";
 
 export type FotosRemovidas = { apagadas: number; na_biblioteca: number };
 
@@ -39,3 +39,7 @@ export const OPCOES_DA_ESCOLHA: OpcoesDaEscolha = { quantas: "padrao", alvo: 0, 
 
 export const escolherMelhores = (id: string, opcoes: OpcoesDaEscolha) =>
   chamarApi<{ categorias: Record<string, number>; sem_analise: number }>(`/albuns/${id}/escolher`, { metodo: "POST", corpo: opcoes });
+
+export const pessoasDoAlbum = (id: string) => chamarApi<PessoaDoAlbum[]>(`/albuns/${id}/pessoas`);
+export const nomearPessoa = (id: string, numero: number, nome: string) =>
+  chamarApi<PessoaDoAlbum>(`/albuns/${id}/pessoas/${numero}`, { metodo: "PATCH", corpo: { nome } });

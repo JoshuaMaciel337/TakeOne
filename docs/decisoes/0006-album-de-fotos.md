@@ -104,7 +104,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
   "talvez"; os modos automático, assistido e manual; quantas ficam ou um número exato; o rigor do desfoque e dos olhos;
   estrelas e cores por categoria. Medido contra as escolhas feitas à mão pelo dono num ensaio de verdade (falta:
   o ensaio e as escolhas do dono; testado com rajadas montadas de fotos reais).
-- [ ] 16.4 As vistas: lupa com a tira do grupo e os rostos da foto, comparação de até 12 com zoom e arrasto juntos,
+- [x] 16.4 As vistas: lupa com a tira do grupo e os rostos da foto, comparação de até 12 com zoom e arrasto juntos,
   tela cheia, pincel de notas, gaveta do resultado, pessoas (SFace) e o filtro "alguma" ou "todas".
 - [ ] 16.5 Editar em lote: o "Melhorar", as LUTs, os filtros e o igualar a cor aplicados às escolhidas; sincronizar os
   ajustes de uma nas outras por grupos; antes e depois; corte e endireitar automáticos (rosto, assunto e linhas).

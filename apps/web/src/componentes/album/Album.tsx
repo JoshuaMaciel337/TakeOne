@@ -1,22 +1,17 @@
 "use client";
 
 import {
-  Aperture,
   ArrowLeft,
+  Brush,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
-  CircleHelp,
-  EyeOff,
+  Columns2,
   FolderUp,
   HardDrive,
   ImageUp,
-  Layers,
   LoaderCircle,
   ScanSearch,
   Search,
-  Star,
   Trash2,
   WandSparkles,
   X,
@@ -24,21 +19,26 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CLASSE_DA_CATEGORIA, CLASSE_DA_COR, dataDaFoto, Estrelas, IconeDaCategoria } from "@/componentes/album/comum";
+import { Comparacao } from "@/componentes/album/Comparacao";
+import { FiltroDePessoas } from "@/componentes/album/FiltroDePessoas";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
+import { Lupa } from "@/componentes/album/Lupa";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
-import { analisarAlbum, escolherMelhores, fotosDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
+import { analisarAlbum, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
 import type { OpcoesDaEscolha } from "@/lib/album/api";
 import {
   type Album as TipoAlbum,
   aplicarMudanca,
   type Categoria,
   CATEGORIAS,
+  COMPARAR_NO_MAXIMO,
+  type PessoaDoAlbum,
   contarCategorias,
   colunasDaGrade,
   contar,
   CORES,
-  type CorDaFoto,
   FILTRO_VAZIO,
   type Filtro,
   filtrarFotos,
@@ -69,34 +69,21 @@ const CHAVE_DA_VISTA = "takeone-album-vista";
 // Muitas fotos chegando de uma vez: a lista é pedida de novo no máximo a cada 1,5 s
 const ESPERA_DA_RECARGA_MS = 1500;
 
-const CLASSE_DA_COR: Record<CorDaFoto, string> = {
-  vermelho: "bg-rotulo-vermelho",
-  amarelo: "bg-rotulo-amarelo",
-  verde: "bg-rotulo-verde",
-  azul: "bg-rotulo-azul",
-  roxo: "bg-rotulo-roxo",
-};
-
-const CLASSE_DA_CATEGORIA: Record<Categoria, string> = {
-  destaque: "bg-grupo-destaque",
-  escolhida: "bg-grupo-escolhida",
-  talvez: "bg-grupo-talvez",
-  parecida: "bg-grupo-parecida",
-  desfocada: "bg-grupo-desfocada",
-  olhos_fechados: "bg-grupo-olhos-fechados",
-};
-
-function IconeDaCategoria({ categoria }: { categoria: Categoria }) {
-  const classe = "size-3";
-  if (categoria === "destaque") return <Star className={classe} fill="currentColor" aria-hidden />;
-  if (categoria === "escolhida") return <Check className={classe} aria-hidden />;
-  if (categoria === "parecida") return <Layers className={classe} aria-hidden />;
-  if (categoria === "desfocada") return <Aperture className={classe} aria-hidden />;
-  if (categoria === "olhos_fechados") return <EyeOff className={classe} aria-hidden />;
-  return <CircleHelp className={classe} aria-hidden />;
-}
-
 type Vista = { tamanho: number; ordem: Ordem };
+
+/** O que o pincel de notas pode pintar. */
+const PINCEIS: { chave: string; nome: string; mudanca: Mudanca }[] = [
+  ...[5, 4, 3, 2, 1, 0].map((n) => ({ chave: `nota${n}`, nome: n ? `${n} estrela${n > 1 ? "s" : ""}` : "Sem estrelas", mudanca: { nota: n } })),
+  { chave: "escolher", nome: "Escolher", mudanca: { marcacao: "escolhida" } },
+  { chave: "rejeitar", nome: "Rejeitar", mudanca: { marcacao: "rejeitada" } },
+  { chave: "sem_marcacao", nome: "Sem marcação", mudanca: { tirar_marcacao: true } },
+  ...CORES.map((cor) => ({ chave: `cor_${cor.id}`, nome: `Cor ${cor.nome.toLowerCase()}`, mudanca: { cor: cor.id } as Mudanca })),
+  { chave: "sem_cor", nome: "Sem cor", mudanca: { tirar_cor: true } },
+];
+
+function chaveDoPincel(mudanca: Mudanca): string {
+  return PINCEIS.find((p) => JSON.stringify(p.mudanca) === JSON.stringify(mudanca))?.chave ?? "nota5";
+}
 
 function lerVista(): Vista {
   try {
@@ -107,13 +94,6 @@ function lerVista(): Vista {
   } catch {
     return { tamanho: TAMANHOS.padrao, ordem: "captura" };
   }
-}
-
-function dataDaFoto(iso?: string): string {
-  if (!iso) return "";
-  const [data, hora] = iso.split("T");
-  const [ano, mes, dia] = data.split("-");
-  return `${dia}/${mes}/${ano}${hora ? ` ${hora.slice(0, 5)}` : ""}`;
 }
 
 /** Lê uma pasta arrastada (e as de dentro), com o caminho de cada foto a partir dela. */
@@ -165,6 +145,7 @@ const EXTENSOES_DE_FOTO = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif|cr2|cr
 function useAlbum(albumId: string) {
   const [album, setAlbum] = useState<TipoAlbum | null>(null);
   const [fotos, setFotos] = useState<FotoDoAlbum[] | null>(null);
+  const [pessoas, setPessoas] = useState<PessoaDoAlbum[]>([]);
   const [erro, setErro] = useState("");
   const [analise, setAnalise] = useState<{ progresso: number; mensagem: string } | null>(null);
   const espera = useRef<number | null>(null);
@@ -175,11 +156,12 @@ function useAlbum(albumId: string) {
 
   const recarregar = useCallback(() => {
     const numero = ++pedido.current;
-    return Promise.all([verAlbum(albumId), fotosDoAlbum(albumId)])
-      .then(([novo, lista]) => {
+    return Promise.all([verAlbum(albumId), fotosDoAlbum(albumId), pessoasDoAlbum(albumId)])
+      .then(([novo, lista, achadas]) => {
         if (numero !== pedido.current) return;
         setAlbum(novo);
         setFotos(lista);
+        setPessoas(achadas);
         setErro("");
       })
       .catch((e) => {
@@ -241,14 +223,17 @@ function useAlbum(albumId: string) {
     if (criados) pedirRecarga();
   }, [criados, pedirRecarga]);
 
-  return { album, setAlbum, fotos, setFotos, erro, setErro, recarregar, analise, setAnalise, esperarAnalise };
+  return { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise };
 }
 
 // -----------------------------------------------
 // A tela
 // -----------------------------------------------
 export function Album({ albumId }: { albumId: string }) {
-  const { album, setAlbum, fotos, setFotos, erro, setErro, recarregar, analise, setAnalise, esperarAnalise } = useAlbum(albumId);
+  const { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise } = useAlbum(albumId);
+  // A comparação (as fotos lado a lado) e o pincel de notas (a mudança que o arrasto pinta nas fotos)
+  const [comparando, setComparando] = useState<string[] | null>(null);
+  const [pincel, setPincel] = useState<Mudanca | null>(null);
   const [escolhendo, setEscolhendo] = useState(false);
   const [ocupado, setOcupado] = useState("");
 
@@ -415,10 +400,21 @@ export function Album({ albumId }: { albumId: string }) {
     [visiveis, indiceDoCursor, ancora],
   );
 
+  /** Abre a comparação com as selecionadas (de 2 a 12), na ordem da grade. */
+  const comparar = useCallback(() => {
+    const ids = visiveis.filter((foto) => selecao.has(foto.midia_id) && foto.status === "pronta").map((foto) => foto.midia_id);
+    if (ids.length < 2) {
+      setAviso("Escolha de 2 a 12 fotos (Ctrl ou Shift + clique) para comparar.");
+      return;
+    }
+    if (ids.length > COMPARAR_NO_MAXIMO) setAviso(`A comparação mostra as ${COMPARAR_NO_MAXIMO} primeiras das selecionadas.`);
+    setComparando(ids.slice(0, COMPARAR_NO_MAXIMO));
+  }, [visiveis, selecao]);
+
   // O teclado da grade e da lupa
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
-      if (evento.defaultPrevented) return;
+      if (evento.defaultPrevented || comparando) return;
       const alvo = evento.target as HTMLElement | null;
       if (alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.tagName === "SELECT" || alvo.isContentEditable)) return;
       const ctrl = evento.ctrlKey || evento.metaKey;
@@ -450,6 +446,16 @@ export function Album({ albumId }: { albumId: string }) {
         remover();
         return;
       }
+      if (evento.key.toLowerCase() === "c" && !lupa) {
+        evento.preventDefault();
+        comparar();
+        return;
+      }
+      if (evento.key.toLowerCase() === "b" && !lupa) {
+        evento.preventDefault();
+        setPincel((atual) => (atual ? null : { nota: 5 }));
+        return;
+      }
       const ids = alvos();
       const atual = ids.length === 1 ? (fotos ?? []).find((foto) => foto.midia_id === ids[0]) : undefined;
       const mudanca = mudancaDaTecla(evento.key, atual);
@@ -460,7 +466,7 @@ export function Album({ albumId }: { albumId: string }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos]);
+  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos, comparando, comparar]);
 
   if (!album || !fotos) {
     return (
@@ -618,7 +624,26 @@ export function Album({ albumId }: { albumId: string }) {
         </div>
       </header>
 
-      <BarraDeFiltros filtro={filtro} aoMudar={setFiltro} ordem={vista.ordem} aoOrdenar={(ordem) => mudarVista({ ordem })} pastas={listaDePastas} porCategoria={porCategoria} />
+      <BarraDeFiltros
+        filtro={filtro}
+        aoMudar={setFiltro}
+        ordem={vista.ordem}
+        aoOrdenar={(ordem) => mudarVista({ ordem })}
+        pastas={listaDePastas}
+        porCategoria={porCategoria}
+        pessoas={
+          <FiltroDePessoas
+            pessoas={pessoas}
+            fotos={fotos}
+            filtro={filtro}
+            aoMudar={setFiltro}
+            aoNomear={(numero, nome) => {
+              setPessoas((lista) => lista.map((p) => (p.numero === numero ? { ...p, nome } : p)));
+              nomearPessoa(albumId, numero, nome).catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível dar o nome."));
+            }}
+          />
+        }
+      />
 
       {erro || aviso || comErro.length ? (
         <div className="flex flex-col gap-1 border-b border-borda bg-painel px-3 py-2 text-xs">
@@ -649,6 +674,10 @@ export function Album({ albumId }: { albumId: string }) {
             </div>
           ) : (
             <Grade
+              pincel={pincel}
+              aoPintar={(ids) => {
+                if (pincel) aplicar(pincel, ids);
+              }}
               fotos={visiveis}
               tamanho={vista.tamanho}
               selecao={selecao}
@@ -679,6 +708,7 @@ export function Album({ albumId }: { albumId: string }) {
           aoAplicar={(mudanca) => aplicar(mudanca)}
           aoRemover={remover}
           todas={fotos}
+          pessoas={pessoas}
         />
       </div>
 
@@ -690,8 +720,44 @@ export function Album({ albumId }: { albumId: string }) {
           {filtroAtivo(filtro) ? ` (de ${fotos.length.toLocaleString("pt-BR")})` : ""} fotos
           {quantosSelecionados > 1 ? ` · ${quantosSelecionados.toLocaleString("pt-BR")} selecionadas` : ""}
         </span>
-        <span className="hidden items-center gap-1 md:flex">
-          {fotoDoCursor ? <Estrelas nota={fotoDoCursor.nota} aoMudar={(nota) => aplicar({ nota })} /> : null}
+        <span className="hidden items-center gap-3 md:flex">
+          {fotoDoCursor && !pincel ? <Estrelas nota={fotoDoCursor.nota} aoMudar={(nota) => aplicar({ nota })} /> : null}
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-painel-2 hover:text-texto disabled:opacity-40"
+            onClick={comparar}
+            disabled={quantosSelecionados < 2}
+            title="Comparar as selecionadas lado a lado (C)"
+          >
+            <Columns2 className="size-3.5" aria-hidden />
+            Comparar
+          </button>
+          <span className={`flex items-center gap-1 rounded px-1 ${pincel ? "bg-aviso/15 text-texto" : ""}`}>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded px-1 py-0.5 hover:text-texto"
+              onClick={() => setPincel((atual) => (atual ? null : { nota: 5 }))}
+              aria-pressed={Boolean(pincel)}
+              title="Pincel de notas: clique e arraste sobre as fotos (B)"
+            >
+              <Brush className="size-3.5" aria-hidden />
+              Pincel
+            </button>
+            {pincel ? (
+              <select
+                value={chaveDoPincel(pincel)}
+                onChange={(evento) => setPincel(PINCEIS.find((p) => p.chave === evento.target.value)?.mudanca ?? null)}
+                className="rounded border border-borda bg-painel-2 px-1 py-0.5"
+                aria-label="O que o pincel pinta"
+              >
+                {PINCEIS.map((p) => (
+                  <option key={p.chave} value={p.chave}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </span>
         </span>
         <label className="flex items-center justify-end gap-2">
           <span className="sr-only">Tamanho das fotos</span>
@@ -722,12 +788,26 @@ export function Album({ albumId }: { albumId: string }) {
       {lupa && fotoDoCursor ? (
         <Lupa
           foto={fotoDoCursor}
+          fotos={fotos}
+          pessoas={pessoas}
+          aoIr={(midiaId) => {
+            setCursor(midiaId);
+            setSelecao(new Set([midiaId]));
+          }}
           indice={indiceDoCursor}
           total={visiveis.length}
           aoFechar={() => setLupa(false)}
           aoAndar={(passo) => mover(passo, false)}
           aoAplicar={(mudanca) => aplicar(mudanca, [fotoDoCursor.midia_id])}
           proxima={visiveis[indiceDoCursor + 1]?.midia_id}
+        />
+      ) : null}
+      {comparando ? (
+        <Comparacao
+          fotos={comparando.map((id) => fotos.find((foto) => foto.midia_id === id)).filter((foto): foto is FotoDoAlbum => Boolean(foto))}
+          aoAplicar={aplicar}
+          aoTirar={(midiaId) => setComparando((ids) => ids?.filter((id) => id !== midiaId) ?? null)}
+          aoFechar={() => setComparando(null)}
         />
       ) : null}
     </div>
@@ -737,22 +817,6 @@ export function Album({ albumId }: { albumId: string }) {
 // -----------------------------------------------
 // Peças
 // -----------------------------------------------
-function Estrelas({ nota, aoMudar, tamanho = "size-3.5" }: { nota: number; aoMudar?: (nota: number) => void; tamanho?: string }) {
-  return (
-    <span className="flex items-center gap-0.5" aria-label={`${nota} de 5 estrelas`}>
-      {[1, 2, 3, 4, 5].map((n) =>
-        aoMudar ? (
-          <button key={n} type="button" className="text-aviso hover:scale-110" onClick={() => aoMudar(nota === n ? 0 : n)} aria-label={`${n} estrela${n > 1 ? "s" : ""}`} title={`${n} (tecla ${n})`}>
-            <Star className={tamanho} fill={n <= nota ? "currentColor" : "none"} aria-hidden />
-          </button>
-        ) : (
-          <Star key={n} className={`${tamanho} ${n <= nota ? "text-aviso" : "text-white/35"}`} fill={n <= nota ? "currentColor" : "none"} aria-hidden />
-        ),
-      )}
-    </span>
-  );
-}
-
 function EstadoVazio({ aoEnviarPasta, aoEnviarFotos, aoImportar }: { aoEnviarPasta: () => void; aoEnviarFotos: () => void; aoImportar?: () => void }) {
   return (
     <div className="flex h-full items-center justify-center p-6">
@@ -788,6 +852,7 @@ function BarraDeFiltros({
   aoOrdenar,
   pastas,
   porCategoria,
+  pessoas,
 }: {
   filtro: Filtro;
   aoMudar: (filtro: Filtro) => void;
@@ -796,6 +861,8 @@ function BarraDeFiltros({
   pastas: { pasta: string; fotos: number }[];
   /** Quantas fotos em cada categoria da escolha (vazio: o álbum ainda não passou pela escolha). */
   porCategoria: Partial<Record<Categoria, number>>;
+  /** O filtro das pessoas (FiltroDePessoas), que tem estado próprio. */
+  pessoas: React.ReactNode;
 }) {
   const muda = (campos: Partial<Filtro>) => aoMudar({ ...filtro, ...campos });
   const separador = <span className="h-4 w-px bg-borda" aria-hidden />;
@@ -852,6 +919,7 @@ function BarraDeFiltros({
           );
         })}
       </div>
+      {pessoas}
       {Object.keys(porCategoria).length ? (
         <>
           {separador}
@@ -923,6 +991,8 @@ function BarraDeFiltros({
 }
 
 function Grade({
+  pincel,
+  aoPintar,
   fotos,
   tamanho,
   selecao,
@@ -931,6 +1001,8 @@ function Grade({
   aoAbrir,
   aoColunas,
 }: {
+  pincel: Mudanca | null;
+  aoPintar: (ids: string[]) => void;
   fotos: FotoDoAlbum[];
   tamanho: number;
   selecao: Set<string>;
@@ -941,6 +1013,18 @@ function Grade({
 }) {
   const rolagem = useRef<HTMLDivElement>(null);
   const [medida, setMedida] = useState({ largura: 0, altura: 0, topo: 0 });
+  // O traço do pincel: as fotos por onde ele passou, aplicadas de uma vez ao soltar
+  const [pintadas, setPintadas] = useState<Set<string> | null>(null);
+  const pintar = (midiaId: string) => setPintadas((atual) => (atual && !atual.has(midiaId) ? new Set(atual).add(midiaId) : atual));
+  useEffect(() => {
+    if (!pintadas) return;
+    const soltar = () => {
+      setPintadas(null);
+      if (pintadas.size) aoPintar([...pintadas]);
+    };
+    window.addEventListener("pointerup", soltar);
+    return () => window.removeEventListener("pointerup", soltar);
+  }, [pintadas, aoPintar]);
 
   useEffect(() => {
     const elemento = rolagem.current;
@@ -990,13 +1074,22 @@ function Grade({
           noCursor={foto.midia_id === cursor}
           aoClicar={aoClicar}
           aoAbrir={aoAbrir}
+          pincel={
+            pincel
+              ? {
+                  pintada: pintadas?.has(foto.midia_id) ?? false,
+                  aoComecar: () => setPintadas(new Set([foto.midia_id])),
+                  aoPassar: () => pintar(foto.midia_id),
+                }
+              : null
+          }
         />,
       );
     }
   }
 
   return (
-    <div ref={rolagem} className="absolute inset-0 overflow-y-auto" role="grid" aria-label="Fotos do álbum" aria-rowcount={linhas}>
+    <div ref={rolagem} className={`absolute inset-0 overflow-y-auto ${pincel ? "cursor-crosshair" : ""}`} role="grid" aria-label="Fotos do álbum" aria-rowcount={linhas}>
       <div className="relative" style={{ height: linhas * alturaDaLinha + VAO }}>
         {cartoes}
       </div>
@@ -1013,6 +1106,7 @@ function Cartao({
   noCursor,
   aoClicar,
   aoAbrir,
+  pincel,
 }: {
   foto: FotoDoAlbum;
   lado: number;
@@ -1022,6 +1116,8 @@ function Cartao({
   noCursor: boolean;
   aoClicar: (midiaId: string, evento: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void;
   aoAbrir: (midiaId: string) => void;
+  /** Com o pincel de notas ligado: o clique e o arrasto pintam em vez de escolher. */
+  pincel: { pintada: boolean; aoComecar: () => void; aoPassar: () => void } | null;
 }) {
   const rejeitada = foto.marcacao === "rejeitada";
   return (
@@ -1029,9 +1125,20 @@ function Cartao({
       role="gridcell"
       aria-selected={selecionada}
       title={foto.nome}
-      onClick={(evento) => aoClicar(foto.midia_id, evento)}
-      onDoubleClick={() => aoAbrir(foto.midia_id)}
-      className={`absolute cursor-pointer overflow-hidden rounded-md bg-painel-2 select-none ${selecionada ? "ring-2 ring-destaque" : noCursor ? "ring-1 ring-suave" : "hover:ring-1 hover:ring-borda-forte"}`}
+      onClick={(evento) => {
+        if (!pincel) aoClicar(foto.midia_id, evento);
+      }}
+      onDoubleClick={() => {
+        if (!pincel) aoAbrir(foto.midia_id);
+      }}
+      onPointerDown={(evento) => {
+        if (pincel && evento.button === 0) {
+          evento.preventDefault();
+          pincel.aoComecar();
+        }
+      }}
+      onPointerEnter={() => pincel?.aoPassar()}
+      className={`absolute overflow-hidden rounded-md bg-painel-2 select-none ${pincel ? "" : "cursor-pointer"} ${pincel?.pintada ? "ring-2 ring-aviso" : selecionada ? "ring-2 ring-destaque" : noCursor ? "ring-1 ring-suave" : "hover:ring-1 hover:ring-borda-forte"}`}
       style={{ left: x, top: y, width: lado, height: lado }}
     >
       {foto.status === "pronta" ? (
@@ -1081,6 +1188,7 @@ function Gaveta({
   aoAplicar,
   aoRemover,
   todas,
+  pessoas,
 }: {
   contagens: ReturnType<typeof contar>;
   filtro: Filtro;
@@ -1090,6 +1198,7 @@ function Gaveta({
   aoAplicar: (mudanca: Mudanca) => void;
   aoRemover: () => void;
   todas: FotoDoAlbum[];
+  pessoas: PessoaDoAlbum[];
 }) {
   const linha = (rotulo: string, numero: number, ativo: boolean, aoClicar?: () => void, classe = "") => (
     <button
@@ -1190,7 +1299,7 @@ function Gaveta({
                   </span>
                 </p>
               ) : null}
-              <MedidasDaFoto foto={foto} fotos={todas} />
+              <MedidasDaFoto foto={foto} fotos={todas} pessoas={pessoas} />
             </>
           ) : null}
           <div className="flex items-center justify-between">
@@ -1242,86 +1351,8 @@ function Gaveta({
   );
 }
 
-function Lupa({
-  foto,
-  indice,
-  total,
-  aoFechar,
-  aoAndar,
-  aoAplicar,
-  proxima,
-}: {
-  foto: FotoDoAlbum;
-  indice: number;
-  total: number;
-  aoFechar: () => void;
-  aoAndar: (passo: number) => void;
-  aoAplicar: (mudanca: Mudanca) => void;
-  proxima?: string;
-}) {
-  return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label={`Foto ${foto.nome}`}>
-      <div className="flex h-12 shrink-0 items-center gap-3 px-3 text-sm">
-        <span className="min-w-0 flex-1 truncate">
-          {foto.nome}
-          <span className="ml-2 text-white/60 tabular-nums">
-            {(indice + 1).toLocaleString("pt-BR")} de {total.toLocaleString("pt-BR")}
-          </span>
-        </span>
-        <span className="hidden text-xs text-white/60 sm:inline">{[dataDaFoto(foto.exif?.data), resumoDaCamera(foto.exif)].filter(Boolean).join(" · ")}</span>
-        <button type="button" className="flex size-8 items-center justify-center rounded-md hover:bg-white/10" onClick={aoFechar} aria-label="Fechar (Esc)">
-          <X className="size-5" aria-hidden />
-        </button>
-      </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center px-12">
-        {foto.status === "pronta" ? (
-          // eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie
-          <img key={foto.midia_id} src={arquivoDaMidia(foto.midia_id, "proxy.webp")} alt={foto.nome} className="max-h-full max-w-full object-contain" />
-        ) : (
-          <LoaderCircle className="size-8 animate-spin" aria-label="Preparando" />
-        )}
-        {/* A próxima já vem carregando, para andar sem esperar */}
-        {proxima ? (
-          // eslint-disable-next-line @next/next/no-img-element -- pré-carga
-          <img src={arquivoDaMidia(proxima, "proxy.webp")} alt="" className="hidden" aria-hidden />
-        ) : null}
-        <button type="button" className="absolute left-2 flex size-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30" onClick={() => aoAndar(-1)} disabled={indice <= 0} aria-label="Anterior (←)">
-          <ChevronLeft className="size-6" aria-hidden />
-        </button>
-        <button type="button" className="absolute right-2 flex size-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30" onClick={() => aoAndar(1)} disabled={indice >= total - 1} aria-label="Próxima (→)">
-          <ChevronRight className="size-6" aria-hidden />
-        </button>
-      </div>
-      <div className="flex h-14 shrink-0 items-center justify-center gap-5">
-        <Estrelas nota={foto.nota} aoMudar={(nota) => aoAplicar({ nota })} tamanho="size-5" />
-        <span className="flex gap-2">
-          {CORES.map((cor) => (
-            <button
-              key={cor.id}
-              type="button"
-              onClick={() => aoAplicar(foto.cor === cor.id ? { tirar_cor: true } : { cor: cor.id })}
-              className={`size-5 rounded-full ${CLASSE_DA_COR[cor.id]} ${foto.cor === cor.id ? "ring-2 ring-white ring-offset-2 ring-offset-black" : "opacity-70 hover:opacity-100"}`}
-              aria-label={cor.nome}
-            />
-          ))}
-        </span>
-        <span className="flex gap-1">
-          <button type="button" onClick={() => aoAplicar(foto.marcacao === "escolhida" ? { tirar_marcacao: true } : { marcacao: "escolhida" })} className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs ${foto.marcacao === "escolhida" ? "bg-sucesso text-white" : "bg-white/10 hover:bg-white/20"}`}>
-            <Check className="size-4" aria-hidden />
-            Escolher
-          </button>
-          <button type="button" onClick={() => aoAplicar(foto.marcacao === "rejeitada" ? { tirar_marcacao: true } : { marcacao: "rejeitada" })} className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs ${foto.marcacao === "rejeitada" ? "bg-erro text-white" : "bg-white/10 hover:bg-white/20"}`}>
-            <X className="size-4" aria-hidden />
-            Rejeitar
-          </button>
-        </span>
-      </div>
-    </div>
-  );
-}
-
 /** As medidas da análise em palavras: o foco comparado ao resto do ensaio, a exposição e o rosto principal. */
-function MedidasDaFoto({ foto, fotos }: { foto: FotoDoAlbum; fotos: FotoDoAlbum[] }) {
+function MedidasDaFoto({ foto, fotos, pessoas }: { foto: FotoDoAlbum; fotos: FotoDoAlbum[]; pessoas: PessoaDoAlbum[] }) {
   if (!foto.medidas) return foto.status === "pronta" ? <p className="text-[11px] text-apagado">Ainda não analisada.</p> : null;
   const posicao = posicaoDoFoco(foto, fotos);
   const principal = rostoPrincipal(foto.medidas);
@@ -1339,6 +1370,7 @@ function MedidasDaFoto({ foto, fotos }: { foto: FotoDoAlbum; fotos: FotoDoAlbum[
         : null}
       {linha("Exposição", exposicao, exposicao === "boa" ? "" : "text-aviso")}
       {linha("Rostos", foto.medidas.rostos.length ? String(foto.medidas.rostos.length) : "nenhum")}
+      {foto.pessoas?.length ? linha("Pessoas", foto.pessoas.map((n) => pessoas.find((p) => p.numero === n)?.nome || `Pessoa ${n}`).join(", ")) : null}
       {principal ? linha("Olhos", principal.olhosFechados ? "fechados" : "abertos", principal.olhosFechados ? "text-erro" : "") : null}
       {principal?.rosto.sorriso !== undefined ? linha("Sorriso", principal.sorrindo ? "sim" : "não") : null}
       {principal?.rosto.olhando !== undefined ? linha("Olhar", principal.olhando ? "para a câmera" : "para o lado") : null}

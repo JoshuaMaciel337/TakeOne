@@ -85,7 +85,12 @@ export type FotoDoAlbum = {
   cena?: number | null;
   nota_ia?: number | null;
   motivo?: string | null;
+  /** Os números das pessoas que aparecem na foto (os rostos juntados pelo SFace). */
+  pessoas?: number[];
 };
+
+/** Uma pessoa do álbum: o rosto maior dela representa (a caixa em frações daquela foto). */
+export type PessoaDoAlbum = { numero: number; nome: string; fotos: number; capa_midia_id: string; caixa: [number, number, number, number] };
 
 /** As categorias da escolha das melhores (core/modelos/escolha.py), com a cor de cada uma na grade. */
 export type Categoria = "destaque" | "escolhida" | "talvez" | "parecida" | "desfocada" | "olhos_fechados";
@@ -124,12 +129,23 @@ export type Filtro = {
   pasta: string | null;
   /** As categorias da escolha (vazio: todas). */
   categorias: Categoria[];
+  /** As pessoas (vazio: todas as fotos); "alguma": a foto tem pelo menos uma delas, "todas": tem todas juntas. */
+  pessoas: number[];
+  pessoasModo: "alguma" | "todas";
 };
 
-export const FILTRO_VAZIO: Filtro = { busca: "", nota: 0, comparacao: "ao_menos", cores: [], marcacao: "todas", pasta: null, categorias: [] };
+export const FILTRO_VAZIO: Filtro = { busca: "", nota: 0, comparacao: "ao_menos", cores: [], marcacao: "todas", pasta: null, categorias: [], pessoas: [], pessoasModo: "alguma" };
 
 export function filtroAtivo(filtro: Filtro): boolean {
-  return Boolean(filtro.busca.trim()) || filtro.nota > 0 || filtro.cores.length > 0 || filtro.marcacao !== "todas" || filtro.pasta !== null || filtro.categorias.length > 0;
+  return (
+    Boolean(filtro.busca.trim()) ||
+    filtro.nota > 0 ||
+    filtro.cores.length > 0 ||
+    filtro.marcacao !== "todas" ||
+    filtro.pasta !== null ||
+    filtro.categorias.length > 0 ||
+    filtro.pessoas.length > 0
+  );
 }
 
 const semAcento = (texto: string) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -148,6 +164,11 @@ export function filtrarFotos(fotos: FotoDoAlbum[], filtro: Filtro): FotoDoAlbum[
     if (filtro.marcacao !== "todas" && filtro.marcacao !== "sem" && foto.marcacao !== filtro.marcacao) return false;
     if (filtro.pasta !== null && foto.pasta !== filtro.pasta) return false;
     if (filtro.categorias.length && (!foto.categoria || !filtro.categorias.includes(foto.categoria))) return false;
+    if (filtro.pessoas.length) {
+      const nela = foto.pessoas ?? [];
+      const tem = (n: number) => nela.includes(n);
+      if (filtro.pessoasModo === "todas" ? !filtro.pessoas.every(tem) : !filtro.pessoas.some(tem)) return false;
+    }
     return true;
   });
 }
@@ -284,4 +305,75 @@ export function contarCategorias(fotos: FotoDoAlbum[]): Partial<Record<Categoria
   const conta: Partial<Record<Categoria, number>> = {};
   for (const foto of fotos) if (foto.categoria) conta[foto.categoria] = (conta[foto.categoria] ?? 0) + 1;
   return conta;
+}
+
+
+// -----------------------------------------------
+// As vistas (onda 16.4): o recorte do rosto, o grupo de parecidas, o estado do olho e do foco, a comparação
+// -----------------------------------------------
+/**
+ * O fundo CSS que mostra um rosto num quadrado: a caixa (em frações da foto) vira um quadrado em pixels da foto,
+ * com folga em volta, preso dentro dela; o tamanho e a posição do fundo saem em porcentagem, então valem com
+ * qualquer arquivo da mesma foto (a capa ou a cópia leve).
+ */
+export function recorteDoRosto(
+  caixa: [number, number, number, number],
+  largura: number,
+  altura: number,
+  folga = 1.6,
+): { backgroundSize: string; backgroundPosition: string } {
+  const [x, y, w, h] = caixa;
+  const lado = Math.min(largura, altura, Math.max(w * largura, h * altura) * folga);
+  const cx = (x + w / 2) * largura;
+  const cy = (y + h / 2) * altura;
+  const esquerda = Math.min(Math.max(0, cx - lado / 2), largura - lado);
+  const topo = Math.min(Math.max(0, cy - lado / 2), altura - lado);
+  const pos = (inicio: number, total: number) => (total - lado > 0.5 ? (inicio / (total - lado)) * 100 : 0);
+  const n = (v: number) => Number(v.toFixed(3));
+  return {
+    backgroundSize: `${n((largura / lado) * 100)}% ${n((altura / lado) * 100)}%`,
+    backgroundPosition: `${n(pos(esquerda, largura))}% ${n(pos(topo, altura))}%`,
+  };
+}
+
+/** As fotos do mesmo grupo de parecidas (a escolha das melhores), na ordem da hora; só ela, se não houver grupo. */
+export function grupoDaFoto(fotos: FotoDoAlbum[], foto: FotoDoAlbum): FotoDoAlbum[] {
+  if (foto.grupo === null || foto.grupo === undefined) return [foto];
+  return ordenarFotos(
+    fotos.filter((f) => f.grupo === foto.grupo),
+    "captura",
+  );
+}
+
+export type EstadoDoOlho = "aberto" | "meio" | "fechado";
+
+/** Os olhos de um rosto em três estados, pela média dos dois (como a escolha). */
+export function estadoDoOlho(rosto: RostoMedido): EstadoDoOlho | null {
+  if (rosto.olho_esq === undefined && rosto.olho_dir === undefined) return null;
+  const media = ((rosto.olho_esq ?? 1) + (rosto.olho_dir ?? 1)) / 2;
+  return media < 0.35 ? "fechado" : media < LIMIAR_OLHO_ABERTO ? "meio" : "aberto";
+}
+
+export type EstadoDoFoco = "nitido" | "macio" | "borrado";
+
+/** O foco de um rosto comparado à mediana do foco dos rostos do ensaio (o recorte tem sempre o mesmo tamanho). */
+export function estadoDoFocoDoRosto(rosto: RostoMedido, fotos: FotoDoAlbum[]): EstadoDoFoco {
+  const todos = fotos.flatMap((f) => f.medidas?.rostos.map((r) => r.foco) ?? []).sort((a, b) => a - b);
+  if (todos.length < 3) return rosto.foco >= 150 ? "nitido" : rosto.foco >= 60 ? "macio" : "borrado";
+  const mediana = todos[Math.floor(todos.length / 2)];
+  const razao = rosto.foco / (mediana || 1);
+  return razao >= 0.6 ? "nitido" : razao >= 0.3 ? "macio" : "borrado";
+}
+
+export const COMPARAR_NO_MAXIMO = 12;
+
+/** Colunas e linhas da comparação de n fotos numa área (a grade que deixa cada foto maior). */
+export function gradeDaComparacao(n: number, largura: number, altura: number, proporcao = 1.5): { colunas: number; linhas: number } {
+  let melhor = { colunas: 1, linhas: n, lado: 0 };
+  for (let colunas = 1; colunas <= n; colunas++) {
+    const linhas = Math.ceil(n / colunas);
+    const celula = Math.min(largura / colunas / proporcao, altura / linhas);
+    if (celula > melhor.lado) melhor = { colunas, linhas, lado: celula };
+  }
+  return { colunas: melhor.colunas, linhas: melhor.linhas };
 }

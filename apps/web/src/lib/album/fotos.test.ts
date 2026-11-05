@@ -135,3 +135,38 @@ test("as categorias da escolha: filtro, ordem e contagem", async () => {
   assert.deepEqual(ordenarFotos(comCategoria, "nota_ia").map((f) => f.midia_id), ["a", "b", "c", "d"]);
   assert.deepEqual(contarCategorias(comCategoria), { destaque: 1, parecida: 1, desfocada: 1 });
 });
+
+test("as vistas: o recorte do rosto, o grupo, os olhos, o foco, as pessoas e a grade da comparação", async () => {
+  const { recorteDoRosto, grupoDaFoto, estadoDoOlho, estadoDoFocoDoRosto, gradeDaComparacao } = await import("./fotos.ts");
+  // Um rosto no meio de uma foto deitada: um quadrado de 1,6 vez o rosto, no meio
+  assert.deepEqual(recorteDoRosto([0.45, 0.4, 0.1, 0.2], 2000, 1000), { backgroundSize: "625% 312.5%", backgroundPosition: "50% 50%" });
+  // Encostado no canto: o quadrado fica dentro da foto
+  assert.deepEqual(recorteDoRosto([0, 0, 0.05, 0.1], 2000, 1000).backgroundPosition, "0% 0%");
+  // Um rosto que é quase a foto toda: o quadrado é o lado menor
+  assert.deepEqual(recorteDoRosto([0.1, 0, 0.8, 1], 1000, 800).backgroundSize, "125% 100%");
+
+  const doGrupo = [
+    foto({ midia_id: "b", grupo: 3, exif: { data: "2026-10-10T15:00:02" } }),
+    foto({ midia_id: "a", grupo: 3, exif: { data: "2026-10-10T15:00:01" } }),
+    foto({ midia_id: "c", grupo: 4 }),
+    foto({ midia_id: "d" }),
+  ];
+  assert.deepEqual(grupoDaFoto(doGrupo, doGrupo[0]).map((f) => f.midia_id), ["a", "b"]);
+  assert.deepEqual(grupoDaFoto(doGrupo, doGrupo[3]).map((f) => f.midia_id), ["d"]);
+
+  const rosto = (olho: number, foco = 100) => ({ caixa: [0, 0, 0.2, 0.2] as [number, number, number, number], confianca: 0.9, foco, olho_esq: olho, olho_dir: olho });
+  assert.deepEqual([0.2, 0.42, 0.8].map((o) => estadoDoOlho(rosto(o))), ["fechado", "meio", "aberto"]);
+  assert.equal(estadoDoOlho({ caixa: [0, 0, 1, 1], confianca: 1, foco: 1 }), null);
+  const comRostos = [100, 200, 300, 400].map((f, i) =>
+    foto({ midia_id: `r${i}`, medidas: { versao: 2, foco: { geral: 1, melhor_bloco: 1 }, exposicao: { mediana: 0.5, estourado: 0, afogado: 0 }, rostos: [rosto(0.8, f)], com_vetor_do_modelo: true } }),
+  );
+  assert.deepEqual([250, 100, 40].map((f) => estadoDoFocoDoRosto(rosto(0.8, f), comRostos)), ["nitido", "macio", "borrado"]);
+
+  const comPessoas = [foto({ midia_id: "ana", pessoas: [1] }), foto({ midia_id: "os_dois", pessoas: [1, 2] }), foto({ midia_id: "leo", pessoas: [2] }), foto({ midia_id: "ninguem" })];
+  assert.deepEqual(filtrarFotos(comPessoas, { ...FILTRO_VAZIO, pessoas: [1, 2] }).map((f) => f.midia_id), ["ana", "os_dois", "leo"]);
+  assert.deepEqual(filtrarFotos(comPessoas, { ...FILTRO_VAZIO, pessoas: [1, 2], pessoasModo: "todas" }).map((f) => f.midia_id), ["os_dois"]);
+
+  assert.deepEqual(gradeDaComparacao(2, 1600, 800), { colunas: 2, linhas: 1 });
+  assert.deepEqual(gradeDaComparacao(4, 1600, 900), { colunas: 2, linhas: 2 });
+  assert.deepEqual(gradeDaComparacao(12, 1600, 900), { colunas: 4, linhas: 3 });
+});

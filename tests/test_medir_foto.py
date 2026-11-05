@@ -60,11 +60,15 @@ def test_medir_sem_modelos_nao_acha_rostos():
     assert v.shape == (384,) and pessoas.shape == (0, 128)
 
 
+FOTOS = Path(__file__).resolve().parents[1] / "apps/web/public/marca/fotos"
+
+
 @pytest.mark.skipif(not Modelos().vetor, reason="DINOv2 não instalado")
 def test_vetor_do_dinov2_aproxima_a_mesma_cena():
+    # Fotos de verdade (as da marca): a mesma foto um pouco mais escura e cortada continua bem mais perto dela do
+    # que de outra foto. Em cenas sintéticas (quadrados de cores), o DINOv2 acha tudo parecido, com razão.
     modelos = Modelos()
-    a, b = _cena(1), _cena(7)
-    # A mesma cena um pouco mais escura e cortada continua mais perto dela do que de outra cena
+    a, b = cv2.imread(str(FOTOS / "podcast.jpg")), cv2.imread(str(FOTOS / "gastronomia.jpg"))
     parecida = cv2.convertScaleAbs(a[20:, 20:], alpha=0.85)
     va, vp, vb = vetor(a, modelos), vetor(parecida, modelos), vetor(b, modelos)
-    assert float(va @ vp) > float(va @ vb) + 0.05
+    assert float(va @ vp) > 0.92 > float(va @ vb) + 0.1

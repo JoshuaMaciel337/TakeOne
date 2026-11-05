@@ -3086,6 +3086,21 @@ class FotoDoAlbumSaida(BaseModel):
     cena: int | None = None
     nota_ia: int | None = None
     motivo: str | None = None
+    # Os números das pessoas que aparecem na foto (core/modelos/pessoas.py)
+    pessoas: list[int] = []
+
+
+class PessoaDoAlbumSaida(BaseModel):
+    """Uma pessoa do álbum: o número, o nome que a pessoa deu, quantas fotos e o rosto que a representa."""
+    numero: int
+    nome: str = ""
+    fotos: int
+    capa_midia_id: str
+    caixa: list[float]
+
+
+class PessoaAtualizarEntrada(BaseModel):
+    nome: str = Field(max_length=80)
 
 
 class FotosMudarEntrada(BaseModel):

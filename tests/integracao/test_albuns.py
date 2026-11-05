@@ -210,7 +210,7 @@ def test_analisar_mede_as_fotos_que_faltam(cliente, db_limpo):
     job = pegar_proximo_job(db_limpo, ["medir_album"], "w-teste")
     processar_job(db_limpo, job, "w-teste")
     assert db_limpo.jobs.find_one({"_id": job["_id"]})["saida"] == {"album_id": album["id"], "medidas": 1, "falhas": 0,
-                                                                     "ja_estavam": 3}
+                                                                     "ja_estavam": 3, "pessoas": 0}
     # Tirar a foto do álbum leva as medidas junto
     cliente.post(f"/api/albuns/{album['id']}/fotos/remover", json={"midia_ids": [ids[0]]})
     assert db_limpo.fotos_medidas.count_documents({"midia_id": ObjectId(ids[0])}) == 0
@@ -264,3 +264,39 @@ def test_album_de_outro_espaco(cliente, db_limpo):
         assert outro.get(f"/api/albuns/{album['id']}").status_code == 404
         assert outro.get("/api/albuns").json() == []
         assert enviar_foto(outro, album["id"], "IMG.jpg", _jpeg((0, 0, 0))).status_code == 404
+
+
+def test_pessoas_juntam_os_rostos_e_guardam_o_nome(cliente, db_limpo):
+    from bson import Binary
+
+    from worker.tarefas.medir_album import atualizar_pessoas
+
+    album = cliente.post("/api/albuns", json={"nome": "Pessoas"}).json()
+    ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", _jpeg((40 * i, 90, 30))) for i in range(4)]
+    ingerir_tudo(db_limpo)
+    base = [np.random.default_rng(s).normal(0, 1, 128) for s in (1, 2)]
+
+    def medir(midia: str, pessoas: list[int]):
+        vetores = np.stack([base[p] + np.random.default_rng(len(midia) + p).normal(0, 0.05, 128) for p in pessoas])
+        rostos = [{"caixa": [0.1 + 0.4 * k, 0.1, 0.2, 0.3]} for k in range(len(pessoas))]
+        db_limpo.fotos_medidas.insert_one({"midia_id": ObjectId(midia), "rostos": rostos,
+                                           "pessoas": Binary(vetores.astype(np.float16).tobytes())})
+
+    # Ana nas quatro fotos, Leo em duas
+    for i, midia in enumerate(ids):
+        medir(midia, [0, 1] if i < 2 else [0])
+    album_id = ObjectId(album["id"])
+    assert atualizar_pessoas(db_limpo, album_id) == 2
+    pessoas = cliente.get(f"/api/albuns/{album['id']}/pessoas").json()
+    assert [p["fotos"] for p in pessoas] == [4, 2]
+    ana, leo = pessoas[0]["numero"], pessoas[1]["numero"]
+    fotos = {f["midia_id"]: f["pessoas"] for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}
+    assert sorted(fotos[ids[0]]) == sorted([ana, leo]) and fotos[ids[3]] == [ana]
+    assert cliente.patch(f"/api/albuns/{album['id']}/pessoas/{leo}", json={"nome": " Leo "}).json()["nome"] == "Leo"
+    assert cliente.patch(f"/api/albuns/{album['id']}/pessoas/99", json={"nome": "x"}).status_code == 404
+    # Analisar de novo guarda o número e o nome
+    atualizar_pessoas(db_limpo, album_id)
+    de_novo = {p["numero"]: p["nome"] for p in cliente.get(f"/api/albuns/{album['id']}/pessoas").json()}
+    assert de_novo[leo] == "Leo"
+    cliente.delete(f"/api/albuns/{album['id']}")
+    assert db_limpo.album_pessoas.count_documents({"album_id": album_id}) == 0
