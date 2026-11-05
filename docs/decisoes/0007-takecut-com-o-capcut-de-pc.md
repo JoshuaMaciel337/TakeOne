@@ -69,7 +69,7 @@ a voz, ajustar a música, o Clipar e a IA toda local.
 - [x] 17.1 Casca: a linha do tempo de ponta a ponta, as ferramentas em abas deitadas em cima do painel de conteúdo, os
   painéis em cartões, a barra de cima com Menu, "salvo às hh:mm" e o nome no centro, layouts prontos com Redefinir, e os
   detalhes do projeto nas propriedades quando nada está escolhido.
-- [ ] 17.2 Linha do tempo: a barra completa (desfazer, refazer, modo do mouse, ajustar o zoom), o menu do botão
+- [x] 17.2 Linha do tempo: a barra completa (desfazer, refazer, modo do mouse, ajustar o zoom), o menu do botão
   direito, a seleção em caixa, as alças de fade e a linha de volume no clipe, os selos (velocidade, efeito, keyframes),
   a prévia seguindo o mouse, o cabeçalho das faixas dobrável e com altura ajustável, o estado vazio clicável e o cursor
   que avisa o encaixe.

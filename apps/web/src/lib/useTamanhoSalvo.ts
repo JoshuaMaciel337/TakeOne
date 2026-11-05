@@ -11,7 +11,9 @@ export function useTamanhoSalvo(chave: string, padrao: number, minimo: number, m
 
   useEffect(() => {
     try {
-      const salvo = Number(localStorage.getItem(`takeone-${chave}`));
+      // Sem nada guardado fica o padrão (Number(null) daria 0, que vale quando o mínimo é 0)
+      const guardado = localStorage.getItem(`takeone-${chave}`);
+      const salvo = guardado === null || guardado === "" ? Number.NaN : Number(guardado);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe depois de montar
       if (salvo >= minimo && salvo <= maximo) setTamanho(salvo);
     } catch {

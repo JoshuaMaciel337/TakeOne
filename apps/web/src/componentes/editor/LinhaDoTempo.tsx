@@ -13,11 +13,19 @@ import {
   Lock,
   LockOpen,
   Magnet,
+  Maximize2,
+  MousePointer2,
   Music,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Redo2,
+  Rows3,
+  ScanLine,
   Scissors,
   Snowflake,
   Trash2,
   Type,
+  Undo2,
   Unlink,
   Volume2,
   VolumeX,
@@ -31,15 +39,19 @@ import { formatarTempo } from "@/lib/formatar";
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Contexto, DestinoClipe } from "@/lib/projeto/edicao";
 import { encaixarIntervalo, pontoMaisProximo, pontosDeEncaixe } from "@/lib/projeto/ima";
+import { corNeutra } from "@/lib/projeto/cor";
 import { CHAVES_DE_KEYFRAME } from "@/lib/projeto/keyframes";
 import { acharClipe, type Clipe, CORES_DOS_MARCADORES, type Faixa, faixaDeTexto, fimDoClipe, type Marcador, type Projeto, type TipoFaixa } from "@/lib/projeto/modelo";
 import { resumoDoTexto } from "@/lib/projeto/texto";
 import { TIPOS_TRANSICAO } from "@/lib/projeto/transicao";
-import { formatarTimecodeLongo, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { alturaDoVolume, fadeArrastado, textoDoVolume, volumeDaAltura } from "@/lib/projeto/linhaDeVolume";
+import { duracaoDoQuadro, formatarTimecodeLongo, type Tick, TICKS_POR_SEGUNDO } from "@/lib/tempo";
+import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
 
 import type { IdFerramentaDaLinha } from "./ferramentasDaLinha";
 import type { Midia } from "@/lib/tipos";
 
+import { type ItemDoContexto, MenuDeContexto } from "./MenuDeContexto";
 import { MarcasDoRitmo } from "./NoRitmo";
 import { FormaDeOndaDoClipe, MiniaturasDoClipe } from "./VisualDoClipe";
 
@@ -65,6 +77,18 @@ type Props = {
   ferramenta?: IdFerramentaDaLinha;
   /** A entrada e a saída da sequência (I e O), marcadas na régua. */
   entradaSaida?: { entrada: Tick | null; saida: Tick | null };
+  /** Desfazer e refazer na barra (o Takecut, que não tem a barra de menus do layout profissional). */
+  nomeDesfazer?: string | null;
+  nomeRefazer?: string | null;
+  aoDesfazer?: () => void;
+  aoRefazer?: () => void;
+  /** Copiar e colar no cursor (o menu do botão direito). */
+  aoCopiar?: () => void;
+  aoColar?: () => void;
+  /** A prévia mostra o instante sob o ponteiro (null: volta ao cursor). */
+  aoPrevisualizar?: (tempo: Tick | null) => void;
+  /** O clique na principal vazia: importar mídias. */
+  aoImportar?: () => void;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -84,10 +108,13 @@ const DISTANCIA_MINIMA_MARCAS = 70;
 
 type Linha = { faixa: Faixa; topo: number; altura: number };
 
-function montarLinhas(projeto: Projeto): { linhas: Linha[]; altura: number } {
+/** As alturas das faixas: compactas, normais e altas (o botão da barra passa de uma à outra). */
+const ESCALAS_DAS_FAIXAS = [75, 100, 145];
+
+function montarLinhas(projeto: Projeto, escala = 1): { linhas: Linha[]; altura: number } {
   let topo = ALTURA_ZONA_NOVA;
   const linhas = projeto.faixas.map((faixa) => {
-    const linha = { faixa, topo, altura: ALTURAS[faixa.tipo] };
+    const linha = { faixa, topo, altura: Math.round(ALTURAS[faixa.tipo] * escala) };
     topo += linha.altura;
     return linha;
   });
@@ -127,7 +154,12 @@ type Arrasto =
   // Alt + arrastar: o conteúdo do clipe (slip) ou o corte entre dois clipes encostados (roll), com o da esquerda
   | { tipo: "deslizar"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
   | { tipo: "corte"; clipe: Clipe; x0: number; ativo: boolean; comando: Comando | null; guia: Tick | null }
-  | { tipo: "soltar"; comando: Comando; guia: Tick | null };
+  | { tipo: "soltar"; comando: Comando; guia: Tick | null }
+  // As alças de fade e a linha de volume do clipe escolhido
+  | { tipo: "fade"; clipe: Clipe; lado: "entrada" | "saida"; x0: number; ativo: boolean; comando: Comando | null; guia: null }
+  | { tipo: "volume"; clipe: Clipe; y0: number; alturaInterna: number; ativo: boolean; comando: Comando | null; guia: null }
+  // A seleção em caixa, arrastando no vazio (em pixels da área das faixas)
+  | { tipo: "caixa"; x0: number; y0: number; x1: number; y1: number; aditivo: boolean; ativo: boolean; comando: null; guia: null };
 
 /** O código da faixa nos editores profissionais: as de imagem são V1 (a principal), V2… de baixo para cima; as de som, A1, A2… */
 export function codigoDaFaixa(faixa: Faixa, projeto: Projeto): string {
@@ -177,6 +209,14 @@ export function LinhaDoTempo({
   pedidoDeZoom,
   ferramenta = "selecao",
   entradaSaida,
+  nomeDesfazer,
+  nomeRefazer,
+  aoDesfazer,
+  aoRefazer,
+  aoCopiar,
+  aoColar,
+  aoPrevisualizar,
+  aoImportar,
   className = "",
   style,
 }: Props) {
@@ -195,6 +235,21 @@ export function LinhaDoTempo({
   const buscandoNaRegua = useRef(false);
   const [marcadorAberto, setMarcadorAberto] = useState<string | null>(null);
   const andandoComAMao = useRef<{ x: number; rolagem: number } | null>(null);
+  // No Takecut, o modo do mouse (seleção ou navalha) fica na barra; no layout profissional, na coluna de ferramentas
+  const [modoDoMouse, setModoDoMouse] = useState<"selecao" | "navalha">("selecao");
+  const ferramentaEfetiva: IdFerramentaDaLinha = profissional ? ferramenta : modoDoMouse;
+  // As preferências da linha guardadas no navegador: a altura das faixas, o cabeçalho recolhido e a prévia no mouse
+  const [escalaDasFaixas, setEscalaDasFaixas] = useTamanhoSalvo("linha-altura-faixas", 100, 75, 145);
+  const [cabecalhoRecolhido, setCabecalhoRecolhido] = useTamanhoSalvo("linha-cabecalho-recolhido", 0, 0, 1);
+  const [seguirMouse, setSeguirMouse] = useTamanhoSalvo("linha-previa-no-mouse", 1, 0, 1);
+  const [contexto, setContexto] = useState<{ x: number; y: number; tempo: Tick; clipeId: string | null } | null>(null);
+  const [xDoMouse, setXDoMouse] = useState<number | null>(null);
+  const previsto = useRef<Tick | null>(null);
+  // "Ver o projeto inteiro" também leva a rolagem ao começo, depois do zoom novo
+  const [voltarAoInicio, setVoltarAoInicio] = useState(0);
+  useEffect(() => {
+    if (voltarAoInicio && rolagem.current) rolagem.current.scrollLeft = 0;
+  }, [voltarAoInicio]);
 
   function trocarArrasto(novo: Arrasto | null) {
     arrastoAtual.current = novo;
@@ -229,8 +284,8 @@ export function LinhaDoTempo({
     return () => elemento.removeEventListener("wheel", aoRolar);
   }, []);
 
-  // Em tela estreita, o cabeçalho da faixa fica só com os botões
-  const compacto = larguraVisivel > 0 && larguraVisivel < LARGURA_TELA_ESTREITA;
+  // Em tela estreita (ou com o cabeçalho recolhido), o cabeçalho da faixa fica só com os botões
+  const compacto = (larguraVisivel > 0 && larguraVisivel < LARGURA_TELA_ESTREITA) || cabecalhoRecolhido === 1;
   const larguraRotulos = compacto ? LARGURA_ROTULOS_COMPACTA : LARGURA_ROTULOS;
 
   // Tocando, a rolagem acompanha o cursor
@@ -253,8 +308,8 @@ export function LinhaDoTempo({
     }
   }, [projeto, comandoEmCurso, ctx]);
 
-  const layoutOriginal = useMemo(() => montarLinhas(projeto), [projeto]);
-  const layout = useMemo(() => montarLinhas(exibido), [exibido]);
+  const layoutOriginal = useMemo(() => montarLinhas(projeto, escalaDasFaixas / 100), [projeto, escalaDasFaixas]);
+  const layout = useMemo(() => montarLinhas(exibido, escalaDasFaixas / 100), [exibido, escalaDasFaixas]);
 
   const px = (t: Tick) => (t / TICKS_POR_SEGUNDO) * zoom;
   // Ticks são inteiros: com o zoom mudado (Ctrl+roda, deslizante) ou com escala de tela fracionária, a conta
@@ -308,9 +363,11 @@ export function LinhaDoTempo({
   function aoApertarClipe(evento: React.PointerEvent, clipe: Clipe, faixa: Faixa, borda?: "inicio" | "fim") {
     if (evento.button !== 0) return;
     // A Mão e o Zoom agem na linha do tempo inteira, também em cima dos clipes
-    if (ferramenta === "mao" || ferramenta === "zoom") return;
+    if (ferramentaEfetiva === "mao" || ferramentaEfetiva === "zoom") return;
     evento.stopPropagation();
-    if (ferramenta === "navalha") {
+    previsto.current = null;
+    aoPrevisualizar?.(null);
+    if (ferramentaEfetiva === "navalha") {
       const t = Math.min(Math.max(tempoNoPonteiro(evento), clipe.inicio), fimDoClipe(clipe));
       const ids = evento.shiftKey
         ? exibido.faixas.filter((item) => !item.travada).flatMap((item) => item.clipes.filter((c) => c.inicio < t && t < fimDoClipe(c)).map((c) => c.id))
@@ -359,11 +416,32 @@ export function LinhaDoTempo({
   const tratarMovimento = useEffectEvent((evento: PointerEvent) => {
     const atual = arrastoAtual.current;
     if (!atual || atual.tipo === "soltar") return;
+    if (atual.tipo === "caixa") {
+      const { x, y } = pontoNaArea(evento);
+      if (!atual.ativo && Math.hypot(x - atual.x0, y - atual.y0) < LIMIAR_ARRASTO_PX) return;
+      trocarArrasto({ ...atual, x1: x, y1: y, ativo: true });
+      return;
+    }
+    if (atual.tipo === "volume") {
+      const dyVolume = evento.clientY - atual.y0;
+      if (!atual.ativo && Math.abs(dyVolume) < 2) return;
+      const altura = alturaDoVolume(atual.clipe.volume) - dyVolume / Math.max(10, atual.alturaInterna);
+      trocarArrasto({ ...atual, ativo: true, comando: { comando: "clipe.audio", parametros: { clipeIds: [atual.clipe.id], volume: volumeDaAltura(Math.min(1, Math.max(0, altura))) } } });
+      return;
+    }
     const dx = evento.clientX - atual.x0;
     const dy = atual.tipo === "mover" ? evento.clientY - atual.y0 : 0;
     if (!atual.ativo && Math.hypot(dx, dy) < LIMIAR_ARRASTO_PX) return;
 
-    if (atual.tipo === "deslizar") {
+    if (atual.tipo === "fade") {
+      const { clipe } = atual;
+      const quadro = duracaoDoQuadro(projeto.taxa);
+      const campos =
+        atual.lado === "entrada"
+          ? { fade_entrada: fadeArrastado(clipe.fade_entrada, ticks(dx), clipe.duracao, clipe.fade_saida, quadro) }
+          : { fade_saida: fadeArrastado(clipe.fade_saida, -ticks(dx), clipe.duracao, clipe.fade_entrada, quadro) };
+      trocarArrasto({ ...atual, ativo: true, comando: { comando: "clipe.audio", parametros: { clipeIds: [clipe.id], ...campos } } });
+    } else if (atual.tipo === "deslizar") {
       trocarArrasto({ ...atual, ativo: true, comando: { comando: "clipe.deslizar", parametros: { clipeId: atual.clipe.id, deslocamento: ticks(dx) } } });
     } else if (atual.tipo === "corte") {
       let alvo = Math.max(0, fimDoClipe(atual.clipe) + ticks(dx));
@@ -395,8 +473,63 @@ export function LinhaDoTempo({
   const tratarSoltura = useEffectEvent(() => {
     const atual = arrastoAtual.current;
     trocarArrasto(null);
+    if (atual?.tipo === "caixa") {
+      if (!atual.ativo) {
+        // Um clique no vazio: tira a seleção e leva o cursor
+        if (!atual.aditivo) aoSelecionar([]);
+        aoBuscar(Math.min(Math.max(0, ticks(atual.x0)), exibido.duracao));
+        return;
+      }
+      const [x0, x1] = [Math.min(atual.x0, atual.x1), Math.max(atual.x0, atual.x1)];
+      const [y0, y1] = [Math.min(atual.y0, atual.y1), Math.max(atual.y0, atual.y1)];
+      const dentro = layoutOriginal.linhas
+        .filter((linha) => linha.topo < y1 && linha.topo + linha.altura > y0 && !linha.faixa.travada)
+        .flatMap((linha) => linha.faixa.clipes.filter((c) => px(c.inicio) < x1 && px(fimDoClipe(c)) > x0).map((c) => c.id));
+      aoSelecionar(atual.aditivo ? [...new Set([...selecao, ...dentro])] : dentro);
+      return;
+    }
     if (atual && atual.tipo !== "soltar" && atual.ativo && atual.comando) aoExecutar(atual.comando);
   });
+
+  /** A alça de fade ou a linha de volume do clipe escolhido. */
+  function aoApertarAudio(evento: React.PointerEvent, clipe: Clipe, alvo: "entrada" | "saida" | "volume", alturaInterna: number) {
+    if (evento.button !== 0) return;
+    evento.stopPropagation();
+    evento.preventDefault();
+    trocarArrasto(
+      alvo === "volume"
+        ? { tipo: "volume", clipe, y0: evento.clientY, alturaInterna, ativo: false, comando: null, guia: null }
+        : { tipo: "fade", clipe, lado: alvo, x0: evento.clientX, ativo: false, comando: null, guia: null },
+    );
+  }
+
+  /** A prévia segue o ponteiro sobre a linha do tempo (um pedido por quadro da tela). */
+  function previsualizar(evento: { clientX: number } | null) {
+    if (!evento) {
+      setXDoMouse(null);
+      if (previsto.current !== null) {
+        previsto.current = null;
+        aoPrevisualizar?.(null);
+      }
+      return;
+    }
+    const x = evento.clientX - area.current!.getBoundingClientRect().left;
+    setXDoMouse(x);
+    if (!seguirMouse || tocando || arrastoAtual.current || !aoPrevisualizar) return;
+    const t = Math.min(Math.max(0, ticks(x)), exibido.duracao);
+    if (previsto.current === t) return;
+    previsto.current = t;
+    aoPrevisualizar(t);
+  }
+
+  /** O menu do botão direito: num clipe (que fica escolhido) ou no vazio. */
+  function abrirContexto(evento: React.MouseEvent, clipe: Clipe | null) {
+    evento.preventDefault();
+    evento.stopPropagation();
+    previsualizar(null);
+    if (clipe && !selecao.includes(clipe.id)) aoSelecionar([clipe.id]);
+    setContexto({ x: evento.clientX, y: evento.clientY, tempo: Math.min(tempoNoPonteiro(evento), exibido.duracao), clipeId: clipe?.id ?? null });
+  }
 
   // Os eventos ficam na janela: durante o arrasto o clipe pode trocar de faixa e ser recriado
   useEffect(() => {
@@ -471,6 +604,59 @@ export function LinhaDoTempo({
   });
   const guia = arrasto && "guia" in arrasto ? arrasto.guia : null;
 
+  /** O zoom que mostra o projeto inteiro na largura da linha do tempo. */
+  function ajustarZoom() {
+    const disponivel = Math.max(80, larguraVisivel - larguraRotulos - 32);
+    setZoom(Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, disponivel / Math.max(1, exibido.duracao / TICKS_POR_SEGUNDO))));
+    setVoltarAoInicio((vez) => vez + 1);
+  }
+
+  function itensDoContexto(alvo: { tempo: Tick; clipeId: string | null }): ItemDoContexto[] {
+    const comCopiar = aoCopiar ? [{ nome: "Copiar", atalho: "Ctrl+C", aoEscolher: aoCopiar }] : [];
+    const comColar = aoColar ? [{ nome: "Colar no cursor", atalho: "Ctrl+V", aoEscolher: aoColar }] : [];
+    if (!alvo.clipeId) {
+      return [
+        ...comColar,
+        { nome: "Pôr um marcador aqui", atalho: "M", aoEscolher: () => aoExecutar({ comando: "marcador.adicionar", parametros: { tempo: alvo.tempo } }) },
+        { nome: "Levar o cursor até aqui", aoEscolher: () => aoBuscar(alvo.tempo) },
+        "-",
+        { nome: "Escolher todos os clipes", aoEscolher: () => aoSelecionar(exibido.faixas.filter((f) => !f.travada).flatMap((f) => f.clipes.map((c) => c.id))) },
+        { nome: "Ver o projeto inteiro", aoEscolher: ajustarZoom },
+      ];
+    }
+    const achado = acharClipe(exibido, alvo.clipeId);
+    if (!achado) return [];
+    const { clipe, faixa } = achado;
+    const midia = midiaDoClipe(midias, clipe);
+    const ids = selecao.includes(clipe.id) ? selecao : [clipe.id];
+    const temCursorDentro = tempo > clipe.inicio && tempo < fimDoClipe(clipe);
+    const itens: ItemDoContexto[] = [
+      ...comCopiar,
+      ...comColar,
+      { nome: "Duplicar", atalho: "Ctrl+Shift+/", aoEscolher: () => aoExecutar({ comando: "clipe.duplicar", parametros: { clipeIds: ids } }) },
+      { nome: "Dividir no cursor", atalho: "Ctrl+K", desativado: !temCursorDentro, aoEscolher: () => aoExecutar({ comando: "linha.dividir", parametros: { tempo, clipeIds: [clipe.id] } }) },
+      { nome: "Dividir aqui", aoEscolher: () => aoExecutar({ comando: "linha.dividir", parametros: { tempo: Math.min(Math.max(alvo.tempo, clipe.inicio), fimDoClipe(clipe)), clipeIds: [clipe.id] } }) },
+      { nome: ids.length > 1 ? `Apagar os ${ids.length} clipes` : "Apagar", atalho: "Delete", aoEscolher: () => aoExecutar({ comando: "clipe.apagar", parametros: { clipeIds: ids } }) },
+      "-",
+    ];
+    if (faixa.tipo !== "audio" && midia?.audio && midia.video && !midia.imagem) {
+      itens.push(
+        clipe.som_separado
+          ? { nome: "Devolver o som ao vídeo", aoEscolher: () => aoExecutar({ comando: "clipe.devolverSom", parametros: { clipeIds: [clipe.id] } }) }
+          : { nome: "Separar o som", aoEscolher: () => aoExecutar({ comando: "clipe.separarSom", parametros: { clipeIds: [clipe.id] } }) },
+      );
+    }
+    if (aoCongelar && faixa.tipo === "principal" && temCursorDentro) itens.push({ nome: "Congelar o quadro do cursor", aoEscolher: aoCongelar });
+    itens.push(
+      { nome: "Ir ao começo do clipe", aoEscolher: () => aoBuscar(clipe.inicio) },
+      { nome: "Ir ao fim do clipe", aoEscolher: () => aoBuscar(fimDoClipe(clipe)) },
+      { nome: "Escolher todos da faixa", aoEscolher: () => aoSelecionar(faixa.clipes.map((c) => c.id)) },
+      "-",
+      { nome: faixa.travada ? "Destravar a faixa" : "Travar a faixa", aoEscolher: () => aoExecutar({ comando: "faixa.alternar", parametros: { faixaId: faixa.id, propriedade: "travada" } }) },
+    );
+    return itens;
+  }
+
   return (
     <section aria-label="Linha do tempo" style={style} className={`isolate flex min-h-0 shrink-0 flex-col bg-painel ${className}`}>
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-borda px-2">
@@ -479,6 +665,27 @@ export function LinhaDoTempo({
             {formatarTimecodeLongo(tempo, exibido.taxa)}
           </span>
         ) : null}
+        {aoDesfazer && aoRefazer ? (
+          <>
+            <button type="button" className="botao-icone" disabled={!nomeDesfazer} onClick={aoDesfazer} title={nomeDesfazer ? `Desfazer ${nomeDesfazer} (Ctrl+Z)` : "Nada para desfazer"} aria-label="Desfazer">
+              <Undo2 className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone" disabled={!nomeRefazer} onClick={aoRefazer} title={nomeRefazer ? `Refazer ${nomeRefazer} (Ctrl+Shift+Z)` : "Nada para refazer"} aria-label="Refazer">
+              <Redo2 className="size-4" aria-hidden />
+            </button>
+            <span className="mx-1 h-5 w-px bg-borda" aria-hidden />
+          </>
+        ) : null}
+        {profissional ? null : (
+          <div className="mr-1 flex rounded-md bg-painel-2 p-0.5" role="group" aria-label="Modo do mouse">
+            <button type="button" className={`grid size-7 place-items-center rounded ${modoDoMouse === "selecao" ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`} aria-pressed={modoDoMouse === "selecao"} onClick={() => setModoDoMouse("selecao")} title="Seleção: escolher, mover e aparar" aria-label="Seleção">
+              <MousePointer2 className="size-4" aria-hidden />
+            </button>
+            <button type="button" className={`grid size-7 place-items-center rounded ${modoDoMouse === "navalha" ? "bg-painel-3 text-texto" : "text-suave hover:text-texto"}`} aria-pressed={modoDoMouse === "navalha"} onClick={() => setModoDoMouse("navalha")} title="Dividir: o clique corta o clipe ali (Shift: todas as faixas)" aria-label="Dividir com o clique">
+              <Scissors className="size-4" aria-hidden />
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className="botao-icone"
@@ -561,6 +768,39 @@ export function LinhaDoTempo({
           <Magnet className="size-4" aria-hidden />
         </button>
         <div className="ml-auto flex items-center gap-1.5">
+          {aoPrevisualizar ? (
+            <button
+              type="button"
+              className={`botao-icone ${seguirMouse ? "text-destaque" : ""}`}
+              aria-pressed={seguirMouse === 1}
+              onClick={() => setSeguirMouse(seguirMouse ? 0 : 1)}
+              title={seguirMouse ? "A prévia segue o mouse sobre a linha do tempo (clique para desligar)" : "A prévia não segue o mouse (clique para ligar)"}
+              aria-label="Prévia seguindo o mouse"
+            >
+              <ScanLine className="size-4" aria-hidden />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="botao-icone"
+            onClick={() => setEscalaDasFaixas(ESCALAS_DAS_FAIXAS[(ESCALAS_DAS_FAIXAS.indexOf(escalaDasFaixas) + 1) % ESCALAS_DAS_FAIXAS.length] ?? 100)}
+            title={`Altura das faixas: ${escalaDasFaixas < 100 ? "compacta" : escalaDasFaixas > 100 ? "alta" : "normal"} (clique para trocar)`}
+            aria-label="Altura das faixas"
+          >
+            <Rows3 className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="botao-icone"
+            onClick={() => setCabecalhoRecolhido(cabecalhoRecolhido ? 0 : 1)}
+            title={cabecalhoRecolhido ? "Mostrar os nomes das faixas" : "Recolher o cabeçalho das faixas"}
+            aria-label={cabecalhoRecolhido ? "Mostrar os nomes das faixas" : "Recolher o cabeçalho das faixas"}
+          >
+            {cabecalhoRecolhido ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+          </button>
+          <button type="button" className="botao-icone" onClick={ajustarZoom} title="Ver o projeto inteiro" aria-label="Ajustar o zoom ao projeto">
+            <Maximize2 className="size-4" aria-hidden />
+          </button>
           <button
             type="button"
             className="botao-icone"
@@ -621,7 +861,9 @@ export function LinhaDoTempo({
               }}
               onPointerMove={(evento) => {
                 if (buscandoNaRegua.current) buscarNaRegua(evento);
+                else previsualizar(evento);
               }}
+              onPointerLeave={() => previsualizar(null)}
               onPointerUp={() => {
                 buscandoNaRegua.current = false;
               }}
@@ -669,12 +911,12 @@ export function LinhaDoTempo({
               className="relative"
               onPointerDown={(evento) => {
                 if (evento.button !== 0) return;
-                if (ferramenta === "mao" && rolagem.current) {
+                if (ferramentaEfetiva === "mao" && rolagem.current) {
                   evento.currentTarget.setPointerCapture(evento.pointerId);
                   andandoComAMao.current = { x: evento.clientX, rolagem: rolagem.current.scrollLeft };
                   return;
                 }
-                if (ferramenta === "zoom" && rolagem.current) {
+                if (ferramentaEfetiva === "zoom" && rolagem.current) {
                   // O instante sob o ponteiro fica no mesmo lugar da tela
                   const t = tempoNoPonteiro(evento);
                   const naTela = evento.clientX - rolagem.current.getBoundingClientRect().left - larguraRotulos;
@@ -686,17 +928,22 @@ export function LinhaDoTempo({
                   });
                   return;
                 }
-                aoSelecionar([]);
-                aoBuscar(Math.min(tempoNoPonteiro(evento), exibido.duracao));
+                // Arrastar no vazio escolhe os clipes da caixa; o clique sem arrastar leva o cursor
+                previsualizar(null);
+                const ponto = pontoNaArea(evento);
+                trocarArrasto({ tipo: "caixa", x0: ponto.x, y0: ponto.y, x1: ponto.x, y1: ponto.y, aditivo: evento.shiftKey || evento.ctrlKey || evento.metaKey, ativo: false, comando: null, guia: null });
               }}
               onPointerMove={(evento) => {
                 const mao = andandoComAMao.current;
                 if (mao && rolagem.current) rolagem.current.scrollLeft = mao.rolagem - (evento.clientX - mao.x);
+                else if (!arrastoAtual.current) previsualizar(evento);
               }}
+              onPointerLeave={() => previsualizar(null)}
+              onContextMenu={(evento) => abrirContexto(evento, null)}
               onPointerUp={() => {
                 andandoComAMao.current = null;
               }}
-              style={{ height: layout.altura, cursor: CURSOR_DA_FERRAMENTA[ferramenta] }}
+              style={{ height: layout.altura, cursor: CURSOR_DA_FERRAMENTA[ferramentaEfetiva] }}
               onDragOver={aoPassarArrastando}
               onDragLeave={aoSairArrastando}
               onDrop={aoSoltar}
@@ -708,9 +955,22 @@ export function LinhaDoTempo({
                   style={{ top: topo, height: altura }}
                 >
                   {faixa.tipo === "principal" && faixa.clipes.length === 0 ? (
-                    <div className="pointer-events-none absolute inset-y-1.5 left-1.5 flex items-center rounded-md border border-dashed border-borda px-3 text-[11px] text-suave" style={{ width: 260 }}>
-                      Arraste uma mídia da biblioteca para cá
-                    </div>
+                    aoImportar ? (
+                      <button
+                        type="button"
+                        onPointerDown={(evento) => evento.stopPropagation()}
+                        onClick={aoImportar}
+                        className="absolute inset-y-1.5 left-1.5 flex items-center gap-2 rounded-md border border-dashed border-borda px-3 text-left text-[11px] text-suave transition hover:border-destaque hover:text-texto"
+                        style={{ width: 320 }}
+                      >
+                        <Film className="size-4 shrink-0" aria-hidden />
+                        Arraste uma mídia para cá ou clique para importar do computador
+                      </button>
+                    ) : (
+                      <div className="pointer-events-none absolute inset-y-1.5 left-1.5 flex items-center rounded-md border border-dashed border-borda px-3 text-[11px] text-suave" style={{ width: 260 }}>
+                        Arraste uma mídia da biblioteca para cá
+                      </div>
+                    )
                   ) : null}
                   {faixa.clipes.map((clipe) => (
                     <BlocoDoClipe
@@ -723,8 +983,10 @@ export function LinhaDoTempo({
                       largura={Math.max(2, px(clipe.duracao))}
                       altura={altura}
                       selecionado={selecao.includes(clipe.id)}
-                      cursor={CURSOR_DA_FERRAMENTA[ferramenta]}
+                      cursor={CURSOR_DA_FERRAMENTA[ferramentaEfetiva]}
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
+                      aoMenu={(evento) => abrirContexto(evento, clipe)}
+                      aoApertarAudio={(evento, alvo, alturaInterna) => aoApertarAudio(evento, clipe, alvo, alturaInterna)}
                     />
                   ))}
                   {/* Batidas da música, depois de achadas na aba Áudio */}
@@ -773,12 +1035,30 @@ export function LinhaDoTempo({
                 </div>
               ))}
 
-              {guia !== null ? <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-amber-300" style={{ left: px(guia) }} aria-hidden /> : null}
+              {guia !== null ? (
+                <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-amber-300" style={{ left: px(guia) }} aria-hidden>
+                  {/* O cursor avisa o encaixe: o ímã no alto da guia */}
+                  <span className="absolute -left-2 top-0.5 grid size-4 place-items-center rounded-full bg-amber-300 text-black">
+                    <Magnet className="size-2.5" aria-hidden />
+                  </span>
+                </div>
+              ) : null}
+              {arrasto?.tipo === "caixa" && arrasto.ativo ? (
+                <div
+                  className="pointer-events-none absolute z-20 rounded-sm border border-destaque bg-destaque/15"
+                  style={{ left: Math.min(arrasto.x0, arrasto.x1), top: Math.min(arrasto.y0, arrasto.y1), width: Math.abs(arrasto.x1 - arrasto.x0), height: Math.abs(arrasto.y1 - arrasto.y0) }}
+                  aria-hidden
+                />
+              ) : null}
+              {xDoMouse !== null && seguirMouse && aoPrevisualizar && !tocando && !arrasto ? (
+                <div className="pointer-events-none absolute inset-y-0 z-10 w-px border-l border-dashed border-texto/50" style={{ left: xDoMouse }} aria-hidden />
+              ) : null}
               <div className="pointer-events-none absolute inset-y-0 z-10 w-px bg-texto" style={{ left: xCursor }} aria-hidden />
             </div>
           </div>
         </div>
       </div>
+      {contexto ? <MenuDeContexto x={contexto.x} y={contexto.y} itens={itensDoContexto(contexto)} aoFechar={() => setContexto(null)} /> : null}
     </section>
   );
 }
@@ -856,6 +1136,8 @@ function BlocoDoClipe({
   selecionado,
   cursor,
   aoApertar,
+  aoMenu,
+  aoApertarAudio,
 }: {
   clipe: Clipe;
   faixa: Faixa;
@@ -867,10 +1149,27 @@ function BlocoDoClipe({
   selecionado: boolean;
   cursor?: string;
   aoApertar: (evento: React.PointerEvent, borda?: "inicio" | "fim") => void;
+  aoMenu?: (evento: React.MouseEvent) => void;
+  aoApertarAudio?: (evento: React.PointerEvent, alvo: "entrada" | "saida" | "volume", alturaInterna: number) => void;
 }) {
   const audio = faixa.tipo === "audio";
   const texto = clipe.texto ?? null;
   const alturaInterna = altura - 6;
+  // O som do clipe se mexe na própria linha do tempo quando ele está escolhido: as alças de fade e a linha de volume
+  const temSom = audio ? Boolean(midia) : Boolean(midia?.audio && midia.video && !midia.imagem && !clipe.som_separado);
+  const comAudio = Boolean(aoApertarAudio) && selecionado && temSom && !faixa.travada && alturaInterna >= 26 && largura > 40;
+  const volumeFixo = !clipe.keyframes?.volume?.length;
+  const larguraFadeEntrada = (clipe.fade_entrada / TICKS_POR_SEGUNDO) * zoom;
+  const larguraFadeSaida = (clipe.fade_saida / TICKS_POR_SEGUNDO) * zoom;
+  // Os selos do que o clipe tem: a velocidade, o efeito, a cor, as animações e os keyframes
+  const selos: { texto: string; dica: string }[] = [];
+  if (clipe.curva_velocidade?.length) selos.push({ texto: "curva", dica: "Velocidade em curva" });
+  else if (Math.abs(clipe.velocidade - 1) > 0.001) selos.push({ texto: `${clipe.velocidade.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}×`, dica: `Velocidade ${clipe.velocidade.toLocaleString("pt-BR")}×` });
+  if (clipe.inverter) selos.push({ texto: "◀", dica: "Ao contrário" });
+  if (clipe.efeito) selos.push({ texto: "fx", dica: "Efeito" });
+  if (clipe.cor && (!corNeutra(clipe.cor) || clipe.cor.filtro || clipe.cor.lut || clipe.cor.curvas || clipe.cor.hsl)) selos.push({ texto: "cor", dica: "Cor ajustada" });
+  if (clipe.animacao && (clipe.animacao.entrada.tipo !== "nenhuma" || clipe.animacao.saida.tipo !== "nenhuma" || (clipe.animacao.loop && clipe.animacao.loop.tipo !== "nenhum"))) selos.push({ texto: "anim", dica: "Animação" });
+  if (CHAVES_DE_KEYFRAME.some((chave) => clipe.keyframes?.[chave]?.length)) selos.push({ texto: "◆", dica: "Keyframes" });
   const nome = texto ? resumoDoTexto(texto) : clipe.ajuste ? "Camada de ajuste" : (midia?.nome ?? "Mídia não encontrada");
   const cores = faixa.tipo === "legenda"
     ? "border-violet-400/50 bg-violet-900/60 text-violet-100"
@@ -890,6 +1189,7 @@ function BlocoDoClipe({
       }`}
       style={{ left: esquerda, width: largura, height: alturaInterna, cursor }}
       onPointerDown={(evento) => aoApertar(evento)}
+      onContextMenu={aoMenu}
       title={nome}
     >
       {midia ? (
@@ -905,6 +1205,50 @@ function BlocoDoClipe({
       <span className="pointer-events-none absolute left-1.5 top-0.5 max-w-[calc(100%-12px)] truncate rounded bg-black/50 px-1 text-[10px] leading-4 text-white/90">
         {nome}
       </span>
+      {selos.length && largura > 60 ? (
+        <span className="pointer-events-none absolute bottom-0.5 right-1 flex gap-0.5" aria-label={`Ajustes: ${selos.map((selo) => selo.dica).join(", ")}`}>
+          {selos.map((selo) => (
+            <span key={selo.dica} className="rounded bg-black/60 px-1 text-[9px] font-semibold leading-[14px] text-white/90" title={selo.dica}>
+              {selo.texto}
+            </span>
+          ))}
+        </span>
+      ) : null}
+      {comAudio ? (
+        <>
+          {/* As rampas dos fades e as alças no alto, para arrastar */}
+          <svg className="pointer-events-none absolute inset-0 size-full" preserveAspectRatio="none" viewBox={`0 0 ${Math.max(1, largura)} ${alturaInterna}`} aria-hidden>
+            {larguraFadeEntrada > 0 ? <polygon points={`0,0 ${larguraFadeEntrada},0 0,${alturaInterna}`} fill="rgb(0 0 0 / 0.45)" /> : null}
+            {larguraFadeSaida > 0 ? <polygon points={`${largura},0 ${largura - larguraFadeSaida},0 ${largura},${alturaInterna}`} fill="rgb(0 0 0 / 0.45)" /> : null}
+          </svg>
+          <span
+            className="absolute top-0.5 z-20 size-2.5 -translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white"
+            style={{ left: Math.max(6, larguraFadeEntrada) }}
+            onPointerDown={(evento) => aoApertarAudio!(evento, "entrada", alturaInterna)}
+            title={`Fade de entrada: ${(clipe.fade_entrada / TICKS_POR_SEGUNDO).toFixed(2).replace(".", ",")} s (arraste)`}
+            aria-label="Fade de entrada"
+          />
+          <span
+            className="absolute top-0.5 z-20 size-2.5 translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white"
+            style={{ right: Math.max(6, larguraFadeSaida) }}
+            onPointerDown={(evento) => aoApertarAudio!(evento, "saida", alturaInterna)}
+            title={`Fade de saída: ${(clipe.fade_saida / TICKS_POR_SEGUNDO).toFixed(2).replace(".", ",")} s (arraste)`}
+            aria-label="Fade de saída"
+          />
+          {volumeFixo ? (
+            <span
+              className="group/vol absolute inset-x-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
+              style={{ top: (1 - alturaDoVolume(clipe.volume)) * alturaInterna }}
+              onPointerDown={(evento) => aoApertarAudio!(evento, "volume", alturaInterna)}
+              title={`Volume: ${textoDoVolume(clipe.volume)} (arraste para cima ou para baixo)`}
+              aria-label="Volume do clipe"
+            >
+              <span className="absolute inset-x-0 top-1/2 h-px bg-amber-300 group-hover/vol:h-0.5" />
+              <span className="absolute -top-3.5 right-0 hidden rounded bg-black/70 px-1 text-[9px] leading-[14px] text-white group-hover/vol:block">{textoDoVolume(clipe.volume)}</span>
+            </span>
+          ) : null}
+        </>
+      ) : null}
       {selecionado && !faixa.travada && largura > 14 ? (
         <>
           <span

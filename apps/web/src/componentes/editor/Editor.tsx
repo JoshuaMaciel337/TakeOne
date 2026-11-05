@@ -322,6 +322,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [pedidoTexto, setPedidoTexto] = useState(doEndereco?.painel === "texto" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const importarRef = useRef<HTMLInputElement>(null);
+  const [tempoDoMouse, setTempoDoMouse] = useState<Tick | null>(null);
   const [ferramentaDaLinha, setFerramentaDaLinha] = useState<IdFerramentaDaLinha>("selecao");
   // A mídia aberta no monitor de origem (duplo clique no Projeto) e a entrada e a saída dela
   const [fonte, setFonte] = useState<{ midiaId: string; entrada: Tick | null; saida: Tick | null } | null>(null);
@@ -493,6 +494,12 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     mostrarAviso(`${quantos === 1 ? "1 clipe copiado" : `${quantos} clipes copiados`}. Ctrl+V cola no cursor; Ctrl+Alt+V cola só os ajustes nos marcados.`);
   }
 
+  /** Ctrl+V: cola os clipes copiados no cursor. */
+  function colarNoCursor() {
+    if (copiados.current.length) executar({ comando: "clipe.colar", parametros: { copiados: copiados.current, inicio: tempo } });
+    else mostrarAviso("Copie um clipe antes (Ctrl+C).");
+  }
+
   /** Q e W: apaga do começo do clipe até o cursor, ou do cursor até o fim (o clipe marcado, ou o da principal). */
   function aparaAteOCursor(borda: "inicio" | "fim") {
     if (!projeto) return;
@@ -640,10 +647,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       if (!copiados.current.length) mostrarAviso("Copie um clipe antes (Ctrl+C).");
       else if (!selecaoValida.length) mostrarAviso("Marque os clipes que vão receber os ajustes do clipe copiado.");
       else setColandoAjustes(copiados.current[0]);
-    } else if (ctrl && tecla === "v") {
-      if (copiados.current.length) executar({ comando: "clipe.colar", parametros: { copiados: copiados.current, inicio: tempo } });
-      else mostrarAviso("Copie um clipe antes (Ctrl+C).");
-    }
+    } else if (ctrl && tecla === "v") colarNoCursor();
     else if (ctrl && tecla === "a") setSelecao(projeto.faixas.flatMap((faixa) => faixa.clipes.map((clipe) => clipe.id)));
     else if (evento.altKey && (tecla === "arrowleft" || tecla === "arrowright")) empurrar(tecla === "arrowleft" ? -1 : 1, evento.shiftKey ? 5 : 1);
     else if ((tecla === "q" || tecla === "w") && !ctrl && !evento.altKey) aparaAteOCursor(tecla === "q" ? "inicio" : "fim");
@@ -800,7 +804,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const propsDaPrevia = {
     projeto: projetoNaTela ?? projeto,
     midias,
-    tempo,
+    tempo: tempoDoMouse !== null && !reproducao.tocando ? tempoDoMouse : tempo,
     tocando: reproducao.tocando,
     andamento: reproducao.andamento,
     aoAlternar: alternar,
@@ -826,6 +830,35 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     aoExecutar: executar,
     aoCongelar: congelavel ? congelar : undefined,
   };
+  // O que a linha do tempo do Takecut tem a mais: desfazer na barra, o menu do botão direito, a prévia pelo mouse e
+  // o clique na principal vazia para importar
+  const extrasDaLinha = {
+    nomeDesfazer: edicao.nomeDesfazer,
+    nomeRefazer: edicao.nomeRefazer,
+    aoDesfazer: desfazer,
+    aoRefazer: refazer,
+    aoCopiar: () => copiar(),
+    aoColar: () => colarNoCursor(),
+    aoPrevisualizar: setTempoDoMouse,
+    aoImportar: () => importarRef.current?.click(),
+  };
+  const entradaDeImportar = (
+    <input
+      ref={importarRef}
+      type="file"
+      multiple
+      hidden
+      accept={ACEITAR_ARQUIVOS}
+      onChange={(evento) => {
+        const arquivos = [...(evento.currentTarget.files ?? [])];
+        evento.currentTarget.value = "";
+        if (arquivos.length) {
+          iniciarEnvio(arquivos);
+          setFerramenta("midia");
+        }
+      }}
+    />
+  );
   const janelas = (
     <>
       {telaLarga ? <JanelaDaAparencia /> : null}
@@ -1266,9 +1299,10 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             </div>
             <Divisor direcao="linha" valor={alturaLinha} minimo={LINHA_DO_TEMPO.minimo} maximo={LINHA_DO_TEMPO.maximo} aoMudar={setAlturaLinha} sentido={-1} rotulo="Altura da linha do tempo" discreto />
             <div className={`${cartao} h-[var(--altura-linha)] shrink-0`}>
-              <LinhaDoTempo {...propsDaLinha} className="h-full" />
+              <LinhaDoTempo {...propsDaLinha} {...extrasDaLinha} className="h-full" />
             </div>
           </div>
+          {entradaDeImportar}
           {janelas}
         </div>
       </IniciarDesenhoDaMascara.Provider>
@@ -1375,11 +1409,14 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           />
           <LinhaDoTempo
             {...propsDaLinha}
+            {...extrasDaLinha}
+            aoPrevisualizar={undefined}
             className="h-48 md:h-[var(--altura-linha)]"
           />
         </div>
       </div>
 
+      {entradaDeImportar}
       {janelas}
     </div>
     </IniciarDesenhoDaMascara.Provider>
