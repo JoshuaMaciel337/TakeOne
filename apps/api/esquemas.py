@@ -645,9 +645,10 @@ class RecursoEntrada(BaseModel):
     # de ações (em dados.acoes: cada uma com id, nome e os passos gravados, que são do editor e a API só guarda), ou
     # uma predefinição de ferramenta (em dados.ferramenta e dados.opcoes, as opções dela, que a API só guarda), ou
     # uma estratégia do Clipar (em dados.instrucoes, o que buscar e o estilo do título, e dados.faixa), ou um modelo
-    # de corte do Clipar (em dados.receita, conferida como ReceitaDoCorte)
+    # de corte do Clipar (em dados.receita, conferida como ReceitaDoCorte), ou um estilo das fotos do álbum (em
+    # dados.estilo, conferido como EstiloDaFotoEntrada)
     tipo: Literal["degrade", "padrao", "forma", "estilo_caractere", "estilo_paragrafo", "estilo_camada", "acoes",
-                  "ferramenta", "estrategia", "modelo_corte"]
+                  "ferramenta", "estrategia", "modelo_corte", "estilo_foto"]
     nome: str = Field(min_length=1, max_length=80)
     dados: dict = Field(default_factory=dict)
     imagem_png: str | None = Field(default=None, max_length=6_000_000)
@@ -3115,6 +3116,33 @@ class EnquadrarEntrada(BaseModel):
     """Endireitar e recortar sozinho, quando a edição for desenhada."""
     endireitar: bool = False
     proporcao: Literal["1:1", "4:5", "5:4", "2:3", "3:2", "9:16", "16:9"] | None = None
+
+
+ControleDoEstilo = Literal["temperatura", "tom", "exposicao", "contraste", "realces", "sombras", "saturacao",
+                           "vinheta", "matiz_escuros", "forca_escuros", "matiz_medios", "forca_medios", "matiz_claros",
+                           "forca_claros", "vibracao", "brancos", "pretos", "niveis_preto", "niveis_branco",
+                           "niveis_gama", "nevoa"]
+
+
+class ModoDoControleEntrada(BaseModel):
+    modo: Literal["somar", "fixo", "desligado"] = "somar"
+    valor: float = Field(default=0, ge=-360, le=360)
+
+
+class GostoEntrada(BaseModel):
+    luz: Literal["clara", "natural", "escura"] = "natural"
+    contraste: Literal["suave", "medio", "forte"] = "medio"
+    temperatura: Literal["quente", "neutra", "fria"] = "neutra"
+
+
+class EstiloDaFotoEntrada(BaseModel):
+    """Um estilo das fotos do álbum (apps/web/src/lib/album/estilos.ts): a cor base, a intensidade, o "Melhorar" por
+    foto, as três perguntas de gosto e o modo de cada controle."""
+    cor: CorEntrada = Field(default_factory=CorEntrada)
+    intensidade: float = Field(default=1, ge=0, le=1.5)
+    melhorar: bool = True
+    gosto: GostoEntrada = Field(default_factory=GostoEntrada)
+    controles: dict[ControleDoEstilo, ModoDoControleEntrada] = Field(default_factory=dict)
 
 
 class EdicaoDaFotoEntrada(BaseModel):

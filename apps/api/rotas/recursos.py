@@ -9,7 +9,7 @@
 #   DELETE /api/recursos/{id}
 #
 # Como os pincéis do espaço: os dados são do editor (lib/pintura/degrade.ts) e a API só guarda. As estratégias
-# do Clipar (ADR 0004) também ficam aqui.
+# do Clipar (ADR 0004) e os estilos das fotos do álbum (ADR 0006) também ficam aqui.
 # -----------------------------------------------
 import base64
 import binascii
@@ -27,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
+    EstiloDaFotoEntrada,
     EstiloDeCamadaEntrada,
     EstiloDoCaractereEntrada,
     EstiloDoParagrafoEntrada,
@@ -182,6 +183,12 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
             dados.dados = {"receita": ReceitaDoCorte.model_validate(dados.dados.get("receita") or {}).model_dump()}
         except ValidationError as erro:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O modelo de corte veio estragado.") from erro
+    if dados.tipo == "estilo_foto":
+        try:
+            estilo = EstiloDaFotoEntrada.model_validate(dados.dados.get("estilo") or {})
+        except ValidationError as erro:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O estilo veio estragado.") from erro
+        dados.dados = {"estilo": estilo.model_dump(exclude_defaults=False)}
     if dados.tipo == "padrao" and not dados.imagem_png:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O padrão precisa do ladrilho.")
     filtro = {"organizacao_id": usuario["organizacao_id"], "tipo": dados.tipo}
@@ -209,7 +216,7 @@ async def criar_recurso(dados: RecursoEntrada, usuario=Depends(usuario_atual), d
 
 
 TIPOS_DE_RECURSO = ("^(degrade|padrao|forma|estilo_caractere|estilo_paragrafo|estilo_camada|acoes|ferramenta|"
-                    "estrategia|modelo_corte)$")
+                    "estrategia|modelo_corte|estilo_foto)$")
 
 
 @router.get("", response_model=list[RecursoSaida])

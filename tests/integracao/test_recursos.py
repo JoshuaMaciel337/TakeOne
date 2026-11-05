@@ -133,3 +133,21 @@ def test_predefinicoes_de_ferramenta(cliente, db_limpo):
     assert [r["dados"]["ferramenta"] for r in cliente.get("/api/recursos?tipo=ferramenta").json()] == ["pincel"]
     sem = cliente.post("/api/recursos", json={"tipo": "ferramenta", "nome": "Sem", "dados": {"ferramenta": "pincel"}})
     assert sem.status_code == 422
+
+
+def test_estilo_das_fotos_do_album(cliente, db_limpo):
+    cadastrar(cliente)
+    estilo = {"cor": {"exposicao": 0.3, "filtro": "quente"}, "intensidade": 0.8, "melhorar": True,
+              "gosto": {"luz": "clara"}, "controles": {"contraste": {"modo": "fixo", "valor": 0.2}}}
+    criado = cliente.post("/api/recursos", json={"tipo": "estilo_foto", "nome": "Casamento",
+                                                 "dados": {"estilo": estilo}})
+    assert criado.status_code == 201, criado.text
+    guardado = criado.json()["dados"]["estilo"]
+    assert guardado["cor"]["exposicao"] == 0.3 and guardado["gosto"] == {"luz": "clara", "contraste": "medio",
+                                                                          "temperatura": "neutra"}
+    assert [r["nome"] for r in cliente.get("/api/recursos?tipo=estilo_foto").json()] == ["Casamento"]
+    ruim = {"cor": {"exposicao": 9}}
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_foto", "nome": "x",
+                                               "dados": {"estilo": ruim}}).status_code == 422
+    assert cliente.post("/api/recursos", json={"tipo": "estilo_foto", "nome": "x", "dados": {
+        "estilo": {"controles": {"nada": {"modo": "fixo"}}}}}).status_code == 422

@@ -10,6 +10,7 @@ import {
   HardDrive,
   ImageUp,
   LoaderCircle,
+  Palette,
   ScanSearch,
   SlidersHorizontal,
   Search,
@@ -23,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CLASSE_DA_CATEGORIA, CLASSE_DA_COR, dataDaFoto, Estrelas, IconeDaCategoria } from "@/componentes/album/comum";
 import { Comparacao } from "@/componentes/album/Comparacao";
 import { FiltroDePessoas } from "@/componentes/album/FiltroDePessoas";
+import { JanelaDeEstilos } from "@/componentes/album/JanelaDeEstilos";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
 import { Lupa } from "@/componentes/album/Lupa";
 import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
@@ -243,6 +245,7 @@ export function Album({ albumId }: { albumId: string }) {
   // A comparação (as fotos lado a lado) e o pincel de notas (a mudança que o arrasto pinta nas fotos)
   const [comparando, setComparando] = useState<string[] | null>(null);
   const [pincel, setPincel] = useState<Mudanca | null>(null);
+  const [estilando, setEstilando] = useState(false);
   const [escolhendo, setEscolhendo] = useState(false);
   const [ocupado, setOcupado] = useState("");
 
@@ -443,7 +446,7 @@ export function Album({ albumId }: { albumId: string }) {
   // O teclado da grade e da lupa
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
-      if (evento.defaultPrevented || comparando) return;
+      if (evento.defaultPrevented || comparando || estilando) return;
       const alvo = evento.target as HTMLElement | null;
       if (alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.tagName === "SELECT" || alvo.isContentEditable)) return;
       const ctrl = evento.ctrlKey || evento.metaKey;
@@ -495,7 +498,7 @@ export function Album({ albumId }: { albumId: string }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos, comparando, comparar]);
+  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos, comparando, comparar, estilando]);
 
   if (!album || !fotos) {
     return (
@@ -591,7 +594,7 @@ export function Album({ albumId }: { albumId: string }) {
           ) : semMedida > 0 ? (
             <button
               type="button"
-              className="botao-secundario px-3 py-1.5 text-xs"
+              className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap"
               title="Mede o foco, a exposição, os rostos, os olhos e o sorriso de cada foto"
               onClick={() => {
                 setAnalise({ progresso: 0, mensagem: "Na fila" });
@@ -606,22 +609,33 @@ export function Album({ albumId }: { albumId: string }) {
             </button>
           ) : null}
           {noComputador ? (
-            <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => setImportando(true)} title="Importar uma pasta do computador do servidor, sem copiar">
+            <button type="button" className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap" onClick={() => setImportando(true)} title="Importar uma pasta do computador do servidor, sem copiar">
               <HardDrive className="size-4" aria-hidden />
-              <span className="hidden lg:inline">Do computador</span>
+              <span className="hidden 2xl:inline">Do computador</span>
             </button>
           ) : null}
-          <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => entradaArquivos.current?.click()} title="Enviar fotos">
+          <button type="button" className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap" onClick={() => entradaArquivos.current?.click()} title="Enviar fotos">
             <ImageUp className="size-4" aria-hidden />
-            <span className="hidden sm:inline">Enviar fotos</span>
+            <span className="hidden 2xl:inline">Enviar fotos</span>
           </button>
           {fotos.length ? (
-            <button type="button" className="botao-principal px-3 py-1.5 text-xs" onClick={() => setEscolhendo(true)} title="A IA agrupa as parecidas, tira as desfocadas e as de olhos fechados e escolhe as melhores">
+            <button
+              type="button"
+              className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap"
+              onClick={() => setEstilando(true)}
+              title="Um estilo de cor em todas as fotos (ou nas selecionadas), com a prévia na foto do cursor"
+            >
+              <Palette className="size-4" aria-hidden />
+              <span className="hidden xl:inline">Estilos</span>
+            </button>
+          ) : null}
+          {fotos.length ? (
+            <button type="button" className="botao-principal px-3 py-1.5 text-xs whitespace-nowrap" onClick={() => setEscolhendo(true)} title="A IA agrupa as parecidas, tira as desfocadas e as de olhos fechados e escolhe as melhores">
               <WandSparkles className="size-4" aria-hidden />
               <span className="hidden sm:inline">Escolher as melhores</span>
             </button>
           ) : null}
-          <button type="button" className={`${fotos.length ? "botao-secundario" : "botao-principal"} px-3 py-1.5 text-xs`} onClick={() => entradaPasta.current?.click()} title="Enviar pasta">
+          <button type="button" className={`${fotos.length ? "botao-secundario" : "botao-principal"} px-3 py-1.5 text-xs whitespace-nowrap`} onClick={() => entradaPasta.current?.click()} title="Enviar pasta">
             <FolderUp className="size-4" aria-hidden />
             <span className="hidden sm:inline">Enviar pasta</span>
           </button>
@@ -842,6 +856,15 @@ export function Album({ albumId }: { albumId: string }) {
           aoAndar={(passo) => mover(passo, false)}
           aoAplicar={(mudanca) => aplicar(mudanca, [fotoDoCursor.midia_id])}
           proxima={visiveis[indiceDoCursor + 1]}
+        />
+      ) : null}
+      {estilando && (fotoDoCursor ?? visiveis.find((foto) => foto.status === "pronta")) ? (
+        <JanelaDeEstilos
+          alvos={selecao.size > 1 ? visiveis.filter((foto) => selecao.has(foto.midia_id)) : visiveis}
+          referencia={(fotoDoCursor ?? visiveis.find((foto) => foto.status === "pronta"))!}
+          grupoDe={(foto) => String(foto.grupo ?? foto.midia_id)}
+          aoAplicar={editarAsFotos}
+          aoFechar={() => setEstilando(false)}
         />
       ) : null}
       {comparando ? (

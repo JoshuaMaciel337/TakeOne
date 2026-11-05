@@ -108,7 +108,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
   tela cheia, pincel de notas, gaveta do resultado, pessoas (SFace) e o filtro "alguma" ou "todas".
 - [x] 16.5 Editar em lote: o "Melhorar", as LUTs, os filtros e o igualar a cor aplicados às escolhidas; sincronizar os
   ajustes de uma nas outras por grupos; antes e depois; corte e endireitar automáticos (rosto, assunto e linhas).
-- [ ] 16.6 Estilos: o estilo instantâneo (de um XMP, de uma LUT ou de um filtro, mais o "Melhorar" e o questionário de
+- [x] 16.6 Estilos: o estilo instantâneo (de um XMP, de uma LUT ou de um filtro, mais o "Melhorar" e o questionário de
   3 luzes), comparar até 3 na própria foto, o ajuste controle a controle e a intensidade, e a consistência entre fotos
   parecidas.
 - [ ] 16.7 Estilo pessoal: os pares das fotos editadas no TakeOne e de XMP, os vizinhos mais parecidos e depois o

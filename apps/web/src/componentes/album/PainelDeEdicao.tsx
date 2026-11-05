@@ -11,34 +11,7 @@ import { estatisticasDaCor } from "@/lib/projeto/igualarCor";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 import { useLuts } from "@/lib/useLuts";
 
-/** Os pixels de uma imagem da API reduzida a `lado` (para o "Melhorar" e o igualar), em RGBA. */
-async function amostra(url: string, lado = 160): Promise<Uint8ClampedArray> {
-  const imagem = new Image();
-  imagem.src = url;
-  await imagem.decode();
-  const escala = lado / Math.max(imagem.naturalWidth, imagem.naturalHeight);
-  const w = Math.max(1, Math.round(imagem.naturalWidth * escala));
-  const h = Math.max(1, Math.round(imagem.naturalHeight * escala));
-  const canvas = new OffscreenCanvas(w, h);
-  const contexto = canvas.getContext("2d")!;
-  contexto.drawImage(imagem, 0, 0, w, h);
-  return contexto.getImageData(0, 0, w, h).data;
-}
-
-/** Roda uma conta em cada item, no máximo `juntas` ao mesmo tempo. */
-async function emLotes<T, R>(itens: T[], conta: (item: T) => Promise<R>, juntas = 6): Promise<R[]> {
-  const saida: R[] = new Array(itens.length);
-  let proximo = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(juntas, itens.length) }, async () => {
-      while (proximo < itens.length) {
-        const i = proximo++;
-        saida[i] = await conta(itens[i]);
-      }
-    }),
-  );
-  return saida;
-}
+import { amostra, emLotes } from "./amostras";
 
 const AJUSTES_RAPIDOS: { campo: keyof Cor; nome: string; minimo: number; maximo: number; passo: number }[] = [
   { campo: "exposicao", nome: "Exposição", minimo: -2, maximo: 2, passo: 0.05 },
