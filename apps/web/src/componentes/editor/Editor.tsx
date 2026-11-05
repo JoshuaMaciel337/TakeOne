@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
+import { BarraDeMenus, type Menu, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
 import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
 import { PainelHistorico } from "@/componentes/area/PainelHistorico";
 import { BotaoAparencia, JanelaDaAparencia, useAparencia } from "@/componentes/Aparencia";
+import { escolherAparencia } from "@/lib/aparencia";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
 
@@ -30,10 +31,14 @@ import { useMidias } from "@/lib/useMidias";
 import { useTamanhoSalvo } from "@/lib/useTamanhoSalvo";
 import type { Midia } from "@/lib/tipos";
 
+import { AbasDeFerramentas } from "./AbasDeFerramentas";
+import { BarraDoTakecut, LAYOUTS_DO_TAKECUT, layoutAtual, type TamanhosDoTakecut } from "./BarraDoTakecut";
 import { BarraFerramentas } from "./BarraFerramentas";
+import { DetalhesDoProjeto } from "./DetalhesDoProjeto";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
+import { NOMES_PROPORCAO, PROPORCOES } from "./proporcoes";
 import { contextoDasMidias } from "./contexto";
 import { ControlesDeEfeito } from "./ControlesDeEfeito";
 import { ColunaDeFerramentas } from "./ColunaDeFerramentas";
@@ -1151,6 +1156,124 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     "--largura-propriedades": `${larguraPropriedades}px`,
     "--altura-linha": `${alturaLinha}px`,
   } as React.CSSProperties;
+
+  // O Takecut na tela larga (ADR 0007, 17.1): os painéis em cartões, as ferramentas em abas deitadas em cima do
+  // conteúdo e a linha do tempo de ponta a ponta embaixo. Abaixo da tela larga, a tela simples de sempre.
+  if (telaLarga) {
+    const tamanhosDoTakecut: TamanhosDoTakecut = { conteudo: larguraConteudo, propriedades: larguraPropriedades, linha: alturaLinha };
+    const menusDoTakecut: Menu[] = [
+      {
+        nome: "Arquivo",
+        itens: [
+          { nome: "Exportar…", aoEscolher: () => setExportando(true) },
+          {
+            nome: "Exportar o quadro do cursor…",
+            aoEscolher: () => {
+              setExportandoQuadro(true);
+              setExportando(true);
+            },
+          },
+          { nome: "Salvar como modelo…", aoEscolher: () => setSalvandoModelo(true) },
+          "-",
+          { nome: "Voltar ao início", aoEscolher: () => router.push("/app") },
+        ],
+      },
+      {
+        nome: "Editar",
+        itens: [
+          { nome: edicao.nomeDesfazer ? `Desfazer ${edicao.nomeDesfazer}` : "Desfazer", atalho: "Ctrl+Z", desativado: !edicao.nomeDesfazer, aoEscolher: desfazer },
+          { nome: edicao.nomeRefazer ? `Refazer ${edicao.nomeRefazer}` : "Refazer", atalho: "Ctrl+Shift+Z", desativado: !edicao.nomeRefazer, aoEscolher: refazer },
+        ],
+      },
+      {
+        nome: "Projeto",
+        itens: [
+          {
+            nome: "Formato",
+            itens: PROPORCOES.map((proporcao) => ({
+              nome: NOMES_PROPORCAO[proporcao],
+              marcado: projeto.proporcao === proporcao,
+              aoEscolher: () => executar({ comando: "projeto.proporcao", parametros: { proporcao } }),
+            })),
+          },
+          { nome: "Configurações da sequência…", aoEscolher: () => setConfigurando(true) },
+        ],
+      },
+      {
+        nome: "Exibir",
+        itens: [
+          {
+            nome: "Layout dos painéis",
+            itens: LAYOUTS_DO_TAKECUT.map((layout) => ({
+              nome: layout.nome,
+              marcado: layoutAtual(tamanhosDoTakecut) === layout.id,
+              aoEscolher: () => {
+                setLarguraConteudo(layout.tamanhos.conteudo);
+                setLarguraPropriedades(layout.tamanhos.propriedades);
+                setAlturaLinha(layout.tamanhos.linha);
+              },
+            })),
+          },
+          { nome: "Layout profissional (Takepro)", aoEscolher: () => escolherAparencia("takepro") },
+          { nome: "Atalhos do teclado", atalho: "?", aoEscolher: () => setVendoAtalhos(true) },
+        ],
+      },
+    ];
+    const cartao = "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-borda/60 bg-painel";
+    return (
+      <IniciarDesenhoDaMascara.Provider value={iniciarDesenho}>
+        <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto" style={tamanhos}>
+          <BarraDoTakecut
+            nome={edicao.nome}
+            aoMudarNome={edicao.renomear}
+            salvamento={edicao.salvamento}
+            nomeDesfazer={edicao.nomeDesfazer}
+            nomeRefazer={edicao.nomeRefazer}
+            aoDesfazer={desfazer}
+            aoRefazer={refazer}
+            menus={menusDoTakecut}
+            tamanhos={tamanhosDoTakecut}
+            aoEscolherLayout={(novos) => {
+              setLarguraConteudo(novos.conteudo);
+              setLarguraPropriedades(novos.propriedades);
+              setAlturaLinha(novos.linha);
+            }}
+            aoExportar={() => setExportando(true)}
+            aoSalvarModelo={() => setSalvandoModelo(true)}
+          />
+          <div className="flex min-h-0 flex-1 flex-col px-2 pb-2">
+            <div className="flex min-h-0 flex-1">
+              <section aria-label="Materiais" className={`${cartao} w-[var(--largura-conteudo)] shrink-0`}>
+                <AbasDeFerramentas ativa={ferramenta} comCorte={Boolean(corteDoProjeto)} aoEscolher={setFerramenta} />
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  <ConteudoDaFerramenta ferramenta={ferramentaAtual} {...propsDoConteudo} />
+                </div>
+              </section>
+              <Divisor direcao="coluna" valor={larguraConteudo} minimo={CONTEUDO.minimo} maximo={CONTEUDO.maximo} aoMudar={setLarguraConteudo} rotulo="Largura do painel de materiais" discreto />
+              <div className={`${cartao} flex-1`}>
+                <Previa {...propsDaPrevia} className="flex-1" />
+              </div>
+              <Divisor direcao="coluna" valor={larguraPropriedades} minimo={PROPRIEDADES.minimo} maximo={PROPRIEDADES.maximo} aoMudar={setLarguraPropriedades} sentido={-1} rotulo="Largura do painel de propriedades" discreto />
+              <div className={`${cartao} w-[var(--largura-propriedades)] shrink-0`}>
+                <PainelPropriedades
+                  {...propsDasPropriedades}
+                  midia={midiaDasPropriedades}
+                  selecionado={selecionado}
+                  semSelecao={midiaDasPropriedades ? undefined : <DetalhesDoProjeto projeto={projetoNaTela ?? projeto} aoPrever={preverDoPainel} aoExecutar={executar} aoConfigurar={() => setConfigurando(true)} />}
+                  className="h-full w-full"
+                />
+              </div>
+            </div>
+            <Divisor direcao="linha" valor={alturaLinha} minimo={LINHA_DO_TEMPO.minimo} maximo={LINHA_DO_TEMPO.maximo} aoMudar={setAlturaLinha} sentido={-1} rotulo="Altura da linha do tempo" discreto />
+            <div className={`${cartao} h-[var(--altura-linha)] shrink-0`}>
+              <LinhaDoTempo {...propsDaLinha} className="h-full" />
+            </div>
+          </div>
+          {janelas}
+        </div>
+      </IniciarDesenhoDaMascara.Provider>
+    );
+  }
 
   return (
     <IniciarDesenhoDaMascara.Provider value={iniciarDesenho}>

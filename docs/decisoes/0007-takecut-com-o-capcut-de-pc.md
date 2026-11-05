@@ -66,7 +66,7 @@ a voz, ajustar a música, o Clipar e a IA toda local.
 
 ## Partes
 
-- [ ] 17.1 Casca: a linha do tempo de ponta a ponta, as ferramentas em abas deitadas em cima do painel de conteúdo, os
+- [x] 17.1 Casca: a linha do tempo de ponta a ponta, as ferramentas em abas deitadas em cima do painel de conteúdo, os
   painéis em cartões, a barra de cima com Menu, "salvo às hh:mm" e o nome no centro, layouts prontos com Redefinir, e os
   detalhes do projeto nas propriedades quando nada está escolhido.
 - [ ] 17.2 Linha do tempo: a barra completa (desfazer, refazer, modo do mouse, ajustar o zoom), o menu do botão
