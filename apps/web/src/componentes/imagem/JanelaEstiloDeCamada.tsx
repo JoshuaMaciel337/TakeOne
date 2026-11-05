@@ -40,7 +40,7 @@ const novoId = () => Math.random().toString(36).slice(2, 10);
 
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
-    <label className="grid grid-cols-[8.5rem_1fr] items-center gap-2 text-xs text-suave">
+    <label className="grid grid-cols-[8.5rem_1fr] items-center gap-2 text-xs text-suave celular:grid-cols-1 celular:gap-1">
       <span>{rotulo}</span>
       <span className="flex min-w-0 items-center gap-2 text-texto">{children}</span>
     </label>
@@ -474,8 +474,9 @@ export function JanelaEstiloDeCamada({ inicial, luz: luzInicial, geral: geralIni
             <X className="size-4" aria-hidden />
           </button>
         </div>
-        <div className="flex min-h-0 flex-1">
-          <ul className="w-56 shrink-0 overflow-y-auto border-r border-borda p-1.5 text-xs" aria-label="Efeitos">
+        {/* No celular, a lista dos efeitos em cima e as opções embaixo, rolando juntas */}
+        <div className="flex min-h-0 flex-1 celular:flex-col celular:overflow-y-auto">
+          <ul className="w-56 shrink-0 overflow-y-auto border-r border-borda p-1.5 text-xs celular:max-h-44 celular:w-full celular:border-b celular:border-r-0" aria-label="Efeitos">
             <li>
               <button type="button" className={`w-full rounded px-2 py-1 text-left ${escolhido === "mesclagem" ? "bg-superficie-2 font-semibold text-texto" : "text-texto hover:bg-superficie-2"}`} onClick={() => setEscolhido("mesclagem")}>
                 Opções de mesclagem

@@ -3,7 +3,7 @@
 // Os grupos de painéis com abas dos editores (ADR 0002): a faixa de abas com o menu "≡" no fim, duplo clique na
 // faixa recolhe o grupo, e o divisor entre dois grupos muda a altura do de cima. O estado de cada área de trabalho
 // fica no navegador (lib/areaDeTrabalho.ts tem as contas).
-import { Menu as IconeMenu } from "lucide-react";
+import { Menu as IconeMenu, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -101,6 +101,8 @@ export type AreaDeTrabalho = ReturnType<typeof useAreaDeTrabalho>;
 /** O menu "≡" do grupo, com o menu da aba ativa em cima. */
 function MenuDoGrupo({ itens }: { itens: ItemDeMenu[] }) {
   const [aberto, setAberto] = useState(false);
+  // Fixo na tela, abaixo do botão (ou acima, quando não cabe): dentro do grupo, ele era cortado quando o grupo é baixo
+  const [lugar, setLugar] = useState<{ right: number; top?: number; bottom?: number }>({ right: 0, top: 0 });
   const caixaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!aberto) return;
@@ -117,11 +119,16 @@ function MenuDoGrupo({ itens }: { itens: ItemDeMenu[] }) {
   }, [aberto]);
   return (
     <div ref={caixaRef} className="relative ml-auto">
-      <button type="button" className="grid size-6 place-items-center rounded text-suave hover:bg-painel-3 hover:text-texto" aria-label="Menu do painel" aria-expanded={aberto} onClick={() => setAberto((valor) => !valor)}>
+      <button type="button" className="grid size-6 place-items-center rounded text-suave hover:bg-painel-3 hover:text-texto" aria-label="Menu do painel" aria-expanded={aberto} onClick={(evento) => {
+          const botao = evento.currentTarget.getBoundingClientRect();
+          const embaixo = window.innerHeight - botao.bottom > 260;
+          setLugar({ right: Math.max(4, window.innerWidth - botao.right), ...(embaixo ? { top: botao.bottom + 2 } : { bottom: window.innerHeight - botao.top + 2 }) });
+          setAberto((valor) => !valor);
+        }}>
         <IconeMenu className="size-3.5" aria-hidden />
       </button>
       {aberto ? (
-        <div role="menu" className="absolute right-0 top-full z-50 mt-0.5 min-w-52 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50">
+        <div role="menu" className="fixed z-[60] max-h-[calc(100dvh-1rem)] min-w-52 overflow-y-auto rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={lugar}>
           {itens.map((item, i) =>
             item === "-" ? (
               <div key={i} role="separator" className="my-1 h-px bg-borda" />
@@ -197,8 +204,14 @@ export function ColunaDePaineis({ grupos, paineis, area, className = "", style }
       {grupos.map((grupo, i) => {
         const preenche = i === ultimoAberto;
         return (
-          <div key={grupo.id} className={`flex min-h-0 flex-col ${preenche ? "flex-1" : "shrink-0"}`}>
-            <GrupoDePaineis grupo={grupo} paineis={paineis} area={area} className={preenche ? "flex-1" : ""} style={!preenche && !grupo.recolhido ? { height: grupo.altura ?? 220 } : undefined} />
+          // Os grupos de altura guardada encolhem (até a faixa de abas e um pouco) quando a coluna é baixa: o que
+          // preenche fica com pelo menos 160 px (no tablet deitado, o Camadas ficava com 3 px)
+          <div
+            key={grupo.id}
+            className={`flex flex-col ${preenche ? "min-h-40 flex-1" : grupo.recolhido ? "shrink-0" : "min-h-16 shrink"}`}
+            style={!preenche && !grupo.recolhido ? { flexBasis: grupo.altura ?? 220 } : undefined}
+          >
+            <GrupoDePaineis grupo={grupo} paineis={paineis} area={area} className={preenche || !grupo.recolhido ? "flex-1" : ""} />
             {!preenche && !grupo.recolhido && i < grupos.length - 1 ? <DivisorDeGrupo altura={grupo.altura ?? 220} aoMudar={(altura) => area.mudarAltura(grupo.id, altura)} /> : null}
           </div>
         );
@@ -215,7 +228,7 @@ function DivisorDeGrupo({ altura, aoMudar }: { altura: number; aoMudar: (altura:
       role="separator"
       aria-orientation="horizontal"
       aria-label="Altura do grupo de painéis"
-      className="h-1 shrink-0 cursor-row-resize touch-none bg-borda hover:bg-destaque/60"
+      className="relative h-1 shrink-0 cursor-row-resize touch-none bg-borda before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] hover:bg-destaque/60 pointer-coarse:before:-inset-y-3"
       onPointerDown={(evento) => {
         evento.currentTarget.setPointerCapture(evento.pointerId);
         inicio.current = { y: evento.clientY, altura };
@@ -227,5 +240,46 @@ function DivisorDeGrupo({ altura, aoMudar }: { altura: number; aoMudar: (altura:
         inicio.current = null;
       }}
     />
+  );
+}
+
+/**
+ * No celular, os painéis numa folha: as abas de todos numa faixa que rola para o lado e um painel por vez com a
+ * altura toda (na coluna, os grupos de altura fixa deixavam o Camadas com 0 px). Em pé, a folha sobe de baixo;
+ * deitado, fica à direita.
+ */
+export function FolhaDePaineis({ abas, paineis, ativa, aoAtivar, aoFechar }: { abas: string[]; paineis: Record<string, Painel>; ativa: string; aoAtivar: (id: string) => void; aoFechar: () => void }) {
+  const faixaRef = useRef<HTMLDivElement>(null);
+  const aberta = abas.includes(ativa) ? ativa : abas[0];
+  // A aba escolhida fica à vista na faixa (ela pode ter vindo de um menu)
+  useEffect(() => {
+    faixaRef.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [aberta]);
+  return (
+    <section
+      aria-label="Painéis"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-[58dvh] flex-col overflow-hidden rounded-t-2xl border-t border-borda bg-painel shadow-2xl shadow-black/50 deitado:inset-x-auto deitado:right-0 deitado:top-0 deitado:h-auto deitado:w-[min(24rem,62vw)] deitado:rounded-none deitado:rounded-l-2xl deitado:border-l deitado:border-t-0"
+    >
+      <div className="flex h-11 shrink-0 items-stretch border-b border-borda">
+        <div ref={faixaRef} role="tablist" aria-label="Painéis" className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none]">
+          {abas.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={id === aberta}
+              onClick={() => aoAtivar(id)}
+              className={`shrink-0 whitespace-nowrap border-b-2 px-3 text-sm transition ${id === aberta ? "border-destaque font-semibold text-texto" : "border-transparent text-suave"}`}
+            >
+              {paineis[id]?.nome ?? id}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="grid w-11 shrink-0 place-items-center text-suave hover:text-texto" onClick={aoFechar} aria-label="Fechar os painéis">
+          <X className="size-5" aria-hidden />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{aberta ? paineis[aberta]?.conteudo : null}</div>
+    </section>
   );
 }

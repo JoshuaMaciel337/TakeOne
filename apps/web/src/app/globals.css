@@ -2,6 +2,16 @@
 
 /* O celular deitado: a tela é larga, mas baixa demais para os painéis em pé */
 @custom-variant deitado (@media (orientation: landscape) and (max-height: 540px));
+/* O celular em pé, e o celular em pé ou deitado (a consulta de lib/useCelular.ts) */
+@custom-variant empe (@media (max-width: 767.98px) and (orientation: portrait));
+@custom-variant celular {
+  @media (max-width: 767.98px) and (orientation: portrait) {
+    @slot;
+  }
+  @media (orientation: landscape) and (max-height: 540px) {
+    @slot;
+  }
+}
 
 /* Cores do TakeOne, do kit da marca (docs/marca/guia.md). O tema escuro é o padrão; o claro e os dois cinzas
    (o médio e o claro, como os dos editores de imagem) valem com data-tema no <html>, que o script do layout põe
@@ -134,6 +144,15 @@ body {
 /* No toque, o deslizante deitado só segue o dedo que anda para o lado: o que anda para cima ou para baixo rola o painel */
 input[type="range"] {
   touch-action: pan-y;
+}
+
+/* No toque, os campos com letra de 16 px: com menos, o Safari do iPhone amplia a página ao tocar neles */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 ::selection {

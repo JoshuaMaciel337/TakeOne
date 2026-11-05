@@ -49,7 +49,7 @@ export function JanelaFlutuante({ titulo, children, aoConfirmar, aoCancelar, rod
     return () => window.removeEventListener("keydown", tecla, true);
   }, [aoConfirmar, aoCancelar]);
   return (
-    <div role="dialog" aria-label={titulo} className="fixed right-[336px] top-20 z-50 flex max-h-[calc(100vh-6rem)] w-80 flex-col rounded-lg border border-borda bg-painel shadow-2xl">
+    <div role="dialog" aria-label={titulo} className="fixed right-[336px] top-20 z-50 flex max-h-[calc(100vh-6rem)] w-80 flex-col rounded-lg border border-borda bg-painel shadow-2xl max-lg:right-2 celular:inset-x-0 celular:bottom-0 celular:top-auto celular:max-h-[50dvh] celular:w-auto celular:rounded-b-none">
       <div className="flex items-center justify-between border-b border-borda px-3 py-2">
         <h2 className="text-sm font-semibold">{titulo}</h2>
         <button type="button" className="botao-icone" onClick={aoCancelar} aria-label="Fechar">

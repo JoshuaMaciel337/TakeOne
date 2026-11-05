@@ -50,11 +50,11 @@ export function OpcoesDoCortePerspectivaNaBarra({
         Mostrar a grade
       </label>
       <span className="text-suave">{temQuad ? "Leve os cantos aos do que deveria ser reto." : "Arraste um retângulo sobre a imagem."}</span>
-      <span className="ml-auto flex items-center gap-1">
-        <button type="button" className="botao-icone size-6" onClick={aoCancelar} disabled={!temQuad} title="Limpar (Esc)" aria-label="Cancelar o corte de perspectiva">
+      <span className="sticky right-0 ml-auto flex items-center gap-1 bg-painel pl-1">
+        <button type="button" className="botao-icone size-6 pointer-coarse:size-9" onClick={aoCancelar} disabled={!temQuad} title="Limpar (Esc)" aria-label="Cancelar o corte de perspectiva">
           <X className="size-4" aria-hidden />
         </button>
-        <button type="button" className="botao-icone size-6 text-destaque" onClick={aoConfirmar} disabled={!temQuad} title="Confirmar (Enter)" aria-label="Confirmar o corte de perspectiva">
+        <button type="button" className="botao-icone size-6 text-destaque pointer-coarse:size-9" onClick={aoConfirmar} disabled={!temQuad} title="Confirmar (Enter)" aria-label="Confirmar o corte de perspectiva">
           <Check className="size-4" aria-hidden />
         </button>
       </span>

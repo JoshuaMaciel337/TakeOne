@@ -144,8 +144,8 @@ export function JanelaGaleriaDeFiltros({
 
   const definicao = efeito ? ({ ...efeito, grupo: "especial" } as unknown as DefinicaoDoFiltro) : null;
   return (
-    <div className="fixed inset-0 z-50 flex bg-fundo text-xs" role="dialog" aria-modal aria-label="Galeria de filtros">
-      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#1b1d22] p-4">
+    <div className="fixed inset-0 z-50 flex bg-fundo text-xs celular:flex-col celular:overflow-y-auto" role="dialog" aria-modal aria-label="Galeria de filtros">
+      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#1b1d22] p-4 celular:h-[38dvh] celular:flex-none">
         <canvas ref={previaRef} className="max-h-full max-w-full object-contain" aria-label="Prévia da galeria de filtros" style={{ background: "repeating-conic-gradient(#cfcfcf 0 25%, #fff 0 50%) 0 0 / 16px 16px" }} />
         {calculando ? (
           <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded bg-black/60 px-2 py-1 text-white">
@@ -153,7 +153,7 @@ export function JanelaGaleriaDeFiltros({
           </span>
         ) : null}
       </div>
-      <nav className="flex w-64 shrink-0 flex-col overflow-y-auto border-l border-borda bg-painel p-2" aria-label="Efeitos">
+      <nav className="flex w-64 shrink-0 flex-col overflow-y-auto border-l border-borda bg-painel p-2 celular:max-h-60 celular:w-full celular:border-l-0 celular:border-t" aria-label="Efeitos">
         {CATEGORIAS_DA_GALERIA.map((categoria) => {
           const aberta = abertas.has(categoria.id);
           return (
@@ -201,7 +201,7 @@ export function JanelaGaleriaDeFiltros({
           );
         })}
       </nav>
-      <aside className="flex w-80 shrink-0 flex-col border-l border-borda bg-painel">
+      <aside className="flex w-80 shrink-0 flex-col border-l border-borda bg-painel celular:w-full celular:border-l-0 celular:border-t">
         <div className="flex items-center justify-between border-b border-borda px-3 py-2">
           <h2 className="text-sm font-semibold">Galeria de filtros</h2>
           <div className="flex items-center gap-2">

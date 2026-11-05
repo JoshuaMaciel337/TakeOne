@@ -351,12 +351,15 @@ export function OpcoesDoTextoNaBarra({ estilo, alinhamento, orientacao, aoEstilo
       {edicao ? (
         <>
           {SEPARADOR}
-          <button type="button" className="botao-icone size-6" title="Cancelar a edição (Esc)" aria-label="Cancelar a edição" onClick={edicao.aoCancelar}>
-            <X className="size-4" aria-hidden />
-          </button>
-          <button type="button" className="botao-icone size-6 text-destaque" title="Confirmar a edição (Ctrl+Enter)" aria-label="Confirmar a edição" onClick={edicao.aoConfirmar}>
-            <Check className="size-4" aria-hidden />
-          </button>
+          {/* Presos à direita da barra, que rola: no celular, sem o Esc e o Ctrl+Enter, são o jeito de terminar */}
+          <span className="sticky right-0 ml-auto flex items-center gap-1 bg-painel pl-1">
+            <button type="button" className="botao-icone size-6 pointer-coarse:size-9" title="Cancelar a edição (Esc)" aria-label="Cancelar a edição" onClick={edicao.aoCancelar}>
+              <X className="size-4" aria-hidden />
+            </button>
+            <button type="button" className="botao-icone size-6 text-destaque pointer-coarse:size-9" title="Confirmar a edição (Ctrl+Enter)" aria-label="Confirmar a edição" onClick={edicao.aoConfirmar}>
+              <Check className="size-4" aria-hidden />
+            </button>
+          </span>
         </>
       ) : null}
     </>

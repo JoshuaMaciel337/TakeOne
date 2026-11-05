@@ -577,7 +577,7 @@ Depois do estudo dos hubs de três editores conhecidos (só a ideia: menu por se
 - [x] Onda 17, o Takecut a partir do CapCut de PC ([ADR 0007](decisoes/0007-takecut-com-o-capcut-de-pc.md)): o layout e as funções do Takecut revistos com o CapCut 9.7 de PC, analisado em 04/11/2026 com o REA e pelo QML e os textos que o programa guarda (a versão web mostrava pouco). Em 9 partes: casca, linha do tempo, materiais, propriedades, keyframes, IA no Takecut, início e exportação, atalhos e primeira vez, gravar tela e câmera.
 - [ ] O TakeOne no celular (pedido do dono em 05/11/2026): 11 testes com toque de verdade (celulares em pé e deitados, iPad em pé e deitado), que acharam 153 problemas, e uma auditoria do código.
   - [x] Editor de vídeo: o toque como nos apps de celular (o dedo escolhe, só o escolhido se arrasta, deslizar rola, segurar abre o menu, a pinça dá zoom na linha e muda o tamanho e o giro na prévia, tocar de novo passa à camada de baixo, alças maiores) e a tela simples em coluna até 1023 px, com um arranjo para o celular deitado.
-  - [ ] Editor de imagem no celular (camadas, barra de opções, desenho com o dedo, menus e janelas que cabem).
+  - [x] Editor de imagem no celular (camadas numa folha, barra de opções, desfazer no topo, ferramentas numa faixa, desenho com o dedo, pinça e dois dedos na vista, menus que rolam e janelas que cabem).
   - [ ] Álbum, hub, páginas públicas, Clipar e modelos no celular.
   - [ ] Os achados da auditoria do código.
 

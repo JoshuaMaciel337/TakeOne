@@ -247,12 +247,14 @@ export function BarraDeOpcoes(props: Props) {
           </label>
         ) : null}
         {SEPARADOR}
-        <button type="button" className="botao-icone size-6" title="Cancelar (Esc)" aria-label="Cancelar a transformação" onClick={t.aoCancelar}>
-          <X className="size-4" aria-hidden />
-        </button>
-        <button type="button" className="botao-icone size-6 text-sucesso" title="Confirmar (Enter)" aria-label="Confirmar a transformação" onClick={t.aoConfirmar}>
-          <Check className="size-4" aria-hidden />
-        </button>
+        <span className="sticky right-0 ml-auto flex items-center gap-1 bg-painel pl-1">
+          <button type="button" className="botao-icone size-6 pointer-coarse:size-9" title="Cancelar (Esc)" aria-label="Cancelar a transformação" onClick={t.aoCancelar}>
+            <X className="size-4" aria-hidden />
+          </button>
+          <button type="button" className="botao-icone size-6 text-sucesso pointer-coarse:size-9" title="Confirmar (Enter)" aria-label="Confirmar a transformação" onClick={t.aoConfirmar}>
+            <Check className="size-4" aria-hidden />
+          </button>
+        </span>
       </>
     );
   } else if (ferramenta === "mover") {
@@ -669,7 +671,8 @@ export function BarraDeOpcoes(props: Props) {
   }
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-2 overflow-x-auto border-b border-borda bg-painel px-2 text-xs max-md:hidden">
+    // No celular também (antes ela sumia, e com ela o tamanho do pincel, a fonte e o confirmar do corte): rola para o lado
+    <div className="flex h-9 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-borda bg-painel px-2 text-xs celular:h-11">
       <BotaoDasPredefinicoes nome={dados.nome} conteudo={props.predefinicoes}>
         <Icone className="size-4" aria-hidden />
       </BotaoDasPredefinicoes>

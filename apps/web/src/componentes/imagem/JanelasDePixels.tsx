@@ -28,21 +28,22 @@ export function Moldura({ titulo, aoFechar, aoConfirmar, children }: { titulo: s
         role="dialog"
         aria-modal
         aria-label={titulo}
-        className="w-full max-w-sm rounded-lg border border-borda bg-painel shadow-2xl"
+        // Nunca mais alta que a tela (o celular, o teclado aberto): o título e o OK ficam, o meio rola
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-sm flex-col rounded-lg border border-borda bg-painel shadow-2xl"
         onClick={(evento) => evento.stopPropagation()}
         onSubmit={(evento) => {
           evento.preventDefault();
           aoConfirmar();
         }}
       >
-        <div className="flex items-center justify-between border-b border-borda px-4 py-2.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-borda px-4 py-2.5">
           <h2 className="text-sm font-semibold">{titulo}</h2>
           <button type="button" className="botao-icone" onClick={aoFechar} aria-label="Fechar">
             <X className="size-4" aria-hidden />
           </button>
         </div>
-        <div className="flex flex-col gap-2 p-4 text-xs">{children}</div>
-        <div className="flex justify-end gap-2 border-t border-borda px-4 py-2.5">
+        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto p-4 text-xs">{children}</div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-borda px-4 py-2.5">
           <button type="button" className="botao-secundario px-3 py-1 text-xs" onClick={aoFechar}>
             Cancelar
           </button>

@@ -193,11 +193,11 @@ export function OpcoesDoCorteNaBarra({
       <span className="tabular-nums text-suave">
         {Math.round(medidas.largura)} × {Math.round(medidas.altura)} px{medidas.angulo ? ` · ${medidas.angulo.toFixed(1).replace(".", ",")}°` : ""}
       </span>
-      <span className="ml-auto flex items-center gap-1">
-        <button type="button" className="botao-icone size-6" onClick={aoCancelar} title="Cancelar o corte (Esc)" aria-label="Cancelar o corte">
+      <span className="sticky right-0 ml-auto flex items-center gap-1 bg-painel pl-1">
+        <button type="button" className="botao-icone size-6 pointer-coarse:size-9" onClick={aoCancelar} title="Cancelar o corte (Esc)" aria-label="Cancelar o corte">
           <X className="size-4" aria-hidden />
         </button>
-        <button type="button" className="botao-icone size-6 text-destaque" onClick={aoConfirmar} title="Confirmar o corte (Enter)" aria-label="Confirmar o corte">
+        <button type="button" className="botao-icone size-6 text-destaque pointer-coarse:size-9" onClick={aoConfirmar} title="Confirmar o corte (Enter)" aria-label="Confirmar o corte">
           <Check className="size-4" aria-hidden />
         </button>
       </span>

@@ -42,7 +42,8 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
   // Os grupos sem as ferramentas tiradas (o índice continua o do grupo, para a última usada de cada um)
   const grupos = GRUPOS_DE_FERRAMENTAS.map((grupo, i) => ({ i, itens: grupo.filter((item) => !ocultas.has(item.id)) })).filter((grupo) => grupo.itens.length);
   const extras = GRUPOS_DE_FERRAMENTAS.flat().filter((item, i, todas) => ocultas.has(item.id) && todas.findIndex((x) => x.id === item.id) === i);
-  const [lista, setLista] = useState<{ grupo: number; topo: number } | null>(null);
+  // A lista de um grupo, fixa na tela: ao lado da caixa em pé, ou acima dela quando ela é a faixa deitada do celular
+  const [lista, setLista] = useState<{ grupo: number; lugar: React.CSSProperties } | null>(null);
   const segurando = useRef<number | null>(null);
   const caixaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -61,12 +62,21 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
 
   function abrirLista(grupo: number, elemento: HTMLElement) {
     const caixa = caixaRef.current?.getBoundingClientRect();
-    setLista({ grupo, topo: elemento.getBoundingClientRect().top - (caixa?.top ?? 0) });
+    const botao = elemento.getBoundingClientRect();
+    const deitada = caixa ? caixa.width > caixa.height : false;
+    const lugar: React.CSSProperties = deitada
+      ? { left: Math.max(4, Math.min(botao.left, window.innerWidth - 264)), bottom: window.innerHeight - botao.top + 4, maxHeight: botao.top - 8 }
+      : { left: botao.right + 4, top: Math.max(4, Math.min(botao.top, window.innerHeight - 200)), maxHeight: window.innerHeight - Math.max(4, Math.min(botao.top, window.innerHeight - 200)) - 8 };
+    setLista({ grupo, lugar });
   }
 
   return (
-    <div ref={caixaRef} className={`relative z-20 flex shrink-0 flex-col items-center gap-0.5 border-r border-borda bg-painel py-1.5 ${colunas === 2 ? "w-[70px]" : "w-10"}`}>
-      <nav aria-label="Ferramentas" className={colunas === 2 ? "grid grid-cols-2 gap-0.5" : "flex flex-col items-center gap-0.5"}>
+    // No celular em pé, uma faixa embaixo da imagem que rola para o lado; deitado, a coluna rola
+    <div
+      ref={caixaRef}
+      className={`relative z-20 flex shrink-0 flex-col items-center gap-0.5 border-r border-borda bg-painel py-1.5 deitado:overflow-y-auto empe:order-last empe:w-full empe:flex-row empe:overflow-x-auto empe:border-r-0 empe:border-t empe:px-1 empe:py-1 ${colunas === 2 ? "w-[70px]" : "w-10 pointer-coarse:w-12"}`}
+    >
+      <nav aria-label="Ferramentas" className={colunas === 2 ? "grid grid-cols-2 gap-0.5 empe:flex empe:flex-row" : "flex flex-col items-center gap-0.5 empe:flex-row"}>
         {grupos.map(({ i, itens: grupo }) => {
           const naVez: FerramentaDaImagem = grupo.find((item) => item.id === ativa) ?? grupo.find((item) => item.id === ultimas[i]) ?? grupo[0];
           const ligada = grupo.some((item) => item.id === ativa);
@@ -91,7 +101,8 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
               }}
               onPointerUp={() => segurando.current !== null && window.clearTimeout(segurando.current)}
               onPointerLeave={() => segurando.current !== null && window.clearTimeout(segurando.current)}
-              className={`relative grid size-[30px] place-items-center rounded transition ${ligada ? "bg-destaque text-white" : "text-suave hover:bg-painel-3 hover:text-texto"}`}
+              onPointerCancel={() => segurando.current !== null && window.clearTimeout(segurando.current)}
+              className={`relative grid size-[30px] shrink-0 place-items-center rounded transition pointer-coarse:size-10 ${ligada ? "bg-destaque text-white" : "text-suave hover:bg-painel-3 hover:text-texto"}`}
             >
               <Icone className="size-[18px]" aria-hidden />
               {grupo.length > 1 ? (
@@ -108,14 +119,14 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
             aria-label="Ferramentas extras"
             title="Ferramentas extras (as tiradas da caixa)"
             onClick={(evento) => abrirLista(EXTRAS, evento.currentTarget)}
-            className={`grid size-[30px] place-items-center rounded transition ${extras.some((item) => item.id === ativa) ? "bg-destaque text-white" : "text-suave hover:bg-painel-3 hover:text-texto"}`}
+            className={`grid size-[30px] shrink-0 place-items-center rounded transition pointer-coarse:size-10 ${extras.some((item) => item.id === ativa) ? "bg-destaque text-white" : "text-suave hover:bg-painel-3 hover:text-texto"}`}
           >
             <MoreHorizontal className="size-[18px]" aria-hidden />
           </button>
         ) : null}
       </nav>
       {lista ? (
-        <div role="menu" className="absolute left-full z-50 ml-1 min-w-64 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={{ top: lista.topo }}>
+        <div role="menu" className="fixed z-50 min-w-64 overflow-y-auto rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50" style={lista.lugar}>
           {(lista.grupo === EXTRAS ? extras : (grupos.find((g) => g.i === lista.grupo)?.itens ?? [])).map((item) => {
             const Icone = item.icone;
             return (
@@ -128,19 +139,19 @@ export function CaixaDeFerramentas({ ativa, aoEscolher, ultimas, primeiroPlano, 
                   aoEscolher(item.id);
                   setLista(null);
                 }}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-destaque/20"
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-destaque/20 pointer-coarse:py-2.5 pointer-coarse:text-sm"
               >
                 <span className={`size-1.5 rounded-full ${item.id === ativa ? "bg-texto" : ""}`} aria-hidden />
                 <Icone className="size-4 text-suave" aria-hidden />
                 <span className="flex-1">{item.nome}</span>
-                <span className="text-[11px] text-suave">{teclaDe(item)}</span>
+                <span className="text-[11px] text-suave pointer-coarse:hidden">{teclaDe(item)}</span>
               </button>
             );
           })}
         </div>
       ) : null}
 
-      <div className="mt-auto flex flex-col items-center gap-1 pb-1">
+      <div className="mt-auto flex shrink-0 flex-col items-center gap-1 pb-1 empe:ml-1 empe:mt-0 empe:flex-row empe:pb-0">
         <div className="flex w-[30px] items-center justify-between">
           <button type="button" onClick={aoCoresPadrao} title="Cores padrão de primeiro plano e de fundo (D)" aria-label="Cores padrão" className="relative size-3">
             <span className="absolute left-0 top-0 size-2 border border-white/70 bg-black" />

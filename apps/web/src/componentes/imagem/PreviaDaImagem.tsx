@@ -643,6 +643,93 @@ export function PreviaDaImagem({
     return () => area.removeEventListener("wheel", ouvir);
   }, [areaRef]);
 
+  // Dois dedos na imagem: a pinça aproxima e o arrasto anda pela vista, com o ponto do documento entre os dedos
+  // sempre embaixo deles (como nos editores de foto do celular). A área não deixa o navegador rolar nem ampliar a
+  // página (touch-none): um dedo é da ferramenta. O segundo dedo desiste do gesto do primeiro (um pointercancel
+  // para quem o recebeu) e, até os dedos saírem, os movimentos não chegam às ferramentas. Na camada escolhida, a
+  // pinça é dela (o manipulador fica com o segundo dedo antes daqui).
+  const toques = useRef(new Map<number, { x: number; y: number; alvo: EventTarget | null }>());
+  const pinca = useRef<{ dedos: [number, number]; distancia: number; escala: number; fx: number; fy: number } | null>(null);
+  const cancelando = useRef(false);
+  const escalaDaPinca = useRef(escala);
+  useLayoutEffect(() => {
+    escalaDaPinca.current = escala;
+  });
+  const apertarNaArea = useEffectEvent((evento: PointerEvent) => {
+    if (evento.pointerType !== "touch" || cancelando.current) return;
+    const primeiro = [...toques.current.entries()][0];
+    toques.current.set(evento.pointerId, { x: evento.clientX, y: evento.clientY, alvo: evento.target });
+    if (!primeiro || pinca.current || toques.current.size !== 2) return;
+    const [idDoPrimeiro, dedo] = primeiro;
+    const area = areaRef.current;
+    const alvo = imagemRef.current;
+    if (!area || !alvo) return;
+    evento.stopPropagation();
+    evento.preventDefault();
+    const meio = { clientX: (dedo.x + evento.clientX) / 2, clientY: (dedo.y + evento.clientY) / 2 };
+    const ponto = pontoNoElemento(meio, alvo);
+    pinca.current = {
+      dedos: [idDoPrimeiro, evento.pointerId],
+      distancia: Math.max(1, Math.hypot(evento.clientX - dedo.x, evento.clientY - dedo.y)),
+      escala: escalaDaPinca.current,
+      fx: ponto.x / tamanho.largura,
+      fy: ponto.y / tamanho.altura,
+    };
+    // Quem recebeu o primeiro dedo desiste do que começou (a forma, a seleção, a mão)
+    cancelando.current = true;
+    dedo.alvo?.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerId: idDoPrimeiro, pointerType: "touch" }));
+    cancelando.current = false;
+  });
+  const moverNaArea = useEffectEvent((evento: PointerEvent) => {
+    const toque = toques.current.get(evento.pointerId);
+    if (!toque) return;
+    toque.x = evento.clientX;
+    toque.y = evento.clientY;
+    const gesto = pinca.current;
+    if (!gesto) return;
+    evento.stopPropagation();
+    const a = toques.current.get(gesto.dedos[0]);
+    const b = toques.current.get(gesto.dedos[1]);
+    const area = areaRef.current;
+    if (!a || !b || !area) return;
+    const caixa = area.getBoundingClientRect();
+    const novo = Math.min(DEGRAUS_DO_ZOOM.at(-1)!, Math.max(DEGRAUS_DO_ZOOM[0], (gesto.escala * Math.hypot(b.x - a.x, b.y - a.y)) / gesto.distancia));
+    const pedido = { fx: gesto.fx, fy: gesto.fy, px: (a.x + b.x) / 2 - caixa.left, py: (a.y + b.y) / 2 - caixa.top };
+    if (Math.abs(novo / escalaDaPinca.current - 1) < 0.002) {
+      // Só andando: a rolagem leva o ponto para baixo dos dedos (o zoom não mudou, não há outra renderização)
+      area.scrollLeft = pedido.fx * tamanho.largura + MESA - pedido.px;
+      area.scrollTop = pedido.fy * tamanho.altura + MESA - pedido.py;
+      return;
+    }
+    ancora.current = pedido;
+    aoMudarZoom(novo);
+  });
+  const soltarNaArea = useEffectEvent((evento: PointerEvent) => {
+    if (cancelando.current) return;
+    toques.current.delete(evento.pointerId);
+    if (pinca.current && pinca.current.dedos.includes(evento.pointerId)) {
+      pinca.current = null;
+      evento.stopPropagation();
+    }
+  });
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const apertar = (evento: PointerEvent) => apertarNaArea(evento);
+    const mover = (evento: PointerEvent) => moverNaArea(evento);
+    const soltar = (evento: PointerEvent) => soltarNaArea(evento);
+    area.addEventListener("pointerdown", apertar, true);
+    area.addEventListener("pointermove", mover, true);
+    area.addEventListener("pointerup", soltar, true);
+    area.addEventListener("pointercancel", soltar, true);
+    return () => {
+      area.removeEventListener("pointerdown", apertar, true);
+      area.removeEventListener("pointermove", mover, true);
+      area.removeEventListener("pointerup", soltar, true);
+      area.removeEventListener("pointercancel", soltar, true);
+    };
+  }, [areaRef]);
+
   // Exibir › Ajustar a camada à tela: o zoom em que o retângulo cabe na área, com o meio dele no meio dela
   const ultimoEnquadrar = useRef(0);
   useLayoutEffect(() => {
@@ -924,7 +1011,7 @@ export function PreviaDaImagem({
       ) : null}
       <div
         ref={areaRef}
-        className={`min-h-0 flex-1 ${ajustada ? "overflow-hidden" : "overflow-auto"}`}
+        className={`min-h-0 flex-1 touch-none ${ajustada ? "overflow-hidden" : "overflow-auto"}`}
         style={vista.reguas && !girada ? { marginTop: LADO_DA_REGUA, marginLeft: LADO_DA_REGUA } : undefined}
         onPointerDown={(evento) => {
           // Girar vista: o ângulo segue o ponteiro em volta do meio da imagem
@@ -979,6 +1066,12 @@ export function PreviaDaImagem({
             onPointerDown={aoApertar}
             onPointerMove={aoMover}
             onPointerUp={aoSoltar}
+            onPointerCancel={() => {
+              // O navegador (ou o segundo dedo) ficou com o gesto: a forma pela metade não fica na tela
+              andando.current = null;
+              setArrastandoMao(false);
+              setDesenho(null);
+            }}
           >
             <canvas ref={canvasRef} className="absolute inset-0 size-full" style={{ ...(corAVista ? { filter: `url(#to-canal-${corAVista})` } : {}), ...(modoAtivo ? { visibility: "hidden" } : {}) }} />
             <canvas ref={modoCanvasRef} className="pointer-events-none absolute inset-0 size-full" hidden={!modoAtivo} aria-hidden data-modo-de-cor />

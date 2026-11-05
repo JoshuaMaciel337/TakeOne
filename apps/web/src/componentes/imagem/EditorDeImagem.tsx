@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, ChevronLeft, Download, LoaderCircle, X } from "lucide-react";
+import { Check, ChevronLeft, Download, Layers, LoaderCircle, Redo2, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { BarraDeMenus, useAtalhosDosMenus } from "@/componentes/area/BarraDeMenus";
-import { ColunaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
+import { type AreaDeTrabalho, ColunaDePaineis, FolhaDePaineis, type Painel, useAreaDeTrabalho } from "@/componentes/area/Paineis";
+import { useCelular } from "@/lib/useCelular";
 import { PainelHistorico } from "@/componentes/area/PainelHistorico";
 import { BotaoTema } from "@/componentes/BotaoTema";
 import { Simbolo } from "@/componentes/Logo";
@@ -412,7 +413,25 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
   const ctx = useMemo(() => contextoDasMidias(midias), [midias]);
   const edicao = useProjeto(projetoId, ctx);
   const { projeto, executar: executarNoProjeto, desfazer, refazer, mostrarAviso } = edicao;
-  const area = useAreaDeTrabalho("imagem", AREAS, "essenciais", IDS_DOS_PAINEIS);
+  const areaDaColuna = useAreaDeTrabalho("imagem", AREAS, "essenciais", IDS_DOS_PAINEIS);
+  // No celular, os painéis ficam numa folha (um por vez): abrir um painel (pelo menu Janela, pela cor, depois de pôr
+  // um ajuste) abre a folha nele
+  const celular = useCelular();
+  const [folha, setFolha] = useState<{ aberta: boolean; ativa: string }>({ aberta: false, ativa: "camadas" });
+  const area: AreaDeTrabalho = celular
+    ? {
+        ...areaDaColuna,
+        abrir: (painel) => {
+          areaDaColuna.abrir(painel);
+          setFolha({ aberta: true, ativa: painel });
+        },
+        alternar: (painel) => {
+          if (folha.aberta && folha.ativa === painel) return setFolha({ aberta: false, ativa: painel });
+          if (!areaDaColuna.aberto(painel)) areaDaColuna.abrir(painel);
+          setFolha({ aberta: true, ativa: painel });
+        },
+      }
+    : areaDaColuna;
 
   const [ferramenta, setFerramenta] = useState<IdFerramentaDaImagem>("mover");
   const [ultimas, setUltimas] = useState<Partial<Record<number, IdFerramentaDaImagem>>>({});
@@ -6867,7 +6886,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-fundo text-texto">
-      <header className={`h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5 ${modoDeTela === "cheia" ? "hidden" : "flex"}`}>
+      <header className={`h-8 shrink-0 items-center gap-1 border-b border-borda bg-painel px-1.5 celular:h-11 ${modoDeTela === "cheia" ? "hidden" : "flex"}`}>
         <Link href="/app" className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-suave transition hover:text-texto" title="Voltar ao início">
           <ChevronLeft className="size-3.5" aria-hidden />
           <Simbolo tamanho={18} />
@@ -6890,8 +6909,20 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             </option>
           ))}
         </select>
+        {/* No celular não há Ctrl+Z: desfazer, refazer e os painéis ficam no topo */}
+        <span className="hidden items-center celular:flex">
+          <button type="button" className="botao-icone size-9" onClick={acoes.desfazer} disabled={!edicao.nomeDesfazer} aria-label={edicao.nomeDesfazer ? `Desfazer: ${edicao.nomeDesfazer}` : "Desfazer"} title="Desfazer">
+            <Undo2 className="size-4" aria-hidden />
+          </button>
+          <button type="button" className="botao-icone size-9" onClick={acoes.refazer} disabled={!edicao.nomeRefazer} aria-label={edicao.nomeRefazer ? `Refazer: ${edicao.nomeRefazer}` : "Refazer"} title="Refazer">
+            <Redo2 className="size-4" aria-hidden />
+          </button>
+          <button type="button" className="botao-icone size-9" onClick={() => setFolha((atual) => ({ ...atual, aberta: !atual.aberta }))} aria-pressed={folha.aberta} aria-label="Camadas e painéis" title="Camadas e painéis">
+            <Layers className="size-4" aria-hidden />
+          </button>
+        </span>
         <BotaoTema />
-        <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs" onClick={() => setExportando("exportar")} title="Exportar como PNG, JPG, WebP, GIF, AVIF, TIFF, PDF… (Ctrl+Alt+Shift+W)">
+        <button type="button" className="botao-principal shrink-0 px-2.5 py-0.5 text-xs celular:py-2" onClick={() => setExportando("exportar")} title="Exportar como PNG, JPG, WebP, GIF, AVIF, TIFF, PDF… (Ctrl+Alt+Shift+W)">
           <Download className="size-3.5" aria-hidden />
           <span className="hidden sm:inline">Exportar</span>
         </button>
@@ -7211,7 +7242,8 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
       />
       </div>
 
-      <div className="flex min-h-0 flex-1 max-md:flex-wrap max-md:content-start max-md:overflow-y-auto">
+      {/* No celular em pé, as ferramentas viram uma faixa embaixo da imagem; deitado, continuam à esquerda */}
+      <div className="flex min-h-0 flex-1 empe:flex-col">
         <div className={paineisOcultos === "todos" ? "hidden" : "contents"}>
         <CaixaDeFerramentas
           ocultas={new Set(personalizacao.ferramentasOcultas)}
@@ -7234,7 +7266,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
         />
         </div>
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col max-md:h-[62vh]">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div role="tablist" aria-label="Documentos" className={`h-7 shrink-0 items-end overflow-x-auto overflow-y-hidden border-b border-borda bg-painel-2 ${modoDeTela === "padrao" ? "flex" : "hidden"}`}>
             {abas.map((documento) =>
               documento.id === projetoId ? (
@@ -7603,7 +7635,7 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
             }}
             aoPegarCor={(cor, paraOFundo) => setCores((atual) => ({ ...atual, [paraOFundo ? "fundo" : "primeiroPlano"]: cor }))}
           />
-          <footer className={`h-6 shrink-0 items-center gap-3 border-t border-borda bg-painel px-2 text-[11px] text-suave ${paineisOcultos === "todos" ? "hidden" : "flex"}`}>
+          <footer className={`h-6 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-t border-borda bg-painel px-2 text-[11px] text-suave ${paineisOcultos === "todos" ? "hidden" : "flex"}`}>
             <span className="tabular-nums">{porcentagem(zoomNaTela)}</span>
             <span className="tabular-nums">
               {tamanho.largura} px × {tamanho.altura} px ({projeto.tamanho?.resolucao ?? 72} ppp)
@@ -7614,13 +7646,22 @@ export function EditorDeImagem({ projetoId, modeloInicial }: { projetoId: string
                 Gravando a ação
               </span>
             ) : null}
-            {vista.dicas ? <span className="min-w-0 truncate max-md:hidden">{dadosDa(ferramenta).dica}</span> : null}
+            {vista.dicas ? <span className="min-w-0 truncate max-lg:hidden">{dadosDa(ferramenta).dica}</span> : null}
           </footer>
         </main>
 
         <div className={paineisOcultos === "nenhum" ? "contents" : "hidden"}>
-          <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="shrink-0 border-l border-borda bg-painel max-md:h-[70vh] max-md:w-full max-md:border-l-0 max-md:border-t md:w-80" />
+          <ColunaDePaineis grupos={area.estado.direita ?? []} paineis={paineis} area={area} className="w-80 shrink-0 border-l border-borda bg-painel max-lg:w-72 celular:hidden" />
         </div>
+        {celular && folha.aberta && paineisOcultos !== "todos" ? (
+          <FolhaDePaineis
+            abas={(area.estado.direita ?? []).flatMap((grupo) => grupo.abas)}
+            paineis={paineis}
+            ativa={folha.ativa}
+            aoAtivar={(ativa) => setFolha({ aberta: true, ativa })}
+            aoFechar={() => setFolha((atual) => ({ ...atual, aberta: false }))}
+          />
+        ) : null}
       </div>
 
       {paradaDaAcao ? <JanelaParadaAoTocar mensagem={paradaDaAcao.mensagem} continuar={paradaDaAcao.continuar} aoResponder={paradaDaAcao.responder} /> : null}
@@ -8486,9 +8527,9 @@ function MenusDaImagem({ acoes, ativo, personalizacao, mostrarTudo, aoMostrarTud
   useAtalhosDosMenus(menus, ativo);
   return (
     <>
-      <BarraDeMenus menus={menus} className="min-w-0 max-md:hidden" />
-      {/* No celular, os menus num só, como submenus */}
-      <BarraDeMenus menus={[{ nome: "Menu", itens: menus.map((menu) => ({ nome: menu.nome, itens: menu.itens })) }]} className="md:hidden" />
+      <BarraDeMenus menus={menus} className="min-w-0 max-lg:hidden" />
+      {/* Abaixo de 1024 px (celular e tablet), os menus num só, com os submenus abrindo por dentro */}
+      <BarraDeMenus menus={[{ nome: "Menu", itens: menus.map((menu) => ({ nome: menu.nome, itens: menu.itens })) }]} className="lg:hidden" empilhado />
     </>
   );
 }

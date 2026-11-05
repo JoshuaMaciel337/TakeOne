@@ -4,7 +4,7 @@
 // trocados passando o mouse com um aberto, com setas, Enter e Esc, os atalhos à direita de cada item e submenus.
 // Os mesmos itens servem aos atalhos de teclado (useAtalhosDosMenus), para o menu e a tecla nunca divergirem.
 import { Check, ChevronRight } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type ItemDeMenu =
   | {
@@ -94,12 +94,39 @@ export function useAtalhosDosMenus(menus: Menu[], ativo = true) {
   }, [ativo]);
 }
 
-function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFechar: () => void; nivel?: number }) {
+/**
+ * O submenu que abre para o lado: fixo na tela, ao lado do item, e empurrado para dentro dela (para cima, ou para
+ * a esquerda do item) quando não cabe. Fixo, ele não é cortado pela lista de cima, que rola quando é alta.
+ */
+function SubmenuAoLado({ ancora, children }: { ancora: HTMLElement | null; children: React.ReactNode }) {
+  const caixaRef = useRef<HTMLDivElement>(null);
+  const [lugar, setLugar] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const caixa = caixaRef.current?.getBoundingClientRect();
+    const item = ancora?.getBoundingClientRect();
+    if (!caixa || !item) return;
+    const direita = item.right + caixa.width <= window.innerWidth - 4;
+    setLugar({
+      left: direita ? item.right : Math.max(4, item.left - caixa.width),
+      top: Math.max(4, Math.min(item.top - 4, window.innerHeight - caixa.height - 4)),
+    });
+  }, [ancora]);
+  return (
+    <div ref={caixaRef} className="fixed z-[60]" style={lugar ?? { left: -9999, top: 0 }}>
+      {children}
+    </div>
+  );
+}
+
+function ListaDoMenu({ itens, aoFechar, nivel = 0, empilhado = false }: { itens: ItemDeMenu[]; aoFechar: () => void; nivel?: number; empilhado?: boolean }) {
   const [aberto, setAberto] = useState<number | null>(null);
+  const [ancora, setAncora] = useState<HTMLElement | null>(null);
   const listaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (nivel === 0) listaRef.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus();
+    if (nivel === 0) listaRef.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus({ preventScroll: true });
   }, [nivel]);
+  // Os itens: no menu empilhado (o "Menu" único do celular), mais altos para o dedo
+  const linha = empilhado ? "py-2.5 text-sm" : "py-1";
   function mover(evento: React.KeyboardEvent, passo: number) {
     const lista = [...(listaRef.current?.querySelectorAll<HTMLElement>(":scope > [role=menuitem]:not([disabled])") ?? [])];
     const atual = lista.indexOf(document.activeElement as HTMLElement);
@@ -110,7 +137,11 @@ function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFe
     <div
       ref={listaRef}
       role="menu"
-      className="min-w-60 rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50"
+      // A lista de cima rola quando passa da altura da tela (Janela tem mais de 30 itens); os submenus para o lado
+      // são fixos e não são cortados por ela. No empilhado, os submenus abrem por dentro, embaixo do item.
+      className={`rounded-md border border-borda bg-painel-2 py-1 text-xs shadow-xl shadow-black/50 ${
+        empilhado ? (nivel === 0 ? "max-h-[calc(100dvh-3.5rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain" : "border-0 shadow-none") : nivel === 0 ? "max-h-[calc(100dvh-3.5rem)] min-w-60 overflow-y-auto overscroll-contain" : "max-h-[calc(100dvh-0.5rem)] min-w-60 overflow-y-auto overscroll-contain"
+      }`}
       onKeyDown={(evento) => {
         if (evento.key === "ArrowDown") mover(evento, 1);
         else if (evento.key === "ArrowUp") mover(evento, -1);
@@ -120,31 +151,51 @@ function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFe
         if (item === "-") return <div key={i} role="separator" className="my-1 h-px bg-borda" />;
         if (ehSubmenu(item)) {
           return (
-            <div key={i} className="relative" onMouseEnter={() => setAberto(i)} onMouseLeave={() => setAberto((atual) => (atual === i ? null : atual))}>
+            <div
+              key={i}
+              className="relative"
+              onMouseEnter={(evento) => {
+                if (empilhado) return;
+                setAncora(evento.currentTarget);
+                setAberto(i);
+              }}
+              onMouseLeave={() => !empilhado && setAberto((atual) => (atual === i ? null : atual))}
+            >
               <button
                 type="button"
                 role="menuitem"
                 aria-haspopup="menu"
                 aria-expanded={aberto === i}
                 disabled={item.desativado}
-                onClick={() => setAberto(i)}
+                onClick={(evento) => {
+                  setAncora(evento.currentTarget.parentElement);
+                  // No empilhado, tocar de novo fecha o submenu
+                  setAberto((atual) => (empilhado && atual === i ? null : i));
+                }}
                 onKeyDown={(evento) => {
                   if (evento.key === "ArrowRight") {
+                    setAncora(evento.currentTarget.parentElement);
                     setAberto(i);
                     evento.preventDefault();
                   }
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1 text-left outline-none hover:bg-destaque/20 focus:bg-destaque/20 disabled:opacity-40"
+                className={`flex w-full items-center gap-2 px-3 text-left outline-none hover:bg-destaque/20 focus:bg-destaque/20 disabled:opacity-40 ${linha}`}
               >
                 <span className="w-3.5" />
                 <span className="flex-1">{item.nome}</span>
-                <ChevronRight className="size-3.5 text-suave" aria-hidden />
+                <ChevronRight className={`size-3.5 text-suave transition ${empilhado && aberto === i ? "rotate-90" : ""}`} aria-hidden />
               </button>
               {aberto === i ? (
-                // No celular o submenu abre embaixo do item, por dentro da lista (para o lado, passaria da tela)
-                <div className="absolute left-full top-0 z-10 -mt-1 max-md:static max-md:mt-0 max-md:pl-3">
-                  <ListaDoMenu itens={item.itens} aoFechar={aoFechar} nivel={nivel + 1} />
-                </div>
+                empilhado ? (
+                  // No celular o submenu abre embaixo do item, por dentro da lista (para o lado, passaria da tela)
+                  <div className="border-l border-borda pl-3 ml-4">
+                    <ListaDoMenu itens={item.itens} aoFechar={aoFechar} nivel={nivel + 1} empilhado />
+                  </div>
+                ) : (
+                  <SubmenuAoLado ancora={ancora}>
+                    <ListaDoMenu itens={item.itens} aoFechar={aoFechar} nivel={nivel + 1} />
+                  </SubmenuAoLado>
+                )
               ) : null}
             </div>
           );
@@ -162,11 +213,12 @@ function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFe
               aoFechar();
               item.aoEscolher();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1 text-left outline-none hover:bg-destaque/20 focus:bg-destaque/20 disabled:opacity-40 disabled:hover:bg-transparent"
+            className={`flex w-full items-center gap-2 px-3 text-left outline-none hover:bg-destaque/20 focus:bg-destaque/20 disabled:opacity-40 disabled:hover:bg-transparent ${linha}`}
           >
             <span className="flex w-3.5 justify-center">{item.marcado ? <Check className="size-3.5" aria-hidden /> : null}</span>
             <span className="flex-1">{item.nome}</span>
-            {item.atalho ? <span className="pl-6 text-[11px] text-suave">{item.atalho.split(" ou ")[0]}</span> : null}
+            {/* No toque não há teclado: o atalho só tomaria o lugar do nome */}
+            {item.atalho ? <span className="pl-6 text-[11px] text-suave pointer-coarse:hidden">{item.atalho.split(" ou ")[0]}</span> : null}
           </button>
         );
       })}
@@ -174,8 +226,11 @@ function ListaDoMenu({ itens, aoFechar, nivel = 0 }: { itens: ItemDeMenu[]; aoFe
   );
 }
 
-/** A barra com os menus. Clique abre; com um aberto, passar o mouse troca; Esc ou clique fora fecha. */
-export function BarraDeMenus({ menus, className = "" }: { menus: Menu[]; className?: string }) {
+/**
+ * A barra com os menus. Clique abre; com um aberto, passar o mouse troca; Esc ou clique fora fecha. `empilhado`
+ * (o "Menu" único das telas pequenas) abre os submenus por dentro da lista, com itens altos para o dedo.
+ */
+export function BarraDeMenus({ menus, className = "", empilhado = false }: { menus: Menu[]; className?: string; empilhado?: boolean }) {
   const [aberto, setAberto] = useState<number | null>(null);
   const barraRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -213,7 +268,7 @@ export function BarraDeMenus({ menus, className = "" }: { menus: Menu[]; classNa
             </button>
             {aberto === i ? (
               <div className="absolute left-0 top-full z-50 mt-0.5">
-                <ListaDoMenu itens={menu.itens} aoFechar={() => setAberto(null)} />
+                <ListaDoMenu itens={menu.itens} aoFechar={() => setAberto(null)} empilhado={empilhado} />
               </div>
             ) : null}
           </div>
