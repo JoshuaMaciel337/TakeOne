@@ -92,6 +92,8 @@ type Props = {
   aoPrevisualizar?: (tempo: Tick | null) => void;
   /** O clique na principal vazia: importar mídias. */
   aoImportar?: () => void;
+  /** Shift+Z: ver o projeto inteiro (muda a cada pedido). */
+  pedidoDeAjuste?: number;
   /** A IA no botão direito de um clipe (a mesma conta do "Melhorar o projeto"). */
   aoMelhorarClipes?: (tipo: "cor" | "volume" | "voz" | "cenas", clipeIds: string[]) => void;
   className?: string;
@@ -223,6 +225,7 @@ export function LinhaDoTempo({
   aoPrevisualizar,
   aoImportar,
   aoMelhorarClipes,
+  pedidoDeAjuste = 0,
   className = "",
   style,
 }: Props) {
@@ -654,6 +657,13 @@ export function LinhaDoTempo({
     const disponivel = Math.max(80, larguraVisivel - larguraRotulos - 32);
     setZoom(Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, disponivel / Math.max(1, exibido.duracao / TICKS_POR_SEGUNDO))));
     setVoltarAoInicio((vez) => vez + 1);
+  }
+
+  // O pedido de fora (Shift+Z) vale uma vez, depois das medidas da linha (o estado muda durante a renderização)
+  const [ajusteVisto, setAjusteVisto] = useState(pedidoDeAjuste);
+  if (pedidoDeAjuste !== ajusteVisto) {
+    setAjusteVisto(pedidoDeAjuste);
+    ajustarZoom();
   }
 
   function itensDoContexto(alvo: { tempo: Tick; clipeId: string | null }): ItemDoContexto[] {

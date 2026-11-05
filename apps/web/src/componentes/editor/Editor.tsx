@@ -38,6 +38,8 @@ import { BarraDoTakecut, LAYOUTS_DO_TAKECUT, layoutAtual, type TamanhosDoTakecut
 import { BarraFerramentas } from "./BarraFerramentas";
 import { DetalhesDoProjeto } from "./DetalhesDoProjeto";
 import { VariosClipes } from "./VariosClipes";
+import { JanelaNovidades } from "./JanelaNovidades";
+import { TourDoTakecut, tourJaVisto } from "./TourDoTakecut";
 import { aplicarMelhoria, MelhorarOProjeto } from "./MelhorarOProjeto";
 import { PecaUmaEdicao } from "./PecaUmaEdicao";
 import { BarraSuperior } from "./BarraSuperior";
@@ -311,7 +313,11 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const router = useRouter();
   const telaLarga = useTelaLarga();
   // O Takepro precisa da tela larga; abaixo dela, e no Takecut, a tela simples
-  const { aparencia } = useAparencia();
+  const { aparencia, escolhida: aparenciaEscolhida } = useAparencia();
+  // O tour do Takecut (ADR 0007, 17.8): na primeira vez, depois de escolher o layout; pelo Menu › Ajuda, quando quiser
+  const [tourPendente, setTourPendente] = useState(() => typeof window !== "undefined" && !tourJaVisto());
+  const [tourPedido, setTourPedido] = useState(false);
+  const [vendoNovidades, setVendoNovidades] = useState(false);
   const profissional = telaLarga && aparencia === "takepro";
   const area = useAreaDeTrabalho("video", AREAS, "edicao", IDS_DOS_PAINEIS);
   const [larguraEsquerdaCima, setLarguraEsquerdaCima] = useTamanhoSalvo("video-esquerda-cima", ESQUERDA_CIMA.padrao, ESQUERDA_CIMA.minimo, ESQUERDA_CIMA.maximo);
@@ -322,6 +328,8 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [exportandoQuadro, setExportandoQuadro] = useState(false);
   const [pedidoDeAba, setPedidoDeAba] = useState<{ aba: IdAba; vez: number } | undefined>(undefined);
   const [pedidoDeZoom, setPedidoDeZoom] = useState<{ fator: number; vez: number } | undefined>(undefined);
+  // Shift+Z: a linha do tempo mostra o projeto inteiro
+  const [pedidoDeAjuste, setPedidoDeAjuste] = useState(0);
   // A aba dos painéis Texto e Gráficos essenciais (o hub abre o editor numa ferramenta de antes)
   const doEndereco = ferramentaInicial ? PAINEL_DA_FERRAMENTA[ferramentaInicial as IdFerramenta] : undefined;
   const [pedidoTexto, setPedidoTexto] = useState(doEndereco?.painel === "texto" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
@@ -644,6 +652,10 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     } else if (ctrl && tecla === "z" && !evento.shiftKey) desfazer();
     else if (ctrl && (tecla === "y" || (tecla === "z" && evento.shiftKey))) refazer();
     else if (ctrl && tecla === "s") mostrarAviso("O TakeOne salva sozinho a cada alteração.");
+    else if (ctrl && tecla === "e" && !evento.shiftKey && !evento.altKey) {
+      evento.preventDefault();
+      setExportando(true);
+    } else if (evento.shiftKey && !ctrl && !evento.altKey && tecla === "z") setPedidoDeAjuste((vez) => vez + 1);
     // S liga o ímã e Ctrl+K divide, como nos editores profissionais (Ctrl+B também divide)
     else if (tecla === "s" && !ctrl && !evento.altKey) setIma((atual) => !atual);
     else if (ctrl && !evento.shiftKey && (tecla === "b" || tecla === "k")) executar({ comando: "linha.dividir", parametros: { tempo, clipeIds: selecaoValida } });
@@ -858,6 +870,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     aoSelecionar: aoSelecionarClipes,
     aoExecutar: executar,
     aoCongelar: congelavel ? congelar : undefined,
+    pedidoDeAjuste,
   };
   // O que a linha do tempo do Takecut tem a mais: desfazer na barra, o menu do botão direito, a prévia pelo mouse e
   // o clique na principal vazia para importar
@@ -1285,7 +1298,14 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             })),
           },
           { nome: "Layout profissional (Takepro)", aoEscolher: () => escolherAparencia("takepro") },
+        ],
+      },
+      {
+        nome: "Ajuda",
+        itens: [
           { nome: "Atalhos do teclado", atalho: "?", aoEscolher: () => setVendoAtalhos(true) },
+          { nome: "Tour pelo editor", aoEscolher: () => setTourPedido(true) },
+          { nome: "Novidades", aoEscolher: () => setVendoNovidades(true) },
         ],
       },
     ];
@@ -1356,6 +1376,15 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           </div>
           {entradaDeImportar}
           {janelas}
+          {tourPedido || (tourPendente && aparenciaEscolhida) ? (
+            <TourDoTakecut
+              aoFechar={() => {
+                setTourPedido(false);
+                setTourPendente(false);
+              }}
+            />
+          ) : null}
+          {vendoNovidades ? <JanelaNovidades aoFechar={() => setVendoNovidades(false)} /> : null}
           {melhorando ? (
             <MelhorarOProjeto
               ambiente={{ projeto, midias, executar, avisar: mostrarAviso, abrirLegendas: () => { setFerramenta("legendas"); setMelhorando(false); } }}

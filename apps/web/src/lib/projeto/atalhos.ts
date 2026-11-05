@@ -3,37 +3,44 @@
 import type { Tick } from "../tempo.ts";
 import { type Clipe, fimDoClipe, type Projeto } from "./modelo.ts";
 
-export type Atalho = { teclas: string; acao: string };
+/** O grupo da aba na janela de atalhos (ADR 0007, 17.8). */
+export type GrupoDeAtalho = "Tocar e andar" | "Cortar e aparar" | "Clipes" | "Linha do tempo" | "Geral";
+export type Atalho = { teclas: string; acao: string; grupo: GrupoDeAtalho };
+export const GRUPOS_DE_ATALHO: GrupoDeAtalho[] = ["Tocar e andar", "Cortar e aparar", "Clipes", "Linha do tempo", "Geral"];
 
 /** A lista da janela de atalhos, na ordem em que aparece. */
 export const ATALHOS: Atalho[] = [
-  { teclas: "Espaço", acao: "Tocar e parar" },
-  { teclas: "J  K  L", acao: "Tocar para trás, parar e tocar; J ou L de novo dobra o andamento até 8× (K segurado com J ou L: um quadro)" },
-  { teclas: "← →", acao: "Um quadro para trás ou para a frente (Shift: cinco)" },
-  { teclas: "↑ ↓", acao: "Corte anterior ou seguinte" },
-  { teclas: "Home End", acao: "Começo ou fim da sequência" },
-  { teclas: "I  O", acao: "Marcar a entrada e a saída (Shift: ir até elas; Ctrl+Shift+X limpa)" },
-  { teclas: ";  '", acao: "Elevar (deixa o espaço) e extrair (fecha o espaço) o trecho entre a entrada e a saída" },
-  { teclas: "M", acao: "Pôr um marcador no cursor" },
-  { teclas: "Shift+M  Ctrl+Shift+M", acao: "Marcador seguinte ou anterior (também Shift+↓ e Shift+↑)" },
-  { teclas: "Ctrl+K  ou  Ctrl+B", acao: "Adicionar edição: dividir no cursor" },
-  { teclas: "Q", acao: "Apagar do começo do clipe até o cursor" },
-  { teclas: "W", acao: "Apagar do cursor até o fim do clipe" },
-  { teclas: "V A Shift+A B N R C Y H Z T", acao: "Ferramentas da linha do tempo: seleção, faixa adiante, faixa para trás, ondulação, contínua, esticar a velocidade, navalha, deslizar, mão, zoom e texto (na tela larga)" },
-  { teclas: "Alt+← Alt+→", acao: "Empurrar os clipes marcados um quadro (Shift: cinco)" },
-  { teclas: "Alt + arrastar o clipe", acao: "Deslizar o conteúdo: o clipe fica no lugar e mostra outro trecho da mídia" },
-  { teclas: "Alt + arrastar a borda", acao: "Mover o corte entre dois clipes encostados: um cresce o que o outro encolhe" },
-  { teclas: "Delete  Shift+Delete", acao: "Apagar os clipes marcados (Shift: e fechar o espaço)" },
-  { teclas: "Ctrl+D  Ctrl+Shift+D", acao: "Aplicar a transição de vídeo (fusão de 1 s) ou a de áudio no corte" },
-  { teclas: "Ctrl+Shift+/", acao: "Duplicar os clipes marcados" },
-  { teclas: "Ctrl+C  Ctrl+V", acao: "Copiar e colar clipes no cursor" },
-  { teclas: "Ctrl+Alt+V", acao: "Colar atributos (cor, efeito, animação...) nos clipes marcados" },
-  { teclas: "Ctrl+A  Ctrl+Shift+A", acao: "Marcar todos os clipes e desmarcar" },
-  { teclas: "Esc", acao: "Desmarcar" },
-  { teclas: "S", acao: "Ligar e desligar o ímã" },
-  { teclas: "=  -", acao: "Aproximar e afastar a linha do tempo" },
-  { teclas: "Ctrl+Z  Ctrl+Shift+Z", acao: "Desfazer e refazer" },
-  { teclas: "?", acao: "Esta lista" },
+  { teclas: "Espaço", acao: "Tocar e parar", grupo: "Tocar e andar" },
+  { teclas: "J  K  L", acao: "Tocar para trás, parar e tocar; J ou L de novo dobra o andamento até 8× (K segurado com J ou L: um quadro)", grupo: "Tocar e andar" },
+  { teclas: "← →", acao: "Um quadro para trás ou para a frente (Shift: cinco)", grupo: "Tocar e andar" },
+  { teclas: "↑ ↓", acao: "Corte anterior ou seguinte", grupo: "Tocar e andar" },
+  { teclas: "Home End", acao: "Começo ou fim da sequência", grupo: "Tocar e andar" },
+  { teclas: "I  O", acao: "Marcar a entrada e a saída (Shift: ir até elas; Ctrl+Shift+X limpa)", grupo: "Cortar e aparar" },
+  { teclas: ";  '", acao: "Elevar (deixa o espaço) e extrair (fecha o espaço) o trecho entre a entrada e a saída", grupo: "Cortar e aparar" },
+  { teclas: "M", acao: "Pôr um marcador no cursor", grupo: "Linha do tempo" },
+  { teclas: "Shift+M  Ctrl+Shift+M", acao: "Marcador seguinte ou anterior (também Shift+↓ e Shift+↑)", grupo: "Linha do tempo" },
+  { teclas: "Ctrl+K  ou  Ctrl+B", acao: "Adicionar edição: dividir no cursor", grupo: "Cortar e aparar" },
+  { teclas: "Q", acao: "Apagar do começo do clipe até o cursor", grupo: "Cortar e aparar" },
+  { teclas: "W", acao: "Apagar do cursor até o fim do clipe", grupo: "Cortar e aparar" },
+  { teclas: "V A Shift+A B N R C Y H Z T", acao: "Ferramentas da linha do tempo: seleção, faixa adiante, faixa para trás, ondulação, contínua, esticar a velocidade, navalha, deslizar, mão, zoom e texto (na tela larga)", grupo: "Linha do tempo" },
+  { teclas: "Alt+← Alt+→", acao: "Empurrar os clipes marcados um quadro (Shift: cinco)", grupo: "Clipes" },
+  { teclas: "Alt + arrastar o clipe", acao: "Deslizar o conteúdo: o clipe fica no lugar e mostra outro trecho da mídia", grupo: "Cortar e aparar" },
+  { teclas: "Alt + arrastar a borda", acao: "Mover o corte entre dois clipes encostados: um cresce o que o outro encolhe", grupo: "Cortar e aparar" },
+  { teclas: "Delete  Shift+Delete", acao: "Apagar os clipes marcados (Shift: e fechar o espaço)", grupo: "Clipes" },
+  { teclas: "Ctrl+D  Ctrl+Shift+D", acao: "Aplicar a transição de vídeo (fusão de 1 s) ou a de áudio no corte", grupo: "Clipes" },
+  { teclas: "Ctrl+Shift+/", acao: "Duplicar os clipes marcados", grupo: "Clipes" },
+  { teclas: "Ctrl+C  Ctrl+V", acao: "Copiar e colar clipes no cursor", grupo: "Clipes" },
+  { teclas: "Ctrl+Alt+V", acao: "Colar atributos (cor, efeito, animação...) nos clipes marcados", grupo: "Clipes" },
+  { teclas: "Ctrl+A  Ctrl+Shift+A", acao: "Marcar todos os clipes e desmarcar", grupo: "Clipes" },
+  { teclas: "Esc", acao: "Desmarcar", grupo: "Clipes" },
+  { teclas: "S", acao: "Ligar e desligar o ímã", grupo: "Linha do tempo" },
+  { teclas: "=  -", acao: "Aproximar e afastar a linha do tempo", grupo: "Linha do tempo" },
+  { teclas: "Ctrl+Z  Ctrl+Shift+Z", acao: "Desfazer e refazer", grupo: "Geral" },
+  { teclas: "Ctrl+E", acao: "Exportar", grupo: "Geral" },
+  { teclas: "Shift+Z", acao: "Ver o projeto inteiro na linha do tempo", grupo: "Linha do tempo" },
+  { teclas: "Botão direito", acao: "O menu do clipe ou do vazio na linha do tempo (com a IA no clipe)", grupo: "Clipes" },
+  { teclas: "Arrastar no vazio", acao: "Escolher os clipes de uma caixa na linha do tempo (Shift soma)", grupo: "Clipes" },
+  { teclas: "?", acao: "Esta lista", grupo: "Geral" },
 ];
 
 /**
