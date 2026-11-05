@@ -15,6 +15,8 @@ export type PropsGravacao = {
   aoAlternar: () => void;
   /** O arquivo gravado sobe para a biblioteca e entra numa faixa de áudio em `inicio` quando ficar pronto. */
   aoGravar: (arquivo: File, inicio: Tick) => void;
+  /** A tela e a câmera gravadas (ADR 0007, 17.9): sobem e entram juntas no instante em que a gravação começou. */
+  aoGravarTela?: (arquivos: { arquivo: File; papel: "tela" | "camera" }[], inicio: Tick) => void;
 };
 
 type Estado = { fase: "parado" } | { fase: "contando"; falta: number } | { fase: "gravando"; desde: number };

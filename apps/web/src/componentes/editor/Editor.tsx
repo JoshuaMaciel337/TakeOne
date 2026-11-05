@@ -24,7 +24,7 @@ import { clipeParaAparar, corteVizinho, marcadorVizinho } from "@/lib/projeto/at
 import { type Comando, executarComando } from "@/lib/projeto/comandos";
 import type { Texto } from "@/lib/projeto/texto";
 import { retomarAudio } from "@/lib/previa/audio";
-import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S } from "@/lib/projeto/edicao";
+import { type ClipeCopiado, type Contexto, DURACAO_CONGELADO_S, ErroEdicao } from "@/lib/projeto/edicao";
 import { acharClipe, fimDoClipe, tempoNaMidia, type Transformacao } from "@/lib/projeto/modelo";
 import { TEXTO_PADRAO } from "@/lib/projeto/texto";
 import { duracaoMaximaDaTransicao } from "@/lib/projeto/transicao";
@@ -457,6 +457,21 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez por projeto aberto
   }, [projetoId]);
+  // A tela e a câmera gravadas (ADR 0007, 17.9): esperam as duas ficarem prontas e entram juntas, num passo só
+  const gravacoes = useRef<{ inicio: Tick; esperando: number; tela?: string; camera?: string }[]>([]);
+  function enviarGravacaoDeTela(arquivos: { arquivo: File; papel: "tela" | "camera" }[], inicio: Tick) {
+    const gravacao: { inicio: Tick; esperando: number; tela?: string; camera?: string } = { inicio, esperando: arquivos.length };
+    gravacoes.current.push(gravacao);
+    for (const { arquivo, papel } of arquivos) {
+      iniciarEnvio([arquivo], {
+        aoCriar: (id) => {
+          gravacao[papel] = id;
+          void biblioteca.recarregar();
+        },
+      });
+    }
+    mostrarAviso(arquivos.length > 1 ? "Tela e câmera gravadas: entram no projeto quando terminarem de subir." : "Gravação feita: entra no projeto quando terminar de subir.");
+  }
   function pedirAnimacao(midia: { id: string }, inicio: Tick = tempo) {
     pendentes.current.set(midia.id, { inicio });
     void biblioteca.recarregar();
@@ -487,6 +502,36 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
       executar(comando);
       return false;
     });
+    gravacoes.current = gravacoes.current.filter((gravacao) => {
+      const ids = [gravacao.tela, gravacao.camera].filter((id): id is string => Boolean(id));
+      if (ids.length < gravacao.esperando || !projeto) return true;
+      const lista = ids.map((id) => midias.get(id));
+      if (lista.some((midia) => !midia || midia.status === "processando" || midia.status === "enviando")) return true;
+      const comErro = lista.find((midia) => midia?.status === "erro");
+      if (comErro) mostrarAviso(`"${comErro.nome}" não ficou pronta: ${comErro.erro ?? "erro desconhecido"}`);
+      const tela = gravacao.tela && midias.get(gravacao.tela)?.status === "pronta" ? gravacao.tela : undefined;
+      const camera = gravacao.camera && midias.get(gravacao.camera)?.status === "pronta" ? gravacao.camera : undefined;
+      try {
+        let atual = projeto;
+        let inicio = gravacao.inicio;
+        if (tela) {
+          const feito = executarComando(atual, { comando: "clipe.adicionar", parametros: { midiaId: tela, inicio } }, ctx);
+          atual = feito.projeto;
+          // Na principal, a tela entra entre os clipes: a câmera vai para onde ela de fato começou
+          inicio = (feito.selecao?.[0] ? acharClipe(atual, feito.selecao[0])?.clipe.inicio : undefined) ?? inicio;
+        }
+        if (camera) {
+          const feito = executarComando(atual, { comando: "clipe.adicionar", parametros: { midiaId: camera, inicio, novaFaixa: Boolean(tela) } }, ctx);
+          atual = feito.projeto;
+          // Com a tela, a câmera fica pequena no canto de baixo à direita
+          if (tela && feito.selecao?.length) atual = executarComando(atual, { comando: "clipe.transformar", parametros: { clipeIds: feito.selecao, transformacao: { escala: 0.28, x: 0.34, y: 0.32 } } }, ctx).projeto;
+        }
+        if ((tela || camera) && executar({ comando: "edicao.pedido", parametros: { projeto: atual } })) mostrarAviso("A gravação entrou no projeto. Ctrl+Z desfaz.");
+      } catch (e) {
+        mostrarAviso(e instanceof ErroEdicao ? e.message : "Não foi possível pôr a gravação no projeto.");
+      }
+      return false;
+    });
     for (const [id, acao] of pendentes.current) {
       const midia = midias.get(id);
       if (!midia || midia.status === "processando" || midia.status === "enviando") continue;
@@ -505,7 +550,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     }
   });
   useEffect(() => {
-    if (pendentes.current.size || grupos.current.length) resolverPendentes();
+    if (pendentes.current.size || grupos.current.length || gravacoes.current.length) resolverPendentes();
   }, [midias]);
 
   const bibliotecaDoEditor = useMemo(
@@ -785,6 +830,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         iniciarEnvio([arquivo], { aoCriar: (id) => pedirAnimacao({ id }, inicio) });
         mostrarAviso("Narração gravada: ela entra na faixa de áudio quando terminar de subir.");
       },
+      aoGravarTela: enviarGravacaoDeTela,
     },
     aoExecutarQuandoProntas: executarQuandoProntas,
     modeloInicial,

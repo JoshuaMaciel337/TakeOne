@@ -20,6 +20,7 @@ import type { Midia } from "@/lib/tipos";
 import { BancoPixabay } from "./BancoPixabay";
 import { type Ferramenta } from "./ferramentas";
 import type { PropsGravacao } from "./GravarNarracao";
+import { GravarTela } from "./GravarTela";
 import { PainelAudio } from "./PainelAudio";
 import { PainelAnimacoes } from "./PainelAnimacoes";
 import { PainelEfeitos } from "./PainelEfeitos";
@@ -89,7 +90,9 @@ function PainelMidia({
   aoAvisar,
   aoPedir,
   projeto,
+  gravacao,
 }: Pick<Props, "biblioteca" | "midiaSelecionadaId" | "aoSelecionarMidia" | "aoAdicionarMidia" | "aoAbrirMidia"> & {
+  gravacao?: PropsGravacao;
   proporcao: string;
   projeto: Projeto;
   aoPedir: (midia: Midia) => void;
@@ -114,6 +117,7 @@ function PainelMidia({
     <div className="flex flex-col gap-3">
       <ZonaDeEnvio compacta />
       <ListaEnvios />
+      {gravacao?.aoGravarTela ? <GravarTela tempo={gravacao.tempo} aoGravar={gravacao.aoGravarTela} /> : null}
       <GerarVideo
         proporcao={proporcao}
         imagens={biblioteca.filter((midia) => midia.imagem && midia.status === "pronta")}
@@ -249,6 +253,7 @@ export function ConteudoDaFerramenta({
         aoExecutar={legendas.aoExecutar}
         aoAvisar={legendas.aoAvisar}
         aoPedir={aoPedirAnimacao}
+        gravacao={gravacao}
       />
     ) : ferramenta.id === "audio" ? (
       <PainelAudio

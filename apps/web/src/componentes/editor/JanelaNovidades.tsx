@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 /** O que chegou ao editor de vídeo, do mais novo para o mais antigo (ADR 0007, 17.8). */
 const NOVIDADES: { titulo: string; texto: string }[] = [
+  { titulo: "Gravar a tela e a câmera", texto: "No painel Mídia: a tela, a câmera ou as duas, com o microfone e a contagem; a tela entra na principal e a câmera por cima, num canto, cada uma num arquivo." },
   { titulo: "Atalhos em abas e o tour", texto: "A janela de atalhos (?) com busca e grupos, Ctrl+E para exportar, Shift+Z para ver o projeto inteiro e o tour pelo editor (Menu › Ajuda)." },
   { titulo: "Projetos com lixeira", texto: "Excluir leva o projeto para a lixeira por 30 dias; a lista busca, ordena, renomeia e duplica, e soltar vídeos na página cria um projeto com eles." },
   { titulo: "Melhorar o projeto e o assistente", texto: "A IA acha o que dá para melhorar (volume, cor, legendas, voz e cenas) e aplica em todos; o botão redondo abre o pedido em palavras." },

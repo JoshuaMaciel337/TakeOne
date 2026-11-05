@@ -91,4 +91,5 @@ a voz, ajustar a música, o Clipar e a IA toda local.
 - [x] 17.8 Atalhos e primeira vez: a janela de atalhos em abas com busca, os atalhos que faltam para funções que já
   existem, atalhos editáveis com conjuntos prontos sem nome de marca, o tour de 6 passos, as novidades e as preferências
   do vídeo. (Os atalhos editáveis e as preferências do vídeo ficaram para depois.)
-- [ ] 17.9 Gravar tela e câmera pelo navegador, com o microfone, a contagem e as faixas separadas.
+- [x] 17.9 Gravar tela e câmera pelo navegador, com o microfone, a contagem e as faixas separadas. Fica para depois
+  desenhar o cursor e os cliques por cima da tela (o navegador não entrega a posição do ponteiro fora da página).
