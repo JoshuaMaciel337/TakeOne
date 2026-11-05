@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* O celular deitado: a tela é larga, mas baixa demais para os painéis em pé */
+@custom-variant deitado (@media (orientation: landscape) and (max-height: 540px));
+
 /* Cores do TakeOne, do kit da marca (docs/marca/guia.md). O tema escuro é o padrão; o claro e os dois cinzas
    (o médio e o claro, como os dos editores de imagem) valem com data-tema no <html>, que o script do layout põe
    antes da pintura (lib/tema.ts). */
@@ -126,6 +129,11 @@ body {
   color: var(--to-texto);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* No toque, o deslizante deitado só segue o dedo que anda para o lado: o que anda para cima ou para baixo rola o painel */
+input[type="range"] {
+  touch-action: pan-y;
 }
 
 ::selection {

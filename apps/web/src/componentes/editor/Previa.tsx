@@ -20,6 +20,7 @@ import { lutsDoProjeto } from "@/lib/projeto/lutImportada";
 import { useTabelasDasLuts } from "@/lib/useLuts";
 import { DesenhoDaMascara } from "./DesenhoDaMascara";
 import { GuiasDaPrevia } from "./GuiasDaPrevia";
+import { escolhaNoPonto } from "@/lib/previa/escolhaNoPonto";
 import { ManipuladorNaPrevia } from "./ManipuladorNaPrevia";
 import { MedidorDeLoudness } from "./MedidorDeLoudness";
 import { MarcadorDeObjeto, type ObjetoMarcado } from "./SeguirObjeto";
@@ -241,8 +242,16 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andam
       aoClicarParaTexto(ponto.x / retangulo.width - 0.5, ponto.y / retangulo.height - 0.5);
       return;
     }
-    const acima = [...camadas].reverse().find((camada) => !ehCopiaDesenhada(camada.clipe.id) && camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto));
-    aoSelecionar(acima ? [acima.clipe.id] : []);
+    const escolhida = escolhaNoPonto(camadasNoPonto(ponto), null, evento.pointerType === "touch");
+    aoSelecionar(escolhida ? [escolhida] : []);
+  }
+
+  /** As camadas sob o ponto (pixels do quadro), da de cima para a de baixo. */
+  function camadasNoPonto(ponto: { x: number; y: number }): string[] {
+    return [...camadas]
+      .reverse()
+      .filter((camada) => !ehCopiaDesenhada(camada.clipe.id) && camada.caixa.opacidade > 0 && contemPonto(camada.caixa, ponto))
+      .map((camada) => camada.clipe.id);
   }
 
   return (
@@ -250,7 +259,7 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andam
       <div ref={areaRef} className="relative min-h-0 flex-1 p-4">
         <div className="absolute inset-4 flex items-center justify-center">
           <div
-            className="relative select-none shadow-lg shadow-black/40"
+            className="relative touch-none select-none shadow-lg shadow-black/40"
             style={{ width: tamanho.largura, height: tamanho.altura, backgroundColor: projeto.fundo.cor }}
             onPointerDown={selecionarNoPonto}
           >
@@ -355,6 +364,10 @@ export function Previa({ projeto: projetoDaEdicao, midias, tempo, tocando, andam
                   setGuias(null);
                   aoPrever(selecionada.clipe.id, null);
                   if (mudanca) aoTransformar(selecionada.clipe.id, mudanca);
+                }}
+                aoTocar={(ponto, toque) => {
+                  const outra = escolhaNoPonto(camadasNoPonto(ponto), selecionada.clipe.id, toque);
+                  if (outra && outra !== selecionada.clipe.id) aoSelecionar([outra]);
                 }}
               />
             ) : null}

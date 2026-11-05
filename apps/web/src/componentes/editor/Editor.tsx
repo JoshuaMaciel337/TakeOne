@@ -414,6 +414,15 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
    * mandam null quando são iguais. Com uma prévia ativa, isso quer dizer que o valor final é o dela:
    * ela vira comando (sem passo no desfazer se não mudou nada em relação ao projeto salvo).
    */
+  // Um deslizante que o navegador tirou do dedo (a pessoa rolou o painel começando nele) deixaria a prévia na
+  // tela sem virar comando: ela sai
+  useEffect(() => {
+    const aoCancelar = (evento: PointerEvent) => {
+      if (evento.target instanceof HTMLInputElement && evento.target.type === "range") setProvisorio(null);
+    };
+    window.addEventListener("pointercancel", aoCancelar, true);
+    return () => window.removeEventListener("pointercancel", aoCancelar, true);
+  }, []);
   const preverDoPainel = (comando: Comando | null) => {
     if (comando !== null || !provisorio) {
       setProvisorio(comando);
@@ -1490,7 +1499,9 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
         aoSalvarModelo={() => setSalvandoModelo(true)}
       />
 
-      <div className="flex min-h-0 flex-1 max-md:flex-col">
+      {/* Abaixo de 1024 px: em pé, a prévia, a linha do tempo e as ferramentas embaixo, com os painéis em folhas;
+          com o celular deitado (tela baixa), as ferramentas à esquerda, a prévia e a linha lado a lado e os painéis à direita */}
+      <div className="flex min-h-0 flex-1 flex-col deitado:flex-row">
         <BarraFerramentas
           ativa={ferramenta}
           comCorte={Boolean(corteDoProjeto)}
@@ -1499,28 +1510,19 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             setPainelNoCelular(true);
             setPropriedadesNoCelular(false);
           }}
-          className="max-md:order-2"
+          className="order-2 deitado:order-none"
         />
 
         <PainelConteudo
           ferramenta={ferramentaAtual}
           {...propsDoConteudo}
           aoFechar={() => setPainelNoCelular(false)}
-          className={`md:w-[var(--largura-conteudo)] max-md:fixed max-md:inset-x-0 max-md:bottom-16 max-md:z-40 max-md:h-[55dvh] ${
-            painelNoCelular ? "" : "max-md:hidden"
+          className={`fixed inset-x-0 bottom-16 z-40 h-[55dvh] deitado:inset-x-auto deitado:bottom-0 deitado:right-0 deitado:top-0 deitado:h-auto deitado:w-[min(26rem,60vw)] ${
+            painelNoCelular ? "" : "hidden"
           }`}
         />
-        <Divisor
-          direcao="coluna"
-          valor={larguraConteudo}
-          minimo={CONTEUDO.minimo}
-          maximo={CONTEUDO.maximo}
-          aoMudar={setLarguraConteudo}
-          rotulo="Largura do painel de conteúdo"
-          className="max-md:hidden"
-        />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col max-md:order-1">
+        <div className="order-1 flex min-h-0 min-w-0 flex-1 flex-col deitado:order-none deitado:flex-row">
           <div className="relative flex min-h-0 flex-1">
             {selecionado && !propriedadesNoCelular ? (
               <button
@@ -1539,43 +1541,23 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
               {...propsDaPrevia}
               className="flex-1"
             />
-            <Divisor
-              direcao="coluna"
-              valor={larguraPropriedades}
-              minimo={PROPRIEDADES.minimo}
-              maximo={PROPRIEDADES.maximo}
-              aoMudar={setLarguraPropriedades}
-              sentido={-1}
-              rotulo="Largura do painel de propriedades"
-              className="max-lg:hidden"
-            />
             <PainelPropriedades
               {...propsDasPropriedades}
               midia={midiaDasPropriedades}
               selecionado={selecionado}
               aoFechar={() => setPropriedadesNoCelular(false)}
-              className={`w-[var(--largura-propriedades)] ${
+              className={
                 propriedadesNoCelular && selecionado
-                  ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-50 max-lg:h-[60dvh] max-lg:w-auto max-lg:border-t max-lg:border-borda max-lg:shadow-2xl"
-                  : "max-lg:hidden"
-              }`}
+                  ? "fixed inset-x-0 bottom-0 z-50 h-[60dvh] w-auto border-t border-borda shadow-2xl deitado:inset-x-auto deitado:right-0 deitado:top-0 deitado:h-auto deitado:w-[min(26rem,60vw)] deitado:border-l deitado:border-t-0"
+                  : "hidden"
+              }
             />
           </div>
-          <Divisor
-            direcao="linha"
-            valor={alturaLinha}
-            minimo={LINHA_DO_TEMPO.minimo}
-            maximo={LINHA_DO_TEMPO.maximo}
-            aoMudar={setAlturaLinha}
-            sentido={-1}
-            rotulo="Altura da linha do tempo"
-            className="max-md:hidden"
-          />
           <LinhaDoTempo
             {...propsDaLinha}
             {...extrasDaLinha}
             aoPrevisualizar={undefined}
-            className="h-48 md:h-[var(--altura-linha)]"
+            className="h-[clamp(170px,34dvh,360px)] shrink-0 deitado:h-auto deitado:w-[52%] deitado:border-l deitado:border-borda"
           />
         </div>
       </div>

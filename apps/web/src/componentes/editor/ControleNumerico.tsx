@@ -101,6 +101,11 @@ export function ControleNumerico({
           aoPrever(evento.currentTarget.valueAsNumber);
         }}
         onPointerUp={(evento) => confirmarDeslizante(evento.currentTarget)}
+        // O dedo que começou num deslizante e rolou o painel: o navegador fica com o gesto e nada é confirmado
+        // (o editor tira a prévia que o toque deixou)
+        onPointerCancel={() => {
+          mexeu.current = false;
+        }}
         onKeyUp={(evento) => confirmarDeslizante(evento.currentTarget)}
         className="col-span-2 h-1.5 w-full cursor-pointer accent-destaque disabled:cursor-not-allowed disabled:opacity-50"
       />

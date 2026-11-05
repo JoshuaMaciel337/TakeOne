@@ -110,6 +110,9 @@ const ALTURA_ZONA_NOVA = 18;
 const ALTURAS: Record<TipoFaixa, number> = { principal: 64, video: 48, audio: 40, texto: 36, legenda: 32 };
 const TOLERANCIA_IMA_PX = 8;
 const LIMIAR_ARRASTO_PX = 4;
+/** No toque: o dedo que anda mais que isso está rolando, e segurar parado por este tempo abre o menu do clipe. */
+const FOLGA_DO_TOQUE_PX = 10;
+const TEMPO_PARA_SEGURAR_MS = 500;
 const INTERVALOS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
 const DISTANCIA_MINIMA_MARCAS = 70;
 
@@ -166,7 +169,8 @@ type Arrasto =
   | { tipo: "fade"; clipe: Clipe; lado: "entrada" | "saida"; x0: number; ativo: boolean; comando: Comando | null; guia: null }
   | { tipo: "volume"; clipe: Clipe; y0: number; alturaInterna: number; ativo: boolean; comando: Comando | null; guia: null }
   // A seleção em caixa, arrastando no vazio (em pixels da área das faixas)
-  | { tipo: "caixa"; x0: number; y0: number; x1: number; y1: number; aditivo: boolean; ativo: boolean; comando: null; guia: null };
+  // (no toque, o dedo no vazio só leva o cursor: arrastar rola a linha)
+  | { tipo: "caixa"; x0: number; y0: number; x1: number; y1: number; aditivo: boolean; toque?: boolean; ativo: boolean; comando: null; guia: null };
 
 /** O código da faixa nos editores profissionais: as de imagem são V1 (a principal), V2… de baixo para cima; as de som, A1, A2… */
 export function codigoDaFaixa(faixa: Faixa, projeto: Projeto): string {
@@ -244,6 +248,9 @@ export function LinhaDoTempo({
   const buscandoNaRegua = useRef(false);
   const [marcadorAberto, setMarcadorAberto] = useState<string | null>(null);
   const andandoComAMao = useRef<{ x: number; rolagem: number } | null>(null);
+  // No toque, o clipe não escolhido é escolhido pelo toque (o click que vem depois) e o deslize rola a linha
+  const toqueNoClipe = useRef<string | null>(null);
+  const segurando = useRef<{ parar: () => void } | null>(null);
   // No Takecut, o modo do mouse (seleção ou navalha) fica na barra; no layout profissional, na coluna de ferramentas
   const [modoDoMouse, setModoDoMouse] = useState<"selecao" | "navalha">("selecao");
   const ferramentaEfetiva: IdFerramentaDaLinha = profissional ? ferramenta : modoDoMouse;
@@ -395,6 +402,13 @@ export function LinhaDoTempo({
       aoSelecionar(selecao.includes(clipe.id) ? selecao.filter((id) => id !== clipe.id) : [...selecao, clipe.id]);
       return;
     }
+    const toque = evento.pointerType === "touch";
+    if (toque) segurarParaOMenu(evento, clipe);
+    if (toque && !selecao.includes(clipe.id) && !borda) {
+      // Como nos editores de celular: o toque escolhe (no click) e só o clipe escolhido se arrasta
+      toqueNoClipe.current = clipe.id;
+      return;
+    }
     if (!selecao.includes(clipe.id) || borda) aoSelecionar([clipe.id]);
     if (faixa.travada) return;
     evento.preventDefault();
@@ -426,6 +440,7 @@ export function LinhaDoTempo({
     const atual = arrastoAtual.current;
     if (!atual || atual.tipo === "soltar") return;
     if (atual.tipo === "caixa") {
+      if (atual.toque) return;
       const { x, y } = pontoNaArea(evento);
       if (!atual.ativo && Math.hypot(x - atual.x0, y - atual.y0) < LIMIAR_ARRASTO_PX) return;
       trocarArrasto({ ...atual, x1: x, y1: y, ativo: true });
@@ -535,27 +550,136 @@ export function LinhaDoTempo({
   function abrirContexto(evento: React.MouseEvent, clipe: Clipe | null) {
     evento.preventDefault();
     evento.stopPropagation();
+    abrirContextoEm(evento, clipe);
+  }
+
+  function abrirContextoEm(evento: { clientX: number; clientY: number }, clipe: Clipe | null) {
+    pararDeSegurar();
     previsualizar(null);
     if (clipe && !selecao.includes(clipe.id)) aoSelecionar([clipe.id]);
     setContexto({ x: evento.clientX, y: evento.clientY, tempo: Math.min(tempoNoPonteiro(evento), exibido.duracao), clipeId: clipe?.id ?? null });
   }
+
+  function pararDeSegurar() {
+    segurando.current?.parar();
+    segurando.current = null;
+  }
+
+  /** O dedo parado sobre um clipe (ou no vazio) abre o menu dele, como o botão direito do mouse. */
+  function segurarParaOMenu(evento: React.PointerEvent, clipe: Clipe | null) {
+    pararDeSegurar();
+    const inicio = { clientX: evento.clientX, clientY: evento.clientY };
+    const id = evento.pointerId;
+    const mover = (outro: PointerEvent) => {
+      if (outro.pointerId === id && Math.hypot(outro.clientX - inicio.clientX, outro.clientY - inicio.clientY) > FOLGA_DO_TOQUE_PX) pararDeSegurar();
+    };
+    const soltar = (outro: PointerEvent) => {
+      if (outro.pointerId === id) pararDeSegurar();
+    };
+    const parar = () => {
+      window.clearTimeout(espera);
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", soltar);
+    };
+    const espera = window.setTimeout(() => {
+      segurando.current = null;
+      parar();
+      toqueNoClipe.current = null;
+      trocarArrasto(null);
+      navigator.vibrate?.(15);
+      engolirOProximoClique();
+      abrirContextoEm(inicio, clipe);
+    }, TEMPO_PARA_SEGURAR_MS);
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+    window.addEventListener("pointercancel", soltar);
+    segurando.current = { parar };
+  }
+
+  useEffect(() => () => segurando.current?.parar(), []);
+
+  /** O menu abre embaixo do dedo: o clique que o navegador manda ao soltar não pode escolher um item dele. */
+  function engolirOProximoClique() {
+    const engolir = (evento: MouseEvent) => {
+      evento.preventDefault();
+      evento.stopPropagation();
+    };
+    const aoSoltar = () => {
+      window.removeEventListener("pointerup", aoSoltar, true);
+      window.setTimeout(() => window.removeEventListener("click", engolir, true), 80);
+    };
+    window.addEventListener("click", engolir, true);
+    window.addEventListener("pointerup", aoSoltar, true);
+  }
+
+  // A pinça com dois dedos muda o zoom da linha, com o ponto entre os dedos parado (o navegador não amplia a página)
+  useEffect(() => {
+    const elemento = rolagem.current;
+    if (!elemento) return;
+    let distancia = 0;
+    const medir = (evento: TouchEvent) => {
+      const [a, b] = [evento.touches[0], evento.touches[1]];
+      return { distancia: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), meio: (a.clientX + b.clientX) / 2 };
+    };
+    function aoComecar(evento: TouchEvent) {
+      if (evento.touches.length !== 2) return;
+      distancia = medir(evento).distancia;
+      segurando.current?.parar();
+      segurando.current = null;
+      if (arrastoAtual.current && arrastoAtual.current.tipo !== "soltar") {
+        arrastoAtual.current = null;
+        setArrasto(null);
+      }
+    }
+    function aoMover(evento: TouchEvent) {
+      if (evento.touches.length !== 2 || !distancia) return;
+      if (evento.cancelable) evento.preventDefault();
+      const agora = medir(evento);
+      const razao = agora.distancia / Math.max(1, distancia);
+      distancia = agora.distancia;
+      const x = agora.meio - area.current!.getBoundingClientRect().left;
+      setZoom((atual) => {
+        const novo = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, atual * razao));
+        requestAnimationFrame(() => {
+          elemento!.scrollLeft += (x / atual) * novo - x;
+        });
+        return novo;
+      });
+    }
+    function aoTerminar(evento: TouchEvent) {
+      if (evento.touches.length < 2) distancia = 0;
+    }
+    elemento.addEventListener("touchstart", aoComecar, { passive: true });
+    elemento.addEventListener("touchmove", aoMover, { passive: false });
+    elemento.addEventListener("touchend", aoTerminar);
+    elemento.addEventListener("touchcancel", aoTerminar);
+    return () => {
+      elemento.removeEventListener("touchstart", aoComecar);
+      elemento.removeEventListener("touchmove", aoMover);
+      elemento.removeEventListener("touchend", aoTerminar);
+      elemento.removeEventListener("touchcancel", aoTerminar);
+    };
+  }, []);
 
   // Os eventos ficam na janela: durante o arrasto o clipe pode trocar de faixa e ser recriado
   useEffect(() => {
     if (!arrastando) return;
     const mover = (evento: PointerEvent) => tratarMovimento(evento);
     const soltar = () => tratarSoltura();
+    // O navegador ficou com o gesto (rolagem, pinça): nada muda, nem a escolha nem o cursor
+    const desistir = () => trocarArrasto(null);
     const cancelar = (evento: KeyboardEvent) => {
       if (evento.key === "Escape") trocarArrasto(null);
     };
     window.addEventListener("pointermove", mover);
     window.addEventListener("pointerup", soltar);
-    window.addEventListener("pointercancel", soltar);
+    window.addEventListener("pointercancel", desistir);
     window.addEventListener("keydown", cancelar);
     return () => {
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
-      window.removeEventListener("pointercancel", soltar);
+      window.removeEventListener("pointercancel", desistir);
       window.removeEventListener("keydown", cancelar);
     };
   }, [arrastando]);
@@ -894,7 +1018,7 @@ export function LinhaDoTempo({
         </div>
       </div>
 
-      <div ref={rolagem} className="min-h-0 flex-1 overflow-auto">
+      <div ref={rolagem} className="min-h-0 flex-1 touch-pan-x touch-pan-y overflow-auto">
         <div className="relative flex min-h-full" style={{ width: largura + larguraRotulos }}>
           <div className="sticky left-0 z-30 flex shrink-0 flex-col border-r border-borda bg-painel" style={{ width: larguraRotulos }}>
             <div className="sticky top-0 z-10 shrink-0 border-b border-borda bg-painel" style={{ height: ALTURA_REGUA }} />
@@ -995,7 +1119,9 @@ export function LinhaDoTempo({
                 // Arrastar no vazio escolhe os clipes da caixa; o clique sem arrastar leva o cursor
                 previsualizar(null);
                 const ponto = pontoNaArea(evento);
-                trocarArrasto({ tipo: "caixa", x0: ponto.x, y0: ponto.y, x1: ponto.x, y1: ponto.y, aditivo: evento.shiftKey || evento.ctrlKey || evento.metaKey, ativo: false, comando: null, guia: null });
+                const toque = evento.pointerType === "touch";
+                if (toque) segurarParaOMenu(evento, null);
+                trocarArrasto({ tipo: "caixa", x0: ponto.x, y0: ponto.y, x1: ponto.x, y1: ponto.y, aditivo: evento.shiftKey || evento.ctrlKey || evento.metaKey, toque, ativo: false, comando: null, guia: null });
               }}
               onPointerMove={(evento) => {
                 const mao = andandoComAMao.current;
@@ -1050,6 +1176,11 @@ export function LinhaDoTempo({
                       cursor={CURSOR_DA_FERRAMENTA[ferramentaEfetiva]}
                       aoApertar={(evento, borda) => aoApertarClipe(evento, clipe, faixa, borda)}
                       aoMenu={(evento) => abrirContexto(evento, clipe)}
+                      aoTocar={() => {
+                        if (toqueNoClipe.current !== clipe.id) return;
+                        toqueNoClipe.current = null;
+                        aoSelecionar([clipe.id]);
+                      }}
                       aoApertarAudio={(evento, alvo, alturaInterna) => aoApertarAudio(evento, clipe, alvo, alturaInterna)}
                     />
                   ))}
@@ -1201,6 +1332,7 @@ function BlocoDoClipe({
   cursor,
   aoApertar,
   aoMenu,
+  aoTocar,
   aoApertarAudio,
 }: {
   clipe: Clipe;
@@ -1214,6 +1346,7 @@ function BlocoDoClipe({
   cursor?: string;
   aoApertar: (evento: React.PointerEvent, borda?: "inicio" | "fim") => void;
   aoMenu?: (evento: React.MouseEvent) => void;
+  aoTocar?: () => void;
   aoApertarAudio?: (evento: React.PointerEvent, alvo: "entrada" | "saida" | "volume", alturaInterna: number) => void;
 }) {
   const audio = faixa.tipo === "audio";
@@ -1246,13 +1379,14 @@ function BlocoDoClipe({
       : "border-sky-500/30 bg-sky-950";
   return (
     <div
-      className={`absolute top-[3px] touch-none select-none overflow-hidden rounded-md border ${
+      className={`absolute top-[3px] ${selecionado ? "touch-none" : "touch-pan-x touch-pan-y"} select-none overflow-hidden rounded-md border ${
         cores
       } ${selecionado ? "z-10 outline outline-2 -outline-offset-1 outline-white" : ""} ${faixa.travada ? "cursor-not-allowed opacity-70" : "cursor-grab active:cursor-grabbing"} ${
         faixa.oculta || faixa.muda ? "opacity-50" : ""
       }`}
       style={{ left: esquerda, width: largura, height: alturaInterna, cursor }}
       onPointerDown={(evento) => aoApertar(evento)}
+      onClick={aoTocar}
       onContextMenu={aoMenu}
       title={nome}
     >
@@ -1286,14 +1420,14 @@ function BlocoDoClipe({
             {larguraFadeSaida > 0 ? <polygon points={`${largura},0 ${largura - larguraFadeSaida},0 ${largura},${alturaInterna}`} fill="rgb(0 0 0 / 0.45)" /> : null}
           </svg>
           <span
-            className="absolute top-0.5 z-20 size-2.5 -translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white"
+            className="absolute top-0.5 z-20 size-2.5 -translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white before:absolute before:-inset-1.5 before:content-[''] pointer-coarse:size-3.5 pointer-coarse:before:-inset-3"
             style={{ left: Math.max(6, larguraFadeEntrada) }}
             onPointerDown={(evento) => aoApertarAudio!(evento, "entrada", alturaInterna)}
             title={`Fade de entrada: ${(clipe.fade_entrada / TICKS_POR_SEGUNDO).toFixed(2).replace(".", ",")} s (arraste)`}
             aria-label="Fade de entrada"
           />
           <span
-            className="absolute top-0.5 z-20 size-2.5 translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white"
+            className="absolute top-0.5 z-20 size-2.5 translate-x-1/2 cursor-ew-resize rounded-full border border-black/40 bg-white before:absolute before:-inset-1.5 before:content-[''] pointer-coarse:size-3.5 pointer-coarse:before:-inset-3"
             style={{ right: Math.max(6, larguraFadeSaida) }}
             onPointerDown={(evento) => aoApertarAudio!(evento, "saida", alturaInterna)}
             title={`Fade de saída: ${(clipe.fade_saida / TICKS_POR_SEGUNDO).toFixed(2).replace(".", ",")} s (arraste)`}
@@ -1301,7 +1435,7 @@ function BlocoDoClipe({
           />
           {volumeFixo ? (
             <span
-              className="group/vol absolute inset-x-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
+              className="group/vol absolute inset-x-2 z-10 h-2 -translate-y-1/2 cursor-ns-resize pointer-coarse:h-5"
               style={{ top: (1 - alturaDoVolume(clipe.volume)) * alturaInterna }}
               onPointerDown={(evento) => aoApertarAudio!(evento, "volume", alturaInterna)}
               title={`Volume: ${textoDoVolume(clipe.volume)} (arraste para cima ou para baixo)`}
@@ -1315,16 +1449,21 @@ function BlocoDoClipe({
       ) : null}
       {selecionado && !faixa.travada && largura > 14 ? (
         <>
+          {/* No toque, a área da alça é mais larga que a barra branca (o dedo não acerta 8 px) */}
           <span
-            className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-md bg-white"
+            className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize pointer-coarse:w-6"
             onPointerDown={(evento) => aoApertar(evento, "inicio")}
             aria-label="Aparar o começo"
-          />
+          >
+            <span className="absolute inset-y-0 left-0 w-2 rounded-l-md bg-white pointer-coarse:w-3" />
+          </span>
           <span
-            className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-md bg-white"
+            className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize pointer-coarse:w-6"
             onPointerDown={(evento) => aoApertar(evento, "fim")}
             aria-label="Aparar o fim"
-          />
+          >
+            <span className="absolute inset-y-0 right-0 w-2 rounded-r-md bg-white pointer-coarse:w-3" />
+          </span>
         </>
       ) : null}
     </div>

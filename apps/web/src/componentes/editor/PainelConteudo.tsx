@@ -311,11 +311,11 @@ export function PainelConteudo({ aoFechar, className = "", style, ...props }: Pr
     <aside
       aria-label={ferramenta.nome}
       style={style}
-      className={`flex min-h-0 shrink-0 flex-col bg-painel max-md:rounded-t-2xl max-md:border-t max-md:border-borda max-md:shadow-2xl ${className}`}
+      className={`flex min-h-0 shrink-0 flex-col rounded-t-2xl border-t border-borda bg-painel shadow-2xl deitado:rounded-none deitado:rounded-l-2xl deitado:border-l deitado:border-t-0 ${className}`}
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-borda px-3">
         <h2 className="text-sm font-semibold">{ferramenta.nome}</h2>
-        <button type="button" onClick={aoFechar} className="botao-icone md:hidden" aria-label="Fechar painel">
+        <button type="button" onClick={aoFechar} className="botao-icone" aria-label="Fechar painel">
           <X className="size-4" aria-hidden />
         </button>
       </div>

@@ -22,8 +22,11 @@ const CANAIS: { id: CanalDaCurva; nome: string; cor: string }[] = [
 const LADO = 200;
 /** Distância mínima entre dois pontos, no eixo x. */
 const VAO = 0.02;
-/** Quão perto (em pixels) o clique precisa estar de um ponto para pegar nele. */
+/** Quão perto (em pixels) o clique precisa estar de um ponto para pegar nele (o dedo, mais longe). */
 const RAIO_DO_PONTO = 8;
+const RAIO_DO_PONTO_NO_TOQUE = 18;
+/** No toque, o dedo que anda mais que isso estava rolando o painel, não criando um ponto. */
+const FOLGA_DO_TOQUE = 10;
 
 const limitar = (v: number, minimo: number, maximo: number) => Math.min(maximo, Math.max(minimo, v));
 
@@ -35,6 +38,8 @@ export function EditorDeCurva({ curvas, desativado, aoPrever, aoConfirmar }: Pro
   const [canal, setCanal] = useState<CanalDaCurva>("rgb");
   const svgRef = useRef<SVGSVGElement>(null);
   const arrasto = useRef<{ indice: number; pontos: PontoDaCurva[] } | null>(null);
+  // No toque, o dedo fora dos pontos só cria um ponto ao soltar sem andar: arrastar rola o painel
+  const toqueNoVazio = useRef<{ x: number; y: number } | null>(null);
   const pontos = curvas[canal] ?? CURVA_NEUTRA;
   const corDoCanal = CANAIS.find((item) => item.id === canal)!.cor;
 
@@ -45,7 +50,8 @@ export function EditorDeCurva({ curvas, desativado, aoPrever, aoConfirmar }: Pro
   };
   const pontoPerto = (evento: React.PointerEvent | React.MouseEvent) => {
     const caixa = svgRef.current!.getBoundingClientRect();
-    return pontos.findIndex(([x, y]) => Math.hypot(x * caixa.width - (evento.clientX - caixa.left), (1 - y) * caixa.height - (evento.clientY - caixa.top)) <= RAIO_DO_PONTO);
+    const raio = "pointerType" in evento && evento.pointerType === "touch" ? RAIO_DO_PONTO_NO_TOQUE : RAIO_DO_PONTO;
+    return pontos.findIndex(([x, y]) => Math.hypot(x * caixa.width - (evento.clientX - caixa.left), (1 - y) * caixa.height - (evento.clientY - caixa.top)) <= raio);
   };
 
   /** O ponto `indice` levado para (x, y), sem passar dos vizinhos; as pontas ficam em x = 0 e x = 1. */
@@ -56,37 +62,55 @@ export function EditorDeCurva({ curvas, desativado, aoPrever, aoConfirmar }: Pro
     return novos;
   }
 
-  function apertar(evento: React.PointerEvent<SVGSVGElement>) {
+  /** Os pontos com um novo na posição (x, y), entre os vizinhos, e o lugar dele; null quando não cabe. */
+  function comPontoNovo([x, y]: [number, number]): { indice: number; base: PontoDaCurva[] } | null {
+    if (pontos.length >= PONTOS_MAXIMOS_DA_CURVA) return null;
+    const indice = pontos.findIndex((p) => p[0] > x);
+    if (indice <= 0 || x - pontos[indice - 1][0] < VAO || pontos[indice][0] - x < VAO) return null;
+    return { indice, base: [...pontos.slice(0, indice), [x, y], ...pontos.slice(indice)] };
+  }
+
+  function apertar(evento: React.PointerEvent<HTMLDivElement>) {
     if (desativado || evento.button !== 0) return;
     let indice = pontoPerto(evento);
     let base = pontos;
     if (indice < 0) {
+      if (evento.pointerType === "touch") {
+        toqueNoVazio.current = { x: evento.clientX, y: evento.clientY };
+        return;
+      }
       // Um ponto novo, na posição do clique, entre os vizinhos
-      if (pontos.length >= PONTOS_MAXIMOS_DA_CURVA) return;
-      const [x, y] = noGrafico(evento);
-      indice = pontos.findIndex((p) => p[0] > x);
-      if (indice <= 0 || x - pontos[indice - 1][0] < VAO || pontos[indice][0] - x < VAO) return;
-      base = [...pontos.slice(0, indice), [x, y], ...pontos.slice(indice)];
+      const novo = comPontoNovo(noGrafico(evento));
+      if (!novo) return;
+      ({ indice, base } = novo);
       aoPrever(comCanal(base));
     }
     arrasto.current = { indice, pontos: base };
     evento.currentTarget.setPointerCapture(evento.pointerId);
   }
 
-  function mexer(evento: React.PointerEvent<SVGSVGElement>) {
+  function mexer(evento: React.PointerEvent<HTMLDivElement>) {
+    const toque = toqueNoVazio.current;
+    if (toque && Math.hypot(evento.clientX - toque.x, evento.clientY - toque.y) > FOLGA_DO_TOQUE) toqueNoVazio.current = null;
     const atual = arrasto.current;
     if (!atual) return;
     atual.pontos = mover(atual.pontos, atual.indice, noGrafico(evento));
     aoPrever(comCanal(atual.pontos));
   }
 
-  function soltar() {
+  function soltar(evento: React.PointerEvent<HTMLDivElement>) {
+    if (toqueNoVazio.current) {
+      toqueNoVazio.current = null;
+      const novo = comPontoNovo(noGrafico(evento));
+      if (novo) aoConfirmar(comCanal(novo.base));
+      return;
+    }
     const atual = arrasto.current;
     arrasto.current = null;
     if (atual) aoConfirmar(comCanal(atual.pontos));
   }
 
-  function apagar(evento: React.MouseEvent<SVGSVGElement>) {
+  function apagar(evento: React.MouseEvent<HTMLDivElement>) {
     const indice = pontoPerto(evento);
     if (desativado || indice <= 0 || indice >= pontos.length - 1) return;
     aoConfirmar(comCanal(pontos.filter((_, i) => i !== indice)));
@@ -125,20 +149,25 @@ export function EditorDeCurva({ curvas, desativado, aoPrever, aoConfirmar }: Pro
           <RotateCcw className="size-3.5" aria-hidden />
         </button>
       </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${LADO} ${LADO}`}
-        className={`aspect-square w-full touch-none rounded-md border border-borda bg-black/40 ${desativado ? "opacity-50" : "cursor-crosshair"}`}
-        role="img"
-        aria-label={`Curva ${CANAIS.find((item) => item.id === canal)!.nome}. Clique para criar um ponto, arraste para mover, duplo clique para apagar.`}
+      {/* O gráfico deixa o dedo rolar o painel; os pontos (as rodas por cima) não: neles, o dedo arrasta */}
+      <div
+        className="relative"
         onPointerDown={apertar}
         onPointerMove={mexer}
         onPointerUp={soltar}
         onPointerCancel={() => {
+          toqueNoVazio.current = null;
           arrasto.current = null;
           aoPrever(null);
         }}
         onDoubleClick={apagar}
+      >
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${LADO} ${LADO}`}
+        className={`block aspect-square w-full touch-pan-y rounded-md border border-borda bg-black/40 ${desativado ? "opacity-50" : "cursor-crosshair"}`}
+        role="img"
+        aria-label={`Curva ${CANAIS.find((item) => item.id === canal)!.nome}. Clique para criar um ponto, arraste para mover, duplo clique para apagar.`}
       >
         {[0.25, 0.5, 0.75].map((v) => (
           <g key={v} stroke="rgba(255,255,255,0.08)">
@@ -152,6 +181,17 @@ export function EditorDeCurva({ curvas, desativado, aoPrever, aoConfirmar }: Pro
           <circle key={i} cx={x * LADO} cy={(1 - y) * LADO} r={4} fill="#111" stroke={corDoCanal} strokeWidth={2} />
         ))}
       </svg>
+      {desativado
+        ? null
+        : pontos.map(([x, y], i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="absolute size-4 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full pointer-coarse:size-9"
+              style={{ left: `${x * 100}%`, top: `${(1 - y) * 100}%` }}
+            />
+          ))}
+      </div>
     </div>
   );
 }
