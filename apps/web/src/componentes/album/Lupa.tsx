@@ -17,6 +17,7 @@ import {
   resumoDaCamera,
 } from "@/lib/album/fotos";
 import { arquivoDaFoto, mudaOEnquadramento, tamanhoExibido } from "@/lib/album/edicao";
+import type { TracoDoRetoque } from "@/lib/album/retoque";
 import { arquivoDaMidia } from "@/lib/api";
 
 const ZOOM_MAXIMO = 4;
@@ -43,6 +44,9 @@ export function Lupa({
   aoIr,
   aoAplicar,
   proxima,
+  retocando = false,
+  aoSalvarPincel,
+  aoSairDoPincel,
 }: {
   albumId: string;
   foto: FotoDoAlbum;
@@ -55,6 +59,10 @@ export function Lupa({
   aoIr: (midiaId: string) => void;
   aoAplicar: (mudanca: Mudanca) => void;
   proxima?: FotoDoAlbum;
+  /** O pincel do retoque: pinta na foto original o que é pele (incluir) e o que não se retoca (excluir). */
+  retocando?: boolean;
+  aoSalvarPincel?: (tracos: TracoDoRetoque[]) => void;
+  aoSairDoPincel?: () => void;
 }) {
   const raiz = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
@@ -74,7 +82,20 @@ export function Lupa({
   // Antes e depois (\ ou o botão): a original, sem a edição
   const [antes, setAntes] = useState(false);
   const editada = Boolean(foto.edicao?.gerada);
-  const mostrandoAntes = antes && editada;
+  const mostrandoAntes = (antes || retocando) && editada;
+  const [tracos, setTracos] = useState<TracoDoRetoque[]>(() => foto.edicao?.retoque?.pincel ?? []);
+  const [modoDoPincel, setModoDoPincel] = useState<"incluir" | "excluir">("incluir");
+  const [raioDoPincel, setRaioDoPincel] = useState(0.025);
+  const imagem = useRef<HTMLDivElement>(null);
+  const pintando = useRef(false);
+  /** O ponto do ponteiro em frações da foto original. */
+  const naFoto = (evento: React.PointerEvent): [number, number] | null => {
+    const caixa = imagem.current?.getBoundingClientRect();
+    if (!caixa) return null;
+    const x = (evento.clientX - caixa.left) / caixa.width;
+    const y = (evento.clientY - caixa.top) / caixa.height;
+    return [Math.round(Math.min(1, Math.max(0, x)) * 10000) / 10000, Math.round(Math.min(1, Math.max(0, y)) * 10000) / 10000];
+  };
   const [largura, altura] = mostrandoAntes ? [foto.largura ?? 1, foto.altura ?? 1] : tamanhoExibido(foto);
   const [tamanhoDaArea, setTamanhoDaArea] = useState({ largura: 0, altura: 0 });
   useEffect(() => {
@@ -234,13 +255,34 @@ export function Lupa({
       <div className="flex min-h-0 flex-1">
         <div
           ref={area}
-          className={`relative min-w-0 flex-1 touch-none overflow-hidden select-none ${zoom ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"}`}
+          className={`relative min-w-0 flex-1 touch-none overflow-hidden select-none ${retocando ? "cursor-crosshair" : zoom ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"}`}
           onPointerDown={(evento) => {
             if (evento.button !== 0) return;
+            if (retocando) {
+              const ponto = naFoto(evento);
+              if (!ponto || tracos.length >= 200) return;
+              pintando.current = true;
+              const modo = evento.altKey ? (modoDoPincel === "incluir" ? "excluir" : "incluir") : modoDoPincel;
+              setTracos((lista) => [...lista, { modo, raio: raioDoPincel, pontos: [ponto] }]);
+              evento.currentTarget.setPointerCapture(evento.pointerId);
+              return;
+            }
             arrasto.current = { x: evento.clientX, y: evento.clientY, zx: zoom?.x ?? 0, zy: zoom?.y ?? 0, moveu: false };
             evento.currentTarget.setPointerCapture(evento.pointerId);
           }}
           onPointerMove={(evento) => {
+            if (retocando) {
+              const ponto = pintando.current ? naFoto(evento) : null;
+              if (ponto)
+                setTracos((lista) => {
+                  const ultimo = lista[lista.length - 1];
+                  const [px, py] = ultimo.pontos[ultimo.pontos.length - 1];
+                  // Um ponto a cada pedaço de um terço do raio (o traço fica leve)
+                  if (Math.hypot(ponto[0] - px, ponto[1] - py) < ultimo.raio / 3 || ultimo.pontos.length >= 600) return lista;
+                  return [...lista.slice(0, -1), { ...ultimo, pontos: [...ultimo.pontos, ponto] }];
+                });
+              return;
+            }
             const a = arrasto.current;
             if (!a) return;
             const dx = evento.clientX - a.x;
@@ -249,6 +291,10 @@ export function Lupa({
             if (zoom && a.moveu) setZoom({ ...zoom, x: a.zx + dx, y: a.zy + dy });
           }}
           onPointerUp={(evento) => {
+            if (retocando) {
+              pintando.current = false;
+              return;
+            }
             const a = arrasto.current;
             arrasto.current = null;
             if (!a || a.moveu) return;
@@ -262,6 +308,7 @@ export function Lupa({
         >
           {foto.status === "pronta" ? (
             <div
+              ref={imagem}
               className="absolute left-1/2 top-1/2"
               style={{
                 width: exibida.largura,
@@ -274,7 +321,22 @@ export function Lupa({
               {/* eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie */}
               <img key={`${foto.midia_id}-${arquivo}`} src={arquivoDaMidia(foto.midia_id, arquivo)} alt={foto.nome} draggable={false} className="size-full" />
               <CaixasDosRostos foto={foto} visiveis={rostosVisiveis && caixasNoLugar} emFoco={rostoEmFoco} />
-              {mostrandoAntes ? <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs">Antes</span> : null}
+              {mostrandoAntes && !retocando ? <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs">Antes</span> : null}
+              {retocando ? (
+                <svg className="pointer-events-none absolute inset-0 size-full" viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" aria-hidden>
+                  {tracos.map((t, i) => (
+                    <polyline
+                      key={i}
+                      points={t.pontos.map(([x, y]) => `${x * largura},${y * altura}`).join(" ")}
+                      fill="none"
+                      stroke={t.modo === "incluir" ? "rgba(40,200,120,0.45)" : "rgba(240,70,70,0.45)"}
+                      strokeWidth={2 * t.raio * Math.min(largura, altura)}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))}
+                </svg>
+              ) : null}
             </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -368,6 +430,39 @@ export function Lupa({
         </div>
       ) : null}
 
+      {retocando ? (
+        <div className="flex h-14 shrink-0 flex-wrap items-center justify-center gap-3 text-xs" role="toolbar" aria-label="Pincel do retoque">
+          <span className="flex rounded-md bg-white/10 p-0.5">
+            {(
+              [
+                ["incluir", "É pele"],
+                ["excluir", "Não retocar"],
+              ] as const
+            ).map(([id, nome]) => (
+              <button key={id} type="button" aria-pressed={modoDoPincel === id} onClick={() => setModoDoPincel(id)} className={`rounded px-2.5 py-1 ${modoDoPincel === id ? (id === "incluir" ? "bg-sucesso" : "bg-erro") : "hover:bg-white/10"}`}>
+                {nome}
+              </button>
+            ))}
+          </span>
+          <label className="flex items-center gap-1.5">
+            Tamanho
+            <input type="range" min={0.005} max={0.1} step={0.005} value={raioDoPincel} onChange={(evento) => setRaioDoPincel(Number(evento.target.value))} className="w-24 accent-[var(--to-destaque)]" aria-label="Tamanho do pincel" />
+          </label>
+          <button type="button" className="rounded-md bg-white/10 px-2.5 py-1 hover:bg-white/20 disabled:opacity-40" onClick={() => setTracos((l) => l.slice(0, -1))} disabled={!tracos.length}>
+            Desfazer
+          </button>
+          <button type="button" className="rounded-md bg-white/10 px-2.5 py-1 hover:bg-white/20 disabled:opacity-40" onClick={() => setTracos([])} disabled={!tracos.length}>
+            Limpar
+          </button>
+          <button type="button" className="rounded-md px-2.5 py-1 hover:bg-white/10" onClick={aoSairDoPincel}>
+            Cancelar
+          </button>
+          <button type="button" className="botao-principal px-3 py-1" onClick={() => aoSalvarPincel?.(tracos)}>
+            Salvar o pincel
+          </button>
+          <span className="text-white/50">Alt troca entre os dois</span>
+        </div>
+      ) : (
       <div className="flex h-14 shrink-0 items-center justify-center gap-5">
         <Estrelas nota={foto.nota} aoMudar={(nota) => aoAplicar({ nota })} tamanho="size-5" />
         <span className="flex gap-2">
@@ -400,6 +495,7 @@ export function Lupa({
           </button>
         </span>
       </div>
+      )}
     </div>
   );
 }

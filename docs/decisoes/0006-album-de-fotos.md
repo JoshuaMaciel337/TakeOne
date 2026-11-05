@@ -70,9 +70,9 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
    gradient boosting que prevê a diferença sobre o "Melhorar". Como o estilo só gera valores da aba Cor, a prévia e a
    exportação continuam saindo da mesma LUT 3D. Por cima do que o modelo prevê, cada controle tem correção, fixo ou
    desligado, e o estilo tem uma intensidade geral (que o AfterShoot não tem).
-5. **O retoque é quase todo conta, sobre um mapa do rosto e do corpo.** Os pontos do Face Landmarker e as regiões do
-   MediaPipe Selfie Multiclass (Apache-2.0: cabelo, pele do rosto, pele do corpo, roupa) viram máscaras por foto,
-   guardadas como as de hoje. Pele (separação de frequências com o filtro guiado), manchas (diferença de gaussianas e
+5. **O retoque é quase todo conta, sobre um mapa do rosto e do corpo.** Os pontos do Face Landmarker viram as
+   máscaras do rosto; a pele do corpo é a cor da pele do rosto dentro da pessoa do MODNet, e a roupa, o resto da
+   pessoa abaixo do queixo (o Selfie Multiclass do plano usa uma operação que o OpenCV não lê; veja o CLAUDE.md). Pele (separação de frequências com o filtro guiado), manchas (diferença de gaussianas e
    Poisson, LaMa nas maiores), rugas e olheiras (média frequência nas regiões dos pontos), olhos e dentes (Lab nas
    regiões) e brilho são contas que o editor de imagem já tem em pedaços. Cada controle de 0 a 100 é um campo do clipe,
    e a prévia e a exportação saem do mesmo resultado, medido em números como sempre.
@@ -113,7 +113,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
   parecidas.
 - [x] 16.7 Estilo pessoal: os pares das fotos editadas no TakeOne e de XMP, os vizinhos mais parecidos e depois o
   gradient boosting, treinados no worker, com "ensinar a correção" ao corrigir uma foto.
-- [ ] 16.8 Retoque de retrato: o mapa do rosto e do corpo e os controles (pele, manchas, sardas, rugas, olheiras,
+- [x] 16.8 Retoque de retrato: o mapa do rosto e do corpo e os controles (pele, manchas, sardas, rugas, olheiras,
   olhos, dentes, brilho, uniformizar e contornar, pescoço, roupa), por pessoa, com o pincel de incluir e excluir,
   predefinições e lote.
 - [ ] 16.9 Mais IA: achar e apagar distrações (um detector aberto de vocabulário livre com o MobileSAM e o LaMa,

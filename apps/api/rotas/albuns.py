@@ -317,7 +317,7 @@ async def editar_fotos(album_id: str, dados: EdicoesEntrada, usuario=Depends(usu
         filtro = {"album_id": album["_id"], "midia_id": midia_id}
         edicao = item.edicao.model_dump(exclude_none=True) if item.edicao else None
         if edicao and not edicao.get("cor") and not edicao.get("igualar") and not edicao.get("giro") \
-                and not edicao.get("recorte") and not edicao.get("auto"):
+                and not edicao.get("recorte") and not edicao.get("auto") and not edicao.get("retoque"):
             edicao = None
         if edicao is None:
             operacoes.append(UpdateOne({**filtro, "edicao": {"$ne": None}},

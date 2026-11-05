@@ -88,9 +88,13 @@ def atualizar_pessoas(db, album_id: ObjectId) -> int:
     antigas = {p["numero"]: p for p in db.album_pessoas.find({"album_id": album_id})}
     pessoas = agrupar(rostos, [(n, np.frombuffer(bytes(p["centro"]), np.float32)) for n, p in antigas.items()])
     por_foto: dict[str, list[int]] = {}
+    # A pessoa de cada rosto da foto, na ordem dos rostos medidos (None: rosto pequeno ou sem vetor)
+    por_rosto: dict[str, dict[int, int]] = {}
     for pessoa in pessoas:
         for midia in pessoa.fotos:
             por_foto.setdefault(midia, []).append(pessoa.numero)
+        for rosto in pessoa.rostos:
+            por_rosto.setdefault(rosto.midia_id, {})[rosto.indice] = pessoa.numero
         capa = pessoa.capa
         db.album_pessoas.update_one({"album_id": album_id, "numero": pessoa.numero}, {"$set": {
             "nome": antigas.get(pessoa.numero, {}).get("nome", ""), "fotos": len(pessoa.fotos),
@@ -101,7 +105,10 @@ def atualizar_pessoas(db, album_id: ObjectId) -> int:
     vivas = [p.numero for p in pessoas]
     db.album_pessoas.delete_many({"album_id": album_id, "numero": {"$nin": vivas}, "nome": ""})
     db.album_pessoas.update_many({"album_id": album_id, "numero": {"$nin": vivas}}, {"$set": {"fotos": 0}})
-    db.album_fotos.update_many({"album_id": album_id}, {"$set": {"pessoas": []}})
+    db.album_fotos.update_many({"album_id": album_id}, {"$set": {"pessoas": [], "pessoas_por_rosto": []}})
     for midia, numeros in por_foto.items():
-        db.album_fotos.update_one({"album_id": album_id, "midia_id": ObjectId(midia)}, {"$set": {"pessoas": numeros}})
+        rostos = por_rosto.get(midia, {})
+        lista = [rostos.get(i) for i in range(max(rostos, default=-1) + 1)]
+        db.album_fotos.update_one({"album_id": album_id, "midia_id": ObjectId(midia)},
+                                  {"$set": {"pessoas": numeros, "pessoas_por_rosto": lista}})
     return len(pessoas)

@@ -3,6 +3,7 @@
 // (core/utils/edicao_de_foto.py): a grade e a lupa mostram a capa e a cópia leve que ele grava.
 import type { Cor } from "../projeto/cor.ts";
 import type { Estatisticas } from "../projeto/igualarCor.ts";
+import { type Retoque, retoqueVazio } from "./retoque.ts";
 
 export type RecorteDaFoto = { x: number; y: number; largura: number; altura: number };
 export type Proporcao = "1:1" | "4:5" | "5:4" | "2:3" | "3:2" | "9:16" | "16:9";
@@ -16,6 +17,8 @@ export type EdicaoDaFoto = {
   recorte?: RecorteDaFoto | null;
   /** Endireitar e recortar sozinho, quando o worker desenhar. */
   auto?: { endireitar?: boolean; proporcao?: Proporcao | null } | null;
+  /** O retoque de retrato (lib/album/retoque.ts), antes da cor. */
+  retoque?: Retoque | null;
 };
 
 /** Como o servidor guarda: a versão (sobe a cada mudança), a última desenhada e o tamanho da cópia leve editada. */
@@ -40,6 +43,7 @@ export function edicaoParaEnviar(edicao: EdicaoGuardada | EdicaoDaFoto | null | 
   if (edicao.giro) saida.giro = edicao.giro;
   if (edicao.recorte) saida.recorte = edicao.recorte;
   if (edicao.auto) saida.auto = edicao.auto;
+  if (edicao.retoque && !retoqueVazio(edicao.retoque)) saida.retoque = edicao.retoque;
   return saida;
 }
 
@@ -53,7 +57,7 @@ export function comCor(edicao: EdicaoGuardada | EdicaoDaFoto | null | undefined,
 export function semNada(edicao: EdicaoDaFoto): boolean {
   const cor = edicao.cor ?? {};
   const corNeutra = Object.entries(cor).every(([chave, valor]) => (chave === "intensidade" ? true : !valor));
-  return corNeutra && !edicao.igualar && !edicao.giro && !edicao.recorte && !edicao.auto;
+  return corNeutra && !edicao.igualar && !edicao.giro && !edicao.recorte && !edicao.auto && retoqueVazio(edicao.retoque);
 }
 
 type FotoComEdicao = { midia_id: string; largura: number | null; altura: number | null; edicao?: EdicaoGuardada | null };

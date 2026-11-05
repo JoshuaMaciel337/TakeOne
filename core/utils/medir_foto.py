@@ -112,16 +112,35 @@ def _recorte_do_rosto(imagem, achado):
     return corte, cv2.invertAffineTransform(m)
 
 
-def _expressoes(imagem, achado, modelos: Modelos) -> dict:
-    """Os olhos, o sorriso, o olhar e o giro da cabeça de um rosto, pelos pontos e pelas expressões."""
+def pontos_do_rosto(imagem, achado, modelos: Modelos) -> tuple[np.ndarray, np.ndarray]:
+    """Os 478 pontos de um rosto: no recorte em pé (256 × 256) e na foto, em pixels."""
     import cv2
 
     corte, volta = _recorte_do_rosto(imagem, achado)
     modelos.pontos.setInput(cv2.dnn.blobFromImage(corte, 1 / 255.0, (256, 256), swapRB=True))
     saidas = modelos.pontos.forward(modelos.pontos.getUnconnectedOutLayersNames())
     no_corte = [s for s in saidas if s.size == 478 * 3][0].reshape(478, 3)[:, :2]
+    return no_corte, no_corte @ volta[:, :2].T + volta[:, 2]
+
+
+def achar_rostos(imagem, modelos: Modelos) -> list:
+    """Os rostos do YuNet (as linhas de 15 números), do maior para o menor, sem os pequenos demais."""
+    import cv2
+
+    if modelos.rosto is None:
+        return []
+    h, w = imagem.shape[:2]
+    detector = cv2.FaceDetectorYN.create(modelos.rosto, "", (w, h), CONFIANCA_DO_ROSTO)
+    _, achados = detector.detect(imagem)
+    if achados is None:
+        return []
+    return [a for a in sorted(achados, key=lambda a: -a[2] * a[3])[:ROSTOS_MAXIMOS] if a[2] >= 12 and a[3] >= 12]
+
+
+def _expressoes(imagem, achado, modelos: Modelos) -> dict:
+    """Os olhos, o sorriso, o olhar e o giro da cabeça de um rosto, pelos pontos e pelas expressões."""
     # As expressões usam os pontos do rosto em pé (como no recorte); o giro da cabeça, os da foto
-    pontos = no_corte @ volta[:, :2].T + volta[:, 2]
+    no_corte, pontos = pontos_do_rosto(imagem, achado, modelos)
     medidas: dict = {}
     # O giro da cabeça pelos pontos: a ponta do nariz entre as maçãs do rosto (de lado) e entre os olhos e a boca
     nariz, esq, dir_ = pontos[1], pontos[234], pontos[454]

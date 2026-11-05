@@ -3177,8 +3177,35 @@ class ParecidaSaida(BaseModel):
     semelhanca: float
 
 
+class TracoDoRetoqueEntrada(BaseModel):
+    """Um traço do pincel do retoque: incluir (vira pele) ou excluir (sai de tudo), o raio em fração do lado menor
+    e os pontos em frações da foto original."""
+    modo: Literal["incluir", "excluir"]
+    raio: float = Field(default=0.02, gt=0, le=0.25)
+    pontos: list[tuple[float, float]] = Field(min_length=1, max_length=600)
+
+
+class RetoqueEntrada(BaseModel):
+    """O retoque de retrato (core/utils/retoque.py): cada controle de 0 a 100, as pessoas (vazio: todas) e o pincel."""
+    pele: float = Field(default=0, ge=0, le=100)
+    manchas: float = Field(default=0, ge=0, le=100)
+    sardas: float = Field(default=0, ge=0, le=100)
+    rugas: float = Field(default=0, ge=0, le=100)
+    olheiras: float = Field(default=0, ge=0, le=100)
+    olhos: float = Field(default=0, ge=0, le=100)
+    dentes: float = Field(default=0, ge=0, le=100)
+    brilho: float = Field(default=0, ge=0, le=100)
+    uniformizar: float = Field(default=0, ge=0, le=100)
+    contornar: float = Field(default=0, ge=0, le=100)
+    pescoco: float = Field(default=0, ge=0, le=100)
+    roupa: float = Field(default=0, ge=0, le=100)
+    pessoas: list[int] = Field(default_factory=list, max_length=50)
+    pincel: list[TracoDoRetoqueEntrada] = Field(default_factory=list, max_length=200)
+
+
 class EdicaoDaFotoEntrada(BaseModel):
     cor: CorEntrada | None = None
+    retoque: RetoqueEntrada | None = None
     igualar: IgualarEntrada | None = None
     giro: float = Field(default=0, ge=-45, le=45)
     recorte: RecorteDaFotoEntrada | None = None

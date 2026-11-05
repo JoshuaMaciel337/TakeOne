@@ -28,12 +28,13 @@ import { JanelaDeEstilos } from "@/componentes/album/JanelaDeEstilos";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
 import { Lupa } from "@/componentes/album/Lupa";
 import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
+import { PainelDeRetoque } from "@/componentes/album/PainelDeRetoque";
 import { PainelEstiloPessoal } from "@/componentes/album/PainelEstiloPessoal";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { analisarAlbum, editarFotos, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
 import type { OpcoesDaEscolha } from "@/lib/album/api";
-import { arquivoDaFoto, type EdicaoDaFoto, editandoAgora } from "@/lib/album/edicao";
+import { arquivoDaFoto, type EdicaoDaFoto, edicaoParaEnviar, editandoAgora } from "@/lib/album/edicao";
 import {
   type Album as TipoAlbum,
   aplicarMudanca,
@@ -258,6 +259,8 @@ export function Album({ albumId }: { albumId: string }) {
   const [comparando, setComparando] = useState<string[] | null>(null);
   const [pincel, setPincel] = useState<Mudanca | null>(null);
   const [estilando, setEstilando] = useState(false);
+  // O pincel do retoque na lupa da foto do cursor
+  const [retocando, setRetocando] = useState(false);
   const [escolhendo, setEscolhendo] = useState(false);
   const [ocupado, setOcupado] = useState("");
 
@@ -777,6 +780,16 @@ export function Album({ albumId }: { albumId: string }) {
                 grupoDa={(foto) => grupoDaFoto(fotos, foto)}
                 aoEditar={editarAsFotos}
               />
+              <PainelDeRetoque
+                alvos={alvosDaGaveta}
+                referencia={fotoDoCursor}
+                pessoas={pessoas}
+                aoEditar={editarAsFotos}
+                aoPincel={() => {
+                  setRetocando(true);
+                  setLupa(true);
+                }}
+              />
               <PainelEstiloPessoal
                 albumId={albumId}
                 alvos={alvosDaGaveta}
@@ -864,7 +877,15 @@ export function Album({ albumId }: { albumId: string }) {
 
       {lupa && fotoDoCursor ? (
         <Lupa
+          key={retocando ? `pincel-${fotoDoCursor.midia_id}` : "lupa"}
           albumId={albumId}
+          retocando={retocando}
+          aoSairDoPincel={() => setRetocando(false)}
+          aoSalvarPincel={(tracos) => {
+            setRetocando(false);
+            const base = edicaoParaEnviar(fotoDoCursor.edicao);
+            void editarAsFotos([{ midia_id: fotoDoCursor.midia_id, edicao: { ...base, retoque: { ...(base.retoque ?? {}), pincel: tracos } } }], `Pincel do retoque salvo (${tracos.length} traço(s)).`);
+          }}
           foto={fotoDoCursor}
           fotos={fotos}
           pessoas={pessoas}
@@ -874,7 +895,10 @@ export function Album({ albumId }: { albumId: string }) {
           }}
           indice={indiceDoCursor}
           total={visiveis.length}
-          aoFechar={() => setLupa(false)}
+          aoFechar={() => {
+            setLupa(false);
+            setRetocando(false);
+          }}
           aoAndar={(passo) => mover(passo, false)}
           aoAplicar={(mudanca) => aplicar(mudanca, [fotoDoCursor.midia_id])}
           proxima={visiveis[indiceDoCursor + 1]}

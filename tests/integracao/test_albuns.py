@@ -325,14 +325,16 @@ def test_editar_as_fotos_desenha_a_capa_e_a_copia_leve(cliente, db_limpo):
     # O recorte automático quadrado saiu, e o desenho é quadrado
     quadrada = fotos[ids[1]]["edicao"]
     assert quadrada["recorte"]["largura"] < 1 and "auto" not in quadrada and quadrada["largura"] == quadrada["altura"]
-    # Uma edição nova apaga a versão de antes; tirar a edição apaga tudo
-    cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": {"cor": {"exposicao": -1}}}]})
-    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
+    # Uma edição nova guarda a versão que a grade mostrava (até a próxima) e apaga as mais velhas; tirar apaga tudo
+    for exposicao in (-1, -0.5):
+        cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": {"cor": {"exposicao": exposicao}}}]})
+        processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
     assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_2_capa.jpg").status_code == 404
     assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_3_capa.jpg").status_code == 200
+    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_4_capa.jpg").status_code == 200
     cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": None}]})
     processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
-    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_3_capa.jpg").status_code == 404
+    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_4_capa.jpg").status_code == 404
     assert cliente.get(f"/api/albuns/{album['id']}/fotos").json()[0]["edicao"] is None
 
 
@@ -389,3 +391,20 @@ def test_estilo_pessoal_aprende_com_as_editadas_e_com_o_xmp(cliente, db_limpo, t
     assert len(cliente.get(f"{url}/parecidas", params={"midia_id": enviadas[1]}).json()) == 2
     assert cliente.delete(url).status_code == 204
     assert db_limpo.estilo_pessoal_pares.count_documents({}) == 0
+
+
+def test_retoque_entra_na_edicao(cliente, db_limpo):
+    album = cliente.post("/api/albuns", json={"nome": "Retoque"}).json()
+    midia = enviar_foto(cliente, album["id"], "IMG_1.jpg", _jpeg((150, 110, 90)))
+    ingerir_tudo(db_limpo)
+    caminho = f"/api/albuns/{album['id']}/edicoes"
+    retoque = {"pele": 60, "manchas": 80, "pessoas": [2], "pincel": [{"modo": "excluir", "raio": 0.03,
+                                                                       "pontos": [[0.2, 0.2], [0.3, 0.25]]}]}
+    assert cliente.put(caminho, json={"edicoes": [{"midia_id": midia, "edicao": {"retoque": retoque}}]}).status_code \
+        == 202
+    assert processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste") == "concluido"
+    edicao = cliente.get(f"/api/albuns/{album['id']}/fotos").json()[0]["edicao"]
+    assert edicao["retoque"]["pele"] == 60 and edicao["retoque"]["pincel"][0]["modo"] == "excluir"
+    assert edicao["gerada"] == edicao["versao"]
+    ruim = {"retoque": {"pele": 120}}
+    assert cliente.put(caminho, json={"edicoes": [{"midia_id": midia, "edicao": ruim}]}).status_code == 422
