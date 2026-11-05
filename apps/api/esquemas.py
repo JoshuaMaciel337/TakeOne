@@ -3088,6 +3088,51 @@ class FotoDoAlbumSaida(BaseModel):
     motivo: str | None = None
     # Os números das pessoas que aparecem na foto (core/modelos/pessoas.py)
     pessoas: list[int] = []
+    # A edição da foto no álbum (core/utils/edicao_de_foto.py), com a versão e a última desenhada (gerada)
+    edicao: dict | None = None
+
+
+class EstatisticasDaCorEntrada(BaseModel):
+    media: list[float] = Field(min_length=3, max_length=3)
+    desvio: list[float] = Field(min_length=3, max_length=3)
+
+
+class IgualarEntrada(BaseModel):
+    """Igualar a cor (lib/projeto/igualarCor.ts): as medidas da foto e as da referência."""
+    alvo: EstatisticasDaCorEntrada
+    referencia: EstatisticasDaCorEntrada
+
+
+class RecorteDaFotoEntrada(BaseModel):
+    """Em frações da foto já girada."""
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    largura: float = Field(gt=0.02, le=1)
+    altura: float = Field(gt=0.02, le=1)
+
+
+class EnquadrarEntrada(BaseModel):
+    """Endireitar e recortar sozinho, quando a edição for desenhada."""
+    endireitar: bool = False
+    proporcao: Literal["1:1", "4:5", "5:4", "2:3", "3:2", "9:16", "16:9"] | None = None
+
+
+class EdicaoDaFotoEntrada(BaseModel):
+    cor: CorEntrada | None = None
+    igualar: IgualarEntrada | None = None
+    giro: float = Field(default=0, ge=-45, le=45)
+    recorte: RecorteDaFotoEntrada | None = None
+    auto: EnquadrarEntrada | None = None
+
+
+class EdicaoDeUmaFotoEntrada(BaseModel):
+    midia_id: IdDeMidia
+    # None tira a edição
+    edicao: EdicaoDaFotoEntrada | None
+
+
+class EdicoesEntrada(BaseModel):
+    edicoes: list[EdicaoDeUmaFotoEntrada] = Field(min_length=1, max_length=20_000)
 
 
 class PessoaDoAlbumSaida(BaseModel):

@@ -6,6 +6,7 @@ from worker.tarefas.animacao_html import executar_animacao_html, marcar_animacao
 from worker.tarefas.batidas import executar_batidas, marcar_batidas_com_erro
 from worker.tarefas.clipagem import executar_clipagem, marcar_clipagem_com_erro
 from worker.tarefas.direcao import executar_direcao
+from worker.tarefas.editar_album import executar_editar_album
 from worker.tarefas.emojis import executar_emojis
 from worker.tarefas.esconder_objeto import executar_esconder_objeto
 from worker.tarefas.esconder_objeto import marcar_com_erro as marcar_objeto_escondido_com_erro
@@ -67,6 +68,7 @@ REGISTRO = {
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
     "importar_pasta": Tarefa(executar_importar_pasta),
     "medir_album": Tarefa(executar_medir_album),
+    "editar_album": Tarefa(executar_editar_album),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
     "clipagem": Tarefa(executar_clipagem, ao_falhar=marcar_clipagem_com_erro),
     "montagem": Tarefa(executar_montagem, ao_falhar=marcar_montagem_com_erro),

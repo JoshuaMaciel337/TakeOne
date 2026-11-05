@@ -26,6 +26,8 @@ TAREFAS = {
     "importar_pasta": RECURSO_CPU,
     # As medidas de cada foto do álbum: foco, exposição, rostos, olhos, sorriso e o vetor (onda 16.2)
     "medir_album": RECURSO_CPU,
+    # A capa e a cópia leve editadas das fotos do álbum (onda 16.5)
+    "editar_album": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,

@@ -16,6 +16,7 @@ import {
   recorteDoRosto,
   resumoDaCamera,
 } from "@/lib/album/fotos";
+import { arquivoDaFoto, mudaOEnquadramento, tamanhoExibido } from "@/lib/album/edicao";
 import { arquivoDaMidia } from "@/lib/api";
 
 const ZOOM_MAXIMO = 4;
@@ -31,6 +32,7 @@ type Zoom = { escala: number; x: number; y: number } | null;
  * olhos e o foco de cada um.
  */
 export function Lupa({
+  albumId,
   foto,
   fotos,
   pessoas,
@@ -42,6 +44,7 @@ export function Lupa({
   aoAplicar,
   proxima,
 }: {
+  albumId: string;
   foto: FotoDoAlbum;
   fotos: FotoDoAlbum[];
   pessoas: PessoaDoAlbum[];
@@ -51,7 +54,7 @@ export function Lupa({
   aoAndar: (passo: number) => void;
   aoIr: (midiaId: string) => void;
   aoAplicar: (mudanca: Mudanca) => void;
-  proxima?: string;
+  proxima?: FotoDoAlbum;
 }) {
   const raiz = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
@@ -68,8 +71,11 @@ export function Lupa({
     setRostoEmFoco(null);
   }
 
-  const largura = foto.largura ?? 1;
-  const altura = foto.altura ?? 1;
+  // Antes e depois (\ ou o botão): a original, sem a edição
+  const [antes, setAntes] = useState(false);
+  const editada = Boolean(foto.edicao?.gerada);
+  const mostrandoAntes = antes && editada;
+  const [largura, altura] = mostrandoAntes ? [foto.largura ?? 1, foto.altura ?? 1] : tamanhoExibido(foto);
   const [tamanhoDaArea, setTamanhoDaArea] = useState({ largura: 0, altura: 0 });
   useEffect(() => {
     const elemento = area.current;
@@ -126,6 +132,9 @@ export function Lupa({
       } else if (letra === "r") {
         evento.preventDefault();
         setRostosVisiveis((v) => !v);
+      } else if (evento.key === "\\") {
+        evento.preventDefault();
+        setAntes((a) => !a);
       }
     };
     window.addEventListener("keydown", tecla);
@@ -158,7 +167,11 @@ export function Lupa({
   const escala = zoom?.escala ?? null;
   const exibida = { largura: largura * (escala ?? caber), altura: altura * (escala ?? caber) };
   // Acima da cópia leve (1920 px no lado maior), o zoom lê a imagem de resolução cheia
-  const arquivo = escala && Math.max(largura, altura) * escala > Math.min(Math.max(largura, altura), 1920) * 1.05 ? "imagem.png" : "proxy.webp";
+  // A cópia leve editada não tem versão de resolução cheia: o zoom fica nela
+  const leve = mostrandoAntes ? "proxy.webp" : arquivoDaFoto(foto, albumId, "proxy");
+  const arquivo = escala && !(editada && !mostrandoAntes) && Math.max(largura, altura) * escala > Math.min(Math.max(largura, altura), 1920) * 1.05 ? "imagem.png" : leve;
+  // Os rostos foram medidos na original: com giro ou recorte, as caixas não caem no lugar
+  const caixasNoLugar = mostrandoAntes || !mudaOEnquadramento(foto);
 
   return (
     <div ref={raiz} className="fixed inset-0 z-40 flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label={`Foto ${foto.nome}`}>
@@ -187,6 +200,17 @@ export function Lupa({
           <ZoomIn className="size-4" aria-hidden />
           {escala ? `${Math.round(escala * 100)}%` : "Caber"}
         </button>
+        {editada ? (
+          <button
+            type="button"
+            className={`flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-white/10 ${mostrandoAntes ? "bg-white/15" : ""}`}
+            onClick={() => setAntes((a) => !a)}
+            aria-pressed={mostrandoAntes}
+            title="Antes e depois da edição (\)"
+          >
+            {mostrandoAntes ? "Antes" : "Depois"}
+          </button>
+        ) : null}
         {rostos.length ? (
           <button
             type="button"
@@ -243,13 +267,14 @@ export function Lupa({
                 width: exibida.largura,
                 height: exibida.altura,
                 transform: `translate(calc(-50% + ${zoom?.x ?? 0}px), calc(-50% + ${zoom?.y ?? 0}px))`,
-                backgroundImage: `url(${arquivoDaMidia(foto.midia_id, "proxy.webp")})`,
+                backgroundImage: `url(${arquivoDaMidia(foto.midia_id, leve)})`,
                 backgroundSize: "100% 100%",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie */}
               <img key={`${foto.midia_id}-${arquivo}`} src={arquivoDaMidia(foto.midia_id, arquivo)} alt={foto.nome} draggable={false} className="size-full" />
-              <CaixasDosRostos foto={foto} visiveis={rostosVisiveis} emFoco={rostoEmFoco} />
+              <CaixasDosRostos foto={foto} visiveis={rostosVisiveis && caixasNoLugar} emFoco={rostoEmFoco} />
+              {mostrandoAntes ? <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs">Antes</span> : null}
             </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -258,7 +283,7 @@ export function Lupa({
           )}
           {proxima ? (
             // eslint-disable-next-line @next/next/no-img-element -- pré-carga da próxima
-            <img src={arquivoDaMidia(proxima, "proxy.webp")} alt="" className="hidden" aria-hidden />
+            <img src={arquivoDaMidia(proxima.midia_id, arquivoDaFoto(proxima, albumId, "proxy"))} alt="" className="hidden" aria-hidden />
           ) : null}
           <button
             type="button"
@@ -298,7 +323,7 @@ export function Lupa({
                 >
                   <span
                     className="size-14 shrink-0 rounded bg-white/5 bg-no-repeat"
-                    style={{ backgroundImage: `url(${arquivoDaMidia(foto.midia_id, "proxy.webp")})`, ...recorteDoRosto(rosto.caixa, largura, altura) }}
+                    style={{ backgroundImage: `url(${arquivoDaMidia(foto.midia_id, "proxy.webp")})`, ...recorteDoRosto(rosto.caixa, foto.largura ?? 1, foto.altura ?? 1) }}
                     aria-hidden
                   />
                   <span className="flex min-w-0 flex-col gap-0.5 text-[11px]">
@@ -331,7 +356,7 @@ export function Lupa({
               className={`relative h-16 w-24 shrink-0 overflow-hidden rounded ${f.midia_id === foto.midia_id ? "ring-2 ring-white" : "opacity-70 hover:opacity-100"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie */}
-              <img src={arquivoDaMidia(f.midia_id, "capa.jpg")} alt="" className="size-full object-cover" />
+              <img src={arquivoDaMidia(f.midia_id, arquivoDaFoto(f, albumId, "capa"))} alt="" className="size-full object-cover" />
               {f.categoria ? <span className={`absolute inset-x-0 top-0 h-1 ${CLASSE_DA_CATEGORIA[f.categoria]}`} /> : null}
               {f.marcacao === "escolhida" ? (
                 <span className="absolute left-0.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-sucesso">

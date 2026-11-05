@@ -1,6 +1,8 @@
 // O álbum de fotos (onda 16, docs/decisoes/0006-album-de-fotos.md): os tipos e as contas puras da grade (filtrar,
 // ordenar, contar, a mudança das notas). As chamadas à API ficam em api.ts.
 
+import type { EdicaoGuardada } from "./edicao.ts";
+
 export type Genero = "casamento" | "ensaio" | "familia" | "evento" | "esporte" | "escola" | "recem_nascido" | "produto" | "outro";
 export type CorDaFoto = "vermelho" | "amarelo" | "verde" | "azul" | "roxo";
 export type Marcacao = "escolhida" | "rejeitada";
@@ -87,6 +89,8 @@ export type FotoDoAlbum = {
   motivo?: string | null;
   /** Os números das pessoas que aparecem na foto (os rostos juntados pelo SFace). */
   pessoas?: number[];
+  /** A edição no álbum (lib/album/edicao.ts), desenhada pelo worker. */
+  edicao?: EdicaoGuardada | null;
 };
 
 /** Uma pessoa do álbum: o rosto maior dela representa (a caixa em frações daquela foto). */

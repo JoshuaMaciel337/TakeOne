@@ -106,7 +106,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
   o ensaio e as escolhas do dono; testado com rajadas montadas de fotos reais).
 - [x] 16.4 As vistas: lupa com a tira do grupo e os rostos da foto, comparação de até 12 com zoom e arrasto juntos,
   tela cheia, pincel de notas, gaveta do resultado, pessoas (SFace) e o filtro "alguma" ou "todas".
-- [ ] 16.5 Editar em lote: o "Melhorar", as LUTs, os filtros e o igualar a cor aplicados às escolhidas; sincronizar os
+- [x] 16.5 Editar em lote: o "Melhorar", as LUTs, os filtros e o igualar a cor aplicados às escolhidas; sincronizar os
   ajustes de uma nas outras por grupos; antes e depois; corte e endireitar automáticos (rosto, assunto e linhas).
 - [ ] 16.6 Estilos: o estilo instantâneo (de um XMP, de uma LUT ou de um filtro, mais o "Melhorar" e o questionário de
   3 luzes), comparar até 3 na própria foto, o ajuste controle a controle e a intensidade, e a consistência entre fotos

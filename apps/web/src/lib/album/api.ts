@@ -1,6 +1,7 @@
 // As chamadas da API do álbum de fotos (apps/api/rotas/albuns.py).
 import { chamarApi } from "@/lib/api";
 
+import type { EdicaoDaFoto } from "./edicao";
 import type { Album, FotoDoAlbum, Genero, Mudanca, PessoaDoAlbum } from "./fotos";
 
 export type FotosRemovidas = { apagadas: number; na_biblioteca: number };
@@ -43,3 +44,7 @@ export const escolherMelhores = (id: string, opcoes: OpcoesDaEscolha) =>
 export const pessoasDoAlbum = (id: string) => chamarApi<PessoaDoAlbum[]>(`/albuns/${id}/pessoas`);
 export const nomearPessoa = (id: string, numero: number, nome: string) =>
   chamarApi<PessoaDoAlbum>(`/albuns/${id}/pessoas/${numero}`, { metodo: "PATCH", corpo: { nome } });
+
+/** Guarda a edição de cada foto (null tira) e põe o desenho na fila do worker. */
+export const editarFotos = (id: string, edicoes: { midia_id: string; edicao: EdicaoDaFoto | null }[]) =>
+  chamarApi<{ job_id: string }>(`/albuns/${id}/edicoes`, { metodo: "PUT", corpo: { edicoes } });

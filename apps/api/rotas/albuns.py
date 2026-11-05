@@ -14,6 +14,8 @@
 #   POST   /api/albuns/{id}/importar         importa uma pasta dela sem copiar (job "importar_pasta")
 #   POST   /api/albuns/{id}/analisar         mede as fotos que faltam (job "medir_album")
 #   POST   /api/albuns/{id}/escolher         escolhe as melhores pelas medidas (core/modelos/escolha.py)
+#   PUT    /api/albuns/{id}/edicoes          a edição de cada foto (cor, igualar, giro, recorte), desenhada pelo
+#                                            worker (job "editar_album", core/utils/edicao_de_foto.py)
 #   GET    /api/albuns/{id}/pessoas          as pessoas achadas nos rostos (core/modelos/pessoas.py)
 #   PATCH  /api/albuns/{id}/pessoas/{n}      dá um nome a uma pessoa
 #
@@ -34,6 +36,7 @@ from api.esquemas import (
     AlbumAtualizarEntrada,
     AlbumEntrada,
     AlbumSaida,
+    EdicoesEntrada,
     EscolhaSaida,
     EscolherEntrada,
     FotoDoAlbumSaida,
@@ -52,8 +55,8 @@ from core.modelos.escolha import ESTRELAS, MARCACAO, Foto, Opcoes, escolher
 from core.modelos.job import STATUS_EXECUTANDO as STATUS_JOB_EXECUTANDO
 from core.modelos.job import STATUS_PENDENTE as STATUS_JOB_PENDENTE
 from core.modelos.job import montar_job
-from core.modelos.midia import STATUS_PROCESSANDO, STATUS_PRONTA, e_imagem
-from core.utils import fotos_no_lugar
+from core.modelos.midia import STATUS_PROCESSANDO, STATUS_PRONTA, chave_arquivo, e_imagem
+from core.utils import fotos_no_lugar, storage
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/albuns", tags=["albuns"])
@@ -124,6 +127,14 @@ async def tirar_fotos(db, album: dict, midia_ids: list[ObjectId]) -> FotosRemovi
         else:
             await apagar_midia(db, midia)
             apagadas += 1
+    # A capa e a cópia leve editadas no álbum saem com ela (a foto que fica na biblioteca não as usa)
+    async for foto in db.album_fotos.find({"album_id": album["_id"], "midia_id": {"$in": midia_ids},
+                                           "edicao": {"$ne": None}}, {"midia_id": 1}):
+        pasta = storage.caminho_local(chave_arquivo(album["organizacao_id"], foto["midia_id"], "x")).parent
+        for arquivo in pasta.glob(f"album_{album['_id']}_*"):
+            arquivo.unlink(missing_ok=True)
+        await db.midias.update_one({"_id": foto["midia_id"]},
+                                   {"$pull": {"arquivos": {"$regex": f"^album_{album['_id']}_"}}})
     await db.album_fotos.delete_many({"album_id": album["_id"], "midia_id": {"$in": midia_ids}})
     return FotosRemovidasSaida(apagadas=apagadas, na_biblioteca=na_biblioteca)
 
@@ -178,13 +189,7 @@ async def importar_pasta(album_id: str, dados: ImportarPastaEntrada, usuario=Dep
 async def analisar(album_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
     """Mede as fotos prontas que ainda não foram medidas; se já há uma análise na fila ou rodando, devolve ela."""
     album = await buscar_album(db, album_id, usuario)
-    andando = await db.jobs.find_one({"tipo": "medir_album", "entrada.album_id": str(album["_id"]),
-                                      "status": {"$in": [STATUS_JOB_PENDENTE, STATUS_JOB_EXECUTANDO]}}, {"_id": 1})
-    if andando:
-        return JobDoAlbumSaida(job_id=str(andando["_id"]))
-    job = montar_job("medir_album", usuario["organizacao_id"], {"album_id": str(album["_id"])},
-                     criado_por=usuario["_id"])
-    return JobDoAlbumSaida(job_id=str((await db.jobs.insert_one(job)).inserted_id))
+    return JobDoAlbumSaida(job_id=await pedir_job_do_album(db, "medir_album", album, usuario))
 
 
 def _hora(exif: dict | None) -> float | None:
@@ -286,8 +291,47 @@ async def listar_fotos(album_id: str, usuario=Depends(usuario_atual), db=Depends
             cor=foto.get("cor"), marcacao=foto.get("marcacao"), enviado_em=midia.get("enviado_em"),
             do_album=midia.get("album_id") == album["_id"], medidas=medidas.get(midia["_id"]),
             categoria=foto.get("categoria"), grupo=foto.get("grupo"), cena=foto.get("cena"),
-            nota_ia=foto.get("nota_ia"), motivo=foto.get("motivo"), pessoas=foto.get("pessoas") or []))
+            nota_ia=foto.get("nota_ia"), motivo=foto.get("motivo"), pessoas=foto.get("pessoas") or [],
+            edicao=foto.get("edicao")))
     return saida
+
+
+async def pedir_job_do_album(db, tipo: str, album: dict, usuario: dict) -> str:
+    """O job do álbum (a análise, a edição): o que já está na fila ou rodando, ou um novo."""
+    andando = await db.jobs.find_one({"tipo": tipo, "entrada.album_id": str(album["_id"]),
+                                      "status": {"$in": [STATUS_JOB_PENDENTE, STATUS_JOB_EXECUTANDO]}}, {"_id": 1})
+    if andando:
+        return str(andando["_id"])
+    job = montar_job(tipo, usuario["organizacao_id"], {"album_id": str(album["_id"])}, criado_por=usuario["_id"])
+    return str((await db.jobs.insert_one(job)).inserted_id)
+
+
+@router.put("/{album_id}/edicoes", response_model=JobDoAlbumSaida, status_code=status.HTTP_202_ACCEPTED)
+async def editar_fotos(album_id: str, dados: EdicoesEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Guarda a edição de cada foto (a versão sobe) e põe na fila o desenho da capa e da cópia leve editadas. A
+    edição vazia (cor neutra, sem giro nem recorte) conta como tirar."""
+    album = await buscar_album(db, album_id, usuario)
+    operacoes = []
+    for item in dados.edicoes:
+        midia_id = _id(item.midia_id, "Foto não encontrada.")
+        filtro = {"album_id": album["_id"], "midia_id": midia_id}
+        edicao = item.edicao.model_dump(exclude_none=True) if item.edicao else None
+        if edicao and not edicao.get("cor") and not edicao.get("igualar") and not edicao.get("giro") \
+                and not edicao.get("recorte") and not edicao.get("auto"):
+            edicao = None
+        if edicao is None:
+            operacoes.append(UpdateOne({**filtro, "edicao": {"$ne": None}},
+                                       {"$set": {"edicao": None, "edicao_tirada": True}}))
+            continue
+        # A edição nova inteira, com a versão seguinte; a gerada (a última desenhada) fica até a nova sair
+        versao = {"versao": {"$add": [{"$ifNull": ["$edicao.versao", 0]}, 1]},
+                  "gerada": {"$ifNull": ["$edicao.gerada", None]}}
+        operacoes.append(UpdateOne(filtro, [{"$set": {"edicao": {"$mergeObjects": [{"$literal": edicao}, versao]}}}]))
+    ids = [_id(item.midia_id, "Foto não encontrada.") for item in dados.edicoes]
+    if not await db.album_fotos.count_documents({"album_id": album["_id"], "midia_id": {"$in": ids}}, limit=1):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhuma das fotos está no álbum.")
+    await db.album_fotos.bulk_write(operacoes, ordered=False)
+    return JobDoAlbumSaida(job_id=await pedir_job_do_album(db, "editar_album", album, usuario))
 
 
 @router.get("/{album_id}/pessoas", response_model=list[PessoaDoAlbumSaida])

@@ -300,3 +300,37 @@ def test_pessoas_juntam_os_rostos_e_guardam_o_nome(cliente, db_limpo):
     assert de_novo[leo] == "Leo"
     cliente.delete(f"/api/albuns/{album['id']}")
     assert db_limpo.album_pessoas.count_documents({"album_id": album_id}) == 0
+
+
+def test_editar_as_fotos_desenha_a_capa_e_a_copia_leve(cliente, db_limpo):
+    album = cliente.post("/api/albuns", json={"nome": "Edição"}).json()
+    ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", _jpeg((90, 90, 90))) for i in range(2)]
+    ingerir_tudo(db_limpo)
+    caminho = f"/api/albuns/{album['id']}/edicoes"
+    assert cliente.put(caminho, json={"edicoes": [{"midia_id": str(ObjectId()), "edicao": None}]}).status_code == 404
+    pedido = cliente.put(caminho, json={"edicoes": [
+        {"midia_id": ids[0], "edicao": {"cor": {"exposicao": 1}}},
+        {"midia_id": ids[1], "edicao": {"giro": 5, "auto": {"proporcao": "1:1"}}}]})
+    assert pedido.status_code == 202
+    # Pedir de novo com a edição na fila devolve o mesmo job
+    assert cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": {"cor": {"exposicao": 1}}}]}).json() \
+        == pedido.json()
+    job = pegar_proximo_job(db_limpo, ["editar_album"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    fotos = {f["midia_id"]: f for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}
+    clara = fotos[ids[0]]["edicao"]
+    assert clara["versao"] == 2 and clara["gerada"] == 2
+    capa = cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_2_capa.jpg")
+    assert capa.status_code == 200 and Image.open(io.BytesIO(capa.content)).getpixel((5, 5))[0] > 115
+    # O recorte automático quadrado saiu, e o desenho é quadrado
+    quadrada = fotos[ids[1]]["edicao"]
+    assert quadrada["recorte"]["largura"] < 1 and "auto" not in quadrada and quadrada["largura"] == quadrada["altura"]
+    # Uma edição nova apaga a versão de antes; tirar a edição apaga tudo
+    cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": {"cor": {"exposicao": -1}}}]})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
+    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_2_capa.jpg").status_code == 404
+    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_3_capa.jpg").status_code == 200
+    cliente.put(caminho, json={"edicoes": [{"midia_id": ids[0], "edicao": None}]})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
+    assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_3_capa.jpg").status_code == 404
+    assert cliente.get(f"/api/albuns/{album['id']}/fotos").json()[0]["edicao"] is None

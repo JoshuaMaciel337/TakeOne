@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CLASSE_DA_CATEGORIA, CLASSE_DA_COR, Estrelas, IconeDaCategoria } from "@/componentes/album/comum";
 import { CATEGORIAS, type FotoDoAlbum, gradeDaComparacao, type Mudanca, mudancaDaTecla } from "@/lib/album/fotos";
+import { arquivoDaFoto, tamanhoExibido } from "@/lib/album/edicao";
 import { arquivoDaMidia } from "@/lib/api";
 
 const ZOOM_MAXIMO = 8;
@@ -26,11 +27,13 @@ function presa(vista: Vista): Vista {
  * 6 a 9, P, X, U) e as setas trocam a ativa; Esc fecha.
  */
 export function Comparacao({
+  albumId,
   fotos,
   aoAplicar,
   aoTirar,
   aoFechar,
 }: {
+  albumId: string;
   fotos: FotoDoAlbum[];
   aoAplicar: (mudanca: Mudanca, ids: string[]) => void;
   aoTirar: (midiaId: string) => void;
@@ -58,8 +61,7 @@ export function Comparacao({
 
   /** O tamanho da foto na célula com o zoom de agora. */
   const tamanhoNaCelula = (foto: FotoDoAlbum, zoom: number): [number, number] => {
-    const w = foto.largura ?? 1;
-    const h = foto.altura ?? 1;
+    const [w, h] = tamanhoExibido(foto);
     const caber = Math.min(celula.largura / w, Math.max(1, celula.altura) / h);
     return [w * caber * zoom, h * caber * zoom];
   };
@@ -148,7 +150,8 @@ export function Comparacao({
         {fotos.map((foto) => {
           const [w, h] = tamanhoNaCelula(foto, vista.zoom);
           const ladoMaior = Math.max(foto.largura ?? 0, foto.altura ?? 0);
-          const arquivo = vista.zoom > 1 && Math.max(w, h) * (window.devicePixelRatio || 1) > Math.min(ladoMaior, 1920) * 1.05 ? "imagem.png" : "proxy.webp";
+          const leve = arquivoDaFoto(foto, albumId, "proxy");
+          const arquivo = !foto.edicao?.gerada && vista.zoom > 1 && Math.max(w, h) * (window.devicePixelRatio || 1) > Math.min(ladoMaior, 1920) * 1.05 ? "imagem.png" : leve;
           const eAtiva = foto.midia_id === ativaAtual;
           const categoria = foto.categoria ? CATEGORIAS.find((c) => c.id === foto.categoria) : null;
           return (
@@ -188,7 +191,7 @@ export function Comparacao({
                     width: w,
                     height: h,
                     transform: `translate(${-vista.u * w}px, ${-vista.v * h}px)`,
-                    backgroundImage: `url(${arquivoDaMidia(foto.midia_id, "proxy.webp")})`,
+                    backgroundImage: `url(${arquivoDaMidia(foto.midia_id, leve)})`,
                     backgroundSize: "100% 100%",
                   }}
                 >

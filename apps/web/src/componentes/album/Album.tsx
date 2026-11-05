@@ -11,6 +11,7 @@ import {
   ImageUp,
   LoaderCircle,
   ScanSearch,
+  SlidersHorizontal,
   Search,
   Trash2,
   WandSparkles,
@@ -24,10 +25,12 @@ import { Comparacao } from "@/componentes/album/Comparacao";
 import { FiltroDePessoas } from "@/componentes/album/FiltroDePessoas";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
 import { Lupa } from "@/componentes/album/Lupa";
+import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
-import { analisarAlbum, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
+import { analisarAlbum, editarFotos, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
 import type { OpcoesDaEscolha } from "@/lib/album/api";
+import { arquivoDaFoto, type EdicaoDaFoto, editandoAgora } from "@/lib/album/edicao";
 import {
   type Album as TipoAlbum,
   aplicarMudanca,
@@ -35,6 +38,7 @@ import {
   CATEGORIAS,
   COMPARAR_NO_MAXIMO,
   type PessoaDoAlbum,
+  grupoDaFoto,
   contarCategorias,
   colunasDaGrade,
   contar,
@@ -201,6 +205,11 @@ function useAlbum(albumId: string) {
       }
       return;
     }
+    // A edição desenhada pelo worker: a grade troca as imagens aos poucos
+    if (job.tipo === "editar_album") {
+      pedirRecarga();
+      return;
+    }
     // A pasta importada do computador: as fotos já estão no álbum quando o job termina
     if (job.tipo === "importar_pasta") {
       if (job.status === "concluido" || job.status === "erro") pedirRecarga();
@@ -319,6 +328,26 @@ export function Album({ albumId }: { albumId: string }) {
       setErro(e instanceof Error ? e.message : "Não foi possível escolher as melhores.");
     } finally {
       setOcupado("");
+    }
+  }
+
+  /** Guarda a edição das fotos: a grade já mostra que estão editando, e o worker desenha. */
+  async function editarAsFotos(edicoes: { midia_id: string; edicao: EdicaoDaFoto | null }[], texto: string) {
+    const porId = new Map(edicoes.map((e) => [e.midia_id, e.edicao]));
+    setFotos(
+      (lista) =>
+        lista?.map((foto) => {
+          if (!porId.has(foto.midia_id)) return foto;
+          const nova = porId.get(foto.midia_id);
+          return { ...foto, edicao: nova ? { ...nova, versao: (foto.edicao?.versao ?? 0) + 1, gerada: foto.edicao?.gerada ?? null } : null };
+        }) ?? lista,
+    );
+    try {
+      await editarFotos(albumId, edicoes);
+      setAviso(texto);
+    } catch (e) {
+      setErro(e instanceof ErroApi ? e.message : "Não foi possível guardar a edição.");
+      void recarregar();
     }
   }
 
@@ -674,6 +703,7 @@ export function Album({ albumId }: { albumId: string }) {
             </div>
           ) : (
             <Grade
+              albumId={albumId}
               pincel={pincel}
               aoPintar={(ids) => {
                 if (pincel) aplicar(pincel, ids);
@@ -709,6 +739,17 @@ export function Album({ albumId }: { albumId: string }) {
           aoRemover={remover}
           todas={fotos}
           pessoas={pessoas}
+          edicao={
+            <PainelDeEdicao
+              albumId={albumId}
+              alvos={alvos()
+                .map((id) => fotos.find((foto) => foto.midia_id === id))
+                .filter((foto): foto is FotoDoAlbum => Boolean(foto))}
+              referencia={fotoDoCursor}
+              grupoDa={(foto) => grupoDaFoto(fotos, foto)}
+              aoEditar={editarAsFotos}
+            />
+          }
         />
       </div>
 
@@ -787,6 +828,7 @@ export function Album({ albumId }: { albumId: string }) {
 
       {lupa && fotoDoCursor ? (
         <Lupa
+          albumId={albumId}
           foto={fotoDoCursor}
           fotos={fotos}
           pessoas={pessoas}
@@ -799,11 +841,12 @@ export function Album({ albumId }: { albumId: string }) {
           aoFechar={() => setLupa(false)}
           aoAndar={(passo) => mover(passo, false)}
           aoAplicar={(mudanca) => aplicar(mudanca, [fotoDoCursor.midia_id])}
-          proxima={visiveis[indiceDoCursor + 1]?.midia_id}
+          proxima={visiveis[indiceDoCursor + 1]}
         />
       ) : null}
       {comparando ? (
         <Comparacao
+          albumId={albumId}
           fotos={comparando.map((id) => fotos.find((foto) => foto.midia_id === id)).filter((foto): foto is FotoDoAlbum => Boolean(foto))}
           aoAplicar={aplicar}
           aoTirar={(midiaId) => setComparando((ids) => ids?.filter((id) => id !== midiaId) ?? null)}
@@ -991,6 +1034,7 @@ function BarraDeFiltros({
 }
 
 function Grade({
+  albumId,
   pincel,
   aoPintar,
   fotos,
@@ -1001,6 +1045,7 @@ function Grade({
   aoAbrir,
   aoColunas,
 }: {
+  albumId: string;
   pincel: Mudanca | null;
   aoPintar: (ids: string[]) => void;
   fotos: FotoDoAlbum[];
@@ -1066,6 +1111,7 @@ function Grade({
       cartoes.push(
         <Cartao
           key={foto.midia_id}
+          albumId={albumId}
           foto={foto}
           lado={lado}
           x={VAO + coluna * (lado + VAO)}
@@ -1098,6 +1144,7 @@ function Grade({
 }
 
 function Cartao({
+  albumId,
   foto,
   lado,
   x,
@@ -1108,6 +1155,7 @@ function Cartao({
   aoAbrir,
   pincel,
 }: {
+  albumId: string;
   foto: FotoDoAlbum;
   lado: number;
   x: number;
@@ -1143,7 +1191,7 @@ function Cartao({
     >
       {foto.status === "pronta" ? (
         // eslint-disable-next-line @next/next/no-img-element -- imagem da API com a sessão do cookie
-        <img src={arquivoDaMidia(foto.midia_id, "capa.jpg")} alt="" draggable={false} loading="lazy" className={`size-full object-contain ${rejeitada ? "opacity-35" : ""}`} />
+        <img src={arquivoDaMidia(foto.midia_id, arquivoDaFoto(foto, albumId, "capa"))} alt="" draggable={false} loading="lazy" className={`size-full object-contain ${rejeitada ? "opacity-35" : ""}`} />
       ) : (
         <span className="flex size-full flex-col items-center justify-center gap-1 p-2 text-center text-[11px] text-suave">
           {foto.status === "erro" ? <CircleAlert className="size-5 text-erro" aria-hidden /> : <LoaderCircle className="size-5 animate-spin" aria-hidden />}
@@ -1163,6 +1211,11 @@ function Cartao({
         <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-aviso">{foto.nota}★</span>
       ) : null}
       {foto.cor ? <span className={`absolute inset-x-0 bottom-0 h-1 ${CLASSE_DA_COR[foto.cor]}`} aria-label={`Cor ${foto.cor}`} /> : null}
+      {foto.edicao ? (
+        <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/60 text-white" title={editandoAgora(foto) ? "Editando…" : "Editada"}>
+          {editandoAgora(foto) ? <LoaderCircle className="size-3 animate-spin" aria-label="Editando" /> : <SlidersHorizontal className="size-3" aria-label="Editada" />}
+        </span>
+      ) : null}
       {foto.categoria ? (
         <>
           <span className={`absolute inset-x-0 top-0 h-1 ${CLASSE_DA_CATEGORIA[foto.categoria]}`} />
@@ -1189,6 +1242,7 @@ function Gaveta({
   aoRemover,
   todas,
   pessoas,
+  edicao,
 }: {
   contagens: ReturnType<typeof contar>;
   filtro: Filtro;
@@ -1199,6 +1253,8 @@ function Gaveta({
   aoRemover: () => void;
   todas: FotoDoAlbum[];
   pessoas: PessoaDoAlbum[];
+  /** O painel de edição das fotos escolhidas (PainelDeEdicao). */
+  edicao: React.ReactNode;
 }) {
   const linha = (rotulo: string, numero: number, ativo: boolean, aoClicar?: () => void, classe = "") => (
     <button
@@ -1334,6 +1390,7 @@ function Gaveta({
               Tirar
             </button>
           </div>
+          {edicao}
           <button type="button" className="flex items-center gap-1.5 self-start text-xs text-suave hover:text-erro" onClick={aoRemover} title="Tirar do álbum (Delete)">
             <Trash2 className="size-3.5" aria-hidden />
             Tirar {alvo} do álbum
