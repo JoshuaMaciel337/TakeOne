@@ -12,6 +12,8 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from core.utils.raw import RawInvalido, abrir_raw, e_raw, exif_do_raw
+
 LADO_MAXIMO_RENDER = 4096
 LADO_MAXIMO_PROXY = 1920
 LARGURA_CAPA = 640
@@ -78,6 +80,11 @@ def abrir_imagem(caminho: Path) -> Image.Image:
             raise ImagemInvalida(str(e)) from e
     if caminho.suffix.lower() in (".heic", ".heif"):
         return _heif_pelo_ffmpeg(caminho)
+    if e_raw(caminho):
+        try:
+            return abrir_raw(caminho)[0]
+        except RawInvalido as e:
+            raise ImagemInvalida(str(e)) from e
     try:
         with Image.open(caminho) as arquivo:
             if arquivo.width * arquivo.height > PIXELS_MAXIMOS:
@@ -127,14 +134,23 @@ def ler_exif(caminho: Path) -> dict:
     abertura, a exposição (em segundos) e a distância focal, só os que existem. Um EXIF quebrado não impede a
     ingestão: sai o que deu para ler.
     """
-    exif: dict = {}
     try:
-        with Image.open(caminho) as arquivo:
-            dados = arquivo.getexif()
-            interno = dados.get_ifd(_IFD_EXIF)
+        if e_raw(caminho):
+            # Sem EXIF no próprio RAW (o RAF guarda no JPEG de dentro), vale o do JPEG
+            dados = exif_do_raw(caminho.read_bytes()) or abrir_raw(caminho)[1]
+        else:
+            with Image.open(caminho) as arquivo:
+                dados = arquivo.getexif()
+        return exif_em_campos(dados) if dados is not None else {}
     except Exception:
-        return exif
-    data = _texto(interno.get(_DATA_ORIGINAL) or interno.get(_DATA_DIGITALIZADA) or dados.get(306))
+        return {}
+
+
+def exif_em_campos(dados) -> dict:
+    """Os campos do álbum a partir de um EXIF lido (Image.Exif, ou o EXIF do CR3, com get e get_ifd)."""
+    exif: dict = {}
+    interno = dados.get_ifd(_IFD_EXIF) or {}
+    data =_texto(interno.get(_DATA_ORIGINAL) or interno.get(_DATA_DIGITALIZADA) or dados.get(306))
     if data and len(data) >= 19 and data[4] == ":" and data[7] == ":":
         exif["data"] = f"{data[:4]}-{data[5:7]}-{data[8:10]}T{data[11:19]}"
     marca, modelo = _texto(dados.get(_MARCA)), _texto(dados.get(_MODELO))
@@ -157,7 +173,16 @@ def ler_exif(caminho: Path) -> dict:
 
 def preparar_imagem(original: Path, pasta: Path) -> dict:
     """Grava os quatro arquivos da imagem em `pasta` e devolve {largura, altura, transparente, miniatura, exif}."""
-    imagem = abrir_imagem(original)
+    exif_do_raw_aberto = None
+    if e_raw(original):
+        # O RAW abre uma vez só: o JPEG de dentro e o EXIF dele saem juntos
+        try:
+            imagem, lido = abrir_raw(original)
+        except RawInvalido as e:
+            raise ImagemInvalida(str(e)) from e
+        exif_do_raw_aberto = exif_em_campos(lido) if lido is not None else {}
+    else:
+        imagem = abrir_imagem(original)
     transparente = _tem_transparencia(imagem)
     if not transparente and imagem.mode == "RGBA":
         imagem = imagem.convert("RGB")
@@ -175,7 +200,8 @@ def preparar_imagem(original: Path, pasta: Path) -> dict:
     miniatura.save(pasta / "miniaturas.jpg", quality=85)
     return {"largura": render.width, "altura": render.height, "transparente": transparente,
             "miniatura": {"largura": miniatura.width, "altura": miniatura.height},
-            "exif": ler_exif(original) if original.suffix.lower() != ".svg" else {}}
+            "exif": exif_do_raw_aberto if exif_do_raw_aberto is not None
+            else ler_exif(original) if original.suffix.lower() != ".svg" else {}}
 
 
 def quadro_inicial(caminho: Path, tamanho: tuple[int, int], destino: Path):

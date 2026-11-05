@@ -22,6 +22,8 @@ RECURSO_MONTAGEM = "montagem"
 TAREFAS = {
     "teste": RECURSO_CPU,
     "ingestao": RECURSO_CPU,
+    # As fotos de uma pasta do computador entram no álbum sem cópia (onda 16)
+    "importar_pasta": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,

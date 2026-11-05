@@ -38,6 +38,8 @@ const EXTENSOES_ACEITAS = [
   ".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".ts",
   ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac",
   ".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".bmp", ".tif", ".tiff", ".avif", ".heic", ".heif",
+  // O RAW das câmeras (pelo JPEG que a câmera grava dentro dele)
+  ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".raf", ".dng", ".orf", ".rw2", ".pef", ".srw",
 ];
 export const ACEITAR_ARQUIVOS = ["video/*", "audio/*", "image/*", ...EXTENSOES_ACEITAS].join(",");
 /** Só as imagens (Arquivo › Abrir do editor de imagem). */

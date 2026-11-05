@@ -30,6 +30,7 @@ from worker.tarefas.geracao_video import (
     marcar_geracao_com_erro,
 )
 from worker.tarefas.importacao import executar_importacao
+from worker.tarefas.importar_pasta import executar_importar_pasta
 from worker.tarefas.ingestao import executar_ingestao, marcar_midia_com_erro
 from worker.tarefas.inversao import executar_inversao, marcar_inversao_com_erro
 from worker.tarefas.legenda_animada import executar_legenda_animada
@@ -63,6 +64,7 @@ class Tarefa:
 REGISTRO = {
     "teste": Tarefa(executar_teste),
     "ingestao": Tarefa(executar_ingestao, ao_falhar=marcar_midia_com_erro),
+    "importar_pasta": Tarefa(executar_importar_pasta),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
     "clipagem": Tarefa(executar_clipagem, ao_falhar=marcar_clipagem_com_erro),
     "montagem": Tarefa(executar_montagem, ao_falhar=marcar_montagem_com_erro),

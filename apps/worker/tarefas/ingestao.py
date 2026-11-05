@@ -46,6 +46,7 @@ from core.utils.ffmpeg import (
     resumir_sondagem,
     sondar,
 )
+from core.utils.fotos_no_lugar import CaminhoInvalido, caminho_do_original
 from core.utils.imagem import ImagemInvalida, preparar_imagem
 from core.utils.mongo import agora
 from core.utils.render import ler_loudness
@@ -146,6 +147,8 @@ def ingerir_imagem(db, midia: dict, original: Path, reportar: Callable[[int, str
     midia_id, organizacao_id = midia["_id"], midia["organizacao_id"]
     reportar(10, "Preparando a imagem")
     pasta = storage.caminho_local(chave_arquivo(organizacao_id, midia_id, ARQUIVO_IMAGEM)).parent
+    # A foto importada no lugar não tem pasta no armazenamento até aqui
+    pasta.mkdir(parents=True, exist_ok=True)
     try:
         info = preparar_imagem(original, pasta)
     except ImagemInvalida as e:
@@ -181,8 +184,13 @@ def executar_ingestao(db, job: dict, reportar: Callable[[int, str], None]) -> di
     def caminho(nome: str) -> Path:
         return storage.caminho_local(chave_arquivo(organizacao_id, midia_id, nome))
 
-    original = caminho(midia["original"])
+    try:
+        original = caminho_do_original(midia)
+    except CaminhoInvalido as e:
+        raise ErroDefinitivo(str(e)) from e
     if not original.is_file():
+        if midia.get("externo"):
+            raise ErroDefinitivo("A foto não está mais na pasta do computador. Confira se ela foi movida ou apagada.")
         raise ErroDefinitivo("O arquivo enviado não foi encontrado no servidor. Envie de novo.")
     db.midias.update_one({"_id": midia_id}, {"$set": {
         "status": STATUS_PROCESSANDO, "erro": None, "atualizado_em": agora(),

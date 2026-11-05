@@ -95,7 +95,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 - [x] 16.1 Álbum de fotos: as coleções, a página no hub, enviar fotos ou a pasta inteira pelo navegador (com as
   subpastas, também arrastando), o EXIF na ingestão (a hora da foto, a câmera, a lente e a exposição), a grade virtual
   com a capa, estrelas, cores, marcação, filtros, ordem, a lupa e os atalhos.
-- [ ] 16.1b Fotos "no lugar", de uma pasta do Nitro montada só para leitura (sem copiar), e o RAW pelo JPEG embutido.
+- [x] 16.1b Fotos "no lugar", de uma pasta do Nitro montada só para leitura (sem copiar), e o RAW pelo JPEG embutido.
 - [ ] 16.2 Medir cada foto: o job do worker de CPU com rostos, pontos do rosto, olhos, sorriso, pose, olhar, foco,
   exposição e o vetor da imagem, guardados por mídia, com o progresso por etapas.
 - [ ] 16.3 Escolher as melhores: grupos por tempo e semelhança, a nota por gênero, a melhor de cada grupo, destaques e

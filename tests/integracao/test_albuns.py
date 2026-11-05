@@ -122,6 +122,70 @@ def test_album_do_envio_a_exclusao(cliente, db_limpo):
     assert cliente.get("/api/albuns").json() == []
 
 
+def test_raw_no_album_pela_previa_de_dentro(cliente, db_limpo):
+    from tests.test_raw import _jpeg, _tiff_do_exif
+
+    album = cliente.post("/api/albuns", json={"nome": "RAW"}).json()
+    conteudo = _tiff_do_exif(orientacao=6, data="2026:05:10 11:00:00") + b"\x00" * 500 + _jpeg(600, 400, (200, 0, 0))
+    midia_id = enviar_foto(cliente, album["id"], "Ensaio/IMG_9999.CR2", conteudo, "image/x-canon-cr2")
+    ingerir_tudo(db_limpo)
+    foto = cliente.get(f"/api/albuns/{album['id']}/fotos").json()[0]
+    assert foto["midia_id"] == midia_id and foto["status"] == "pronta"
+    assert (foto["largura"], foto["altura"]) == (400, 600) and foto["exif"]["data"] == "2026-05-10T11:00:00"
+
+
+def test_importar_pasta_do_computador_sem_copiar(cliente, db_limpo, tmp_path, monkeypatch):
+    from core.utils import fotos_no_lugar
+
+    fotos = tmp_path / "fotos"
+    (fotos / "Casamento" / "Festa").mkdir(parents=True)
+    (fotos / "Casamento" / "IMG_1.jpg").write_bytes(_jpeg((200, 10, 10)))
+    (fotos / "Casamento" / "Festa" / "IMG_2.jpg").write_bytes(_jpeg((10, 200, 10)))
+    (fotos / "Casamento" / "Festa" / "notas.txt").write_text("não é foto")
+    (fotos / "Casamento" / ".oculta").mkdir()
+    (fotos / "Casamento" / ".oculta" / "IMG_3.jpg").write_bytes(_jpeg((0, 0, 0)))
+    album = cliente.post("/api/albuns", json={"nome": "No lugar"}).json()
+
+    # Sem a pasta montada, a rota diz que não há; com ela, lista as pastas
+    monkeypatch.setattr(fotos_no_lugar, "PASTA_DAS_FOTOS", tmp_path / "nao-existe")
+    assert cliente.get("/api/albuns/pasta-do-computador").json()["disponivel"] is False
+    assert cliente.post(f"/api/albuns/{album['id']}/importar", json={"caminho": ""}).status_code == 409
+    monkeypatch.setattr(fotos_no_lugar, "PASTA_DAS_FOTOS", fotos)
+    raiz = cliente.get("/api/albuns/pasta-do-computador").json()
+    assert raiz == {"disponivel": True, "caminho": "", "fotos": 0,
+                    "pastas": [{"nome": "Casamento", "caminho": "Casamento", "fotos": 1}]}
+    dentro = cliente.get("/api/albuns/pasta-do-computador", params={"caminho": "Casamento"}).json()
+    assert dentro["pastas"] == [{"nome": "Festa", "caminho": "Casamento/Festa", "fotos": 1}] and dentro["fotos"] == 1
+    for fora in ("../", "Casamento/../../etc"):
+        assert cliente.get("/api/albuns/pasta-do-computador", params={"caminho": fora}).status_code == 404
+
+    pedido = cliente.post(f"/api/albuns/{album['id']}/importar", json={"caminho": "Casamento", "subpastas": True})
+    assert pedido.status_code == 202
+    job = pegar_proximo_job(db_limpo, ["importar_pasta"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    saida = db_limpo.jobs.find_one({"_id": job["_id"]})["saida"]
+    assert saida == {"album_id": album["id"], "novas": 2, "ja_estavam": 0}
+    ingerir_tudo(db_limpo)
+    lista = cliente.get(f"/api/albuns/{album['id']}/fotos").json()
+    assert sorted((f["pasta"], f["nome"], f["status"]) for f in lista) == [
+        ("Casamento", "IMG_1", "pronta"), ("Casamento/Festa", "IMG_2", "pronta")]
+    # Nada foi copiado: o original é o arquivo da pasta, e o download o devolve
+    midia = db_limpo.midias.find_one({"_id": ObjectId(lista[0]["midia_id"])})
+    assert midia["externo"].startswith("Casamento/") and "original.jpg" not in midia["arquivos"]
+    baixado = cliente.get(f"/api/midias/{midia['_id']}/original")
+    assert baixado.status_code == 200 and baixado.content == (fotos / midia["externo"]).read_bytes()
+
+    # Importar de novo traz só as novas; tirar do álbum não apaga o arquivo da pasta
+    (fotos / "Casamento" / "IMG_4.jpg").write_bytes(_jpeg((0, 0, 200)))
+    cliente.post(f"/api/albuns/{album['id']}/importar", json={"caminho": "Casamento"})
+    job = pegar_proximo_job(db_limpo, ["importar_pasta"], "w-teste")
+    processar_job(db_limpo, job, "w-teste")
+    assert db_limpo.jobs.find_one({"_id": job["_id"]})["saida"]["novas"] == 1
+    ingerir_tudo(db_limpo)
+    assert cliente.delete(f"/api/albuns/{album['id']}").json()["apagadas"] == 3
+    assert (fotos / "Casamento" / "IMG_1.jpg").is_file() and (fotos / "Casamento" / "Festa" / "IMG_2.jpg").is_file()
+
+
 def test_album_de_outro_espaco(cliente, db_limpo):
     album = cliente.post("/api/albuns", json={"nome": "Meu"}).json()
     with TestClient(app) as outro:

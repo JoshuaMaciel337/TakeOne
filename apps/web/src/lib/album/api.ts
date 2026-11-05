@@ -16,3 +16,9 @@ export const mudarFotos = (id: string, midiaIds: string[], mudanca: Mudanca) =>
 export const removerFotos = (id: string, midiaIds: string[]) =>
   chamarApi<FotosRemovidas>(`/albuns/${id}/fotos/remover`, { metodo: "POST", corpo: { midia_ids: midiaIds } });
 
+
+export type PastaDoComputador = { disponivel: boolean; caminho: string; pastas: { nome: string; caminho: string; fotos: number }[]; fotos: number };
+
+export const pastaDoComputador = (caminho: string) => chamarApi<PastaDoComputador>(`/albuns/pasta-do-computador?caminho=${encodeURIComponent(caminho)}`);
+export const importarPasta = (id: string, caminho: string, subpastas: boolean) =>
+  chamarApi<{ job_id: string }>(`/albuns/${id}/importar`, { metodo: "POST", corpo: { caminho, subpastas } });

@@ -3102,3 +3102,26 @@ class FotosRemovidasSaida(BaseModel):
     """Quantas fotos saíram do disco e quantas voltaram para a biblioteca porque um projeto ou modelo as usa."""
     apagadas: int
     na_biblioteca: int
+
+
+class SubpastaDoComputador(BaseModel):
+    nome: str
+    caminho: str
+    fotos: int
+
+
+class PastaDoComputadorSaida(BaseModel):
+    """Uma pasta da pasta das fotos do Nitro (montada só para leitura): as de dentro e quantas fotos ela tem."""
+    disponivel: bool
+    caminho: str = ""
+    pastas: list[SubpastaDoComputador] = Field(default_factory=list)
+    fotos: int = 0
+
+
+class ImportarPastaEntrada(BaseModel):
+    caminho: str = Field(default="", max_length=1000)
+    subpastas: bool = True
+
+
+class ImportarPastaSaida(BaseModel):
+    job_id: str

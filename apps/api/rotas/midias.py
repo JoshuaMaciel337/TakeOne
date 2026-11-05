@@ -87,6 +87,7 @@ from core.modelos.transcricao import STATUS_PROCESSANDO as TRANSCRICAO_PROCESSAN
 from core.modelos.transcricao import STATUS_PRONTA as TRANSCRICAO_PRONTA
 from core.modelos.transcricao import montar_transcricao
 from core.utils import storage
+from core.utils.fotos_no_lugar import CaminhoInvalido, caminho_do_original
 from core.utils.link import ErroImportacao, ler_metadados, mensagem_definitiva
 from core.utils.mongo import agora
 from core.utils.preenchimento import EntradaInvalida, ler_entrada
@@ -429,7 +430,10 @@ async def baixar_original(midia_id: str, usuario=Depends(usuario_atual), db=Depe
     midia = await buscar_midia(db, midia_id, usuario)
     if midia["status"] != STATUS_PRONTA or not midia.get("original"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
-    caminho = storage.caminho_local(chave_arquivo(midia["organizacao_id"], midia["_id"], midia["original"]))
+    try:
+        caminho = caminho_do_original(midia)
+    except CaminhoInvalido as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.") from e
     if not caminho.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Arquivo não encontrado.")
     return FileResponse(caminho, media_type="application/octet-stream", filename=midia["nome_original"],

@@ -21,6 +21,8 @@ DATABASE_NAME = os.environ.get("DATABASE_NAME", "takeone")
 # ARMAZENAMENTO DE ARQUIVOS
 # -----------------------------------------------
 PASTA_ARMAZENAMENTO = Path(os.environ.get("PASTA_ARMAZENAMENTO", PASTA_RAIZ / "armazenamento"))
+# As fotos que o álbum importa "no lugar", sem copiar (uma pasta do computador montada só para leitura)
+PASTA_DAS_FOTOS = Path(os.environ.get("PASTA_DAS_FOTOS", "/fotos"))
 
 # A biblioteca de fontes livres (core/fontes/biblioteca.json), baixada na construção das imagens
 FONTES_DA_BIBLIOTECA = Path(os.environ.get("FONTES_DA_BIBLIOTECA", PASTA_RAIZ / "core" / "fontes" / "biblioteca"))
@@ -37,8 +39,12 @@ EXTENSOES_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 # Fotos e imagens paradas: viram clipes de duração livre (core/utils/imagem.py)
 # GIF (o primeiro quadro), BMP, TIFF e AVIF pelo Pillow; HEIC e HEIF (as fotos do iPhone) pelo FFmpeg, porque o
 # leitor livre de HEIF (libheif) é LGPL
+# O RAW das câmeras entra pelo JPEG que a câmera grava dentro dele (core/utils/raw.py); revelar o RAW de verdade fica
+# para depois (ADR 0006)
+EXTENSOES_RAW = {".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".raf", ".dng", ".orf", ".rw2", ".pef",
+                 ".srw"}
 EXTENSOES_IMAGEM = {".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".bmp", ".tif", ".tiff", ".avif", ".heic",
-                    ".heif"}
+                    ".heif"} | EXTENSOES_RAW
 
 # -----------------------------------------------
 # FFMPEG

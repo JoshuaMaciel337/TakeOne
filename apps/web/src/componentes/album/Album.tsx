@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleAlert,
   FolderUp,
+  HardDrive,
   ImageUp,
   LoaderCircle,
   Search,
@@ -17,8 +18,9 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
-import { fotosDoAlbum, mudarAlbum, mudarFotos, removerFotos, verAlbum } from "@/lib/album/api";
+import { fotosDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
 import {
   type Album as TipoAlbum,
   aplicarMudanca,
@@ -122,7 +124,7 @@ async function arquivosArrastados(itens: DataTransferItemList): Promise<{ arquiv
   return { arquivos, caminhos };
 }
 
-const EXTENSOES_DE_FOTO = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif)$/i;
+const EXTENSOES_DE_FOTO = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif|cr2|cr3|nef|nrw|arw|srf|sr2|raf|dng|orf|rw2|pef|srw)$/i;
 
 // -----------------------------------------------
 // Os dados do álbum: a lista, a recarga quando as fotos chegam e o andamento de cada uma
@@ -165,7 +167,14 @@ function useAlbum(albumId: string) {
   }, [recarregar]);
 
   useEventosJobs((job) => {
-    if (job.tipo !== "ingestao" || job.entrada.album_id !== albumId) return;
+    if (job.entrada.album_id !== albumId) return;
+    // A pasta importada do computador: as fotos já estão no álbum quando o job termina
+    if (job.tipo === "importar_pasta") {
+      if (job.status === "concluido" || job.status === "erro") pedirRecarga();
+      if (job.status === "erro") setErro(job.erro ?? "A pasta não pôde ser importada.");
+      return;
+    }
+    if (job.tipo !== "ingestao") return;
     if (job.status === "concluido" || job.status === "erro") {
       pedirRecarga();
       return;
@@ -198,6 +207,14 @@ export function Album({ albumId }: { albumId: string }) {
   const [lupa, setLupa] = useState(false);
   const [arrastando, setArrastando] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [importando, setImportando] = useState(false);
+  // O servidor tem a pasta das fotos montada? Só então aparece "Do computador"
+  const [noComputador, setNoComputador] = useState(false);
+  useEffect(() => {
+    pastaDoComputador("")
+      .then((pasta) => setNoComputador(pasta.disponivel))
+      .catch(() => setNoComputador(false));
+  }, []);
   const entradaArquivos = useRef<HTMLInputElement>(null);
   const entradaPasta = useRef<HTMLInputElement>(null);
 
@@ -443,6 +460,12 @@ export function Album({ albumId }: { albumId: string }) {
               </span>
             </span>
           ) : null}
+          {noComputador ? (
+            <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => setImportando(true)} title="Importar uma pasta do computador do servidor, sem copiar">
+              <HardDrive className="size-4" aria-hidden />
+              <span className="hidden lg:inline">Do computador</span>
+            </button>
+          ) : null}
           <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => entradaArquivos.current?.click()} title="Enviar fotos">
             <ImageUp className="size-4" aria-hidden />
             <span className="hidden sm:inline">Enviar fotos</span>
@@ -496,7 +519,11 @@ export function Album({ albumId }: { albumId: string }) {
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
           {fotos.length === 0 ? (
-            <EstadoVazio aoEnviarPasta={() => entradaPasta.current?.click()} aoEnviarFotos={() => entradaArquivos.current?.click()} />
+            <EstadoVazio
+              aoEnviarPasta={() => entradaPasta.current?.click()}
+              aoEnviarFotos={() => entradaArquivos.current?.click()}
+              aoImportar={noComputador ? () => setImportando(true) : undefined}
+            />
           ) : visiveis.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-suave">
               Nenhuma foto com esses filtros.
@@ -563,6 +590,8 @@ export function Album({ albumId }: { albumId: string }) {
         </label>
       </footer>
 
+      {importando ? <JanelaImportarPasta albumId={albumId} aoFechar={() => setImportando(false)} aoImportar={setAviso} /> : null}
+
       {lupa && fotoDoCursor ? (
         <Lupa
           foto={fotoDoCursor}
@@ -597,7 +626,7 @@ function Estrelas({ nota, aoMudar, tamanho = "size-3.5" }: { nota: number; aoMud
   );
 }
 
-function EstadoVazio({ aoEnviarPasta, aoEnviarFotos }: { aoEnviarPasta: () => void; aoEnviarFotos: () => void }) {
+function EstadoVazio({ aoEnviarPasta, aoEnviarFotos, aoImportar }: { aoEnviarPasta: () => void; aoEnviarFotos: () => void; aoImportar?: () => void }) {
   return (
     <div className="flex h-full items-center justify-center p-6">
       <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-borda p-10 text-center">
@@ -614,6 +643,12 @@ function EstadoVazio({ aoEnviarPasta, aoEnviarFotos }: { aoEnviarPasta: () => vo
             Escolher fotos
           </button>
         </div>
+        {aoImportar ? (
+          <button type="button" className="flex items-center gap-1.5 text-xs text-suave hover:text-texto" onClick={aoImportar}>
+            <HardDrive className="size-3.5" aria-hidden />
+            Ou importe uma pasta do computador do servidor, sem copiar
+          </button>
+        ) : null}
       </div>
     </div>
   );

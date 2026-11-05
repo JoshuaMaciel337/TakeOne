@@ -20,9 +20,9 @@ from fastapi.responses import StreamingResponse
 
 from api.dependencias import obter_db, usuario_atual
 from api.rotas.projetos import buscar_projeto
-from core.modelos.midia import chave_arquivo, e_imagem
+from core.modelos.midia import e_imagem
 from core.modelos.projeto import midias_usadas
-from core.utils import storage
+from core.utils.fotos_no_lugar import caminho_do_original
 from core.utils.intercambio import montar_xmeml
 
 router = APIRouter(prefix="/api/projetos", tags=["intercambio"])
@@ -41,7 +41,8 @@ async def _preparar(db, projeto_id: str, usuario: dict) -> tuple[dict, dict[str,
     if projeto.get("tipo") == "imagem":
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Só projetos de vídeo vão para outro editor.")
     ids = [ObjectId(i) for i in midias_usadas(projeto["faixas"]) if ObjectId.is_valid(i)]
-    campos = {"nome": 1, "original": 1, "duracao": 1, "video": 1, "audio": 1, "imagem": 1, "extensao": 1}
+    campos = {"nome": 1, "original": 1, "duracao": 1, "video": 1, "audio": 1, "imagem": 1, "extensao": 1,
+              "organizacao_id": 1, "externo": 1}
     cursor = db.midias.find({"_id": {"$in": ids}, "organizacao_id": usuario["organizacao_id"]}, campos)
     midias, caminhos, usados = {}, {}, set()
     async for midia in cursor:
@@ -54,8 +55,7 @@ async def _preparar(db, projeto_id: str, usuario: dict) -> tuple[dict, dict[str,
         chave = str(midia["_id"])
         midias[chave] = {"nome": midia["nome"], "arquivo": arquivo, "duracao": midia.get("duracao"),
                          "video": midia.get("video"), "audio": bool(midia.get("audio")), "imagem": e_imagem(midia)}
-        original = chave_arquivo(usuario["organizacao_id"], midia["_id"], midia["original"])
-        caminhos[chave] = storage.caminho_local(original)
+        caminhos[chave] = caminho_do_original(midia)
     return projeto, midias, caminhos
 
 

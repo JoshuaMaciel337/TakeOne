@@ -10,6 +10,8 @@
 #   POST   /api/albuns/{id}/fotos            põe imagens da biblioteca no álbum
 #   PATCH  /api/albuns/{id}/fotos            a mesma nota, cor ou marcação em várias fotos
 #   POST   /api/albuns/{id}/fotos/remover    tira fotos do álbum
+#   GET    /api/albuns/pasta-do-computador   as pastas da pasta das fotos do Nitro (montada só para leitura)
+#   POST   /api/albuns/{id}/importar         importa uma pasta dela sem copiar (job "importar_pasta")
 #
 # As fotos chegam pelo envio de sempre (tus), com o álbum nos metadados (api/rotas/uploads.py).
 # -----------------------------------------------
@@ -18,6 +20,7 @@ import logging
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 
 from api.dependencias import obter_db, usuario_atual
 from api.esquemas import (
@@ -28,10 +31,15 @@ from api.esquemas import (
     FotosIdsEntrada,
     FotosMudarEntrada,
     FotosRemovidasSaida,
+    ImportarPastaEntrada,
+    ImportarPastaSaida,
+    PastaDoComputadorSaida,
 )
 from api.rotas.midias import apagar_midia, jobs_de_ingestao, motivo_para_manter
 from core.modelos.album import FOTOS_POR_ALBUM, montar_album, montar_foto, mudanca_das_fotos
+from core.modelos.job import montar_job
 from core.modelos.midia import STATUS_PROCESSANDO, STATUS_PRONTA, e_imagem
+from core.utils import fotos_no_lugar
 from core.utils.mongo import agora
 
 router = APIRouter(prefix="/api/albuns", tags=["albuns"])
@@ -120,6 +128,35 @@ async def criar_album(dados: AlbumEntrada, usuario=Depends(usuario_atual), db=De
     album["_id"] = (await db.albuns.insert_one(album)).inserted_id
     logging.info(f"[{usuario['organizacao_id']}] Álbum criado: {album['nome']}")
     return (await resumos(db, [album]))[0]
+
+
+@router.get("/pasta-do-computador", response_model=PastaDoComputadorSaida)
+async def pasta_do_computador(caminho: str = "", usuario=Depends(usuario_atual)):
+    """As pastas e as fotos de uma pasta da pasta das fotos do Nitro (PASTA_DAS_FOTOS_HOST no .env)."""
+    if not fotos_no_lugar.disponivel():
+        return PastaDoComputadorSaida(disponivel=False)
+    try:
+        lida = await run_in_threadpool(fotos_no_lugar.listar, caminho)
+    except fotos_no_lugar.CaminhoInvalido as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    return PastaDoComputadorSaida(disponivel=True, **lida)
+
+
+@router.post("/{album_id}/importar", response_model=ImportarPastaSaida, status_code=status.HTTP_202_ACCEPTED)
+async def importar_pasta(album_id: str, dados: ImportarPastaEntrada, usuario=Depends(usuario_atual),
+                         db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    if not fotos_no_lugar.disponivel():
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A pasta das fotos não está montada no servidor (PASTA_DAS_FOTOS_HOST no .env).")
+    try:
+        await run_in_threadpool(fotos_no_lugar.listar, dados.caminho)
+    except fotos_no_lugar.CaminhoInvalido as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    job = montar_job("importar_pasta", usuario["organizacao_id"],
+                     {"album_id": str(album["_id"]), "caminho": dados.caminho, "subpastas": dados.subpastas},
+                     criado_por=usuario["_id"])
+    return ImportarPastaSaida(job_id=str((await db.jobs.insert_one(job)).inserted_id))
 
 
 @router.get("/{album_id}", response_model=AlbumSaida)
