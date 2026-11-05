@@ -28,11 +28,15 @@
 # As fotos chegam pelo envio de sempre (tus), com o álbum nos metadados (api/rotas/uploads.py).
 # -----------------------------------------------
 import logging
+import mimetypes
+import zipfile
+from pathlib import PurePosixPath
+from urllib.parse import quote
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pymongo import UpdateOne
 from starlette.concurrency import run_in_threadpool
 
@@ -134,7 +138,8 @@ async def resumos(db, albuns: list[dict]) -> list[AlbumSaida]:
     for album in albuns:
         conta = contas.get(album["_id"], {})
         saida.append(AlbumSaida(
-            id=str(album["_id"]), nome=album["nome"], genero=album["genero"], fotos=conta.get("fotos", 0),
+            id=str(album["_id"]), nome=album["nome"], genero=album["genero"], unica=bool(album.get("unica")),
+            fotos=conta.get("fotos", 0),
             escolha_opcoes=album.get("escolha_opcoes"),
             prontas=conta.get("prontas", 0), escolhidas=conta.get("escolhidas", 0),
             capa_midia_id=str(conta["capa"]) if conta.get("capa") else None,
@@ -174,14 +179,16 @@ async def tirar_fotos(db, album: dict, midia_ids: list[ObjectId]) -> FotosRemovi
 # ROTAS
 # -----------------------------------------------
 @router.get("", response_model=list[AlbumSaida])
-async def listar_albuns(usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    cursor = db.albuns.find({"organizacao_id": usuario["organizacao_id"]}).sort("atualizado_em", -1).limit(500)
+async def listar_albuns(unica: bool = False, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    # Os álbuns da edição em massa, ou (com ?unica=true) as edições de uma foto
+    filtro = {"organizacao_id": usuario["organizacao_id"], "unica": True if unica else {"$ne": True}}
+    cursor = db.albuns.find(filtro).sort("atualizado_em", -1).limit(500)
     return await resumos(db, [a async for a in cursor])
 
 
 @router.post("", response_model=AlbumSaida, status_code=status.HTTP_201_CREATED)
 async def criar_album(dados: AlbumEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
-    album = montar_album(usuario["organizacao_id"], usuario["_id"], dados.nome, dados.genero)
+    album = montar_album(usuario["organizacao_id"], usuario["_id"], dados.nome, dados.genero, unica=dados.unica)
     album["_id"] = (await db.albuns.insert_one(album)).inserted_id
     logging.info(f"[{usuario['organizacao_id']}] Álbum criado: {album['nome']}")
     return (await resumos(db, [album]))[0]
@@ -365,7 +372,24 @@ async def baixar_saida(album_id: str, job_id: str, usuario=Depends(usuario_atual
     if not job or job.get("status") != "concluido" or not caminho.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Exportação não encontrada.")
     nome = f"{album['nome']}.zip".replace('"', "")
+    if album.get("unica"):
+        # A edição de uma foto baixa a foto, não um ZIP com ela (o XMP, se pedido, fica de fora)
+        foto = await run_in_threadpool(foto_do_zip, caminho)
+        if foto:
+            nome_da_foto, conteudo = foto
+            return Response(conteudo, media_type=mimetypes.guess_type(nome_da_foto)[0] or "application/octet-stream",
+                            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nome_da_foto)}"})
     return FileResponse(caminho, media_type="application/zip", filename=nome)
+
+
+def foto_do_zip(caminho) -> tuple[str, bytes] | None:
+    """O nome e os bytes da única foto do ZIP (sem os .xmp), ou None se ele tem outra coisa."""
+    with zipfile.ZipFile(caminho) as arquivo:
+        fotos = [item for item in arquivo.infolist()
+                 if not item.is_dir() and not item.filename.lower().endswith(".xmp")]
+        if len(fotos) != 1:
+            return None
+        return PurePosixPath(fotos[0].filename).name, arquivo.read(fotos[0])
 
 
 @router.get("/{album_id}/pessoas", response_model=list[PessoaDoAlbumSaida])

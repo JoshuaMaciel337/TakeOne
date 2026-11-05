@@ -453,6 +453,24 @@ def test_exportar_as_escolhidas_num_zip(cliente, db_limpo):
     assert cliente.get(f"/api/albuns/{album['id']}/saidas/{ObjectId()}").status_code == 404
 
 
+def test_edicao_de_uma_foto_fica_fora_da_lista_e_baixa_a_foto(cliente, db_limpo):
+    # A edição de uma foto é um álbum "unica": a lista da edição em massa não a mostra, e o download é a foto
+    em_massa = cliente.post("/api/albuns", json={"nome": "Ensaio"}).json()
+    unica = cliente.post("/api/albuns", json={"nome": "Retrato", "unica": True}).json()
+    assert unica["unica"] is True and em_massa["unica"] is False
+    assert [a["id"] for a in cliente.get("/api/albuns").json()] == [em_massa["id"]]
+    assert [a["id"] for a in cliente.get("/api/albuns?unica=true").json()] == [unica["id"]]
+    midia = enviar_foto(cliente, unica["id"], "retrato.jpg", _jpeg_grande((90, 120, 150)))
+    ingerir_tudo(db_limpo)
+    pedido = cliente.post(f"/api/albuns/{unica['id']}/exportar",
+                          json={"midia_ids": [midia], "opcoes": {"formato": "jpg", "xmp": True}})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["exportar_album"], "w-teste"), "w-teste")
+    resposta = cliente.get(f"/api/albuns/{unica['id']}/saidas/{pedido.json()['job_id']}")
+    assert resposta.status_code == 200 and resposta.headers["content-type"] == "image/jpeg"
+    assert ".jpg" in resposta.headers["content-disposition"]
+    assert Image.open(io.BytesIO(resposta.content)).size == (900, 600)
+
+
 def test_galeria_do_cliente_pelo_link(cliente, db_limpo):
     album = cliente.post("/api/albuns", json={"nome": "Ensaio da Ana"}).json()
     ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", _jpeg((40 * i, 90, 30))) for i in range(3)]

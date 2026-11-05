@@ -32,6 +32,8 @@ export type Album = {
   id: string;
   nome: string;
   genero: Genero;
+  /** A edição de uma foto (fora da lista da edição em massa). */
+  unica?: boolean;
   fotos: number;
   prontas: number;
   escolhidas: number;

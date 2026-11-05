@@ -24,7 +24,7 @@ export function PainelDeRetoque({
   pessoas: PessoaDoAlbum[];
   aoEditar: (edicoes: { midia_id: string; edicao: EdicaoDaFoto | null }[], aviso: string) => Promise<void>;
   /** Abre a lupa da foto do cursor com o pincel do retoque. */
-  aoPincel: () => void;
+  aoPincel?: () => void;
 }) {
   const [ocupado, setOcupado] = useState(false);
   const [rascunho, setRascunho] = useState<Partial<Record<ControleDoRetoque, number>>>({});
@@ -71,10 +71,12 @@ export function PainelDeRetoque({
             </option>
           ))}
         </select>
-        <button type="button" className="flex items-center gap-1 rounded-md bg-painel-2 px-2 py-1 text-xs hover:bg-painel-3 disabled:opacity-40" onClick={aoPincel} disabled={!referencia || ocupado} title="Pintar na foto o que é pele (incluir) e o que não deve ser retocado (excluir)">
-          <Brush className="size-3.5" aria-hidden />
-          Pincel
-        </button>
+        {aoPincel ? (
+          <button type="button" className="flex items-center gap-1 rounded-md bg-painel-2 px-2 py-1 text-xs hover:bg-painel-3 disabled:opacity-40" onClick={aoPincel} disabled={!referencia || ocupado} title="Pintar na foto o que é pele (incluir) e o que não deve ser retocado (excluir)">
+            <Brush className="size-3.5" aria-hidden />
+            Pincel
+          </button>
+        ) : null}
       </div>
       {nasFotos.length > 1 ? (
         <div className="flex flex-wrap items-center gap-1 text-[11px]" role="group" aria-label="Retocar só estas pessoas">

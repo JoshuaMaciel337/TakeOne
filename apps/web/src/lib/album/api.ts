@@ -6,9 +6,10 @@ import type { Album, FotoDoAlbum, Genero, Mudanca, PessoaDoAlbum } from "./fotos
 
 export type FotosRemovidas = { apagadas: number; na_biblioteca: number };
 
-export const listarAlbuns = () => chamarApi<Album[]>("/albuns");
+/** Os álbuns da edição em massa, ou (unica) as edições de uma foto. */
+export const listarAlbuns = (unica = false) => chamarApi<Album[]>(unica ? "/albuns?unica=true" : "/albuns");
 export const verAlbum = (id: string) => chamarApi<Album>(`/albuns/${id}`);
-export const criarAlbum = (nome: string, genero: Genero) => chamarApi<Album>("/albuns", { metodo: "POST", corpo: { nome, genero } });
+export const criarAlbum = (nome: string, genero: Genero, unica = false) => chamarApi<Album>("/albuns", { metodo: "POST", corpo: { nome, genero, unica } });
 export const mudarAlbum = (id: string, campos: { nome?: string; genero?: Genero }) => chamarApi<Album>(`/albuns/${id}`, { metodo: "PATCH", corpo: campos });
 export const excluirAlbum = (id: string) => chamarApi<FotosRemovidas>(`/albuns/${id}`, { metodo: "DELETE" });
 export const fotosDoAlbum = (id: string) => chamarApi<FotoDoAlbum[]>(`/albuns/${id}/fotos`);

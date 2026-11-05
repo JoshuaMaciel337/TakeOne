@@ -32,7 +32,8 @@ LADO_MAXIMO_DO_NOME = 120
 LADO_MAXIMO_DA_PASTA = 200
 
 
-def montar_album(organizacao_id, criado_por, nome: str, genero: str, momento: datetime | None = None) -> dict:
+def montar_album(organizacao_id, criado_por, nome: str, genero: str, momento: datetime | None = None,
+                 unica: bool = False) -> dict:
     if genero not in GENEROS:
         raise ValueError(f"Tipo de ensaio desconhecido: {genero}")
     momento = momento or datetime.now(TZ)
@@ -41,6 +42,8 @@ def montar_album(organizacao_id, criado_por, nome: str, genero: str, momento: da
         "criado_por": criado_por,
         "nome": nome.strip()[:LADO_MAXIMO_DO_NOME] or "Álbum",
         "genero": genero,
+        # A edição de uma foto (a página "Edição de uma foto"): um álbum de uma foto só, fora da lista dos álbuns
+        "unica": unica,
         "criado_em": momento,
         "atualizado_em": momento,
     }

@@ -156,7 +156,7 @@ const EXTENSOES_DE_FOTO = /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|heic|heif|cr2|cr
 // -----------------------------------------------
 // Os dados do álbum: a lista, a recarga quando as fotos chegam e o andamento de cada uma
 // -----------------------------------------------
-function useAlbum(albumId: string) {
+export function useAlbum(albumId: string) {
   const [album, setAlbum] = useState<TipoAlbum | null>(null);
   const [fotos, setFotos] = useState<FotoDoAlbum[] | null>(null);
   const [pessoas, setPessoas] = useState<PessoaDoAlbum[]>([]);
@@ -561,7 +561,7 @@ export function Album({ albumId }: { albumId: string }) {
       {/* A barra de cima: voltar, o nome, o tipo do ensaio e os envios */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-borda bg-painel px-3 sm:grid sm:grid-cols-[1fr_auto_1fr]">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Link href="/app/albuns" className="botao-icone" aria-label="Voltar aos álbuns" title="Álbuns">
+          <Link href="/app/albuns" className="botao-icone" aria-label="Voltar à edição em massa" title="Edição em massa">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
           <input

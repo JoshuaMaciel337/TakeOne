@@ -47,6 +47,7 @@ const ICONES: Record<string, LucideIcon> = {
   "editor-video": Clapperboard,
   "editor-imagem": ImagePlus,
   "album-de-fotos": Images,
+  "edicao-uma-foto": WandSparkles,
   clipar: ScissorsLineDashed,
   "criar-automaticamente": WandSparkles,
   legendas: Captions,

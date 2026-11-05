@@ -3045,6 +3045,8 @@ IdDeMidia = Annotated[str, Field(min_length=24, max_length=24)]
 class AlbumEntrada(BaseModel):
     nome: str = Field(min_length=1, max_length=120)
     genero: GeneroDoAlbum = "ensaio"
+    # A edição de uma foto: o álbum fica fora da lista da edição em massa
+    unica: bool = False
 
     @field_validator("nome", mode="before")
     @classmethod
@@ -3066,6 +3068,7 @@ class AlbumSaida(BaseModel):
     id: str
     nome: str
     genero: str
+    unica: bool = False
     # As últimas opções de "Escolher as melhores", para a janela abrir com elas
     escolha_opcoes: dict | None = None
     fotos: int = 0

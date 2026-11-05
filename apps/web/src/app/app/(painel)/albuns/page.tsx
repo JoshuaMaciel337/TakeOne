@@ -7,8 +7,8 @@ export default function PaginaAlbuns() {
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">
       <TituloDaPagina
-        titulo="Álbuns de fotos"
-        descricao="Envie a pasta de um ensaio, dê notas e cores e separe as melhores fotos, com o teclado ou pela tela."
+        titulo="Edição em massa"
+        descricao="Envie a pasta de um ensaio: o TakeOne escolhe as melhores fotos e edita todas no seu estilo. Para uma foto só, use a edição de uma foto."
       />
       <ListaAlbuns />
     </main>

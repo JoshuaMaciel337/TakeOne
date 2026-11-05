@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { Album } from "@/componentes/album/Album";
 
-export const metadata: Metadata = { title: "Álbum de fotos" };
+export const metadata: Metadata = { title: "Edição em massa" };
 
 export default async function PaginaAlbum({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
