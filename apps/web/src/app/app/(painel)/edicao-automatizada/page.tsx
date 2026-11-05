@@ -36,7 +36,7 @@ export default function PaginaEdicaoDeUmaFoto() {
     const destino = `/app/foto/${enviando.albumId}`;
     router.push(destino);
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a reserva para quando a troca de página não acontece
-    const reserva = window.setTimeout(() => window.location.assign(destino), 4000);
+    const reserva = window.setTimeout(() => window.location.assign(destino), 8000);
     return () => window.clearTimeout(reserva);
   }, [terminou, enviando, router]);
 
