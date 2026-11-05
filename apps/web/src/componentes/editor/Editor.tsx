@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, Download, Film, LoaderCircle, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Check, ChevronLeft, Download, Film, LoaderCircle, SlidersHorizontal, Sparkles, TriangleAlert, WandSparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -36,6 +36,8 @@ import { BarraDoTakecut, LAYOUTS_DO_TAKECUT, layoutAtual, type TamanhosDoTakecut
 import { BarraFerramentas } from "./BarraFerramentas";
 import { DetalhesDoProjeto } from "./DetalhesDoProjeto";
 import { VariosClipes } from "./VariosClipes";
+import { aplicarMelhoria, MelhorarOProjeto } from "./MelhorarOProjeto";
+import { PecaUmaEdicao } from "./PecaUmaEdicao";
 import { BarraSuperior } from "./BarraSuperior";
 import { Divisor } from "./Divisor";
 import { FERRAMENTAS, type IdFerramenta } from "./ferramentas";
@@ -324,6 +326,9 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
   const [pedidoGraficos, setPedidoGraficos] = useState(doEndereco?.painel === "graficos" && doEndereco.aba ? { aba: doEndereco.aba, vez: 1 } : undefined);
   const importarRef = useRef<HTMLInputElement>(null);
   const [tempoDoMouse, setTempoDoMouse] = useState<Tick | null>(null);
+  // "Melhorar o projeto" e o assistente flutuante do Takecut (ADR 0007, 17.6)
+  const [melhorando, setMelhorando] = useState(false);
+  const [assistenteAberto, setAssistenteAberto] = useState(false);
   const [ferramentaDaLinha, setFerramentaDaLinha] = useState<IdFerramentaDaLinha>("selecao");
   // A mídia aberta no monitor de origem (duplo clique no Projeto) e a entrada e a saída dela
   const [fonte, setFonte] = useState<{ midiaId: string; entrada: Tick | null; saida: Tick | null } | null>(null);
@@ -843,6 +848,13 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
     aoColar: () => colarNoCursor(),
     aoPrevisualizar: setTempoDoMouse,
     aoImportar: () => importarRef.current?.click(),
+    aoMelhorarClipes: (tipo: "cor" | "volume" | "voz" | "cenas", clipeIds: string[]) => {
+      if (!projeto) return;
+      mostrarAviso("A IA está trabalhando nos clipes…");
+      void aplicarMelhoria(tipo, clipeIds, { projeto, midias, executar, avisar: mostrarAviso, abrirLegendas: () => setFerramenta("legendas") }).catch((erro: unknown) =>
+        mostrarAviso(erro instanceof Error ? erro.message : "A IA não conseguiu terminar."),
+      );
+    },
   };
   const entradaDeImportar = (
     <input
@@ -1232,6 +1244,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             })),
           },
           { nome: "Configurações da sequência…", aoEscolher: () => setConfigurando(true) },
+          { nome: "Melhorar o projeto…", aoEscolher: () => setMelhorando(true) },
         ],
       },
       {
@@ -1275,6 +1288,7 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
             }}
             aoExportar={() => setExportando(true)}
             aoSalvarModelo={() => setSalvandoModelo(true)}
+            aoMelhorar={() => setMelhorando(true)}
           />
           <div className="flex min-h-0 flex-1 flex-col px-2 pb-2">
             <div className="flex min-h-0 flex-1">
@@ -1320,6 +1334,43 @@ export function Editor({ projetoId, ferramentaInicial, modeloInicial, animacaoIn
           </div>
           {entradaDeImportar}
           {janelas}
+          {melhorando ? (
+            <MelhorarOProjeto
+              ambiente={{ projeto, midias, executar, avisar: mostrarAviso, abrirLegendas: () => { setFerramenta("legendas"); setMelhorando(false); } }}
+              aoFechar={() => setMelhorando(false)}
+            />
+          ) : null}
+          {/* O assistente flutuante: o pedido em palavras ao Qwen3 local e o atalho do "Melhorar o projeto" */}
+          {assistenteAberto ? (
+            <section aria-label="Assistente" className="fixed bottom-20 right-5 z-40 flex max-h-[70vh] w-96 flex-col overflow-hidden rounded-xl border border-borda bg-painel shadow-2xl shadow-black/50">
+              <div className="flex items-center justify-between border-b border-borda px-3 py-2">
+                <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Sparkles className="size-4 text-destaque" aria-hidden />
+                  Assistente
+                </h2>
+                <button type="button" className="botao-icone" onClick={() => setAssistenteAberto(false)} aria-label="Fechar o assistente">
+                  <X className="size-4" aria-hidden />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <button type="button" className="botao-secundario mb-3 w-full px-3 py-1.5 text-xs" onClick={() => setMelhorando(true)}>
+                  <WandSparkles className="size-4 text-destaque" aria-hidden />
+                  Melhorar o projeto (volume, cor, legendas, voz e cenas)
+                </button>
+                <PecaUmaEdicao projeto={projeto} midias={[...midias.values()]} aoExecutar={executar} aoAvisar={mostrarAviso} />
+              </div>
+            </section>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setAssistenteAberto(!assistenteAberto)}
+            aria-pressed={assistenteAberto}
+            className="fixed bottom-5 right-5 z-40 grid size-12 place-items-center rounded-full bg-destaque text-white shadow-xl shadow-black/40 transition hover:brightness-110"
+            aria-label={assistenteAberto ? "Fechar o assistente" : "Abrir o assistente"}
+            title="Assistente: peça uma edição em palavras ou melhore o projeto"
+          >
+            <Sparkles className="size-5" aria-hidden />
+          </button>
         </div>
       </IniciarDesenhoDaMascara.Provider>
     );

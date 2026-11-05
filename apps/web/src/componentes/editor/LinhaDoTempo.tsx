@@ -92,6 +92,8 @@ type Props = {
   aoPrevisualizar?: (tempo: Tick | null) => void;
   /** O clique na principal vazia: importar mídias. */
   aoImportar?: () => void;
+  /** A IA no botão direito de um clipe (a mesma conta do "Melhorar o projeto"). */
+  aoMelhorarClipes?: (tipo: "cor" | "volume" | "voz" | "cenas", clipeIds: string[]) => void;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -220,6 +222,7 @@ export function LinhaDoTempo({
   aoColar,
   aoPrevisualizar,
   aoImportar,
+  aoMelhorarClipes,
   className = "",
   style,
 }: Props) {
@@ -689,6 +692,15 @@ export function LinhaDoTempo({
       );
     }
     if (aoCongelar && faixa.tipo === "principal" && temCursorDentro) itens.push({ nome: "Congelar o quadro do cursor", aoEscolher: aoCongelar });
+    if (aoMelhorarClipes && midia) {
+      // A IA no clipe (ou nos escolhidos): as melhorias que fazem sentido para ele
+      const ehImagem = faixa.tipo !== "audio" && Boolean(midia.video) && !clipe.texto;
+      const temSom = Boolean(midia.audio);
+      if (ehImagem) itens.push({ nome: "IA: melhorar a cor", aoEscolher: () => aoMelhorarClipes("cor", ids) });
+      if (temSom) itens.push({ nome: "IA: igualar o volume", aoEscolher: () => aoMelhorarClipes("volume", ids) });
+      if (temSom && !midia.imagem) itens.push({ nome: "IA: limpar a voz", aoEscolher: () => aoMelhorarClipes("voz", ids) });
+      if (faixa.tipo === "principal" && midia.video && !midia.imagem) itens.push({ nome: "IA: dividir nas trocas de cena", aoEscolher: () => aoMelhorarClipes("cenas", [clipe.id]) });
+    }
     itens.push(
       { nome: "Ir ao começo do clipe", aoEscolher: () => aoBuscar(clipe.inicio) },
       { nome: "Ir ao fim do clipe", aoEscolher: () => aoBuscar(fimDoClipe(clipe)) },

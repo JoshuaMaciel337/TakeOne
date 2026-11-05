@@ -1,6 +1,6 @@
 "use client";
 
-import { BookmarkPlus, Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2 } from "lucide-react";
+import { BookmarkPlus, Check, ChevronLeft, CloudOff, Download, LoaderCircle, Redo2, TriangleAlert, Undo2, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -48,6 +48,7 @@ export function BarraDoTakecut({
   aoEscolherLayout,
   aoExportar,
   aoSalvarModelo,
+  aoMelhorar,
 }: {
   nome: string;
   aoMudarNome: (nome: string) => void;
@@ -61,6 +62,7 @@ export function BarraDoTakecut({
   aoEscolherLayout: (tamanhos: TamanhosDoTakecut) => void;
   aoExportar: () => void;
   aoSalvarModelo: () => void;
+  aoMelhorar: () => void;
 }) {
   // A hora em que o último salvamento terminou (a primeira vez que o estado vira "salvo" depois de outro)
   const [anterior, setAnterior] = useState(salvamento);
@@ -132,6 +134,10 @@ export function BarraDoTakecut({
             </option>
           ))}
         </select>
+        <button type="button" className="botao-secundario ml-1 px-2 py-1 text-xs" onClick={aoMelhorar} title="O que dá para melhorar no projeto inteiro: o volume, a cor, as legendas, a voz e as cenas">
+          <WandSparkles className="size-4 text-destaque" aria-hidden />
+          <span className="max-xl:hidden">Melhorar</span>
+        </button>
         <BotaoAparencia className="mx-1" />
         <BotaoTema />
         <button type="button" className="botao-icone" onClick={aoSalvarModelo} aria-label="Salvar como modelo" title="Salvar como modelo (fica na biblioteca do espaço)">
