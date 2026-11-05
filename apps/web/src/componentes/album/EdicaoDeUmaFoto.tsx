@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAlbum } from "@/componentes/album/Album";
 import { JanelaExportarAlbum } from "@/componentes/album/JanelaExportarAlbum";
+import { Lupa } from "@/componentes/album/Lupa";
 import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
 import { PainelDeRetoque } from "@/componentes/album/PainelDeRetoque";
 import { PainelEstiloPessoal } from "@/componentes/album/PainelEstiloPessoal";
@@ -31,6 +32,8 @@ export function EdicaoDeUmaFoto({ albumId }: { albumId: string }) {
   const [estilos, setEstilos] = useState<EstiloPessoal[]>([]);
   const [estiloId, setEstiloId] = useState("");
   const [comRetoque, setComRetoque] = useState(true);
+  // O pincel do retoque, na lupa (o mesmo do álbum)
+  const [pincel, setPincel] = useState(false);
   const analisada = useRef(false);
 
   useEffect(() => {
@@ -183,13 +186,35 @@ export function EdicaoDeUmaFoto({ albumId }: { albumId: string }) {
           {foto && pronta ? (
             <>
               <PainelDeEdicao albumId={albumId} alvos={[foto]} referencia={foto} grupoDa={() => [foto]} aoEditar={editar} />
-              <PainelDeRetoque alvos={[foto]} referencia={foto} pessoas={pessoas} aoEditar={editar} />
+              <PainelDeRetoque alvos={[foto]} referencia={foto} pessoas={pessoas} aoEditar={editar} aoPincel={() => setPincel(true)} />
               <PainelEstiloPessoal albumId={albumId} alvos={[foto]} referencia={foto} evento={eventoDoEstilo} aoAviso={(texto, comErro) => (comErro ? setErro(texto) : setAviso(texto))} />
             </>
           ) : null}
         </aside>
       </div>
 
+      {pincel && foto ? (
+        <Lupa
+          key={`pincel-${foto.midia_id}`}
+          albumId={albumId}
+          retocando
+          foto={foto}
+          fotos={[foto]}
+          pessoas={pessoas}
+          indice={0}
+          total={1}
+          aoIr={() => undefined}
+          aoAndar={() => undefined}
+          aoAplicar={() => undefined}
+          aoFechar={() => setPincel(false)}
+          aoSairDoPincel={() => setPincel(false)}
+          aoSalvarPincel={(tracos) => {
+            setPincel(false);
+            const base = edicaoParaEnviar(foto.edicao);
+            void editar([{ midia_id: foto.midia_id, edicao: { ...base, retoque: { ...(base.retoque ?? {}), pincel: tracos } } }], `Pincel do retoque salvo (${tracos.length} traço(s)).`);
+          }}
+        />
+      ) : null}
       {baixando && foto ? <JanelaExportarAlbum albumId={albumId} escolhidas={[]} selecionadas={[foto]} visiveis={[foto]} aoFechar={() => setBaixando(false)} /> : null}
     </div>
   );
