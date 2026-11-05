@@ -27,6 +27,7 @@ from api.rotas import (
     efeitos_sonoros,
     elementos,
     espacos,
+    estilos_pessoais,
     eventos,
     exportacoes,
     fontes,
@@ -151,6 +152,7 @@ app.include_router(eventos.router)
 app.include_router(uploads.router)
 app.include_router(midias.router)
 app.include_router(albuns.router)
+app.include_router(estilos_pessoais.router)
 app.include_router(projetos.router)
 app.include_router(modelos.router)
 app.include_router(exportacoes.router)

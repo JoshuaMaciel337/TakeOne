@@ -3145,6 +3145,38 @@ class EstiloDaFotoEntrada(BaseModel):
     controles: dict[ControleDoEstilo, ModoDoControleEntrada] = Field(default_factory=dict)
 
 
+class EstiloPessoalEntrada(BaseModel):
+    nome: str = Field(min_length=1, max_length=80)
+
+
+class EstiloPessoalSaida(BaseModel):
+    id: str
+    nome: str
+    # Quantas fotos ensinaram o estilo, e como ele prevê: os vizinhos mais parecidos ou o gradient boosting
+    pares: int = 0
+    modelo: Literal["vizinhos", "boosting"] = "vizinhos"
+    treinado_em: datetime | None = None
+    criado_em: datetime
+
+
+class EnsinarEstiloEntrada(BaseModel):
+    album_id: str = Field(min_length=24, max_length=24)
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=20_000)
+    # A edição das fotos no TakeOne, ou o .xmp de outro programa ao lado das fotos importadas no lugar
+    origem: Literal["takeone", "xmp"] = "takeone"
+
+
+class AplicarEstiloPessoalEntrada(BaseModel):
+    album_id: str = Field(min_length=24, max_length=24)
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=20_000)
+    intensidade: float = Field(default=1, ge=0, le=1.5)
+
+
+class ParecidaSaida(BaseModel):
+    midia_id: str
+    semelhanca: float
+
+
 class EdicaoDaFotoEntrada(BaseModel):
     cor: CorEntrada | None = None
     igualar: IgualarEntrada | None = None

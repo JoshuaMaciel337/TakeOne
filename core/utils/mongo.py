@@ -64,6 +64,12 @@ INDICES = {
     "fotos_medidas": [
         ([("midia_id", 1)], {"unique": True}),
     ],
+    "estilos_pessoais": [
+        ([("organizacao_id", 1), ("criado_em", 1)], {}),
+    ],
+    "estilo_pessoal_pares": [
+        ([("estilo_id", 1), ("midia_id", 1)], {"unique": True}),
+    ],
     "album_pessoas": [
         ([("album_id", 1), ("numero", 1)], {"unique": True}),
     ],

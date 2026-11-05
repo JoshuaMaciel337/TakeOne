@@ -111,7 +111,7 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 - [x] 16.6 Estilos: o estilo instantâneo (de um XMP, de uma LUT ou de um filtro, mais o "Melhorar" e o questionário de
   3 luzes), comparar até 3 na própria foto, o ajuste controle a controle e a intensidade, e a consistência entre fotos
   parecidas.
-- [ ] 16.7 Estilo pessoal: os pares das fotos editadas no TakeOne e de XMP, os vizinhos mais parecidos e depois o
+- [x] 16.7 Estilo pessoal: os pares das fotos editadas no TakeOne e de XMP, os vizinhos mais parecidos e depois o
   gradient boosting, treinados no worker, com "ensinar a correção" ao corrigir uma foto.
 - [ ] 16.8 Retoque de retrato: o mapa do rosto e do corpo e os controles (pele, manchas, sardas, rugas, olheiras,
   olhos, dentes, brilho, uniformizar e contornar, pescoço, roupa), por pessoa, com o pincel de incluir e excluir,

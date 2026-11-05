@@ -13,6 +13,7 @@ from worker.tarefas.esconder_objeto import marcar_com_erro as marcar_objeto_esco
 from worker.tarefas.esconder_rostos import executar_esconder_rostos
 from worker.tarefas.esconder_rostos import marcar_com_erro as marcar_rostos_com_erro
 from worker.tarefas.estabilizacao import executar_estabilizacao, marcar_estabilizacao_com_erro
+from worker.tarefas.estilo_pessoal import executar_aplicar_estilo_pessoal, executar_ensinar_estilo
 from worker.tarefas.fala import executar_fala
 from worker.tarefas.fluido import executar_fluido, marcar_fluido_com_erro
 from worker.tarefas.foto_ia import (
@@ -69,6 +70,8 @@ REGISTRO = {
     "importar_pasta": Tarefa(executar_importar_pasta),
     "medir_album": Tarefa(executar_medir_album),
     "editar_album": Tarefa(executar_editar_album),
+    "ensinar_estilo": Tarefa(executar_ensinar_estilo),
+    "aplicar_estilo_pessoal": Tarefa(executar_aplicar_estilo_pessoal),
     "importar_link": Tarefa(executar_importacao, ao_falhar=marcar_midia_com_erro),
     "clipagem": Tarefa(executar_clipagem, ao_falhar=marcar_clipagem_com_erro),
     "montagem": Tarefa(executar_montagem, ao_falhar=marcar_montagem_com_erro),

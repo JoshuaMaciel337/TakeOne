@@ -48,3 +48,16 @@ export const nomearPessoa = (id: string, numero: number, nome: string) =>
 /** Guarda a edição de cada foto (null tira) e põe o desenho na fila do worker. */
 export const editarFotos = (id: string, edicoes: { midia_id: string; edicao: EdicaoDaFoto | null }[]) =>
   chamarApi<{ job_id: string }>(`/albuns/${id}/edicoes`, { metodo: "PUT", corpo: { edicoes } });
+
+/** Um estilo pessoal do espaço (apps/api/rotas/estilos_pessoais.py): quantas fotos o ensinaram e como ele prevê. */
+export type EstiloPessoal = { id: string; nome: string; pares: number; modelo: "vizinhos" | "boosting"; treinado_em: string | null; criado_em: string };
+
+export const estilosPessoais = () => chamarApi<EstiloPessoal[]>("/estilos-pessoais");
+export const criarEstiloPessoal = (nome: string) => chamarApi<EstiloPessoal>("/estilos-pessoais", { metodo: "POST", corpo: { nome } });
+export const excluirEstiloPessoal = (id: string) => chamarApi<void>(`/estilos-pessoais/${id}`, { metodo: "DELETE" });
+export const ensinarEstilo = (id: string, albumId: string, midiaIds: string[], origem: "takeone" | "xmp") =>
+  chamarApi<{ job_id: string }>(`/estilos-pessoais/${id}/ensinar`, { metodo: "POST", corpo: { album_id: albumId, midia_ids: midiaIds, origem } });
+export const aplicarEstiloPessoal = (id: string, albumId: string, midiaIds: string[], intensidade: number) =>
+  chamarApi<{ job_id: string }>(`/estilos-pessoais/${id}/aplicar`, { metodo: "POST", corpo: { album_id: albumId, midia_ids: midiaIds, intensidade } });
+export const parecidasDoEstilo = (id: string, midiaId: string) =>
+  chamarApi<{ midia_id: string; semelhanca: number }[]>(`/estilos-pessoais/${id}/parecidas?midia_id=${midiaId}`);

@@ -28,6 +28,9 @@ TAREFAS = {
     "medir_album": RECURSO_CPU,
     # A capa e a cópia leve editadas das fotos do álbum (onda 16.5)
     "editar_album": RECURSO_CPU,
+    # O estilo pessoal: aprender com as fotos editadas e aplicar nas outras (onda 16.7)
+    "ensinar_estilo": RECURSO_CPU,
+    "aplicar_estilo_pessoal": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,

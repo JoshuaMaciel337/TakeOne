@@ -334,3 +334,58 @@ def test_editar_as_fotos_desenha_a_capa_e_a_copia_leve(cliente, db_limpo):
     processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
     assert cliente.get(f"/api/midias/{ids[0]}/arquivos/album_{album['id']}_3_capa.jpg").status_code == 404
     assert cliente.get(f"/api/albuns/{album['id']}/fotos").json()[0]["edicao"] is None
+
+
+def test_estilo_pessoal_aprende_com_as_editadas_e_com_o_xmp(cliente, db_limpo, tmp_path, monkeypatch):
+    from core.utils import fotos_no_lugar
+
+    def foto(semente: int) -> bytes:
+        imagem = Image.fromarray(np.random.default_rng(semente).integers(40, 200, (48, 64, 3), dtype=np.uint8))
+        saida = io.BytesIO()
+        imagem.resize((256, 192)).save(saida, "JPEG", quality=90)
+        return saida.getvalue()
+
+    # Duas fotos "no lugar", uma com o .xmp de outro programa ao lado
+    pasta = tmp_path / "fotos" / "Ensaio"
+    pasta.mkdir(parents=True)
+    (pasta / "IMG_1.jpg").write_bytes(foto(1))
+    (pasta / "IMG_1.xmp").write_text('<x:xmpmeta><rdf:Description crs:Exposure2012="+0.8" crs:Saturation="-30"/>'
+                                      '</x:xmpmeta>', encoding="utf-8")
+    (pasta / "IMG_2.jpg").write_bytes(foto(2))
+    monkeypatch.setattr(fotos_no_lugar, "PASTA_DAS_FOTOS", tmp_path / "fotos")
+    album = cliente.post("/api/albuns", json={"nome": "Pessoal"}).json()
+    cliente.post(f"/api/albuns/{album['id']}/importar", json={"caminho": "Ensaio"})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["importar_pasta"], "w-teste"), "w-teste")
+    enviadas = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", foto(i)) for i in (3, 4)]
+    ingerir_tudo(db_limpo)
+    fotos = {f["nome"]: f["midia_id"] for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}
+
+    estilo = cliente.post("/api/estilos-pessoais", json={"nome": "Meu"}).json()
+    assert estilo["pares"] == 0 and estilo["modelo"] == "vizinhos"
+    url = f"/api/estilos-pessoais/{estilo['id']}"
+    assert cliente.post(f"{url}/aplicar", json={"album_id": album["id"], "midia_ids": enviadas}).status_code == 409
+    # Ensina pelo .xmp (só a que tem) e por uma foto editada no TakeOne
+    cliente.post(f"{url}/ensinar", json={"album_id": album["id"], "midia_ids": [fotos["IMG_1"], fotos["IMG_2"]],
+                                         "origem": "xmp"})
+    assert processar_job(db_limpo, pegar_proximo_job(db_limpo, ["ensinar_estilo"], "w-teste"), "w-teste") == "concluido"
+    cliente.put(f"/api/albuns/{album['id']}/edicoes", json={"edicoes": [
+        {"midia_id": enviadas[0], "edicao": {"cor": {"exposicao": 0.8, "saturacao": -0.3}}}]})
+    cliente.post(f"{url}/ensinar", json={"album_id": album["id"], "midia_ids": [enviadas[0]]})
+    job = pegar_proximo_job(db_limpo, ["ensinar_estilo"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido"
+    assert db_limpo.jobs.find_one({"_id": job["_id"]})["saida"]["pares"] == 2
+    assert [e["pares"] for e in cliente.get("/api/estilos-pessoais").json()] == [2]
+    pares = list(db_limpo.estilo_pessoal_pares.find({}))
+    assert {p["origem"] for p in pares} == {"xmp", "takeone"}
+    assert all(p["cor"]["exposicao"] == 0.8 and p["cor"]["saturacao"] == -0.3 for p in pares)
+    # Aplicar na que não foi ensinada (ela é medida ali) e as parecidas dela
+    cliente.post(f"{url}/aplicar", json={"album_id": album["id"], "midia_ids": [enviadas[1]], "intensidade": 1})
+    job = pegar_proximo_job(db_limpo, ["aplicar_estilo_pessoal"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    editada = next(f for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json() if f["midia_id"] == enviadas[1])
+    # O resíduo sobre o Melhorar: a saturação -0.3 dos dois pares (as fotos de ruído não pedem saturação a mais)
+    assert editada["edicao"]["cor"]["saturacao"] == pytest.approx(-0.3, abs=0.2)
+    assert editada["edicao"]["gerada"] == editada["edicao"]["versao"]
+    assert len(cliente.get(f"{url}/parecidas", params={"midia_id": enviadas[1]}).json()) == 2
+    assert cliente.delete(url).status_code == 204
+    assert db_limpo.estilo_pessoal_pares.count_documents({}) == 0

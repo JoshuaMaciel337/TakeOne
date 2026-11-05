@@ -28,6 +28,7 @@ import { JanelaDeEstilos } from "@/componentes/album/JanelaDeEstilos";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
 import { Lupa } from "@/componentes/album/Lupa";
 import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
+import { PainelEstiloPessoal } from "@/componentes/album/PainelEstiloPessoal";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { analisarAlbum, editarFotos, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
@@ -67,6 +68,7 @@ import {
 import { arquivoDaMidia, ErroApi } from "@/lib/api";
 import { ACEITAR_IMAGENS, useEnvios } from "@/lib/envios";
 import { useEventosJobs } from "@/lib/eventos";
+import type { Job } from "@/lib/tipos";
 import { formatarBytes } from "@/lib/formatar";
 
 const VAO = 6;
@@ -154,6 +156,8 @@ function useAlbum(albumId: string) {
   const [pessoas, setPessoas] = useState<PessoaDoAlbum[]>([]);
   const [erro, setErro] = useState("");
   const [analise, setAnalise] = useState<{ progresso: number; mensagem: string } | null>(null);
+  // O último job do estilo pessoal que terminou (o painel dele recarrega e avisa)
+  const [eventoDoEstilo, setEventoDoEstilo] = useState<Job | null>(null);
   const espera = useRef<number | null>(null);
   const esperaDaAnalise = useRef<((deuCerto: boolean) => void) | null>(null);
   /** Uma promessa que se resolve quando a análise em andamento termina (true se deu certo). */
@@ -207,6 +211,14 @@ function useAlbum(albumId: string) {
       }
       return;
     }
+    // O estilo pessoal: ensinar e aplicar (aplicar já desenha as fotos)
+    if (job.tipo === "ensinar_estilo" || job.tipo === "aplicar_estilo_pessoal") {
+      if (job.status === "concluido" || job.status === "erro") {
+        setEventoDoEstilo(job);
+        pedirRecarga();
+      }
+      return;
+    }
     // A edição desenhada pelo worker: a grade troca as imagens aos poucos
     if (job.tipo === "editar_album") {
       pedirRecarga();
@@ -234,14 +246,14 @@ function useAlbum(albumId: string) {
     if (criados) pedirRecarga();
   }, [criados, pedirRecarga]);
 
-  return { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise };
+  return { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise, eventoDoEstilo };
 }
 
 // -----------------------------------------------
 // A tela
 // -----------------------------------------------
 export function Album({ albumId }: { albumId: string }) {
-  const { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise } = useAlbum(albumId);
+  const { album, setAlbum, fotos, setFotos, pessoas, setPessoas, erro, setErro, recarregar, analise, setAnalise, esperarAnalise, eventoDoEstilo } = useAlbum(albumId);
   // A comparação (as fotos lado a lado) e o pincel de notas (a mudança que o arrasto pinta nas fotos)
   const [comparando, setComparando] = useState<string[] | null>(null);
   const [pincel, setPincel] = useState<Mudanca | null>(null);
@@ -355,6 +367,9 @@ export function Album({ albumId }: { albumId: string }) {
   }
 
   /** As fotos que recebem a ação: as escolhidas, ou a do cursor. */
+  const alvosDaGaveta = (selecao.size ? [...selecao] : cursor ? [cursor] : [])
+    .map((id) => (fotos ?? []).find((foto) => foto.midia_id === id))
+    .filter((foto): foto is FotoDoAlbum => Boolean(foto));
   const alvos = useCallback((): string[] => (selecao.size ? [...selecao] : cursor ? [cursor] : []), [selecao, cursor]);
 
   const aplicar = useCallback(
@@ -754,15 +769,22 @@ export function Album({ albumId }: { albumId: string }) {
           todas={fotos}
           pessoas={pessoas}
           edicao={
-            <PainelDeEdicao
-              albumId={albumId}
-              alvos={alvos()
-                .map((id) => fotos.find((foto) => foto.midia_id === id))
-                .filter((foto): foto is FotoDoAlbum => Boolean(foto))}
-              referencia={fotoDoCursor}
-              grupoDa={(foto) => grupoDaFoto(fotos, foto)}
-              aoEditar={editarAsFotos}
-            />
+            <>
+              <PainelDeEdicao
+                albumId={albumId}
+                alvos={alvosDaGaveta}
+                referencia={fotoDoCursor}
+                grupoDa={(foto) => grupoDaFoto(fotos, foto)}
+                aoEditar={editarAsFotos}
+              />
+              <PainelEstiloPessoal
+                albumId={albumId}
+                alvos={alvosDaGaveta}
+                referencia={fotoDoCursor}
+                evento={eventoDoEstilo}
+                aoAviso={(texto, comErro) => (comErro ? setErro(texto) : setAviso(texto))}
+              />
+            </>
           }
         />
       </div>
