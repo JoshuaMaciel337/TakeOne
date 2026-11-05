@@ -1,6 +1,7 @@
 # O álbum de fotos (onda 16) de ponta a ponta: criar, enviar fotos pelo tus com a pasta, a ingestão, a grade, as
 # notas, tirar fotos (a usada num projeto vai para a biblioteca) e excluir o álbum
 import base64
+import contextlib
 import io
 
 import numpy as np
@@ -31,6 +32,12 @@ def _b64(texto: str) -> str:
 def _jpeg(cor) -> bytes:
     saida = io.BytesIO()
     Image.new("RGB", (64, 48), cor).save(saida, "JPEG")
+    return saida.getvalue()
+
+
+def _jpeg_grande(cor) -> bytes:
+    saida = io.BytesIO()
+    Image.new("RGB", (900, 600), cor).save(saida, "JPEG")
     return saida.getvalue()
 
 
@@ -408,3 +415,132 @@ def test_retoque_entra_na_edicao(cliente, db_limpo):
     assert edicao["gerada"] == edicao["versao"]
     ruim = {"retoque": {"pele": 120}}
     assert cliente.put(caminho, json={"edicoes": [{"midia_id": midia, "edicao": ruim}]}).status_code == 422
+
+
+def test_exportar_as_escolhidas_num_zip(cliente, db_limpo):
+    import zipfile
+
+    album = cliente.post("/api/albuns", json={"nome": "Saída"}).json()
+    bytes_da_primeira = _jpeg((90, 120, 150))
+    ids = [enviar_foto(cliente, album["id"], "Festa/IMG_1.jpg", bytes_da_primeira),
+           enviar_foto(cliente, album["id"], "Festa/IMG_2.jpg", _jpeg_grande((200, 60, 40)))]
+    ingerir_tudo(db_limpo)
+    cliente.patch(f"/api/albuns/{album['id']}/fotos", json={"midia_ids": [ids[0]], "nota": 5, "cor": "azul"})
+    cliente.put(f"/api/albuns/{album['id']}/edicoes", json={"edicoes": [
+        {"midia_id": ids[0], "edicao": {"cor": {"exposicao": 0.5}}}]})
+    opcoes = {"formato": "jpg", "lado_maximo": 300, "divisao": "nota", "xmp": True, "padrao": "{album}_{n}",
+              "marca": {"tipo": "texto", "texto": "Estúdio", "tamanho": 0.2}}
+    pedido = cliente.post(f"/api/albuns/{album['id']}/exportar", json={"midia_ids": ids, "opcoes": opcoes})
+    assert pedido.status_code == 202
+    job = pegar_proximo_job(db_limpo, ["exportar_album"], "w-teste")
+    assert processar_job(db_limpo, job, "w-teste") == "concluido", db_limpo.jobs.find_one({"_id": job["_id"]})["erro"]
+    resposta = cliente.get(f"/api/albuns/{album['id']}/saidas/{pedido.json()['job_id']}")
+    assert resposta.status_code == 200 and "Sa" in resposta.headers["content-disposition"]
+    with zipfile.ZipFile(io.BytesIO(resposta.content)) as z:
+        nomes = sorted(z.namelist())
+        assert nomes == ["5 estrelas/Saída_0001.jpg", "5 estrelas/Saída_0001.xmp", "Sem nota/Saída_0002.jpg",
+                         "Sem nota/Saída_0002.xmp"]
+        assert 'xmp:Rating="5"' in z.read("5 estrelas/Saída_0001.xmp").decode()
+        assert 'crs:Exposure2012="+0.50"' in z.read("5 estrelas/Saída_0001.xmp").decode()
+        assert Image.open(io.BytesIO(z.read("Sem nota/Saída_0002.jpg"))).size == (300, 200)
+    # Original: os bytes como chegaram
+    pedido = cliente.post(f"/api/albuns/{album['id']}/exportar", json={"midia_ids": [ids[0]],
+                                                                         "opcoes": {"formato": "original"}})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["exportar_album"], "w-teste"), "w-teste")
+    with zipfile.ZipFile(io.BytesIO(cliente.get(f"/api/albuns/{album['id']}/saidas/{pedido.json()['job_id']}")
+                                    .content)) as z:
+        assert z.read("IMG_1.jpg") == bytes_da_primeira
+    assert cliente.get(f"/api/albuns/{album['id']}/saidas/{ObjectId()}").status_code == 404
+
+
+def test_galeria_do_cliente_pelo_link(cliente, db_limpo):
+    album = cliente.post("/api/albuns", json={"nome": "Ensaio da Ana"}).json()
+    ids = [enviar_foto(cliente, album["id"], f"IMG_{i}.jpg", _jpeg((40 * i, 90, 30))) for i in range(3)]
+    ingerir_tudo(db_limpo)
+    cliente.put(f"/api/albuns/{album['id']}/edicoes", json={"edicoes": [
+        {"midia_id": ids[0], "edicao": {"cor": {"exposicao": 0.5}}}]})
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["editar_album"], "w-teste"), "w-teste")
+    criada = cliente.post(f"/api/albuns/{album['id']}/galeria",
+                          json={"midia_ids": ids[:2], "para": "Ana", "mensagem": "Escolha 1"})
+    assert criada.status_code == 201
+    token = criada.json()["token"]
+    assert db_limpo.albuns.find_one({"_id": ObjectId(album["id"])})["galeria"]["token_hash"] != token
+
+    # As rotas da galeria não leem a sessão (um segundo TestClient abriria o banco noutro laço de eventos)
+    with contextlib.nullcontext(cliente) as anonimo:
+        publica = anonimo.get(f"/api/galeria/{token}").json()
+        assert publica["album"] == "Ensaio da Ana" and publica["para"] == "Ana" and publica["status"] == "aberta"
+        assert [f["midia_id"] for f in publica["fotos"]] == ids[:2] and publica["fotos"][0]["versao"] == 1
+        # A foto editada vem desenhada; a de fora da galeria não abre
+        capa = anonimo.get(f"/api/galeria/{token}/fotos/{ids[0]}/capa")
+        assert capa.status_code == 200
+        editada = db_limpo.midias.find_one({"_id": ObjectId(ids[0])})
+        assert f"album_{album['id']}_1_capa.jpg" in editada["arquivos"]
+        assert anonimo.get(f"/api/galeria/{token}/fotos/{ids[2]}/capa").status_code == 404
+        assert anonimo.get(f"/api/galeria/{token}/fotos/{ids[1]}/original").status_code == 404
+        assert anonimo.get("/api/galeria/token-que-nao-existe").status_code == 404
+        assert anonimo.patch(f"/api/galeria/{token}/fotos/{ids[1]}",
+                             json={"favorita": True, "comentario": "Essa!"}).status_code == 204
+        assert anonimo.patch(f"/api/galeria/{token}/fotos/{ids[2]}", json={"favorita": True}).status_code == 404
+        enviada = anonimo.post(f"/api/galeria/{token}/enviar", json={"nome": "Ana", "comentario": "Amei"})
+        assert enviada.status_code == 200 and enviada.json()["status"] == "enviada"
+        assert anonimo.post(f"/api/galeria/{token}/enviar", json={"nome": "Ana"}).status_code == 409
+        assert anonimo.patch(f"/api/galeria/{token}/fotos/{ids[0]}", json={"favorita": True}).status_code == 409
+
+    # O fotógrafo vê as favoritas na grade e no resumo do álbum
+    fotos = {f["midia_id"]: f for f in cliente.get(f"/api/albuns/{album['id']}/fotos").json()}
+    assert fotos[ids[1]]["cliente"]["favorita"] is True and fotos[ids[1]]["cliente"]["comentario"] == "Essa!"
+    resumo = cliente.get(f"/api/albuns/{album['id']}").json()["galeria"]
+    assert resumo["status"] == "enviada" and resumo["favoritas"] == 1 and resumo["nome"] == "Ana"
+    # Um link novo desliga o de antes e começa outra rodada
+    novo = cliente.post(f"/api/albuns/{album['id']}/galeria", json={"midia_ids": ids}).json()["token"]
+    assert cliente.get(f"/api/galeria/{token}").status_code == 404
+    assert cliente.get(f"/api/galeria/{novo}").json()["fotos"][1]["favorita"] is False
+    assert cliente.delete(f"/api/albuns/{album['id']}/galeria").status_code == 204
+    assert cliente.get(f"/api/galeria/{novo}").status_code == 404
+
+
+def test_pasta_monitorada_importa_mede_e_escolhe(cliente, db_limpo, tmp_path, monkeypatch):
+    import os
+
+    from core.utils import fotos_no_lugar, pasta_monitorada
+
+    fotos = tmp_path / "fotos"
+    (fotos / "Cartao").mkdir(parents=True)
+    passado = (pasta_monitorada.agora().timestamp() - 60,) * 2
+    for i in range(3):
+        arquivo = fotos / "Cartao" / f"IMG_{i}.jpg"
+        arquivo.write_bytes(_jpeg((60 * i, 90, 30)))
+        os.utime(arquivo, passado)
+    monkeypatch.setattr(fotos_no_lugar, "PASTA_DAS_FOTOS", fotos)
+    album = cliente.post("/api/albuns", json={"nome": "Cartão"}).json()
+    assert cliente.put(f"/api/albuns/{album['id']}/monitorar", json={"caminho": "../fora"}).status_code == 404
+    ligado = cliente.put(f"/api/albuns/{album['id']}/monitorar", json={"caminho": "Cartao"})
+    assert ligado.status_code == 200 and ligado.json()["monitorar"]["etapa"] == "olhando"
+
+    def volta(etapa_esperada):
+        documento = db_limpo.albuns.find_one({"_id": ObjectId(album["id"])})
+        pasta_monitorada.avancar(db_limpo, documento)
+        assert db_limpo.albuns.find_one({"_id": ObjectId(album["id"])})["monitorar"]["etapa"] == etapa_esperada
+
+    # Um arquivo ainda chegando (mexido agora) fica para a próxima volta
+    (fotos / "Cartao" / "IMG_9.jpg").write_bytes(_jpeg((1, 2, 3)))
+    volta("importando")
+    assert db_limpo.albuns.find_one({"_id": ObjectId(album["id"])})["monitorar"]["ultimas_novas"] == 3
+    volta("importando")
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["importar_pasta"], "w-teste"), "w-teste")
+    volta("preparando")
+    ingerir_tudo(db_limpo)
+    volta("medindo")
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["medir_album"], "w-teste"), "w-teste")
+    volta("olhando")
+    lista = cliente.get(f"/api/albuns/{album['id']}/fotos").json()
+    assert len(lista) == 3 and all(f["categoria"] for f in lista)
+    # O arquivo que chegava entra quando para; a pasta sem nada novo não pede nada
+    volta("olhando")
+    os.utime(fotos / "Cartao" / "IMG_9.jpg", passado)
+    volta("importando")
+    processar_job(db_limpo, pegar_proximo_job(db_limpo, ["importar_pasta"], "w-teste"), "w-teste")
+    assert len(cliente.get(f"/api/albuns/{album['id']}/fotos").json()) == 4
+    assert cliente.delete(f"/api/albuns/{album['id']}/monitorar").status_code == 204
+    assert cliente.get(f"/api/albuns/{album['id']}").json()["monitorar"] is None

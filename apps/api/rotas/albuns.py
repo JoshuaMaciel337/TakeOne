@@ -16,18 +16,23 @@
 #   POST   /api/albuns/{id}/escolher         escolhe as melhores pelas medidas (core/modelos/escolha.py)
 #   PUT    /api/albuns/{id}/edicoes          a edição de cada foto (cor, igualar, giro, recorte), desenhada pelo
 #                                            worker (job "editar_album", core/utils/edicao_de_foto.py)
+#   POST   /api/albuns/{id}/exportar         as fotos num ZIP (job "exportar_album": a edição, a marca, o XMP)
+#   GET    /api/albuns/{id}/saidas/{job}     o ZIP pronto
 #   GET    /api/albuns/{id}/pessoas          as pessoas achadas nos rostos (core/modelos/pessoas.py)
 #   PATCH  /api/albuns/{id}/pessoas/{n}      dá um nome a uma pessoa
+#   POST   /api/albuns/{id}/galeria          gera o link da galeria do cliente (api/rotas/galeria.py é a pública)
+#   DELETE /api/albuns/{id}/galeria          desliga o link
+#   PUT    /api/albuns/{id}/monitorar        liga a pasta monitorada (core/utils/pasta_monitorada.py)
+#   DELETE /api/albuns/{id}/monitorar        desliga
 #
 # As fotos chegam pelo envio de sempre (tus), com o álbum nos metadados (api/rotas/uploads.py).
 # -----------------------------------------------
 import logging
-from datetime import datetime
 
-import numpy as np
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from pymongo import UpdateOne
 from starlette.concurrency import run_in_threadpool
 
@@ -39,19 +44,24 @@ from api.esquemas import (
     EdicoesEntrada,
     EscolhaSaida,
     EscolherEntrada,
+    ExportarAlbumEntrada,
     FotoDoAlbumSaida,
     FotosIdsEntrada,
     FotosMudarEntrada,
     FotosRemovidasSaida,
+    GaleriaCriadaSaida,
+    GaleriaEntrada,
     ImportarPastaEntrada,
     JobDoAlbumSaida,
+    MonitorarEntrada,
     PastaDoComputadorSaida,
     PessoaAtualizarEntrada,
     PessoaDoAlbumSaida,
 )
 from api.rotas.midias import apagar_midia, jobs_de_ingestao, motivo_para_manter
 from core.modelos.album import FOTOS_POR_ALBUM, montar_album, montar_foto, mudanca_das_fotos
-from core.modelos.escolha import ESTRELAS, MARCACAO, Foto, Opcoes, escolher
+from core.modelos.escolha import escolha_no_album
+from core.modelos.galeria import montar_galeria
 from core.modelos.job import STATUS_EXECUTANDO as STATUS_JOB_EXECUTANDO
 from core.modelos.job import STATUS_PENDENTE as STATUS_JOB_PENDENTE
 from core.modelos.job import montar_job
@@ -83,6 +93,24 @@ async def buscar_album(db, album_id: str, usuario: dict) -> dict:
     return album
 
 
+def resumo_da_galeria(galeria: dict | None, favoritas: int) -> dict | None:
+    if not galeria:
+        return None
+    return {"status": galeria["status"], "para": galeria.get("para", ""), "fotos": len(galeria.get("fotos", [])),
+            "favoritas": favoritas, "expira_em": galeria["expira_em"], "pedida_em": galeria["pedida_em"],
+            "nome": galeria.get("nome"), "comentario": galeria.get("comentario"),
+            "enviada_em": galeria.get("enviada_em")}
+
+
+def resumo_do_monitorar(monitorar: dict | None) -> dict | None:
+    if not monitorar:
+        return None
+    campos = ("caminho", "subpastas", "analisar", "escolher", "intensidade", "etapa", "ultima_volta", "ultimas_novas",
+              "erro")
+    return {**{c: monitorar.get(c) for c in campos},
+            "estilo_pessoal_id": str(monitorar["estilo_pessoal_id"]) if monitorar.get("estilo_pessoal_id") else None}
+
+
 async def resumos(db, albuns: list[dict]) -> list[AlbumSaida]:
     """A contagem de fotos, de prontas e de escolhidas e a capa de cada álbum, numa agregação só."""
     ids = [a["_id"] for a in albuns]
@@ -96,6 +124,7 @@ async def resumos(db, albuns: list[dict]) -> list[AlbumSaida]:
             "fotos": {"$sum": 1},
             "prontas": {"$sum": {"$cond": [{"$eq": [{"$first": "$m.status"}, STATUS_PRONTA]}, 1, 0]}},
             "escolhidas": {"$sum": {"$cond": [{"$eq": ["$marcacao", "escolhida"]}, 1, 0]}},
+            "favoritas": {"$sum": {"$cond": [{"$eq": ["$cliente.favorita", True]}, 1, 0]}},
             "capa": {"$min": {"$cond": [{"$eq": [{"$first": "$m.status"}, STATUS_PRONTA]}, "$midia_id", None]}},
         }},
     ])
@@ -109,6 +138,8 @@ async def resumos(db, albuns: list[dict]) -> list[AlbumSaida]:
             escolha_opcoes=album.get("escolha_opcoes"),
             prontas=conta.get("prontas", 0), escolhidas=conta.get("escolhidas", 0),
             capa_midia_id=str(conta["capa"]) if conta.get("capa") else None,
+            galeria=resumo_da_galeria(album.get("galeria"), conta.get("favoritas", 0)),
+            monitorar=resumo_do_monitorar(album.get("monitorar")),
             criado_em=album["criado_em"], atualizado_em=album["atualizado_em"]))
     return saida
 
@@ -192,14 +223,6 @@ async def analisar(album_id: str, usuario=Depends(usuario_atual), db=Depends(obt
     return JobDoAlbumSaida(job_id=await pedir_job_do_album(db, "medir_album", album, usuario))
 
 
-def _hora(exif: dict | None) -> float | None:
-    """A hora da foto em segundos (o EXIF não tem fuso: só a diferença entre as fotos importa)."""
-    try:
-        return datetime.fromisoformat(exif["data"]).timestamp() if exif and exif.get("data") else None
-    except ValueError:
-        return None
-
-
 @router.post("/{album_id}/escolher", response_model=EscolhaSaida)
 async def escolher_melhores(album_id: str, dados: EscolherEntrada, usuario=Depends(usuario_atual),
                             db=Depends(obter_db)):
@@ -211,29 +234,13 @@ async def escolher_melhores(album_id: str, dados: EscolherEntrada, usuario=Depen
         {"midia_id": {"$in": list(midias)}}, {"pessoas": 0})}
     if not medidas:
         raise HTTPException(status.HTTP_409_CONFLICT, "Analise as fotos antes de escolher as melhores.")
-    ordem = {mid: i for i, mid in enumerate(sorted(midias, key=lambda m: (midias[m].get("enviado_em") or agora(), m)))}
-    fotos = [Foto(str(mid), _hora(midias[mid].get("exif")), ordem[mid], med,
-                  np.frombuffer(med["vetor"], np.float16).astype(np.float32)) for mid, med in medidas.items()]
-    opcoes = Opcoes(quantas=dados.quantas, alvo=dados.alvo, rigor=dados.rigor, olhos_fechados=dados.olhos_fechados,
-                    grupos=dados.grupos, genero=album["genero"])
-    resultado = await run_in_threadpool(escolher, fotos, opcoes)
-    momento = agora()
-    gravacoes = []
-    for foto in fotos:
-        mid, categoria = ObjectId(foto.id), resultado.categoria[foto.id]
-        campos = {"categoria": categoria, "grupo": resultado.grupo[foto.id], "cena": resultado.cena[foto.id],
-                  "nota_ia": resultado.nota[foto.id], "motivo": resultado.motivo.get(foto.id), "atualizado_em": momento}
-        feita_a_mao = registros[mid].get("origem") == "pessoa"
-        if dados.aplicar and not (dados.manter_feitas_a_mao and feita_a_mao):
-            campos.update({"nota": ESTRELAS[categoria], "marcacao": MARCACAO.get(categoria), "origem": "ia"})
-        gravacoes.append(UpdateOne({"album_id": album["_id"], "midia_id": mid}, {"$set": campos}))
+    gravacoes, contagem = await run_in_threadpool(escolha_no_album, registros, midias, medidas, dados.model_dump(),
+                                                  album["genero"], agora())
+    gravacoes = [UpdateOne({"album_id": album["_id"], "midia_id": mid}, {"$set": campos}) for mid, campos in gravacoes]
     if gravacoes:
         await db.album_fotos.bulk_write(gravacoes, ordered=False)
     await db.albuns.update_one({"_id": album["_id"]},
-                               {"$set": {"escolha_opcoes": dados.model_dump(), "atualizado_em": momento}})
-    contagem: dict[str, int] = {}
-    for categoria in resultado.categoria.values():
-        contagem[categoria] = contagem.get(categoria, 0) + 1
+                               {"$set": {"escolha_opcoes": dados.model_dump(), "atualizado_em": agora()}})
     return EscolhaSaida(categorias=contagem, sem_analise=len(midias) - len(medidas))
 
 
@@ -292,7 +299,7 @@ async def listar_fotos(album_id: str, usuario=Depends(usuario_atual), db=Depends
             do_album=midia.get("album_id") == album["_id"], medidas=medidas.get(midia["_id"]),
             categoria=foto.get("categoria"), grupo=foto.get("grupo"), cena=foto.get("cena"),
             nota_ia=foto.get("nota_ia"), motivo=foto.get("motivo"), pessoas=foto.get("pessoas") or [],
-            edicao=foto.get("edicao")))
+            edicao=foto.get("edicao"), cliente=foto.get("cliente")))
     return saida
 
 
@@ -317,7 +324,8 @@ async def editar_fotos(album_id: str, dados: EdicoesEntrada, usuario=Depends(usu
         filtro = {"album_id": album["_id"], "midia_id": midia_id}
         edicao = item.edicao.model_dump(exclude_none=True) if item.edicao else None
         if edicao and not edicao.get("cor") and not edicao.get("igualar") and not edicao.get("giro") \
-                and not edicao.get("recorte") and not edicao.get("auto") and not edicao.get("retoque"):
+                and not edicao.get("recorte") and not edicao.get("auto") and not edicao.get("retoque") \
+                and not edicao.get("fundo") and not edicao.get("ruido") and not edicao.get("distracoes"):
             edicao = None
         if edicao is None:
             operacoes.append(UpdateOne({**filtro, "edicao": {"$ne": None}},
@@ -332,6 +340,32 @@ async def editar_fotos(album_id: str, dados: EdicoesEntrada, usuario=Depends(usu
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhuma das fotos está no álbum.")
     await db.album_fotos.bulk_write(operacoes, ordered=False)
     return JobDoAlbumSaida(job_id=await pedir_job_do_album(db, "editar_album", album, usuario))
+
+
+@router.post("/{album_id}/exportar", response_model=JobDoAlbumSaida, status_code=status.HTTP_202_ACCEPTED)
+async def exportar_fotos(album_id: str, dados: ExportarAlbumEntrada, usuario=Depends(usuario_atual),
+                         db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    ids = [_id(i, "Foto não encontrada.") for i in dict.fromkeys(dados.midia_ids)]
+    if not await db.album_fotos.count_documents({"album_id": album["_id"], "midia_id": {"$in": ids}}, limit=1):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhuma das fotos está no álbum.")
+    job = montar_job("exportar_album", usuario["organizacao_id"],
+                     {"album_id": str(album["_id"]), "midia_ids": [str(i) for i in ids],
+                      "opcoes": dados.opcoes.model_dump()}, criado_por=usuario["_id"])
+    return JobDoAlbumSaida(job_id=str((await db.jobs.insert_one(job)).inserted_id))
+
+
+@router.get("/{album_id}/saidas/{job_id}")
+async def baixar_saida(album_id: str, job_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    job = await db.jobs.find_one({"_id": _id(job_id, "Exportação não encontrada."), "tipo": "exportar_album",
+                                  "organizacao_id": usuario["organizacao_id"], "entrada.album_id": str(album["_id"])})
+    caminho = storage.caminho_local(f"org_{album['organizacao_id']}/albuns/{album['_id']}/saidas/{job_id}.zip") \
+        if job else None
+    if not job or job.get("status") != "concluido" or not caminho.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Exportação não encontrada.")
+    nome = f"{album['nome']}.zip".replace('"', "")
+    return FileResponse(caminho, media_type="application/zip", filename=nome)
 
 
 @router.get("/{album_id}/pessoas", response_model=list[PessoaDoAlbumSaida])
@@ -403,3 +437,61 @@ async def remover_fotos(album_id: str, dados: FotosIdsEntrada, usuario=Depends(u
     resultado = await tirar_fotos(db, album, [_id(i, "Mídia não encontrada.") for i in dados.midia_ids])
     await db.albuns.update_one({"_id": album["_id"]}, {"$set": {"atualizado_em": agora()}})
     return resultado
+
+
+@router.post("/{album_id}/galeria", response_model=GaleriaCriadaSaida, status_code=status.HTTP_201_CREATED)
+async def criar_galeria(album_id: str, dados: GaleriaEntrada, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    """Um link novo (o anterior para de valer). As marcações do cliente da galeria de antes saem: é outra rodada."""
+    album = await buscar_album(db, album_id, usuario)
+    ids = [_id(i, "Foto não encontrada.") for i in dados.midia_ids]
+    do_album = {f["midia_id"] async for f in db.album_fotos.find({"album_id": album["_id"], "midia_id": {"$in": ids}},
+                                                                  {"midia_id": 1})}
+    prontas = [m["_id"] async for m in db.midias.find({"_id": {"$in": list(do_album)}, "status": STATUS_PRONTA},
+                                                       {"_id": 1})]
+    if not prontas:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Nenhuma dessas fotos está pronta no álbum.")
+    prontas_set = set(prontas)
+    token, galeria = montar_galeria([i for i in ids if i in prontas_set], usuario["_id"], dados.para, dados.mensagem,
+                                    agora())
+    await db.album_fotos.update_many({"album_id": album["_id"], "cliente": {"$exists": True}},
+                                     {"$unset": {"cliente": ""}})
+    await db.albuns.update_one({"_id": album["_id"]}, {"$set": {"galeria": galeria, "atualizado_em": agora()}})
+    return GaleriaCriadaSaida(token=token, expira_em=galeria["expira_em"])
+
+
+@router.delete("/{album_id}/galeria", status_code=status.HTTP_204_NO_CONTENT)
+async def desligar_galeria(album_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    await db.albuns.update_one({"_id": album["_id"]}, {"$unset": {"galeria": ""}})
+
+
+@router.put("/{album_id}/monitorar", response_model=AlbumSaida)
+async def ligar_monitorar(album_id: str, dados: MonitorarEntrada, usuario=Depends(usuario_atual),
+                          db=Depends(obter_db)):
+    """Liga a pasta monitorada: o worker olha a pasta a cada minuto e traz as fotos novas, com a ação pedida."""
+    album = await buscar_album(db, album_id, usuario)
+    if not fotos_no_lugar.disponivel():
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "A pasta das fotos não está montada no servidor (PASTA_DAS_FOTOS_HOST no .env).")
+    try:
+        await run_in_threadpool(fotos_no_lugar.listar, dados.caminho)
+    except fotos_no_lugar.CaminhoInvalido as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    estilo_id = None
+    if dados.estilo_pessoal_id:
+        estilo = await db.estilos_pessoais.find_one({"_id": _id(dados.estilo_pessoal_id, "Estilo não encontrado."),
+                                                     "organizacao_id": usuario["organizacao_id"]}, {"_id": 1})
+        if estilo is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Estilo não encontrado.")
+        estilo_id = estilo["_id"]
+    monitorar = {**dados.model_dump(), "estilo_pessoal_id": estilo_id, "por": usuario["_id"], "etapa": "olhando",
+                 "ligado_em": agora(), "proxima_volta": agora(), "ultima_volta": None, "ultimas_novas": 0,
+                 "erro": None}
+    await db.albuns.update_one({"_id": album["_id"]}, {"$set": {"monitorar": monitorar, "atualizado_em": agora()}})
+    return (await resumos(db, [await buscar_album(db, album_id, usuario)]))[0]
+
+
+@router.delete("/{album_id}/monitorar", status_code=status.HTTP_204_NO_CONTENT)
+async def desligar_monitorar(album_id: str, usuario=Depends(usuario_atual), db=Depends(obter_db)):
+    album = await buscar_album(db, album_id, usuario)
+    await db.albuns.update_one({"_id": album["_id"]}, {"$unset": {"monitorar": ""}})

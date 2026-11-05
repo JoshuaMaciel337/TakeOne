@@ -254,6 +254,17 @@ def endireitar_automatico(imagem: np.ndarray) -> float:
     return 0.0 if abs(giro) < 0.3 or abs(giro) > 6 else round(giro, 2)
 
 
+def reduzir_ruido(rgb8: np.ndarray, forca: float) -> np.ndarray:
+    """O ruído (de 0 a 100) tirado pelo Non-local Means do OpenCV: a luz e a cor, mais fortes com a força."""
+    if forca <= 0:
+        return rgb8
+    import cv2
+
+    k = min(1.0, forca / 100)
+    h = 2 + 10 * k
+    return cv2.fastNlMeansDenoisingColored(rgb8, None, h, h * 1.2, 7, 21)
+
+
 # -----------------------------------------------
 # A foto editada
 # -----------------------------------------------

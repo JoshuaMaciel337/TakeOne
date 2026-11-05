@@ -5,6 +5,9 @@ import {
   Brush,
   Check,
   CircleAlert,
+  Download,
+  Eye,
+  Heart,
   Columns2,
   FolderUp,
   HardDrive,
@@ -26,13 +29,15 @@ import { Comparacao } from "@/componentes/album/Comparacao";
 import { FiltroDePessoas } from "@/componentes/album/FiltroDePessoas";
 import { JanelaDeEstilos } from "@/componentes/album/JanelaDeEstilos";
 import { JanelaEscolher } from "@/componentes/album/JanelaEscolher";
+import { JanelaExportarAlbum } from "@/componentes/album/JanelaExportarAlbum";
+import { JanelaGaleria } from "@/componentes/album/JanelaGaleria";
 import { Lupa } from "@/componentes/album/Lupa";
 import { PainelDeEdicao } from "@/componentes/album/PainelDeEdicao";
 import { PainelDeRetoque } from "@/componentes/album/PainelDeRetoque";
 import { PainelEstiloPessoal } from "@/componentes/album/PainelEstiloPessoal";
 import { JanelaImportarPasta } from "@/componentes/album/JanelaImportarPasta";
 import { AvisoErro } from "@/componentes/AvisoErro";
-import { analisarAlbum, editarFotos, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
+import { analisarAlbum, desligarMonitorar, editarFotos, escolherMelhores, fotosDoAlbum, nomearPessoa, pessoasDoAlbum, mudarAlbum, mudarFotos, pastaDoComputador, removerFotos, verAlbum } from "@/lib/album/api";
 import type { OpcoesDaEscolha } from "@/lib/album/api";
 import { arquivoDaFoto, type EdicaoDaFoto, edicaoParaEnviar, editandoAgora } from "@/lib/album/edicao";
 import {
@@ -259,6 +264,8 @@ export function Album({ albumId }: { albumId: string }) {
   const [comparando, setComparando] = useState<string[] | null>(null);
   const [pincel, setPincel] = useState<Mudanca | null>(null);
   const [estilando, setEstilando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [galeriaAberta, setGaleriaAberta] = useState(false);
   // O pincel do retoque na lupa da foto do cursor
   const [retocando, setRetocando] = useState(false);
   const [escolhendo, setEscolhendo] = useState(false);
@@ -464,7 +471,7 @@ export function Album({ albumId }: { albumId: string }) {
   // O teclado da grade e da lupa
   useEffect(() => {
     const tecla = (evento: KeyboardEvent) => {
-      if (evento.defaultPrevented || comparando || estilando) return;
+      if (evento.defaultPrevented || comparando || estilando || exportando || galeriaAberta) return;
       const alvo = evento.target as HTMLElement | null;
       if (alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA" || alvo.tagName === "SELECT" || alvo.isContentEditable)) return;
       const ctrl = evento.ctrlKey || evento.metaKey;
@@ -516,7 +523,7 @@ export function Album({ albumId }: { albumId: string }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos, comparando, comparar, estilando]);
+  }, [visiveis, lupa, mover, fotoDoCursor, remover, alvos, aplicar, fotos, comparando, comparar, estilando, exportando, galeriaAberta]);
 
   if (!album || !fotos) {
     return (
@@ -626,6 +633,24 @@ export function Album({ albumId }: { albumId: string }) {
               <span className="hidden lg:inline">Analisar {semMedida.toLocaleString("pt-BR")}</span>
             </button>
           ) : null}
+          {album.monitorar ? (
+            <span className="hidden items-center gap-1 rounded-full bg-painel-2 py-1 pr-1 pl-2 text-xs text-suave lg:flex" title={album.monitorar.erro ?? `As fotos novas de "${album.monitorar.caminho || "Fotos"}" entram sozinhas`}>
+              <Eye className={`size-3.5 ${album.monitorar.erro ? "text-erro" : album.monitorar.etapa === "olhando" ? "" : "animate-pulse text-destaque"}`} aria-hidden />
+              <span className="max-w-32 truncate">{album.monitorar.caminho.split("/").pop() || "Fotos"}</span>
+              <button
+                type="button"
+                className="rounded-full p-0.5 hover:bg-painel-3 hover:text-texto"
+                aria-label="Parar de monitorar a pasta"
+                onClick={() => {
+                  desligarMonitorar(albumId)
+                    .then(() => recarregar())
+                    .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível parar o monitor."));
+                }}
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            </span>
+          ) : null}
           {noComputador ? (
             <button type="button" className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap" onClick={() => setImportando(true)} title="Importar uma pasta do computador do servidor, sem copiar">
               <HardDrive className="size-4" aria-hidden />
@@ -636,6 +661,26 @@ export function Album({ albumId }: { albumId: string }) {
             <ImageUp className="size-4" aria-hidden />
             <span className="hidden 2xl:inline">Enviar fotos</span>
           </button>
+          {fotos.length ? (
+            <button
+              type="button"
+              className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap"
+              onClick={() => {
+                void recarregar();
+                setGaleriaAberta(true);
+              }}
+              title="Um link para o cliente marcar as favoritas, sem conta"
+            >
+              <Heart className={`size-4 ${album.galeria?.favoritas ? "fill-current text-destaque" : ""}`} aria-hidden />
+              <span className="hidden xl:inline">Galeria{album.galeria ? ` (${album.galeria.favoritas})` : ""}</span>
+            </button>
+          ) : null}
+          {fotos.length ? (
+            <button type="button" className="botao-secundario px-3 py-1.5 text-xs whitespace-nowrap" onClick={() => setExportando(true)} title="As fotos num ZIP, com a edição, a marca d'água e o XMP">
+              <Download className="size-4" aria-hidden />
+              <span className="hidden xl:inline">Exportar</span>
+            </button>
+          ) : null}
           {fotos.length ? (
             <button
               type="button"
@@ -863,7 +908,22 @@ export function Album({ albumId }: { albumId: string }) {
         </label>
       </footer>
 
-      {importando ? <JanelaImportarPasta albumId={albumId} aoFechar={() => setImportando(false)} aoImportar={setAviso} /> : null}
+      {importando ? <JanelaImportarPasta albumId={albumId} aoFechar={() => setImportando(false)} aoImportar={setAviso} aoMonitorar={setAlbum} /> : null}
+      {galeriaAberta ? (
+        <JanelaGaleria
+          albumId={albumId}
+          galeria={album.galeria ?? null}
+          escolhidas={fotos.filter((foto) => foto.marcacao === "escolhida")}
+          selecionadas={visiveis.filter((foto) => selecao.has(foto.midia_id))}
+          visiveis={visiveis}
+          aoMudar={() => void recarregar()}
+          aoVerFavoritas={() => {
+            setFiltro({ ...FILTRO_VAZIO, doCliente: true });
+            setGaleriaAberta(false);
+          }}
+          aoFechar={() => setGaleriaAberta(false)}
+        />
+      ) : null}
       {escolhendo ? (
         <JanelaEscolher
           iniciais={(album.escolha_opcoes as Partial<OpcoesDaEscolha> | null) ?? null}
@@ -911,6 +971,15 @@ export function Album({ albumId }: { albumId: string }) {
           grupoDe={(foto) => String(foto.grupo ?? foto.midia_id)}
           aoAplicar={editarAsFotos}
           aoFechar={() => setEstilando(false)}
+        />
+      ) : null}
+      {exportando ? (
+        <JanelaExportarAlbum
+          albumId={albumId}
+          escolhidas={fotos.filter((foto) => foto.marcacao === "escolhida")}
+          selecionadas={visiveis.filter((foto) => selecao.has(foto.midia_id))}
+          visiveis={visiveis}
+          aoFechar={() => setExportando(false)}
         />
       ) : null}
       {comparando ? (
@@ -1279,6 +1348,11 @@ function Cartao({
       ) : foto.nota > 0 ? (
         <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[10px] font-semibold text-aviso">{foto.nota}★</span>
       ) : null}
+      {foto.cliente?.favorita ? (
+        <span className="absolute left-1 top-7 flex size-5 items-center justify-center rounded-full bg-black/60 text-destaque" title={foto.cliente.comentario ? `Favorita do cliente: ${foto.cliente.comentario}` : "Favorita do cliente"}>
+          <Heart className="size-3 fill-current" aria-label="Favorita do cliente" />
+        </span>
+      ) : null}
       {foto.cor ? <span className={`absolute inset-x-0 bottom-0 h-1 ${CLASSE_DA_COR[foto.cor]}`} aria-label={`Cor ${foto.cor}`} /> : null}
       {foto.edicao ? (
         <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/60 text-white" title={editandoAgora(foto) ? "Editando…" : "Editada"}>
@@ -1347,6 +1421,9 @@ function Gaveta({
         {linha("Rejeitadas", contagens.rejeitadas, filtro.marcacao === "rejeitada", () => aoFiltrar({ ...FILTRO_VAZIO, marcacao: "rejeitada" }), "text-erro")}
         {linha("Sem marcação", contagens.total - contagens.escolhidas - contagens.rejeitadas, filtro.marcacao === "sem", () => aoFiltrar({ ...FILTRO_VAZIO, marcacao: "sem" }))}
         {linha("Com nota", contagens.comNota, filtro.nota === 1 && filtro.comparacao === "ao_menos", () => aoFiltrar({ ...FILTRO_VAZIO, nota: 1 }))}
+        {todas.some((f) => f.cliente?.favorita)
+          ? linha("Favoritas do cliente", todas.filter((f) => f.cliente?.favorita).length, Boolean(filtro.doCliente), () => aoFiltrar({ ...FILTRO_VAZIO, doCliente: true }), "text-destaque")
+          : null}
         {contagens.processando ? linha("Preparando", contagens.processando, false) : null}
         {contagens.erros ? linha("Com erro", contagens.erros, false, undefined, "text-erro") : null}
       </section>

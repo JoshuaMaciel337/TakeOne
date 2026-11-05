@@ -1,21 +1,44 @@
 "use client";
 
-import { ChevronRight, Folder, HardDrive, LoaderCircle, X } from "lucide-react";
+import { ChevronRight, Eye, Folder, HardDrive, LoaderCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { importarPasta, type PastaDoComputador, pastaDoComputador } from "@/lib/album/api";
+import { type EstiloPessoal, estilosPessoais, importarPasta, ligarMonitorar, type PastaDoComputador, pastaDoComputador } from "@/lib/album/api";
+import type { Album } from "@/lib/album/fotos";
 import { ErroApi } from "@/lib/api";
 
 /**
  * As fotos que já estão no computador do servidor (a pasta das fotos, montada só para leitura) entram no álbum sem
  * cópia: a pessoa anda pelas pastas e importa a escolhida, com as de dentro ou não.
  */
-export function JanelaImportarPasta({ albumId, aoFechar, aoImportar }: { albumId: string; aoFechar: () => void; aoImportar: (mensagem: string) => void }) {
+export function JanelaImportarPasta({
+  albumId,
+  aoFechar,
+  aoImportar,
+  aoMonitorar,
+}: {
+  albumId: string;
+  aoFechar: () => void;
+  aoImportar: (mensagem: string) => void;
+  /** A pasta ficou monitorada (o álbum devolvido, com o monitor). */
+  aoMonitorar: (album: Album) => void;
+}) {
   const [caminho, setCaminho] = useState("");
   const [pasta, setPasta] = useState<PastaDoComputador | null>(null);
   const [subpastas, setSubpastas] = useState(true);
   const [erro, setErro] = useState("");
   const [importando, setImportando] = useState(false);
+  // A pasta monitorada: o que fazer com as fotos que chegarem
+  const [monitorando, setMonitorando] = useState(false);
+  const [acao, setAcao] = useState({ analisar: true, escolher: true, estilo: "", intensidade: 1 });
+  const [estilos, setEstilos] = useState<EstiloPessoal[]>([]);
+
+  useEffect(() => {
+    if (!monitorando) return;
+    estilosPessoais()
+      .then((lista) => setEstilos(lista.filter((e) => e.pares > 0)))
+      .catch(() => setEstilos([]));
+  }, [monitorando]);
 
   useEffect(() => {
     pastaDoComputador(caminho)
@@ -115,6 +138,51 @@ export function JanelaImportarPasta({ albumId, aoFechar, aoImportar }: { albumId
               Importar {caminho ? `"${partes[partes.length - 1]}"` : "a pasta"}
               {fotosAqui || (subpastas && fotosDentro) ? ` (${(fotosAqui + (subpastas ? fotosDentro : 0)).toLocaleString("pt-BR")}${subpastas && pasta.pastas.length ? "+" : ""} fotos)` : ""}
             </button>
+            {monitorando ? (
+              <div className="flex flex-col gap-1.5 rounded-md border border-borda p-2 text-xs">
+                <p className="text-suave">A cada minuto o TakeOne olha a pasta e traz as fotos que chegaram (as que pararam de mudar há 10 s), e então:</p>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={acao.analisar} onChange={(e) => setAcao({ ...acao, analisar: e.target.checked })} />
+                  Analisa as fotos novas
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={acao.escolher} onChange={(e) => setAcao({ ...acao, escolher: e.target.checked })} />
+                  Escolhe as melhores de novo (com as opções da última escolha)
+                </label>
+                <label className="flex items-center gap-2">
+                  Aplica o estilo
+                  <select className="min-w-0 flex-1 rounded border border-borda bg-painel-2 px-1.5 py-1" value={acao.estilo} onChange={(e) => setAcao({ ...acao, estilo: e.target.value })}>
+                    <option value="">Nenhum</option>
+                    {estilos.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="botao-principal px-3 py-1.5"
+                  onClick={() => {
+                    ligarMonitorar(albumId, { caminho, subpastas, analisar: acao.analisar, escolher: acao.escolher, estilo_pessoal_id: acao.estilo || null, intensidade: acao.intensidade })
+                      .then((album) => {
+                        aoMonitorar(album);
+                        aoImportar(`De olho em "${caminho || "Fotos"}": as fotos novas entram sozinhas.`);
+                        aoFechar();
+                      })
+                      .catch((e) => setErro(e instanceof ErroApi ? e.message : "Não foi possível monitorar a pasta."));
+                  }}
+                >
+                  <Eye className="size-4" aria-hidden />
+                  Ficar de olho {caminho ? `em "${partes[partes.length - 1]}"` : "na pasta"}
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="botao-secundario px-3 py-1.5 text-xs" onClick={() => setMonitorando(true)}>
+                <Eye className="size-4" aria-hidden />
+                Monitorar esta pasta…
+              </button>
+            )}
           </div>
         ) : null}
       </div>

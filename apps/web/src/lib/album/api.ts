@@ -61,3 +61,27 @@ export const aplicarEstiloPessoal = (id: string, albumId: string, midiaIds: stri
   chamarApi<{ job_id: string }>(`/estilos-pessoais/${id}/aplicar`, { metodo: "POST", corpo: { album_id: albumId, midia_ids: midiaIds, intensidade } });
 export const parecidasDoEstilo = (id: string, midiaId: string) =>
   chamarApi<{ midia_id: string; semelhanca: number }[]>(`/estilos-pessoais/${id}/parecidas?midia_id=${midiaId}`);
+
+/** Como exportar as fotos do álbum (apps/api/esquemas.py, OpcoesDaSaidaEntrada). */
+export type OpcoesDaSaida = {
+  formato: "jpg" | "png" | "original";
+  qualidade: number;
+  lado_maximo: number | null;
+  tamanho_maximo_kb: number | null;
+  padrao: string;
+  divisao: "nenhuma" | "nota" | "cor" | "categoria" | "pasta";
+  xmp: boolean;
+  com_edicao: boolean;
+  marca: { tipo: "texto" | "logo"; texto: string; midia_id: string | null; canto: "baixo-direita" | "baixo-esquerda" | "cima-direita" | "cima-esquerda" | "meio"; tamanho: number; opacidade: number } | null;
+};
+
+export const exportarAlbum = (id: string, midiaIds: string[], opcoes: OpcoesDaSaida) =>
+  chamarApi<{ job_id: string }>(`/albuns/${id}/exportar`, { metodo: "POST", corpo: { midia_ids: midiaIds, opcoes } });
+
+export const criarGaleria = (id: string, midiaIds: string[], para: string, mensagem: string) =>
+  chamarApi<{ token: string; expira_em: string }>(`/albuns/${id}/galeria`, { metodo: "POST", corpo: { midia_ids: midiaIds, para, mensagem } });
+export const desligarGaleria = (id: string) => chamarApi<void>(`/albuns/${id}/galeria`, { metodo: "DELETE" });
+
+export type OpcoesDoMonitorar = { caminho: string; subpastas: boolean; analisar: boolean; escolher: boolean; estilo_pessoal_id: string | null; intensidade: number };
+export const ligarMonitorar = (id: string, opcoes: OpcoesDoMonitorar) => chamarApi<Album>(`/albuns/${id}/monitorar`, { metodo: "PUT", corpo: opcoes });
+export const desligarMonitorar = (id: string) => chamarApi<void>(`/albuns/${id}/monitorar`, { metodo: "DELETE" });

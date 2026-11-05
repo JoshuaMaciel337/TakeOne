@@ -10,12 +10,13 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
 from bson import ObjectId
 
 from core.modelos.job import ErroDefinitivo
 from core.modelos.midia import ARQUIVO_PROXY_IMAGEM, chave_arquivo
 from core.utils import storage
-from core.utils.edicao_de_foto import editar, endireitar_automatico, recorte_automatico
+from core.utils.edicao_de_foto import editar, endireitar_automatico, recorte_automatico, reduzir_ruido
 from core.utils.imagem import LARGURA_CAPA
 from core.utils.lut import chave_da_lut, de_bytes
 
@@ -42,7 +43,7 @@ def _apagar_versoes(db, organizacao_id, midia_id, album_id, menos: tuple = ()):
     db.midias.update_one({"_id": midia_id}, {"$pull": {"arquivos": {"$regex": f"^album_{album_id}_{manter}"}}})
 
 
-def _luts(db, organizacao_id, edicoes: list[dict]) -> dict:
+def luts_das_edicoes(db, organizacao_id, edicoes: list[dict]) -> dict:
     ids = {((e.get("cor") or {}).get("lut") or {}).get("id") for e in edicoes} - {None}
     luts = {}
     for doc in db.luts.find({"_id": {"$in": [ObjectId(i) for i in ids if ObjectId.is_valid(i)]},
@@ -83,6 +84,94 @@ def _retocar(db, foto: dict, midia: dict, rgb, retoque: dict):
                    medidas.get("rostos") or [], foto.get("pessoas_por_rosto") or [])
 
 
+def _apagar_distracoes(rgb, consultas: list[str]):
+    """As distrações achadas pelo texto, longe da pessoa, recortadas pelo MobileSAM e refeitas pelo LaMa. Sem os
+    modelos, a foto fica como está."""
+    from PIL import Image
+
+    from core.config import MODELO_APAGAR, MODELO_DISTRACOES, MODELO_SELECAO
+    from core.utils.clip_bpe import TokenizadorClip
+    from core.utils.distracoes import detectar, longe_da_pessoa, pessoa_protegida
+    from core.utils.objeto import apagar, imagem_para_o_sam, mascara_dos_pontos
+    from core.utils.retoque import pessoa_pelo_modnet
+    from worker.tarefas.objeto import CODIFICADOR, DECODIFICADOR, _sessao
+
+    tokenizador = MODELO_DISTRACOES.parent / "tokenizer.json"
+    if not (MODELO_DISTRACOES.is_file() and tokenizador.is_file() and (MODELO_SELECAO / CODIFICADOR).is_file()):
+        return rgb, []
+    global _tokenizador
+    if _tokenizador is None:
+        _tokenizador = TokenizadorClip(tokenizador)
+    modnet = _sessao_do_modnet()
+    pessoa = pessoa_pelo_modnet(rgb, modnet) if modnet is not None else None
+    if pessoa is not None:
+        import cv2
+
+        from core.utils.medir_foto import achar_rostos
+        from worker.tarefas.medir_album import modelos
+
+        rostos = [list(a[:4]) for a in achar_rostos(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), modelos())]
+        pessoa = pessoa_protegida(pessoa, rostos)
+    caixas = longe_da_pessoa(detectar(rgb, consultas, _sessao(MODELO_DISTRACOES), _tokenizador), pessoa)
+    if not caixas:
+        return rgb, []
+    h, w = rgb.shape[:2]
+    imagem = Image.fromarray(rgb)
+    entrada, _ = imagem_para_o_sam(imagem)
+    embedding = _sessao(MODELO_SELECAO / CODIFICADOR).run(None, {"input_image": entrada})[0]
+    lama = _sessao(MODELO_APAGAR) if MODELO_APAGAR.is_file() else None
+    for caixa in caixas:
+        x0, y0, x1, y1 = caixa["caixa"]
+        centro = [[(x0 + x1) / 2, (y0 + y1) / 2, True]]
+        mascara = mascara_dos_pontos(_sessao(MODELO_SELECAO / DECODIFICADOR), embedding, centro, w, h, caixa["caixa"])
+        if pessoa is not None:
+            mascara = mascara & (pessoa < 0.5)
+        if mascara.any():
+            imagem = apagar(imagem, mascara, lama)
+    return np.asarray(imagem.convert("RGB")), caixas
+
+
+_tokenizador = None
+
+
+def _trocar_fundo(db, midia: dict, rgb, fundo: dict):
+    """O fundo novo atrás da pessoa (core/utils/fundo_da_foto.py); sem o MODNet, a foto fica como está."""
+    from core.utils.fundo_da_foto import trocar_fundo
+    from core.utils.retoque import pessoa_pelo_modnet
+
+    sessao = _sessao_do_modnet()
+    if sessao is None:
+        return rgb
+    imagem_do_fundo = None
+    if fundo.get("tipo") == "imagem" and fundo.get("midia_id"):
+        outra = db.midias.find_one({"_id": ObjectId(fundo["midia_id"]), "organizacao_id": midia["organizacao_id"]},
+                                   {"organizacao_id": 1})
+        if outra:
+            import cv2
+
+            caminho = storage.caminho_local(chave_arquivo(outra["organizacao_id"], outra["_id"],
+                                                          ARQUIVO_PROXY_IMAGEM))
+            bgr = cv2.imread(str(caminho), cv2.IMREAD_COLOR) if caminho.is_file() else None
+            imagem_do_fundo = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB) if bgr is not None else None
+    return trocar_fundo(rgb, pessoa_pelo_modnet(rgb, sessao), fundo, imagem_do_fundo)
+
+
+def foto_editada(db, foto: dict, midia: dict, rgb, edicao: dict, luts: dict):
+    """A foto (RGB, uint8, em qualquer tamanho) com a edição inteira: o retoque, as distrações, o ruído, o fundo e,
+    por último, a cor, o giro, o recorte e a vinheta. A cópia leve e a exportação passam por aqui. As distrações
+    achadas ficam em edicao["distracoes"]["achadas"]."""
+    if edicao.get("retoque"):
+        rgb = _retocar(db, foto, midia, rgb, edicao["retoque"])
+    if edicao.get("distracoes"):
+        rgb, achadas = _apagar_distracoes(rgb, edicao["distracoes"]["consultas"])
+        edicao["distracoes"] = {**edicao["distracoes"], "achadas": achadas}
+    if edicao.get("ruido"):
+        rgb = reduzir_ruido(rgb, float(edicao["ruido"]))
+    if edicao.get("fundo"):
+        rgb = _trocar_fundo(db, midia, rgb, edicao["fundo"])
+    return editar(rgb, edicao, luts)
+
+
 def _editar_uma(db, album_id, foto: dict, midia: dict, luts: dict) -> bool:
     import cv2
 
@@ -101,9 +190,7 @@ def _editar_uma(db, album_id, foto: dict, midia: dict, luts: dict) -> bool:
             h, w = rgb.shape[:2]
             edicao["recorte"] = recorte_automatico(w, h, auto["proporcao"], medidas.get("rostos") or [],
                                                    float(edicao.get("giro") or 0))
-    if edicao.get("retoque"):
-        rgb = _retocar(db, foto, midia, rgb, edicao["retoque"])
-    saida = editar(rgb, edicao, luts)
+    saida = foto_editada(db, foto, midia, rgb, edicao, luts)
     versao = edicao["versao"]
     nome_capa, nome_proxy = arquivos_da_edicao(album_id, versao)
     pasta = origem.parent
@@ -114,6 +201,8 @@ def _editar_uma(db, album_id, foto: dict, midia: dict, luts: dict) -> bool:
     db.midias.update_one({"_id": midia["_id"]}, {"$addToSet": {"arquivos": {"$each": [nome_capa, nome_proxy]}}})
     # Só grava se ninguém mudou a edição enquanto ela era desenhada (senão a próxima volta a refaz)
     campos = {"edicao.gerada": versao, "edicao.largura": w, "edicao.altura": h}
+    if edicao.get("distracoes"):
+        campos["edicao.distracoes.achadas"] = edicao["distracoes"]["achadas"]
     if auto:
         campos.update({"edicao.giro": edicao.get("giro") or 0, "edicao.recorte": edicao.get("recorte")})
     gravada = db.album_fotos.update_one({"_id": foto["_id"], "edicao.versao": versao},
@@ -143,7 +232,7 @@ def executar_editar_album(db, job: dict, reportar: Callable[[int, str], None]) -
             db.album_fotos.update_one({"_id": foto["_id"]}, {"$unset": {"edicao_tirada": ""}})
         midias = {m["_id"]: m for m in db.midias.find({"_id": {"$in": [f["midia_id"] for f in pendentes]}},
                                                      {"organizacao_id": 1})}
-        luts = _luts(db, album["organizacao_id"], [f["edicao"] for f in pendentes])
+        luts = luts_das_edicoes(db, album["organizacao_id"], [f["edicao"] for f in pendentes])
         def uma(foto: dict, midias=midias, luts=luts) -> bool:
             midia = midias.get(foto["midia_id"])
             if midia is None or not _editar_uma(db, album_id, foto, midia, luts):

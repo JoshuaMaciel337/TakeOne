@@ -3,13 +3,14 @@
 import { Copy, Crop, LoaderCircle, Palette, RotateCcw, Ruler, Sparkles, Undo2 } from "lucide-react";
 import { useState } from "react";
 
-import { type EdicaoDaFoto, arquivoDaFoto, comCor, edicaoParaEnviar, PROPORCOES, type Proporcao } from "@/lib/album/edicao";
+import { type EdicaoDaFoto, arquivoDaFoto, comCor, edicaoParaEnviar, type FundoDaFoto, PROPORCOES, type Proporcao } from "@/lib/album/edicao";
 import type { FotoDoAlbum } from "@/lib/album/fotos";
 import { arquivoDaMidia } from "@/lib/api";
 import { type Cor, FILTROS } from "@/lib/projeto/cor";
 import { estatisticasDaCor } from "@/lib/projeto/igualarCor";
 import { ajustesAutomaticos } from "@/lib/projeto/melhorar";
 import { useLuts } from "@/lib/useLuts";
+import { consultasDe, DISTRACOES_PRONTAS } from "@/lib/album/distracoes";
 
 import { amostra, emLotes } from "./amostras";
 
@@ -44,6 +45,13 @@ export function PainelDeEdicao({
   const [ocupado, setOcupado] = useState("");
   const [rapidos, setRapidos] = useState<Partial<Record<keyof Cor, number>>>({});
   const [proporcao, setProporcao] = useState<Proporcao>("4:5");
+  const [corDoFundo, setCorDoFundo] = useState("#f2f2f2");
+  const [comSombra, setComSombra] = useState(true);
+  const fundoAtual = referencia?.edicao?.fundo ?? null;
+  const [distracoes, setDistracoes] = useState<string[]>(["Lixeira", "Placa de saída", "Extintor", "Fios"]);
+  const [outraDistracao, setOutraDistracao] = useState("");
+  const [ruido, setRuido] = useState<number | null>(null);
+  const achadas = referencia?.edicao?.distracoes?.achadas;
   const prontas = alvos.filter((foto) => foto.status === "pronta");
   const cor = referencia?.edicao?.cor ?? {};
   const outras = referencia ? prontas.filter((foto) => foto.midia_id !== referencia.midia_id) : [];
@@ -210,6 +218,119 @@ export function PainelDeEdicao({
           <RotateCcw className="size-3.5" aria-hidden />
         </button>
       </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-10 text-xs text-suave">Fundo</span>
+          <select
+            className="min-w-0 flex-1 rounded border border-borda bg-painel-2 px-1.5 py-1 text-xs"
+            value={fundoAtual?.tipo ?? ""}
+            disabled={Boolean(ocupado)}
+            aria-label="Fundo"
+            onChange={(evento) => {
+              const tipo = evento.target.value as FundoDaFoto["tipo"] | "";
+              const sombra = comSombra ? { opacidade: 0.35, desfoque: 0.04, distancia: 0.03, direcao: 135 } : null;
+              const fundo: FundoDaFoto | null = !tipo
+                ? null
+                : tipo === "imagem"
+                  ? { tipo, midia_id: referencia?.midia_id ?? null, sombra }
+                  : tipo === "desfoque"
+                    ? { tipo, desfoque: 0.6 }
+                    : { tipo, cor: corDoFundo, sombra };
+              const alvosDoFundo = tipo === "imagem" ? outras : prontas;
+              void fazer(
+                "Trocando o fundo",
+                async () => alvosDoFundo.map((foto) => ({ midia_id: foto.midia_id, edicao: { ...edicaoParaEnviar(foto.edicao), fundo } })),
+                fundo ? `Fundo novo em ${alvosDoFundo.length} foto(s).` : "Fundo original de volta.",
+              );
+            }}
+          >
+            <option value="">Original</option>
+            <option value="cor">Cor lisa</option>
+            <option value="degrade">Estúdio (degradê)</option>
+            <option value="desfoque">Desfocado</option>
+            {referencia && outras.length ? <option value="imagem">A foto do cursor</option> : null}
+          </select>
+          <input type="color" value={corDoFundo} onChange={(evento) => setCorDoFundo(evento.target.value)} className="h-7 w-8 rounded border border-borda bg-painel-2" aria-label="Cor do fundo" title="A cor do fundo (escolha antes do tipo)" />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-suave">
+          <input type="checkbox" checked={comSombra} onChange={(evento) => setComSombra(evento.target.checked)} />
+          Sombra da pessoa no fundo novo
+        </label>
+      </div>
+
+      <details>
+        <summary className="cursor-pointer text-xs text-suave">Ruído e distrações</summary>
+        <div className="mt-2 flex flex-col gap-2">
+          <label className="grid grid-cols-[5.5rem_1fr_2.5rem] items-center gap-1.5 text-xs">
+            <span className="text-suave">Tirar o ruído</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={ruido ?? referencia?.edicao?.ruido ?? 0}
+              disabled={Boolean(ocupado)}
+              onChange={(evento) => setRuido(Number(evento.target.value))}
+              onPointerUp={() => {
+                if (ruido === null) return;
+                const valor = ruido;
+                void fazer("Tirando o ruído", emTodas((foto) => ({ ...edicaoParaEnviar(foto.edicao), ruido: valor })), `Ruído tirado de ${nomeDosAlvos}.`).then(() => setRuido(null));
+              }}
+              className="accent-[var(--to-destaque)]"
+              aria-label="Tirar o ruído"
+            />
+            <span className="text-right tabular-nums text-suave">{ruido ?? referencia?.edicao?.ruido ?? 0}</span>
+          </label>
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Distrações para apagar">
+            {DISTRACOES_PRONTAS.map((d) => {
+              const ligada = distracoes.includes(d.nome);
+              return (
+                <button
+                  key={d.nome}
+                  type="button"
+                  aria-pressed={ligada}
+                  onClick={() => setDistracoes((lista) => (ligada ? lista.filter((n) => n !== d.nome) : [...lista, d.nome]))}
+                  className={`rounded-full px-2 py-0.5 text-[11px] ${ligada ? "bg-destaque text-white" : "bg-painel-2 text-suave hover:text-texto"}`}
+                >
+                  {d.nome}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            value={outraDistracao}
+            onChange={(evento) => setOutraDistracao(evento.target.value)}
+            maxLength={120}
+            placeholder="Outras, em inglês (ex.: ladder, backpack)"
+            className="rounded border border-borda bg-painel-2 px-2 py-1 text-xs"
+            aria-label="Outras distrações"
+          />
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              className={botao}
+              disabled={Boolean(ocupado) || !consultasDe(distracoes, outraDistracao).length}
+              title="Acha essas coisas longe da pessoa e refaz o fundo atrás delas"
+              onClick={() => {
+                const consultas = consultasDe(distracoes, outraDistracao);
+                void fazer("Apagando as distrações", emTodas((foto) => ({ ...edicaoParaEnviar(foto.edicao), distracoes: { consultas } })), `Procurando distrações em ${nomeDosAlvos}.`);
+              }}
+            >
+              Apagar distrações
+            </button>
+            <button
+              type="button"
+              className={botao}
+              disabled={Boolean(ocupado) || !prontas.some((foto) => foto.edicao?.distracoes)}
+              onClick={() => void fazer("Devolvendo", emTodas((foto) => ({ ...edicaoParaEnviar(foto.edicao), distracoes: null })), "Distrações de volta.")}
+            >
+              Devolver
+            </button>
+          </div>
+          {achadas ? <p className="text-[11px] text-suave">{achadas.length ? `Nesta foto: ${achadas.map((a) => DISTRACOES_PRONTAS.find((d) => d.consulta === a.consulta)?.nome ?? a.consulta).join(", ")}.` : "Nesta foto, nenhuma distração achada."}</p> : null}
+        </div>
+      </details>
 
       {referencia && outras.length ? (
         <div className="grid grid-cols-2 gap-1.5">

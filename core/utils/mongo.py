@@ -60,6 +60,8 @@ INDICES = {
     ],
     "albuns": [
         ([("organizacao_id", 1), ("atualizado_em", -1)], {}),
+        ([("galeria.token_hash", 1)], {"sparse": True}),
+        ([("monitorar.proxima_volta", 1)], {"sparse": True}),
     ],
     "fotos_medidas": [
         ([("midia_id", 1)], {"unique": True}),

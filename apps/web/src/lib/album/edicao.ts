@@ -19,6 +19,20 @@ export type EdicaoDaFoto = {
   auto?: { endireitar?: boolean; proporcao?: Proporcao | null } | null;
   /** O retoque de retrato (lib/album/retoque.ts), antes da cor. */
   retoque?: Retoque | null;
+  /** O fundo novo atrás da pessoa (core/utils/fundo_da_foto.py), depois do retoque e antes da cor. */
+  fundo?: FundoDaFoto | null;
+  /** O ruído tirado, de 0 a 100. */
+  ruido?: number;
+  /** As distrações apagadas: as consultas (em inglês) e, depois do worker, as achadas. */
+  distracoes?: { consultas: string[]; achadas?: { caixa: number[]; nota: number; consulta: string }[] | null } | null;
+};
+
+export type FundoDaFoto = {
+  tipo: "cor" | "degrade" | "desfoque" | "imagem";
+  cor?: string;
+  desfoque?: number;
+  midia_id?: string | null;
+  sombra?: { opacidade: number; desfoque: number; distancia: number; direcao: number } | null;
 };
 
 /** Como o servidor guarda: a versão (sobe a cada mudança), a última desenhada e o tamanho da cópia leve editada. */
@@ -44,6 +58,9 @@ export function edicaoParaEnviar(edicao: EdicaoGuardada | EdicaoDaFoto | null | 
   if (edicao.recorte) saida.recorte = edicao.recorte;
   if (edicao.auto) saida.auto = edicao.auto;
   if (edicao.retoque && !retoqueVazio(edicao.retoque)) saida.retoque = edicao.retoque;
+  if (edicao.fundo) saida.fundo = edicao.fundo;
+  if (edicao.ruido) saida.ruido = edicao.ruido;
+  if (edicao.distracoes) saida.distracoes = { consultas: edicao.distracoes.consultas };
   return saida;
 }
 
@@ -57,7 +74,7 @@ export function comCor(edicao: EdicaoGuardada | EdicaoDaFoto | null | undefined,
 export function semNada(edicao: EdicaoDaFoto): boolean {
   const cor = edicao.cor ?? {};
   const corNeutra = Object.entries(cor).every(([chave, valor]) => (chave === "intensidade" ? true : !valor));
-  return corNeutra && !edicao.igualar && !edicao.giro && !edicao.recorte && !edicao.auto && retoqueVazio(edicao.retoque);
+  return corNeutra && !edicao.igualar && !edicao.giro && !edicao.recorte && !edicao.auto && retoqueVazio(edicao.retoque) && !edicao.fundo && !edicao.ruido && !edicao.distracoes;
 }
 
 type FotoComEdicao = { midia_id: string; largura: number | null; altura: number | null; edicao?: EdicaoGuardada | null };

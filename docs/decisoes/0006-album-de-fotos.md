@@ -116,8 +116,10 @@ documento é o plano (as partes, com a caixa marcada quando cada uma estiver pro
 - [x] 16.8 Retoque de retrato: o mapa do rosto e do corpo e os controles (pele, manchas, sardas, rugas, olheiras,
   olhos, dentes, brilho, uniformizar e contornar, pescoço, roupa), por pessoa, com o pincel de incluir e excluir,
   predefinições e lote.
-- [ ] 16.9 Mais IA: achar e apagar distrações (um detector aberto de vocabulário livre com o MobileSAM e o LaMa,
-  protegendo a pessoa), troca de fundo com sombra em lote e redução de ruído com IA (SCUNet ou NAFNet).
-- [ ] 16.10 Saída: exportar as escolhidas com subpastas, nomes, divisão por nota, cor ou categoria, tamanho máximo do
+- [x] 16.9 Mais IA: achar e apagar distrações (um detector aberto de vocabulário livre com o MobileSAM e o LaMa,
+  protegendo a pessoa), troca de fundo com sombra em lote e redução de ruído com IA (SCUNet ou NAFNet). O detector é o
+  OWL-ViT (Apache-2.0); o ruído ficou no Non-local Means do OpenCV, porque o NAFNet passava de 260 MB e era pesado
+  demais para lote na CPU (fica para o dono decidir se vale pôr na placa de vídeo).
+- [x] 16.10 Saída: exportar as escolhidas com subpastas, nomes, divisão por nota, cor ou categoria, tamanho máximo do
   arquivo e marca d'água (texto ou o logo do kit, com predefinições); o XMP ao lado do original; a galeria do cliente
   pelo link de aprovação; e a pasta monitorada que aplica uma ação do espaço.

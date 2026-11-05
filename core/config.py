@@ -65,6 +65,8 @@ MODELO_EXPRESSOES = Path(os.environ.get("MODELO_EXPRESSOES", "/app/modelos/rosto
 MODELO_VETOR_DA_FOTO = Path(os.environ.get("MODELO_VETOR_DA_FOTO", "/app/modelos/dinov2_small.onnx"))
 # SFace (OpenCV Zoo, Apache-2.0): o vetor de cada rosto, para juntar as fotos da mesma pessoa
 MODELO_PESSOA = Path(os.environ.get("MODELO_PESSOA", "/app/modelos/sface.onnx"))
+# OWL-ViT base (Apache-2.0, ONNX quantizado), com o tokenizer.json na mesma pasta: as distrações das fotos pelo texto
+MODELO_DISTRACOES = Path(os.environ.get("MODELO_DISTRACOES", "/app/modelos/owlvit/model.onnx"))
 MODELO_RASTREIO = Path(os.environ.get("MODELO_RASTREIO", "/app/modelos/vittrack.onnx"))
 # MODNet (recorte de retrato) para recortar o fundo do vídeo
 MODELO_RECORTE = Path(os.environ.get("MODELO_RECORTE", "/app/modelos/modnet.onnx"))

@@ -31,6 +31,8 @@ TAREFAS = {
     # O estilo pessoal: aprender com as fotos editadas e aplicar nas outras (onda 16.7)
     "ensinar_estilo": RECURSO_CPU,
     "aplicar_estilo_pessoal": RECURSO_CPU,
+    # As fotos escolhidas do álbum num ZIP, com a edição, a marca d'água e o XMP (onda 16.10)
+    "exportar_album": RECURSO_CPU,
     "renderizacao": RECURSO_CPU,
     "transcricao": RECURSO_GPU,
     "geracao_video": RECURSO_GPU,

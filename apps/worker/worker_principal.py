@@ -33,6 +33,7 @@ from core.utils.fila import (
     renovar_lease,
 )
 from core.utils.mongo import agora, conectar, criar_indices
+from core.utils.pasta_monitorada import laco_das_pastas
 from worker.tarefas import REGISTRO
 
 # -----------------------------------------------
@@ -221,6 +222,9 @@ def main():
     # montando não segura a volta das esteiras
     if "montagem" in recursos and not args.agora:
         threading.Thread(target=laco_das_automacoes, args=(db, _parar), daemon=True).start()
+    # As pastas monitoradas dos álbuns andam no worker de CPU, onde a pasta das fotos está montada
+    if "cpu" in recursos and not args.agora:
+        threading.Thread(target=laco_das_pastas, args=(db, _parar), daemon=True).start()
     executar_loop(db, tipos, worker_id, somente_disponiveis=args.agora)
     _parar.set()
     try:

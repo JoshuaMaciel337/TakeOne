@@ -13,6 +13,7 @@
 #      escolhidas com variedade (as que menos se parecem entre si).
 # -----------------------------------------------
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import numpy as np
 
@@ -240,3 +241,39 @@ def _diversas(fotos: list[Foto], nota: dict[str, int], quantas: int) -> list[Fot
 # A nota (estrelas) e a marcação de cada categoria quando a escolha é aplicada no álbum
 ESTRELAS = {"destaque": 5, "escolhida": 4, "talvez": 3, "parecida": 2, "desfocada": 1, "olhos_fechados": 1}
 MARCACAO = {"destaque": "escolhida", "escolhida": "escolhida"}
+
+
+def hora_do_exif(exif: dict | None) -> float | None:
+    """A hora da foto em segundos (o EXIF não tem fuso: só a diferença entre as fotos importa)."""
+    try:
+        return datetime.fromisoformat(exif["data"]).timestamp() if exif and exif.get("data") else None
+    except ValueError:
+        return None
+
+
+def escolha_no_album(registros: dict, midias: dict, medidas: dict, opcoes: dict, genero: str,
+                     momento) -> tuple[list[tuple], dict[str, int]]:
+    """A escolha das melhores pronta para gravar, a partir do que o banco tem (a API e a pasta monitorada usam a
+    mesma): `registros` são as fotos do álbum, `midias` as prontas (com o exif e o envio) e `medidas` as medidas
+    delas, todos pelo id da mídia. Devolve (midia_id, campos) de cada foto medida e quantas há em cada categoria."""
+    ordem = {mid: i for i, mid in enumerate(sorted(midias, key=lambda m: (midias[m].get("enviado_em") or momento, m)))}
+    fotos = [Foto(str(mid), hora_do_exif(midias[mid].get("exif")), ordem[mid], med,
+                  np.frombuffer(med["vetor"], np.float16).astype(np.float32))
+             for mid, med in medidas.items() if mid in midias]
+    resultado = escolher(fotos, Opcoes(quantas=opcoes.get("quantas", "padrao"), alvo=opcoes.get("alvo", 0),
+                                       rigor=opcoes.get("rigor", "moderado"),
+                                       olhos_fechados=opcoes.get("olhos_fechados", True),
+                                       grupos=opcoes.get("grupos", "padrao"), genero=genero))
+    pelo_texto = {str(mid): mid for mid in midias}
+    gravacoes, contagem = [], {}
+    for foto in fotos:
+        mid = pelo_texto[foto.id]
+        categoria = resultado.categoria[foto.id]
+        contagem[categoria] = contagem.get(categoria, 0) + 1
+        campos = {"categoria": categoria, "grupo": resultado.grupo[foto.id], "cena": resultado.cena[foto.id],
+                  "nota_ia": resultado.nota[foto.id], "motivo": resultado.motivo.get(foto.id), "atualizado_em": momento}
+        feita_a_mao = (registros.get(mid) or {}).get("origem") == "pessoa"
+        if opcoes.get("aplicar", True) and not (opcoes.get("manter_feitas_a_mao", True) and feita_a_mao):
+            campos.update({"nota": ESTRELAS[categoria], "marcacao": MARCACAO.get(categoria), "origem": "ia"})
+        gravacoes.append((mid, campos))
+    return gravacoes, contagem

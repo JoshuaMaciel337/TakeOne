@@ -107,6 +107,11 @@ ADD --checksum=sha256:0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087
     https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx \
     /app/modelos/sface.onnx
 RUN chmod 644 /app/modelos/sface.onnx
+# OWL-ViT base patch32 (Apache-2.0; a exportação ONNX quantizada do Xenova numa revisão fixa) e o tokenizador do
+# CLIP: as distrações das fotos do álbum pelo texto
+ADD --checksum=sha256:06af49bd5db977936bcddad2b45d0031072673517579d15b8cb42bf015a94156     https://huggingface.co/Xenova/owlvit-base-patch32/resolve/b75f4e52949639c3bb0b96546ea4149482f6e7ef/onnx/model_quantized.onnx     /app/modelos/owlvit/model.onnx
+ADD --checksum=sha256:50b24e94079fb11cb1503f65fef0ed08044186a1cd118c79683991554d9a5b23     https://huggingface.co/Xenova/owlvit-base-patch32/resolve/b75f4e52949639c3bb0b96546ea4149482f6e7ef/tokenizer.json     /app/modelos/owlvit/tokenizer.json
+RUN chmod -R a+rX /app/modelos/owlvit
 
 COPY core /app/core
 COPY apps/worker /app/worker

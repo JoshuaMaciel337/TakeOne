@@ -33,7 +33,10 @@ def executar_importar_pasta(db, job: dict, reportar: Callable[[int, str], None])
     if not fotos:
         raise ErroDefinitivo("A pasta não tem fotos (JPG, PNG, HEIC, RAW...).")
     ja = {m["externo"] for m in db.midias.find({"album_id": album_id, "externo": {"$exists": True}}, {"externo": 1})}
-    novas = [foto for foto in fotos if relativo_de(foto) not in ja]
+    # A pasta monitorada só traz os arquivos parados (um cartão ainda descarregando fica para a volta seguinte)
+    parados_ate = entrada.get("parados_ate")
+    novas = [foto for foto in fotos if relativo_de(foto) not in ja
+             and (parados_ate is None or foto.stat().st_mtime <= parados_ate)]
     total = db.album_fotos.count_documents({"album_id": album_id})
     if total + len(novas) > FOTOS_POR_ALBUM:
         limite = f"{FOTOS_POR_ALBUM:,}".replace(",", ".")

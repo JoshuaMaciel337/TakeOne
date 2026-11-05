@@ -32,6 +32,7 @@ from api.rotas import (
     exportacoes,
     fontes,
     foto_ia,
+    galeria,
     intercambio,
     jobs,
     legendas_animadas,
@@ -152,6 +153,7 @@ app.include_router(eventos.router)
 app.include_router(uploads.router)
 app.include_router(midias.router)
 app.include_router(albuns.router)
+app.include_router(galeria.router)
 app.include_router(estilos_pessoais.router)
 app.include_router(projetos.router)
 app.include_router(modelos.router)

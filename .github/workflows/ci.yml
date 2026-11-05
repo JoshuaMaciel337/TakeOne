@@ -56,6 +56,10 @@ jobs:
           curl -sSL -o "$RUNNER_TEMP/sface.onnx" https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
           echo "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79  $RUNNER_TEMP/sface.onnx" | sha256sum -c -
           echo "MODELO_PESSOA=$RUNNER_TEMP/sface.onnx" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/owlvit"
+          curl -sSL -o "$RUNNER_TEMP/owlvit/tokenizer.json" https://huggingface.co/Xenova/owlvit-base-patch32/resolve/b75f4e52949639c3bb0b96546ea4149482f6e7ef/tokenizer.json
+          echo "50b24e94079fb11cb1503f65fef0ed08044186a1cd118c79683991554d9a5b23  $RUNNER_TEMP/owlvit/tokenizer.json" | sha256sum -c -
+          echo "MODELO_DISTRACOES=$RUNNER_TEMP/owlvit/model.onnx" >> "$GITHUB_ENV"
       - name: Baixar o rastreador de objetos (testes do texto que segue um objeto)
         run: |
           curl -sSL -o "$RUNNER_TEMP/vittrack.onnx" https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/object_tracking_vittrack/object_tracking_vittrack_2023sep.onnx

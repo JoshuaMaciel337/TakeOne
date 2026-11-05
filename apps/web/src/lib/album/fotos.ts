@@ -37,8 +37,37 @@ export type Album = {
   escolhidas: number;
   capa_midia_id: string | null;
   escolha_opcoes?: Record<string, unknown> | null;
+  /** A galeria do cliente (sem o link, que só aparece ao gerar). */
+  galeria?: GaleriaDoAlbum | null;
+  /** A pasta monitorada. */
+  monitorar?: PastaMonitorada | null;
   criado_em: string;
   atualizado_em: string;
+};
+
+export type GaleriaDoAlbum = {
+  status: "aberta" | "enviada";
+  para: string;
+  fotos: number;
+  favoritas: number;
+  expira_em: string;
+  pedida_em: string;
+  nome: string | null;
+  comentario: string | null;
+  enviada_em: string | null;
+};
+
+export type PastaMonitorada = {
+  caminho: string;
+  subpastas: boolean;
+  analisar: boolean;
+  escolher: boolean;
+  estilo_pessoal_id: string | null;
+  intensidade: number;
+  etapa: "olhando" | "importando" | "preparando" | "medindo";
+  ultima_volta: string | null;
+  ultimas_novas: number;
+  erro: string | null;
 };
 
 export type Exif = { data?: string; camera?: string; lente?: string; iso?: number; abertura?: number; exposicao?: number; focal?: number };
@@ -91,6 +120,8 @@ export type FotoDoAlbum = {
   pessoas?: number[];
   /** A edição no álbum (lib/album/edicao.ts), desenhada pelo worker. */
   edicao?: EdicaoGuardada | null;
+  /** O que o cliente marcou na galeria. */
+  cliente?: { favorita: boolean; comentario: string } | null;
 };
 
 /** Uma pessoa do álbum: o rosto maior dela representa (a caixa em frações daquela foto). */
@@ -136,6 +167,8 @@ export type Filtro = {
   /** As pessoas (vazio: todas as fotos); "alguma": a foto tem pelo menos uma delas, "todas": tem todas juntas. */
   pessoas: number[];
   pessoasModo: "alguma" | "todas";
+  /** Só as favoritas do cliente na galeria. */
+  doCliente?: boolean;
 };
 
 export const FILTRO_VAZIO: Filtro = { busca: "", nota: 0, comparacao: "ao_menos", cores: [], marcacao: "todas", pasta: null, categorias: [], pessoas: [], pessoasModo: "alguma" };
@@ -148,7 +181,8 @@ export function filtroAtivo(filtro: Filtro): boolean {
     filtro.marcacao !== "todas" ||
     filtro.pasta !== null ||
     filtro.categorias.length > 0 ||
-    filtro.pessoas.length > 0
+    filtro.pessoas.length > 0 ||
+    Boolean(filtro.doCliente)
   );
 }
 
@@ -167,6 +201,7 @@ export function filtrarFotos(fotos: FotoDoAlbum[], filtro: Filtro): FotoDoAlbum[
     if (filtro.marcacao === "sem" && foto.marcacao) return false;
     if (filtro.marcacao !== "todas" && filtro.marcacao !== "sem" && foto.marcacao !== filtro.marcacao) return false;
     if (filtro.pasta !== null && foto.pasta !== filtro.pasta) return false;
+    if (filtro.doCliente && !foto.cliente?.favorita) return false;
     if (filtro.categorias.length && (!foto.categoria || !filtro.categorias.includes(foto.categoria))) return false;
     if (filtro.pessoas.length) {
       const nela = foto.pessoas ?? [];

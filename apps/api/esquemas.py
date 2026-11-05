@@ -3057,6 +3057,10 @@ class AlbumSaida(BaseModel):
     escolhidas: int = 0
     # A foto da capa do cartão: a primeira pronta
     capa_midia_id: str | None = None
+    # A galeria do cliente (core/modelos/galeria.py), sem o token: a situação, quantas fotos e quantas favoritas
+    galeria: dict | None = None
+    # A pasta monitorada (core/utils/pasta_monitorada.py): o caminho, a ação e a última volta
+    monitorar: dict | None = None
     criado_em: datetime
     atualizado_em: datetime
 
@@ -3091,6 +3095,8 @@ class FotoDoAlbumSaida(BaseModel):
     pessoas: list[int] = []
     # A edição da foto no álbum (core/utils/edicao_de_foto.py), com a versão e a última desenhada (gerada)
     edicao: dict | None = None
+    # O que o cliente marcou na galeria (favorita e comentário)
+    cliente: dict | None = None
 
 
 class EstatisticasDaCorEntrada(BaseModel):
@@ -3143,6 +3149,35 @@ class EstiloDaFotoEntrada(BaseModel):
     melhorar: bool = True
     gosto: GostoEntrada = Field(default_factory=GostoEntrada)
     controles: dict[ControleDoEstilo, ModoDoControleEntrada] = Field(default_factory=dict)
+
+
+class MarcaDaguaEntrada(BaseModel):
+    """A marca d'água: um texto ou o logo (uma imagem da biblioteca), no canto, com o tamanho em fração do lado menor
+    (a altura do texto ou a largura do logo) e a opacidade."""
+    tipo: Literal["texto", "logo"]
+    texto: str = Field(default="", max_length=60)
+    midia_id: IdDeMidia | None = None
+    canto: Literal["baixo-direita", "baixo-esquerda", "cima-direita", "cima-esquerda", "meio"] = "baixo-direita"
+    tamanho: float = Field(default=0.04, ge=0.01, le=0.5)
+    opacidade: float = Field(default=0.6, ge=0.05, le=1)
+
+
+class OpcoesDaSaidaEntrada(BaseModel):
+    """Como exportar as fotos do álbum (core/modelos/saida_do_album.py)."""
+    formato: Literal["jpg", "png", "original"] = "jpg"
+    qualidade: int = Field(default=92, ge=50, le=100)
+    lado_maximo: int | None = Field(default=None, ge=256, le=20_000)
+    tamanho_maximo_kb: int | None = Field(default=None, ge=50, le=100_000)
+    padrao: str = Field(default="{original}", max_length=80)
+    divisao: Literal["nenhuma", "nota", "cor", "categoria", "pasta"] = "nenhuma"
+    xmp: bool = False
+    com_edicao: bool = True
+    marca: MarcaDaguaEntrada | None = None
+
+
+class ExportarAlbumEntrada(BaseModel):
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=20_000)
+    opcoes: OpcoesDaSaidaEntrada = Field(default_factory=OpcoesDaSaidaEntrada)
 
 
 class EstiloPessoalEntrada(BaseModel):
@@ -3203,9 +3238,45 @@ class RetoqueEntrada(BaseModel):
     pincel: list[TracoDoRetoqueEntrada] = Field(default_factory=list, max_length=200)
 
 
+class SombraDoFundoEntrada(BaseModel):
+    """A sombra da pessoa no fundo novo: opacidade, desfoque e distância em fração do lado menor, direção em graus."""
+    opacidade: float = Field(default=0.4, ge=0, le=1)
+    desfoque: float = Field(default=0.04, ge=0, le=0.2)
+    distancia: float = Field(default=0.03, ge=0, le=0.3)
+    direcao: float = Field(default=135, ge=0, le=360)
+
+
+class FundoDaFotoEntrada(BaseModel):
+    """O fundo novo (core/utils/fundo_da_foto.py): cor lisa, degradê, a foto desfocada ou outra foto."""
+    tipo: Literal["cor", "degrade", "desfoque", "imagem"]
+    cor: str = Field(default="#f2f2f2", pattern=r"^#[0-9a-fA-F]{6}$")
+    desfoque: float = Field(default=0.5, ge=0, le=1)
+    midia_id: IdDeMidia | None = None
+    sombra: SombraDoFundoEntrada | None = None
+
+
+class DistracoesEntrada(BaseModel):
+    """O que apagar (core/utils/distracoes.py): as consultas em inglês, a língua do detector. As achadas são do
+    worker."""
+    consultas: list[str] = Field(min_length=1, max_length=12)
+    achadas: list[dict] | None = None
+
+    @field_validator("consultas")
+    @classmethod
+    def _consultas(cls, consultas: list[str]) -> list[str]:
+        limpas = [" ".join(c.split())[:40] for c in consultas if c.strip()]
+        if not limpas:
+            raise ValueError("Diga o que apagar.")
+        return limpas
+
+
 class EdicaoDaFotoEntrada(BaseModel):
     cor: CorEntrada | None = None
     retoque: RetoqueEntrada | None = None
+    fundo: FundoDaFotoEntrada | None = None
+    # O ruído tirado (de 0 a 100) e as distrações apagadas (onda 16.9)
+    ruido: float = Field(default=0, ge=0, le=100)
+    distracoes: DistracoesEntrada | None = None
     igualar: IgualarEntrada | None = None
     giro: float = Field(default=0, ge=-45, le=45)
     recorte: RecorteDaFotoEntrada | None = None
@@ -3303,3 +3374,26 @@ class EscolhaSaida(BaseModel):
     """Quantas fotos ficaram em cada categoria, e quantas não entraram por falta de análise."""
     categorias: dict[str, int]
     sem_analise: int
+
+
+class GaleriaEntrada(BaseModel):
+    """A galeria do cliente (core/modelos/galeria.py): as fotos, para quem e um recado."""
+    midia_ids: list[IdDeMidia] = Field(min_length=1, max_length=2000)
+    para: str = Field(default="", max_length=60)
+    mensagem: str = Field(default="", max_length=500)
+
+
+class GaleriaCriadaSaida(BaseModel):
+    token: str
+    expira_em: datetime
+
+
+class MonitorarEntrada(BaseModel):
+    """A pasta monitorada do álbum (core/utils/pasta_monitorada.py): de onde vêm as fotos novas e o que fazer com
+    elas."""
+    caminho: str = Field(default="", max_length=1000)
+    subpastas: bool = True
+    analisar: bool = True
+    escolher: bool = True
+    estilo_pessoal_id: str | None = Field(default=None, min_length=24, max_length=24)
+    intensidade: float = Field(default=1.0, ge=0, le=1.5)
